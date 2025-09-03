@@ -1,38 +1,114 @@
-import Home from './components/Home';
-import DoctorRegistration from './components/DoctorRegistration';
-import DoctorApp from './components/DoctorApp'
-import './App.css'
-import { BrowserRouter as Router , Routes ,Route } from 'react-router-dom';
-import Contact from './components/Contact';
-import ScrollToTop from './components/ScrollToTop';
-import PrivacyPolicy from './components/PrivacyPolicy';
-import TearmsCondition from './components/TearmsCondition';
-import Cancellation from './components/Cancelation';
-import ShippingPolicy from './components/ShippingPolicy';
-import MedicalDataConsent from './components/MedicalDataConsent';
-import CookiePolicy from './components/CookiePolicy';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import GTMRouteListener from './GTMRouteListener'
+import Home from './pages/Home';
+import Register from './pages/Register';
+import PetInfo from './pages/PetInfo';
+import Dashboard from './pages/Dashboard';
+import { Toaster } from 'react-hot-toast';
+import Login from './pages/Login';
+import ProtectedRoute from './ProtectedRoute';
+import ChatInterface from './pages/ChatInterface';
+import ForgotPassword from './pages/ForgotPassword';
+import AddPet from './pages/AddPet';
+import EditPet from './pages/EditPet';
+import TokenLogin from './components/TokenLogin';
+import Videocall from './pages/VideoCall';
 
 function App() {
 
-
   return (
-    <div>
-      <Router basename="/frontend/files">
-         <ScrollToTop /> 
+    <Router>
+      <GTMRouteListener />
+      <Toaster position="bottom-right" reverseOrder={false} />
+
+      <div className="bg-white text-black">
+
         <Routes>
-          <Route path='/' element={<Home/>}/>
-          <Route path='/contact us' element={<Contact/>}/>
-          <Route path='/doctor registration form' element={<DoctorRegistration/>}/>
-          <Route path='/doctor demo' element={<DoctorApp/>}/>
-          <Route path='/privacypolicy' element={<PrivacyPolicy/>}/>
-          <Route path='/tearms' element={<TearmsCondition/>}/>
-          <Route path='/Cancellation_Refund_Policy' element={<Cancellation/>}/>
-          <Route path='/shipping_policy' element={<ShippingPolicy/>}/>
-          <Route path='/MedicalDataConsent' element={<MedicalDataConsent/>}/>
-          <Route path='/Cookie_policy' element={<CookiePolicy/>}/>
+          {/* Home hamesha accessible hai */}
+
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Public Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/token-login/:token" element={<TokenLogin />} />
+
+          {/* Protected Routes */}
+          <Route
+            path="/pet-info"
+            element={
+              <ProtectedRoute>
+                <PetInfo />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user/pets"
+            element={
+              <ProtectedRoute>
+                <PetInfo />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user/pets/add"
+            element={
+              <ProtectedRoute>
+                <AddPet />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user/pets/edit/:id"
+            element={
+              <ProtectedRoute>
+                <EditPet />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/chat/:chat_room_token"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/video-call"
+            element={
+              <ProtectedRoute>
+                <Videocall />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chats/:chatToken"
+            element={
+              <ProtectedRoute>
+                <ChatInterface />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-      </Router>
-    </div>
+      </div>
+    </Router>
   );
 }
 

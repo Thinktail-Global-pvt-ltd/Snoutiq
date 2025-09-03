@@ -1,140 +1,301 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import logo from "../assets/images/logo-dark.png";
+import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
+import {
+    Bars3Icon,
+    XMarkIcon,
+    ChatBubbleLeftRightIcon,
+    UserIcon,
+    ArrowRightOnRectangleIcon,
+    HomeIcon,
+    HeartIcon
+} from '@heroicons/react/24/outline';
+import Sidebar from './Sidebar';
+import RightSidebar from './RightSidebar';
+import logo from '../assets/images/logo.png';
+import axiosClient from '../axios';
+import { AuthContext } from '../auth/AuthContext';
 
 const Header = () => {
-  const [isOpen, setIsOpen] = useState(false);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState(false);
+    const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(false);
+    const [stats, setStats] = useState({
+        totalUser: 'Loading',
+        totalQuery: 'Loading'
+    });
 
-  return (
-    <nav className="bg-white shadow-md fixed top-0 left-0 right-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
-          {/* Logo / Brand */}
-          <div className="cursor-pointer z-60">
-            <img
-              src={logo}
-              className="h-8 cursor-pointer transition-transform hover:scale-105"
-              alt="Logo"
-            />
-          </div>
+    const navigate = useNavigate();
+    const { user } = useContext(AuthContext);
 
-          {/* Center Offers Slider */}
-{/* Center Offers Slider */}
-<div className="hidden md:flex justify-center mx-6 overflow-hidden relative w-[500px]">
-  {/* Outer wrapper */}
-  <div className="flex space-x-12 text-sm font-medium min-w-max animate-marquee">
-    {/* First copy */}
-    <span className="flex items-center space-x-2 text-blue-600">
-      <span>🎁</span>
-      <span>6 Months Premium FREE for Founders!</span>
-    </span>
-    <span className="flex items-center space-x-2 text-pink-600">
-      <span>💎</span>
-      <span>Lifetime Founder's Rate Locked</span>
-    </span>
-    <span className="flex items-center space-x-2 text-green-600">
-      <span>🔥</span>
-      <span>Exclusive Early Access to New Features</span>
-    </span>
-    <span className="flex items-center space-x-2 text-purple-600">
-      <span>🚀</span>
-      <span>Be Part of the Growth Journey</span>
-    </span>
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await axiosClient.get("/ai-stats");
+                setStats(res.data);
+            } catch (error) {
+                console.error("Error:", error);
+            }
+        })();
+    }, []);
 
-    {/* Duplicate copy for seamless loop */}
-    <span className="flex items-center space-x-2 text-blue-600">
-      <span>🎁</span>
-      <span>6 Months Premium FREE for Founders!</span>
-    </span>
-    <span className="flex items-center space-x-2 text-pink-600">
-      <span>💎</span>
-      <span>Lifetime Founder's Rate Locked</span>
-    </span>
-    <span className="flex items-center space-x-2 text-green-600">
-      <span>🔥</span>
-      <span>Exclusive Early Access to New Features</span>
-    </span>
-    <span className="flex items-center space-x-2 text-purple-600">
-      <span>🚀</span>
-      <span>Be Part of the Growth Journey</span>
-    </span>
-  </div>
-</div>
+    const handleLogin = () => {
+        navigate('/login');
+    };
+    const handleRegister = () => {
+        navigate('/register');
+    };
+    const handleLogout = () => {
+        localStorage.clear();
+        navigate('/');
+        window.location.reload();
+    };
+
+    const toggleDropdown = () => {
+        setIsDropdownOpen(!isDropdownOpen);
+    };
+
+    const closeLeftDrawer = () => setIsLeftDrawerOpen(false);
+    const closeRightDrawer = () => setIsRightDrawerOpen(false);
 
 
+    const MobileDrawers = () => (
+        <>
+            {/* Left Drawer - Chat History */}
 
-          {/* Desktop Menu */}
-          <div className="hidden md:flex space-x-6">
-            <Link
-              to="/"
-              className="text-gray-700 hover:text-blue-600 font-medium"
-            >
-              Home
-            </Link>
-            <Link
-              to="/contact us"
-              className="text-gray-700 hover:text-blue-600 font-medium"
-            >
-              Contact US
-            </Link>
-          </div>
+            <Transition.Root show={isLeftDrawerOpen} as={Fragment}>
+                <Dialog as="div" className="relative z-50" onClose={setIsLeftDrawerOpen}>
+                    <Transition.Child
+                        as={Fragment}
+                        enter="ease-in-out duration-300"
+                        enterFrom="opacity-0"
+                        enterTo="opacity-100"
+                        leave="ease-in-out duration-300"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                    >
+                        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 transition-opacity" />
+                    </Transition.Child>
 
-          {/* Mobile Menu Button */}
-          <div className="md:hidden">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="text-gray-700 focus:outline-none"
-            >
-              {/* Hamburger icon */}
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                {isOpen ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                )}
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
+                    <div className="fixed inset-0 overflow-hidden">
+                        <div className="absolute inset-0 overflow-hidden">
+                            <div className="pointer-events-none fixed inset-y-0 left-0 flex max-w-full pr-10">
+                                <Transition.Child
+                                    as={Fragment}
+                                    enter="transform transition ease-in-out duration-300"
+                                    enterFrom="-translate-x-full"
+                                    enterTo="translate-x-0"
+                                    leave="transform transition ease-in-out duration-300"
+                                    leaveFrom="translate-x-0"
+                                    leaveTo="-translate-x-full"
+                                >
+                                    <Dialog.Panel className="pointer-events-auto w-screen max-w-md">
 
-      {/* Mobile Drawer */}
-      {isOpen && (
-        <div className="md:hidden bg-white shadow-lg">
-          <div className="flex flex-col px-4 py-3 space-y-3">
-            <Link
-              to="/"
-              onClick={() => setIsOpen(false)}
-              className="text-gray-700 hover:text-blue-600 font-medium"
-            >
-              Home
-            </Link>
-            <Link
-              to="/contact us"
-              className="text-gray-700 hover:text-blue-600 font-medium"
-            >
-              Contact US
-            </Link>
-          </div>
-        </div>
-      )}
-    </nav>
-  );
+                                        <div className="flex h-full flex-col bg-white shadow-xl">
+                                            {user ? <>
+                                                <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                                                    <Dialog.Title className="text-lg font-semibold">
+                                                        Chat History
+                                                    </Dialog.Title>
+                                                    <button
+                                                        type="button"
+                                                        className="rounded-md text-white hover:text-gray-200 transition-colors"
+                                                        onClick={() => setIsLeftDrawerOpen(false)}
+                                                    >
+                                                        <XMarkIcon className="w-6 h-6" />
+                                                    </button>
+                                                </div>
+
+                                                <div className="flex-1 overflow-y-auto">
+                                                    <div className="px-4 py-4">
+                                                        <Sidebar isMobile={true} onItemClick={closeLeftDrawer} />
+                                                    </div>
+
+                                                </div>
+                                            </>
+                                                : ""}
+                                        </div>
+
+                                    </Dialog.Panel>
+                                </Transition.Child>
+                            </div>
+                        </div>
+                    </div>
+                </Dialog>
+            </Transition.Root>
+
+
+        </>
+    );
+
+    return (
+        <>
+            <nav className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 shadow-sm">
+                {/* Desktop Navbar */}
+                <div className="hidden md:flex items-center justify-between px-6 py-4 h-[70px]">
+                    {/* Logo and Brand */}
+                    <div className="flex items-center space-x-3">
+                        <img
+                            src={logo}
+                            alt="Snoutiq Logo"
+                            className="h-8 cursor-pointer transition-transform hover:scale-105"
+                            onClick={() => navigate(user ? '/dashboard' : '/')}
+                        />
+                    </div>
+
+                    {/* User Profile or Login Button */}
+                    <div className="flex items-center space-x-4 h-full">
+                        {/* Tail Talks Button */}
+                        {/* <a
+                            href="https://snoutiq.com/blog"
+                            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center h-12"
+                        >
+                            <div className="flex items-center space-x-2">
+                                <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                                <span>Tail Talks</span>
+                            </div>
+                        </a> */}
+
+                        {!user ? (
+                            <>
+                                <button
+                                    onClick={handleRegister}
+                                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center h-12"
+                                >
+                                    Register
+                                </button>
+                                <button
+                                    onClick={handleLogin}
+                                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center h-12"
+                                >
+                                    Login
+                                </button>
+                            </>
+                        ) : (
+                            <div className="relative">
+                                <div
+                                    className="bg-white rounded-lg px-4 py-3 flex items-center space-x-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
+                                    onClick={toggleDropdown}
+                                >
+                                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                                        <UserIcon className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <div className="text-sm font-semibold text-gray-800">{user.name}</div>
+                                        <div className="text-xs text-gray-500">Pet Owner</div>
+                                    </div>
+                                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                                {isDropdownOpen && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 border border-gray-200">
+                                        <button
+                                            onClick={() => navigate('/dashboard')}
+                                            className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                        >
+                                            <HomeIcon className="w-4 h-4 mr-2" />
+                                            Dashboard
+                                        </button>
+                                        <button
+                                            onClick={() => navigate('/pet-info')}
+                                            className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                        >
+                                            <HeartIcon className="w-4 h-4 mr-2" />
+                                            My Pets
+                                        </button>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                        >
+                                            <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
+                                            Logout
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Mobile Navbar */}
+                <div className="md:hidden">
+                    <div className="flex items-center justify-between px-4 py-3 h-[60px]">
+                        {/* Mobile Menu Button */}
+                        <button
+                            onClick={() => setIsLeftDrawerOpen(true)}
+                            className="p-2 rounded-lg bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                        >
+                            <Bars3Icon className="w-6 h-6 text-gray-700" />
+                        </button>
+
+                        {/* Mobile Logo and Title */}
+                        <div className="flex items-center space-x-2">
+                            <img
+                                src={logo}
+                                alt="Snoutiq Logo"
+                                className="h-6 cursor-pointer"
+                                onClick={() => navigate(user ? '/dashboard' : '/')}
+                            />
+                        </div>
+
+                        {/* Mobile User Profile or Login Button */}
+                        <div className="flex items-center">
+                            {!user ? (
+                                <button
+                                    onClick={handleLogin}
+                                    className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                                >
+                                    Login
+                                </button>
+                            ) : (
+                                <div className="relative">
+                                    <div
+                                        className="bg-white rounded-lg p-2 flex items-center shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
+                                        onClick={toggleDropdown}
+                                    >
+                                        <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                                            <UserIcon className="w-3 h-3 text-white" />
+                                        </div>
+                                    </div>
+                                    {isDropdownOpen && (
+                                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 border border-gray-200">
+                                            <button
+                                                onClick={() => navigate('/dashboard')}
+                                                className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                            >
+                                                <HomeIcon className="w-4 h-4 mr-2" />
+                                                Dashboard
+                                            </button>
+                                            <button
+                                                onClick={() => navigate('/pet-info')}
+                                                className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                            >
+                                                <HeartIcon className="w-4 h-4 mr-2" />
+                                                My Pets
+                                            </button>
+                                            <button
+                                                onClick={handleLogout}
+                                                className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                            >
+                                                <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
+                                                Logout
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            {/* Mobile Components */}
+            <MobileDrawers />
+        </>
+    );
 };
 
 export default Header;
