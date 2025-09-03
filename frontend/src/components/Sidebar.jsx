@@ -53,7 +53,7 @@ const Sidebar = ({ isMobile = false, onItemClick }) => {
 
     try {
       const res = await axios.get(
-        `https://snoutiq.com/backend/index.php/api/chat-rooms/new?user_id=${user.id}`,
+        `https://snoutiq.com/api/chat-rooms/new?user_id=${user.id}`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
 
@@ -103,7 +103,7 @@ const Sidebar = ({ isMobile = false, onItemClick }) => {
       if (!token) return;
 
       const response = await axios.get(
-        `https://snoutiq.com/backend/index.php/api/chat/listRooms?user_id=${user.id}`,
+        `https://snoutiq.com/api/chat/listRooms?user_id=${user.id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -135,7 +135,7 @@ const Sidebar = ({ isMobile = false, onItemClick }) => {
       const token = localStorage.getItem("token");
 
       await axios.delete(
-        `https://snoutiq.com/backend/index.php/api/chat-rooms/${chatRoomToken}`,
+        `https://snoutiq.com/api/chat-rooms/${chatRoomToken}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           data: { user_id: user.id }

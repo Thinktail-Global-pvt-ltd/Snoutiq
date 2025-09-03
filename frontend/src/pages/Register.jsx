@@ -131,7 +131,7 @@ const Register = () => {
 
     setIsLoading((prev) => ({ ...prev, email: true }));
     try {
-      const res = await axios.post('https://snoutiq.com/backend/index.php/api/auth/send-otp', {
+      const res = await axios.post('https://snoutiq.com/api/auth/send-otp', {
         type: 'email',
         value: formData.email,
         unique: 'yes',
@@ -164,7 +164,7 @@ const Register = () => {
 
   const verifyOtp = async () => {
     try {
-      const res = await axios.post('https://snoutiq.com/backend/index.php/api/auth/verify-otp', {
+      const res = await axios.post('https://snoutiq.com/api/auth/verify-otp', {
         token: emailOtpToken,
         otp: formData.emailOtp
       });
@@ -350,12 +350,12 @@ const Register = () => {
         submitData.append('pet_doc2', formData.petDoc2);
       }
 
-      await axios.post('https://snoutiq.com/backend/index.php/api/auth/register',
+      await axios.post('https://snoutiq.com/api/auth/register',
         submitData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      const res = await axios.post('https://snoutiq.com/backend/index.php/api/auth/login', {
+      const res = await axios.post('https://snoutiq.com/api/auth/login', {
         login: formData.email,
         password: formData.password,
       });
