@@ -135,7 +135,6 @@ const MessageBubble = memo(({ msg, index, onFeedback }) => {
                     <ActionButton tag={msg.classificationTag} />
                 )}
                 
-                {/* Timestamp */}
                 <div
                     className={`text-xs mt-2 ${msg.sender === "user"
                         ? "text-blue-200"
@@ -152,7 +151,6 @@ const MessageBubble = memo(({ msg, index, onFeedback }) => {
                         : ""}
                 </div>
 
-                {/* Feedback buttons */}
                 {msg.sender === "ai" && !msg.isError && (
                     <div className="mt-2 flex gap-2">
                         <button

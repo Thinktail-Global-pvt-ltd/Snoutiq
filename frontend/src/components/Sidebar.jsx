@@ -16,56 +16,109 @@ import OliverPic from "./../assets/pets/Oliver, 40 days, Faridabad.jpg";
 import ShadowPic from "./../assets/pets/Shadow, 1 Year, Mahabaleshwar.jpg";
 
 const Sidebar = ({ isMobile = false, onItemClick }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [history, setHistory] = useState([]);
   const [mainPet, setActivePet] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
+
+  const { user } = useContext(AuthContext);
+  const { chat_room_token } = useParams();
   const navigate = useNavigate();
-  const { user, chatRoomToken } = useContext(AuthContext);
-  console.log(user.id, chatRoomToken, 'ankit');
+
+  const [history, setHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // ✅ Fetch chat history
+  const fetchHistory = useCallback(async () => {
+    if (!user?.id) return;
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No token found");
+
+      const res = await axios.get(`/chat/history/${user.id}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.data?.history) {
+        setHistory(res.data.history);
+      }
+    } catch (err) {
+      console.error("Error fetching chat history:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  // ✅ Create new chat
+  const handleCreateNewChat = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No token found");
+
+      const res = await axios.post(
+        "/chat/create/",
+        { user_id: user.id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.data?.chat_room_token) {
+        const newChat = {
+          chat_room_token: res.data.chat_room_token,
+          last_message: "",
+        };
+        setHistory((prev) => [newChat, ...prev]); // ✅ update immediately
+        navigate(`/chat/${res.data.chat_room_token}`);
+      }
+    } catch (err) {
+      console.error("Error creating new chat:", err);
+      toast.error("Failed to create new chat");
+    }
+  };
+
+  // ✅ Delete chat
+  const handleDeleteChat = async (tokenToDelete) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No token found");
+
+      await axios.delete(`/chat/delete/${tokenToDelete}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setHistory((prev) =>
+        prev.filter((chat) => chat.chat_room_token !== tokenToDelete)
+      );
+
+      if (chat_room_token === tokenToDelete) {
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      console.error("Error deleting chat:", err);
+      toast.error("Failed to delete chat");
+    }
+  };
 
   // const handleNewChat = async () => {
+  //   if (!user || !user.id) return;
+
   //   try {
   //     const res = await axios.get(
-  //       `http://192.168.1.21:8000/api/chat-rooms/new?user_id=1`,
+  //       `https://snoutiq.com/backend/api/chat-rooms/new?user_id=${user.id}`,
   //       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
   //     );
 
   //     const { chat_room_token } = res.data;
-
-  //     updateChatRoomToken(chat_room_token);
-
   //     toast.success("New chat started!");
-
-  //     // Reload the page to start fresh
-  //     window.location.reload();
+  //     navigate(`/chat/${chat_room_token}`);
+  //     // Optional: fetchHistory(); // to update sidebar with new chat
   //   } catch (err) {
   //     console.error(err);
   //     toast.error("Failed to start new chat");
   //   }
   // };
-
-  // ✅ Fetch chat history function
-
-  const handleNewChat = async () => {
-    if (!user || !user.id) return;
-
-    try {
-      const res = await axios.get(
-        `https://snoutiq.com/backend/api/chat-rooms/new?user_id=${user.id}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-      );
-
-      const { chat_room_token } = res.data;
-      toast.success("New chat started!");
-      navigate(`/chat/${chat_room_token}`);
-      // Optional: fetchHistory(); // to update sidebar with new chat
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to start new chat");
-    }
-  };
 
   // const fetchHistory = async () => {
   //   setIsLoading(true);
@@ -96,66 +149,67 @@ const Sidebar = ({ isMobile = false, onItemClick }) => {
 
   // ✅ Delete chat function
 
-  const fetchHistory = async () => {
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
+  // const fetchHistory = async () => {
+  //   setIsLoading(true);
+  //   try {
+  //     const token = localStorage.getItem("token");
+  //     if (!token) return;
 
-      const response = await axios.get(
-        `https://snoutiq.com/backend/api/chat/listRooms?user_id=${user.id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  //     const response = await axios.get(
+  //       `https://snoutiq.com/backend/api/chat/listRooms?user_id=${user.id}`,
+  //       { headers: { Authorization: `Bearer ${token}` } }
+  //     );
 
-      console.log(response.data, "res");
+  //     console.log(response.data, "res");
 
-      // Sort by creation date: newest first
-      const sortedHistory = response.data.rooms.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+  //     // Sort by creation date: newest first
+  //     const sortedHistory = response.data.rooms.sort(
+  //       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  //     );
 
-      setHistory(sortedHistory);
-    } catch (error) {
-      console.error("Failed to fetch chat history:", error);
-      toast.error("Failed to fetch chat history");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  //     setHistory(sortedHistory);
+  //   } catch (error) {
+  //     console.error("Failed to fetch chat history:", error);
+  //     toast.error("Failed to fetch chat history");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
-  const handleDeleteChat = async (chatId, chatRoomToken, e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // const handleDeleteChat = async (chatId, chatRoomToken, e) => {
+  //   e.preventDefault();
+  //   e.stopPropagation();
 
-    if (!window.confirm("Are you sure you want to delete this chat?")) return;
+  //   if (!window.confirm("Are you sure you want to delete this chat?")) return;
 
-    setDeletingId(chatId);
+  //   setDeletingId(chatId);
 
-    try {
-      const token = localStorage.getItem("token");
+  //   try {
+  //     const token = localStorage.getItem("token");
 
-      await axios.delete(
-        `https://snoutiq.com/backend/api/chat-rooms/${chatRoomToken}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          data: { user_id: user.id }
-        }
-      );
+  //     await axios.delete(
+  //       `https://snoutiq.com/backend/api/chat-rooms/${chatRoomToken}`,
+  //       {
+  //         headers: { Authorization: `Bearer ${token}` },
+  //         data: { user_id: user.id }
+  //       }
+  //     );
 
-      toast.success("Chat deleted successfully");
+  //     toast.success("Chat deleted successfully");
 
-      // Remove from local state
-      setHistory(prev => prev.filter(chat => chat.id !== chatId));
-    } catch (error) {
-      console.error("Failed to delete chat:", error);
-      toast.error("Failed to delete chat");
-    } finally {
-      setDeletingId(null);
-    }
-  };
+  //     // Remove from local state
+  //     setHistory(prev => prev.filter(chat => chat.id !== chatId));
+  //   } catch (error) {
+  //     console.error("Failed to delete chat:", error);
+  //     toast.error("Failed to delete chat");
+  //   } finally {
+  //     setDeletingId(null);
+  //   }
+  // };
 
 
   // Format date for display
+  
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -178,7 +232,6 @@ const Sidebar = ({ isMobile = false, onItemClick }) => {
   }, []);
 
   useEffect(() => {
-    // Pet of the day
     const petsFamus = [
       { name: "Paw Bros", img: PowBrosPic, age: "2 years", loc: "New Delhi" },
       { name: "Baby Loki", img: BabyLokiPine, age: "20 days", loc: "Pune" },
@@ -198,7 +251,7 @@ const Sidebar = ({ isMobile = false, onItemClick }) => {
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <h3 className="text-sm font-semibold text-gray-700">Chat History</h3>
         <button
-          onClick={handleNewChat}
+          onClick={handleCreateNewChat}
           className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 p-1 rounded hover:bg-blue-50 transition-colors"
           title="Start new chat"
         >
@@ -217,41 +270,65 @@ const Sidebar = ({ isMobile = false, onItemClick }) => {
           <div className="text-center p-4">
             <p className="text-gray-500 text-sm mb-2">No chat history yet</p>
             <button
-              onClick={handleNewChat}
+              onClick={handleCreateNewChat}
               className="text-xs text-blue-600 hover:text-blue-700 font-medium"
             >
               Start your first chat
             </button>
           </div>
         ) : (
-          history.map((item) => (
-            <Link
-              key={item.id}
-              to={`/chat/${item.chat_room_token}`}
-              className="group flex items-center justify-between p-2 rounded-md hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all duration-200"
-            >
-              <div className="flex-1 min-w-0">
-                <span className="font-medium text-gray-700 text-sm truncate block">
-                  {item.name || "New Chat"}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {formatDate(item.created_at)}
-                </span>
-              </div>
+          // history.map((item) => (
+          //   <Link
+          //     key={item.id}
+          //     to={`/chat/${item.chat_room_token}`}
+          //     className="group flex items-center justify-between p-2 rounded-md hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all duration-200"
+          //   >
+          //     <div className="flex-1 min-w-0">
+          //       <span className="font-medium text-gray-700 text-sm truncate block">
+          //         {item.name || "New Chat"}
+          //       </span>
+          //       <span className="text-xs text-gray-400">
+          //         {formatDate(item.created_at)}
+          //       </span>
+          //     </div>
 
+          //     <button
+          //       onClick={(e) => handleDeleteChat(item.id, item.chat_room_token, e)}
+          //       disabled={deletingId === item.id}
+          //       className="opacity-0 group-hover:opacity-60 hover:opacity-100 p-1 rounded hover:bg-gray-200 transition-all duration-200 ml-2"
+          //       title="Delete chat"
+          //     >
+          //       {deletingId === item.id ? (
+          //         <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+          //       ) : (
+          //         <TrashIcon className="w-4 h-4 text-gray-500" />
+          //       )}
+          //     </button>
+          //   </Link>
+          // ))
+            history.map((chat) => (
+            <div
+              key={chat.chat_room_token}
+              className={`flex items-center justify-between p-2 rounded-lg cursor-pointer ${
+                chat_room_token === chat.chat_room_token
+                  ? "bg-blue-200"
+                  : "bg-white"
+              }`}
+              onClick={() => navigate(`/chat/${chat.chat_room_token}`)}
+            >
+              <span className="truncate text-sm">
+                {chat.last_message || "New Chat"}
+              </span>
               <button
-                onClick={(e) => handleDeleteChat(item.id, item.chat_room_token, e)}
-                disabled={deletingId === item.id}
-                className="opacity-0 group-hover:opacity-60 hover:opacity-100 p-1 rounded hover:bg-gray-200 transition-all duration-200 ml-2"
-                title="Delete chat"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteChat(chat.chat_room_token);
+                }}
+                className="p-1 hover:bg-gray-100 rounded"
               >
-                {deletingId === item.id ? (
-                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <TrashIcon className="w-4 h-4 text-gray-500" />
-                )}
+                <TrashIcon className="w-4 h-4 text-gray-500" />
               </button>
-            </Link>
+            </div>
           ))
 
         )}
