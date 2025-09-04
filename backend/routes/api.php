@@ -31,7 +31,7 @@ use App\Http\Controllers\Api\ContactRequestController;
 
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
 Route::get('/test-dd', function () {
-    dd("Hello bhai Webhook 5.0 👋, test route working!  maayank malhotra");
+    dd("Hello bhai Webhook 55.0 👋, test route working!  maayank malhotra");
 });
 Route::get('/chats', [GeminiChatController::class, 'history']); 
 Route::post('/contact-request', [ContactRequestController::class, 'store']);

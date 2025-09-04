@@ -1,11 +1,16 @@
 <?php 
 return [
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie','*'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'], // Change to your domain in production
+    // ❌ yaha '*' mat rakho, frontend domain add karo
+    'allowed_origins' => [
+        'http://localhost:5173',
+        'http://10.163.123.215:3000',
+        'https://snoutiq.com'
+    ],
 
     'allowed_origins_patterns' => [],
 
@@ -15,5 +20,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true, // Required if using cookies (SPA login)
+    'supports_credentials' => true, // ✅ ye true hona chahiye
 ];
+
