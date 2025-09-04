@@ -29,7 +29,9 @@ use App\Http\Controllers\Api\GeminiChatController;
 use App\Http\Controllers\Api\ContactRequestController;
 
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
-
+Route::get('/test-dd', function () {
+    dd("Hello bhai 👋, test route working!");
+});
 Route::get('/chats', [GeminiChatController::class, 'history']); 
 Route::post('/contact-request', [ContactRequestController::class, 'store']);
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
