@@ -148,22 +148,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   // 🔹 Logout function - CLEAR EVERYTHING
+
   const logout = () => {
     setUser(null);
     setToken(null);
     setChatRoomToken(null);
 
-    // Clear all localStorage items
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("chat_room_token");
-    
-    // Clear all chat messages from localStorage
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('chatMessages_')) {
-        localStorage.removeItem(key);
-      }
-    });
   };
 
   // 🔹 Update chatRoomToken
