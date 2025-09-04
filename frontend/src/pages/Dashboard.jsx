@@ -12,7 +12,7 @@
 
 // const Dashboard = () => {
 //     const navigate = useNavigate();
-//     const { user, token, chatRoomToken, updateChatRoomToken } = useContext(AuthContext);
+//     const { user, updateChatRoomToken } = useContext(AuthContext);
 //     const [isLoading, setIsLoading] = useState(false);
 //     const [messages, setMessages] = useState([]);
 //     const [sending, setSending] = useState(false);
@@ -124,7 +124,7 @@
 //                             id: baseId + 2,
 //                             sender: "ai",
 //                             text: chat.answer,
-//                             displayedText: chat.answer, 
+//                             displayedText: chat.answer, // Show full text for history
 //                             timestamp: new Date(chat.created_at),
 //                         },
 //                     ];
@@ -158,10 +158,12 @@
 //             setContextToken("");
 //             fetchChatHistory(currentChatRoomToken);
 //         } else {
+//             // Load general history if no specific chat room
 //             fetchChatHistory();
 //         }
 //     }, [currentChatRoomToken, fetchChatHistory, updateChatRoomToken, chat_room_token]);
 
+//     // Save messages to localStorage (debounced)
 //     useEffect(() => {
 //         const timeoutId = setTimeout(() => {
 //             if (messages.length > 0) {
@@ -499,15 +501,7 @@
 
 // export default Dashboard;
 
-import React, {
-  useEffect,
-  useState,
-  useContext,
-  useRef,
-  useCallback,
-  useMemo,
-  useLayoutEffect,
-} from "react";
+import React, { useEffect, useState, useContext, useRef, useCallback, useMemo } from "react";
 import ChatInput from "../components/ChatInput";
 import RightSidebar from "../components/RightSidebar";
 import axios from "../axios";
@@ -519,264 +513,177 @@ import Navbar from "../components/Navbar";
 import MessageBubble from "./MessageBubble";
 
 const Dashboard = () => {
-  const navigate = useNavigate();
-  const { chat_room_token } = useParams(); // ✅ only source of truth
-  const { user, updateChatRoomToken } = useContext(AuthContext);
+    const navigate = useNavigate();
+    const { user, updateChatRoomToken } = useContext(AuthContext);
+    const { chat_room_token } = useParams();
+    const [isLoading, setIsLoading] = useState(false);
+    const [messages, setMessages] = useState([]);
+    const [sending, setSending] = useState(false);
+    const messagesEndRef = useRef(null);
+    const [contextToken, setContextToken] = useState("");
+    const typingTimeouts = useRef(new Map());
+    const isAutoScrolling = useRef(false);
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [isSending, setIsSending] = useState(false);
+    const currentChatRoomToken = chat_room_token || "";
 
-  const messagesEndRef = useRef(null);
-  const isAutoScrolling = useRef(true);
-  const typingTimeouts = useRef(new Map());
+    const genId = () => Date.now() + Math.random();
 
-  // ✅ scroll to bottom helper
-  const scrollToBottom = useCallback((behavior = "smooth") => {
-    if (messagesEndRef.current && isAutoScrolling.current) {
-      setTimeout(() => {
-        messagesEndRef.current.scrollIntoView({ behavior });
-      }, 50);
-    }
-  }, []);
+    // Scroll to bottom optimized
+    const scrollToBottom = useCallback((behavior = "smooth") => {
+        if (isAutoScrolling.current) return;
+        isAutoScrolling.current = true;
+        requestAnimationFrame(() => {
+            if (messagesEndRef.current?.parentNode) {
+                const parent = messagesEndRef.current.parentNode;
+                parent.scrollTo({ top: parent.scrollHeight, behavior });
+            }
+            setTimeout(() => { isAutoScrolling.current = false; }, 100);
+        });
+    }, []);
 
-  // ✅ fetch chat history (API → fallback localStorage)
-  const fetchChatHistory = useCallback(async () => {
-    if (!user?.id || !chat_room_token) return;
+    // Typing cleanup
+    const cleanupTypingAnimation = useCallback((messageId) => {
+        if (typingTimeouts.current.has(messageId)) {
+            clearTimeout(typingTimeouts.current.get(messageId));
+            typingTimeouts.current.delete(messageId);
+        }
+    }, []);
 
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
+    useEffect(() => {
+        return () => {
+            typingTimeouts.current.forEach(clearTimeout);
+            typingTimeouts.current.clear();
+        };
+    }, []);
 
-      const res = await axios.get(
-        `/chat/history/${user.id}/${chat_room_token}/`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (sending || messages.length > 0) scrollToBottom(sending ? "auto" : "smooth");
+        }, 50);
+        return () => clearTimeout(timeoutId);
+    }, [messages.length, sending, scrollToBottom]);
 
-      if (res.data?.history) {
-        const msgs = res.data.history.map((m) => ({
-          ...m,
-          displayedText: m.displayedText || m.message, // ✅ fix for refresh
-        }));
-        setMessages(msgs);
-        localStorage.setItem(
-          `chatMessages_${chat_room_token}`,
-          JSON.stringify(msgs)
-        );
-      }
-    } catch (err) {
-      console.error("Error fetching chat history:", err);
-      const saved = localStorage.getItem(`chatMessages_${chat_room_token}`);
-      if (saved) {
+    const fetchChatHistory = useCallback(async (token = null) => {
+        const localToken = localStorage.getItem("token");
+        if (!localToken) return;
+
         try {
-          const parsed = JSON.parse(saved);
-          setMessages(
-            parsed.map((m) => ({ ...m, displayedText: m.displayedText || m.message }))
-          );
-        } catch (e) {
-          console.error("Failed to parse saved messages:", e);
+            setIsLoading(true);
+            let url = "https://snoutiq.com/backend/api/chat/history";
+            if (token) url = `https://snoutiq.com/backend/api/chat/room/${token}/history`;
+
+            const res = await axios.get(url, { headers: { Authorization: `Bearer ${localToken}` } });
+            const messagesFromAPI = res.data
+                .filter(chat => chat.question && chat.answer)
+                .flatMap(chat => {
+                    const baseId = Number(new Date(chat.created_at)) + Math.random();
+                    return [
+                        { id: baseId + 1, sender: "user", text: chat.question, timestamp: new Date(chat.created_at) },
+                        { id: baseId + 2, sender: "ai", text: chat.answer, displayedText: chat.answer, timestamp: new Date(chat.created_at) },
+                    ];
+                });
+
+            setMessages(messagesFromAPI);
+
+            if (res.data.length > 0 && res.data[res.data.length - 1].context_token) {
+                setContextToken(res.data[res.data.length - 1].context_token);
+            }
+        } catch (err) {
+            console.error("Failed to fetch history", err);
+            toast.error("Failed to load chat history");
+        } finally {
+            setIsLoading(false);
         }
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id, chat_room_token]);
+    }, []);
 
-  useEffect(() => {
-    fetchChatHistory();
-  }, [fetchChatHistory]);
-
-  // ✅ auto-scroll when messages update
-  useLayoutEffect(() => {
-    scrollToBottom("auto");
-  }, [messages, scrollToBottom]);
-
-  // ✅ typing animation
-  const startTypingAnimation = useCallback((fullText, messageId) => {
-    let index = 0;
-    const interval = setInterval(() => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, displayedText: fullText.slice(0, index) }
-            : m
-        )
-      );
-      index++;
-      if (index > fullText.length) {
-        clearInterval(interval);
-      }
-    }, 20);
-    typingTimeouts.current.set(messageId, interval);
-  }, []);
-
-  // ✅ cleanup intervals on unmount
-  useEffect(() => {
-    return () => {
-      typingTimeouts.current.forEach(clearTimeout);
-      typingTimeouts.current.clear();
-    };
-  }, []);
-
-  // ✅ send message
-  const handleSendMessage = useCallback(
-    async (messageText) => {
-      if (!messageText.trim() || !user?.id || !chat_room_token) return;
-      setIsSending(true);
-
-      const newMessage = {
-        id: Date.now(),
-        sender: "user",
-        message: messageText,
-        displayedText: messageText,
-      };
-      setMessages((prev) => [...prev, newMessage]);
-
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) throw new Error("No token found");
-
-        const res = await axios.post(
-          "/chat/send_message/",
-          {
-            user_id: user.id,
-            chat_room_token,
-            message: messageText,
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        if (res.data?.ai_response) {
-          const aiMessage = {
-            id: Date.now() + 1,
-            sender: "ai",
-            message: res.data.ai_response,
-            displayedText: "",
-          };
-          setMessages((prev) => [...prev, aiMessage]);
-          startTypingAnimation(res.data.ai_response, aiMessage.id);
+    useEffect(() => {
+        if (currentChatRoomToken) {
+            if (updateChatRoomToken) updateChatRoomToken(currentChatRoomToken);
+            setMessages([]);
+            setContextToken("");
+            fetchChatHistory(currentChatRoomToken);
+        } else {
+            fetchChatHistory();
         }
-      } catch (err) {
-        console.error("Error sending message:", err);
-        toast.error("Failed to send message");
-      } finally {
-        setIsSending(false);
-      }
-    },
-    [user?.id, chat_room_token, startTypingAnimation]
-  );
+    }, [currentChatRoomToken, fetchChatHistory, updateChatRoomToken]);
 
-  // ✅ persist messages to localStorage
-  useEffect(() => {
-    if (chat_room_token) {
-      localStorage.setItem(
-        `chatMessages_${chat_room_token}`,
-        JSON.stringify(messages)
-      );
-    }
-  }, [messages, chat_room_token]);
-
-  // ✅ clear chat
-  const clearChat = useCallback(() => {
-    if (window.confirm("Are you sure you want to clear the chat history?")) {
-      typingTimeouts.current.forEach(clearTimeout);
-      typingTimeouts.current.clear();
-
-      setMessages([]);
-      localStorage.removeItem(`chatMessages_${chat_room_token}`);
-      toast.success("Chat cleared");
-    }
-  }, [chat_room_token]);
-
-  const ChatContent = useMemo(() => {
-    return (
-      <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Snoutiq AI</h1>
-            <p className="text-gray-600 mt-1 text-sm">
-              {chat_room_token
-                ? `Ask questions about ${user?.pet_name || "your pet"}'s health`
-                : ``}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            {messages.length > 0 && (
-              <button
-                onClick={clearChat}
-                className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-md transition-colors"
-                disabled={isSending}
-              >
-                Clear Chat
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto px-4 bg-gray-50">
-          <div className="max-w-4xl mx-auto py-4">
-            {isLoading ? (
-              <div className="flex justify-center items-center h-40">
-                <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {chat_room_token
-                      ? "No messages in this chat"
-                      : "Welcome to Pet Health Assistant"}
-                  </h2>
-                  <p className="text-gray-600 mb-4 text-sm">
-                    {chat_room_token
-                      ? "Start the conversation by asking a question about your pet."
-                      : "Describe symptoms, ask questions, or seek advice about pet care."}
-                  </p>
+    const ChatContent = useMemo(() => (
+        <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center shadow-sm">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Snoutiq AI</h1>
+                    <p className="text-gray-600 mt-1 text-sm">
+                        {currentChatRoomToken ? `Ask questions about ${user?.pet_name || "your pet"}'s health` : ""}
+                    </p>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {messages.map((msg, index) => (
-                  <MessageBubble key={msg.id || index} msg={msg} index={index} />
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Chat Input */}
-        <div className="border-t border-gray-200 bg-white p-4 shadow-lg">
-          <div className="max-w-4xl mx-auto px-4">
-            <ChatInput onSend={handleSendMessage} disabled={isSending || isLoading} />
-            <div className="mt-2 text-xs text-gray-500 text-center">
-              ⚠️ AI-generated advice. Consult a licensed veterinarian for serious
-              health concerns.
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  }, [messages, user, isSending, clearChat, handleSendMessage, isLoading, chat_room_token]);
 
-  return (
-    <>
-      <Navbar />
-      <div className="hidden lg:flex h-[calc(100vh-64px)] mt-16 bg-gray-50">
-        <div className="w-64 bg-white border-r border-gray-200 shadow-sm overflow-y-auto">
-          <Sidebar />
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-4 bg-gray-50">
+                <div className="max-w-4xl mx-auto py-4">
+                    {isLoading ? (
+                        <div className="flex justify-center items-center h-40">
+                            <div className="text-center">
+                                <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full mb-4 mx-auto"></div>
+                                <p className="text-gray-600">Loading chat history...</p>
+                            </div>
+                        </div>
+                    ) : messages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                            <div className="bg-white rounded-xl shadow-md p-6 lg:p-8 max-w-md">
+                                <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-2">
+                                    {currentChatRoomToken ? "No messages in this chat" : "Welcome to Pet Health Assistant"}
+                                </h2>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {messages.map((msg, idx) => (
+                                <MessageBubble key={msg.id || idx} msg={msg} index={idx} />
+                            ))}
+                            <div ref={messagesEndRef} />
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Input */}
+            <div className="border-t border-gray-200 bg-white p-4 shadow-lg">
+                <div className="max-w-4xl mx-auto px-4">
+                    <ChatInput onSendMessage={() => {}} isLoading={sending} />
+                </div>
+            </div>
         </div>
-        <div className="flex-1 flex flex-col overflow-hidden">{ChatContent}</div>
-        <div className="w-80 bg-white border-l border-gray-200 shadow-sm overflow-y-auto">
-          <RightSidebar />
-        </div>
-      </div>
-      <div className="lg:hidden h-[calc(100vh-64px)] mt-16">{ChatContent}</div>
-    </>
-  );
+    ), [messages, user, sending, isLoading, currentChatRoomToken]);
+
+    return (
+        <>
+            <Navbar />
+            {/* Desktop Layout */}
+            <div className="hidden lg:flex h-[calc(100vh-64px)] mt-16 bg-gray-50">
+                {/* Left Sidebar */}
+                <div className="w-64 bg-white border-r border-gray-200 shadow-sm overflow-y-auto">
+                    <Sidebar />
+                </div>
+
+                {/* Chat */}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    {ChatContent}
+                </div>
+
+                {/* Right Sidebar */}
+                <div className="w-80 bg-white border-l border-gray-200 shadow-sm overflow-y-auto">
+                    <RightSidebar />
+                </div>
+            </div>
+
+            {/* Mobile Layout */}
+            <div className="lg:hidden h-[calc(100vh-64px)] mt-16">
+                {ChatContent}
+            </div>
+        </>
+    );
 };
 
 export default Dashboard;
