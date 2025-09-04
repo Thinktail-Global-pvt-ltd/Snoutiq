@@ -178,7 +178,7 @@ const MessageBubble = memo(({ msg, index, onFeedback }) => {
     const nextMsg = nextProps.msg;
 
     return (
-        prevMsg.id === nextMsg.id &&
+        prevMsg.id === nextMsg.id && 
         prevMsg.displayedText === nextMsg.displayedText &&
         prevMsg.text === nextMsg.text &&
         prevMsg.type === nextMsg.type
