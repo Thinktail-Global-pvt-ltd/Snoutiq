@@ -521,7 +521,21 @@ const Dashboard = () => {
     const { chat_room_token } = useParams();
     const currentChatRoomToken = chat_room_token || chatRoomToken;
 
-   const genId = () => crypto.randomUUID();
+    const genId = () => crypto.randomUUID();
+
+    useEffect(() => {
+        const handleRoomChange = (e) => {
+            const newToken = e.detail;
+            setMessages([]);
+            setContextToken("");
+            fetchChatHistory(newToken);
+            if (updateChatRoomToken) updateChatRoomToken(newToken);
+        };
+
+        window.addEventListener("chatRoomChanged", handleRoomChange);
+        return () => window.removeEventListener("chatRoomChanged", handleRoomChange);
+    }, [fetchChatHistory, updateChatRoomToken]);
+
 
     // Scroll to bottom
     const scrollToBottom = useCallback((behavior = "smooth") => {
@@ -581,7 +595,7 @@ const Dashboard = () => {
                 .flat();
 
             setMessages(messagesFromAPI);
-
+            scrollToBottom("auto");
             // Update context token if present
             if (res.data.length && res.data[res.data.length - 1].context_token) {
                 setContextToken(res.data[res.data.length - 1].context_token);
@@ -598,12 +612,21 @@ const Dashboard = () => {
     useEffect(() => {
         if (!currentChatRoomToken) return;
 
-        if (updateChatRoomToken && chat_room_token) updateChatRoomToken(chat_room_token);
-
         setMessages([]);
         setContextToken("");
+
+        // Load saved messages if any
+        const saved = localStorage.getItem(`chatMessages_${currentChatRoomToken}`);
+        if (saved) {
+            setMessages(JSON.parse(saved));
+        }
+
+        // Fetch latest messages from API
         fetchChatHistory(currentChatRoomToken);
-    }, [currentChatRoomToken, fetchChatHistory, updateChatRoomToken, chat_room_token]);
+
+        if (updateChatRoomToken) updateChatRoomToken(currentChatRoomToken);
+    }, [currentChatRoomToken, fetchChatHistory, updateChatRoomToken]);
+
 
     // Save messages to localStorage
     useEffect(() => {
@@ -713,25 +736,25 @@ const Dashboard = () => {
     }, [currentChatRoomToken]);
 
 
-const handleFeedback = async (feedback, timestamp) => {
-  try {
-    const targetTime = new Date(timestamp).getTime();
+    const handleFeedback = async (feedback, timestamp) => {
+        try {
+            const targetTime = new Date(timestamp).getTime();
 
-    const consultationId = messages.find(msg => {
-      const msgTime = new Date(msg.timestamp).getTime();
-      // allow small difference (100ms) to avoid mismatch
-      return Math.abs(msgTime - targetTime) < 100;
-    })?.consultationId;
+            const consultationId = messages.find(msg => {
+                const msgTime = new Date(msg.timestamp).getTime();
+                // allow small difference (100ms) to avoid mismatch
+                return Math.abs(msgTime - targetTime) < 100;
+            })?.consultationId;
 
-    if (!consultationId) return;
+            if (!consultationId) return;
 
-    await axios.post("/api/feedback", { consultationId, feedback });
-    toast.success("Thanks for your feedback!");
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to submit feedback");
-  }
-};
+            await axios.post("/api/feedback", { consultationId, feedback });
+            toast.success("Thanks for your feedback!");
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to submit feedback");
+        }
+    };
 
     const ChatContent = useMemo(() => {
         return (

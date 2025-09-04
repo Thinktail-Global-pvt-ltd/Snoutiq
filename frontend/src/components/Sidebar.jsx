@@ -335,26 +335,25 @@ const Sidebar = () => {
   };
 
   // Start new chat
-  const handleNewChat = async () => {
-    if (!user) return;
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(
-        `https://snoutiq.com/backend/api/chat-rooms/new?user_id=${user.id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const { chat_room_token } = res.data;
+const handleNewChat = async () => {
+  if (!user) return;
+  try {
+    const token = localStorage.getItem("token");
+    const res = await axios.get(`https://snoutiq.com/backend/api/chat-rooms/new?user_id=${user.id}`, 
+        { headers: { Authorization: `Bearer ${token}` } });
+    const { chat_room_token } = res.data;
 
-      if (updateChatRoomToken) updateChatRoomToken(chat_room_token);
-      toast.success("New chat started!");
+    if (updateChatRoomToken) updateChatRoomToken(chat_room_token);
+    toast.success("New chat started!");
 
-      await fetchHistory();
-      navigate(`/chat/${chat_room_token}`);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to start new chat");
-    }
-  };
+    await fetchHistory();
+    navigate(`/chat/${chat_room_token}`);
+    return chat_room_token;
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to start new chat");
+  }
+};
 
   // Delete chat
   const handleDeleteChat = async (chatId, chatRoomToken, e) => {
@@ -385,13 +384,27 @@ const Sidebar = () => {
   };
 
   // Click on chat history
+  // const handleHistoryClick = async (chatRoomToken) => {
+  //   if (!chatRoomToken) return;
+  //   if (updateChatRoomToken) updateChatRoomToken(chatRoomToken);
+
+  //   // Fetch messages for that chat room and navigate
+  //   navigate(`/chat/${chatRoomToken}`);
+  // };
+
   const handleHistoryClick = async (chatRoomToken) => {
     if (!chatRoomToken) return;
+
+    // Update context
     if (updateChatRoomToken) updateChatRoomToken(chatRoomToken);
 
-    // Fetch messages for that chat room and navigate
+    // Navigate to the chat room
     navigate(`/chat/${chatRoomToken}`);
+
+    // Optional: trigger immediate fetch in Dashboard
+    window.dispatchEvent(new CustomEvent("chatRoomChanged", { detail: chatRoomToken }));
   };
+
 
   // Pet of the day
   useEffect(() => {
