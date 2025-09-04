@@ -33,6 +33,13 @@ Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 
 Route::get('/test-dd', function () {
     dd("Hello bhai Webhook 55.0 👋, test route working!  maayank malhotra");
 });
+Route::get('/test-cors', function (Request $request) {
+    return response()->json([
+        'message' => 'CORS test',
+        'headers' => $request->headers->all()
+    ]);
+});
+
 Route::get('/chats', [GeminiChatController::class, 'history']); 
 Route::post('/contact-request', [ContactRequestController::class, 'store']);
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
