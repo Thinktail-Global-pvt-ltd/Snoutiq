@@ -531,7 +531,17 @@ const Dashboard = () => {
     const currentChatRoomToken = chat_room_token || chatRoomToken;
 
     const genId = () => Date.now() + Math.random();
+    // Dashboard.js में
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            navigate("/login");
+            return;
+        } else {
+            navigate("/dashboard")
+        }
 
+    }, [navigate, user]);
     // Optimized scroll function with debouncing
     const scrollToBottom = useCallback((behavior = "smooth") => {
         if (isAutoScrolling.current) return;
@@ -599,7 +609,13 @@ const Dashboard = () => {
 
     const fetchChatHistory = useCallback(async (specificChatRoomToken = null) => {
         const token = localStorage.getItem("token");
-        if (!token) return;
+
+        // ✅ Check if user is authenticated
+        if (!token || !user) {
+            console.log("User not authenticated, skipping history fetch");
+            setIsLoading(false);
+            return;
+        }
 
         try {
             setIsLoading(true);
@@ -651,12 +667,12 @@ const Dashboard = () => {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [user]);
 
     // ✅ FIX: Load chat history when URL params change (when clicking on sidebar items)
     useEffect(() => {
         console.log("Chat room token changed:", currentChatRoomToken);
-        
+
         if (currentChatRoomToken) {
             // Update the AuthContext with new chat room token
             if (updateChatRoomToken && chat_room_token) {
@@ -678,7 +694,7 @@ const Dashboard = () => {
         const handleChatRoomChange = (event) => {
             const newChatRoomToken = event.detail;
             console.log("Received chat room change event:", newChatRoomToken);
-            
+
             if (newChatRoomToken && updateChatRoomToken) {
                 updateChatRoomToken(newChatRoomToken);
                 navigate(`/chat/${newChatRoomToken}`);
@@ -686,7 +702,7 @@ const Dashboard = () => {
         };
 
         window.addEventListener('chatRoomChanged', handleChatRoomChange);
-        
+
         return () => {
             window.removeEventListener('chatRoomChanged', handleChatRoomChange);
         };

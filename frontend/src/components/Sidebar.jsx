@@ -288,10 +288,10 @@
 
 import { useEffect, useState, useContext } from "react";
 import axios from "../axios";
-import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { PlusCircleIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { AuthContext } from "../auth/AuthContext";
+import { useNavigate, useParams } from "react-router-dom";
 
 // Pet Images
 import PowBrosPic from "../assets/pets/Paw Bros, 2 Years, New Delhi.jpg";
@@ -309,8 +309,12 @@ const Sidebar = () => {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
+
   const { user, chatRoomToken, updateChatRoomToken } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  // ✅ Get current chat room token from URL params
+  const { chat_room_token: currentChatRoomToken } = useParams();
 
   // Fetch chat history
   const fetchHistory = async () => {
@@ -335,31 +339,58 @@ const Sidebar = () => {
   };
 
   // Start new chat
-const handleNewChat = async () => {
-  if (!user) return;
-  try {
-    const token = localStorage.getItem("token");
-    const res = await axios.get(`https://snoutiq.com/backend/api/chat-rooms/new?user_id=${user.id}`, 
+  const handleNewChat = async () => {
+    if (!user) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`https://snoutiq.com/backend/api/chat-rooms/new?user_id=${user.id}`,
         { headers: { Authorization: `Bearer ${token}` } });
-    const { chat_room_token } = res.data;
+      const { chat_room_token } = res.data;
 
-    if (updateChatRoomToken) updateChatRoomToken(chat_room_token);
-    toast.success("New chat started!");
+      if (updateChatRoomToken) updateChatRoomToken(chat_room_token);
+      toast.success("New chat started!");
 
-    await fetchHistory();
-    navigate(`/chat/${chat_room_token}`);
-    return chat_room_token;
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to start new chat");
-  }
-};
+      await fetchHistory();
+      navigate(`/chat/${chat_room_token}`);
+      return chat_room_token;
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to start new chat");
+    }
+  };
 
   // Delete chat
-  const handleDeleteChat = async (chatId, chatRoomToken, e) => {
+  // const handleDeleteChat = async (chatId, chatRoomToken, e) => {
+  //   e.preventDefault();
+  //   e.stopPropagation();
+  //   if (!window.confirm("Are you sure?")) return;
+
+  //   setDeletingId(chatId);
+  //   try {
+  //     const token = localStorage.getItem("token");
+  //     await axios.delete(
+  //       `https://snoutiq.com/backend/api/chat-rooms/${chatRoomToken}`,
+  //       { headers: { Authorization: `Bearer ${token}` }, data: { user_id: user.id } }
+  //     );
+
+  //     toast.success("Chat deleted");
+  //     // Remove deleted chat from state
+  //     setHistory(prev => prev.filter(c => c.id !== chatId));
+
+  //     // Turant new chat create aur navigate
+  //     handleNewChat();
+  //   } catch (err) {
+  //     console.error(err);
+  //     toast.error("Failed to delete chat");
+  //   } finally {
+  //     setDeletingId(null);
+  //   }
+  // };
+
+ const handleDeleteChat = async (chatId, chatRoomToken, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm("Are you sure?")) return;
+    if (!window.confirm("Are you sure you want to delete this chat?")) return;
 
     setDeletingId(chatId);
     try {
@@ -370,11 +401,14 @@ const handleNewChat = async () => {
       );
 
       toast.success("Chat deleted");
+      
       // Remove deleted chat from state
       setHistory(prev => prev.filter(c => c.id !== chatId));
 
-      // Turant new chat create aur navigate
-      handleNewChat();
+      // ✅ FIX: Only create new chat if the deleted chat is the current active chat
+      if (chatRoomToken === currentChatRoomToken) {
+        handleNewChat();
+      }
     } catch (err) {
       console.error(err);
       toast.error("Failed to delete chat");
@@ -382,21 +416,20 @@ const handleNewChat = async () => {
       setDeletingId(null);
     }
   };
+  const handleHistoryClick = async (chatRoomToken) => {
+    if (!chatRoomToken) return;
 
- const handleHistoryClick = async (chatRoomToken) => {
-  if (!chatRoomToken) return;
-  
-  // Update context
-  if (updateChatRoomToken) updateChatRoomToken(chatRoomToken);
-  
-  // Navigate to the chat room
-  navigate(`/chat/${chatRoomToken}`);
-  
-  // Dispatch a custom event to trigger message fetching
-  window.dispatchEvent(new CustomEvent("chatRoomChanged", { 
-    detail: chatRoomToken 
-  }));
-};
+    // Update context
+    if (updateChatRoomToken) updateChatRoomToken(chatRoomToken);
+
+    // Navigate to the chat room
+    navigate(`/chat/${chatRoomToken}`);
+
+    // Dispatch a custom event to trigger message fetching
+    window.dispatchEvent(new CustomEvent("chatRoomChanged", {
+      detail: chatRoomToken
+    }));
+  };
 
   // Pet of the day
   useEffect(() => {
