@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { PlusCircleIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { AuthContext } from "../auth/AuthContext";
+import { useParams } from "react-router-dom";
 
 // 🐾 Pet Images
 import PowBrosPic from "./../assets/pets/Paw Bros, 2 Years, New Delhi.jpg";
