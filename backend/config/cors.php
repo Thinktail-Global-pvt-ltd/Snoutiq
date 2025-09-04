@@ -1,13 +1,11 @@
 <?php 
 return [
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
-    'allowed_methods' => ['*'], // all HTTP methods (GET, POST, etc.)
+    'paths' => ['api/*', 'sanctum/csrf-cookie','*'],
 
-    'allowed_origins' => [
-        'http://localhost:5173',
-        'http://10.163.123.215:3000',
-    ],
+    'allowed_methods' => ['*'],
+
+    'allowed_origins' => ['*'], // Change to your domain in production
 
     'allowed_origins_patterns' => [],
 
@@ -17,6 +15,5 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true,
+    'supports_credentials' => true, // Required if using cookies (SPA login)
 ];
-
