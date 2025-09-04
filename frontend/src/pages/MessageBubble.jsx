@@ -173,7 +173,7 @@ const MessageBubble = memo(({ msg, index, onFeedback }) => {
         </div>
     );
 }, (prevProps, nextProps) => {
-    // Custom comparison for better performance
+
     const prevMsg = prevProps.msg;
     const nextMsg = nextProps.msg;
 
