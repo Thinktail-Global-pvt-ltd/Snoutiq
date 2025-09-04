@@ -90,7 +90,7 @@ const Home = () => {
           </h1>
           <p className="text-base sm:text-lg md:text-xl text-[#828282] max-w-xl mx-auto mb-8 px-4 sm:px-14">
             Your AI-powered pet companion for expert care, guidance, and endless
-            tail wags
+            tail wags Testing
           </p>
 
           {/* Chat Input */}
