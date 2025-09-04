@@ -299,7 +299,11 @@ public function register(Request $request)
         'pet_age'     => $request->pet_age,
         'pet_doc1'    => $doc1Path,
         'pet_doc2'    => $doc2Path,
-        'summary'     => $summaryText,  // Gemini se jo summary aayi usko save karo
+        'summary'     => $summaryText,
+            'breed'       => $request->breed,        // ✅ new
+    'latitude'    => $request->latitude,     // ✅ new
+    'longitude'   => $request->longitude,  
+          // Gemini se jo summary aayi usko save karo
     ]);
 
     // ✅ plain token generate and save
