@@ -1,6 +1,17 @@
 // Create a separate memoized component for messages to prevent unnecessary re-renders
 import React, { memo } from 'react';
 
+// Simple button component since the original Button wasn't imported
+const Button = ({ onClick, className, children }) => {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-md transition-colors ${className}`}
+    >
+      {children}
+    </button>
+  );
+};
 
 const ActionButton = ({ tag }) => {
     switch (tag) {
@@ -35,7 +46,6 @@ const ActionButton = ({ tag }) => {
             return null;
     }
 };
-
 
 const MessageBubble = memo(({ msg, index, onFeedback }) => {
     console.log(msg, 'msg');
@@ -124,20 +134,8 @@ const MessageBubble = memo(({ msg, index, onFeedback }) => {
                 {msg.sender === "ai" && msg.classificationTag && (
                     <ActionButton tag={msg.classificationTag} />
                 )}
+                
                 {/* Timestamp */}
-                {/* <div
-                    className={`text-xs mt-2 ${msg.sender === "user"
-                        ? "text-blue-200"
-                        : msg.isError
-                            ? "text-red-500"
-                            : "text-gray-500"
-                        }`}
-                >
-                    {msg.timestamp.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                    })}
-                </div> */}
                 <div
                     className={`text-xs mt-2 ${msg.sender === "user"
                         ? "text-blue-200"
