@@ -957,8 +957,8 @@ const Dashboard = () => {
 
         try {
             setIsLoading(true);
-            let url = roomToken 
-                ? `https://snoutiq.com/backend/api/chat/room/${roomToken}/history` 
+            let url = roomToken
+                ? `https://snoutiq.com/backend/api/chat/room/${roomToken}/history`
                 : "https://snoutiq.com/backend/api/chat/history";
 
             const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -994,18 +994,44 @@ const Dashboard = () => {
     }, [user, scrollToBottom]);
 
     /** Load chat history on mount or token change */
+    // useEffect(() => {
+    //     if (!currentChatRoomToken) return;
+
+    //     setMessages([]);
+    //     setContextToken("");
+
+    //     fetchChatHistory(currentChatRoomToken);
+
+    //     if (updateChatRoomToken) updateChatRoomToken(currentChatRoomToken);
+    // }, [currentChatRoomToken, fetchChatHistory, updateChatRoomToken]);
     useEffect(() => {
+        // अगर currentChatRoomToken नहीं है तो return
         if (!currentChatRoomToken) return;
 
+        // Messages और context reset करें
         setMessages([]);
         setContextToken("");
 
+        // नए token के लिए history fetch करें
         fetchChatHistory(currentChatRoomToken);
 
+        // Context को update करें
         if (updateChatRoomToken) updateChatRoomToken(currentChatRoomToken);
-    }, [currentChatRoomToken, fetchChatHistory, updateChatRoomToken]);
-
+    }, [currentChatRoomToken, fetchChatHistory, updateChatRoomToken]); // Dependencies
     /** Handle external chat room changes */
+    // useEffect(() => {
+    //     const handleRoomChange = (e) => {
+    //         const newToken = e.detail;
+    //         setMessages([]);
+    //         setContextToken("");
+    //         fetchChatHistory(newToken);
+    //         if (updateChatRoomToken) updateChatRoomToken(newToken);
+    //     };
+
+    //     window.addEventListener("chatRoomChanged", handleRoomChange);
+    //     return () => window.removeEventListener("chatRoomChanged", handleRoomChange);
+    // }, [fetchChatHistory, updateChatRoomToken]);
+    // Add this useEffect to your chat component
     useEffect(() => {
         const handleRoomChange = (e) => {
             const newToken = e.detail;
@@ -1018,7 +1044,6 @@ const Dashboard = () => {
         window.addEventListener("chatRoomChanged", handleRoomChange);
         return () => window.removeEventListener("chatRoomChanged", handleRoomChange);
     }, [fetchChatHistory, updateChatRoomToken]);
-
     /** Save messages to localStorage */
     useEffect(() => {
         if (messages.length === 0) return;
@@ -1118,6 +1143,7 @@ const Dashboard = () => {
         toast.success("Chat cleared");
     }, [currentChatRoomToken]);
 
+
     /** Handle feedback */
     const handleFeedback = async (feedback, timestamp) => {
         try {
@@ -1171,7 +1197,7 @@ const Dashboard = () => {
                             <div className="bg-white rounded-xl shadow-md p-6 lg:p-8 max-w-md">
                                 <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-4 mx-auto">
                                     <svg className="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                                     </svg>
                                 </div>
                                 <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-2">
