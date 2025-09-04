@@ -92,6 +92,34 @@ const Register = () => {
       );
     });
   };
+const handleNext = async () => {
+  if (activeStep === 0 && locationAllowed === null) {
+    try {
+      const granted = await requestLocation();
+      if (!granted) return; // agar deny kare toh yahi stop karo
+      // ❌ yahan turant next step mat karo
+      setLocationAllowed(true);
+      return; // user ko dobara Next dabana hoga
+    } catch {
+      return;
+    }
+  }
+
+  if (validateStep()) {
+    setActiveStep((prev) => prev + 1);
+  } else {
+    const stepFields = activeStep === 0
+      ? ["fullName", "email", "mobileNumber"]
+      : activeStep === 1
+        ? ["petName", "petGender", "petAge", "petBread"]
+        : ["emailOtp", "password", "confirmPassword"];
+    const touchedUpdate = {};
+    stepFields.forEach(f => touchedUpdate[f] = true);
+    setTouched(prev => ({ ...prev, ...touchedUpdate }));
+    const firstErrorKey = Object.keys(errors)[0];
+    if (firstErrorKey) toast.error(errors[firstErrorKey]);
+  }
+};
 
   // ✅ Run Once on Mount
   useEffect(() => {
@@ -131,7 +159,7 @@ const Register = () => {
 
     setIsLoading((prev) => ({ ...prev, email: true }));
     try {
-      const res = await axios.post('https://snoutiq.com/api/auth/send-otp', {
+      const res = await axios.post('https://snoutiq.com/backend/api/auth/send-otp', {
         type: 'email',
         value: formData.email,
         unique: 'yes',
@@ -164,7 +192,7 @@ const Register = () => {
 
   const verifyOtp = async () => {
     try {
-      const res = await axios.post('https://snoutiq.com/api/auth/verify-otp', {
+      const res = await axios.post('https://snoutiq.com/backend/api/auth/verify-otp', {
         token: emailOtpToken,
         otp: formData.emailOtp
       });
@@ -223,30 +251,30 @@ const Register = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = async () => {
-    if (activeStep === 0 && locationAllowed === null) {
-      try {
-        await requestLocation();
-      } catch {
-        return;
-      }
-    }
+  // const handleNext = async () => {
+  //   if (activeStep === 0 && locationAllowed === null) {
+  //     try {
+  //       await requestLocation();
+  //     } catch {
+  //       return;
+  //     }
+  //   }
 
-    if (validateStep()) {
-      setActiveStep((prev) => prev + 1);
-    } else {
-      const stepFields = activeStep === 0
-        ? ["fullName", "email", "mobileNumber"]
-        : activeStep === 1
-          ? ["petName", "petGender", "petAge", "petBread"]
-          : ["emailOtp", "password", "confirmPassword"];
-      const touchedUpdate = {};
-      stepFields.forEach(f => touchedUpdate[f] = true);
-      setTouched(prev => ({ ...prev, ...touchedUpdate }));
-      const firstErrorKey = Object.keys(errors)[0];
-      if (firstErrorKey) toast.error(errors[firstErrorKey]);
-    }
-  };
+  //   if (validateStep()) {
+  //     setActiveStep((prev) => prev + 1);
+  //   } else {
+  //     const stepFields = activeStep === 0
+  //       ? ["fullName", "email", "mobileNumber"]
+  //       : activeStep === 1
+  //         ? ["petName", "petGender", "petAge", "petBread"]
+  //         : ["emailOtp", "password", "confirmPassword"];
+  //     const touchedUpdate = {};
+  //     stepFields.forEach(f => touchedUpdate[f] = true);
+  //     setTouched(prev => ({ ...prev, ...touchedUpdate }));
+  //     const firstErrorKey = Object.keys(errors)[0];
+  //     if (firstErrorKey) toast.error(errors[firstErrorKey]);
+  //   }
+  // };
 
 
   const handleBack = () => {
@@ -350,12 +378,12 @@ const Register = () => {
         submitData.append('pet_doc2', formData.petDoc2);
       }
 
-      await axios.post('https://snoutiq.com/api/auth/register',
+      await axios.post('https://snoutiq.com/backend/api/auth/register',
         submitData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      const res = await axios.post('https://snoutiq.com/api/auth/login', {
+      const res = await axios.post('https://snoutiq.com/backend/api/auth/login', {
         login: formData.email,
         password: formData.password,
       });

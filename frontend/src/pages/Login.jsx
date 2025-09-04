@@ -79,7 +79,7 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      const res = await axios.post("https://snoutiq.com/api/auth/login", {
+      const res = await axios.post("https://snoutiq.com/backend/api/auth/login", {
         login: formData.email,
         password: formData.password,
       });
