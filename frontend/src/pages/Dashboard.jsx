@@ -98,11 +98,11 @@ const Dashboard = () => {
 
         try {
             setIsLoading(true);
-            let url = "https://snoutiq.com/backend/index.php/index.php/api/chat/history";
+            let url = "https://snoutiq.com/backend/api/chat/history";
 
             // If specific chat room token is provided, fetch that chat's history
             if (specificChatRoomToken) {
-                url = `https://snoutiq.com/backend/index.php/index.php/api/chat/room/${specificChatRoomToken}/history`;
+                url = `https://snoutiq.com/backend/api/chat/room/${specificChatRoomToken}/history`;
             }
 
             const res = await axios.get(url, {
@@ -286,7 +286,7 @@ const Dashboard = () => {
             };
 
             const res = await axios.post(
-                "https://snoutiq.com/backend/index.php/index.php/api/chat/send",
+                "https://snoutiq.com/backend/api/chat/send",
                 payload,
                 {
                     headers: { Authorization: `Bearer ${token}` },
