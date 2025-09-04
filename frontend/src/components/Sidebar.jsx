@@ -288,7 +288,7 @@
 
 import { useEffect, useState, useContext } from "react";
 import axios from "../axios";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { PlusCircleIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { AuthContext } from "../auth/AuthContext";
@@ -309,7 +309,7 @@ const Sidebar = () => {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  const { user } = useContext(AuthContext);
+  const { user, chatRoomToken, updateChatRoomToken } = useContext(AuthContext);
   const navigate = useNavigate();
 
   // Fetch chat history
@@ -334,6 +334,7 @@ const Sidebar = () => {
     }
   };
 
+  // Start new chat
   const handleNewChat = async () => {
     if (!user) return;
     try {
@@ -343,8 +344,11 @@ const Sidebar = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const { chat_room_token } = res.data;
+
+      if (updateChatRoomToken) updateChatRoomToken(chat_room_token);
       toast.success("New chat started!");
-      fetchHistory();
+
+      await fetchHistory();
       navigate(`/chat/${chat_room_token}`);
     } catch (err) {
       console.error(err);
@@ -352,6 +356,7 @@ const Sidebar = () => {
     }
   };
 
+  // Delete chat
   const handleDeleteChat = async (chatId, chatRoomToken, e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -366,12 +371,11 @@ const Sidebar = () => {
       );
 
       toast.success("Chat deleted");
+      // Remove deleted chat from state
       setHistory(prev => prev.filter(c => c.id !== chatId));
 
-      // Navigate to new chat if current chat is deleted
-      if (window.location.pathname.includes(chatRoomToken)) {
-        handleNewChat();
-      }
+      // Turant new chat create aur navigate
+      handleNewChat();
     } catch (err) {
       console.error(err);
       toast.error("Failed to delete chat");
@@ -380,10 +384,13 @@ const Sidebar = () => {
     }
   };
 
-  const formatDate = dateStr => {
-    const d = new Date(dateStr);
-    const diff = Math.floor((new Date() - d) / (1000 * 60 * 60 * 24));
-    return diff === 0 ? "Today" : diff === 1 ? "Yesterday" : diff < 7 ? `${diff} days ago` : d.toLocaleDateString();
+  // Click on chat history
+  const handleHistoryClick = async (chatRoomToken) => {
+    if (!chatRoomToken) return;
+    if (updateChatRoomToken) updateChatRoomToken(chatRoomToken);
+
+    // Fetch messages for that chat room and navigate
+    navigate(`/chat/${chatRoomToken}`);
   };
 
   // Pet of the day
@@ -404,6 +411,12 @@ const Sidebar = () => {
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  const formatDate = dateStr => {
+    const d = new Date(dateStr);
+    const diff = Math.floor((new Date() - d) / (1000 * 60 * 60 * 24));
+    return diff === 0 ? "Today" : diff === 1 ? "Yesterday" : diff < 7 ? `${diff} days ago` : d.toLocaleDateString();
+  };
 
   return (
     <div className="fixed left-0 top-[70px] h-[calc(100vh-70px)] w-[260px] bg-white border-r border-gray-200 flex flex-col">
@@ -430,7 +443,11 @@ const Sidebar = () => {
           </div>
         ) : (
           history.map(item => (
-            <Link key={item.id} to={`/chat/${item.chat_room_token}`} className="group flex items-center justify-between p-2 rounded-md hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all duration-200">
+            <div
+              key={item.id}
+              onClick={() => handleHistoryClick(item.chat_room_token)}
+              className="group flex items-center justify-between p-2 rounded-md hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all duration-200"
+            >
               <div className="flex-1 min-w-0">
                 <span className="font-medium text-gray-700 text-sm truncate block">{item.name || "New Chat"}</span>
                 <span className="text-xs text-gray-400">{formatDate(item.created_at)}</span>
@@ -440,9 +457,13 @@ const Sidebar = () => {
                 disabled={deletingId === item.id}
                 className="opacity-0 group-hover:opacity-60 hover:opacity-100 p-1 rounded hover:bg-gray-200 transition-all duration-200 ml-2"
               >
-                {deletingId === item.id ? <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div> : <TrashIcon className="w-4 h-4 text-gray-500" />}
+                {deletingId === item.id ? (
+                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <TrashIcon className="w-4 h-4 text-gray-500" />
+                )}
               </button>
-            </Link>
+            </div>
           ))
         )}
       </div>
