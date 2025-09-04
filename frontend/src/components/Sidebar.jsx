@@ -383,15 +383,6 @@ const handleNewChat = async () => {
     }
   };
 
-  // Click on chat history
-  // const handleHistoryClick = async (chatRoomToken) => {
-  //   if (!chatRoomToken) return;
-  //   if (updateChatRoomToken) updateChatRoomToken(chatRoomToken);
-
-  //   // Fetch messages for that chat room and navigate
-  //   navigate(`/chat/${chatRoomToken}`);
-  // };
-
  const handleHistoryClick = async (chatRoomToken) => {
   if (!chatRoomToken) return;
   
