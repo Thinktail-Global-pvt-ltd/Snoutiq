@@ -530,8 +530,9 @@ const Dashboard = () => {
     const { chat_room_token } = useParams();
     const currentChatRoomToken = chat_room_token || chatRoomToken;
 
+
     const genId = () => Date.now() + Math.random();
-  
+
     // Optimized scroll function with debouncing
     const scrollToBottom = useCallback((behavior = "smooth") => {
         if (isAutoScrolling.current) return;
@@ -597,28 +598,38 @@ const Dashboard = () => {
         }
     };
 
+    // const fetchChatHistory = useCallback(async (specificChatRoomToken = null) => {
+    //     const token = localStorage.getItem("token");
+
+    //     // ✅ Check if user is authenticated
+    //     if (!token || !user) {
+    //         console.log("User not authenticated, skipping history fetch");
+    //         setIsLoading(false);
+    //         return;
+    //     }
+
+    //     try {
+    //         setIsLoading(true);
+    //         let url = "https://snoutiq.com/backend/api/chat/history";
+
+    //         // If specific chat room token is provided, fetch that chat's history
+    //         if (specificChatRoomToken) {
+    //             url = `https://snoutiq.com/backend/api/chat/room/${specificChatRoomToken}/history`;
+    //         }
     const fetchChatHistory = useCallback(async (specificChatRoomToken = null) => {
         const token = localStorage.getItem("token");
-
-        // ✅ Check if user is authenticated
-        if (!token || !user) {
-            console.log("User not authenticated, skipping history fetch");
-            setIsLoading(false);
-            return;
-        }
+        if (!token || !user) return;
 
         try {
             setIsLoading(true);
-            let url = "https://snoutiq.com/backend/api/chat/history";
+            const roomToken = specificChatRoomToken || chatRoomToken;
+            if (!roomToken) return;
 
-            // If specific chat room token is provided, fetch that chat's history
-            if (specificChatRoomToken) {
-                url = `https://snoutiq.com/backend/api/chat/room/${specificChatRoomToken}/history`;
-            }
+            const res = await axios.get(
+                `https://snoutiq.com/backend/api/chat/room/${roomToken}/history`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
 
-            const res = await axios.get(url, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
 
             const messagesFromAPI = res.data
                 .filter(chat => chat.question && chat.answer)
@@ -657,7 +668,7 @@ const Dashboard = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [user]);
+    }, [user,chatRoomToken]);
 
     // ✅ FIX: Load chat history when URL params change (when clicking on sidebar items)
     useEffect(() => {

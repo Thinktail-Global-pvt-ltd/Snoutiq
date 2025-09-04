@@ -416,20 +416,37 @@ const Sidebar = () => {
       setDeletingId(null);
     }
   };
+  // const handleHistoryClick = async (chatRoomToken) => {
+  //   if (!chatRoomToken) return;
+
+  //   // Update context
+  //   if (updateChatRoomToken) updateChatRoomToken(chatRoomToken);
+
+  //   // Navigate to the chat room
+  //   navigate(`/chat/${chatRoomToken}`);
+
+  //   // Dispatch a custom event to trigger message fetching
+  //   window.dispatchEvent(new CustomEvent("chatRoomChanged", {
+  //     detail: chatRoomToken
+  //   }));
+  // };
+
   const handleHistoryClick = async (chatRoomToken) => {
     if (!chatRoomToken) return;
 
-    // Update context
-    if (updateChatRoomToken) updateChatRoomToken(chatRoomToken);
+    if (updateChatRoomToken) {
+        updateChatRoomToken(chatRoomToken);
+    }
 
-    // Navigate to the chat room
-    navigate(`/chat/${chatRoomToken}`);
+    // Wait a tick to ensure Dashboard sees updated context
+    setTimeout(() => {
+        navigate(`/chat/${chatRoomToken}`);
+        window.dispatchEvent(new CustomEvent("chatRoomChanged", {
+            detail: chatRoomToken
+        }));
+    }, 0);
+};
 
-    // Dispatch a custom event to trigger message fetching
-    window.dispatchEvent(new CustomEvent("chatRoomChanged", {
-      detail: chatRoomToken
-    }));
-  };
 
   // Pet of the day
   useEffect(() => {
