@@ -91,7 +91,7 @@ class GeminiChatController extends Controller
         $level = $this->detectEmergencyLevel((string) $request->question);
 
         // Call Gemini
-        $apiKey = env('GEMINI_API_KEY');
+        $apiKey = 'AIzaSyALZDZm-pEK3mtcK9PG9ftz6xyGemEHQ3k';
         if (!$apiKey) {
             return response()->json(['error' => 'GEMINI_API_KEY missing in .env'], 500);
         }
