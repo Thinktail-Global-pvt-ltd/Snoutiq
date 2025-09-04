@@ -616,42 +616,134 @@ const Dashboard = () => {
     //         if (specificChatRoomToken) {
     //             url = `https://snoutiq.com/backend/api/chat/room/${specificChatRoomToken}/history`;
     //         }
+    // const fetchChatHistory = useCallback(async (specificChatRoomToken = null) => {
+    //     const token = localStorage.getItem("token");
+    //     if (!token || !user) return;
+
+    //     try {
+    //         setIsLoading(true);
+    //         const roomToken = specificChatRoomToken || chatRoomToken;
+    //         if (!roomToken) return;
+
+    //         const res = await axios.get(
+    //             `https://snoutiq.com/backend/api/chat/room/${roomToken}/history`,
+    //             { headers: { Authorization: `Bearer ${token}` } }
+    //         );
+
+
+    //         const messagesFromAPI = res.data
+    //             .filter(chat => chat.question && chat.answer)
+    //             .map(chat => {
+    //                 const baseId = Number(new Date(chat.created_at)) + Math.random();
+    //                 return [
+    //                     {
+    //                         id: baseId + 1,
+    //                         sender: "user",
+    //                         text: chat.question,
+    //                         timestamp: new Date(chat.created_at),
+    //                     },
+    //                     {
+    //                         id: baseId + 2,
+    //                         sender: "ai",
+    //                         text: chat.answer,
+    //                         displayedText: chat.answer, // Show full text for history
+    //                         timestamp: new Date(chat.created_at),
+    //                     },
+    //                 ];
+    //             })
+    //             .flat();
+
+    //         setMessages(messagesFromAPI);
+
+    //         // Update context if it exists in response
+    //         if (res.data.length > 0 && res.data[res.data.length - 1].context_token) {
+    //             setContextToken(res.data[res.data.length - 1].context_token);
+    //         }
+
+    //     } catch (err) {
+    //         console.error("Failed to fetch history", err);
+    //         if (specificChatRoomToken) {
+    //             toast.error("Failed to load chat history");
+    //         }
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // }, [user]);
+
     const fetchChatHistory = useCallback(async (specificChatRoomToken = null) => {
         const token = localStorage.getItem("token");
         if (!token || !user) return;
 
         try {
             setIsLoading(true);
-            const roomToken = specificChatRoomToken || chatRoomToken;
-            if (!roomToken) return;
 
-            const res = await axios.get(
-                `https://snoutiq.com/backend/api/chat/room/${roomToken}/history`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            // ✅ सही API endpoint format
+            let url;
+            if (specificChatRoomToken) {
+                // Specific chat room के messages
+                url = `https://snoutiq.com/backend/api/chat-rooms/${specificChatRoomToken}/chats?user_id=${user.id}`;
+            } else {
+                // All rooms की list
+                url = `https://snoutiq.com/backend/api/chat/listRooms?user_id=${user.id}`;
+            }
 
+            const res = await axios.get(url, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
 
-            const messagesFromAPI = res.data
-                .filter(chat => chat.question && chat.answer)
-                .map(chat => {
-                    const baseId = Number(new Date(chat.created_at)) + Math.random();
-                    return [
-                        {
-                            id: baseId + 1,
-                            sender: "user",
-                            text: chat.question,
-                            timestamp: new Date(chat.created_at),
-                        },
-                        {
-                            id: baseId + 2,
-                            sender: "ai",
-                            text: chat.answer,
-                            displayedText: chat.answer, // Show full text for history
-                            timestamp: new Date(chat.created_at),
-                        },
-                    ];
-                })
-                .flat();
+            console.log("Chat history API response:", res.data);
+
+            // ✅ Response structure को correctly handle करें
+            // यहां आपको API के actual response structure के according code लिखना होगा
+            let messagesFromAPI = [];
+
+            if (res.data && Array.isArray(res.data)) {
+                // अगर response array है
+                messagesFromAPI = res.data
+                    .filter(chat => chat.question && chat.answer)
+                    .map(chat => {
+                        const baseId = Number(new Date(chat.created_at)) + Math.random();
+                        return [
+                            {
+                                id: baseId + 1,
+                                sender: "user",
+                                text: chat.question,
+                                timestamp: new Date(chat.created_at),
+                            },
+                            {
+                                id: baseId + 2,
+                                sender: "ai",
+                                text: chat.answer,
+                                displayedText: chat.answer,
+                                timestamp: new Date(chat.created_at),
+                            },
+                        ];
+                    })
+                    .flat();
+            } else if (res.data && res.data.chats) {
+                // अगर response में chats array है
+                messagesFromAPI = res.data.chats
+                    .filter(chat => chat.question && chat.answer)
+                    .map(chat => {
+                        const baseId = Number(new Date(chat.created_at)) + Math.random();
+                        return [
+                            {
+                                id: baseId + 1,
+                                sender: "user",
+                                text: chat.question,
+                                timestamp: new Date(chat.created_at),
+                            },
+                            {
+                                id: baseId + 2,
+                                sender: "ai",
+                                text: chat.answer,
+                                displayedText: chat.answer,
+                                timestamp: new Date(chat.created_at),
+                            },
+                        ];
+                    })
+                    .flat();
+            }
 
             setMessages(messagesFromAPI);
 
@@ -668,8 +760,7 @@ const Dashboard = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [user,chatRoomToken]);
-
+    }, [user]);
     // ✅ FIX: Load chat history when URL params change (when clicking on sidebar items)
     useEffect(() => {
         console.log("Chat room token changed:", currentChatRoomToken);
