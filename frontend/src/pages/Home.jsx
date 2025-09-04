@@ -86,7 +86,7 @@ const Home = () => {
         {/* Hero Section */}
         <div className="text-center">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 mb-4 mt-12 sm:mt-20">
-            Your AI Pet Companion
+            Your AI Pet Companion test
           </h1>
           <p className="text-base sm:text-lg md:text-xl text-[#828282] max-w-xl mx-auto mb-8 px-4 sm:px-14">
             Your AI-powered pet companion for expert care, guidance, and endless
