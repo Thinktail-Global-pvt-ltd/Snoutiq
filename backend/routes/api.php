@@ -29,7 +29,9 @@ use App\Http\Controllers\Api\GeminiChatController;
 use App\Http\Controllers\Api\ContactRequestController;
 
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
-
+Route::get('/test-dd', function () {
+    dd("Hello bhai Webhook 2.0 👋, test route working!");
+});
 Route::get('/chats', [GeminiChatController::class, 'history']); 
 Route::post('/contact-request', [ContactRequestController::class, 'store']);
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
@@ -201,4 +203,18 @@ Route::prefix('public')->group(function(){
     Route::middleware('auth:sanctum')->post('/support/sendMessage', [SupportController::class, 'store']);
     Route::middleware('auth:sanctum')->post('/support/mydata', [SupportController::class, 'mydata']);
 
+});
+
+
+use Illuminate\Support\Facades\Log;
+
+Route::post('/webhook/deploy', function () {
+    Log::info('🚀 Webhook received at ' . now());
+
+    exec('bash /var/www/deploy.sh 2>&1', $output, $returnCode);
+
+    Log::info('Webhook Output:', $output);
+    Log::info('Webhook Exit Code: ' . $returnCode);
+
+    return response()->json(['status' => 'ok']);
 });
