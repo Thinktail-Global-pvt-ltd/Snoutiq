@@ -204,3 +204,17 @@ Route::prefix('public')->group(function(){
     Route::middleware('auth:sanctum')->post('/support/mydata', [SupportController::class, 'mydata']);
 
 });
+
+
+use Illuminate\Support\Facades\Log;
+
+Route::post('/webhook/deploy', function () {
+    Log::info('🚀 Webhook received at ' . now());
+
+    exec('bash /var/www/deploy.sh 2>&1', $output, $returnCode);
+
+    Log::info('Webhook Output:', $output);
+    Log::info('Webhook Exit Code: ' . $returnCode);
+
+    return response()->json(['status' => 'ok']);
+});
