@@ -133,45 +133,95 @@ class AuthController extends Controller
     //         'token'   => $token
     //     ]);
     // }
+
+
     public function send_otp(Request $request)
 {
-    $request->validate([
-        'value' => 'required|email'
-    ]);
+    try {
+        $request->validate([
+            'value' => 'required|email'
+        ]);
 
-    $value  = $request->input('value');   // email address
-    $otp    = rand(1000, 9999);
-    $token  = Str::uuid(); // track request
-    $expiresAt = Carbon::now()->addMinutes(10);
+        $value     = $request->input('value');   // email address
+        $otp       = rand(1000, 9999);
+        $token     = Str::uuid(); // track request
+        $expiresAt = Carbon::now()->addMinutes(10);
 
-    if ($request->input("unique") === "yes") {
-        $user = User::where('email', $value)->first();
-        if ($user) {
-            return response()->json([
-                'message' => 'Email is already registered with us',
-            ], 401);
+        if ($request->input("unique") === "yes") {
+            $user = User::where('email', $value)->first();
+            if ($user) {
+                return response()->json([
+                    'message' => 'Email is already registered with us',
+                ], 401);
+            }
         }
+
+        // Send OTP via Email
+        Mail::to($value)->send(new OtpMail($otp));
+
+        // Save OTP record in DB
+        Otp::create([
+            'token'       => $token,
+            'type'        => 'email',
+            'value'       => $value,
+            'otp'         => $otp,
+            'expires_at'  => $expiresAt,
+            'is_verified' => 0,
+        ]);
+
+        return response()->json([
+            'message' => 'OTP sent successfully',
+            'otp'     => 'hidden', // ⚠️ Debug ke liye rakh sakte ho, prod me hata do
+            'token'   => $token
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Something went wrong while sending OTP',
+            'error'   => $e->getMessage(), // ⚠️ Prod me isko hata dena, sirf dev me rakhna
+        ], 500);
     }
-
-    // Send OTP via Email
-    Mail::to($value)->send(new OtpMail($otp));
-
-    // Save OTP record in DB
-    Otp::create([
-        'token'      => $token,
-        'type'       => 'email',
-        'value'      => $value,
-        'otp'        => $otp,
-        'expires_at' => $expiresAt,
-        'is_verified'=> 0,
-    ]);
-
-    return response()->json([
-        'message' => 'OTP sent successfully',
-        'otp'     => 'hidden', // ⚠️ debug ke liye show kar sakte ho, prod me hata do
-        'token'   => $token
-    ]);
 }
+
+//     public function send_otp(Request $request)
+// {
+//     $request->validate([
+//         'value' => 'required|email'
+//     ]);
+
+//     $value  = $request->input('value');   // email address
+//     $otp    = rand(1000, 9999);
+//     $token  = Str::uuid(); // track request
+//     $expiresAt = Carbon::now()->addMinutes(10);
+
+//     if ($request->input("unique") === "yes") {
+//         $user = User::where('email', $value)->first();
+//         if ($user) {
+//             return response()->json([
+//                 'message' => 'Email is already registered with us',
+//             ], 401);
+//         }
+//     }
+
+//     // Send OTP via Email
+//     Mail::to($value)->send(new OtpMail($otp));
+
+//     // Save OTP record in DB
+//     Otp::create([
+//         'token'      => $token,
+//         'type'       => 'email',
+//         'value'      => $value,
+//         'otp'        => $otp,
+//         'expires_at' => $expiresAt,
+//         'is_verified'=> 0,
+//     ]);
+
+//     return response()->json([
+//         'message' => 'OTP sent successfully',
+//         'otp'     => 'hidden', // ⚠️ debug ke liye show kar sakte ho, prod me hata do
+//         'token'   => $token
+//     ]);
+// }
 
 
     // -------------------------- OTP VERIFY ---------------------------------
