@@ -531,17 +531,7 @@ const Dashboard = () => {
     const currentChatRoomToken = chat_room_token || chatRoomToken;
 
     const genId = () => Date.now() + Math.random();
-    // Dashboard.js में
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        if (!token) {
-            navigate("/login");
-            return;
-        } else {
-            navigate("/dashboard")
-        }
-
-    }, [navigate, user]);
+  
     // Optimized scroll function with debouncing
     const scrollToBottom = useCallback((behavior = "smooth") => {
         if (isAutoScrolling.current) return;
