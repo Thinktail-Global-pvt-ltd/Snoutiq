@@ -17,42 +17,42 @@ const ActionButton = ({ emergencyStatus }) => {
     switch (emergencyStatus) {
         case "⚠️ URGENT - Seek immediate veterinary care!":
             return (
-                <Button
+                <button
                     onClick={() => window.location.href = "/book-clinic-visit"}
-                    className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white"
+                    className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
                 >
-                    🚨 Book Emergency Appointment
-                </Button>
+                    🚨 {emergencyStatus}
+                </button>
             );
         case "ℹ️ Routine inquiry":
             return (
-                <Button
+                <button
                     onClick={() => window.location.href = "/book-video-consultation"}
-                    className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
                 >
-                    📹 Schedule Video Consultation
-                </Button>
+                    📹 {emergencyStatus}
+                </button>
             );
         default:
-            // General inquiry or unknown → show both
             return (
                 <div className="flex flex-col gap-2 mt-3">
-                    <Button
+                    <button
                         onClick={() => window.location.href = "/book-video-consultation"}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
                     >
-                        📹 Schedule Video Consultation
-                    </Button>
-                    <Button
+                        📹 {emergencyStatus || "Schedule Video Consultation"}
+                    </button>
+                    <button
                         onClick={() => window.location.href = "/book-clinic-visit"}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
                     >
-                        🏥 Book Clinic Appointment
-                    </Button>
+                        🏥 {emergencyStatus || "Book Clinic Appointment"}
+                    </button>
                 </div>
             );
     }
 };
+
 
 const MessageBubble = memo(({ msg, index, onFeedback }) => {
     console.log(msg, 'msg');

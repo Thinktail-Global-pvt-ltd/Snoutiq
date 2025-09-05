@@ -369,9 +369,8 @@ const Dashboard = () => {
                             sender: "ai",
                             text: fullText,
                             displayedText: "",
-                            classificationTag,
                             timestamp: new Date(),
-                            emergency_status: respEmergency || chat.emergency_status,
+                            emergency_status: respEmergency || emergency_status,
                         }
                         : m
                 )
