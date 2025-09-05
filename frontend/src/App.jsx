@@ -15,6 +15,13 @@ import TokenLogin from './components/TokenLogin';
 import Videocall from './pages/VideoCall';
 import SearchingDoctor from './pages/SearchingDoctor';
 
+import PrivacyPolicy from './policies/PrivacyPolicy';
+import TearmsCondition from './policies/TearmsCondition';
+import Cancelation from './policies/Cancelation';
+import CookiePolicy from './policies/CookiePolicy';
+import MedicalDataConsent from './policies/MedicalDataConsent';
+import ShippingPolicy from './policies/ShippingPolicy';
+
 function App() {
 
   return (
@@ -41,6 +48,13 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/register" element={<Register />} />
           <Route path="/token-login/:token" element={<TokenLogin />} />
+
+          <Route path='/privacy-policy' element={<PrivacyPolicy/>}/>
+          <Route path='/terms-of-service' element={<TearmsCondition/>}/>
+          <Route path='/cancellation-policy' element={<Cancelation/>}/>
+          <Route path='/cookie-policy' element={<CookiePolicy/>}/>
+          <Route path='/medical-data-consent' element={<MedicalDataConsent/>}/>
+          <Route path='/shipping-policy' element={<ShippingPolicy/>}/>
 
           {/* Protected Routes */}
           <Route

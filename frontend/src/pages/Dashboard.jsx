@@ -115,35 +115,13 @@ const Dashboard = () => {
             });
 
             console.log("Chat history API response:", res.data);
+            // console.log("Chat history API response:", res.data.emergency_status);
 
             // ✅ Response structure को correctly handle करें
             // यहां आपको API के actual response structure के according code लिखना होगा
             let messagesFromAPI = [];
 
             if (res.data && Array.isArray(res.data)) {
-                // अगर response array है
-                // messagesFromAPI = res.data
-                //     .filter(chat => chat.question && chat.answer)
-                //     .map(chat => {
-                //         const baseId = Number(new Date(chat.created_at)) + Math.random();
-                //         return [
-                //             {
-                //                 id: baseId + 1,
-                //                 sender: "user",
-                //                 text: chat.question,
-                //                 timestamp: new Date(chat.created_at),
-                //             },
-                //             {
-                //                 id: baseId + 2,
-                //                 sender: "ai",
-                //                 text: chat.answer,
-                //                 displayedText: chat.answer,
-                //                 timestamp: new Date(chat.created_at),
-                //                 emergency_status: chat.emergency_status,
-                //             },
-                //         ];
-                //     })
-                //     .flat();
                 const emergencyStatus = res.data.emergency_status || null;
 
                 messagesFromAPI = res.data.chats?.map(chat => {
@@ -535,7 +513,8 @@ const Dashboard = () => {
                                         key={msg.id || `msg-${index}`}
                                         msg={msg}
                                         index={index}
-                                        onFeedback={handleFeedback}
+                                        // onFeedback={handleFeedback}
+                                        onFeedback={(value, timestamp) => handleFeedback(value, timestamp)}
                                     />
                                 ))}
                                 <div ref={messagesEndRef} />

@@ -16,6 +16,7 @@ const Spinner = () => (
 const SearchingDoctor = () => {
   const { token } = useContext(AuthContext);
   const navigate = useNavigate();
+  
 
   const [status, setStatus] = useState('searching');
   const [requestDetails, setRequestDetails] = useState(null);
@@ -75,7 +76,7 @@ const SearchingDoctor = () => {
       const countdownInterval = setInterval(() => {
         if (count <= 0) {
           clearInterval(countdownInterval);
-          navigate(`/video-call/${token}`);
+          navigate(`/video-call`);
         } else {
           setCountdown(count);
           count--;

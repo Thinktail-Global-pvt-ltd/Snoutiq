@@ -5,6 +5,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import axios from './../axios';
 import { AuthContext } from '../auth/AuthContext';
 import Header from '../components/Header';
+import Footer from '../components/Footer';
 
 const Pets = () => {
   const navigate = useNavigate();
@@ -476,6 +477,7 @@ const Pets = () => {
           )}
         </div>
       </div>
+      <Footer/>
     </>
   );
 };

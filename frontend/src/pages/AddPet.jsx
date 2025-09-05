@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from './../axios';
 import toast from 'react-hot-toast';
 import Header from '../components/Header';
+import Footer from '../components/Footer';
 
 const AddPetForm = () => {
   const navigate = useNavigate();
@@ -536,6 +537,7 @@ const AddPetForm = () => {
           </div>
         </div>
       </div>
+      <Footer/>
     </>
   );
 };

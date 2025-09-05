@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import AgoraUIKit from 'agora-react-uikit';
 import { useNavigate, useParams } from 'react-router-dom';
+import { AuthContext } from '../auth/AuthContext';
 
 const Videocall = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [canAccessMedia, setCanAccessMedia] = useState(null); 
+  const [canAccessMedia, setCanAccessMedia] = useState(null);
   const [error, setError] = useState("");
+  const { token } = useContext(AuthContext);
 
   const callbacks = {
     EndCall: () => {
@@ -14,11 +16,10 @@ const Videocall = () => {
     },
   };
 
-  const rtcProps = { 
-    appId: '88a602d093ed47d6b77a29726aa6c35e', 
-    channel: 'booking' + id 
+  const rtcProps = {
+    appId: '88a602d093ed47d6b77a29726aa6c35e',
+    channel: 'booking_' + token  // ya koi unique identifier
   };
-
   // Check if camera/mic is accessible
   useEffect(() => {
     const checkMedia = async () => {
