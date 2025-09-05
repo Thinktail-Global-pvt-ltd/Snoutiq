@@ -3,19 +3,28 @@ import React, { memo } from 'react';
 
 // Simple button component since the original Button wasn't imported
 const Button = ({ onClick, className, children }) => {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 rounded-md transition-colors ${className}`}
-    >
-      {children}
-    </button>
-  );
+    return (
+        <button
+            onClick={onClick}
+            className={`px-4 py-2 rounded-md transition-colors ${className}`}
+        >
+            {children}
+        </button>
+    );
 };
 
-const ActionButton = ({ tag }) => {
-    switch (tag) {
-        case "VIDEO_CONSULT_SUGGESTED":
+const ActionButton = ({ emergencyStatus }) => {
+    switch (emergencyStatus) {
+        case "⚠️ URGENT - Seek immediate veterinary care!":
+            return (
+                <Button
+                    onClick={() => window.location.href = "/book-clinic-visit"}
+                    className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white"
+                >
+                    🚨 Book Emergency Appointment
+                </Button>
+            );
+        case "ℹ️ Routine inquiry":
             return (
                 <Button
                     onClick={() => window.location.href = "/book-video-consultation"}
@@ -24,26 +33,24 @@ const ActionButton = ({ tag }) => {
                     📹 Schedule Video Consultation
                 </Button>
             );
-        case "CLINIC_VISIT_NEEDED":
-            return (
-                <Button
-                    onClick={() => window.location.href = "/book-clinic-visit"}
-                    className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
-                >
-                    🏥 Book Clinic Appointment
-                </Button>
-            );
-        case "EMERGENCY":
-            return (
-                <Button
-                    onClick={() => window.location.href = "/emergency-vets"}
-                    className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white"
-                >
-                    🚨 Find Emergency Vet Now
-                </Button>
-            );
         default:
-            return null;
+            // General inquiry or unknown → show both
+            return (
+                <div className="flex flex-col gap-2 mt-3">
+                    <Button
+                        onClick={() => window.location.href = "/book-video-consultation"}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                        📹 Schedule Video Consultation
+                    </Button>
+                    <Button
+                        onClick={() => window.location.href = "/book-clinic-visit"}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    >
+                        🏥 Book Clinic Appointment
+                    </Button>
+                </div>
+            );
     }
 };
 
@@ -130,11 +137,12 @@ const MessageBubble = memo(({ msg, index, onFeedback }) => {
                 <div className="whitespace-pre-line leading-relaxed text-sm lg:text-base">
                     {msg.displayedText !== undefined ? msg.displayedText : msg.text}
                 </div>
-                
-                {msg.sender === "ai" && msg.classificationTag && (
-                    <ActionButton tag={msg.classificationTag} />
+
+                {msg.sender === "ai" && msg.emergency_status && (
+                    <ActionButton emergencyStatus={msg.emergency_status} />
                 )}
-                
+
+
                 <div
                     className={`text-xs mt-2 ${msg.sender === "user"
                         ? "text-blue-200"
@@ -176,7 +184,7 @@ const MessageBubble = memo(({ msg, index, onFeedback }) => {
     const nextMsg = nextProps.msg;
 
     return (
-        prevMsg.id === nextMsg.id && 
+        prevMsg.id === nextMsg.id &&
         prevMsg.displayedText === nextMsg.displayedText &&
         prevMsg.text === nextMsg.text &&
         prevMsg.type === nextMsg.type

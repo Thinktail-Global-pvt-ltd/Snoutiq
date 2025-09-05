@@ -139,6 +139,7 @@ const Dashboard = () => {
                                 text: chat.answer,
                                 displayedText: chat.answer,
                                 timestamp: new Date(chat.created_at),
+                                emergency_status: chat.emergency_status,
                             },
                         ];
                     })
