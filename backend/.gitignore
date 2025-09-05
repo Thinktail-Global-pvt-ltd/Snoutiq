@@ -27,7 +27,6 @@ yarn-error.log
 *.zip
 *.zip
 # Laravel extra ignores
-/public/.htaccess
 /cache/
 /storage/*
 !/storage/.gitignore
