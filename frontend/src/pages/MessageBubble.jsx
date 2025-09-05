@@ -14,42 +14,43 @@ const Button = ({ onClick, className, children }) => {
 };
 
 const ActionButton = ({ emergencyStatus }) => {
-    switch (emergencyStatus) {
-        case "⚠️ URGENT - Seek immediate veterinary care!":
-            return (
-                <button
-                    onClick={() => window.location.href = "/book-clinic-visit"}
-                    className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
-                >
-                    🚨 {emergencyStatus}
-                </button>
-            );
-        case "ℹ️ Routine inquiry":
-            return (
+    if (!emergencyStatus) return null;
+
+    if (emergencyStatus.includes("URGENT")) {
+        return (
+            <button
+                onClick={() => window.location.href = "/book-clinic-visit"}
+                className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
+            >
+                🚨 {emergencyStatus}
+            </button>
+        );
+    } else if (emergencyStatus.includes("Routine")) {
+        return (
+            <button
+                onClick={() => window.location.href = "/book-video-consultation"}
+                className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+            >
+                📹 {emergencyStatus}
+            </button>
+        );
+    } else {
+        return (
+            <div className="flex flex-col gap-2 mt-3">
                 <button
                     onClick={() => window.location.href = "/book-video-consultation"}
-                    className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
                 >
-                    📹 {emergencyStatus}
+                    📹 {emergencyStatus || "Schedule Video Consultation"}
                 </button>
-            );
-        default:
-            return (
-                <div className="flex flex-col gap-2 mt-3">
-                    <button
-                        onClick={() => window.location.href = "/book-video-consultation"}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
-                    >
-                        📹 {emergencyStatus || "Schedule Video Consultation"}
-                    </button>
-                    <button
-                        onClick={() => window.location.href = "/book-clinic-visit"}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
-                    >
-                        🏥 {emergencyStatus || "Book Clinic Appointment"}
-                    </button>
-                </div>
-            );
+                <button
+                    onClick={() => window.location.href = "/book-clinic-visit"}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
+                >
+                    🏥 {emergencyStatus || "Book Clinic Appointment"}
+                </button>
+            </div>
+        );
     }
 };
 
@@ -138,9 +139,13 @@ const MessageBubble = memo(({ msg, index, onFeedback }) => {
                     {msg.displayedText !== undefined ? msg.displayedText : msg.text}
                 </div>
 
-                {msg.sender === "ai" && msg.emergency_status && (
+                {/* {msg.sender === "ai" && msg.emergency_status && (
                     <ActionButton emergencyStatus={msg.emergency_status} />
+                )} */}
+                {msg.sender === "ai" && msg.emergency_status && (
+                    <ActionButton emergencyStatus={msg.emergency_status.trim()} />
                 )}
+
 
 
                 <div
