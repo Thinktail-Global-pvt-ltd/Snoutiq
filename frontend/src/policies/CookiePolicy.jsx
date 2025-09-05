@@ -4,7 +4,7 @@ export default function CookiePolicy() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 text-gray-800">
       <h1 className="text-2xl font-bold mb-2">Cookie Policy</h1>
-      <p className="text-sm text-gray-500 mb-6">Last Updated: May 31, 2025</p>
+      <p className="text-sm text-gray-500 mb-6">Last Updated: May 31, 2025 </p>
 
       <p className="mb-6">
         This Cookie Policy explains how Snoutiq (operated by Thinktail Global Pvt.
