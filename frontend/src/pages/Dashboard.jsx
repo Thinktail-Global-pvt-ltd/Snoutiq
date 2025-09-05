@@ -352,7 +352,10 @@ const Dashboard = () => {
                 }
             );
 
-            const { context_token: newCtx, chat: { answer, classificationTag } = { answer: "" } } = res.data || {};
+            // const { context_token: newCtx, chat: { answer, classificationTag } = { answer: "" } } = res.data || {};
+            // if (newCtx) setContextToken(newCtx);
+
+            const { context_token: newCtx, chat = {}, emergency_status: respEmergency } = res.data || {};
             if (newCtx) setContextToken(newCtx);
 
             const fullText = String(answer ?? "");
@@ -368,6 +371,7 @@ const Dashboard = () => {
                             displayedText: "",
                             classificationTag,
                             timestamp: new Date(),
+                            emergency_status: respEmergency || chat.emergency_status,
                         }
                         : m
                 )
