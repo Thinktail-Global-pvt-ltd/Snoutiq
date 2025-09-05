@@ -122,28 +122,50 @@ const Dashboard = () => {
 
             if (res.data && Array.isArray(res.data)) {
                 // अगर response array है
-                messagesFromAPI = res.data
-                    .filter(chat => chat.question && chat.answer)
-                    .map(chat => {
-                        const baseId = Number(new Date(chat.created_at)) + Math.random();
-                        return [
-                            {
-                                id: baseId + 1,
-                                sender: "user",
-                                text: chat.question,
-                                timestamp: new Date(chat.created_at),
-                            },
-                            {
-                                id: baseId + 2,
-                                sender: "ai",
-                                text: chat.answer,
-                                displayedText: chat.answer,
-                                timestamp: new Date(chat.created_at),
-                                emergency_status: chat.emergency_status,
-                            },
-                        ];
-                    })
-                    .flat();
+                // messagesFromAPI = res.data
+                //     .filter(chat => chat.question && chat.answer)
+                //     .map(chat => {
+                //         const baseId = Number(new Date(chat.created_at)) + Math.random();
+                //         return [
+                //             {
+                //                 id: baseId + 1,
+                //                 sender: "user",
+                //                 text: chat.question,
+                //                 timestamp: new Date(chat.created_at),
+                //             },
+                //             {
+                //                 id: baseId + 2,
+                //                 sender: "ai",
+                //                 text: chat.answer,
+                //                 displayedText: chat.answer,
+                //                 timestamp: new Date(chat.created_at),
+                //                 emergency_status: chat.emergency_status,
+                //             },
+                //         ];
+                //     })
+                //     .flat();
+                const emergencyStatus = res.data.emergency_status || null;
+
+                messagesFromAPI = res.data.chats?.map(chat => {
+                    const baseId = Number(new Date(chat.created_at)) + Math.random();
+                    return [
+                        {
+                            id: baseId + 1,
+                            sender: "user",
+                            text: chat.question,
+                            timestamp: new Date(chat.created_at),
+                        },
+                        {
+                            id: baseId + 2,
+                            sender: "ai",
+                            text: chat.answer,
+                            displayedText: chat.answer,
+                            timestamp: new Date(chat.created_at),
+                            emergency_status: emergencyStatus,
+                        }
+                    ];
+                }).flat() || [];
+
             } else if (res.data && res.data.chats) {
                 // अगर response में chats array है
                 messagesFromAPI = res.data.chats
@@ -294,112 +316,112 @@ const Dashboard = () => {
         typingTimeouts.current.set(messageId, initialTimeout);
     }, [cleanupTypingAnimation, scrollToBottom]);
 
-  const handleSendMessage = useCallback(async (inputMessage) => {
-    if (inputMessage.trim() === "" || sending) return;
+    const handleSendMessage = useCallback(async (inputMessage) => {
+        if (inputMessage.trim() === "" || sending) return;
 
-    setSending(true);
+        setSending(true);
 
-    const userMsgId = genId();
-    const loaderId = "__loader__";
+        const userMsgId = genId();
+        const loaderId = "__loader__";
 
-    const userMessage = {
-        id: userMsgId,
-        text: inputMessage,
-        sender: "user",
-        timestamp: new Date(),
-    };
-
-    const loaderMessage = {
-        id: loaderId,
-        type: "loading",
-        sender: "ai",
-        text: "",
-        timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage, loaderMessage]);
-
-    try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-            toast.error("Please log in to continue");
-            setMessages(prev => prev.filter(m => m.id !== loaderId));
-            setSending(false);
-            return;
-        }
-
-        const petData = {
-            pet_name: user?.pet_name || "Unknown",
-            pet_breed: "Unknown Breed",
-            pet_age: user?.pet_age?.toString() || "Unknown",
-            pet_location: "Unknown Location",
+        const userMessage = {
+            id: userMsgId,
+            text: inputMessage,
+            sender: "user",
+            timestamp: new Date(),
         };
 
-        const payload = {
-            user_id: user.id,
-            question: inputMessage,
-            context_token: contextToken || "",
-            chat_room_token: currentChatRoomToken || "",
-            ...petData,
+        const loaderMessage = {
+            id: loaderId,
+            type: "loading",
+            sender: "ai",
+            text: "",
+            timestamp: new Date(),
         };
 
-        const res = await axios.post(
-            "https://snoutiq.com/backend/api/chat/send",
-            payload,
-            {
-                headers: { Authorization: `Bearer ${token}` },
-                timeout: 30000
+        setMessages(prev => [...prev, userMessage, loaderMessage]);
+
+        try {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                toast.error("Please log in to continue");
+                setMessages(prev => prev.filter(m => m.id !== loaderId));
+                setSending(false);
+                return;
             }
-        );
 
-        // CORRECTED: Properly destructure the response
-        const { 
-            context_token: newCtx, 
-            chat = {}, 
-            emergency_status 
-        } = res.data || {};
-        
-        if (newCtx) setContextToken(newCtx);
+            const petData = {
+                pet_name: user?.pet_name || "Unknown",
+                pet_breed: "Unknown Breed",
+                pet_age: user?.pet_age?.toString() || "Unknown",
+                pet_location: "Unknown Location",
+            };
 
-        const fullText = String(chat.answer || "");
-        const aiId = genId();
+            const payload = {
+                user_id: user.id,
+                question: inputMessage,
+                context_token: contextToken || "",
+                chat_room_token: currentChatRoomToken || "",
+                ...petData,
+            };
 
-        setMessages(prev =>
-            prev.map(m =>
-                m.id === loaderId
-                    ? {
-                        id: aiId,
-                        sender: "ai",
-                        text: fullText,
-                        displayedText: "",
-                        timestamp: new Date(),
-                        emergency_status: emergency_status, // Add emergency_status to the message
-                    }
-                    : m
-            )
-        );
+            const res = await axios.post(
+                "https://snoutiq.com/backend/api/chat/send",
+                payload,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    timeout: 30000
+                }
+            );
 
-        startTypingAnimation(aiId, fullText);
+            // CORRECTED: Properly destructure the response
+            const {
+                context_token: newCtx,
+                chat = {},
+                emergency_status
+            } = res.data || {};
 
-    } catch (error) {
-        console.error("Error sending chat:", error);
-        toast.error("Something went wrong. Try again.");
+            if (newCtx) setContextToken(newCtx);
 
-        setMessages(prev => [
-            ...prev.filter(m => m.id !== loaderId),
-            {
-                id: genId(),
-                text: "⚠️ Sorry, I'm having trouble connecting right now.",
-                sender: "ai",
-                timestamp: new Date(),
-                isError: true,
-                displayedText: "⚠️ Sorry, I'm having trouble connecting right now.",
-            },
-        ]);
-    } finally {
-        setSending(false);
-    }
-}, [contextToken, currentChatRoomToken, user, sending, startTypingAnimation]);
+            const fullText = String(chat.answer || "");
+            const aiId = genId();
+
+            setMessages(prev =>
+                prev.map(m =>
+                    m.id === loaderId
+                        ? {
+                            id: aiId,
+                            sender: "ai",
+                            text: fullText,
+                            displayedText: "",
+                            timestamp: new Date(),
+                            emergency_status: emergency_status, // Add emergency_status to the message
+                        }
+                        : m
+                )
+            );
+
+            startTypingAnimation(aiId, fullText);
+
+        } catch (error) {
+            console.error("Error sending chat:", error);
+            toast.error("Something went wrong. Try again.");
+
+            setMessages(prev => [
+                ...prev.filter(m => m.id !== loaderId),
+                {
+                    id: genId(),
+                    text: "⚠️ Sorry, I'm having trouble connecting right now.",
+                    sender: "ai",
+                    timestamp: new Date(),
+                    isError: true,
+                    displayedText: "⚠️ Sorry, I'm having trouble connecting right now.",
+                },
+            ]);
+        } finally {
+            setSending(false);
+        }
+    }, [contextToken, currentChatRoomToken, user, sending, startTypingAnimation]);
 
     const clearChat = useCallback(() => {
         if (window.confirm("Are you sure you want to clear the chat history?")) {
