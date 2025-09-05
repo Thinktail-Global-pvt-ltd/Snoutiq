@@ -407,7 +407,6 @@ const Dashboard = () => {
             typingTimeouts.current.clear();
 
             setMessages([]);
-            
             setContextToken("");
 
             // Clear from localStorage
