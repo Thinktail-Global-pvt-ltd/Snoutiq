@@ -13,6 +13,7 @@ import AddPet from './pages/AddPet';
 import EditPet from './pages/EditPet';
 import TokenLogin from './components/TokenLogin';
 import Videocall from './pages/VideoCall';
+import SearchingDoctor from './pages/SearchingDoctor';
 
 function App() {
 
@@ -95,6 +96,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Videocall />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="searching-doctor"
+            element={
+              <ProtectedRoute>
+                <SearchingDoctor />
               </ProtectedRoute>
             }
           />
