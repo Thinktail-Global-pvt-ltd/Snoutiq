@@ -294,109 +294,112 @@ const Dashboard = () => {
         typingTimeouts.current.set(messageId, initialTimeout);
     }, [cleanupTypingAnimation, scrollToBottom]);
 
-    const handleSendMessage = useCallback(async (inputMessage) => {
-        if (inputMessage.trim() === "" || sending) return;
+  const handleSendMessage = useCallback(async (inputMessage) => {
+    if (inputMessage.trim() === "" || sending) return;
 
-        setSending(true);
+    setSending(true);
 
-        const userMsgId = genId();
-        const loaderId = "__loader__";
+    const userMsgId = genId();
+    const loaderId = "__loader__";
 
-        const userMessage = {
-            id: userMsgId,
-            text: inputMessage,
-            sender: "user",
-            timestamp: new Date(),
-        };
+    const userMessage = {
+        id: userMsgId,
+        text: inputMessage,
+        sender: "user",
+        timestamp: new Date(),
+    };
 
-        const loaderMessage = {
-            id: loaderId,
-            type: "loading",
-            sender: "ai",
-            text: "",
-            timestamp: new Date(),
-        };
+    const loaderMessage = {
+        id: loaderId,
+        type: "loading",
+        sender: "ai",
+        text: "",
+        timestamp: new Date(),
+    };
 
-        setMessages(prev => [...prev, userMessage, loaderMessage]);
+    setMessages(prev => [...prev, userMessage, loaderMessage]);
 
-        try {
-            const token = localStorage.getItem("token");
-            if (!token) {
-                toast.error("Please log in to continue");
-                setMessages(prev => prev.filter(m => m.id !== loaderId));
-                setSending(false);
-                return;
-            }
-
-            const petData = {
-                pet_name: user?.pet_name || "Unknown",
-                pet_breed: "Unknown Breed",
-                pet_age: user?.pet_age?.toString() || "Unknown",
-                pet_location: "Unknown Location",
-            };
-
-            const payload = {
-                user_id: user.id,
-                question: inputMessage,
-                context_token: contextToken || "",
-                chat_room_token: currentChatRoomToken || "",
-                ...petData,
-            };
-
-            const res = await axios.post(
-                "https://snoutiq.com/backend/api/chat/send",
-                payload,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                    timeout: 30000
-                }
-            );
-
-            // const { context_token: newCtx, chat: { answer, classificationTag } = { answer: "" } } = res.data || {};
-            // if (newCtx) setContextToken(newCtx);
-
-            const { context_token: newCtx, chat = {}, emergency_status: respEmergency } = res.data || {};
-            if (newCtx) setContextToken(newCtx);
-
-            const fullText = String(answer ?? "");
-            const aiId = genId();
-
-            setMessages(prev =>
-                prev.map(m =>
-                    m.id === loaderId
-                        ? {
-                            id: aiId,
-                            sender: "ai",
-                            text: fullText,
-                            displayedText: "",
-                            timestamp: new Date(),
-                            emergency_status: respEmergency || emergency_status,
-                        }
-                        : m
-                )
-            );
-
-            startTypingAnimation(aiId, fullText);
-
-        } catch (error) {
-            console.error("Error sending chat:", error);
-            toast.error("Something went wrong. Try again.");
-
-            setMessages(prev => [
-                ...prev.filter(m => m.id !== loaderId),
-                {
-                    id: genId(),
-                    text: "⚠️ Sorry, I'm having trouble connecting right now.",
-                    sender: "ai",
-                    timestamp: new Date(),
-                    isError: true,
-                    displayedText: "⚠️ Sorry, I'm having trouble connecting right now.",
-                },
-            ]);
-        } finally {
+    try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            toast.error("Please log in to continue");
+            setMessages(prev => prev.filter(m => m.id !== loaderId));
             setSending(false);
+            return;
         }
-    }, [contextToken, currentChatRoomToken, user, sending, startTypingAnimation]);
+
+        const petData = {
+            pet_name: user?.pet_name || "Unknown",
+            pet_breed: "Unknown Breed",
+            pet_age: user?.pet_age?.toString() || "Unknown",
+            pet_location: "Unknown Location",
+        };
+
+        const payload = {
+            user_id: user.id,
+            question: inputMessage,
+            context_token: contextToken || "",
+            chat_room_token: currentChatRoomToken || "",
+            ...petData,
+        };
+
+        const res = await axios.post(
+            "https://snoutiq.com/backend/api/chat/send",
+            payload,
+            {
+                headers: { Authorization: `Bearer ${token}` },
+                timeout: 30000
+            }
+        );
+
+        // CORRECTED: Properly destructure the response
+        const { 
+            context_token: newCtx, 
+            chat = {}, 
+            emergency_status 
+        } = res.data || {};
+        
+        if (newCtx) setContextToken(newCtx);
+
+        const fullText = String(chat.answer || "");
+        const aiId = genId();
+
+        setMessages(prev =>
+            prev.map(m =>
+                m.id === loaderId
+                    ? {
+                        id: aiId,
+                        sender: "ai",
+                        text: fullText,
+                        displayedText: "",
+                        timestamp: new Date(),
+                        emergency_status: emergency_status, // Add emergency_status to the message
+                    }
+                    : m
+            )
+        );
+
+        startTypingAnimation(aiId, fullText);
+
+    } catch (error) {
+        console.error("Error sending chat:", error);
+        toast.error("Something went wrong. Try again.");
+
+        setMessages(prev => [
+            ...prev.filter(m => m.id !== loaderId),
+            {
+                id: genId(),
+                text: "⚠️ Sorry, I'm having trouble connecting right now.",
+                sender: "ai",
+                timestamp: new Date(),
+                isError: true,
+                displayedText: "⚠️ Sorry, I'm having trouble connecting right now.",
+            },
+        ]);
+    } finally {
+        setSending(false);
+    }
+}, [contextToken, currentChatRoomToken, user, sending, startTypingAnimation]);
 
     const clearChat = useCallback(() => {
         if (window.confirm("Are you sure you want to clear the chat history?")) {

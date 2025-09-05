@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import axiosClient from '../../axios';
+import axiosClient from '../axios';
 import { AuthContext } from '../auth/AuthContext';
 
 // Loading spinner component
