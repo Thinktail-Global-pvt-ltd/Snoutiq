@@ -440,7 +440,7 @@ const Dashboard = () => {
                 <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">
-                            Snoutiq AI wehook test 1.20
+                            Snoutiq AI wehook test 1.30
                         </h1>
                         <p className="text-gray-600 mt-1 text-sm">
                             {currentChatRoomToken ? `Ask questions about ${user?.pet_name || "your pet"}'s health` : ``
