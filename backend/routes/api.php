@@ -33,7 +33,7 @@ use App\Http\Controllers\Api\VideoCallingController;
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
 Route::get('/test-dd', function () {
-    dd("webhook is finally working fronten and backend");
+    dd("highest in the room");
 });
 Route::get('/test-cors', function (Request $request) {
     return response()->json([
