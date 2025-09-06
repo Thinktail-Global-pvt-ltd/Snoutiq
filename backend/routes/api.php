@@ -28,7 +28,7 @@ use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
 use App\Http\Controllers\Api\GeminiChatController;
 use App\Http\Controllers\Api\ContactRequestController;
-use App\Http\Controllers\Auth\VideoCallingController;
+use App\Http\Controllers\Api\VideoCallingController;
 // routes/api.php
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
