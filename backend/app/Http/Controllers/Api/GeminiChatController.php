@@ -43,7 +43,116 @@ class GeminiChatController extends Controller
     }
 
     /** SEND MESSAGE: Requires existing room; refresh room name each message */
-    public function sendMessage(Request $request)
+public function sendMessage(Request $request)
+{
+    $request->validate([
+        'user_id'         => 'required|integer',
+        'chat_room_token' => 'required|string',
+        'chat_room_id'    => 'required_without:chat_room_token|integer',
+        'question'        => 'required|string',
+        'context_token'   => 'nullable|string',
+        'title'           => 'nullable|string', 
+        'pet_name'        => 'nullable|string',
+        'pet_breed'       => 'nullable|string',
+        'pet_age'         => 'nullable|string',
+        'pet_location'    => 'nullable|string',
+    ]);
+
+    $userId  = (int) $request->user_id;
+
+    // Find room by id or token, ensuring it belongs to user
+    if ($request->filled('chat_room_id')) {
+        $room = ChatRoom::where('id', $request->chat_room_id)
+            ->where('user_id', $userId)
+            ->firstOrFail();
+    } else {
+        $room = ChatRoom::where('chat_room_token', $request->chat_room_token)
+            ->firstOrFail();
+    }
+
+    $contextToken = $request->context_token ?: Str::uuid()->toString();
+
+    // Last chat in SAME room (for short context)
+    $lastChat = Chat::where('chat_room_id', $room->id)
+        ->latest()
+        ->first();
+
+    // ✅ Build Gemini payload with 6 rules included
+    $payload = $this->buildGeminiPayload($request->all(), $lastChat);
+
+    // Emergency level detection (your custom method)
+    $level = $this->detectEmergencyLevel((string) $request->question);
+
+    // Gemini API call
+    $apiKey = 'AIzaSyALZDZm-pEK3mtcK9PG9ftz6xyGemEHQ3k';
+    if (!$apiKey) {
+        return response()->json(['error' => 'GEMINI_API_KEY missing in .env'], 500);
+    }
+
+    $resp = Http::withHeaders([
+        'Content-Type'   => 'application/json',
+        'X-goog-api-key' => $apiKey,
+    ])->post(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+        $payload
+    );
+
+    // ✅ Fallback safe response if API fails
+    if (!$resp->successful()) {
+        return response()->json([
+            'status'  => 'success',
+            'message' => "I understand how worrying this must be. It's important to have a veterinarian check your pet. For now, please keep your pet comfortable and hydrated. [VIDEO_CONSULT_SUGGESTED]",
+        ], 200);
+    }
+
+    // Process Gemini response
+    $answerRaw = $resp->json('candidates.0.content.parts.0.text') ?? "No response.";
+    $answerRaw = $this->enforceSnoutBrand($answerRaw);
+    $answer    = $this->stripMarkdownToPlain($answerRaw);
+
+    // ✅ Extract output tag
+    preg_match('/\[(GENERAL_GUIDANCE|VIDEO_CONSULT_SUGGESTED|EMERGENCY)\]$/', $answer, $matches);
+    $responseTag = $matches[1] ?? 'GENERAL_GUIDANCE';
+
+    // ✅ Clean tag from answer text before saving
+    $answerClean = trim(preg_replace('/\[(GENERAL_GUIDANCE|VIDEO_CONSULT_SUGGESTED|EMERGENCY)\]$/', '', $answer));
+
+    // Save message
+    $chat = Chat::create([
+        'user_id'         => $userId,
+        'chat_room_id'    => $room->id,
+        'chat_room_token' => $room->chat_room_token,
+        'context_token'   => $contextToken,
+        'question'        => $request->question,
+        'answer'          => $answerClean,
+        'response_tag'    => $responseTag,   // ✅ NEW FIELD
+        'pet_name'        => $request->pet_name,
+        'pet_breed'       => $request->pet_breed,
+        'pet_age'         => $request->pet_age,
+        'pet_location'    => $request->pet_location,
+    ]);
+
+    // Refresh room name on every question
+    $newName = $request->title ?: $this->autoTitleFromQuestion($request->question);
+    $room->name = $newName;
+    $room->touch(); 
+    $room->save();
+
+    return response()->json([
+        'status'           => 'success',
+        'chat_room_id'     => $room->id,
+        'chat_room_token'  => $room->chat_room_token,
+        'room_name'        => $room->name,
+        'context_token'    => $contextToken,
+        'emergency_status' => $level,
+        'response_tag'     => $responseTag,  // ✅ return in API response also
+        'chat'             => $chat,
+    ]);
+}
+
+
+    /** SEND MESSAGE: Requires existing room; refresh room name each message */
+    public function sendMessage_old(Request $request)
     {
        
         $request->validate([
@@ -215,6 +324,84 @@ class GeminiChatController extends Controller
     }
 
     private function buildGeminiPayload(array $req, ?Chat $lastChat): array
+{
+    $petContextBlock = "";
+    if (!empty($req['pet_name']) || !empty($req['pet_breed']) || !empty($req['pet_age']) || !empty($req['pet_location'])) {
+        $petContextBlock =
+            "Pet Profile:\n" .
+            "- Pet Name: " . ($req['pet_name'] ?? 'Not specified') . "\n" .
+            "- Breed: " . ($req['pet_breed'] ?? 'Mixed/Unknown breed') . "\n" .
+            "- Age: " . ($req['pet_age'] ?? 'Age not specified') . " years old\n" .
+            "- Location: " . ($req['pet_location'] ?? 'India (general advice)');
+    }
+
+    $lastQnA = "";
+    if ($lastChat) {
+        $lastQnA =
+            "Previous Exchange:\n" .
+            "- Last Question: " . trim($lastChat->question) . "\n" .
+            "- Last Answer: " . mb_substr(trim($lastChat->answer), 0, 800) . (mb_strlen($lastChat->answer) > 800 ? "..." : "");
+    }
+
+    // ✅ 6 rules system instruction
+    $system = <<<SYS
+Role:
+- You are SnoutAI Assistant, empathetic guide for Indian pet parents.
+- You are NOT a vet and cannot diagnose or treat.
+
+Response Structure:
+1) Acknowledge emotion.
+2) Emphasize safety (vet check).
+3) Give short educational context.
+4) Provide caring guidance.
+
+Safety Rules:
+- Never prescribe medicines/treatments.
+- For symptoms: emotion → vet recommendation → context → guidance.
+- For emergencies: urgent but compassionate.
+
+Output Tags:
+- End with one tag only: [GENERAL_GUIDANCE], [VIDEO_CONSULT_SUGGESTED], or [EMERGENCY].
+
+Style:
+- Warm, empathetic, simple words.
+- Never call yourself Gemini/Google (only "SnoutAI Assistant").
+- Plain text only (no Markdown).
+- Use 1), 2), 3) if needed.
+
+Example:
+"My dog has stopped eating" →
+"I understand how worrying this must be. It's important to have a veterinarian examine your dog. Sometimes it’s due to stress or stomach upset, but it can also be serious. Ensure clean water and avoid giving new foods right now. Please book a vet visit soon. [VIDEO_CONSULT_SUGGESTED]"
+SYS;
+
+    $userParts = array_filter([
+        $petContextBlock,
+        $lastQnA,
+        "Current Question: " . ($req['question'] ?? '')
+    ]);
+    $userPrompt = implode("\n\n", $userParts);
+
+    return [
+        "systemInstruction" => [
+            "role"  => "system",
+            "parts" => [ [ "text" => $system ] ],
+        ],
+        "contents" => [
+            [
+                "role"  => "user",
+                "parts" => [ [ "text" => $userPrompt ] ],
+            ],
+        ],
+        "generationConfig" => [
+            "temperature"      => 0.7,
+            "topK"             => 40,
+            "topP"             => 0.95,
+            "maxOutputTokens"  => 800,
+        ],
+    ];
+}
+
+    private function buildGeminiPayload_old(array $req, ?Chat $lastChat): array
     {
         $petContextBlock = "";
         if (!empty($req['pet_name']) || !empty($req['pet_breed']) || !empty($req['pet_age']) || !empty($req['pet_location'])) {
