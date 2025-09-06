@@ -28,7 +28,9 @@ use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
 use App\Http\Controllers\Api\GeminiChatController;
 use App\Http\Controllers\Api\ContactRequestController;
-
+use App\Http\Controllers\Auth\VideoCallingController;
+// routes/api.php
+Route::post('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
 Route::get('/test-dd', function () {
     dd("webhook is finally working fronten and backend");
