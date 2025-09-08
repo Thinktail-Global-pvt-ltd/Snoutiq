@@ -8,7 +8,7 @@ import { AuthContext } from "../auth/AuthContext";
 import Header from "../components/Header";
 
 const Register = () => {
-  const [userType, setUserType] = useState("pet_owner"); // 'pet_owner' or 'veterinarian'
+  const [userType, setUserType] = useState("pet_owner"); 
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",

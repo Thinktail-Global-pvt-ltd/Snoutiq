@@ -146,52 +146,37 @@ const HeaderWithSidebar = ({ children }) => {
         },
       ],
     },
+
     {
-      category: "My Pets",
+      category: "Pet Owner",
       items: [
-        {
+          {
           text: "My Pets",
           icon: <HiOutlineHeart />,
           path: "/user-dashboard/pet-info",
         },
-     
-      ],
-    },
-    {
-      category: "Appointments",
-      items: [
         {
           text: "My Bookings",
           icon: <HiOutlineCalendar />,
           path: "/user-dashboard/my-bookings",
         },
-        {
-          text: "Calendar",
-          icon: <HiOutlineCalendar />,
-          path: "/user-dashboard/calendar",
-        },
-      ],
-    },
-
-    
-    {
-      category: "Business",
-      items: [
-        {
-          text: "Booking Requests",
-          icon: <HiOutlineCalendar />,
-          path: "/user-dashboard/bookings",
-        },
-        {
-          text: "Client History",
+         {
+          text: "History",
           icon: <HiOutlineUserGroup />,
           path: "/user-dashboard/history",
         },
       ],
     },
+
+  
      {
       category: "Doctor",
       items: [
+          {
+          text: "Booking Requests",
+          icon: <HiOutlineCalendar />,
+          path: "/user-dashboard/bookings",
+        },
         {
           text: "Profile & Settings",
           icon: <HiOutlineUser />,
@@ -215,7 +200,7 @@ const HeaderWithSidebar = ({ children }) => {
         {
           text: "Ratings & Reviews",
           icon: <HiOutlineStar />,
-          path: "/user-dashboard/ratings",
+          path: "/user-dashboard/rating",
         },
         {
           text: "Support",

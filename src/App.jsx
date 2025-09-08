@@ -27,6 +27,8 @@ import VetOnwerProfile from "./VetDashboard/VetOnwerProfile";
 import VetPayment from "./VetDashboard/VetPayment";
 import VetDocument from "./VetDashboard/VetDocument";
 import DoctorRegistration from "./VetDashboard/DoctorRegistration";
+import Ratings from "./VetDashboard/Rating";
+import Support from "./pages/Support";
 
 function App() {
   return (
@@ -180,6 +182,26 @@ function App() {
               <ProtectedRoute>
                 <HeaderWithSidebar>
                   <VetPayment />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+             <Route
+            path="/user-dashboard/rating"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <Ratings />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+             <Route
+            path="/user-dashboard/support"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <Support />
                 </HeaderWithSidebar>
               </ProtectedRoute>
             }
