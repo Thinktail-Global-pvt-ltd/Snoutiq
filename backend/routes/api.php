@@ -22,6 +22,9 @@ use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
 use App\Models\User;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
+Route::get('/dog-breed/{breed}', [\App\Http\Controllers\Api\DogBreedController::class, 'getBreedImage']);
+Route::get('/dog-breeds/all', [\App\Http\Controllers\Api\DogBreedController::class, 'allBreeds']);
+
 
 
 
