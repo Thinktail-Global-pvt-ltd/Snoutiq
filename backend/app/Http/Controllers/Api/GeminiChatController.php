@@ -690,7 +690,7 @@ SYS;
         $payload = $this->buildGeminiPayload($request->all(), $lastChat);
 
         // Call Gemini
-        $apiKey = env('GEMINI_API_KEY');
+        $apiKey = 'AIzaSyCQga1wT5BkkX_uahvd_DdAllPeYXpkzOg';
         if (!$apiKey) {
             return response()->json(['error' => 'GEMINI_API_KEY missing in .env'], 500);
         }
