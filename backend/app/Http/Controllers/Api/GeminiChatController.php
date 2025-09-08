@@ -309,7 +309,7 @@ class GeminiChatController extends Controller
         $payload = $this->buildGeminiPayload($request->all(), $lastChat, $exchanges);
 
         // Call Gemini
-        $apiKey = env('GEMINI_API_KEY');
+        $apiKey = 'AIzaSyCIB0yfzSQGGwpVUruqy_sd2WqujTLa1Rk';
         if (!$apiKey) {
             return response()->json(['error' => 'GEMINI_API_KEY missing in .env'], 500);
         }
