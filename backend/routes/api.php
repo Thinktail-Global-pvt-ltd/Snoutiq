@@ -29,6 +29,18 @@ use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 use App\Http\Controllers\Api\GeminiChatController;
 use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\VideoCallingController;
+use App\Http\Controllers\Api\WeatherController;
+
+
+Route::get('/weather/latest', [WeatherLogController::class, 'latest']);
+Route::get('/weather/history', [WeatherLogController::class, 'history']);
+
+Route::get('/weather/by-coords', [WeatherController::class, 'byCoords']);
+
+Route::get('/weather/cities', [WeatherController::class, 'cities']);            // ?cities=Delhi,Mumbai,Bangalore
+Route::get('/weather/detail', [WeatherController::class, 'detail']);            // ?city=Delhi
+Route::get('/weather/hourly-schedule', [WeatherController::class, 'hourlySchedule']); // ?city=Delhi
+
 // routes/api.php
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);

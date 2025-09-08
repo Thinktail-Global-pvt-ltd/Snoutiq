@@ -20,5 +20,8 @@ class Chat extends Model
         'pet_breed',
         'pet_age',
         'pet_location',
+        'emergency_status',
+        'diagnosis'
+
     ];
 }
