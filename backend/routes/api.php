@@ -45,7 +45,7 @@ Route::get('/weather/hourly-schedule', [WeatherController::class, 'hourlySchedul
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
 Route::get('/test-dd', function () {
-    dd("highest in the room ~travis scott");
+    dd("highest in the room ~travis scott g g g g");
 });
 Route::get('/test-cors', function (Request $request) {
     return response()->json([
