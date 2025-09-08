@@ -62,73 +62,118 @@ const Header = () => {
 
 
     const MobileDrawers = () => (
-        <>
-            {/* Left Drawer - Chat History */}
+    <>
+      {/* Left Drawer - Chat History */}
+      <Transition.Root show={isLeftDrawerOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={setIsLeftDrawerOpen}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-in-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in-out duration-300"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-800 bg-opacity-75 transition-opacity" />
+          </Transition.Child>
 
-            <Transition.Root show={isLeftDrawerOpen} as={Fragment}>
-                <Dialog as="div" className="relative z-50" onClose={setIsLeftDrawerOpen}>
-                    <Transition.Child
-                        as={Fragment}
-                        enter="ease-in-out duration-300"
-                        enterFrom="opacity-0"
-                        enterTo="opacity-100"
-                        leave="ease-in-out duration-300"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                    >
-                        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 transition-opacity" />
-                    </Transition.Child>
-
-                    <div className="fixed inset-0 overflow-hidden">
-                        <div className="absolute inset-0 overflow-hidden">
-                            <div className="pointer-events-none fixed inset-y-0 left-0 flex max-w-full pr-10">
-                                <Transition.Child
-                                    as={Fragment}
-                                    enter="transform transition ease-in-out duration-300"
-                                    enterFrom="-translate-x-full"
-                                    enterTo="translate-x-0"
-                                    leave="transform transition ease-in-out duration-300"
-                                    leaveFrom="translate-x-0"
-                                    leaveTo="-translate-x-full"
-                                >
-                                    <Dialog.Panel className="pointer-events-auto w-screen max-w-md">
-
-                                        <div className="flex h-full flex-col bg-white shadow-xl">
-                                            {user ? <>
-                                                <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-                                                    <Dialog.Title className="text-lg font-semibold">
-                                                        Chat History
-                                                    </Dialog.Title>
-                                                    <button
-                                                        type="button"
-                                                        className="rounded-md text-white hover:text-gray-200 transition-colors"
-                                                        onClick={() => setIsLeftDrawerOpen(false)}
-                                                    >
-                                                        <XMarkIcon className="w-6 h-6" />
-                                                    </button>
-                                                </div>
-
-                                                <div className="flex-1 overflow-y-auto">
-                                                    <div className="px-4 py-4">
-                                                        <Sidebar isMobile={true} onItemClick={closeLeftDrawer} />
-                                                    </div>
-
-                                                </div>
-                                            </>
-                                                : ""}
-                                        </div>
-
-                                    </Dialog.Panel>
-                                </Transition.Child>
-                            </div>
+          <div className="fixed inset-0 overflow-hidden">
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="pointer-events-none fixed inset-y-0 left-0 flex max-w-full pr-10">
+                <Transition.Child
+                  as={Fragment}
+                  enter="transform transition ease-in-out duration-300"
+                  enterFrom="-translate-x-full"
+                  enterTo="translate-x-0"
+                  leave="transform transition ease-in-out duration-300"
+                  leaveFrom="translate-x-0"
+                  leaveTo="-translate-x-full"
+                >
+                  <Dialog.Panel className="pointer-events-auto w-[260px]">
+                    <div className="flex h-full flex-col bg-white shadow-xl">
+                      <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                        <Dialog.Title className="text-lg font-semibold">
+                          Chat History
+                        </Dialog.Title>
+                        <button
+                          type="button"
+                          className="rounded-md text-white hover:text-gray-200 transition-colors"
+                          onClick={() => setIsLeftDrawerOpen(false)}
+                        >
+                          <XMarkIcon className="w-6 h-6" />
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        <div className="px-4 py-4">
+                          <Sidebar isMobile={true} onItemClick={closeLeftDrawer} />
                         </div>
+                      </div>
                     </div>
-                </Dialog>
-            </Transition.Root>
+                  </Dialog.Panel>
+                </Transition.Child>
+              </div>
+            </div>
+          </div>
+        </Dialog>
+      </Transition.Root>
 
+      {/* Right Drawer - Additional Features */}
+      <Transition.Root show={isRightDrawerOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={setIsRightDrawerOpen}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-in-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in-out duration-300"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-800 bg-opacity-75 transition-opacity" />
+          </Transition.Child>
 
-        </>
-    );
+          <div className="fixed inset-0 overflow-hidden">
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+                <Transition.Child
+                  as={Fragment}
+                  enter="transform transition ease-in-out duration-300"
+                  enterFrom="translate-x-full"
+                  enterTo="translate-x-0"
+                  leave="transform transition ease-in-out duration-300"
+                  leaveFrom="translate-x-0"
+                  leaveTo="translate-x-full"
+                >
+                  <Dialog.Panel className="pointer-events-auto w-[260px]">
+                    <div className="flex h-full flex-col bg-white shadow-xl">
+                      <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                        <Dialog.Title className="text-lg font-semibold">
+                          Features & Offers
+                        </Dialog.Title>
+                        <button
+                          type="button"
+                          className="rounded-md text-white hover:text-gray-200 transition-colors"
+                          onClick={() => setIsRightDrawerOpen(false)}
+                        >
+                          <XMarkIcon className="w-6 h-6" />
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        <div className="w-full">
+                          <RightSidebar isMobile={true} onItemClick={closeRightDrawer} />
+                        </div>
+                      </div>
+                    </div>
+                  </Dialog.Panel>
+                </Transition.Child>
+              </div>
+            </div>
+          </div>
+        </Dialog>
+      </Transition.Root>
+    </>
+  );
 
     return (
         <>

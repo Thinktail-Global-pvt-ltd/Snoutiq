@@ -13,6 +13,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.7",
     "@heroicons/react": "^2.2.0",
+    "@react-google-maps/api": "^2.20.7",
     "agora-react-uikit": "^1.2.0",
     "agora-rn-uikit": "^5.0.2",
     "axios": "^1.11.0",

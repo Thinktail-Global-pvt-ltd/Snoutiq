@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
-import { FaPaw, FaPlusCircle, FaCamera, FaTrash, FaArrowLeft } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
-import axios from './../axios';
-import toast from 'react-hot-toast';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
+import React, { useState } from "react";
+import {
+  FaPaw,
+  FaPlusCircle,
+  FaCamera,
+  FaTrash,
+  FaArrowLeft,
+} from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import axios from "./../axios";
+import toast from "react-hot-toast";
 
 const AddPetForm = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
-    type: '',
-    breed: '',
-    dob: '',
-    gender: '',
-    petPicture: 'https://placehold.co/200x200?text=Upload+Image',
+    name: "",
+    type: "",
+    breed: "",
+    dob: "",
+    gender: "",
+    petPicture: "https://placehold.co/200x200?text=Upload+Image",
   });
   const [petPictureFile, setPetPictureFile] = useState(null);
   const [isPetPictureUpdated, setIsPetPictureUpdated] = useState(false);
@@ -22,37 +26,37 @@ const AddPetForm = () => {
   const [vaccinationEntries, setVaccinationEntries] = useState([]);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   const validateForm = () => {
     const newErrors = {};
 
     if (isPetPictureUpdated && petPictureFile) {
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
       if (!allowedTypes.includes(petPictureFile.type)) {
-        newErrors.petPicture = 'Only JPEG, PNG, or GIF images are allowed';
+        newErrors.petPicture = "Only JPEG, PNG, or GIF images are allowed";
       } else if (petPictureFile.size > 5 * 1024 * 1024) {
-        newErrors.petPicture = 'Image size must be less than 5MB';
+        newErrors.petPicture = "Image size must be less than 5MB";
       }
     }
     medicalEntries.forEach((entry, index) => {
       if (!entry.condition.trim()) {
-        newErrors[`medicalCondition${index}`] = 'Condition is required';
+        newErrors[`medicalCondition${index}`] = "Condition is required";
       }
       if (!entry.date) {
-        newErrors[`medicalDate${index}`] = 'Date is required';
+        newErrors[`medicalDate${index}`] = "Date is required";
       } else if (new Date(entry.date) > new Date()) {
-        newErrors[`medicalDate${index}`] = 'Date cannot be in the future';
+        newErrors[`medicalDate${index}`] = "Date cannot be in the future";
       }
     });
     vaccinationEntries.forEach((entry, index) => {
       if (!entry.vaccineName.trim()) {
-        newErrors[`vaccineName${index}`] = 'Vaccine Name is required';
+        newErrors[`vaccineName${index}`] = "Vaccine Name is required";
       }
       if (!entry.date) {
-        newErrors[`vaccineDate${index}`] = 'Date is required';
+        newErrors[`vaccineDate${index}`] = "Date is required";
       } else if (new Date(entry.date) > new Date()) {
-        newErrors[`vaccineDate${index}`] = 'Date cannot be in the future';
+        newErrors[`vaccineDate${index}`] = "Date cannot be in the future";
       }
     });
     setErrors(newErrors);
@@ -62,7 +66,7 @@ const AddPetForm = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: '' }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const handleImageUpload = (e) => {
@@ -83,17 +87,17 @@ const AddPetForm = () => {
     setMedicalEntries((prev) =>
       prev.map((entry, i) =>
         i === index
-          ? { ...entry, [name]: type === 'checkbox' ? checked : value }
-          : entry,
-      ),
+          ? { ...entry, [name]: type === "checkbox" ? checked : value }
+          : entry
+      )
     );
-    setErrors((prev) => ({ ...prev, [`${name}${index}`]: '' }));
+    setErrors((prev) => ({ ...prev, [`${name}${index}`]: "" }));
   };
 
   const addMedicalEntry = () => {
     setMedicalEntries((prev) => [
       ...prev,
-      { condition: '', date: '', isRecovered: false },
+      { condition: "", date: "", isRecovered: false },
     ]);
   };
 
@@ -110,13 +114,15 @@ const AddPetForm = () => {
   const handleVaccinationChange = (index, e) => {
     const { name, value } = e.target;
     setVaccinationEntries((prev) =>
-      prev.map((entry, i) => (i === index ? { ...entry, [name]: value } : entry)),
+      prev.map((entry, i) =>
+        i === index ? { ...entry, [name]: value } : entry
+      )
     );
-    setErrors((prev) => ({ ...prev, [`${name}${index}`]: '' }));
+    setErrors((prev) => ({ ...prev, [`${name}${index}`]: "" }));
   };
 
   const addVaccination = () => {
-    setVaccinationEntries((prev) => [...prev, { vaccineName: '', date: '' }]);
+    setVaccinationEntries((prev) => [...prev, { vaccineName: "", date: "" }]);
   };
 
   const removeVaccinationEntry = (index) => {
@@ -135,33 +141,39 @@ const AddPetForm = () => {
       setIsLoading(true);
       try {
         const formDataPayload = new FormData();
-        formDataPayload.append('name', formData.name);
-        formDataPayload.append('type', formData.type);
-        formDataPayload.append('breed', formData.breed);
-        formDataPayload.append('dob', formData.dob);
-        formDataPayload.append('gender', formData.gender);
-        formDataPayload.append('medical_history', JSON.stringify(medicalEntries));
-        formDataPayload.append('vaccination_log', JSON.stringify(vaccinationEntries));
+        formDataPayload.append("name", formData.name);
+        formDataPayload.append("type", formData.type);
+        formDataPayload.append("breed", formData.breed);
+        formDataPayload.append("dob", formData.dob);
+        formDataPayload.append("gender", formData.gender);
+        formDataPayload.append(
+          "medical_history",
+          JSON.stringify(medicalEntries)
+        );
+        formDataPayload.append(
+          "vaccination_log",
+          JSON.stringify(vaccinationEntries)
+        );
         if (isPetPictureUpdated && petPictureFile) {
-          formDataPayload.append('pet_pic', petPictureFile);
+          formDataPayload.append("pet_pic", petPictureFile);
         }
 
-        const res = await axios.post('user/add_pet', formDataPayload, {
+        const res = await axios.post("user/add_pet", formDataPayload, {
           headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        console.log('Pet saved:', res.data);
-        toast.success('Pet registered successfully!');
-        navigate('/dashboard');
+        console.log("Pet saved:", res.data);
+        toast.success("Pet registered successfully!");
+        navigate("/dashboard");
       } catch (error) {
         const errorMessage =
           error.response && error.response.data && error.response.data.message
             ? error.response.data.message
-            : 'Error getting profile';
+            : "Error getting profile";
         toast.error(errorMessage);
-        setErrors({ submit: 'Failed to register pet. Please try again.' });
+        setErrors({ submit: "Failed to register pet. Please try again." });
       } finally {
         setIsLoading(false);
       }
@@ -170,26 +182,22 @@ const AddPetForm = () => {
 
   return (
     <>
-      <Header />
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8 px-4 md:px-8 mt-[70px]">
+      <div>
         <div className="max-w-4xl mx-auto">
           {/* Header with Back Button */}
           <div className="flex items-center mb-6">
-            <button
-              onClick={() => navigate('/user/pets')}
-              className="flex items-center text-blue-600 hover:text-blue-800 transition-colors mr-4 p-2 rounded-lg hover:bg-blue-50"
-            >
-              <FaArrowLeft className="mr-2" />
-              Back to Pets
-            </button>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Register New Pet</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              Register New Pet
+            </h1>
           </div>
 
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
             {/* Form Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
               <h2 className="text-xl font-semibold">Pet Information</h2>
-              <p className="text-blue-100 text-sm">Add your furry friend to the family</p>
+              <p className="text-blue-100 text-sm">
+                Add your furry friend to the family
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-8">
@@ -202,7 +210,10 @@ const AddPetForm = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Pet Name */}
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="name"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Pet Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -219,7 +230,10 @@ const AddPetForm = () => {
 
                   {/* Pet Type */}
                   <div>
-                    <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="type"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Pet Type <span className="text-red-500">*</span>
                     </label>
                     <select
@@ -242,7 +256,10 @@ const AddPetForm = () => {
 
                   {/* Breed */}
                   <div>
-                    <label htmlFor="breed" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="breed"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Breed <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -259,7 +276,10 @@ const AddPetForm = () => {
 
                   {/* Date of Birth */}
                   <div>
-                    <label htmlFor="dob" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="dob"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Date of Birth <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -276,7 +296,10 @@ const AddPetForm = () => {
 
                   {/* Gender */}
                   <div>
-                    <label htmlFor="gender" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="gender"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Gender <span className="text-red-500">*</span>
                     </label>
                     <select
@@ -327,11 +350,14 @@ const AddPetForm = () => {
                     </label>
 
                     <p className="text-sm text-gray-500 mt-2">
-                      JPEG, PNG or GIF (Max 5MB). This helps us personalize your experience.
+                      JPEG, PNG or GIF (Max 5MB). This helps us personalize your
+                      experience.
                     </p>
 
                     {errors.petPicture && (
-                      <p className="text-sm text-red-600 mt-1">{errors.petPicture}</p>
+                      <p className="text-sm text-red-600 mt-1">
+                        {errors.petPicture}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -345,7 +371,10 @@ const AddPetForm = () => {
 
                 <div className="space-y-4">
                   {medicalEntries.map((entry, index) => (
-                    <div key={index} className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <div
+                      key={index}
+                      className="bg-blue-50 p-4 rounded-lg border border-blue-100"
+                    >
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                         <div className="md:col-span-5">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -393,10 +422,14 @@ const AddPetForm = () => {
                               type="checkbox"
                               name="isRecovered"
                               checked={entry.isRecovered}
-                              onChange={(e) => handleMedicalEntryChange(index, e)}
+                              onChange={(e) =>
+                                handleMedicalEntryChange(index, e)
+                              }
                               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                             />
-                            <span className="text-sm text-gray-700">Recovered</span>
+                            <span className="text-sm text-gray-700">
+                              Recovered
+                            </span>
                           </label>
                         </div>
 
@@ -434,7 +467,10 @@ const AddPetForm = () => {
 
                 <div className="space-y-4">
                   {vaccinationEntries.map((entry, index) => (
-                    <div key={index} className="bg-green-50 p-4 rounded-lg border border-green-100">
+                    <div
+                      key={index}
+                      className="bg-green-50 p-4 rounded-lg border border-green-100"
+                    >
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                         <div className="md:col-span-5">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -458,7 +494,8 @@ const AddPetForm = () => {
 
                         <div className="md:col-span-4">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Date Administered <span className="text-red-500">*</span>
+                            Date Administered{" "}
+                            <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="date"
@@ -506,7 +543,7 @@ const AddPetForm = () => {
               <div className="flex flex-col-reverse md:flex-row justify-end space-y-4 space-y-reverse md:space-y-0 md:space-x-4 pt-6 border-t border-gray-200">
                 <button
                   type="button"
-                  onClick={() => navigate('/user/pets')}
+                  onClick={() => navigate("/user/pets")}
                   disabled={isLoading}
                   className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors shadow-sm disabled:bg-gray-200 disabled:cursor-not-allowed"
                 >
@@ -519,9 +556,25 @@ const AddPetForm = () => {
                 >
                   {isLoading ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
                       </svg>
                       Processing...
                     </>
@@ -537,7 +590,6 @@ const AddPetForm = () => {
           </div>
         </div>
       </div>
-      <Footer/>
     </>
   );
 };

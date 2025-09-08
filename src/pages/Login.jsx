@@ -11,14 +11,16 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    role: "", // Add role to form data
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
   const navigate = useNavigate();
 
-  const { user, login,updateChatRoomToken  } = useContext(AuthContext);
+  const { user, login, updateChatRoomToken } = useContext(AuthContext);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -52,6 +54,11 @@ const Login = () => {
           error = "Password is required";
         }
         break;
+      case "role":
+        if (!value) {
+          error = "Please select a role";
+        }
+        break;
       default:
         break;
     }
@@ -69,12 +76,27 @@ const Login = () => {
     if (!formData.password) {
       newErrors.password = "Password is required";
     }
+    if (!formData.role) {
+      newErrors.role = "Please select a role";
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // First validate email and password only
+    const emailPasswordValid = validateEmailPassword();
+    if (!emailPasswordValid) return;
+    
+    // If email and password are valid but no role selected, show role selection
+    if (!formData.role) {
+      setShowRoleSelection(true);
+      return;
+    }
+    
+    // If all fields are filled, proceed with login
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -82,13 +104,14 @@ const Login = () => {
       const res = await axios.post("https://snoutiq.com/backend/api/auth/login", {
         login: formData.email,
         password: formData.password,
+        role: formData.role
       });
-      console.log(res, 'data')
-        const chatRoomToken = res.data.chat_room?.token || null;
-      const { token, user  } = res.data;
+      
+      const chatRoomToken = res.data.chat_room?.token || null;
+      const { token, user } = res.data;
 
-      if (token && user && chatRoomToken ) {
-        login(user, token, chatRoomToken );
+      if (token && user) {
+        login(user, token, chatRoomToken);
         navigate("/dashboard");
         toast.success("Login successful!");
       } else {
@@ -103,13 +126,83 @@ const Login = () => {
     }
   };
 
+  // Validate only email and password
+  const validateEmailPassword = () => {
+    const newErrors = {};
+    if (!formData.email) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleRoleSelect = (role) => {
+    handleInputChange("role", role);
+    setShowRoleSelection(false);
+  };
+
   if (user) return <Navigate to="/dashboard" replace />;
+  
   return (
     <>
       <Header />
       <div className="min-h-screen bg-white bg-gradient-to-br from-blue-50 to-indigo-100 mt-12 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-sm sm:max-w-md">
           <Card className="text-center shadow-xl rounded-xl overflow-hidden p-6 sm:p-8">
+            {/* Role Selection Modal */}
+            {showRoleSelection && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                  <h2 className="text-xl font-bold mb-4">Select Your Role</h2>
+                  <p className="text-gray-600 mb-6">Please choose how you'd like to use Snoutiq:</p>
+                  
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => handleRoleSelect("pet_owner")}
+                      className="w-full bg-blue-100 border border-blue-300 rounded-lg p-4 text-left hover:bg-blue-200 transition-colors"
+                    >
+                      <h3 className="font-semibold text-blue-800">Pet Owner</h3>
+                      <p className="text-sm text-gray-600 mt-1">I want to manage my pets and connect with veterinarians</p>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleRoleSelect("veterinarian")}
+                      className="w-full bg-green-100 border border-green-300 rounded-lg p-4 text-left hover:bg-green-200 transition-colors"
+                    >
+                      <h3 className="font-semibold text-green-800">Veterinarian</h3>
+                      <p className="text-sm text-gray-600 mt-1">I want to provide veterinary services and connect with pet owners</p>
+                    </button>
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowRoleSelection(false)}
+                    className="mt-6 w-full bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Selected Role Display */}
+            {formData.role && (
+              <div className={`mb-4 p-3 rounded-lg ${formData.role === "pet_owner" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"}`}>
+                <span className="font-medium">Selected: </span>
+                {formData.role === "pet_owner" ? "Pet Owner" : "Veterinarian"}
+                <button
+                  onClick={() => handleInputChange("role", "")}
+                  className="ml-2 text-sm underline"
+                >
+                  Change
+                </button>
+              </div>
+            )}
+
             {/* Logo */}
             <div className="mb-6">
               <img

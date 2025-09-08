@@ -109,7 +109,7 @@ const Navbar = () => {
         <img src={OfferIcon} alt="Offers" className="w-7 h-7 filter invert" />
       </button>
 
-      <button
+      {/* <button
         className="w-14 h-14 rounded-full bg-emerald-500 shadow-lg flex items-center justify-center hover:bg-emerald-600 transition-all duration-300 transform hover:scale-105"
         onClick={() => setIsRightDrawerOpen(true)}
       >
@@ -121,7 +121,7 @@ const Navbar = () => {
         onClick={() => setIsRightDrawerOpen(true)}
       >
         <img src={groomericon} alt="Groomer" className="w-7 h-7 filter invert" />
-      </button>
+      </button> */}
     </div>
   );
 
@@ -338,18 +338,11 @@ const Navbar = () => {
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 border border-gray-200">
                       <button
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => navigate('/user-dashboard')}
                         className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                       >
                         <HomeIcon className="w-4 h-4 mr-2" />
                         Dashboard
-                      </button>
-                      <button
-                        onClick={() => navigate('/pet-info')}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                      >
-                        <HeartIcon className="w-4 h-4 mr-2" />
-                        My Pets
                       </button>
                       <button
                         onClick={handleLogout}

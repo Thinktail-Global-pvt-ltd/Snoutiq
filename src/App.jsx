@@ -1,39 +1,42 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import GTMRouteListener from './GTMRouteListener'
-import Home from './pages/Home';
-import Register from './pages/Register';
-import PetInfo from './pages/PetInfo';
-import Dashboard from './pages/Dashboard';
-import { Toaster } from 'react-hot-toast';
-import Login from './pages/Login';
-import ProtectedRoute from './ProtectedRoute';
-import ChatInterface from './pages/ChatInterface';
-import ForgotPassword from './pages/ForgotPassword';
-import AddPet from './pages/AddPet';
-import EditPet from './pages/EditPet';
-import TokenLogin from './components/TokenLogin';
-import Videocall from './pages/VideoCall';
-import SearchingDoctor from './pages/SearchingDoctor';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import GTMRouteListener from "./GTMRouteListener";
+import Home from "./pages/Home";
+import Register from "./pages/Register";
+import PetInfo from "./pages/PetInfo";
+import Dashboard from "./pages/Dashboard";
+import { Toaster } from "react-hot-toast";
+import Login from "./pages/Login";
+import ProtectedRoute from "./ProtectedRoute";
+import ChatInterface from "./pages/ChatInterface";
+import ForgotPassword from "./pages/ForgotPassword";
+import AddPet from "./pages/AddPet";
+import EditPet from "./pages/EditPet";
+import TokenLogin from "./components/TokenLogin";
+import Videocall from "./pages/VideoCall";
+import SearchingDoctor from "./pages/SearchingDoctor";
 
-import PrivacyPolicy from './policies/PrivacyPolicy';
-import TearmsCondition from './policies/TearmsCondition';
-import Cancelation from './policies/Cancelation';
-import CookiePolicy from './policies/CookiePolicy';
-import MedicalDataConsent from './policies/MedicalDataConsent';
-import ShippingPolicy from './policies/ShippingPolicy';
+import PrivacyPolicy from "./policies/PrivacyPolicy";
+import TearmsCondition from "./policies/TearmsCondition";
+import Cancelation from "./policies/Cancelation";
+import CookiePolicy from "./policies/CookiePolicy";
+import MedicalDataConsent from "./policies/MedicalDataConsent";
+import ShippingPolicy from "./policies/ShippingPolicy";
+import VetHome from "./VetDashboard/VetHome";
+import HeaderWithSidebar from "./VetDashboard/Sidebar";
+import VetOnwerProfile from "./VetDashboard/VetOnwerProfile";
+import VetPayment from "./VetDashboard/VetPayment";
+import VetDocument from "./VetDashboard/VetDocument";
+import DoctorRegistration from "./VetDashboard/DoctorRegistration";
 
 function App() {
-
   return (
     <Router>
       <GTMRouteListener />
       <Toaster position="bottom-right" reverseOrder={false} />
 
       <div className="bg-white text-black">
-
         <Routes>
           {/* Home hamesha accessible hai */}
-
           <Route
             path="/"
             element={
@@ -47,37 +50,27 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/vet-register" element={<DoctorRegistration/>}/>
+
           <Route path="/token-login/:token" element={<TokenLogin />} />
 
-          <Route path='/privacy-policy' element={<PrivacyPolicy/>}/>
-          <Route path='/terms-of-service' element={<TearmsCondition/>}/>
-          <Route path='/cancellation-policy' element={<Cancelation/>}/>
-          <Route path='/cookie-policy' element={<CookiePolicy/>}/>
-          <Route path='/medical-data-consent' element={<MedicalDataConsent/>}/>
-          <Route path='/shipping-policy' element={<ShippingPolicy/>}/>
-
-          {/* Protected Routes */}
+          {/* privacy policy */}
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TearmsCondition />} />
+          <Route path="/cancellation-policy" element={<Cancelation />} />
+          <Route path="/cookie-policy" element={<CookiePolicy />} />
           <Route
-            path="/pet-info"
-            element={
-              <ProtectedRoute>
-                <PetInfo />
-              </ProtectedRoute>
-            }
+            path="/medical-data-consent"
+            element={<MedicalDataConsent />}
           />
+          <Route path="/shipping-policy" element={<ShippingPolicy />} />
+
+
           <Route
             path="/user/pets"
             element={
               <ProtectedRoute>
                 <PetInfo />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/user/pets/add"
-            element={
-              <ProtectedRoute>
-                <AddPet />
               </ProtectedRoute>
             }
           />
@@ -89,6 +82,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* main page */}
           <Route
             path="/dashboard"
             element={
@@ -97,7 +91,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-           <Route
+          <Route
             path="/chat/:chat_room_token"
             element={
               <ProtectedRoute>
@@ -105,7 +99,8 @@ function App() {
               </ProtectedRoute>
             }
           />
-           <Route
+
+          <Route
             path="/video-call"
             element={
               <ProtectedRoute>
@@ -114,7 +109,7 @@ function App() {
             }
           />
           <Route
-            path="searching-doctor"
+            path="/searching-doctor"
             element={
               <ProtectedRoute>
                 <SearchingDoctor />
@@ -126,6 +121,66 @@ function App() {
             element={
               <ProtectedRoute>
                 <ChatInterface />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/user-dashboard/*"
+            element={
+              <ProtectedRoute>
+                <VetHome />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/user-dashboard/pet-info"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <PetInfo />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user-dashboard/add-pet"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <AddPet />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/user-dashboard/vet-profile"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <VetOnwerProfile />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+            <Route
+            path="/user-dashboard/vet-document"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <VetDocument />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+            <Route
+            path="/user-dashboard/vet-payment"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <VetPayment />
+                </HeaderWithSidebar>
               </ProtectedRoute>
             }
           />
