@@ -1,6 +1,20 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+use App\Models\User;
+
+// using Query Builder
+Route::get('/users-db', function () {
+    $users = DB::table('users')->get();
+    return response()->json($users);
+});
+
+// using Eloquent Model
+Route::get('/users', function () {
+    $users = User::all();
+    return response()->json($users);
+});
 
 Route::get('/', function () {
     return view('welcome');
