@@ -22,6 +22,12 @@ use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
 use App\Models\User;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
+
+use App\Http\Controllers\AdminController;
+
+Route::get('/users', [AdminController::class, 'getUsers']);
+Route::get('/vets', [AdminController::class, 'getVets']);
+
 Route::get('/dog-breed/{breed}', [\App\Http\Controllers\Api\DogBreedController::class, 'getBreedImage']);
 Route::get('/dog-breeds/all', [\App\Http\Controllers\Api\DogBreedController::class, 'allBreeds']);
 
@@ -123,6 +129,10 @@ Route::get('/users', function () {
 
     $users = User::all();
     return response()->json($users);
+});
+Route::get('/vets', function () {
+    $vets = DB::table('vet_registerations_temp')->get();
+    return response()->json($vets);
 });
 
 Route::prefix('groomer')->middleware('auth:sanctum')->group(function () {
