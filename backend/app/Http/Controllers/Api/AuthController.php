@@ -300,6 +300,7 @@ public function register(Request $request)
         'pet_doc1'    => $doc1Path,
         'pet_doc2'    => $doc2Path,
         'summary'     => $summaryText,
+        'google_token'     => $request->google_token,
             'breed'       => $request->breed,        // ✅ new
     'latitude'    => $request->latitude,     // ✅ new
     'longitude'   => $request->longitude,  
@@ -512,6 +513,44 @@ private function describePetImageDynamic($imagePath)
             'note'       => 'Use this chat_room_token for all messages in this new room.',
         ], 200);
     }
+
+    public function googleLogin(Request $request)
+{
+    $request->validate([
+        'email'        => 'required|email',
+        'google_token' => 'required|string',
+    ]);
+
+    try {
+        // ✅ Check user with email & google_token
+        $user = User::where('email', $request->email)
+                    ->where('google_token', $request->google_token)
+                    ->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid credentials',
+            ], 401);
+        }
+
+        // ✅ If found → success
+        return response()->json([
+            'success' => true,
+            'message' => 'Login success',
+            'user'    => $user,  // full row
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Google login failed',
+            'error'   => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
 
     // --------------------------- SESSION CHECK ------------------------------
     public function me(Request $request)

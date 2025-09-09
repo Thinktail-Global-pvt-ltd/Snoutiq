@@ -13,7 +13,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name','email','phone','role','password',
         'pet_name','pet_gender','pet_age','pet_doc1','pet_doc2',
-        'api_token_hash','summary'
+        'api_token_hash','summary','google_token'
     ];
 
     protected $hidden = ['password','remember_token','api_token_hash'];

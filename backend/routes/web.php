@@ -6,12 +6,14 @@ use App\Models\User;
 
 // using Query Builder
 Route::get('/users-db', function () {
+      //  dd('hi');
     $users = DB::table('users')->get();
     return response()->json($users);
 });
 
 // using Eloquent Model
 Route::get('/users', function () {
+
     $users = User::all();
     return response()->json($users);
 });
