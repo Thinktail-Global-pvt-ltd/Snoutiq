@@ -718,7 +718,8 @@ const DoctorRegistration = () => {
       if (res.status === 200 || res.status === 201) {
         toast.success(res.data.message || "Profile saved successfully!");
         alert("Form submitted successfully ✅");
-        navigate("/login");
+        window.location.reload()
+        // navigate("/login");
       }
     } catch (error) {
       const errorMessage =
@@ -930,7 +931,7 @@ const DoctorRegistration = () => {
                     )}
                     {activeTerm === "terms" && (
                       <div>
-                         <h4 className="font-medium mb-2">
+                        <h4 className="font-medium mb-2">
                           Effective date: 20 August 2025
                         </h4>
                         <h4 className="font-medium mb-2">
@@ -1066,7 +1067,7 @@ const DoctorRegistration = () => {
                     )}
                     {activeTerm === "community_reviews_policy" && (
                       <div>
-                          <h4 className="font-medium mb-2">
+                        <h4 className="font-medium mb-2">
                           Effective date: 20 August 2025
                         </h4>
                         <p className="text-gray-700 mb-4">
@@ -1083,7 +1084,7 @@ const DoctorRegistration = () => {
                     )}
                     {activeTerm === "cookie_policy" && (
                       <div>
-                          <h4 className="font-medium mb-2">
+                        <h4 className="font-medium mb-2">
                           Effective date: 20 August 2025
                         </h4>
                         <h4 className="font-medium mb-2">
@@ -1113,7 +1114,7 @@ const DoctorRegistration = () => {
 
                     {activeTerm === "pet_death_disclaimer" && (
                       <div>
-                          <h4 className="font-medium mb-2">
+                        <h4 className="font-medium mb-2">
                           Effective date: 20 August 2025
                         </h4>
                         <p className="text-gray-700 mb-4">
@@ -1161,7 +1162,7 @@ const DoctorRegistration = () => {
 
                     {activeTerm === "provider_agreement_rvp" && (
                       <div>
-                          <h4 className="font-medium mb-2">
+                        <h4 className="font-medium mb-2">
                           Effective date: 20 August 2025
                         </h4>
                         <h4 className="font-medium mb-2">
@@ -1301,7 +1302,7 @@ const DoctorRegistration = () => {
 
                     {activeTerm === "refund_cancellation_policy" && (
                       <div>
-                          <h4 className="font-medium mb-2">
+                        <h4 className="font-medium mb-2">
                           Effective date: 20 August 2025
                         </h4>
                         <h4 className="font-medium mb-2">1. Scope</h4>
@@ -1356,7 +1357,7 @@ const DoctorRegistration = () => {
 
                     {activeTerm === "third_party_services_policy" && (
                       <div>
-                          <h4 className="font-medium mb-2">
+                        <h4 className="font-medium mb-2">
                           Effective date: 20 August 2025
                         </h4>
                         <h4 className="font-medium mb-2">
@@ -1377,7 +1378,7 @@ const DoctorRegistration = () => {
 
                     {activeTerm === "ui_text_snippets" && (
                       <div>
-                          <h4 className="font-medium mb-2">
+                        <h4 className="font-medium mb-2">
                           Effective date: 20 August 2025
                         </h4>
                         <h4 className="font-medium mb-2">Consent Checkbox</h4>
@@ -2120,9 +2121,18 @@ const DoctorRegistration = () => {
                   />
                   <span className="text-sm text-gray-700 leading-relaxed">
                     By continuing, I confirm that I have read and agree to
-                    SnoutIQ’s:
-                    <ul className="list-disc pl-6 mt-2 space-y-1">
-                      <li>
+                    SnoutIQ’s:{" "}
+                    <span
+                      onClick={() => {
+                        setActiveTerm("provider_agreement_rvp");
+                        setShowTermsModal(true);
+                      }}
+                      className="text-blue-600 hover:underline cursor-pointer"
+                    >
+                      Provider Agreement (RVP)
+                    </span>
+                    {/* {/* <ul className="list-disc pl-6 mt-2 space-y-1"> */}
+                      {/* <li>
                         <span
                           onClick={() => {
                             setActiveTerm("privacy");
@@ -2132,8 +2142,8 @@ const DoctorRegistration = () => {
                         >
                           Privacy Policy
                         </span>
-                      </li>
-                      <li>
+                      </li> */}
+                      {/* <li>
                         <span
                           onClick={() => {
                             setActiveTerm("terms");
@@ -2143,8 +2153,8 @@ const DoctorRegistration = () => {
                         >
                           Terms & Conditions
                         </span>
-                      </li>
-                      <li>
+                      </li> */}
+                      {/* <li>
                         <span
                           onClick={() => {
                             setActiveTerm("community_reviews_policy");
@@ -2154,8 +2164,8 @@ const DoctorRegistration = () => {
                         >
                           Community Reviews Policy
                         </span>
-                      </li>
-                      <li>
+                      </li> */}
+                      {/* <li>
                         <span
                           onClick={() => {
                             setActiveTerm("cookie_policy");
@@ -2165,8 +2175,8 @@ const DoctorRegistration = () => {
                         >
                           Cookie Policy
                         </span>
-                      </li>
-                      <li>
+                      </li> */}
+                      {/* <li>
                         <span
                           onClick={() => {
                             setActiveTerm("pet_death_disclaimer");
@@ -2176,8 +2186,8 @@ const DoctorRegistration = () => {
                         >
                           Pet Death Disclaimer
                         </span>
-                      </li>
-                      <li>
+                      </li> */}
+                      {/* <li>
                         <span
                           onClick={() => {
                             setActiveTerm("provider_agreement_rvp");
@@ -2187,8 +2197,8 @@ const DoctorRegistration = () => {
                         >
                           Provider Agreement (RVP)
                         </span>
-                      </li>
-                      <li>
+                      </li> */}
+                      {/* <li>
                         <span
                           onClick={() => {
                             setActiveTerm("third_party_services_policy");
@@ -2198,8 +2208,8 @@ const DoctorRegistration = () => {
                         >
                           Third-Party Services Policy
                         </span>
-                      </li>
-                      <li>
+                      </li> */}
+                      {/* <li>
                         <span
                           onClick={() => {
                             setActiveTerm("refund_cancellation_policy");
@@ -2209,8 +2219,8 @@ const DoctorRegistration = () => {
                         >
                           Refund & Cancellation Policy
                         </span>
-                      </li>
-                      <li>
+                      </li> */}
+                      {/* <li>
                         <span
                           onClick={() => {
                             setActiveTerm("ui_text_snippets");
@@ -2220,8 +2230,8 @@ const DoctorRegistration = () => {
                         >
                           UI Text Snippets
                         </span>
-                      </li>
-                    </ul>
+                      </li> */}
+                    {/* </ul>  */}
                   </span>
                 </label>
               </div>

@@ -146,6 +146,21 @@ const HeaderWithSidebar = ({ children }) => {
         },
       ],
     },
+    {
+      category: "Super Admin",
+      items: [
+        {
+          text: "Pet Owner",
+          icon: <HiOutlineStar />,
+          path: "/user-dashboard/pet-owner",
+        },
+        {
+          text: "Vet Owner",
+          icon: <HiOutlineCog />,
+          path: "/user-dashboard/vet-owner",
+        },
+      ],
+    },
 
     {
       category: "Pet Owner",

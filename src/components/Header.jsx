@@ -289,12 +289,20 @@ const Header = () => {
                         {/* Mobile User Profile or Login Button */}
                         <div className="flex items-center">
                             {!user ? (
+                              <div className='flex gap-1'>
+                              <button
+                                    onClick={handleRegister}
+                                    className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                                >
+                                    Register
+                                </button>
                                 <button
                                     onClick={handleLogin}
                                     className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
                                 >
                                     Login
                                 </button>
+                                </div>
                             ) : (
                                 <div className="relative">
                                     <div

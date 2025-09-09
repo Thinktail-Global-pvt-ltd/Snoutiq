@@ -6,6 +6,7 @@ import Card from "../components/Card";
 import logo from "../assets/images/logo.png";
 import { AuthContext } from "../auth/AuthContext";
 import Header from "../components/Header";
+import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -162,6 +163,51 @@ const Login = () => {
           login: formData.email,
           password: formData.password,
           role: role, // use selected role
+        }
+      );
+
+      const chatRoomToken = res.data.chat_room?.token || null;
+      const { token, user } = res.data;
+
+      if (token && user) {
+        login(user, token, chatRoomToken);
+        navigate("/dashboard");
+        toast.success("Login successful!");
+      } else {
+        toast.error("Invalid response from server.");
+      }
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        "Login failed. Please check your credentials and try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setIsLoading(true);
+    try {
+      const base64Url = credentialResponse.credential.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      const googleData = JSON.parse(jsonPayload);
+
+      const uniqueUserId = googleData.sub; 
+      const email = googleData.email || "";
+
+      // Call your backend with the Google `sub`
+      const res = await axios.post(
+        "https://snoutiq.com/backend/api/google-login",
+        {
+          email: email, 
+          google_token: uniqueUserId,
+          // role: formData.role,        
         }
       );
 
@@ -451,6 +497,27 @@ const Login = () => {
                 )}
               </button>
             </form>
+            <div className="flex justify-center">
+              <GoogleOAuthProvider
+                clientId={import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID}
+                onScriptLoadError={() =>
+                  console.error("Google OAuth script failed to load")
+                }
+                onScriptLoadSuccess={() =>
+                  console.log("Google OAuth script loaded")
+                }
+              >
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => toast.error("Google login failed.")}
+                  useOneTap
+                  theme="filled_blue"
+                  size="large"
+                  text="continue_with"
+                  shape="rectangular"
+                />
+              </GoogleOAuthProvider>
+            </div>
 
             {/* Register Link */}
             <div className="mt-6 pt-4 border-t border-gray-200">

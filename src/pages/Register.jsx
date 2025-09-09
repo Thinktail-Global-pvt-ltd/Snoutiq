@@ -6,69 +6,89 @@ import logo from "../assets/images/logo.png";
 import axios from "../axios";
 import { AuthContext } from "../auth/AuthContext";
 import Header from "../components/Header";
+import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 
 const Register = () => {
-  const [userType, setUserType] = useState("pet_owner"); 
+  const [userType, setUserType] = useState("pet_owner");
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     mobileNumber: "",
+    petType: "",
     petName: "",
     petGender: "",
     petAge: "",
-    petBread: "",
+    petBreed: "",
     petDoc1: null,
     petDoc2: null,
-    emailOtp: "",
     password: "",
     confirmPassword: "",
+    google_token: "",
   });
 
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-  const [otpSent, setOtpSent] = useState(false);
-  const [isLoading, setIsLoading] = useState({ email: false, register: false });
-  const [emailOtpCooldown, setEmailOtpCooldown] = useState(0);
-  const [emailOtpToken, setEmailOtpToken] = useState("");
+  const [isLoading, setIsLoading] = useState({
+    email: false,
+    register: false,
+    breedImage: false,
+  });
   const [activeStep, setActiveStep] = useState(0);
-  const [otpStatus, setOtpStatus] = useState(null);
   const [locationAllowed, setLocationAllowed] = useState(null);
   const [coords, setCoords] = useState({ lat: null, lng: null });
-
+  const [breedOptions, setBreedOptions] = useState([]);
+  const [loadingBreeds, setLoadingBreeds] = useState(false);
+  const [breedImage, setBreedImage] = useState(null);
+  const [showBreedModal, setShowBreedModal] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugLogs, setDebugLogs] = useState([]);
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
   const { user, login, updateChatRoomToken } = useContext(AuthContext);
 
   const steps = ["Basic Details", "Pet Details", "Verification & Password"];
-  
-  // If user is a veterinarian, show the professional registration form
-  if (userType === "veterinarian") {
-    return (
-      navigate('/vet-register')
-    );
-  }
+
+  // Debug logging function
+  const addDebugLog = (message, data = null) => {
+    if (debugMode) {
+      const timestamp = new Date().toISOString();
+      const logEntry = { timestamp, message, data };
+      setDebugLogs((prev) => [...prev, logEntry].slice(-50)); // Keep last 50 logs
+      console.log(`[DEBUG] ${timestamp}: ${message}`, data || "");
+    }
+  };
+
+  // If user is a veterinarian, redirect to veterinarian registration
+  useEffect(() => {
+    if (userType === "veterinarian") {
+      navigate("/vet-register");
+    }
+  }, [userType, navigate]);
+
+  // If user is already logged in, redirect to dashboard
+  if (user) return <Navigate to="/dashboard" replace />;
 
   // ✅ Location Permission Check
   const checkLocationPermission = async () => {
     if (!navigator.permissions) {
-      console.log("Permissions API not supported in this browser");
+      const msg = "Permissions API not supported in this browser";
+      addDebugLog(msg);
       return null;
     }
 
     try {
       const result = await navigator.permissions.query({ name: "geolocation" });
+      addDebugLog("Location permission status", result.state);
 
       if (result.state === "granted") {
-        console.log("✅ Location already allowed");
         return true;
       } else if (result.state === "prompt") {
-        console.log("ℹ️ Location permission not asked yet");
         return null;
       } else if (result.state === "denied") {
-        console.log("❌ Location blocked by user");
         return false;
       }
     } catch (error) {
-      console.error("Error checking location permission:", error);
+      addDebugLog("Error checking location permission", error);
       return null;
     }
   };
@@ -77,13 +97,17 @@ const Register = () => {
   const requestLocation = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        toast.error("Geolocation not supported");
+        const msg = "Geolocation not supported";
+        addDebugLog(msg);
+        toast.error(msg);
         reject(false);
         return;
       }
+
+      addDebugLog("Requesting location permission");
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          console.log("Location allowed ✅", pos.coords);
+          addDebugLog("Location allowed", pos.coords);
           setLocationAllowed(true);
           setCoords({
             lat: pos.coords.latitude,
@@ -92,22 +116,76 @@ const Register = () => {
           resolve(true);
         },
         (err) => {
-          console.log("Location denied ❌", err);
+          addDebugLog("Location denied", err);
           setLocationAllowed(false);
           toast.error("⚠️ Please allow location to continue");
           reject(false);
-        }
+        },
+        { timeout: 10000, enableHighAccuracy: true }
       );
     });
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      setLoading(true);
+      addDebugLog("Google OAuth success", credentialResponse);
+
+      // Decode Google JWT
+      const base64Url = credentialResponse.credential.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map(function (c) {
+            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+          })
+          .join("")
+      );
+
+      const googleData = JSON.parse(jsonPayload);
+      addDebugLog("Google user data", googleData);
+
+      // Unique ID for backend
+      const uniqueUserId = googleData.sub;
+      addDebugLog("Google unique ID", uniqueUserId);
+
+      setFormData((prev) => ({
+        ...prev,
+        fullName: googleData.name || "",
+        email: googleData.email || "",
+        mobileNumber: "",
+        google_token: uniqueUserId,
+      }));
+
+      // Move user to Step 1 (Pet Details)
+      setActiveStep(1);
+      addDebugLog("Moved to step 1 after Google login");
+
+      toast.success("Google login successful. Continue with pet details!");
+    } catch (error) {
+      addDebugLog("Google login failed", error);
+      console.error("Google login failed:", error);
+      toast.error("Google login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    addDebugLog("Google OAuth failed");
+    toast.error("Google login failed. Please try again.");
+  };
+
   const handleNext = async () => {
-    if (activeStep === 0 && locationAllowed === null) {
+    addDebugLog("Next button clicked", { activeStep, locationAllowed });
+
+    // Request location before moving to pet details step
+    if (activeStep === 1 && locationAllowed === null) {
       try {
         const granted = await requestLocation();
-        if (!granted) return;
+        if (!granted) return; // stop here if denied
         setLocationAllowed(true);
-        return;
       } catch {
         return;
       }
@@ -115,24 +193,37 @@ const Register = () => {
 
     if (validateStep()) {
       setActiveStep((prev) => prev + 1);
+      addDebugLog("Moved to next step", { newStep: activeStep + 1 });
     } else {
       const stepFields =
         activeStep === 0
-          ? ["fullName", "email", "mobileNumber"]
+          ? ["fullName", "email"]
           : activeStep === 1
-          ? ["petName", "petGender", "petAge", "petBread"]
-          : ["emailOtp", "password", "confirmPassword"];
+          ? ["petType", "petName", "petGender", "petAge", "petBreed"]
+          : ["mobileNumber", "password", "confirmPassword"];
+
       const touchedUpdate = {};
       stepFields.forEach((f) => (touchedUpdate[f] = true));
       setTouched((prev) => ({ ...prev, ...touchedUpdate }));
+
       const firstErrorKey = Object.keys(errors)[0];
-      if (firstErrorKey) toast.error(errors[firstErrorKey]);
+      if (firstErrorKey) {
+        addDebugLog("Validation error", {
+          field: firstErrorKey,
+          error: errors[firstErrorKey],
+        });
+        toast.error(errors[firstErrorKey]);
+      }
     }
   };
 
   // ✅ Run Once on Mount
   useEffect(() => {
+    addDebugLog("Component mounted");
+
     checkLocationPermission().then((status) => {
+      addDebugLog("Location permission check completed", { status });
+
       if (status === true) {
         setLocationAllowed(true);
         requestLocation();
@@ -141,94 +232,137 @@ const Register = () => {
         toast.error("Please enable location access in browser settings");
       }
     });
+
+    // Enable debug mode with triple click on logo
+    const handleDebugActivation = () => {
+      setDebugMode((prev) => {
+        const newMode = !prev;
+        toast(newMode ? "Debug mode enabled" : "Debug mode disabled");
+        return newMode;
+      });
+    };
+
+    let clickCount = 0;
+    let lastClickTime = 0;
+
+    const debugClickListener = (e) => {
+      const currentTime = new Date().getTime();
+      if (currentTime - lastClickTime > 300) {
+        clickCount = 0;
+      }
+
+      clickCount++;
+      lastClickTime = currentTime;
+
+      if (clickCount >= 3) {
+        handleDebugActivation();
+        clickCount = 0;
+      }
+    };
+
+    const logoElement = document.querySelector(".debug-logo");
+    if (logoElement) {
+      logoElement.addEventListener("click", debugClickListener);
+    }
+
+    return () => {
+      if (logoElement) {
+        logoElement.removeEventListener("click", debugClickListener);
+      }
+    };
   }, []);
 
   const handleInputChange = (field, value) => {
+    addDebugLog("Input changed", { field, value });
     setFormData((prev) => ({ ...prev, [field]: value }));
 
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
+    if (field === "petBreed" && value && formData.petType === "Dog") {
+      fetchBreedImage(value);
+    } else {
+      setBreedImage(null);
+    }
   };
 
   const handleBlur = (field) => {
+    addDebugLog("Input blurred", { field });
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  const handleSendEmailOtp = async () => {
-    if (!formData.email.includes("@")) {
-      setErrors({ ...errors, email: "Valid email is required" });
-      toast.error("Valid email is required");
-      return;
-    }
-
-    setIsLoading((prev) => ({ ...prev, email: true }));
-    try {
-      const res = await axios.post(
-        "https://snoutiq.com/backend/api/auth/send-otp",
-        {
-          type: "email",
-          value: formData.email,
-          unique: "yes",
-        }
-      );
-
-      if (res.data.message === "OTP sent successfully") {
-        setEmailOtpToken(res.data.token);
-        setOtpSent(true);
-        setEmailOtpCooldown(15);
-        toast.success(`Email OTP sent successfully`);
-      } else {
-        toast.error(res.data.message);
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to send email OTP");
-    } finally {
-      setIsLoading((prev) => ({ ...prev, email: false }));
-    }
-  };
+  const toTitleCase = (str) =>
+    str
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
 
   useEffect(() => {
-    if (emailOtpCooldown > 0) {
-      const timer = setInterval(() => {
-        setEmailOtpCooldown((prev) => prev - 1);
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [emailOtpCooldown]);
+    const fetchBreeds = async () => {
+      if (formData.petType === "Dog") {
+        setLoadingBreeds(true);
+        addDebugLog("Fetching dog breeds");
 
-  const verifyOtp = async () => {
-    try {
-      const res = await axios.post(
-        "https://snoutiq.com/backend/api/auth/verify-otp",
-        {
-          token: emailOtpToken,
-          otp: formData.emailOtp,
+        try {
+          const res = await axios.get(
+            "https://snoutiq.com/backend/api/dog-breeds/all"
+          );
+
+          addDebugLog("Dog breeds API response", res.data);
+
+          if (res.data && res.data.breeds) {
+            const breedsData = res.data.breeds;
+            const breedList = [];
+
+            Object.entries(breedsData).forEach(([breed, subBreeds]) => {
+              if (Array.isArray(subBreeds) && subBreeds.length > 0) {
+                subBreeds.forEach((sub) => {
+                  breedList.push(`${sub} ${breed}`);
+                });
+              } else {
+                breedList.push(breed);
+              }
+            });
+
+            setBreedOptions(breedList.sort());
+            addDebugLog("Processed breed options", breedList);
+          } else {
+            const msg = "Invalid response format for breeds";
+            addDebugLog(msg, res.data);
+            console.error(msg);
+            setBreedOptions([]);
+          }
+        } catch (err) {
+          addDebugLog("Failed to fetch breeds", err);
+          console.error("Failed to fetch breeds", err);
+          toast.error("Failed to load dog breeds");
+          setBreedOptions([]);
+        } finally {
+          setLoadingBreeds(false);
         }
-      );
-
-      if (res.data.message === "OTP verified successfully") {
-        setOtpStatus("valid");
-        toast.success("OTP verified successfully!");
+      } else if (formData.petType === "Cat") {
+        addDebugLog("Setting cat breeds");
+        // Static cat breeds
+        setBreedOptions([
+          "Siamese",
+          "Persian",
+          "Maine Coon",
+          "Bengal",
+          "Sphynx",
+          "British Shorthair",
+          "Ragdoll",
+          "Abyssinian",
+          "Scottish Fold",
+        ]);
       } else {
-        setOtpStatus("invalid");
-        toast.error(res.data.message || "Invalid OTP");
+        setBreedOptions([]);
       }
-    } catch (error) {
-      setOtpStatus("invalid");
-      toast.error(error.response?.data?.message || "Failed to verify OTP");
-    }
-  };
+    };
 
-  useEffect(() => {
-    if (formData.emailOtp.length === 4) {
-      const timer = setTimeout(() => {
-        verifyOtp();
-      }, 3000);
-
-      return () => clearTimeout(timer);
+    if (formData.petType) {
+      fetchBreeds();
     }
-  }, [formData.emailOtp]);
+  }, [formData.petType]);
 
   const validateStep = (step = activeStep) => {
     const newErrors = {};
@@ -237,22 +371,20 @@ const Register = () => {
       if (!formData.fullName.trim()) newErrors.fullName = "Name is required";
       if (!formData.email.includes("@"))
         newErrors.email = "Valid email is required";
-      if (!/^\d{10}$/.test(formData.mobileNumber))
-        newErrors.mobileNumber = "Valid 10-digit mobile number required";
     }
 
     if (step === 1) {
+      if (!formData.petType) newErrors.petType = "Pet type is required";
       if (!formData.petName.trim()) newErrors.petName = "Pet name is required";
       if (!formData.petGender) newErrors.petGender = "Pet gender is required";
       if (!formData.petAge || formData.petAge <= 0)
         newErrors.petAge = "Valid pet age is required";
-      if (!formData.petBread)
-        newErrors.petBread = "Valid pet Breed is required";
+      if (!formData.petBreed) newErrors.petBreed = "Pet breed is required";
     }
 
     if (step === 2) {
-      if (!otpSent) newErrors.emailOtp = "Please send email OTP first";
-      if (!formData.emailOtp.trim()) newErrors.emailOtp = "Enter email OTP";
+      if (!/^\d{10}$/.test(formData.mobileNumber))
+        newErrors.mobileNumber = "Valid 10-digit mobile number required";
       if (formData.password.length < 6)
         newErrors.password = "Password must be at least 6 characters";
       if (formData.password !== formData.confirmPassword) {
@@ -260,15 +392,47 @@ const Register = () => {
       }
     }
 
+    addDebugLog("Validation results", { step, errors: newErrors });
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleBack = () => {
+    addDebugLog("Back button clicked", { fromStep: activeStep });
     setActiveStep((prev) => prev - 1);
   };
 
+  const fetchBreedImage = async (breed) => {
+    setIsLoading((prev) => ({ ...prev, breedImage: true }));
+    addDebugLog("Fetching breed image", { breed });
+
+    try {
+      // Extract the main breed name (remove sub-breed if present)
+      const breedName = breed.split(" ").reverse()[0].toLowerCase();
+
+      const res = await axios.get(
+        `https://snoutiq.com/backend/api/dog-breed/${breedName}`
+      );
+
+      addDebugLog("Breed image API response", res.data);
+
+      if (res.data.status === "success" && res.data.image) {
+        setBreedImage(res.data.image);
+      } else {
+        setBreedImage(null);
+      }
+    } catch (err) {
+      addDebugLog("Failed to fetch breed image", err);
+      console.error("Failed to fetch breed image", err);
+      setBreedImage(null);
+    } finally {
+      setIsLoading((prev) => ({ ...prev, breedImage: false }));
+    }
+  };
+
   const compressImage = (file, maxSizeKB = 50, maxWidthOrHeight = 800) => {
+    addDebugLog("Compressing image", { file: file.name, size: file.size });
+
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -299,11 +463,24 @@ const Register = () => {
           const tryCompress = () => {
             canvas.toBlob(
               (blob) => {
+                addDebugLog("Image compression iteration", {
+                  quality,
+                  size: blob.size / 1024,
+                  target: maxSizeKB,
+                });
+
                 if (blob.size / 1024 > maxSizeKB && quality > 0.1) {
                   quality -= 0.1;
                   tryCompress();
                 } else {
-                  resolve(new File([blob], file.name, { type: "image/jpeg" }));
+                  const compressedFile = new File([blob], file.name, {
+                    type: "image/jpeg",
+                  });
+                  addDebugLog("Image compression complete", {
+                    original: file.size / 1024,
+                    compressed: compressedFile.size / 1024,
+                  });
+                  resolve(compressedFile);
                 }
               },
               "image/jpeg",
@@ -317,6 +494,8 @@ const Register = () => {
   };
 
   const handleFileChange = async (field, files) => {
+    addDebugLog("File selected", { field, file: files[0]?.name });
+
     if (files && files.length > 0) {
       const file = files[0];
 
@@ -331,10 +510,13 @@ const Register = () => {
   };
 
   const handleSubmit = async () => {
+    addDebugLog("Form submission started", formData);
+
     if (!validateStep()) return;
 
     if (!coords.lat || !coords.lng) {
-      alert("⚠️ Please allow location to continue");
+      addDebugLog("Location not available", coords);
+      toast.error("⚠️ Please allow location to continue");
       return;
     }
 
@@ -346,49 +528,62 @@ const Register = () => {
       submitData.append("mobileNumber", formData.mobileNumber);
       submitData.append("password", formData.password);
       submitData.append("comfirmPassword", formData.confirmPassword);
+      submitData.append("pet_type", formData.petType);
       submitData.append("pet_name", formData.petName);
       submitData.append("pet_gender", formData.petGender);
       submitData.append("pet_age", formData.petAge);
-      submitData.append("pet_bread", formData.petBread);
-
+      submitData.append("breed", formData.petBreed);
       submitData.append("latitude", coords.lat);
       submitData.append("longitude", coords.lng);
 
-      if (formData.petDoc1) {
-        submitData.append("pet_doc1", formData.petDoc1);
-      }
-      if (formData.petDoc2) {
-        submitData.append("pet_doc2", formData.petDoc2);
-      }
+      if (formData.google_token)
+        submitData.append("google_token", formData.google_token);
+      if (formData.petDoc1) submitData.append("pet_doc1", formData.petDoc1);
+      if (formData.petDoc2) submitData.append("pet_doc2", formData.petDoc2);
 
-      await axios.post(
-        "https://snoutiq.com/backend/api/auth/register",
-        submitData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        }
+      addDebugLog(
+        "Sending registration request",
+        Object.fromEntries(submitData)
       );
 
       const res = await axios.post(
+        "https://snoutiq.com/backend/api/auth/register",
+        submitData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      addDebugLog("Registration successful, attempting login");
+
+      const loginRes = await axios.post(
         "https://snoutiq.com/backend/api/auth/login",
         {
           login: formData.email,
           password: formData.password,
         }
       );
-      const chatRoomToken = res.data.chat_room?.token || null;
 
-      login(res.data.user, res.data.token, chatRoomToken);
+      const chatRoomToken = loginRes.data.chat_room?.token || null;
+      addDebugLog("Login successful", {
+        user: loginRes.data.user,
+        token: loginRes.data.token,
+      });
+
+      login(loginRes.data.user, loginRes.data.token, chatRoomToken);
       toast.success("Registration successful!");
       navigate("/dashboard");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Registration failed");
+      const message = error.response?.data?.message || "Registration failed";
+      addDebugLog("Registration failed", message);
+
+      if (message.includes("unique mobile or email")) {
+        toast.error("⚠️ Email or mobile number already exists!");
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsLoading((prev) => ({ ...prev, register: false }));
     }
   };
-
-  if (user) return <Navigate to="/dashboard" replace />;
 
   return (
     <>
@@ -396,14 +591,52 @@ const Register = () => {
       <div className="min-h-screen bg-white bg-gradient-to-br from-blue-50 to-indigo-100 mt-12 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-sm sm:max-w-md">
           <Card className="text-center shadow-xl rounded-xl p-6 sm:p-8">
-            {/* Logo */}
+            {/* Logo with debug activation */}
             <div className="mb-6">
               <img
                 src={logo}
                 alt="Snoutiq Logo"
-                className="h-12 sm:h-14 mx-auto mb-3"
+                className="h-12 sm:h-14 mx-auto mb-3 debug-logo cursor-pointer"
               />
             </div>
+
+            {/* Debug Panel */}
+            {debugMode && (
+              <div className="mb-4 p-3 bg-gray-100 rounded-lg text-left max-h-40 overflow-y-auto">
+                <h3 className="font-bold text-sm mb-2">Debug Logs</h3>
+                {debugLogs.length === 0 ? (
+                  <p className="text-xs">
+                    No logs yet. Interactions will appear here.
+                  </p>
+                ) : (
+                  debugLogs.map((log, index) => (
+                    <div
+                      key={index}
+                      className="text-xs mb-1 border-b border-gray-200 pb-1"
+                    >
+                      <span className="text-gray-500">
+                        [{log.timestamp.split("T")[1].split(".")[0]}]
+                      </span>
+                      <span className="font-medium"> {log.message}</span>
+                      {log.data && (
+                        <span className="text-gray-600">
+                          :{" "}
+                          {typeof log.data === "object"
+                            ? JSON.stringify(log.data)
+                            : log.data}
+                        </span>
+                      )}
+                    </div>
+                  ))
+                )}
+                <button
+                  className="mt-2 text-xs text-blue-600"
+                  onClick={() => setDebugLogs([])}
+                >
+                  Clear logs
+                </button>
+              </div>
+            )}
 
             {/* Welcome Message */}
             <div className="mb-4 sm:mb-6">
@@ -497,135 +730,29 @@ const Register = () => {
             <div className="space-y-4 mb-2">
               {activeStep === 0 && (
                 <>
-                  {/* Full Name */}
-                  <div className="text-left">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Full Name *
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                          />
-                        </svg>
-                      </div>
-                      <input
-                        type="text"
-                        value={formData.fullName}
-                        onChange={(e) =>
-                          handleInputChange("fullName", e.target.value)
-                        }
-                        onBlur={() => handleBlur("fullName")}
-                        className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          errors.fullName && touched.fullName
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="Enter your full name"
-                      />
-                      {errors.fullName && touched.fullName && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {errors.fullName}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Email */}
-                  <div className="text-left">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email *
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) =>
-                          handleInputChange("email", e.target.value)
-                        }
-                        onBlur={() => handleBlur("email")}
-                        className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          errors.email && touched.email
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="Enter your email"
-                      />
-                      {errors.email && touched.email && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {errors.email}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Mobile Number */}
-                  <div className="text-left">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Mobile Number *
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                          />
-                        </svg>
-                      </div>
-                      <input
-                        type="tel"
-                        value={formData.mobileNumber}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "mobileNumber",
-                            e.target.value.replace(/\D/g, "").slice(0, 10)
-                          )
-                        }
-                        onBlur={() => handleBlur("mobileNumber")}
-                        className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          errors.mobileNumber && touched.mobileNumber
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        placeholder="Enter your 10-digit mobile number"
-                      />
-                      {errors.mobileNumber && touched.mobileNumber && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {errors.mobileNumber}
-                        </p>
-                      )}
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-sm border rounded-xl shadow-md p-6 bg-white">
+                      <GoogleOAuthProvider
+                        clientId={import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID}
+                        onScriptLoadError={() => {
+                          addDebugLog("Google OAuth script failed to load");
+                          console.error("Google OAuth script failed to load");
+                        }}
+                        onScriptLoadSuccess={() => {
+                          addDebugLog("Google OAuth script loaded");
+                          console.log("Google OAuth script loaded");
+                        }}
+                      >
+                        <GoogleLogin
+                          onSuccess={handleGoogleSuccess}
+                          onError={handleGoogleError}
+                          useOneTap
+                          theme="filled_blue"
+                          size="large"
+                          text="continue_with"
+                          shape="rectangular"
+                        />
+                      </GoogleOAuthProvider>
                     </div>
                   </div>
                 </>
@@ -633,8 +760,37 @@ const Register = () => {
 
               {activeStep === 1 && (
                 <>
+                  {/* Pet Type */}
                   <div className="text-left">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Pet Type *
+                    </label>
+                    <select
+                      value={formData.petType}
+                      onChange={(e) =>
+                        handleInputChange("petType", e.target.value)
+                      }
+                      onBlur={() => handleBlur("petType")}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.petType && touched.petType
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
+                    >
+                      <option value="">Select Pet Type</option>
+                      <option value="Dog">Dog</option>
+                      <option value="Cat">Cat</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {errors.petType && touched.petType && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors.petType}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="text-left">
+                    <label className="block text-sm font-medium text-gray-700 mb极狐">
                       Pet Name *
                     </label>
                     <input
@@ -684,30 +840,6 @@ const Register = () => {
                       </p>
                     )}
                   </div>
-
-                  <div className="text-left">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Pet Breed *
-                    </label>
-                    <input
-                      value={formData.petBread}
-                      onChange={(e) =>
-                        handleInputChange("petBread", e.target.value)
-                      }
-                      onBlur={() => handleBlur("petBread")}
-                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.petBread && touched.petBread
-                          ? "border-red-500"
-                          : "border-gray-300"
-                      }`}
-                      placeholder="Enter your pet's breed"
-                    />
-                    {errors.petBread && touched.petBread && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {errors.petBread}
-                      </p>
-                    )}
-                  </div>
                   <div className="text-left">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Pet Age *
@@ -733,6 +865,116 @@ const Register = () => {
                       </p>
                     )}
                   </div>
+
+                  <div className="text-left">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Pet Breed *
+                    </label>
+                    {loadingBreeds ? (
+                      <div className="flex items-center justify-center py-3">
+                        <svg
+                          className="animate-spin h-5 w-5 mr-2 text-blue-600"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        <span>Loading breeds...</span>
+                      </div>
+                    ) : (
+                      <select
+                        value={formData.petBreed}
+                        onChange={(e) =>
+                          handleInputChange("petBreed", e.target.value)
+                        }
+                        onBlur={() => handleBlur("petBreed")}
+                        className={`w-full px-极狐 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          errors.petBreed && touched.petBreed
+                            ? "border-red-500"
+                            : "border-gray-300"
+                        }`}
+                        disabled={
+                          !formData.petType || breedOptions.length === 0
+                        }
+                      >
+                        <option value="">Select Breed</option>
+                        {breedOptions.map((breed, index) => (
+                          <option key={index} value={breed}>
+                            {toTitleCase(breed)}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {errors.petBreed && touched.petBreed && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors.petBreed}
+                      </p>
+                    )}
+                  </div>
+
+                  {formData.petType === "Dog" && formData.petBreed && (
+                    <div className="text-left">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Breed Image
+                      </label>
+                      {isLoading.breedImage ? (
+                        <div className="flex items-center justify-center py-3">
+                          <svg
+                            className="animate-spin h-5 w-5 mr-2 text-blue-600"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 极狐 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          <span>Loading image...</span>
+                        </div>
+                      ) : breedImage ? (
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => setShowBreedModal(true)}
+                        >
+                          <img
+                            src={breedImage}
+                            alt={formData.petBreed}
+                            className="w-24 h-24 object-cover rounded-lg shadow-md"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Click to view larger image
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">
+                          No image available for this breed
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="text-left">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -797,7 +1039,7 @@ const Register = () => {
                           <svg
                             className="w-8 h-8 mb-4 text-gray-500"
                             aria-hidden="true"
-                            xmlns="http://www.w3.org2000/svg"
+                            xmlns="http://www.w3.org/2000/svg"
                             fill="none"
                             viewBox="0 0 20 16"
                           >
@@ -832,58 +1074,50 @@ const Register = () => {
 
               {activeStep === 2 && (
                 <>
-                  {/* Email OTP */}
                   <div className="text-left">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email OTP *
+                      Mobile Number *
                     </label>
                     <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21极狐2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                          />
+                        </svg>
+                      </div>
                       <input
-                        type="text"
-                        value={formData.emailOtp}
+                        type="tel"
+                        value={formData.mobileNumber}
                         onChange={(e) =>
                           handleInputChange(
-                            "emailOtp",
-                            e.target.value.replace(/\D/g, "")
+                            "mobileNumber",
+                            e.target.value.replace(/\D/g, "").slice(0, 10)
                           )
                         }
-                        className="w-full pl-4 pr-28 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter email OTP"
-                        maxLength="4"
-                      />
-                      {otpStatus === "valid" && (
-                        <p className="text-green-600 text-sm mt-1">
-                          ✅ Verified
-                        </p>
-                      )}
-                      {otpStatus === "invalid" && (
-                        <p className="text-red-600 text-sm mt-1">
-                          ❌ Invalid OTP
-                        </p>
-                      )}
-                      <button
-                        onClick={handleSendEmailOtp}
-                        disabled={isLoading.email || emailOtpCooldown > 0}
-                        className={`absolute right-2 top-1/2 transform -translate-y-1/2 text-xs py-2 px-3 rounded ${
-                          isLoading.email || emailOtpCooldown > 0
-                            ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                            : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                        onBlur={() => handleBlur("mobileNumber")}
+                        className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          errors.mobileNumber && touched.mobileNumber
+                            ? "border-red-500"
+                            : "border-gray-300"
                         }`}
-                      >
-                        {isLoading.email
-                          ? "Sending..."
-                          : emailOtpCooldown > 0
-                          ? `Resend (${emailOtpCooldown}s)`
-                          : "Send OTP"}
-                      </button>
-                      {errors.emailOtp && touched.emailOtp && (
+                        placeholder="Enter your 10-digit mobile number"
+                      />
+                      {errors.mobileNumber && touched.mobileNumber && (
                         <p className="text-red-500 text-xs mt-1">
-                          {errors.emailOtp}
+                          {errors.mobileNumber}
                         </p>
                       )}
                     </div>
                   </div>
-
                   {/* Password */}
                   <div className="text-left">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -966,7 +1200,8 @@ const Register = () => {
               ) : (
                 <button
                   onClick={handleSubmit}
-                  disabled={isLoading.register}
+                  // disabled={isLoading.register}
+                  disabled={isLoading.register || !coords.lat || !coords.lng}
                   className="flex-1 bg-blue-600 text-white font-medium py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                 >
                   {isLoading.register ? (

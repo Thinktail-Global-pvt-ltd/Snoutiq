@@ -29,6 +29,8 @@ import VetDocument from "./VetDashboard/VetDocument";
 import DoctorRegistration from "./VetDashboard/DoctorRegistration";
 import Ratings from "./VetDashboard/Rating";
 import Support from "./pages/Support";
+import VetOwner from "./admin/VetOwner";
+import PetOwner from "./admin/PetOwner";
 
 function App() {
   return (
@@ -202,6 +204,26 @@ function App() {
               <ProtectedRoute>
                 <HeaderWithSidebar>
                   <Support />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/user-dashboard/pet-owner"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <PetOwner />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+            <Route
+            path="/user-dashboard/vet-owner"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <VetOwner />
                 </HeaderWithSidebar>
               </ProtectedRoute>
             }
