@@ -3,6 +3,10 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
+use App\Http\Controllers\TestControlelr;
+
+Route::get('/import-vets', [TestControlelr::class, 'importPdfData']);
+
 
 // using Query Builder
 Route::get('/users-db', function () {

@@ -535,15 +535,53 @@ private function describePetImageDynamic($imagePath)
         ], 200);
     }
 
-    public function googleLogin(Request $request)
+//     public function googleLogin(Request $request)
+// {
+//     $request->validate([
+//         'email'        => 'required|email',
+//         'google_token' => 'required|string',
+//     ]);
+
+//     try {
+//         // ✅ Check user with email & google_token
+//         $user = User::where('email', $request->email)
+//                     ->where('google_token', $request->google_token)
+//                     ->first();
+
+//         if (!$user) {
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Invalid credentials',
+//             ], 401);
+//         }
+
+//         // ✅ If found → success
+//         return response()->json([
+//             'success' => true,
+//             'message' => 'Login success',
+//             'user'    => $user,  // full row
+//         ]);
+
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'success' => false,
+//             'message' => 'Google login failed',
+//             'error'   => $e->getMessage(),
+//         ], 500);
+//     }
+// }
+
+
+public function googleLogin(Request $request)
 {
     $request->validate([
         'email'        => 'required|email',
         'google_token' => 'required|string',
+       // 'room_title'   => 'nullable|string', // optional
     ]);
 
     try {
-        // ✅ Check user with email & google_token
+        // ✅ User check
         $user = User::where('email', $request->email)
                     ->where('google_token', $request->google_token)
                     ->first();
@@ -555,12 +593,36 @@ private function describePetImageDynamic($imagePath)
             ], 401);
         }
 
-        // ✅ If found → success
+        $plainToken = null;
+        $room = null;
+
+        DB::transaction(function () use (&$plainToken, &$room, $user, $request) {
+            // ✅ API token regenerate
+            $plainToken = bin2hex(random_bytes(32));
+            $user->api_token_hash = $plainToken; // (prod: hash store karein)
+            $user->save();
+
+            // ✅ Create NEW chat room on login
+            $room = ChatRoom::create([
+                'user_id'         => $user->id,
+                'chat_room_token' => 'room_' . Str::uuid()->toString(),
+                'name'            => $request->room_title ?? ('New chat - ' . now()->format('d M Y H:i')),
+            ]);
+        });
+
         return response()->json([
-            'success' => true,
-            'message' => 'Login success',
-            'user'    => $user,  // full row
-        ]);
+            'success'    => true,
+            'message'    => 'Login success',
+            'user'       => $user,
+            'token'      => $plainToken,
+            'token_type' => 'Bearer',
+            'chat_room'  => [
+                'id'    => $room->id,
+                'token' => $room->chat_room_token,
+                'name'  => $room->name,
+            ],
+            'note'       => 'Use this chat_room_token for all messages in this new room.',
+        ], 200);
 
     } catch (\Exception $e) {
         return response()->json([
@@ -570,6 +632,7 @@ private function describePetImageDynamic($imagePath)
         ], 500);
     }
 }
+
 
 
 
