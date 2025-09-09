@@ -111,6 +111,20 @@ Route::post('/auth/logout',     [AuthController::class, 'logout']); // invalidat
 Route::get('/fetchNearbyPlaces', [PublicController::class, 'fetchNearbyPlaces']);
 
 
+// using Query Builder
+Route::get('/users-db', function () {
+      //  dd('hi');
+    $users = DB::table('users')->get();
+    return response()->json($users);
+});
+
+// using Eloquent Model
+Route::get('/users', function () {
+
+    $users = User::all();
+    return response()->json($users);
+});
+
 Route::prefix('groomer')->middleware('auth:sanctum')->group(function () {
 Route::post('/profile', [GroomerProfileController::class, 'store']);
 Route::get('/ratings', [GroomerProfileController::class, 'ratings']);
