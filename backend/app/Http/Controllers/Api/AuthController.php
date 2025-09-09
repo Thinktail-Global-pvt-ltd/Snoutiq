@@ -257,6 +257,27 @@ class AuthController extends Controller
 
 public function register(Request $request)
 {
+    
+    // check email
+    $emailExists = DB::table('users')
+        ->where('email', $request->email)
+        ->exists();
+
+    // check mobile (phone column)
+    $mobileExists = DB::table('users')
+        ->where('phone', $request->mobileNumber)
+        ->exists();
+
+    if ($emailExists || $mobileExists) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => 'enter unique mobile or email'
+        ], 422);
+    }
+
+
+
+
     $doc1Path = null;
     $doc2Path = null;
     $summaryText = null;
