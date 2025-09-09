@@ -92,15 +92,15 @@ if(App\Models\UserProfile::where('user_id', $Request->user()->id)->count() == 0)
 // Route::post('/forgot-password', [ForgotPasswordSimpleController::class, 'sendNewPassword']);
 
 // Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
-// Route::post('/login', [AuthController::class, 'login']);
+// Route::post('/login', [AuthController::class , 'login']);
 // Route::post('/register', [AuthController::class, 'register']);
 
 
 
 
 
-Route::post('/auth/send-otp',   [AuthController::class, 'send_otp']);
-Route::post('/auth/verify-otp', [AuthController::class, 'verify_otp']);
+//Route::post('/auth/send-otp',   [AuthController::class, 'send_otp']);
+//Route::post('/auth/verify-otp', [AuthController::class, 'verify_otp']);
 
 Route::post('/auth/register',   [AuthController::class, 'register']);
 Route::post('/auth/login',      [AuthController::class, 'login']);
