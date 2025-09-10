@@ -447,6 +447,7 @@ private function describePetImageDynamic($imagePath)
 //         'token_type' => 'Bearer',
 //     ], 201);
 // }
+
 // public function login(Request $request)
 // {
 
@@ -482,48 +483,48 @@ private function describePetImageDynamic($imagePath)
 //     ], 200);
 // }
 
-  public function login(Request $request)
-    {
-        $data = $request->validate([
-            'login'      => 'required|string', // email or phone
-            'password'   => 'required|string',
-            'room_title' => 'nullable|string', // optional: login par room ka naam set karna ho to
-        ]);
+public function login(Request $request)
+{
+    $email = $request->input('email') ?? $request->input('login');
+    $role  = $request->input('role'); // 👈 role pick karo
+    $roomTitle = $request->input('room_title');
 
-        // find user by email or phone
-        $user = User::where('email', $data['login'])
-                    ->orWhere('phone', $data['login'])
-                    ->first();
+    if (empty($email) || empty($role)) {
+        return response()->json(['message' => 'Email or role missing'], 422);
+    }
+
+    $room = null;
+    $plainToken = null;
+
+    if ($role === 'pet') {
+        // 🔹 Search in users table
+        $user = User::where('email', $email)->first();
 
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        // plain text password check (note: production me hash use karein)
-        if ($user->password !== $data['password']) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
-        }
-
-        $plainToken = null;
-        $room = null;
-
-        DB::transaction(function () use (&$plainToken, &$room, $user, $data) {
-            // ✅ API token regenerate
+        DB::transaction(function () use (&$plainToken, &$room, $user, $roomTitle) {
             $plainToken = bin2hex(random_bytes(32));
-            $user->api_token_hash = $plainToken; // (prod: hash store karein)
+            $user->api_token_hash = $plainToken;
             $user->save();
 
-            // ✅ Create NEW chat room on login
             $room = ChatRoom::create([
                 'user_id'         => $user->id,
                 'chat_room_token' => 'room_' . Str::uuid()->toString(),
-                'name'            => $data['room_title'] ?? ('New chat - ' . now()->format('d M Y H:i')),
+                'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
             ]);
         });
 
+        // ✅ Password exclude karo
+        $userData = $user->toArray();
+        unset($userData['password']);
+        $userData['role'] = 'pet';
+
         return response()->json([
             'message'    => 'Login successful',
-            'user'       => $user,
+            'role'       => 'pet',
+            'email'      => $user->email,
             'token'      => $plainToken,
             'token_type' => 'Bearer',
             'chat_room'  => [
@@ -531,9 +532,43 @@ private function describePetImageDynamic($imagePath)
                 'token' => $room->chat_room_token,
                 'name'  => $room->name,
             ],
-            'note'       => 'Use this chat_room_token for all messages in this new room.',
+            'user'       => $userData,
+        ], 200);
+
+    } elseif ($role === 'vet') {
+        // 🔹 Search in vet_registerations_temp
+        $tempVet = DB::table('vet_registerations_temp')
+            ->where('email', $email)
+            ->first();
+
+        if (!$tempVet) {
+            return response()->json(['message' => 'Vet not found'], 404);
+        }
+
+        // ✅ Password exclude karo
+        $vetData = (array) $tempVet;
+        unset($vetData['password']);
+        $vetData['role'] = 'vet';
+
+        return response()->json([
+            'message' => 'Login successful',
+            'role'    => 'vet',
+            'email'   => $tempVet->email,
+            'vet'     => $vetData,
         ], 200);
     }
+
+    return response()->json(['message' => 'Invalid role'], 400);
+}
+
+
+
+
+
+
+
+
+
 
 //     public function googleLogin(Request $request)
 // {
