@@ -16,6 +16,7 @@ import { AuthContext } from "../auth/AuthContext";
 import Navbar from "../components/Navbar";
 import { useParams } from "react-router-dom";
 import MessageBubble from "./MessageBubble";
+import DetailedWeatherWidget from "./DetailedWeatherWidget";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -54,8 +55,6 @@ const Dashboard = () => {
     });
   }, []);
 
-
-  
   // Cleanup function for typing animations
   const cleanupTypingAnimation = useCallback((messageId) => {
     if (typingTimeouts.current.has(messageId)) {
@@ -450,6 +449,8 @@ const Dashboard = () => {
     if (saved) setContextToken(saved);
   }, []);
 
+ 
+
   const ChatContent = useMemo(() => {
     return (
       <div className="flex flex-col h-full">
@@ -463,6 +464,7 @@ const Dashboard = () => {
                 : ``}
             </p>
           </div>
+            <DetailedWeatherWidget />
           <div className="flex gap-2">
             {messages.length > 0 && (
               <button

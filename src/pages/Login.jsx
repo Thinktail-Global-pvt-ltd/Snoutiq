@@ -499,7 +499,7 @@ const Login = () => {
             </form>
             <div className="flex justify-center">
               <GoogleOAuthProvider
-                clientId={import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID}
+                clientId='635875509179-o5uue99oues26tr2ibqtdrc42tkvpigv.apps.googleusercontent.com'
                 onScriptLoadError={() =>
                   console.error("Google OAuth script failed to load")
                 }

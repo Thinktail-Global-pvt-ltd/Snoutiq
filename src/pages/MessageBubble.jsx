@@ -3,7 +3,7 @@ import React, { memo } from "react";
 const EmergencyStatusBox = ({ emergencyStatus }) => {
   if (!emergencyStatus) return null;
 
-  if (emergencyStatus.includes("URGENT")) {
+  if (emergencyStatus.includes("EMERGENCY")) {
     return (
       <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 rounded-r-xl shadow-sm">
         <div className="flex items-center mb-3">
@@ -30,7 +30,7 @@ const EmergencyStatusBox = ({ emergencyStatus }) => {
         </button>
       </div>
     );
-  } else if (emergencyStatus.includes("Routine")) {
+  } else if (emergencyStatus.includes("ROUTINE")) {
     return (
       <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-r-xl shadow-sm">
         <div className="flex items-center mb-3">

@@ -66,7 +66,7 @@ const DoctorRegistration = () => {
   ]);
 
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    googleMapsApiKey: 'AIzaSyDEFWG5jYxYTXBouOr43vjV4Aj6WEOXBps',
     libraries: LIBRARIES,
   });
 
@@ -198,7 +198,7 @@ const DoctorRegistration = () => {
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${
-          import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+          'AIzaSyDEFWG5jYxYTXBouOr43vjV4Aj6WEOXBps'
         }`
       );
       const data = await response.json();

@@ -733,7 +733,7 @@ const Register = () => {
                   <div className="flex justify-center">
                     <div className="w-full max-w-sm border rounded-xl shadow-md p-6 bg-white">
                       <GoogleOAuthProvider
-                        clientId={import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID}
+                        clientId='635875509179-o5uue99oues26tr2ibqtdrc42tkvpigv.apps.googleusercontent.com'
                         onScriptLoadError={() => {
                           addDebugLog("Google OAuth script failed to load");
                           console.error("Google OAuth script failed to load");
