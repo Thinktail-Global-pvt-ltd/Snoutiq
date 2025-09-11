@@ -2,9 +2,14 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import AgoraRTC from "agora-rtc-sdk-ng";
 
+// ====== HARD-CODED CONFIGS (as you asked) ======
 const API_BASE = "http://127.0.0.1:8000";
 const POLL_MS = 2000;
-const AGORA_APP_ID = "b13636f3f07448e2bf6778f5bc2c506f";          // <-- from .env
+
+// 👇 App ID ko .trim() se normalize kiya hai (hidden space/newline kill)
+const AGORA_APP_ID = "88a602d093ed47d6b77a29726aa6c35e ".trim();
+
+// Razorpay live key (tumne diya):
 const RAZORPAY_KEY_ID = "rzp_live_RGBIfjaGxq1Ma4";
 
 export default function CallTestPage() {
@@ -13,16 +18,23 @@ export default function CallTestPage() {
   const [paymentSessionId, setPaymentSessionId] = useState(null);
   const [isPolling, setIsPolling] = useState(false);
   const [joined, setJoined] = useState(false);
+  const [openingPayment, setOpeningPayment] = useState(false);
 
   const pollRef = useRef(null);
 
   // Agora refs
   const clientRef = useRef(null);
   const localTracksRef = useRef({ mic: null, cam: null });
-  const remoteUsersRef = useRef(new Map()); // uid -> { videoTrack }
 
   const log = (msg) =>
     setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+
+  // ----------- tiny debug to catch wrong App ID -----------
+  useEffect(() => {
+    const chars = [...AGORA_APP_ID].map((c) => c.charCodeAt(0));
+    log(`🔧 AGORA_APP_ID="${AGORA_APP_ID}" (len=${AGORA_APP_ID.length})`);
+    log(`🔎 charCodes=${chars.join(",")}`);
+  }, []);
 
   // ---------- Polling helpers ----------
   const stopPolling = () => {
@@ -42,21 +54,21 @@ export default function CallTestPage() {
       try {
         const res = await axios.get(`${API_BASE}/api/call/${sid}`);
         const s = res.data?.session ?? res.data;
-        log(`📥 Status: ${s.status}, Payment: ${s.payment_status}`);
+        if (!s) return;
+        log(`📥 Status: ${s.status || "pending"}, Payment: ${s.payment_status || "unpaid"}`);
 
-        if (!joined && s.status === "accepted" && s.payment_status !== "paid") {
-          setPaymentSessionId(s.id); // show Pay Now
+        // Doctor accepted -> show Pay Now button (human click)
+        if (!joined && s.status === "accepted" && s.payment_status !== "paid" && !paymentSessionId && !openingPayment) {
+          setPaymentSessionId(s.id);
           log("✅ Doctor accepted detected — showing Pay Now");
-          // (choice) stop poll here; ya chalta rehne do
-          // stopPolling();
         }
 
+        // If backend already marked paid (e.g. another tab), auto-join
         if (s.payment_status === "paid" && !joined) {
-          // in case backend marked paid (e.g., another tab flow)
           await joinAgora(s.id, s.channel_name);
         }
       } catch (e) {
-        log("❌ Poll error: " + e.message);
+        log("❌ Poll error: " + (e?.message || String(e)));
       }
     }, POLL_MS);
   };
@@ -66,22 +78,21 @@ export default function CallTestPage() {
       stopPolling();
       leaveAgora();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---------- 1) Patient: create call ----------
   const createCall = async () => {
     try {
-      const res = await axios.post(`${API_BASE}/api/call/create`, {
-        patient_id: 101,
-      });
+      await leaveAgora();
+      const res = await axios.post(`${API_BASE}/api/call/create`, { patient_id: 101 });
       setSession(res.data);
       setPaymentSessionId(null);
       setJoined(false);
+      setOpeningPayment(false);
       log("🆕 Patient created call: " + JSON.stringify(res.data));
       startPolling(res.data.session_id);
     } catch (e) {
-      log("Create call error: " + e.message);
+      log("Create call error: " + (e?.message || String(e)));
     }
   };
 
@@ -89,25 +100,24 @@ export default function CallTestPage() {
   const acceptCall = async () => {
     if (!session) return alert("Create a call first!");
     try {
-      const res = await axios.post(
-        `${API_BASE}/api/call/${session.session_id}/accept`,
-        { doctor_id: 501 }
-      );
+      const res = await axios.post(`${API_BASE}/api/call/${session.session_id}/accept`, { doctor_id: 501 });
       log("👨‍⚕️ Doctor accepted API response: " + JSON.stringify(res.data));
     } catch (e) {
-      log("Accept call error: " + e.message);
+      log("Accept call error: " + (e?.message || String(e)));
     }
   };
 
-  // ---------- 3) Razorpay: open on user click, then join Agora ----------
+  // ---------- 3) Razorpay: open on click, then notify backend, then Agora join ----------
   const openRazorpayPayment = async (sid) => {
     try {
+      if (openingPayment) return; // double click guard
+      setOpeningPayment(true);
+
       const orderRes = await axios.post(`${API_BASE}/api/create-order`);
 
       if (!window.Razorpay) {
-        log(
-          "⚠️ Razorpay script not loaded. Add <script src='https://checkout.razorpay.com/v1/checkout.js'></script> in public/index.html"
-        );
+        log("⚠️ Razorpay script not loaded. Add <script src='https://checkout.razorpay.com/v1/checkout.js'></script> in public/index.html");
+        setOpeningPayment(false);
         return;
       }
 
@@ -121,14 +131,14 @@ export default function CallTestPage() {
         handler: async (response) => {
           log("✅ Payment success: " + JSON.stringify(response));
 
-          // notify backend
+          // tell backend
           await axios.post(`${API_BASE}/api/call/${sid}/payment-success`, {
             payment_id: response.razorpay_payment_id,
             order_id: response.razorpay_order_id,
             signature: response.razorpay_signature,
           });
 
-          // fetch channel_name (if not in state)
+          // fetch channel_name fresh
           let channelName = session?.channel_name;
           if (!channelName) {
             const sRes = await axios.get(`${API_BASE}/api/call/${sid}`);
@@ -136,8 +146,9 @@ export default function CallTestPage() {
             channelName = s.channel_name;
           }
 
-          // 👉 join agora now
+          // join agora
           await joinAgora(sid, channelName);
+          setOpeningPayment(false);
         },
         prefill: {
           name: "Test Patient",
@@ -149,26 +160,36 @@ export default function CallTestPage() {
       const rzp = new window.Razorpay(options);
       log("🪟 Opening Razorpay checkout…");
       rzp.open();
+
+      // If modal closed by user, allow retry
+      rzp.on("payment.failed", (resp) => {
+        log("❌ Payment failed: " + JSON.stringify(resp?.error || {}));
+        setOpeningPayment(false);
+      });
+      rzp.on("modal.closed", () => {
+        log("ℹ️ Razorpay modal closed");
+        setOpeningPayment(false);
+      });
     } catch (e) {
-      log("Payment error: " + e.message);
+      log("Payment error: " + (e?.message || String(e)));
+      setOpeningPayment(false);
     }
   };
 
   // ---------- 4) Agora: join / leave ----------
-  const joinAgora = async (sid, channelName) => {
+  const joinAgora = async (_sid, channelName) => {
     try {
       if (joined) {
         log("ℹ️ Already in Agora channel, skipping join");
         return;
       }
       if (!AGORA_APP_ID) {
-        log("❌ Missing VITE_AGORA_APP_ID in frontend .env");
+        log("❌ AGORA_APP_ID missing");
         return;
       }
-      const uid = Math.floor(Math.random() * 1_000_000);
 
-      // get token from backend
-      // Expected API: POST /api/agora/token { channel, uid, role }
+      // backend se token
+      const uid = Math.floor(Math.random() * 1_000_000);
       const tRes = await axios.post(`${API_BASE}/api/agora/token`, {
         channel: channelName,
         uid,
@@ -179,16 +200,15 @@ export default function CallTestPage() {
         log("❌ No Agora token from backend");
         return;
       }
+      log(`🪪 Token len=${String(token).length}, uid=${uid}`);
 
-      // create client
+      // client create
       const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
       clientRef.current = client;
 
-      // remote user handlers
       client.on("user-published", async (user, mediaType) => {
         await client.subscribe(user, mediaType);
         log(`📡 Remote published: uid=${user.uid}, media=${mediaType}`);
-
         if (mediaType === "video") {
           ensureRemoteVideoContainer(user.uid);
           user.videoTrack?.play(getRemoteDivId(user.uid));
@@ -200,9 +220,7 @@ export default function CallTestPage() {
 
       client.on("user-unpublished", (user, mediaType) => {
         log(`🧹 Remote unpublished: uid=${user.uid}, media=${mediaType}`);
-        if (mediaType === "video") {
-          removeRemoteVideoContainer(user.uid);
-        }
+        if (mediaType === "video") removeRemoteVideoContainer(user.uid);
       });
 
       client.on("user-left", (user) => {
@@ -210,17 +228,15 @@ export default function CallTestPage() {
         removeRemoteVideoContainer(user.uid);
       });
 
-      // join
+      // *** THE JOIN ***
+      log(`➡️ Joining: appId=${AGORA_APP_ID} ch=${channelName}`);
       await client.join(AGORA_APP_ID, channelName, token, uid);
 
-      // create local tracks
+      // local tracks
       const [mic, cam] = await AgoraRTC.createMicrophoneAndCameraTracks();
       localTracksRef.current = { mic, cam };
-
-      // play local video
       cam.play("local-player");
 
-      // publish
       await client.publish([mic, cam]);
       setJoined(true);
       log(`🎥 Joined Agora: ch=${channelName}, uid=${uid}`);
@@ -234,14 +250,8 @@ export default function CallTestPage() {
       const client = clientRef.current;
       const { mic, cam } = localTracksRef.current;
 
-      if (mic) {
-        mic.stop();
-        mic.close();
-      }
-      if (cam) {
-        cam.stop();
-        cam.close();
-      }
+      if (mic) { mic.stop(); mic.close(); }
+      if (cam) { cam.stop(); cam.close(); }
       localTracksRef.current = { mic: null, cam: null };
 
       if (client) {
@@ -283,7 +293,7 @@ export default function CallTestPage() {
 
   return (
     <div style={{ padding: 20 }}>
-      <h2>Call Flow Test (Polling + Agora on Payment)</h2>
+      <h2>Call Flow Test (Polling → Razorpay → Agora)</h2>
 
       <div style={{ marginBottom: 12 }}>
         <button onClick={createCall}>1. Create Call (Patient)</button>
@@ -309,15 +319,17 @@ export default function CallTestPage() {
         {paymentSessionId && !joined && (
           <button
             onClick={() => openRazorpayPayment(paymentSessionId)}
+            disabled={openingPayment}
             style={{
               marginLeft: 10,
-              background: "green",
+              background: openingPayment ? "#999" : "green",
+              cursor: openingPayment ? "not-allowed" : "pointer",
               color: "white",
               padding: "8px 16px",
               borderRadius: 6,
             }}
           >
-            💳 Pay Now
+            {openingPayment ? "Processing…" : "💳 Pay Now"}
           </button>
         )}
 

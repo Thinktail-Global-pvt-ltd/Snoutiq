@@ -30,6 +30,11 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AgoraController;
 
 
+Route::get('/agora/appid', function () {
+    return response()->json([
+        'appId' => trim(env('AGORA_APP_ID')),
+    ]);
+});
 Route::get('/call/{id}', [CallController::class, 'show']);
 // routes/web.php (ya api.php)
 Route::get('/debug/pusher', function () {
