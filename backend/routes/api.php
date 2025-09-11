@@ -24,6 +24,29 @@ use App\Models\User;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\CallController;
+// routes/api.php
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\AgoraController;
+
+
+Route::get('/call/{id}', [CallController::class, 'show']);
+// routes/web.php (ya api.php)
+Route::get('/debug/pusher', function () {
+    return [
+        'driver'  => config('broadcasting.default'),
+        'key'     => config('broadcasting.connections.pusher.key'),
+        'app_id'  => config('broadcasting.connections.pusher.app_id'),
+        'cluster' => config('broadcasting.connections.pusher.options.cluster'),
+    ];
+});
+
+
+Route::post('/create-order', [PaymentController::class, 'createOrder']);
+
+Route::post('/call/create', [CallController::class, 'createSession']);
+Route::post('/call/{id}/accept', [CallController::class, 'acceptCall']);
+Route::post('/call/{id}/payment-success', [CallController::class, 'paymentSuccess']);
 
 Route::get('/users', [AdminController::class, 'getUsers']);
 Route::get('/vets', [AdminController::class, 'getVets']);
@@ -267,3 +290,6 @@ Route::post('/webhook/deploy', function () {
 
     return response()->json(['status' => 'ok']);
 });
+
+// routes/api.php
+Route::post('/agora/token', [AgoraController::class, 'generateToken']);
