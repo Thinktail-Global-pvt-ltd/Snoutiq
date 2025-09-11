@@ -8,8 +8,9 @@ class AgoraController extends Controller
 {
     public function generateToken(Request $request)
     {
-        $appID = env('AGORA_APP_ID');
-        $appCertificate = env('AGORA_APP_CERTIFICATE');
+        $appID ='b13636f3f07448e2bf6778f5bc2c506f';
+        $appCertificate = 'c30ae10e278c490f9b09608b15c353ba';
+
 
         $channelName = $request->input('channel');
         $uid = $request->input('uid') ?? rand(1, 999999);
