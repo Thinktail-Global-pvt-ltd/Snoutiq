@@ -8,8 +8,8 @@ class PaymentController extends Controller
 {
   public function createOrder(Request $request)
 {
-    $keyId = env('RAZORPAY_KEY');
-    $keySecret = env('RAZORPAY_SECRET');
+    $keyId = 'rzp_live_RGBIfjaGxq1Ma4';
+    $keySecret = 'WypJ2plLEmScSrVjrLzixWyN';
 
     try {
         $api = new \Razorpay\Api\Api($keyId, $keySecret);
