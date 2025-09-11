@@ -5,7 +5,7 @@ import AgoraRTC from "agora-rtc-sdk-ng";
 const API_BASE = "http://127.0.0.1:8000";
 const POLL_MS = 2000;
 const AGORA_APP_ID = "b13636f3f07448e2bf6778f5bc2c506f";          // <-- from .env
-const RAZORPAY_KEY_ID = "rzp_test_1nhE9190sR3rkP";
+const RAZORPAY_KEY_ID = "rzp_live_RGBIfjaGxq1Ma4";
 
 export default function CallTestPage() {
   const [session, setSession] = useState(null);
