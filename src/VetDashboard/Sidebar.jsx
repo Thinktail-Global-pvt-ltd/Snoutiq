@@ -175,6 +175,16 @@ const HeaderWithSidebar = ({ children }) => {
             path: "/user-dashboard/pet-info",
           },
           {
+            text: "Health Records",
+            icon: <HiOutlineHeart />,
+            path: "/user-dashboard/pet-health",
+          },
+          {
+            text: "Daily Care",
+            icon: <HiOutlineHeart />,
+            path: "/user-dashboard/pet-daily-care",
+          },
+          {
             text: "My Bookings",
             icon: <HiOutlineCalendar />,
             path: "/user-dashboard/my-bookings",
@@ -183,6 +193,36 @@ const HeaderWithSidebar = ({ children }) => {
             text: "History",
             icon: <HiOutlineUserGroup />,
             path: "/user-dashboard/history",
+          },
+          {
+            text: "Vaccinations",
+            icon: <HiOutlineExclamation />,
+            path: "/user-dashboard/vaccination-tracker",
+          },
+          {
+            text: "Medication Tracker",
+            icon: <HiOutlineExclamation />,
+            path: "/user-dashboard/medical-tracker",
+          },
+          {
+            text: "Weight Monitoring",
+            icon: <HiOutlineExclamation />,
+            path: "/user-dashboard/weight-monitoring",
+          },
+          {
+            text: "Vet Visits",
+            icon: <HiOutlineExclamation />,
+            path: "/user-dashboard/vet-visits",
+          },
+          {
+            text: "Photo Timeline",
+            icon: <HiOutlineExclamation />,
+            path: "/user-dashboard/photo-timeline",
+          },
+          {
+            text: "Emergency Contacts",
+            icon: <HiOutlineExclamation />,
+            path: "/user-dashboard/emergency-contacts",
           },
         ],
       },

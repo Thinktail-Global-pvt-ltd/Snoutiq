@@ -2,15 +2,15 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import GTMRouteListener from "./GTMRouteListener";
 import Home from "./pages/Home";
 import Register from "./pages/Register";
-import PetInfo from "./pages/PetInfo";
+import PetInfo from "./PetDashboard/PetInfo";
 import Dashboard from "./pages/Dashboard";
 import { Toaster } from "react-hot-toast";
 import Login from "./pages/Login";
 import ProtectedRoute from "./ProtectedRoute";
 import ChatInterface from "./pages/ChatInterface";
 import ForgotPassword from "./pages/ForgotPassword";
-import AddPet from "./pages/AddPet";
-import EditPet from "./pages/EditPet";
+import AddPet from "./PetDashboard/AddPet";
+import EditPet from "./PetDashboard/EditPet";
 import TokenLogin from "./components/TokenLogin";
 import Videocall from "./pages/VideoCall";
 import SearchingDoctor from "./pages/SearchingDoctor";
@@ -32,6 +32,12 @@ import Support from "./pages/Support";
 import VetOwner from "./admin/VetOwner";
 import PetOwner from "./admin/PetOwner";
 import DoctorEmergencySearch from "./VetDashboard/DoctorEmergencySearch";
+import VaccinationTracker from "./PetDashboard/VaccinationTracker";
+import PetHealth from "./PetDashboard/PetHealth";
+import PetDailyCare from "./PetDashboard/PetDailyCare";
+import PetWeightMonitoring from "./PetDashboard/PetWeightMonitoring";
+import PetMedicationTracker from "./PetDashboard/PetMedicationTracker";
+import CallTestPage from "./CallTestPage";
 
 function App() {
   return (
@@ -55,7 +61,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/vet-register" element={<DoctorRegistration/>}/>
+          <Route path="/vet-register" element={<DoctorRegistration />} />
 
           <Route path="/token-login/:token" element={<TokenLogin />} />
 
@@ -69,7 +75,6 @@ function App() {
             element={<MedicalDataConsent />}
           />
           <Route path="/shipping-policy" element={<ShippingPolicy />} />
-
 
           <Route
             path="/user/pets"
@@ -159,7 +164,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-           <Route
+          <Route
             path="/user-dashboard/vet-profile"
             element={
               <ProtectedRoute>
@@ -169,7 +174,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-            <Route
+          <Route
             path="/user-dashboard/vet-document"
             element={
               <ProtectedRoute>
@@ -179,7 +184,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-            <Route
+          <Route
             path="/user-dashboard/vet-payment"
             element={
               <ProtectedRoute>
@@ -189,7 +194,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-             <Route
+          <Route
             path="/user-dashboard/rating"
             element={
               <ProtectedRoute>
@@ -199,7 +204,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-             <Route
+          <Route
             path="/user-dashboard/support"
             element={
               <ProtectedRoute>
@@ -209,7 +214,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-           <Route
+          <Route
             path="/user-dashboard/pet-owner"
             element={
               <ProtectedRoute>
@@ -219,7 +224,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-            <Route
+          <Route
             path="/user-dashboard/vet-owner"
             element={
               <ProtectedRoute>
@@ -229,13 +234,71 @@ function App() {
               </ProtectedRoute>
             }
           />
-             <Route
+          <Route
             path="/doctor-emergency-search"
             element={
               <ProtectedRoute>
                 <HeaderWithSidebar>
                   <DoctorEmergencySearch />
                 </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user-dashboard/vaccination-tracker"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <VaccinationTracker />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user-dashboard/pet-health"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <PetHealth />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/user-dashboard/pet-daily-care"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <PetDailyCare />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+            <Route
+            path="/user-dashboard/weight-monitoring"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <PetWeightMonitoring />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user-dashboard/medical-tracker"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <PetMedicationTracker />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/doctor-testing"
+            element={
+              <ProtectedRoute>
+                  <CallTestPage />
               </ProtectedRoute>
             }
           />

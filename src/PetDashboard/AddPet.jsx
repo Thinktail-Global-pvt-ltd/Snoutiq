@@ -7,7 +7,7 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import axios from "./../axios";
+import axios from "../axios";
 import toast from "react-hot-toast";
 
 const AddPetForm = () => {
@@ -543,7 +543,7 @@ const AddPetForm = () => {
               <div className="flex flex-col-reverse md:flex-row justify-end space-y-4 space-y-reverse md:space-y-0 md:space-x-4 pt-6 border-t border-gray-200">
                 <button
                   type="button"
-                  onClick={() => navigate("/user/pets")}
+                  onClick={() => navigate("user-dashboard/pet-info")}
                   disabled={isLoading}
                   className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors shadow-sm disabled:bg-gray-200 disabled:cursor-not-allowed"
                 >
