@@ -9,8 +9,9 @@ class AgoraTokenService
 
     public function generateToken(string $channelName, int $uid, int $role = self::ROLE_PUBLISHER, int $expireSeconds = 3600): string
     {
-        $appId = env('AGORA_APP_ID');
-        $appCertificate = env('AGORA_APP_CERTIFICATE');
+       $appId = "88a602d093ed47d6b77a29726aa6c35e";
+       $appCertificate = "39ac7bae76084ba1a51ee728d592a9d3";
+
 
         if (!$appId || !$appCertificate) {
             throw new \Exception("Agora credentials missing in .env");
