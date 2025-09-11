@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axiosClient from '../axios';
 
 import ringtone from './../assets/ringtone.mp3';
+import { AuthContext } from '../auth/AuthContext';
 
 // Modal component to show the emergency request
 const EmergencyCallModal = ({ request, onAccept, onDecline, isAccepting }) => {
@@ -53,17 +54,16 @@ const DoctorEmergencySearch = () => {
   const [isAccepting, setIsAccepting] = useState(false);
   const [isPollingActive, setIsPollingActive] = useState(true); // Controls the search
   const audioRef = useRef(null);
-
+const {token} = useContext(AuthContext)
   // Function to search for new requests
   const searchForRequest = useCallback(async () => {
     // Stop if polling is deactivated or a request is already showing
     if (!isPollingActive || pendingRequest) return;
 
     try {
-      const authToken = localStorage.getItem('token');
-      const response = await axiosClient.post('/user/emergency/searchForRequest',{}, {
+      const response = await axiosClient.post('https://snoutiq.com/backend/user/emergency/searchForRequest',{}, {
         headers: {
-          Authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -106,11 +106,10 @@ const DoctorEmergencySearch = () => {
     setIsAccepting(true);
     toast.loading('Accepting call...');
     try {
-      const authToken = localStorage.getItem('token');
-      await axiosClient.post('/user/emergency/acceptEmergancy', {
+      await axiosClient.post('https://snoutiq.com/backend/user/emergency/acceptEmergancy', {
         token: pendingRequest.token,
       }, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       toast.dismiss();

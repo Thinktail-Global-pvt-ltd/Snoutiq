@@ -2282,7 +2282,7 @@ const DoctorRegistration = () => {
                 </button>
               </div>
             </form>
-            <div className="mt-6 pt-4 border-t border-gray-200 items-center text-center">
+            {/* <div className="mt-6 pt-4 border-t border-gray-200 items-center text-center">
               <p className="text-gray-600 text-sm">
                 Already have an account?{" "}
                 <Link
@@ -2292,7 +2292,81 @@ const DoctorRegistration = () => {
                   Login here
                 </Link>
               </p>
-            </div>
+            </div> */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+  <h3 className="text-lg font-semibold text-gray-800 text-center mb-4">
+    Contact Us
+  </h3>
+
+  <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-gray-700">
+    {/* Email */}
+    <div className="flex items-center gap-2 group">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-5 w-5 text-blue-600 group-hover:text-blue-800 transition-colors"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          d="M16 12H8m8-4H8m8 8H8m12-12H4a2 2 0 00-2 2v12a2
+          2 0 002 2h16a2 2 0 002-2V6a2
+          2 0 00-2-2z"
+        />
+      </svg>
+      <a
+        href="mailto:info@snoutiq.com"
+        className="font-medium hover:text-blue-600 transition-colors"
+      >
+        info@snoutiq.com
+      </a>
+    </div>
+
+    {/* Divider */}
+    <div className="hidden sm:block h-6 w-px bg-gray-300"></div>
+
+    {/* Phone */}
+    <div className="flex items-center gap-2 group">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-5 w-5 text-green-600 group-hover:text-green-800 transition-colors"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          d="M3 5a2 2 0 012-2h2.586a1 1 0 01.707.293l2.414
+          2.414a1 1 0 01.293.707V9a1 1 0
+          01-1 1H8a1 1 0 00-1 1v2c0
+          5.523 4.477 10 10 10h2a1 1 0
+          001-1v-1.586a1 1 0
+          00-.293-.707l-2.414-2.414a1 1 0
+          00-.707-.293H15a1 1 0
+          01-1-1v-2a1 1 0 011-1h3.586a1
+          1 0 01.707.293l2.414 2.414a1
+          1 0 01.293.707V21a2 2 0
+          01-2 2h-2C10.477 23 5 17.523
+          5 11V9a2 2 0 012-2h2a1 1 0
+          011-1V5a2 2 0 00-2-2H5a2 2 0
+          00-2 2z"
+        />
+      </svg>
+      <a
+        href="tel:+918588007466"
+        className="font-medium hover:text-green-600 transition-colors"
+      >
+        +91 8588007466
+      </a>
+    </div>
+  </div>
+</div>
+
           </div>
         </div>
       </div>

@@ -51,7 +51,7 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
   // ---------------- MOBILE VERSION ----------------
   if (isMobile) {
     return (
-      <div className="w-full space-y-6 p-4">
+      <div className="w-full space-y-6 p-4 bg-[#EFF6FF]">
    
         {/* AI Assistance Stats */}
      
@@ -112,7 +112,7 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
 
   // ---------------- DESKTOP VERSION ----------------
   return (
-    <div className="relative w-62 bg-white border-l border-gray-200 overflow-y-auto px-4 py-6 space-y-5 custom-scroll">
+    <div className="relative w-62 bg-[#EFF6FF] border-l border-gray-200 overflow-y-auto px-4 py-6 space-y-5 custom-scroll">
    
   
 

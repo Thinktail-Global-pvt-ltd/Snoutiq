@@ -37,8 +37,7 @@ const HeaderWithSidebar = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useContext(AuthContext);
-  console.log(user.role,'fhg');
-  
+  console.log(user?.role, "fhg");
 
   useEffect(() => {
     (async () => {
@@ -107,7 +106,6 @@ const HeaderWithSidebar = ({ children }) => {
     navigate("/register");
   };
   const handleLogout = () => {
-    // Update live status to false when logging out
     if (isLive) {
       axiosClient
         .post("/user/update-live-status", { isLive: false })
@@ -135,95 +133,115 @@ const HeaderWithSidebar = ({ children }) => {
   };
 
   // Navigation items organized by category
+  // Role-based navigation setup
+  const navConfig = {
+    common1: [
+      {
+        category: "Home",
+        items: [
+          {
+            text: "Home",
+            icon: <HiOutlineViewGrid />,
+            path: "/dashboard",
+          },
+        ],
+      },
+    ],
+    super_admin: [
+      {
+        category: "Super Admin",
+        items: [
+          {
+            text: "Pet Owner",
+            icon: <HiOutlineStar />,
+            path: "/user-dashboard/pet-owner",
+          },
+          {
+            text: "Vet Owner",
+            icon: <HiOutlineCog />,
+            path: "/user-dashboard/vet-owner",
+          },
+        ],
+      },
+    ],
+
+    pet: [
+      {
+        category: "Pet Owner",
+        items: [
+          {
+            text: "My Pets",
+            icon: <HiOutlineHeart />,
+            path: "/user-dashboard/pet-info",
+          },
+          {
+            text: "My Bookings",
+            icon: <HiOutlineCalendar />,
+            path: "/user-dashboard/my-bookings",
+          },
+          {
+            text: "History",
+            icon: <HiOutlineUserGroup />,
+            path: "/user-dashboard/history",
+          },
+        ],
+      },
+    ],
+
+    vet: [
+      {
+        category: "Doctor",
+        items: [
+          {
+            text: "Booking Requests",
+            icon: <HiOutlineCalendar />,
+            path: "/user-dashboard/bookings",
+          },
+          {
+            text: "Profile & Settings",
+            icon: <HiOutlineUser />,
+            path: "/user-dashboard/vet-profile",
+          },
+          {
+            text: "My Document",
+            icon: <HiOutlineStar />,
+            path: "/user-dashboard/vet-document",
+          },
+          {
+            text: "Payment",
+            icon: <ChatBubbleLeftIcon className="w-5 h-5" />,
+            path: "/user-dashboard/vet-payment",
+          },
+        ],
+      },
+    ],
+
+    common: [
+      {
+        category: "Account",
+        items: [
+          {
+            text: "Ratings & Reviews",
+            icon: <HiOutlineStar />,
+            path: "/user-dashboard/rating",
+          },
+          {
+            text: "Support",
+            icon: <HiOutlineCog />,
+            path: "/user-dashboard/support",
+          },
+        ],
+      },
+    ],
+  };
+
+  // Decide nav items based on role
   const mainNavItems = [
-    {
-      category: "Home",
-      items: [
-        {
-          text: "Home",
-          icon: <HiOutlineViewGrid />,
-          path: "/dashboard",
-        },
-      ],
-    },
-    {
-      category: "Super Admin",
-      items: [
-        {
-          text: "Pet Owner",
-          icon: <HiOutlineStar />,
-          path: "/user-dashboard/pet-owner",
-        },
-        {
-          text: "Vet Owner",
-          icon: <HiOutlineCog />,
-          path: "/user-dashboard/vet-owner",
-        },
-      ],
-    },
-
-    {
-      category: "Pet Owner",
-      items: [
-          {
-          text: "My Pets",
-          icon: <HiOutlineHeart />,
-          path: "/user-dashboard/pet-info",
-        },
-        {
-          text: "My Bookings",
-          icon: <HiOutlineCalendar />,
-          path: "/user-dashboard/my-bookings",
-        },
-         {
-          text: "History",
-          icon: <HiOutlineUserGroup />,
-          path: "/user-dashboard/history",
-        },
-      ],
-    },
-
-  
-     {
-      category: "Doctor",
-      items: [
-          {
-          text: "Booking Requests",
-          icon: <HiOutlineCalendar />,
-          path: "/user-dashboard/bookings",
-        },
-        {
-          text: "Profile & Settings",
-          icon: <HiOutlineUser />,
-          path: "/user-dashboard/vet-profile",
-        },
-        {
-          text: "My Document",
-          icon: <HiOutlineStar />,
-          path: "/user-dashboard/vet-document",
-        },
-        {
-          text: "Payment",
-         icon: <ChatBubbleLeftIcon className="w-5 h-5" />,
-          path: "/user-dashboard/vet-payment",
-        },
-      ],
-    },
-    {
-      category: "Account",
-      items: [
-        {
-          text: "Ratings & Reviews",
-          icon: <HiOutlineStar />,
-          path: "/user-dashboard/rating",
-        },
-        {
-          text: "Support",
-          icon: <HiOutlineCog />,
-          path: "/user-dashboard/support",
-        },
-      ],
-    },
+    ...(navConfig.common1 || []),
+    ...(navConfig.common || []),
+    ...(user?.role === "super_admin" ? navConfig.super_admin : []),
+    ...(user?.role === "pet" ? navConfig.pet : []),
+    ...(user?.role === "vet" ? navConfig.vet : []),
   ];
 
   // Flattened version for finding active item

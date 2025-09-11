@@ -47,7 +47,7 @@ const SearchingDoctor = () => {
   // Verify payment
   const verifyPayment = async (paymentData) => {
     try {
-      await axiosClient.post('/user/emergency/amtPaid', {
+      await axiosClient.post('https://snoutiq.com/backend/user/emergency/amtPaid', {
         token,
         razorpay_payment_id: paymentData.razorpay_payment_id,
         razorpay_order_id: paymentData.razorpay_order_id,
@@ -76,7 +76,7 @@ const SearchingDoctor = () => {
     }
 
     try {
-      const orderRes = await axiosClient.post('/user/razorpay/create-order', {
+      const orderRes = await axiosClient.post('https://snoutiq.com/backend/user/razorpay/create-order', {
         amount: requestDetails.amount_tobe_paid,
       }, { headers: { Authorization: `Bearer ${token}` } });
 
@@ -108,7 +108,7 @@ const SearchingDoctor = () => {
   // Polling to check doctor acceptance
   const checkRequestStatus = useCallback(async () => {
     try {
-      const res = await axiosClient.post('/user/emergency/isAccepted', { token }, {
+      const res = await axiosClient.post('https://snoutiq.com/backend/user/emergency/isAccepted', { token }, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -116,7 +116,7 @@ const SearchingDoctor = () => {
       if (data.servicer_id && data.is_paid === 0) {
         setRequestDetails(data);
 
-        const doctorRes = await axiosClient.get(`/public/single_groomer/${data.servicer_id}`);
+        const doctorRes = await axiosClient.get(`https://snoutiq.com/backend/public/single_groomer/${data.servicer_id}`);
         setDoctorDetails(doctorRes.data.data);
         setStatus('accepted');
       } else if (data.is_paid === 1) {

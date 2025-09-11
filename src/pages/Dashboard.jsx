@@ -20,8 +20,13 @@ import DetailedWeatherWidget from "./DetailedWeatherWidget";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, token, chatRoomToken, updateChatRoomToken } =
-    useContext(AuthContext);
+  const {
+    user,
+    token,
+    chatRoomToken,
+    updateChatRoomToken,
+    updateNearbyDoctors,
+  } = useContext(AuthContext);
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
@@ -36,6 +41,38 @@ const Dashboard = () => {
   const currentChatRoomToken = chat_room_token || chatRoomToken;
 
   const genId = () => Date.now() + Math.random();
+
+  const fetchNearbyDoctors = async () => {
+  if (!token) return;
+
+  try {
+    setIsLoading(true);
+    const res = await axios.get(
+      `https://snoutiq.com/backend/api/nearby-vets?user_id=${user.id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    console.log(res.data, "Nearby doctors response");
+
+    if (res.data && Array.isArray(res.data.data)) {
+      updateNearbyDoctors(res.data.data); // ✅ correct
+      console.log("Doctors updated:", res.data.data);
+    }
+  } catch (err) {
+    console.error("Failed to fetch nearby doctors", err);
+    toast.error("Failed to fetch doctors");
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+  useEffect(() => {
+  fetchNearbyDoctors();
+  const interval = setInterval(fetchNearbyDoctors, 5 * 60 * 1000);
+
+  return () => clearInterval(interval);
+}, []);
+
 
   // Optimized scroll function with debouncing
   const scrollToBottom = useCallback((behavior = "smooth") => {
@@ -449,7 +486,34 @@ const Dashboard = () => {
     if (saved) setContextToken(saved);
   }, []);
 
- 
+  // const fetchAvailableVet = async () => {
+  //   try {
+  //     setIsLoading(true);
+  //     const response = await axios.get(
+  //       `https://snoutiq.com/api/nearby-vets?user_id=1`
+  //     );
+
+  //     if (response.data.status === "success") {
+  //       setWeather(response.data);
+  //       setError(null);
+  //     } else {
+  //       setError("Unable to fetch weather data");
+  //     }
+  //   } catch (err) {
+  //     console.error("Weather fetch error:", err);
+  //     setError("Failed to load weather");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
+  // useEffect(() => {
+  //   fetchAvailableVet();
+
+  //   const interval = setInterval(fetchWeather, 30 * 60 * 1000);
+
+  //   return () => clearInterval(interval);
+  // }, []);
 
   const ChatContent = useMemo(() => {
     return (
@@ -464,7 +528,7 @@ const Dashboard = () => {
                 : ``}
             </p>
           </div>
-            <DetailedWeatherWidget />
+          <DetailedWeatherWidget />
           <div className="flex gap-2">
             {messages.length > 0 && (
               <button
@@ -499,7 +563,6 @@ const Dashboard = () => {
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
-                      
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"

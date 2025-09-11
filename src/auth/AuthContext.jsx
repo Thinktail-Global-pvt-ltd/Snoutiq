@@ -8,7 +8,6 @@
 //   const [token, setToken] = useState(localStorage.getItem("token") || null);
 //   const [chat_room_token , setChatRoomToken] = useState(localStorage.getItem("chat_room_token") || null);
 
-
 //   const login = (userData, jwtToken) => {
 //     setUser(userData);
 //     setToken(jwtToken);
@@ -16,15 +15,13 @@
 //     localStorage.setItem("user", JSON.stringify(userData));
 //   };
 
-
 //   const logout = () => {
 //     setUser(null);
 //     setToken(null);
 //     localStorage.removeItem("token");
 //     localStorage.removeItem("user");
-    
-//   };
 
+//   };
 
 //   useEffect(() => {
 //     const savedUser = localStorage.getItem("user");
@@ -129,7 +126,7 @@ export const AuthProvider = ({ children }) => {
     if (savedToken) setToken(savedToken);
     if (savedUser) setUser(JSON.parse(savedUser));
     if (savedChatRoomToken) setChatRoomToken(savedChatRoomToken);
-    
+
     setLoading(false);
   }, []);
 
@@ -165,6 +162,29 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("chat_room_token", newToken);
   };
 
+  // AuthContext.js
+  const [nearbyDoctors, setNearbyDoctors] = useState([]);
+
+  const updateNearbyDoctors = (newDoctors) => {
+    setNearbyDoctors((prev) => {
+      const existingIds = new Set(prev.map((d) => d.id));
+      const merged = [
+        ...prev,
+        ...newDoctors.filter((d) => !existingIds.has(d.id)),
+      ];
+      localStorage.setItem("nearby_doctors", JSON.stringify(merged));
+      return merged;
+    });
+  };
+
+  // Load on mount
+  useEffect(() => {
+    const savedDoctors = JSON.parse(
+      localStorage.getItem("nearby_doctors") || "[]"
+    );
+    setNearbyDoctors(savedDoctors);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -174,6 +194,8 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         updateChatRoomToken,
+        nearbyDoctors,
+        updateNearbyDoctors,
         loading,
       }}
     >

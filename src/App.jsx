@@ -31,6 +31,7 @@ import Ratings from "./VetDashboard/Rating";
 import Support from "./pages/Support";
 import VetOwner from "./admin/VetOwner";
 import PetOwner from "./admin/PetOwner";
+import DoctorEmergencySearch from "./VetDashboard/DoctorEmergencySearch";
 
 function App() {
   return (
@@ -224,6 +225,16 @@ function App() {
               <ProtectedRoute>
                 <HeaderWithSidebar>
                   <VetOwner />
+                </HeaderWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+             <Route
+            path="/doctor-emergency-search"
+            element={
+              <ProtectedRoute>
+                <HeaderWithSidebar>
+                  <DoctorEmergencySearch />
                 </HeaderWithSidebar>
               </ProtectedRoute>
             }
