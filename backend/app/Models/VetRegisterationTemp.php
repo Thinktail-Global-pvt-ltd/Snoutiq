@@ -23,7 +23,7 @@ protected $fillable = [
     'address',
     'chat_price',
     'bio',
-    
+    'password',
     'hospital_profile',
     'clinic_profile',
     'employee_id',
