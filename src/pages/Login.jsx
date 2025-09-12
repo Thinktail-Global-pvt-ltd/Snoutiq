@@ -619,7 +619,14 @@ const Login = () => {
 
       login(user, token, chatRoomToken);
       toast.success("Login successful!");
-      navigate("/dashboard");
+      // navigate("/dashboard");
+         if (user.role === "vet") {
+        navigate("/user-dashboard/bookings");
+      } else {
+        navigate("/dashboard"); 
+        toast.info(`Welcome ${user.role}, dashboard is only for vets.`);
+      }
+
     } else {
       toast.error("Invalid response from server.");
     }
@@ -683,7 +690,13 @@ const Login = () => {
     handleInputChange("role", getBackendRole(type));
   };
 
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    if (user.role === "vet") {
+      return <Navigate to="/user-dashboard/bookings" replace />;
+    } else {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
 
   return (
     <>

@@ -66,7 +66,13 @@ const Register = () => {
   }, [userType, navigate]);
 
   // If user is already logged in, redirect to dashboard
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    if (user.role === "vet") {
+      return <Navigate to="/user-dashboard/bookings" replace />;
+    } else {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
 
   // ✅ Location Permission Check
   const checkLocationPermission = async () => {

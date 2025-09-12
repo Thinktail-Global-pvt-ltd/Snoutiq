@@ -16,10 +16,6 @@ const Videocall = () => {
     },
   };
 
-  const rtcProps = {
-    appId: '88a602d093ed47d6b77a29726aa6c35e',
-    channel: 'booking_' + token  // ya koi unique identifier
-  };
   // Check if camera/mic is accessible
   useEffect(() => {
     const checkMedia = async () => {
@@ -59,6 +55,31 @@ const Videocall = () => {
       </div>
     );
   }
+
+  const [agoraToken, setAgoraToken] = useState(null);
+const [channelName, setChannelName] = useState(null);
+
+useEffect(() => {
+  const fetchAgoraToken = async () => {
+    try {
+      const res = await axios.post(`/api/agora-token`, {
+        channel: "booking_" + id
+      });
+      setAgoraToken(res.data.token);
+      setChannelName(res.data.channel);
+    } catch (error) {
+      console.error("Error fetching Agora token:", error);
+    }
+  };
+  fetchAgoraToken();
+}, [id]);
+
+const rtcProps = {
+  appId: "88a602d093ed47d6b77a29726aa6c35e",
+  channel: channelName,
+  token: agoraToken
+};
+
 
   return (
     <div className="h-screen w-full bg-gray-100">

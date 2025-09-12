@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -11,6 +11,7 @@ import {
   ExclamationTriangleIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
+import { AuthContext } from "../auth/AuthContext";
 
 const API_BASE = "https://snoutiq.com/backend";
 const POLL_MS = 2000;
@@ -25,6 +26,7 @@ const WaitingForDoctor = () => {
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [loaderType, setLoaderType] = useState(1);
   const pollRef = useRef(null);
+  const {user} = useContext(AuthContext)
   // Auto accept after 10 seconds (for demo)
 useEffect(() => {
   if (status === "searching" || status === "connecting") {
@@ -46,27 +48,6 @@ useEffect(() => {
       specialty: "Veterinary Dermatology",
       rating: 4.9,
       experience: "12 years",
-    },
-    {
-      image: "/images/doc2.png",
-      name: "Dr. Michael Chen",
-      specialty: "Animal Surgery",
-      rating: 4.8,
-      experience: "9 years",
-    },
-    {
-      image: "/images/doc3.png",
-      name: "Dr. Emily Rodriguez",
-      specialty: "Feline Health",
-      rating: 4.95,
-      experience: "15 years",
-    },
-    {
-      image: "/images/doc4.png",
-      name: "Dr. James Wilson",
-      specialty: "Canine Nutrition",
-      rating: 4.7,
-      experience: "7 years",
     },
   ];
 
@@ -109,7 +90,8 @@ useEffect(() => {
       setStatus("searching");
       setConnectionAttempts((prev) => prev + 1);
       const res = await axios.post(`${API_BASE}/api/call/create`, {
-        patient_id: 101,
+        patient_id: user.id,
+        
       });
       setSessionId(res.data.session_id);
 

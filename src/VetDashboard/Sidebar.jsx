@@ -223,11 +223,13 @@ const HeaderWithSidebar = ({ children }) => {
   };
 
   const mainNavItems = [
-    ...(navConfig.common1 || []),
-    ...(navConfig.common || []),
+    ...(user?.role === "super_admin" || user?.role === "pet"
+      ? navConfig.common1 || []
+      : []),
     ...(user?.role === "super_admin" ? navConfig.super_admin : []),
     ...(user?.role === "pet" ? navConfig.pet : []),
     ...(user?.role === "vet" ? navConfig.vet : []),
+    ...(navConfig.common || []),
   ];
 
   const allNavItems = mainNavItems.flatMap((category) => category.items);
@@ -236,7 +238,8 @@ const HeaderWithSidebar = ({ children }) => {
     <div className="flex h-screen bg-gray-50">
       {/* Incoming Call Dialog */}
 
-      <RingtonePopup />
+      {user?.role === "vet" && <RingtonePopup />}
+
       {/* Rest of your component remains the same... */}
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex lg:flex-shrink-0">
@@ -307,7 +310,7 @@ const HeaderWithSidebar = ({ children }) => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {user && (
+              {user.business_status && (
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600 hidden md:block">
                     {isLive ? "Live" : "Offline"}
@@ -359,7 +362,7 @@ const HeaderWithSidebar = ({ children }) => {
                       </div>
                       <div className="hidden md:flex flex-col items-start">
                         <div className="text-sm font-medium text-gray-800">
-                          {user.name}
+                          {user.name || user.business_status}
                         </div>
                         <div className="text-xs text-gray-500">
                           {user.role || "Pet Owner"}

@@ -23,57 +23,67 @@ const RingtonePopup = () => {
   const callTimerRef = useRef(null);
   const navigate = useNavigate();
 
-  const {user} =useContext(AuthContext);
-  console.log(user);
-  
+  const { user } = useContext(AuthContext);
+  const isVetDoctor = user && user.role === "vet";
+
+  // 🔹 Initialize audio object only (no auto play)
   useEffect(() => {
-    if (ringtone) {
+    if (ringtone && isVetDoctor) {
       ringtoneRef.current = new Audio(ringtone);
       ringtoneRef.current.preload = "auto";
       ringtoneRef.current.volume = 0.8;
       ringtoneRef.current.loop = true;
-      console.log("Audio initialized");
-
-      ringtoneRef.current.play().then(() => {
-        ringtoneRef.current.pause();
-        ringtoneRef.current.currentTime = 0;
-        setAudioInitialized(true);
-        setRequiresUserInteraction(false);
-        console.log("Audio pre-initialized successfully");
-      }).catch(err => {
-        console.log("Audio requires user interaction:", err);
-        setRequiresUserInteraction(true);
-      });
+      setAudioInitialized(true);
     }
-  }, []);
+  }, [isVetDoctor]);
 
-  // Handle ringtone when call comes
+  // 🔹 Polling for incoming calls
   useEffect(() => {
+    if (!isVetDoctor) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get("/api/call/incoming", {
+          params: { doctor_id: user?.id },
+        });
+
+        if (res.data && res.data.call) {
+          setIncomingCall(res.data.call);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 5000); // हर 5 सेकंड में चेक
+
+    return () => clearInterval(interval);
+  }, [isVetDoctor, user?.id]);
+
+  // 🔹 Handle ringtone + timer only when incomingCall present
+  useEffect(() => {
+    if (!isVetDoctor) return;
+
     const playRingtone = async () => {
       if (incomingCall && ringtoneRef.current && !isMuted) {
         try {
           ringtoneRef.current.currentTime = 0;
           ringtoneRef.current.loop = true;
           await ringtoneRef.current.play();
-          console.log("Ringtone started playing");
-        } catch (error) {
-          console.error("Failed to play ringtone:", error);
+          setRequiresUserInteraction(false);
+        } catch {
           setRequiresUserInteraction(true);
         }
       }
     };
 
     if (incomingCall) {
-      // Start call timer
       setCallDuration(0);
+
       callTimerRef.current = setInterval(() => {
         setCallDuration((prev) => prev + 1);
       }, 1000);
 
-      // Play ringtone
       playRingtone();
 
-      // Auto-timeout after 30s
       const timeoutId = setTimeout(() => {
         handleCallTimeout();
       }, 30000);
@@ -83,85 +93,64 @@ const RingtonePopup = () => {
           ringtoneRef.current.pause();
           ringtoneRef.current.currentTime = 0;
         }
-        if (callTimerRef.current) {
-          clearInterval(callTimerRef.current);
-        }
+        if (callTimerRef.current) clearInterval(callTimerRef.current);
         clearTimeout(timeoutId);
       };
     }
-  }, [incomingCall, isMuted]);
+  }, [incomingCall, isMuted, isVetDoctor]);
 
-  // Manual audio enable function
+  // 🔹 Manual audio enable (browser policy)
   const enableAudio = async () => {
-    if (ringtoneRef.current) {
+    if (ringtoneRef.current && isVetDoctor) {
       try {
         await ringtoneRef.current.play();
         ringtoneRef.current.pause();
         ringtoneRef.current.currentTime = 0;
         setAudioInitialized(true);
         setRequiresUserInteraction(false);
-        console.log("Audio manually enabled");
-        
-        // Try to play again if call is active
+
         if (incomingCall && !isMuted) {
-          ringtoneRef.current.play().catch(console.error);
+          ringtoneRef.current.play().catch(() => {});
         }
       } catch (err) {
-        console.error("Manual audio enable failed:", err);
+        console.error("Enable audio failed:", err);
       }
     }
   };
 
-  // Toggle mute/unmute
+  // 🔹 Toggle mute
   const toggleMute = () => {
-    const newMutedState = !isMuted;
-    setIsMuted(newMutedState);
+    if (!isVetDoctor) return;
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
 
     if (ringtoneRef.current) {
-      if (newMutedState) {
-        // Mute - pause ringtone
+      if (newMuted) {
         ringtoneRef.current.pause();
-        console.log("Ringtone muted");
-      } else {
-        // Unmute - resume ringtone if call is active
-        if (incomingCall && audioInitialized) {
-          ringtoneRef.current.play().catch(console.error);
-          console.log("Ringtone unmuted");
-        }
+      } else if (incomingCall && audioInitialized) {
+        ringtoneRef.current.play().catch(() => {});
       }
     }
   };
 
-  // Format duration
-  const formatDuration = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  };
-
-  // Handle call timeout
+  // 🔹 Timeout handler
   const handleCallTimeout = async () => {
-    if (!incomingCall) return;
-
-    console.log("Call timed out");
+    if (!incomingCall || !isVetDoctor) return;
     try {
       await axios.post(`/api/call/${incomingCall.callId}/timeout`, {
         doctor_id: user?.id,
       });
     } catch (error) {
-      console.error("Error handling call timeout:", error);
+      console.error("Timeout error:", error);
     } finally {
       setIncomingCall(null);
     }
   };
 
-  // Accept call
+  // 🔹 Accept call
   const acceptCall = async () => {
-    if (!incomingCall) return;
+    if (!incomingCall || !isVetDoctor) return;
 
-    // Stop ringtone
     if (ringtoneRef.current) {
       ringtoneRef.current.pause();
       ringtoneRef.current.currentTime = 0;
@@ -174,15 +163,14 @@ const RingtonePopup = () => {
       navigate(`/video-call/${incomingCall.callId}`);
       setIncomingCall(null);
     } catch (error) {
-      console.error("Error accepting call:", error);
+      console.error("Accept error:", error);
     }
   };
 
-  // Reject call
+  // 🔹 Reject call
   const rejectCall = async () => {
-    if (!incomingCall) return;
+    if (!incomingCall || !isVetDoctor) return;
 
-    // Stop ringtone
     if (ringtoneRef.current) {
       ringtoneRef.current.pause();
       ringtoneRef.current.currentTime = 0;
@@ -193,34 +181,28 @@ const RingtonePopup = () => {
         doctor_id: user?.id,
       });
     } catch (error) {
-      console.error("Error rejecting call:", error);
+      console.error("Reject error:", error);
     } finally {
       setIncomingCall(null);
     }
   };
 
-//   // Simulate incoming call (remove in production)
-//   useEffect(() => {
-//     const timer = setTimeout(() => {
-//       console.log("Simulating incoming call...");
-//       setIncomingCall({
-//         callId: 1,
-//         callerName: "Dr. John Smith",
-//         callerImage: null,
-//         callType: "Emergency Consultation",
-//         petName: "Buddy",
-//       });
-//     }, 3000);
+  // Format timer
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  };
 
-//     return () => clearTimeout(timer);
-//   }, []);
-
-
+  if (!isVetDoctor) return null;
 
   return (
     <div>
       <Transition.Root show={!!incomingCall} as={Fragment}>
         <Dialog as="div" className="relative z-50" onClose={() => {}}>
+          {/* Overlay */}
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"
@@ -233,6 +215,7 @@ const RingtonePopup = () => {
             <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm" />
           </Transition.Child>
 
+          {/* Popup */}
           <div className="fixed inset-0 flex items-center justify-center p-4">
             <Transition.Child
               as={Fragment}
@@ -245,86 +228,62 @@ const RingtonePopup = () => {
             >
               <Dialog.Panel className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 text-white">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="relative">
-                        <PhoneIcon className="w-5 h-5 animate-bounce" />
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
-                      </div>
-                      <span className="text-sm font-medium">Incoming Call</span>
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 text-white flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <PhoneIcon className="w-5 h-5 animate-bounce" />
+                    <span className="text-sm font-medium">Incoming Call</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-sm font-mono">
+                      {formatDuration(callDuration)}
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="text-sm font-mono">
-                        {formatDuration(callDuration)}
-                      </div>
-                      {/* Mute/Unmute Button */}
-                      <button
-                        onClick={toggleMute}
-                        className="p-1 rounded-full hover:bg-white hover:bg-opacity-20 transition-colors"
-                      >
-                        {isMuted ? (
-                          <SpeakerXMarkIcon className="w-5 h-5 text-red-300" />
-                        ) : (
-                          <SpeakerWaveIcon className="w-5 h-5 text-white" />
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      onClick={toggleMute}
+                      className="p-1 rounded-full hover:bg-white hover:bg-opacity-20"
+                    >
+                      {isMuted ? (
+                        <SpeakerXMarkIcon className="w-5 h-5 text-red-300" />
+                      ) : (
+                        <SpeakerWaveIcon className="w-5 h-5 text-white" />
+                      )}
+                    </button>
                   </div>
                 </div>
 
                 {/* Caller Info */}
                 <div className="px-6 py-8 text-center">
-                  {/* Avatar */}
-                  <div className="relative mx-auto mb-4">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 p-1 animate-pulse">
-                      <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center">
-                        {incomingCall?.callerImage ? (
-                          <img
-                            src={incomingCall.callerImage}
-                            alt={incomingCall.callerName}
-                            className="w-full h-full object-cover rounded-full"
-                          />
-                        ) : (
-                          <UserIcon className="w-12 h-12 text-gray-400" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 rounded-full border-4 border-blue-500 opacity-20 animate-ping"></div>
-                    <div className="absolute inset-2 rounded-full border-2 border-purple-500 opacity-30 animate-ping"></div>
+                  <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-gray-200 flex items-center justify-center">
+                    {incomingCall?.callerImage ? (
+                      <img
+                        src={incomingCall.callerImage}
+                        alt={incomingCall.callerName}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <UserIcon className="w-12 h-12 text-gray-400" />
+                    )}
                   </div>
 
-                  {/* Call Details */}
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      {incomingCall?.callerName}
-                    </h3>
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {incomingCall?.callerName}
+                  </h3>
 
-                    {incomingCall?.callType && (
-                      <p className="text-sm text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full inline-block">
-                        {incomingCall.callType}
-                      </p>
-                    )}
-
-                    {incomingCall?.petName && (
-                      <p className="text-sm text-gray-600">
-                        Regarding:{" "}
-                        <span className="font-medium">
-                          {incomingCall.petName}
-                        </span>
-                      </p>
-                    )}
-
-                    <p className="text-xs text-gray-500 mt-2">
-                      Auto-end in {30 - callDuration} seconds
+                  {incomingCall?.callType && (
+                    <p className="text-sm text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full inline-block">
+                      {incomingCall.callType}
                     </p>
+                  )}
 
-                    {isMuted && (
-                      <p className="text-xs text-red-500 font-medium">
-                        Sound is muted
-                      </p>
-                    )}
-                  </div>
+                  {incomingCall?.petName && (
+                    <p className="text-sm text-gray-600">
+                      Regarding:{" "}
+                      <span className="font-medium">{incomingCall.petName}</span>
+                    </p>
+                  )}
+
+                  <p className="text-xs text-gray-500 mt-2">
+                    Auto-end in {30 - callDuration} seconds
+                  </p>
                 </div>
 
                 {/* Action Buttons */}
@@ -332,34 +291,23 @@ const RingtonePopup = () => {
                   <div className="flex justify-center space-x-6">
                     <button
                       onClick={rejectCall}
-                      className="flex items-center justify-center w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full shadow-lg transform transition-all duration-200 hover:scale-110 active:scale-95"
+                      className="flex items-center justify-center w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full shadow-lg"
                     >
                       <PhoneXMarkIcon className="w-8 h-8 text-white" />
                     </button>
-
                     <button
                       onClick={acceptCall}
-                      className="flex items-center justify-center w-16 h-16 bg-green-500 hover:bg-green-600 rounded-full shadow-lg transform transition-all duration-200 hover:scale-110 active:scale-95 animate-pulse"
+                      className="flex items-center justify-center w-16 h-16 bg-green-500 hover:bg-green-600 rounded-full shadow-lg animate-pulse"
                     >
                       <PhoneIcon className="w-8 h-8 text-white" />
                     </button>
                   </div>
 
-                  <div className="flex justify-center space-x-6 mt-3">
-                    <span className="text-xs text-gray-500 w-16 text-center">
-                      Decline
-                    </span>
-                    <span className="text-xs text-gray-500 w-16 text-center">
-                      Accept
-                    </span>
-                  </div>
-
-                  {/* Enable Audio Button */}
                   {requiresUserInteraction && (
                     <div className="mt-4 text-center">
-                      <button 
+                      <button
                         onClick={enableAudio}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
                       >
                         🔊 Enable Call Audio
                       </button>

@@ -36,6 +36,8 @@ const Navbar = () => {
   const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+  console.log(user,'user');
+  
 
   const handleLogin = () => {
     navigate("/login");
@@ -350,9 +352,10 @@ const Navbar = () => {
                     </div>
                     <div className="flex flex-col">
                       <div className="text-sm font-semibold text-gray-800">
-                        {user.name}
+                        {user.name || user.business_status}
+
                       </div>
-                      <div className="text-xs text-gray-500">Pet Owner</div>
+                      <div className="text-xs text-gray-500">{!user.business_status?"Pet Owner":"Vet Owner"}</div>
                     </div>
                     <svg
                       className="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform"
