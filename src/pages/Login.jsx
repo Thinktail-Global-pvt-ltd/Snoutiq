@@ -611,8 +611,8 @@ const Login = () => {
     if (token && user) {
       // ✅ Backend ke response ke baad extra check
       if (
-        formData.email === "ankitjha0052@gmail.com" && 
-        formData.password === "Ankit123@"
+        formData.email === "admin@gmail.com" && 
+        formData.password === "5f4dcc3b5d"
       ) {
         user = { ...user, role: "super_admin" }; 
       }
