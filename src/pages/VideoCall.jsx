@@ -1,156 +1,25 @@
-// import React, { useState, useEffect, useContext } from 'react';
-// import AgoraUIKit from 'agora-react-uikit';
-// import { useNavigate, useParams } from 'react-router-dom';
-// import { AuthContext } from '../auth/AuthContext';
-
-// const Videocall = () => {
-//   const { id } = useParams();
-//   const navigate = useNavigate();
-//   const [canAccessMedia, setCanAccessMedia] = useState(null);
-//   const [error, setError] = useState("");
-//   const { token } = useContext(AuthContext);
-
-//   const callbacks = {
-//     EndCall: () => {
-//       navigate('/dashboard');
-//     },
-//   };
-
-//   const rtcProps = {
-//     appId: '88a602d093ed47d6b77a29726aa6c35e',
-//     channel: 'booking_' + token  // ya koi unique identifier
-//   };
-//   // Check if camera/mic is accessible
-//   useEffect(() => {
-//     const checkMedia = async () => {
-//       try {
-//         await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-//         setCanAccessMedia(true);
-//       } catch (err) {
-//         console.error("Cannot access camera/mic:", err);
-//         setError("Cannot access camera or microphone. Please check permissions or use HTTPS/localhost.");
-//         setCanAccessMedia(false);
-//       }
-//     };
-//     checkMedia();
-//   }, []);
-
-//   if (canAccessMedia === null) {
-//     return (
-//       <div className="flex items-center justify-center h-screen">
-//         <div className="flex items-center space-x-3">
-//           <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-//           <p className="text-lg text-gray-700">Checking camera and microphone...</p>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   if (canAccessMedia === false) {
-//     return (
-//       <div className="flex flex-col items-center justify-center h-screen space-y-4">
-//         <p className="text-lg text-red-600">{error}</p>
-//         <button
-//           onClick={() => window.location.reload()}
-//           className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700"
-//         >
-//           Retry
-//         </button>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="h-screen w-full bg-gray-100">
-//       <AgoraUIKit rtcProps={rtcProps} callbacks={callbacks} />
-//     </div>
-//   );
-// };
-
-// export default Videocall;
-
 import React, { useState, useEffect, useContext } from 'react';
 import AgoraUIKit from 'agora-react-uikit';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AuthContext } from '../auth/AuthContext';
-import axios from 'axios';
 
 const Videocall = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [canAccessMedia, setCanAccessMedia] = useState(null);
   const [error, setError] = useState("");
-  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
-  const [prescription, setPrescription] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const [callEnded, setCallEnded] = useState(false);
-  const [callDuration, setCallDuration] = useState(0);
-  const { token, user } = useContext(AuthContext);
-
-  // Timer for call duration
-  useEffect(() => {
-    let timer;
-    if (canAccessMedia === true && !callEnded) {
-      timer = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [canAccessMedia, callEnded]);
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  const { token } = useContext(AuthContext);
 
   const callbacks = {
     EndCall: () => {
-      // If user is a doctor, show prescription modal
-      if (user?.role === 'doctor') {
-        setShowPrescriptionModal(true);
-      } else {
-        // If user is pet owner, navigate to dashboard
-        navigate('/dashboard');
-      }
-      setCallEnded(true);
+      navigate('/dashboard');
     },
   };
 
   const rtcProps = {
     appId: '88a602d093ed47d6b77a29726aa6c35e',
-    channel: 'booking_' + id + '_' + token
+    channel: 'booking_' + token  // ya koi unique identifier
   };
-
-  const handleSendPrescription = async () => {
-    if (!prescription.trim()) {
-      alert('Please enter prescription details');
-      return;
-    }
-
-    setIsSending(true);
-    try {
-      // Send prescription to backend
-      await axios.post('/api/prescriptions', {
-        consultation_id: id,
-        doctor_id: user.id,
-        prescription_text: prescription,
-        call_duration: callDuration
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      alert('Prescription sent successfully!');
-      setShowPrescriptionModal(false);
-      navigate('/doctor/dashboard');
-    } catch (error) {
-      console.error('Error sending prescription:', error);
-      alert('Failed to send prescription. Please try again.');
-    } finally {
-      setIsSending(false);
-    }
-  };
-
   // Check if camera/mic is accessible
   useEffect(() => {
     const checkMedia = async () => {
@@ -168,25 +37,10 @@ const Videocall = () => {
 
   if (canAccessMedia === null) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="w-20 h-20 mx-auto mb-6 bg-blue-50 rounded-full flex items-center justify-center relative">
-              <div className="absolute inset-0 rounded-full border-4 border-blue-100 animate-ping"></div>
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </div>
-            
-            <h1 className="text-2xl font-bold text-gray-800 mb-3">Preparing Your Video Consultation</h1>
-            <p className="text-gray-600 mb-6">Checking your camera and microphone permissions</p>
-            
-            <div className="flex items-center justify-center space-x-3">
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-            </div>
-          </div>
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center space-x-3">
+          <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-lg text-gray-700">Checking camera and microphone...</p>
         </div>
       </div>
     );
@@ -194,121 +48,267 @@ const Videocall = () => {
 
   if (canAccessMedia === false) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
-          <div className="text-center">
-            <div className="w-20 h-20 mx-auto mb-6 bg-red-50 rounded-full flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            
-            <h1 className="text-2xl font-bold text-gray-800 mb-3">Permission Required</h1>
-            <p className="text-red-600 mb-6">{error}</p>
-            
-            <div className="bg-red-50 p-4 rounded-xl border border-red-100 mb-6">
-              <p className="text-sm text-red-700">
-                Your browser is blocking access to your camera or microphone. This is required for your video consultation.
-              </p>
-            </div>
-            
-            <div className="space-y-3">
-              <button
-                onClick={() => window.location.reload()}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"
-              >
-                Retry
-              </button>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="w-full py-3 bg-gray-500 text-white rounded-lg shadow hover:bg-gray-600 transition-colors"
-              >
-                Return to Dashboard
-              </button>
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-col items-center justify-center h-screen space-y-4">
+        <p className="text-lg text-red-600">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full bg-gray-900 relative">
-      {/* Custom header overlay */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/70 to-transparent p-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-white font-semibold">Veterinary Consultation</h2>
-              <p className="text-blue-200 text-sm">Call duration: {formatTime(callDuration)}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Main video container */}
-      <div className="h-full w-full">
-        <AgoraUIKit rtcProps={rtcProps} callbacks={callbacks} />
-      </div>
-
-      {/* Prescription Modal for Doctors */}
-      {showPrescriptionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Consultation Summary</h2>
-            <p className="text-gray-600 mb-2">Call Duration: {formatTime(callDuration)}</p>
-            
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-medium mb-2">
-                Prescription & Recommendations
-              </label>
-              <textarea
-                value={prescription}
-                onChange={(e) => setPrescription(e.target.value)}
-                placeholder="Enter prescription details, recommendations, and follow-up instructions..."
-                className="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-              />
-            </div>
-            
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowPrescriptionModal(false);
-                  navigate('/doctor/dashboard');
-                }}
-                className="flex-1 py-3 bg-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
-                disabled={isSending}
-              >
-                Skip
-              </button>
-              <button
-                onClick={handleSendPrescription}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center"
-                disabled={isSending}
-              >
-                {isSending ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Sending...
-                  </>
-                ) : (
-                  'Send Prescription'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="h-screen w-full bg-gray-100">
+      <AgoraUIKit rtcProps={rtcProps} callbacks={callbacks} />
     </div>
   );
 };
 
 export default Videocall;
+
+// import React, { useState, useEffect, useContext } from 'react';
+// import AgoraUIKit from 'agora-react-uikit';
+// import { useNavigate, useParams } from 'react-router-dom';
+// import { AuthContext } from '../auth/AuthContext';
+// import axios from 'axios';
+
+// const Videocall = () => {
+//   const { id } = useParams();
+//   const navigate = useNavigate();
+//   const [canAccessMedia, setCanAccessMedia] = useState(null);
+//   const [error, setError] = useState("");
+//   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+//   const [prescription, setPrescription] = useState("");
+//   const [isSending, setIsSending] = useState(false);
+//   const [callEnded, setCallEnded] = useState(false);
+//   const [callDuration, setCallDuration] = useState(0);
+//   const { token, user } = useContext(AuthContext);
+
+//   // Timer for call duration
+//   useEffect(() => {
+//     let timer;
+//     if (canAccessMedia === true && !callEnded) {
+//       timer = setInterval(() => {
+//         setCallDuration(prev => prev + 1);
+//       }, 1000);
+//     }
+//     return () => clearInterval(timer);
+//   }, [canAccessMedia, callEnded]);
+
+//   const formatTime = (seconds) => {
+//     const mins = Math.floor(seconds / 60);
+//     const secs = seconds % 60;
+//     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+//   };
+
+//   const callbacks = {
+//     EndCall: () => {
+//       // If user is a doctor, show prescription modal
+//       if (user?.role === 'doctor') {
+//         setShowPrescriptionModal(true);
+//       } else {
+//         // If user is pet owner, navigate to dashboard
+//         navigate('/dashboard');
+//       }
+//       setCallEnded(true);
+//     },
+//   };
+
+//   const rtcProps = {
+//     appId: '88a602d093ed47d6b77a29726aa6c35e',
+//     channel: 'booking_' + id + '_' + token
+//   };
+
+//   const handleSendPrescription = async () => {
+//     if (!prescription.trim()) {
+//       alert('Please enter prescription details');
+//       return;
+//     }
+
+//     setIsSending(true);
+//     try {
+//       // Send prescription to backend
+//       await axios.post('/api/prescriptions', {
+//         consultation_id: id,
+//         doctor_id: user.id,
+//         prescription_text: prescription,
+//         call_duration: callDuration
+//       }, {
+//         headers: { Authorization: `Bearer ${token}` }
+//       });
+
+//       alert('Prescription sent successfully!');
+//       setShowPrescriptionModal(false);
+//       navigate('/doctor/dashboard');
+//     } catch (error) {
+//       console.error('Error sending prescription:', error);
+//       alert('Failed to send prescription. Please try again.');
+//     } finally {
+//       setIsSending(false);
+//     }
+//   };
+
+//   // Check if camera/mic is accessible
+//   useEffect(() => {
+//     const checkMedia = async () => {
+//       try {
+//         await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+//         setCanAccessMedia(true);
+//       } catch (err) {
+//         console.error("Cannot access camera/mic:", err);
+//         setError("Cannot access camera or microphone. Please check permissions or use HTTPS/localhost.");
+//         setCanAccessMedia(false);
+//       }
+//     };
+//     checkMedia();
+//   }, []);
+
+//   if (canAccessMedia === null) {
+//     return (
+//       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+//         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full mx-4">
+//           <div className="text-center">
+//             <div className="w-20 h-20 mx-auto mb-6 bg-blue-50 rounded-full flex items-center justify-center relative">
+//               <div className="absolute inset-0 rounded-full border-4 border-blue-100 animate-ping"></div>
+//               <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+//               </svg>
+//             </div>
+            
+//             <h1 className="text-2xl font-bold text-gray-800 mb-3">Preparing Your Video Consultation</h1>
+//             <p className="text-gray-600 mb-6">Checking your camera and microphone permissions</p>
+            
+//             <div className="flex items-center justify-center space-x-3">
+//               <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+//               <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+//               <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+//             </div>
+//           </div>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (canAccessMedia === false) {
+//     return (
+//       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+//         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
+//           <div className="text-center">
+//             <div className="w-20 h-20 mx-auto mb-6 bg-red-50 rounded-full flex items-center justify-center">
+//               <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+//               </svg>
+//             </div>
+            
+//             <h1 className="text-2xl font-bold text-gray-800 mb-3">Permission Required</h1>
+//             <p className="text-red-600 mb-6">{error}</p>
+            
+//             <div className="bg-red-50 p-4 rounded-xl border border-red-100 mb-6">
+//               <p className="text-sm text-red-700">
+//                 Your browser is blocking access to your camera or microphone. This is required for your video consultation.
+//               </p>
+//             </div>
+            
+//             <div className="space-y-3">
+//               <button
+//                 onClick={() => window.location.reload()}
+//                 className="w-full py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"
+//               >
+//                 Retry
+//               </button>
+//               <button
+//                 onClick={() => navigate('/dashboard')}
+//                 className="w-full py-3 bg-gray-500 text-white rounded-lg shadow hover:bg-gray-600 transition-colors"
+//               >
+//                 Return to Dashboard
+//               </button>
+//             </div>
+//           </div>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="h-screen w-full bg-gray-900 relative">
+//       {/* Custom header overlay */}
+//       <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/70 to-transparent p-4">
+//         <div className="flex justify-between items-center">
+//           <div className="flex items-center space-x-3">
+//             <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+//               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+//               </svg>
+//             </div>
+//             <div>
+//               <h2 className="text-white font-semibold">Veterinary Consultation</h2>
+//               <p className="text-blue-200 text-sm">Call duration: {formatTime(callDuration)}</p>
+//             </div>
+//           </div>
+//         </div>
+//       </div>
+      
+//       {/* Main video container */}
+//       <div className="h-full w-full">
+//         <AgoraUIKit rtcProps={rtcProps} callbacks={callbacks} />
+//       </div>
+
+//       {/* Prescription Modal for Doctors */}
+//       {showPrescriptionModal && (
+//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+//           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+//             <h2 className="text-2xl font-bold text-gray-800 mb-4">Consultation Summary</h2>
+//             <p className="text-gray-600 mb-2">Call Duration: {formatTime(callDuration)}</p>
+            
+//             <div className="mb-4">
+//               <label className="block text-gray-700 text-sm font-medium mb-2">
+//                 Prescription & Recommendations
+//               </label>
+//               <textarea
+//                 value={prescription}
+//                 onChange={(e) => setPrescription(e.target.value)}
+//                 placeholder="Enter prescription details, recommendations, and follow-up instructions..."
+//                 className="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+//               />
+//             </div>
+            
+//             <div className="flex space-x-3">
+//               <button
+//                 onClick={() => {
+//                   setShowPrescriptionModal(false);
+//                   navigate('/doctor/dashboard');
+//                 }}
+//                 className="flex-1 py-3 bg-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
+//                 disabled={isSending}
+//               >
+//                 Skip
+//               </button>
+//               <button
+//                 onClick={handleSendPrescription}
+//                 className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center"
+//                 disabled={isSending}
+//               >
+//                 {isSending ? (
+//                   <>
+//                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+//                     Sending...
+//                   </>
+//                 ) : (
+//                   'Send Prescription'
+//                 )}
+//               </button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
+
+// export default Videocall;
 
 
 {/*import React, { useState, useEffect, useContext } from 'react';

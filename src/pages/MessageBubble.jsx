@@ -47,7 +47,7 @@ const EmergencyStatusBox = ({ emergencyStatus }) => {
           Schedule a convenient video consultation with a veterinary professional.
         </p>
         <button
-          onClick={() => (window.location.href = "/doctor-testing")}
+          onClick={() => (window.location.href = "/waiting-for-doctor")}
           className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,7 +75,7 @@ const EmergencyStatusBox = ({ emergencyStatus }) => {
         </p>
         <div className="space-y-3">
           <button
-            onClick={() => (window.location.href = "/doctor-testing")}
+            onClick={() => (window.location.href = "/waiting-for-doctor")}
             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
