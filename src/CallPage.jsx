@@ -43,7 +43,7 @@ export default function CallPage() {
   const joinChannel = async () => {
     try {
       // ✅ Laravel API call
-      const res = await axios.post("http://localhost:8000/api/agora/token");
+      const res = await axios.post("https://snoutiq.com/backend/api/agora/token");
 
       const { appId, token, channelName, uid } = res.data;
 
