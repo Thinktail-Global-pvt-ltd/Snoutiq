@@ -486,103 +486,114 @@ private function describePetImageDynamic($imagePath)
 
 public function login(Request $request)
 {
-    $email = $request->input('email') ?? $request->input('login');
-    $role  = $request->input('role'); // 👈 role pick karo
-    $roomTitle = $request->input('room_title');
+    try {
+        $email = $request->input('email') ?? $request->input('login');
+        $role  = $request->input('role'); // 👈 role pick karo
+        $roomTitle = $request->input('room_title');
 
-    if (empty($email) || empty($role)) {
-        return response()->json(['message' => 'Email or role missing'], 422);
-    }
-
-    $room = null;
-    $plainToken = null;
-
-    if ($role === 'pet') {
-        // 🔹 Search in users table
-        $user = User::where('email', $email)->first();
-
-        if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
+        if (empty($email) || empty($role)) {
+            return response()->json(['message' => 'Email or role missing'], 422);
         }
 
-        DB::transaction(function () use (&$plainToken, &$room, $user, $roomTitle) {
-            $plainToken = bin2hex(random_bytes(32));
-            $user->api_token_hash = $plainToken;
-            $user->save();
+        $room = null;
+        $plainToken = null;
 
-            $room = ChatRoom::create([
-                'user_id'         => $user->id,
-                'chat_room_token' => 'room_' . Str::uuid()->toString(),
-                'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
-            ]);
-        });
+        if ($role === 'pet') {
+            // 🔹 Search in users table
+            $user = User::where('email', $email)->first();
 
-        // ✅ Password exclude karo
-        $userData = $user->toArray();
-        unset($userData['password']);
-        $userData['role'] = 'pet';
+            if (!$user) {
+                return response()->json(['message' => 'User not found'], 404);
+            }
 
-        return response()->json([
-            'message'    => 'Login successful',
-            'role'       => 'pet',
-            'email'      => $user->email,
-            'token'      => $plainToken,
-            'token_type' => 'Bearer',
-            'chat_room'  => [
-                'id'    => $room->id,
-                'token' => $room->chat_room_token,
-                'name'  => $room->name,
-            ],
-            'user'       => $userData,
-        ], 200);
+            DB::transaction(function () use (&$plainToken, &$room, $user, $roomTitle) {
+                $plainToken = bin2hex(random_bytes(32));
+                $user->api_token_hash = $plainToken;
+                $user->save();
 
-    } elseif ($role === 'vet') {
-        // 🔹 Search in vet_registerations_temp
-        $tempVet = DB::table('vet_registerations_temp')
-            ->where('email', $email)
-            ->first();
+                $room = ChatRoom::create([
+                    'user_id'         => $user->id,
+                    'chat_room_token' => 'room_' . Str::uuid()->toString(),
+                    'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
+                ]);
+            });
 
-        if (!$tempVet) {
-            return response()->json(['message' => 'Vet not found'], 404);
+            // ✅ Password exclude karo
+            $userData = $user->toArray();
+            unset($userData['password']);
+            $userData['role'] = 'pet';
+
+            return response()->json([
+                'message'    => 'Login successful',
+                'role'       => 'pet',
+                'email'      => $user->email,
+                'token'      => $plainToken,
+                'token_type' => 'Bearer',
+                'chat_room'  => [
+                    'id'    => $room->id,
+                    'token' => $room->chat_room_token,
+                    'name'  => $room->name,
+                ],
+                'user'       => $userData,
+            ], 200);
+
+        } elseif ($role === 'vet') {
+            // 🔹 Search in vet_registerations_temp
+            $tempVet = DB::table('vet_registerations_temp')
+                ->where('email', $email)
+                ->first();
+
+            if (!$tempVet) {
+                return response()->json(['message' => 'Vet not found'], 404);
+            }
+
+            DB::transaction(function () use (&$plainToken, &$room, $tempVet, $roomTitle) {
+                $plainToken = bin2hex(random_bytes(32));
+
+                // 🟢 Update token for vet
+                DB::table('vet_registerations_temp')
+                    ->where('id', $tempVet->id)
+                    ->update(['api_token_hash' => $plainToken]);
+
+                $room = ChatRoom::create([
+                    'user_id'         => $tempVet->id,
+                    'chat_room_token' => 'room_' . Str::uuid()->toString(),
+                    'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
+                ]);
+            });
+
+            // ✅ Password exclude karo
+            $vetData = (array) $tempVet;
+            unset($vetData['password']);
+            $vetData['role'] = 'vet';
+
+            return response()->json([
+                'message'    => 'Login successful',
+                'role'       => 'vet',
+                'email'      => $tempVet->email,
+                'token'      => $plainToken,
+                'token_type' => 'Bearer',
+                'chat_room'  => [
+                    'id'    => $room->id,
+                    'token' => $room->chat_room_token,
+                    'name'  => $room->name,
+                ],
+                'user'        => $vetData,
+            ], 200);
         }
 
-        DB::transaction(function () use (&$plainToken, &$room, $tempVet, $roomTitle) {
-            $plainToken = bin2hex(random_bytes(32));
+        return response()->json(['message' => 'Invalid role'], 400);
 
-            // 🟢 Agar vet_registerations_temp table me token column nahi hai, to migrate/add karna padega
-            DB::table('vet_registerations_temp')
-                ->where('id', $tempVet->id)
-                ->update(['api_token_hash' => $plainToken]);
-
-            $room = ChatRoom::create([
-                'user_id'         => $tempVet->id,
-                'chat_room_token' => 'room_' . Str::uuid()->toString(),
-                'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
-            ]);
-        });
-
-        // ✅ Password exclude karo
-        $vetData = (array) $tempVet;
-        unset($vetData['password']);
-        $vetData['role'] = 'vet';
-
+    } catch (\Throwable $e) {
+        // ⚠️ Exception handle karo
         return response()->json([
-            'message'    => 'Login successful',
-            'role'       => 'vet',
-            'email'      => $tempVet->email,
-            'token'      => $plainToken,
-            'token_type' => 'Bearer',
-            'chat_room'  => [
-                'id'    => $room->id,
-                'token' => $room->chat_room_token,
-                'name'  => $room->name,
-            ],
-            'user'        => $vetData,
-        ], 200);
+            'success' => false,
+            'message' => 'Login failed. Please try again later.',
+            'error'   => $e->getMessage(), // 👉 debug ke liye
+        ], 500);
     }
-
-    return response()->json(['message' => 'Invalid role'], 400);
 }
+
 
 
 public function login_bkp(Request $request)
