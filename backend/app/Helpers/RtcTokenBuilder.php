@@ -2,24 +2,24 @@
 
 namespace App\Helpers;
 
-// ye bhi include karna padega
-
 class RtcTokenBuilder
 {
-    const Role_Publisher = 1;
-    const Role_Subscriber = 2;
+    const RolePublisher = 1;
+    const RoleSubscriber = 2;
 
-    public static function buildTokenWithUid($appID, $appCertificate, $channelName, $uid, $role, $privilegeExpiredTs)
+    private static function hmac($key, $message) {
+        return hash_hmac('sha256', $message, $key, true);
+    }
+
+    public static function buildTokenWithUid($appId, $appCertificate, $channelName, $uid, $role, $privilegeExpiredTs)
     {
-        $token = new AccessToken($appID, $appCertificate, $channelName, $uid);
-        $token->addPrivilege(AccessToken::Privileges["JoinChannel"], $privilegeExpiredTs);
-
-        if ($role == self::Role_Publisher) {
-            $token->addPrivilege(AccessToken::Privileges["PublishAudioStream"], $privilegeExpiredTs);
-            $token->addPrivilege(AccessToken::Privileges["PublishVideoStream"], $privilegeExpiredTs);
-            $token->addPrivilege(AccessToken::Privileges["PublishDataStream"], $privilegeExpiredTs);
-        }
-
-        return $token->build();
+        $version = "006";
+        $unixTs = time();
+        $salt = rand(1, 99999999);
+        $uidStr = $uid == 0 ? "" : (string)$uid;
+        $message = $appId.$channelName.$uidStr.$unixTs.$salt.$privilegeExpiredTs.$role;
+        $signature = self::hmac($appCertificate, $message);
+        $content = $signature.pack("V", $unixTs).pack("V", $salt).pack("V", $privilegeExpiredTs);
+        return $version.$appId.base64_encode($content);
     }
 }

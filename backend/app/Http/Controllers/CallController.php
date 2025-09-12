@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CallSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-
+use App\Helpers\RtcTokenBuilder;
 class CallController extends Controller
 {
 public function createSession(Request $request)
@@ -80,4 +80,49 @@ public function createSession(Request $request)
         ]);
     }
 
+
+
+
+
+
+
+      public function generateToken(Request $request)
+    {
+        $appId          = "b13636f3f07448e2bf6778f5bc2c506f";
+        $appCertificate = "c30ae10e278c490f9b09608b15c353ba";
+
+        // ✅ channel_name optional rakho, default generate ho jaayega
+        $channelName = $request->input('channel_name');
+        if (empty($channelName)) {
+            $channelName = 'call_' . Str::random(8);
+        }
+
+        // ✅ uid optional rakho
+        $uid = (int) ($request->input('uid') ?? random_int(1000, 999999));
+
+        $role = RtcTokenBuilder::RolePublisher;
+        $expireTimeInSeconds = 3600;
+        $privilegeExpiredTs = time() + $expireTimeInSeconds;
+
+        $token = RtcTokenBuilder::buildTokenWithUid(
+            $appId,
+            $appCertificate,
+            $channelName,
+            $uid,
+            $role,
+            $privilegeExpiredTs
+        );
+
+        return response()->json([
+            'success'     => true,
+            'token'       => $token,
+            'appId'       => $appId,
+            'channelName' => $channelName,
+            'uid'         => $uid,
+            'expiresIn'   => $expireTimeInSeconds,
+        ]);
+    }
 }
+
+
+

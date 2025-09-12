@@ -38,6 +38,8 @@ import PetDailyCare from "./PetDashboard/PetDailyCare";
 import PetWeightMonitoring from "./PetDashboard/PetWeightMonitoring";
 import PetMedicationTracker from "./PetDashboard/PetMedicationTracker";
 import CallTestPage from "./CallTestPage";
+import CallPage from "./CallPage";
+
 
 function App() {
   return (
@@ -58,6 +60,7 @@ function App() {
           />
 
           {/* Public Routes */}
+                <Route path="/call" element={<CallPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/register" element={<Register />} />

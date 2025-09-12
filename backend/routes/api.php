@@ -297,4 +297,4 @@ Route::post('/webhook/deploy', function () {
 });
 
 // routes/api.php
-Route::post('/agora/token', [AgoraController::class, 'generateToken']);
+Route::post('/agora/token', [CallController::class, 'generateToken']);
