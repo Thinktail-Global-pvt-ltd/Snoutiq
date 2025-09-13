@@ -3,8 +3,10 @@
   <head>
     <meta charset="UTF-8" />
 
+    <!-- Preconnect for faster font loading -->
     <link rel="preconnect" href="https://www.googletagmanager.com" />
 
+    <!-- GTM async load with slight delay -->
     <script>
       setTimeout(function () {
         window.addEventListener("load", function () {
@@ -21,96 +23,36 @@
         });
       }, 2000);
     </script>
-    <!-- End Google Tag Manager -->
 
-    <!-- ✅ Favicons -->
+    <!-- Favicons -->
     <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
 
-    <!-- ✅ SEO -->
-    <meta http-equiv="content-language" content="en-US" />
+    <!-- SEO & Meta -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="index, follow" />
-
     <title>SnoutIQ - Your AI Pet Companion for Smart Pet Care</title>
-    <meta
-      name="title"
-      content="Snoutiq – 24/7 AI Pet Care & Health Assistant"
-    />
-    <meta
-      name="description"
-      content="Snoutiq is a free AI pet care website offering 24/7 support, health checks, instant answers, vet video consultations, and nearby clinic search for your pet."
-    />
-
-    <!-- ✅ Canonical -->
+    <meta name="description" content="AI pet care with 24/7 support, vet video consultations, and health checks." />
     <link rel="canonical" href="https://snoutiq.com/" />
-
-    <!-- ✅ Sitemap -->
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
 
-    <!-- ✅ Critical CSS Inline - Extract from your main CSS file -->
+    <!-- Critical CSS Inline -->
     <style>
-      /* Critical CSS for above-the-fold content */
-      body {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-          sans-serif;
-      }
-      #root {
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-      }
-
+      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif; }
+      #root { display: flex; flex-direction: column; min-height: 100vh; }
     </style>
 
-    <!-- ✅ Defer non-critical CSS -->
-    <link
-      rel="preload"
-      href="/assets/index.css"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
+    <!-- Defer main CSS -->
+    <link rel="preload" href="/assets/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="/assets/index.css" /></noscript>
 
-    <!-- ✅ Fonts (self-hosted, fast) -->
-    <link
-      rel="preload"
-      href="/fonts/inter.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin="anonymous"
-    />
+    <!-- Fonts -->
+    <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
 
-    <!-- ✅ Social Preview -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://snoutiq.com/" />
-    <meta
-      property="og:title"
-      content="Snoutiq – 24/7 AI Pet Care & Health Assistant"
-    />
-    <meta
-      property="og:description"
-      content="Snoutiq offers AI-driven pet care, instant health checks, and vet video consultations."
-    />
-    <meta property="og:image" content="https://snoutiq.com/og-image.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta
-      name="twitter:title"
-      content="Snoutiq – 24/7 AI Pet Care & Health Assistant"
-    />
-    <meta
-      name="twitter:description"
-      content="AI pet care with 24/7 support, instant health checks, and vet video calls."
-    />
-    <meta name="twitter:image" content="https://snoutiq.com/og-image.png" />
-
-    <!-- ✅ Mobile theme color -->
-    <meta name="theme-color" content="#2563eb" />
-
-    <!-- ✅ Structured Data -->
+    <!-- Structured Data -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -124,58 +66,32 @@
         ]
       }
     </script>
-    <link
-      rel="preload"
-      href="/fonts/inter-400.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin="anonymous"
-    />
-    <link
-      rel="preload"
-      href="/fonts/inter-700.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin="anonymous"
-    />
   </head>
   <body>
-    <!-- ✅ Google Tag Manager (noscript) -->
+    <!-- GTM noscript -->
     <noscript>
-      <iframe
-        src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
-        height="0"
-        width="0"
-        style="display: none; visibility: hidden"
-      ></iframe>
+      <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW" height="0" width="0" style="display:none;visibility:hidden"></iframe>
     </noscript>
-    <!-- End Google Tag Manager (noscript) -->
 
     <div id="root"></div>
 
-    <!-- ✅ Load scripts with defer attribute -->
+    <!-- Main JS -->
     <script type="module" src="/src/main.jsx" defer></script>
 
-    <!-- ✅ Performance monitoring -->
+    <!-- Performance Monitoring -->
     <script>
-      // Monitor LCP
       const lcpObserver = new PerformanceObserver((entryList) => {
-        const entries = entryList.getEntries();
-        const lastEntry = entries[entries.length - 1];
-        console.log("LCP candidate:", lastEntry.startTime, lastEntry);
+        const last = entryList.getEntries().pop();
+        if(last) console.log("LCP candidate:", last.startTime, last);
       });
       lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
 
-      // Monitor CLS
       let clsValue = 0;
-      let clsEntries = [];
-
       new PerformanceObserver((entryList) => {
         for (const entry of entryList.getEntries()) {
-          if (!entry.hadRecentInput) {
-            clsEntries.push(entry);
+          if(!entry.hadRecentInput){
             clsValue += entry.value;
-            console.log("Current CLS value:", clsValue, entry);
+            console.log("CLS update:", clsValue, entry);
           }
         }
       }).observe({ type: "layout-shift", buffered: true });
