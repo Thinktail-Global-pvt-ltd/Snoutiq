@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Inter font-face */
 @font-face {
   font-family: 'Inter';
   font-style: normal;
@@ -30,6 +31,7 @@
   font-display: swap;
   src: url('/fonts/inter-700.woff2') format('woff2');
 }
+
 @layer base {
   h1 {
     @apply font-inter font-bold text-4xl text-gray-900;
