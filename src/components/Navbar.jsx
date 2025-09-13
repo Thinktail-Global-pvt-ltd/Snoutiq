@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext ,lazy} from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment } from "react";
@@ -22,16 +22,13 @@ import {
 import Sidebar from "./Sidebar";
 import RightSidebar from "./RightSidebar";
 import OfferIcon from "../assets/images/offericon.png";
-import VetIcon from "../assets/images/veticon.png";
-import groomericon from "../assets/images/groomericon.png";
 import logo from "../assets/images/logo.png";
-import axiosClient from "../axios";
 import { AuthContext } from "../auth/AuthContext";
+
 
 const Navbar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPoliciesDropdownOpen, setIsPoliciesDropdownOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState(false);
   const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(false);
   const navigate = useNavigate();
@@ -265,6 +262,7 @@ const Navbar = () => {
             <img
               src={logo}
               alt="Snoutiq Logo"
+                loading="lazy"
               className="h-8 cursor-pointer transition-transform hover:scale-105"
               onClick={() => navigate(user ? "/dashboard" : "/")}
             />

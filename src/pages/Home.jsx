@@ -122,12 +122,12 @@
 
 // export default Home;
 
-import React, { useState } from "react";
+import React, { useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
-import ChatInput from "../components/ChatInput";
-import FeatureCard from "../components/FeatureCard";
-import Footer from "../components/Footer";
-import Header from "../components/Header";
+const ChatInput = lazy(() => import("../components/ChatInput"));
+
+const Footer = lazy(() => import("../components/Footer"));
+const Header = lazy(() => import("../components/Header"));
 
 const Home = () => {
   const navigate = useNavigate();
@@ -215,7 +215,9 @@ const Home = () => {
 
   return (
     <>
-      <Header />
+      <Suspense fallback={<div className="h-16" />}>
+        <Header />
+      </Suspense>
       <div className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex flex-col">
         {/* Main Content */}
         <div className="flex-1 flex flex-col px-4 py-8 max-w-6xl mx-auto w-full">
@@ -252,7 +254,10 @@ const Home = () => {
             {/* Chat Input */}
             <div className="max-w-xl mx-auto mb-16">
               <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
-                <ChatInput onSendMessage={handleSendMessage} />
+                {/* <ChatInput onSendMessage={handleSendMessage} /> */}
+                <Suspense fallback={<div>Loading...</div>}>
+                  <ChatInput onSendMessage={handleSendMessage} />
+                </Suspense>
               </div>
               <p className="text-sm text-gray-500 mt-3">
                 Ask anything about your pet's health, behavior, or training
@@ -328,7 +333,9 @@ const Home = () => {
           </div>
         </div>
 
-        <Footer />
+        <Suspense fallback={null}>
+          <Footer />
+        </Suspense>
       </div>
     </>
   );

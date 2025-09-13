@@ -338,6 +338,7 @@ import { FaSquareXTwitter } from "react-icons/fa6";
 import { FaLocationDot } from "react-icons/fa6";
 import { Link } from "react-router-dom";
 import logo from '../assets/images/logo.png';
+import { lazy } from "react";
 
 export default function Footer() {
   return (
@@ -360,6 +361,7 @@ export default function Footer() {
                 <img
                   src={logo}
                   alt="Snoutiq"
+                    loading="lazy"
                   className="w-40 p-3 rounded-lg"
                 />
               </div>
