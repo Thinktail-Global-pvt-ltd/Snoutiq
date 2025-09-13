@@ -4,16 +4,26 @@
 
 /* Inter font-face */
 @font-face {
-  font-family:'Inter'; font-style:normal; font-weight:400; font-display:swap; src:url('/fonts/inter-400.woff2') format('woff2');
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
 }
 @font-face {
-  font-family:'Inter'; font-style:normal; font-weight:700; font-display:swap; src:url('/fonts/inter-700.woff2') format('woff2');
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter-700.woff2') format('woff2');
 }
 
 @layer base {
   h1 { @apply font-inter font-bold text-4xl text-gray-900; }
   h2 { @apply font-inter font-semibold text-2xl text-gray-800; }
-  p { @apply font-inter text-base text-gray-700; }
+  p  { @apply font-inter text-base text-gray-700; }
 }
 
-h1 { font-family:'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
+h1 {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}

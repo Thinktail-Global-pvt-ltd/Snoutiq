@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- Preconnect for faster font loading -->
+    <!-- Preconnect -->
     <link rel="preconnect" href="https://www.googletagmanager.com" />
 
-    <!-- GTM async load with slight delay -->
+    <!-- GTM Async Load -->
     <script>
       setTimeout(function () {
         window.addEventListener("load", function () {
@@ -30,7 +30,7 @@
     <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
 
-    <!-- SEO & Meta -->
+    <!-- Meta / SEO -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="index, follow" />
     <title>SnoutIQ - Your AI Pet Companion for Smart Pet Care</title>
@@ -38,7 +38,7 @@
     <link rel="canonical" href="https://snoutiq.com/" />
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
 
-    <!-- Critical CSS Inline -->
+    <!-- Critical CSS -->
     <style>
       body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif; }
       #root { display: flex; flex-direction: column; min-height: 100vh; }
@@ -48,7 +48,7 @@
     <link rel="preload" href="/assets/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="/assets/index.css" /></noscript>
 
-    <!-- Fonts -->
+    <!-- Fonts preload -->
     <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
     <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
 
@@ -67,6 +67,7 @@
       }
     </script>
   </head>
+
   <body>
     <!-- GTM noscript -->
     <noscript>
@@ -75,7 +76,7 @@
 
     <div id="root"></div>
 
-    <!-- Main JS -->
+    <!-- Main React JS -->
     <script type="module" src="/src/main.jsx" defer></script>
 
     <!-- Performance Monitoring -->
