@@ -7,7 +7,6 @@
 // import { Toaster } from "react-hot-toast";
 // import Login from "./pages/Login";
 // import ProtectedRoute from "./ProtectedRoute";
-// import ChatInterface from "./pages/ChatInterface";
 // import ForgotPassword from "./pages/ForgotPassword";
 // import AddPet from "./PetDashboard/AddPet";
 // import EditPet from "./PetDashboard/EditPet";
@@ -322,7 +321,6 @@ import Dashboard from "./pages/Dashboard";
 import { Toaster } from "react-hot-toast";
 import Login from "./pages/Login";
 import ProtectedRoute from "./ProtectedRoute";
-import ChatInterface from "./pages/ChatInterface";
 import ForgotPassword from "./pages/ForgotPassword";
 import AddPet from "./PetDashboard/AddPet";
 import EditPet from "./PetDashboard/EditPet";
@@ -355,6 +353,7 @@ import PetMedicationTracker from "./PetDashboard/PetMedicationTracker";
 import CallTestPage from "./CallTestPage";
 import WaitingForDoctor from "./PetDashboard/WaitingForDoctor";
 import PaymentPage from "./PetDashboard/Payment";
+import AdminLogin from "./admin/AdminLogin";
 
 function App() {
   return (
@@ -440,14 +439,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <SearchingDoctor />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/chats/:chatToken"
-            element={
-              <ProtectedRoute>
-                <ChatInterface />
               </ProtectedRoute>
             }
           />
@@ -636,6 +627,9 @@ function App() {
             }
           />
           <Route path="/call" element={<CallPage />} />
+          <Route path="/super/admin" element={<AdminLogin />} />
+            <Route path="/super/admin/admin-slider/*" element={<AdminLogin />} />
+
         </Routes>
       </div>
     </Router>

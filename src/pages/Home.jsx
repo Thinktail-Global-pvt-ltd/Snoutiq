@@ -131,7 +131,9 @@ import Header from "../components/Header";
 
 const Home = () => {
   const navigate = useNavigate();
-  const [message, setMessage] = useState(localStorage.getItem("messageIntended") || "");
+  const [message, setMessage] = useState(
+    localStorage.getItem("messageIntended") || ""
+  );
 
   const handleSendMessage = (message) => {
     if (message && message.trim() !== "") {
@@ -160,7 +162,8 @@ const Home = () => {
         </svg>
       ),
       title: "24/7 Pet Care Support",
-      description: "Get instant answers to your pet care questions anytime, anywhere",
+      description:
+        "Get instant answers to your pet care questions anytime, anywhere",
     },
     {
       icon: (
@@ -219,20 +222,31 @@ const Home = () => {
           {/* Hero Section */}
           <div className="text-center py-12 md:py-20">
             <div className="inline-flex items-center justify-center mb-4 bg-blue-100 text-blue-800 rounded-full px-4 py-2 text-sm font-medium">
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <svg
+                className="w-4 h-4 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
                 <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                  clipRule="evenodd"
+                />
               </svg>
               AI-Powered Pet Care Assistant
             </div>
-            
+
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              SnoutIQ - Your AI Pet Companion for 
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600"> Smart Pet Care</span>
+              SnoutIQ - Your AI Pet Companion for{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 whitespace-nowrap">
+                Smart Pet Care
+              </span>
             </h1>
-            
+
             <p className="text-lg sm:text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
-              Intelligent pet care guidance, health advice, and training tips powered by advanced AI technology
+              Intelligent pet care guidance, health advice, and training tips
+              powered by advanced AI technology
             </p>
 
             {/* Chat Input */}
@@ -273,21 +287,24 @@ const Home = () => {
                 Why Pet Owners Love Us
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Advanced AI technology combined with veterinary expertise to give your pet the best care
+                Advanced AI technology combined with veterinary expertise to
+                give your pet the best care
               </p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {features.map((feature, index) => (
-                <div 
-                  key={index} 
+                <div
+                  key={index}
                   className="bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-2xl p-6 shadow-lg transform transition-all duration-300 hover:-translate-y-2"
                 >
                   <div className="w-14 h-14 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mb-5">
                     {feature.icon}
                   </div>
                   <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                  <p className="text-blue-100 opacity-90">{feature.description}</p>
+                  <p className="text-blue-100 opacity-90">
+                    {feature.description}
+                  </p>
                 </div>
               ))}
             </div>
@@ -299,10 +316,11 @@ const Home = () => {
               Ready to Transform Your Pet's Life?
             </h2>
             <p className="text-lg text-blue-100 max-w-2xl mx-auto mb-8">
-              Join thousands of pet owners who trust our AI assistant for their pet's health and happiness
+              Join thousands of pet owners who trust our AI assistant for their
+              pet's health and happiness
             </p>
-            <button 
-              onClick={() => navigate('/register')}
+            <button
+              onClick={() => navigate("/register")}
               className="bg-white text-blue-600 font-semibold py-3 px-8 rounded-full hover:bg-gray-100 transition-colors duration-300 shadow-lg"
             >
               Get Started Now
