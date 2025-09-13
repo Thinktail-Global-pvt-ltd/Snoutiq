@@ -121,6 +121,8 @@
 // };
 
 // export default Home;
+
+
 import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
@@ -196,7 +198,7 @@ const Home = () => {
 
             {/* Optimized heading for LCP with ref for potential optimizations */}
             <h1 
-              ref={mainHeadingRef}
+              // ref={mainHeadingRef}
               className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6"
             >
               SnoutIQ - Your AI Pet Companion for{" "}
@@ -235,7 +237,8 @@ const Home = () => {
             ].map((stat, i) => (
               <div
                 key={i}
-                className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100"
+                // className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100"
+                className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100 aspect-[1/1] flex flex-col justify-center"
               >
                 <div className="text-3xl font-bold text-blue-600 mb-2">
                   {stat.value}
