@@ -5,8 +5,39 @@
 @font-face {
   font-family: 'Inter';
   font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
   font-weight: 600;
-  font-display: swap;  /* Important */
+  font-display: swap;
   src: url('/fonts/inter-600.woff2') format('woff2');
 }
-h1 { font-weight: 700; font-size: 2.5rem; color: #111827; }
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter-700.woff2') format('woff2');
+}
+@layer base {
+  h1 {
+    @apply font-inter font-bold text-4xl text-gray-900;
+  }
+  h2 {
+    @apply font-inter font-semibold text-2xl text-gray-800;
+  }
+  p {
+    @apply font-inter text-base text-gray-700;
+  }
+}
