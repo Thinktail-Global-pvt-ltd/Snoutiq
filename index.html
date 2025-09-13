@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- Preconnect -->
+    <!-- Preconnect for faster font & GTM load -->
     <link rel="preconnect" href="https://www.googletagmanager.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <!-- GTM Async Load -->
+    <!-- GTM Async Load with slight delay -->
     <script>
-      setTimeout(function () {
+      setTimeout(() => {
         window.addEventListener("load", function () {
           (function (w, d, s, l, i) {
             w[l] = w[l] || [];
@@ -23,19 +23,19 @@
             f.parentNode.insertBefore(j, f);
           })(window, document, "script", "dataLayer", "GTM-5D756BMW");
         });
-      }, 2000);
+      }, 3000);
     </script>
 
     <!-- Favicons -->
     <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
+    <link rel="icon" sizes="192x192" href="/favicon-192.png" />
+    <link rel="icon" sizes="512x512" href="/favicon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
 
-    <!-- Meta / SEO -->
+    <!-- SEO -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="index, follow" />
-    <title>SnoutIQ - Your AI Pet Companion for Smart Pet Care</title>
+    <title>SnoutIQ - Your AI Pet Companion</title>
     <meta
       name="description"
       content="AI pet care with 24/7 support, vet video consultations, and health checks."
@@ -43,7 +43,7 @@
     <link rel="canonical" href="https://snoutiq.com/" />
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
 
-    <!-- Critical CSS -->
+    <!-- Critical CSS Inline -->
     <style>
       body {
         margin: 0;
@@ -57,7 +57,7 @@
       }
     </style>
 
-    <!-- Defer main CSS -->
+    <!-- Defer non-critical CSS -->
     <link
       rel="preload"
       href="/assets/index.css"
@@ -105,7 +105,7 @@
         src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
         height="0"
         width="0"
-        style="display: none; visibility: hidden"
+        style="display:none;visibility:hidden"
       ></iframe>
     </noscript>
 
