@@ -98,17 +98,15 @@ const Home = () => {
               <div
                 key={i}
                 className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100 aspect-[1/1] flex flex-col justify-center"
+                style={{ contentVisibility: "auto" }}
               >
                 <div
                   className="text-3xl font-bold text-blue-600 mb-2"
-                  style={{ contentVisibility: "auto" }}
+                  style={{ minHeight: "3rem" }}
                 >
                   {stat.value}
                 </div>
-                <div
-                  className="text-gray-600"
-                  style={{ contentVisibility: "auto" }}
-                >
+                <div className="text-gray-600" style={{ minHeight: "1.5rem" }}>
                   {stat.label}
                 </div>
               </div>
