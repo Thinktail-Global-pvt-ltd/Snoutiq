@@ -241,7 +241,10 @@ const Home = () => {
 
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
               SnoutIQ - Your AI Pet Companion for{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 whitespace-nowrap">
+              <span
+                className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 whitespace-nowrap"
+                style={{ WebkitTextFillColor: "blue" }} // fallback color
+              >
                 Smart Pet Care
               </span>
             </h1>
