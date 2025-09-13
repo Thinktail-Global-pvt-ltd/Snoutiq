@@ -181,18 +181,12 @@ const Home = () => {
               🐶 AI-Powered Pet Care Assistant
             </div>
 
-            {/* <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              SnoutIQ - Your AI Pet Companion for{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 whitespace-nowrap">
-                Smart Pet Care
-              </span>
-            </h1> */}
             <Header />
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 leading-snug">
+            <h1 >
               SnoutIQ - Your AI Pet Companion for{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent whitespace-nowrap">
+              {/* <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent whitespace-nowrap"> */}
                 Smart Pet Care
-              </span>
+              {/* </span> */}
             </h1>
 
             <p className="text-lg sm:text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
