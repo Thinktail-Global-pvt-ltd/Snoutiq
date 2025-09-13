@@ -163,7 +163,8 @@ const Home = () => {
       {
         icon: "🐾",
         title: "Behavior Training Tips",
-        description: "Learn effective techniques to train and bond with your pet",
+        description:
+          "Learn effective techniques to train and bond with your pet",
       },
     ],
     []
@@ -180,9 +181,16 @@ const Home = () => {
               🐶 AI-Powered Pet Care Assistant
             </div>
 
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+            {/* <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
               SnoutIQ - Your AI Pet Companion for{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 whitespace-nowrap">
+                Smart Pet Care
+              </span>
+            </h1> */}
+            <Header />
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 leading-snug">
+              SnoutIQ - Your AI Pet Companion for{" "}
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent whitespace-nowrap">
                 Smart Pet Care
               </span>
             </h1>
@@ -195,7 +203,11 @@ const Home = () => {
             {/* Chat Input */}
             <div className="max-w-xl mx-auto mb-16">
               <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
-                <Suspense fallback={<div className="p-4 text-gray-400">Loading chat...</div>}>
+                <Suspense
+                  fallback={
+                    <div className="p-4 text-gray-400">Loading chat...</div>
+                  }
+                >
                   <ChatInput onSendMessage={handleSendMessage} />
                 </Suspense>
               </div>
