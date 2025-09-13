@@ -3,31 +3,22 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- ✅ Google Tag Manager -->
+    <!-- ✅ Google Tag Manager (delayed load for performance) -->
     <script>
-      (function (w, d, s, l, i) {
-        w[l] = w[l] || [];
-        w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
-        var f = d.getElementsByTagName(s)[0],
-          j = d.createElement(s),
-          dl = l != "dataLayer" ? "&l=" + l : "";
-        j.async = true;
-        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
-        f.parentNode.insertBefore(j, f);
-      })(window, document, "script", "dataLayer", "GTM-5D756BMW");
+      window.addEventListener("load", function () {
+        (function (w, d, s, l, i) {
+          w[l] = w[l] || [];
+          w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
+          var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+          j.async = true;
+          j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+          f.parentNode.insertBefore(j, f);
+        })(window, document, "script", "dataLayer", "GTM-5D756BMW");
+      });
     </script>
     <!-- End Google Tag Manager -->
-
-    <!-- ✅ Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-MNC09220K1"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-      gtag("config", "G-MNC09220K1");
-    </script>
 
     <!-- ✅ Favicons -->
     <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
@@ -42,7 +33,10 @@
 
     <title>SnoutIQ - Your AI Pet Companion for Smart Pet Care</title>
     <meta name="title" content="Snoutiq – 24/7 AI Pet Care & Health Assistant" />
-    <meta name="description" content="Snoutiq is a free AI pet care website offering 24/7 support, health checks, instant answers, vet video consultations, and nearby clinic search for your pet." />
+    <meta
+      name="description"
+      content="Snoutiq is a free AI pet care website offering 24/7 support, health checks, instant answers, vet video consultations, and nearby clinic search for your pet."
+    />
 
     <!-- ✅ Canonical -->
     <link rel="canonical" href="https://snoutiq.com/" />
@@ -50,21 +44,36 @@
     <!-- ✅ Sitemap -->
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
 
-    <!-- ✅ Fonts -->
-    <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://www.googletagmanager.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+    <!-- ✅ Fonts (self-hosted, fast) -->
+    <link
+      rel="preload"
+      href="/fonts/inter.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin="anonymous"
+    />
 
     <!-- ✅ Social Preview -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://snoutiq.com/" />
-    <meta property="og:title" content="Snoutiq – 24/7 AI Pet Care & Health Assistant" />
-    <meta property="og:description" content="Snoutiq offers AI-driven pet care, instant health checks, and vet video consultations." />
+    <meta
+      property="og:title"
+      content="Snoutiq – 24/7 AI Pet Care & Health Assistant"
+    />
+    <meta
+      property="og:description"
+      content="Snoutiq offers AI-driven pet care, instant health checks, and vet video consultations."
+    />
     <meta property="og:image" content="https://snoutiq.com/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Snoutiq – 24/7 AI Pet Care & Health Assistant" />
-    <meta name="twitter:description" content="AI pet care with 24/7 support, instant health checks, and vet video calls." />
+    <meta
+      name="twitter:title"
+      content="Snoutiq – 24/7 AI Pet Care & Health Assistant"
+    />
+    <meta
+      name="twitter:description"
+      content="AI pet care with 24/7 support, instant health checks, and vet video calls."
+    />
     <meta name="twitter:image" content="https://snoutiq.com/og-image.png" />
 
     <!-- ✅ Mobile theme color -->
@@ -88,8 +97,12 @@
   <body>
     <!-- ✅ Google Tag Manager (noscript) -->
     <noscript>
-      <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
-              height="0" width="0" style="display:none;visibility:hidden"></iframe>
+      <iframe
+        src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
+        height="0"
+        width="0"
+        style="display:none;visibility:hidden"
+      ></iframe>
     </noscript>
     <!-- End Google Tag Manager (noscript) -->
 
