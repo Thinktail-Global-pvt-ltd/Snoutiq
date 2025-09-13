@@ -1,9 +1,10 @@
+
 import React, { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import GTMRouteListener from "./GTMRouteListener";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./ProtectedRoute";
-import { FaPaw } from "react-icons/fa";
+import { FaPaw } from 'react-icons/fa';
 
 // Public pages
 const Login = lazy(() => import("./pages/Login"));
@@ -57,8 +58,7 @@ const PetMedicationTracker = lazy(() =>
   import("./PetDashboard/PetMedicationTracker")
 );
 const AdminLogin = lazy(() => import("./admin/AdminLogin"));
-// const CallPage = lazy(() => import("./CallPage"));
-
+const CallPage = lazy(() => import("./CallPage"));
 function App() {
   return (
     <Router>
@@ -66,15 +66,15 @@ function App() {
       <Toaster position="bottom-right" reverseOrder={false} />
 
       <div className="bg-white text-black">
-        <Suspense
-          fallback={
-            <div className="flex items-center justify-center h-screen">
-              <div className="animate-spin">
-                <FaPaw className="w-16 h-16 text-blue-500" />
-              </div>
-            </div>
-          }
-        >
+       <Suspense
+  fallback={
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin">
+        <FaPaw className="w-16 h-16 text-blue-500" />
+      </div>
+    </div>
+  }
+>
           <Routes>
             {/* Home page */}
             <Route
