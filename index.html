@@ -3,36 +3,22 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- Preconnect for faster font & GTM load -->
+    <!-- ✅ Preconnect for faster external requests -->
     <link rel="preconnect" href="https://www.googletagmanager.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <!-- GTM Async Load with slight delay -->
-    <script>
-      setTimeout(() => {
-        window.addEventListener("load", function () {
-          (function (w, d, s, l, i) {
-            w[l] = w[l] || [];
-            w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
-            var f = d.getElementsByTagName(s)[0],
-              j = d.createElement(s),
-              dl = l != "dataLayer" ? "&l=" + l : "";
-            j.async = true;
-            j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
-            f.parentNode.insertBefore(j, f);
-          })(window, document, "script", "dataLayer", "GTM-5D756BMW");
-        });
-      }, 3000);
-    </script>
+    <!-- ✅ Preload critical CSS & JS -->
+    <link rel="preload" href="/assets/index-DwCyAPPt.js" as="script" />
+    <link rel="preload" href="/assets/index-D1wt8b9t.css" as="style" />
 
-    <!-- Favicons -->
+    <!-- ✅ Favicons -->
     <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
     <link rel="icon" sizes="192x192" href="/favicon-192.png" />
     <link rel="icon" sizes="512x512" href="/favicon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
 
-    <!-- SEO -->
+    <!-- ✅ SEO -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="index, follow" />
     <title>SnoutIQ - Your AI Pet Companion</title>
@@ -43,7 +29,7 @@
     <link rel="canonical" href="https://snoutiq.com/" />
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
 
-    <!-- Critical CSS Inline -->
+    <!-- ✅ Critical CSS Inline -->
     <style>
       body {
         margin: 0;
@@ -57,7 +43,7 @@
       }
     </style>
 
-    <!-- Defer non-critical CSS -->
+    <!-- ✅ Defer non-critical CSS -->
     <link
       rel="preload"
       href="/assets/index.css"
@@ -66,7 +52,7 @@
     />
     <noscript><link rel="stylesheet" href="/assets/index.css" /></noscript>
 
-    <!-- Fonts preload -->
+    <!-- ✅ Fonts preload -->
     <link
       rel="preload"
       href="/fonts/inter-400.woff2"
@@ -82,7 +68,7 @@
       crossorigin="anonymous"
     />
 
-    <!-- Structured Data -->
+    <!-- ✅ Structured Data -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -99,7 +85,7 @@
   </head>
 
   <body>
-    <!-- GTM noscript -->
+    <!-- ✅ GTM noscript -->
     <noscript>
       <iframe
         src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
@@ -111,26 +97,50 @@
 
     <div id="root"></div>
 
-    <!-- Main React JS -->
+    <!-- ✅ Main React JS (deferred) -->
     <script type="module" src="/src/main.jsx" defer></script>
 
-    <!-- Performance Monitoring -->
+    <!-- ✅ Lazy load GTM (after 3-4s) -->
     <script>
-      const lcpObserver = new PerformanceObserver((entryList) => {
-        const last = entryList.getEntries().pop();
-        if (last) console.log("LCP candidate:", last.startTime, last);
+      window.addEventListener("load", function () {
+        setTimeout(function () {
+          (function (w, d, s, l, i) {
+            w[l] = w[l] || [];
+            w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
+            var f = d.getElementsByTagName(s)[0],
+              j = d.createElement(s),
+              dl = l != "dataLayer" ? "&l=" + l : "";
+            j.async = true;
+            j.src =
+              "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+            f.parentNode.insertBefore(j, f);
+          })(window, document, "script", "dataLayer", "GTM-5D756BMW");
+        }, 3000);
       });
-      lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+    </script>
 
-      let clsValue = 0;
-      new PerformanceObserver((entryList) => {
-        for (const entry of entryList.getEntries()) {
-          if (!entry.hadRecentInput) {
-            clsValue += entry.value;
-            console.log("CLS update:", clsValue, entry);
+    <!-- ✅ Performance Monitoring (only sample users) -->
+    <script>
+      if (Math.random() < 0.1) {
+        const lcpObserver = new PerformanceObserver((entryList) => {
+          const last = entryList.getEntries().pop();
+          if (last) console.log("LCP candidate:", last.startTime, last);
+        });
+        lcpObserver.observe({
+          type: "largest-contentful-paint",
+          buffered: true,
+        });
+
+        let clsValue = 0;
+        new PerformanceObserver((entryList) => {
+          for (const entry of entryList.getEntries()) {
+            if (!entry.hadRecentInput) {
+              clsValue += entry.value;
+              console.log("CLS update:", clsValue, entry);
+            }
           }
-        }
-      }).observe({ type: "layout-shift", buffered: true });
+        }).observe({ type: "layout-shift", buffered: true });
+      }
     </script>
   </body>
 </html>
