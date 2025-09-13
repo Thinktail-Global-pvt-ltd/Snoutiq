@@ -121,130 +121,68 @@
 // };
 
 // export default Home;
-
-import React, { useState, lazy, Suspense } from "react";
+import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
-const ChatInput = lazy(() => import("../components/ChatInput"));
+import Header from "../components/Header"; // header ko normal import rakha hai
 
+const ChatInput = lazy(() => import("../components/ChatInput"));
 const Footer = lazy(() => import("../components/Footer"));
-const Header = lazy(() => import("../components/Header"));
 
 const Home = () => {
   const navigate = useNavigate();
-  const [message, setMessage] = useState(
-    localStorage.getItem("messageIntended") || ""
-  );
+  const [message, setMessage] = useState("");
 
-  const handleSendMessage = (message) => {
-    if (message && message.trim() !== "") {
-      localStorage.setItem("messageIntended", message);
-      console.log("User intended message:", message);
+  // localStorage read only once on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("messageIntended");
+    if (stored) setMessage(stored);
+  }, []);
+
+  const handleSendMessage = (msg) => {
+    if (msg?.trim()) {
+      localStorage.setItem("messageIntended", msg);
+      console.log("User intended message:", msg);
       navigate("/register");
     }
   };
 
-  const features = [
-    {
-      icon: (
-        <svg
-          className="w-8 h-8 text-white"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-          />
-        </svg>
-      ),
-      title: "24/7 Pet Care Support",
-      description:
-        "Get instant answers to your pet care questions anytime, anywhere",
-    },
-    {
-      icon: (
-        <svg
-          className="w-8 h-8 text-white"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-          />
-        </svg>
-      ),
-      title: "Personalized Pet Plans",
-      description: "Receive tailored advice based on your pet's unique needs",
-    },
-    {
-      icon: (
-        <svg
-          className="w-8 h-8 text-white"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      ),
-      title: "Behavior Training Tips",
-      description: "Learn effective techniques to train and bond with your pet",
-    },
-  ];
+  // memoize static features
+  const features = useMemo(
+    () => [
+      {
+        icon: "✅",
+        title: "24/7 Pet Care Support",
+        description:
+          "Get instant answers to your pet care questions anytime, anywhere",
+      },
+      {
+        icon: "👩‍⚕️",
+        title: "Personalized Pet Plans",
+        description: "Receive tailored advice based on your pet's unique needs",
+      },
+      {
+        icon: "🐾",
+        title: "Behavior Training Tips",
+        description: "Learn effective techniques to train and bond with your pet",
+      },
+    ],
+    []
+  );
 
   return (
     <>
-      <Suspense fallback={<div className="h-16" />}>
-        <Header />
-      </Suspense>
-      <div className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex flex-col">
-        {/* Main Content */}
+      <Header />
+      <main className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex flex-col">
         <div className="flex-1 flex flex-col px-4 py-8 max-w-6xl mx-auto w-full">
           {/* Hero Section */}
-          <div className="text-center py-12 md:py-20">
+          <section className="text-center py-12 md:py-20">
             <div className="inline-flex items-center justify-center mb-4 bg-blue-100 text-blue-800 rounded-full px-4 py-2 text-sm font-medium">
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                <path
-                  fillRule="evenodd"
-                  d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              AI-Powered Pet Care Assistant
+              🐶 AI-Powered Pet Care Assistant
             </div>
 
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
               SnoutIQ - Your AI Pet Companion for{" "}
-              <span
-                className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 whitespace-nowrap"
-                style={{ WebkitTextFillColor: "blue" }} // fallback color
-              >
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 whitespace-nowrap">
                 Smart Pet Care
               </span>
             </h1>
@@ -257,8 +195,7 @@ const Home = () => {
             {/* Chat Input */}
             <div className="max-w-xl mx-auto mb-16">
               <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
-                {/* <ChatInput onSendMessage={handleSendMessage} /> */}
-                <Suspense fallback={<div>Loading...</div>}>
+                <Suspense fallback={<div className="p-4 text-gray-400">Loading chat...</div>}>
                   <ChatInput onSendMessage={handleSendMessage} />
                 </Suspense>
               </div>
@@ -266,30 +203,30 @@ const Home = () => {
                 Ask anything about your pet's health, behavior, or training
               </p>
             </div>
-          </div>
+          </section>
 
           {/* Stats Section */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20">
-            <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="text-3xl font-bold text-blue-600 mb-2">10K+</div>
-              <div className="text-gray-600">Happy Pets</div>
-            </div>
-            <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="text-3xl font-bold text-blue-600 mb-2">24/7</div>
-              <div className="text-gray-600">Support</div>
-            </div>
-            <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="text-3xl font-bold text-blue-600 mb-2">98%</div>
-              <div className="text-gray-600">Accuracy</div>
-            </div>
-            <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="text-3xl font-bold text-blue-600 mb-2">500+</div>
-              <div className="text-gray-600">Pet Experts</div>
-            </div>
-          </div>
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20">
+            {[
+              { value: "10K+", label: "Happy Pets" },
+              { value: "24/7", label: "Support" },
+              { value: "98%", label: "Accuracy" },
+              { value: "500+", label: "Pet Experts" },
+            ].map((stat, i) => (
+              <div
+                key={i}
+                className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100"
+              >
+                <div className="text-3xl font-bold text-blue-600 mb-2">
+                  {stat.value}
+                </div>
+                <div className="text-gray-600">{stat.label}</div>
+              </div>
+            ))}
+          </section>
 
-          {/* Feature Cards */}
-          <div className="w-full mb-20">
+          {/* Feature Section */}
+          <section className="w-full mb-20">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
                 Why Pet Owners Love Us
@@ -301,25 +238,23 @@ const Home = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {features.map((feature, index) => (
+              {features.map((f, idx) => (
                 <div
-                  key={index}
+                  key={idx}
                   className="bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-2xl p-6 shadow-lg transform transition-all duration-300 hover:-translate-y-2"
                 >
-                  <div className="w-14 h-14 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mb-5">
-                    {feature.icon}
+                  <div className="w-14 h-14 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mb-5 text-2xl">
+                    {f.icon}
                   </div>
-                  <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                  <p className="text-blue-100 opacity-90">
-                    {feature.description}
-                  </p>
+                  <h3 className="text-xl font-bold mb-3">{f.title}</h3>
+                  <p className="text-blue-100 opacity-90">{f.description}</p>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
           {/* CTA Section */}
-          <div className="text-center py-12 px-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl text-white mb-16">
+          <section className="text-center py-12 px-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl text-white mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
               Ready to Transform Your Pet's Life?
             </h2>
@@ -333,13 +268,14 @@ const Home = () => {
             >
               Get Started Now
             </button>
-          </div>
+          </section>
         </div>
 
+        {/* Footer lazy load */}
         <Suspense fallback={null}>
           <Footer />
         </Suspense>
-      </div>
+      </main>
     </>
   );
 };
