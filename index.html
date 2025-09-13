@@ -3,12 +3,9 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- ✅ Preconnect to external domains for faster loading -->
     <link rel="preconnect" href="https://www.googletagmanager.com" />
 
-    <!-- ✅ Google Tag Manager (delayed load for performance) -->
     <script>
-      // Load GTM after a slight delay to prioritize content rendering
       setTimeout(function () {
         window.addEventListener("load", function () {
           (function (w, d, s, l, i) {
@@ -66,19 +63,7 @@
         flex-direction: column;
         min-height: 100vh;
       }
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-      }
 
-      /* Add minimal styles needed for your header/hero section */
     </style>
 
     <!-- ✅ Defer non-critical CSS -->
