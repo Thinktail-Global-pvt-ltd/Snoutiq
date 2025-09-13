@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext ,lazy} from "react";
+import React, { useState, useEffect, useContext, lazy } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment } from "react";
@@ -25,7 +25,6 @@ import OfferIcon from "../assets/images/offericon.png";
 import logo from "../assets/images/logo.png";
 import { AuthContext } from "../auth/AuthContext";
 
-
 const Navbar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPoliciesDropdownOpen, setIsPoliciesDropdownOpen] = useState(false);
@@ -33,8 +32,7 @@ const Navbar = () => {
   const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
-  console.log(user,'user');
-  
+  console.log(user, "user");
 
   const handleLogin = () => {
     navigate("/login");
@@ -167,8 +165,9 @@ const Navbar = () => {
                           type="button"
                           className="rounded-md text-white hover:text-gray-200 transition-colors"
                           onClick={() => setIsLeftDrawerOpen(false)}
+                          aria-label="Close menu"
                         >
-                          <XMarkIcon className="w-6 h-6" />
+                          <XMarkIcon className="w-6 h-6" aria-hidden="true" />
                         </button>
                       </div>
                       <div className="flex-1 overflow-y-auto">
@@ -229,9 +228,11 @@ const Navbar = () => {
                           type="button"
                           className="rounded-md text-white hover:text-gray-200 transition-colors"
                           onClick={() => setIsRightDrawerOpen(false)}
+                            aria-label="Close menu"
                         >
-                          <XMarkIcon className="w-6 h-6" />
+                          <XMarkIcon className="w-6 h-6" aria-hidden="true"  />
                         </button>
+
                       </div>
                       <div className="flex-1 overflow-y-auto">
                         <div className="w-full">
@@ -262,7 +263,7 @@ const Navbar = () => {
             <img
               src={logo}
               alt="Snoutiq Logo"
-                loading="lazy"
+              loading="lazy"
               className="h-8 cursor-pointer transition-transform hover:scale-105"
               onClick={() => navigate(user ? "/dashboard" : "/")}
             />
@@ -351,9 +352,10 @@ const Navbar = () => {
                     <div className="flex flex-col">
                       <div className="text-sm font-semibold text-gray-800">
                         {user.name || user.business_status}
-
                       </div>
-                      <div className="text-xs text-gray-500">{!user.business_status?"Pet Owner":"Vet Owner"}</div>
+                      <div className="text-xs text-gray-500">
+                        {!user.business_status ? "Pet Owner" : "Vet Owner"}
+                      </div>
                     </div>
                     <svg
                       className="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform"
@@ -405,8 +407,9 @@ const Navbar = () => {
             <button
               onClick={() => setIsLeftDrawerOpen(true)}
               className="p-2 rounded-lg bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+              aria-label="Open menu"
             >
-              <Bars3Icon className="w-6 h-6 text-gray-700" />
+              <Bars3Icon className="w-6 h-6 text-gray-700" aria-hidden="true" />
             </button>
 
             {/* Mobile Logo and Title */}
@@ -421,13 +424,15 @@ const Navbar = () => {
             <div className="flex space-x-3">
               {/* Policies Dropdown for Mobile */}
               <div className="relative">
-                <button
-                  onClick={togglePoliciesDropdown}
-                  className="bg-white rounded-lg p-2 flex items-center shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
-                  // className="p-2 rounded-lg bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                >
-                  <DocumentTextIcon className="w-6 h-6 text-gray-700" />
-                </button>
+               <button
+  onClick={togglePoliciesDropdown}
+  className="bg-white rounded-lg p-2 flex items-center shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
+  aria-label="Open policies menu"
+  aria-expanded={isPoliciesDropdownOpen}
+>
+  <DocumentTextIcon className="w-6 h-6 text-gray-700" aria-hidden="true" />
+</button>
+
 
                 {isPoliciesDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
