@@ -123,7 +123,7 @@
 // export default Home;
 import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "../components/Header"; // header ko normal import rakha hai
+import Header from "../components/Header";
 
 const ChatInput = lazy(() => import("../components/ChatInput"));
 const Footer = lazy(() => import("../components/Footer"));
@@ -132,7 +132,7 @@ const Home = () => {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
 
-  // localStorage read only once on mount
+  // Move useEffect after useState to follow rules of hooks
   useEffect(() => {
     const stored = localStorage.getItem("messageIntended");
     if (stored) setMessage(stored);
@@ -175,18 +175,16 @@ const Home = () => {
       <Header />
       <main className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex flex-col">
         <div className="flex-1 flex flex-col px-4 py-8 max-w-6xl mx-auto w-full">
-          {/* Hero Section */}
+          {/* Hero Section - Prioritize LCP content */}
           <section className="text-center py-12 md:py-20">
             <div className="inline-flex items-center justify-center mb-4 bg-blue-100 text-blue-800 rounded-full px-4 py-2 text-sm font-medium">
               🐶 AI-Powered Pet Care Assistant
             </div>
 
-            <Header />
-            <h1 >
+            {/* Optimized heading for LCP */}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
               SnoutIQ - Your AI Pet Companion for{" "}
-              {/* <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent whitespace-nowrap"> */}
-                Smart Pet Care
-              {/* </span> */}
+              <span className="text-blue-600">Smart Pet Care</span>
             </h1>
 
             <p className="text-lg sm:text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
@@ -194,7 +192,7 @@ const Home = () => {
               powered by advanced AI technology
             </p>
 
-            {/* Chat Input */}
+            {/* Chat Input - Defer loading with lazy and Suspense */}
             <div className="max-w-xl mx-auto mb-16">
               <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
                 <Suspense
