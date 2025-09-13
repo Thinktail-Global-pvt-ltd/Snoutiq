@@ -125,17 +125,30 @@ import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 
-const ChatInput = lazy(() => import("../components/ChatInput"));
-const Footer = lazy(() => import("../components/Footer"));
+// Preload components for better performance
+const ChatInput = lazy(() => 
+  import(/* webpackPrefetch: true */ "../components/ChatInput")
+);
+const Footer = lazy(() => 
+  import(/* webpackPrefetch: true */ "../components/Footer")
+);
 
 const Home = () => {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
 
-  // Move useEffect after useState to follow rules of hooks
+  // Use a ref for the main heading to potentially implement LCP optimization
+  const mainHeadingRef = React.useRef(null);
+
   useEffect(() => {
     const stored = localStorage.getItem("messageIntended");
     if (stored) setMessage(stored);
+    
+    // Implement a simple LCP optimization by ensuring the heading is prioritized
+    if (mainHeadingRef.current) {
+      // Force browser to prioritize this element
+      mainHeadingRef.current.style.contentVisibility = "auto";
+    }
   }, []);
 
   const handleSendMessage = (msg) => {
@@ -181,8 +194,11 @@ const Home = () => {
               🐶 AI-Powered Pet Care Assistant
             </div>
 
-            {/* Optimized heading for LCP */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+            {/* Optimized heading for LCP with ref for potential optimizations */}
+            <h1 
+              ref={mainHeadingRef}
+              className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6"
+            >
               SnoutIQ - Your AI Pet Companion for{" "}
               <span className="text-blue-600">Smart Pet Care</span>
             </h1>

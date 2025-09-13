@@ -3,20 +3,26 @@
   <head>
     <meta charset="UTF-8" />
 
+    <!-- ✅ Preconnect to external domains for faster loading -->
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+
     <!-- ✅ Google Tag Manager (delayed load for performance) -->
     <script>
-      window.addEventListener("load", function () {
-        (function (w, d, s, l, i) {
-          w[l] = w[l] || [];
-          w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
-          var f = d.getElementsByTagName(s)[0],
-            j = d.createElement(s),
-            dl = l != "dataLayer" ? "&l=" + l : "";
-          j.async = true;
-          j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
-          f.parentNode.insertBefore(j, f);
-        })(window, document, "script", "dataLayer", "GTM-5D756BMW");
-      });
+      // Load GTM after a slight delay to prioritize content rendering
+      setTimeout(function () {
+        window.addEventListener("load", function () {
+          (function (w, d, s, l, i) {
+            w[l] = w[l] || [];
+            w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
+            var f = d.getElementsByTagName(s)[0],
+              j = d.createElement(s),
+              dl = l != "dataLayer" ? "&l=" + l : "";
+            j.async = true;
+            j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+            f.parentNode.insertBefore(j, f);
+          })(window, document, "script", "dataLayer", "GTM-5D756BMW");
+        });
+      }, 500);
     </script>
     <!-- End Google Tag Manager -->
 
@@ -32,7 +38,10 @@
     <meta name="robots" content="index, follow" />
 
     <title>SnoutIQ - Your AI Pet Companion for Smart Pet Care</title>
-    <meta name="title" content="Snoutiq – 24/7 AI Pet Care & Health Assistant" />
+    <meta
+      name="title"
+      content="Snoutiq – 24/7 AI Pet Care & Health Assistant"
+    />
     <meta
       name="description"
       content="Snoutiq is a free AI pet care website offering 24/7 support, health checks, instant answers, vet video consultations, and nearby clinic search for your pet."
@@ -43,6 +52,43 @@
 
     <!-- ✅ Sitemap -->
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+    <!-- ✅ Critical CSS Inline - Extract from your main CSS file -->
+    <style>
+      /* Critical CSS for above-the-fold content */
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+          sans-serif;
+      }
+      #root {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* Add minimal styles needed for your header/hero section */
+    </style>
+
+    <!-- ✅ Defer non-critical CSS -->
+    <link
+      rel="preload"
+      href="/assets/index.css"
+      as="style"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript><link rel="stylesheet" href="/assets/index.css" /></noscript>
 
     <!-- ✅ Fonts (self-hosted, fast) -->
     <link
@@ -101,12 +147,39 @@
         src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
         height="0"
         width="0"
-        style="display:none;visibility:hidden"
+        style="display: none; visibility: hidden"
       ></iframe>
     </noscript>
     <!-- End Google Tag Manager (noscript) -->
 
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- ✅ Load scripts with defer attribute -->
+    <script type="module" src="/src/main.jsx" defer></script>
+
+    <!-- ✅ Performance monitoring -->
+    <script>
+      // Monitor LCP
+      const lcpObserver = new PerformanceObserver((entryList) => {
+        const entries = entryList.getEntries();
+        const lastEntry = entries[entries.length - 1];
+        console.log("LCP candidate:", lastEntry.startTime, lastEntry);
+      });
+      lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+
+      // Monitor CLS
+      let clsValue = 0;
+      let clsEntries = [];
+
+      new PerformanceObserver((entryList) => {
+        for (const entry of entryList.getEntries()) {
+          if (!entry.hadRecentInput) {
+            clsEntries.push(entry);
+            clsValue += entry.value;
+            console.log("Current CLS value:", clsValue, entry);
+          }
+        }
+      }).observe({ type: "layout-shift", buffered: true });
+    </script>
   </body>
 </html>

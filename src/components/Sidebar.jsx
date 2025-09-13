@@ -6,14 +6,15 @@ import { AuthContext } from '../auth/AuthContext'
 import { useNavigate, useParams } from "react-router-dom";
 
 // Pet Images
-import PowBrosPic from "../assets/pets/Paw Bros, 2 Years, New Delhi.jpg";
-import BabyLokiPine from "../assets/pets/Baby Loki, 20 days, Pune.jpg";
-import TigerPic from "../assets/pets/I am Tiger, 1 year, Haryana.jpg";
-import Kitty from "../assets/pets/Kitty, 2 months, Delhi.jpg";
-import LuckyPic from "../assets/pets/Lucy, 7 years, Pune.jpg";
-import NotTwins from "../assets/pets/Not Twins, 2 years, New Delhi,.jpg";
-import OliverPic from "../assets/pets/Oliver, 40 days, Faridabad.jpg";
-import ShadowPic from "../assets/pets/Shadow, 1 Year, Mahabaleshwar.jpg";
+import PowBrosPic from "../assets/pets/Paw Bros, 2 Years, New Delhi.webp";
+import BabyLokiPine from "../assets/pets/Baby Loki, 20 days, Pune.webp";
+import TigerPic from "../assets/pets/I am Tiger, 1 year, Haryana.webp";
+import Kitty from "../assets/pets/Kitty, 2 months, Delhi.webp";
+
+import LuckyPic from "../assets/pets/Lucy, 7 years, Pune.webp";
+import NotTwins from "../assets/pets/Not Twins, 2 years, New Delhi,.webp";
+import OliverPic from "../assets/pets/Oliver, 40 days, Faridabad.webp";
+import ShadowPic from "../assets/pets/Shadow, 1 Year, Mahabaleshwar.webp";
 
 const Sidebar = () => {
   const [history, setHistory] = useState([]);
