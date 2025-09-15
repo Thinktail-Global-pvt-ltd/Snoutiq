@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, lazy } from "react";
 import axios from "../axios";
 import toast from "react-hot-toast";
 const PlusCircleIcon = lazy(() => import("@heroicons/react/24/outline/PlusCircleIcon"));
