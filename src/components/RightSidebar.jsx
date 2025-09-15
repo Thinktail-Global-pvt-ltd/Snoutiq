@@ -1,7 +1,6 @@
 import React, { lazy, useEffect, useState } from "react";
 import axiosClient from "../axios";
 import VetList from "./VetList";
-import GroomerList from "./GroomerList";
 const GroomerList = lazy(()=> import('./GroomerList'))
 import playstore from '../assets/images/googlePlay.webp'
 
