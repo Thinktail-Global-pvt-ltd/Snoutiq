@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
 
     <!-- ✅ Preconnect for faster external requests -->
-    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <!-- <link rel="preconnect" href="https://www.googletagmanager.com" /> -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
@@ -86,14 +86,14 @@
 
   <body>
     <!-- ✅ GTM noscript -->
-    <noscript>
+    <!-- <noscript>
       <iframe
         src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
         height="0"
         width="0"
         style="display:none;visibility:hidden"
       ></iframe>
-    </noscript>
+    </noscript> -->
 
     <div id="root"></div>
 
@@ -101,7 +101,7 @@
     <script type="module" src="/src/main.jsx" defer></script>
 
     <!-- ✅ Lazy load GTM (after 3-4s) -->
-    <script>
+    <!-- <script>
       window.addEventListener("load", function () {
         setTimeout(function () {
           (function (w, d, s, l, i) {
@@ -117,7 +117,7 @@
           })(window, document, "script", "dataLayer", "GTM-5D756BMW");
         }, 3000);
       });
-    </script>
+    </script> -->
 
     <!-- ✅ Performance Monitoring (only sample users) -->
     <script>
