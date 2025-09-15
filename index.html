@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,17 +6,15 @@
   <title>SnoutIQ - Your AI Pet Companion</title>
   <meta name="description" content="AI pet care with 24/7 support, vet video consultations, and health checks.">
 
-  <!-- Preconnect & preload fonts -->
+  <!-- Fonts from Google CDN -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 
-
-    <link rel="icon" href="/favicon.webp" sizes="32x32" type="image/webp" />
-    <link rel="icon" sizes="192x192" href="/favicon-192.webp" />
-    <link rel="icon" sizes="512x512" href="/favicon-512.webp" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.webp" />
+  <link rel="icon" href="/favicon.webp" sizes="32x32" type="image/webp" />
+  <link rel="icon" sizes="192x192" href="/favicon-192.webp" />
+  <link rel="icon" sizes="512x512" href="/favicon-512.webp" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.webp" />
 
   <!-- Critical CSS -->
   <style>
@@ -28,11 +25,6 @@
   <!-- Deferred main CSS -->
   <link rel="preload" href="/assets/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="/assets/index.css"></noscript>
-
-  <!-- Lazy load GTM -->
-  <script>
-    window.addEventListener("load", ()=>{setTimeout(()=>{(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5D756BMW');},3000);});
-  </script>
 </head>
 
 <body>
@@ -47,6 +39,24 @@
   </noscript>
 
   <div id="root"></div>
-  <script type="module" src="/src/main.jsx" defer></script>
+  <script type="module" src="/src/main.jsx"></script>
+  
+  <!-- Move GTM script here -->
+  <script>
+    window.addEventListener("load", ()=>{
+      setTimeout(()=>{
+        (function(w,d,s,l,i){
+          w[l]=w[l]||[];
+          w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});
+          var f=d.getElementsByTagName(s)[0],
+              j=d.createElement(s),
+              dl=l!='dataLayer'?'&l='+l:'';
+          j.async=true;
+          j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
+          f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','GTM-5D756BMW');
+      },3000);
+    });
+  </script>
 </body>
 </html>
