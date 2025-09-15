@@ -15,7 +15,6 @@
     "@react-google-maps/api": "^2.20.7",
     "@react-oauth/google": "^0.12.2",
     "agora-react-uikit": "^1.2.0",
-    "agora-rn-uikit": "^5.0.2",
     "axios": "^1.11.0",
     "chart.js": "^4.5.0",
     "heroicons": "^2.2.0",
