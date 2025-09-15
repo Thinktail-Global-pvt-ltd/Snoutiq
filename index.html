@@ -1,108 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-        <script>
-      window.addEventListener("load", function () {
-        setTimeout(function () {
-          (function (w, d, s, l, i) {
-            w[l] = w[l] || [];
-            w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
-            var f = d.getElementsByTagName(s)[0],
-              j = d.createElement(s),
-              dl = l != "dataLayer" ? "&l=" + l : "";
-            j.async = true;
-            j.src =
-              "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
-            f.parentNode.insertBefore(j, f);
-          })(window, document, "script", "dataLayer", "GTM-5D756BMW");
-        }, 3000);
-      });
-    </script>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SnoutIQ - Your AI Pet Companion</title>
+  <meta name="description" content="AI pet care with 24/7 support, vet video consultations, and health checks.">
 
-    <!-- ✅ Preconnect for faster external requests -->
+  <!-- Preconnect & preload fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- Critical CSS -->
+  <style>
+    body { margin:0; font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+    #root { min-height:100vh; display:flex; flex-direction:column;}
+  </style>
 
-    <!-- ✅ Preload critical CSS & JS -->
-    <link rel="preload" href="/assets/index-DwCyAPPt.js" as="script" />
-    <link rel="preload" href="/assets/index-D1wt8b9t.css" as="style" />
+  <!-- Deferred main CSS -->
+  <link rel="preload" href="/assets/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/assets/index.css"></noscript>
 
-    <!-- ✅ Favicons -->
-    <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
-    <link rel="icon" sizes="192x192" href="/favicon-192.png" />
-    <link rel="icon" sizes="512x512" href="/favicon-512.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
+  <!-- Lazy load GTM -->
+  <script>
+    window.addEventListener("load", ()=>{setTimeout(()=>{(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5D756BMW');},3000);});
+  </script>
+</head>
 
-    <!-- ✅ SEO -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="robots" content="index, follow" />
-    <title>SnoutIQ - Your AI Pet Companion</title>
-    <meta
-      name="description"
-      content="AI pet care with 24/7 support, vet video consultations, and health checks."
-    />
-    <link rel="canonical" href="https://snoutiq.com/" />
-    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
-
-    <!-- ✅ Critical CSS Inline -->
-    <style>
-      body {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-          sans-serif;
-      }
-      #root {
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-      }
-    </style>
-
-    <!-- ✅ Defer non-critical CSS -->
-    <link
-      rel="preload"
-      href="/assets/index.css"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript><link rel="stylesheet" href="/assets/index.css" /></noscript>
-
-    <!-- ✅ Fonts preload -->
-    <link
-      rel="preload"
-      href="/fonts/inter-400.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin="anonymous"
-    />
-    <link
-      rel="preload"
-      href="/fonts/inter-700.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin="anonymous"
-    />
-
-    <!-- ✅ Structured Data -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": "Snoutiq",
-        "url": "https://snoutiq.com",
-        "logo": "https://snoutiq.com/favicon-512.png",
-        "sameAs": [
-          "https://www.facebook.com/snoutiq",
-          "https://twitter.com/snoutiq"
-        ]
-      }
-    </script>
-  </head>
 
   <body>
-    <!-- ✅ GTM noscript -->
+    <!-- ✅ GTM noscript fallback -->
     <noscript>
       <iframe
         src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
@@ -116,32 +44,5 @@
 
     <!-- ✅ Main React JS (deferred) -->
     <script type="module" src="/src/main.jsx" defer></script>
-
-    <!-- ✅ Lazy load GTM (after 3-4s) -->
-
-
-    <!-- ✅ Performance Monitoring (only sample users) -->
-    <script>
-      if (Math.random() < 0.1) {
-        const lcpObserver = new PerformanceObserver((entryList) => {
-          const last = entryList.getEntries().pop();
-          if (last) console.log("LCP candidate:", last.startTime, last);
-        });
-        lcpObserver.observe({
-          type: "largest-contentful-paint",
-          buffered: true,
-        });
-
-        let clsValue = 0;
-        new PerformanceObserver((entryList) => {
-          for (const entry of entryList.getEntries()) {
-            if (!entry.hadRecentInput) {
-              clsValue += entry.value;
-              console.log("CLS update:", clsValue, entry);
-            }
-          }
-        }).observe({ type: "layout-shift", buffered: true });
-      }
-    </script>
   </body>
 </html>

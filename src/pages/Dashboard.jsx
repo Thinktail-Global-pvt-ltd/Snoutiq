@@ -10,7 +10,7 @@ import ChatInput from "../components/ChatInput";
 import RightSidebar from "../components/RightSidebar";
 import axios from "../axios";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate ,Navigate} from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import { AuthContext } from "../auth/AuthContext";
 import Navbar from "../components/Navbar";
@@ -39,6 +39,14 @@ const Dashboard = () => {
   // Get chat_room_token from URL params
   const { chat_room_token } = useParams();
   const currentChatRoomToken = chat_room_token || chatRoomToken;
+
+    if (user) {
+    if (user.role === "vet") {
+      return <Navigate to="/user-dashboard/bookings" replace />;
+    } else {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
 
   const genId = () => Date.now() + Math.random();
 

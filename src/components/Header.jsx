@@ -14,7 +14,6 @@ import HeartIcon from "@heroicons/react/24/outline/HeartIcon";
 const Sidebar = lazy(() => import("./Sidebar"));
 const RightSidebar = lazy(() => import("./RightSidebar"));
 import logo from "../assets/images/logo.webp";
-import axiosClient from "../axios";
 import { AuthContext } from "../auth/AuthContext";
 
 const Header = () => {
@@ -198,6 +197,7 @@ const Header = () => {
               alt="SnoutIQ Logo"
               width={120}
               height={40}
+              loading="lazy"
               className="h-8 cursor-pointer transition-transform hover:scale-105"
               onClick={() => navigate(user ? "/dashboard" : "/")}
             />
