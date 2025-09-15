@@ -8,7 +8,7 @@ import {
   Autocomplete,
   useLoadScript,
 } from "@react-google-maps/api";
-import logo from "../assets/images/logo.png";
+import logo from "../assets/images/logo.webp";
 import Header from "../components/Header";
 
 const LIBRARIES = ["places"];

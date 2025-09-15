@@ -22,7 +22,7 @@ import {
 import Sidebar from "./Sidebar";
 import RightSidebar from "./RightSidebar";
 import OfferIcon from "../assets/images/offericon.png";
-import logo from "../assets/images/logo.png";
+import logo from "../assets/images/logo.webp";
 import { AuthContext } from "../auth/AuthContext";
 
 const Navbar = () => {

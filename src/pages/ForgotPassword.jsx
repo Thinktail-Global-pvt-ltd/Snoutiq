@@ -3,7 +3,7 @@ import { toast } from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from '../axios';
 import Card from '../components/Card';
-import logo from '../assets/images/logo.png';
+import logo from '../assets/images/logo.webp';
 
 const Login = ({ checkIfLoggedIn }) => {
   const [formData, setFormData] = useState({

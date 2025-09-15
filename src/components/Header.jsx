@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, Fragment } from "react";
+import React, { useState, useEffect, useContext, Fragment, lazy } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, Transition } from "@headlessui/react";
 
@@ -11,9 +11,9 @@ import ArrowRightOnRectangleIcon from "@heroicons/react/24/outline/ArrowRightOnR
 import HomeIcon from "@heroicons/react/24/outline/HomeIcon";
 import HeartIcon from "@heroicons/react/24/outline/HeartIcon";
 
-import Sidebar from "./Sidebar";
-import RightSidebar from "./RightSidebar";
-import logo from "../assets/images/logo.png";
+const Sidebar = lazy(() => import("./Sidebar"));
+const RightSidebar = lazy(() => import("./RightSidebar"));
+import logo from "../assets/images/logo.webp";
 import axiosClient from "../axios";
 import { AuthContext } from "../auth/AuthContext";
 
@@ -28,15 +28,14 @@ const Header = () => {
 
   const [isUserLoaded, setIsUserLoaded] = useState(false);
 
-useEffect(() => {
-  // Simulate checking localStorage or API call
-  const storedUser = JSON.parse(localStorage.getItem("user"));
-  if (storedUser) {
-    setUser(storedUser);
-  }
-  setIsUserLoaded(true); // Now we know if user exists
-}, []);
-
+  useEffect(() => {
+    // Simulate checking localStorage or API call
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+    if (storedUser) {
+      setUser(storedUser);
+    }
+    setIsUserLoaded(true); // Now we know if user exists
+  }, []);
 
   // ✅ Better logout (no full reload)
   const handleLogout = () => {
@@ -65,7 +64,11 @@ useEffect(() => {
     <>
       {/* Left Drawer */}
       <Transition.Root show={isLeftDrawerOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={setIsLeftDrawerOpen}>
+        <Dialog
+          as="div"
+          className="relative z-50"
+          onClose={setIsLeftDrawerOpen}
+        >
           <Transition.Child
             as={Fragment}
             enter="ease-in-out duration-300"
@@ -106,7 +109,10 @@ useEffect(() => {
                         </button>
                       </div>
                       <div className="flex-1 overflow-y-auto px-4 py-4">
-                        <Sidebar isMobile={true} onItemClick={() => setIsLeftDrawerOpen(false)} />
+                        <Sidebar
+                          isMobile={true}
+                          onItemClick={() => setIsLeftDrawerOpen(false)}
+                        />
                       </div>
                     </div>
                   </Dialog.Panel>
@@ -119,7 +125,11 @@ useEffect(() => {
 
       {/* Right Drawer */}
       <Transition.Root show={isRightDrawerOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={setIsRightDrawerOpen}>
+        <Dialog
+          as="div"
+          className="relative z-50"
+          onClose={setIsRightDrawerOpen}
+        >
           <Transition.Child
             as={Fragment}
             enter="ease-in-out duration-300"
@@ -160,7 +170,10 @@ useEffect(() => {
                         </button>
                       </div>
                       <div className="flex-1 overflow-y-auto">
-                        <RightSidebar isMobile={true} onItemClick={() => setIsRightDrawerOpen(false)} />
+                        <RightSidebar
+                          isMobile={true}
+                          onItemClick={() => setIsRightDrawerOpen(false)}
+                        />
                       </div>
                     </div>
                   </Dialog.Panel>
@@ -230,7 +243,12 @@ useEffect(() => {
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
                   </svg>
                 </div>
 
@@ -267,14 +285,17 @@ useEffect(() => {
         {/* Mobile Navbar */}
         <div className="md:hidden">
           <div className="flex items-center justify-between px-4 py-3 h-[60px]">
-            <button
-              aria-label="Open menu"
-              onClick={() => setIsLeftDrawerOpen(true)}
-              className="p-2 rounded-lg bg-gray-100 hover:bg-indigo-50 transition-colors"
-            >
-              <Bars3Icon className="w-6 h-6 text-gray-700" />
-            </button>
-
+            {isUserLoaded && user && (
+              <Suspense fallback={<div>Loading menu...</div>}>
+                <button
+                  aria-label="Open menu"
+                  onClick={() => setIsLeftDrawerOpen(true)}
+                  className="p-2 rounded-lg bg-gray-100 hover:bg-indigo-50 transition-colors"
+                >
+                  <Bars3Icon className="w-6 h-6 text-gray-700" />
+                </button>
+              </Suspense>
+            )}
             <img
               src={logo}
               alt="SnoutIQ Logo"
@@ -344,10 +365,11 @@ useEffect(() => {
       </nav>
 
       {/* Mobile Drawers */}
-      {/* <MobileDrawers /> */}
-      {/* Mobile Drawers */}
-{isUserLoaded && user && <MobileDrawers />}
-
+      {isUserLoaded && user && (
+        <Suspense fallback={<div>Loading menu...</div>}>
+          <MobileDrawers />
+        </Suspense>
+      )}
     </>
   );
 };

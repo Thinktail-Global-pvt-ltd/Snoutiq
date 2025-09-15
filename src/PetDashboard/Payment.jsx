@@ -47,7 +47,7 @@ const PaymentPage = () => {
         order_id: orderRes.data.id,
         name: "Snoutiq Veterinary Consultation",
         description: "Video consultation with certified veterinarian",
-        image: "https://snoutiq.com/logo.png",
+        image: "https://snoutiq.com/logo.webp",
         theme: {
           color: "#4F46E5"
         },

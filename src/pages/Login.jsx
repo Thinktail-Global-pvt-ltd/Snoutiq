@@ -3,7 +3,7 @@ import { toast } from "react-hot-toast";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import axios from "../axios";
 import Card from "../components/Card";
-import logo from "../assets/images/logo.png";
+import logo from "../assets/images/logo.webp";
 import { AuthContext } from "../auth/AuthContext";
 import Header from "../components/Header";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";

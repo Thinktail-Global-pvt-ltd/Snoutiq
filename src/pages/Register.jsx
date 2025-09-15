@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { toast } from "react-hot-toast";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import Card from "../components/Card";
-import logo from "../assets/images/logo.png";
+import logo from "../assets/images/logo.webp";
 import axios from "../axios";
 import { AuthContext } from "../auth/AuthContext";
 import Header from "../components/Header";

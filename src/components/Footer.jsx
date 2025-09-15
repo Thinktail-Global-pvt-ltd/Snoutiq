@@ -152,7 +152,7 @@
 // import { FaSquareXTwitter } from "react-icons/fa6";
 // import { FaLocationDot } from "react-icons/fa6";
 // import { Link } from "react-router-dom";
-// import logo from '../assets/images/logo.png';
+// import logo from '../assets/images/logo.webp';
 
 // export default function Footer() {
 //   return (
@@ -342,7 +342,7 @@ import {
 } from "react-icons/fa";
 import { FaSquareXTwitter, FaLocationDot } from "react-icons/fa6";
 import { Link } from "react-router-dom";
-import logo from "../assets/images/logo.png";
+import logo from "../assets/images/logo.webp";
 
 export default function Footer() {
   return (

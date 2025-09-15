@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import logo from "../assets/images/logo.png";
+import logo from "../assets/images/logo.webp";
 import { useNavigate } from "react-router-dom";
 
 const AdminLogin = () => {
