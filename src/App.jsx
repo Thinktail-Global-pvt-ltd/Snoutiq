@@ -1,6 +1,5 @@
 import React, { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import GTMRouteListener from "./GTMRouteListener";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./ProtectedRoute";
 import { FaPaw } from "react-icons/fa";
@@ -60,7 +59,6 @@ const CallPage = lazy(() => import("./CallPage"));
 function App() {
   return (
     <Router>
-      <GTMRouteListener />
       <Toaster position="bottom-right" reverseOrder={false} />
 
       <div className="bg-white text-black">
