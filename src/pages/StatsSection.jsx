@@ -1,3 +1,5 @@
+import React from "react";
+
 const StatsSection = () => {
   const stats = [
     { value: "10K+", label: "Happy Pets" },
@@ -14,10 +16,10 @@ const StatsSection = () => {
       {stats.map((stat, i) => (
         <div
           key={i}
-          className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[80px]"
-          style={{ minHeight: "160px" }}
+          className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[80px] items-center"
+          style={{ minHeight: "208px" }} // matches skeleton height
         >
-          <div className="text-3xl font-bold text-blue-600 mb-2 h-8 flex items-center justify-center">
+          <div className="text-3xl font-bold text-blue-600 mb-2 h-8 flex items-center justify-center font-mono tabular-nums w-[72px]">
             {stat.value}
           </div>
           <div className="text-gray-600 h-6 flex items-center justify-center">

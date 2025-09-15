@@ -90,22 +90,25 @@ const Home = () => {
             </div>
           </section>
 
-          <Suspense
-            fallback={
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20">
-                {Array(4)
-                  .fill(0)
-                  .map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-40 bg-gray-100 rounded-xl animate-pulse"
-                    />
-                  ))}
-              </div>
-            }
-          >
-            <StatsSection />
-          </Suspense>
+          {/* Stats */}
+          <div id="stats-anchor">
+            <Suspense
+              fallback={
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20">
+                  {Array(4)
+                    .fill(0)
+                    .map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-[208px] bg-gray-100 rounded-xl animate-pulse"
+                      />
+                    ))}
+                </div>
+              }
+            >
+              <StatsSection />
+            </Suspense>
+          </div>
 
           {/* Features */}
           <section className="w-full mb-20">

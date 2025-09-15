@@ -2,33 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Only keep needed weights */
 @font-face {
   font-family: 'Inter';
   font-style: normal;
   font-weight: 400;
-  font-display: optional; /* Change from swap to optional */
+  font-display: optional; /* prevents CLS */
   src: url('/fonts/inter-400.woff2') format('woff2');
 }
+
 @font-face {
   font-family: 'Inter';
   font-style: normal;
   font-weight: 700;
-  font-display: optional; /* Change from swap to optional */
+  font-display: optional; /* prevents CLS */
   src: url('/fonts/inter-700.woff2') format('woff2');
 }
 
+/* Tailwind layer overrides */
 @layer base {
-  h1 { @apply font-inter font-bold text-4xl text-gray-900; }
-  h2 { @apply font-inter font-semibold text-2xl text-gray-800; }
-  p  { @apply font-inter text-base text-gray-700; }
-}
-
-h1 {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-}
-/* tailwind.css or global.css */
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/inter.woff2') format('woff2');
-  font-display: swap;
+  h1 {
+    @apply font-bold text-4xl text-gray-900;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+  h2 {
+    @apply font-semibold text-2xl text-gray-800;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+  p {
+    @apply text-base text-gray-700;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
 }
