@@ -1,18 +1,30 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
   build: {
-    target: 'esnext', // ✅ सिर्फ modern JS compile होगा
-    modulePreload: { polyfill: false },
+    target: 'esnext',
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ['react', 'react-dom'],
-          vendor: ['react-router-dom']
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor'; // node_modules ek hi chunk me
+          }
+          // pages folder ke components ko alag chunks me
+          if (id.includes('pages/Home')) {
+            return 'home';
+          }
+          if (id.includes('pages/Login')) {
+            return 'login';
+          }
         }
       }
     }
   }
-})
+});
