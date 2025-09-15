@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import axiosClient from "../axios";
 import VetList from "./VetList";
 import GroomerList from "./GroomerList";
-import playstore from '../assets/images/googlePlay.png'
+import playstore from '../assets/images/googlePlay.webp'
 
 export default function RightSidebar({ isMobile = false, onItemClick }) {
   const [location, setLocation] = useState(null);

@@ -4,10 +4,10 @@ import { Fragment } from 'react';
 import { Bars3Icon, XMarkIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import Sidebar from './Sidebar';
 import RightSidebar from './RightSidebar';
-import OfferIcon from '../assets/images/offericon.png';
-import VetIcon from '../assets/images/veticon.png';
-import groomericon from '../assets/images/groomericon.png';
-import newchaticon from '../assets/images/newchaticon.png';
+import OfferIcon from '../assets/images/offericon.webp';
+import VetIcon from '../assets/images/veticon.webp';
+import groomericon from '../assets/images/groomericon.webp';
+import newchaticon from '../assets/images/newchaticon.webp';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../auth/AuthContext';
 

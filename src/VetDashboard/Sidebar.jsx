@@ -17,7 +17,7 @@ import {
   HiOutlineStar,
   HiOutlineUserGroup,
 } from "react-icons/hi";
-import logo from "../assets/images/dark bg.png";
+import logo from "../assets/images/dark bg.webp";
 import { AuthContext } from "../auth/AuthContext";
 import axios from "axios";
 import RingtonePopup from "../pages/RingtonePopup";
