@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
-import StatsSection from "./StatsSection"; // directly import, no lazy
-import ChatInput from "../components/ChatInput";
-import Footer from "../components/Footer";
+import StatsSection from "./StatsSection";
+
+const ChatInput = lazy(() => import("../components/ChatInput"));
+const Footer = lazy(() => import("../components/Footer"));
 
 const Home = () => {
   const navigate = useNavigate();
@@ -58,12 +59,11 @@ const Home = () => {
             </div>
             <h1
               ref={mainHeadingRef}
-              className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight min-h-[3.5rem] sm:min-h-[4rem] md:min-h-[5rem]"
+              className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6"
             >
               SnoutIQ - Your AI Pet Companion for{" "}
               <span className="text-blue-600">Smart Pet Care</span>
             </h1>
-
             <p className="text-lg sm:text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
               Intelligent pet care guidance, health advice, and training tips
               powered by advanced AI technology
@@ -72,16 +72,26 @@ const Home = () => {
             {/* Chat Input */}
             <div className="max-w-xl mx-auto mb-16">
               <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
-                <ChatInput onSendMessage={handleSendMessage} />
+                <Suspense
+                  fallback={
+                    <div className="p-4 text-gray-400">Loading chat...</div>
+                  }
+                >
+                  <ChatInput onSendMessage={handleSendMessage} />
+                </Suspense>
               </div>
               <p className="text-sm text-gray-500 mt-3">
                 Ask anything about your pet's health, behavior, or training
               </p>
             </div>
           </section>
-
-          {/* Stats */}
-          <StatsSection />
+            <Suspense
+                  fallback={
+                    <div className="p-4 text-gray-400">Loading chat...</div>
+                  }
+                >
+                  <StatsSection/>
+                </Suspense>
 
           {/* Features */}
           <section className="w-full mb-20">
@@ -127,7 +137,9 @@ const Home = () => {
           </section>
         </div>
 
-        <Footer />
+        <Suspense fallback={null}>
+          <Footer />
+        </Suspense>
       </main>
     </>
   );
