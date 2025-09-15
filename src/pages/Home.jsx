@@ -85,13 +85,6 @@ const Home = () => {
               </p>
             </div>
           </section>
-            <Suspense
-                  fallback={
-                    <div className="p-4 text-gray-400">Loading chat...</div>
-                  }
-                >
-                  <StatsSection/>
-                </Suspense>
 
           {/* Features */}
           <section className="w-full mb-20">
