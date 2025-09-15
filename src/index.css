@@ -2,22 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Only keep needed weights */
 @font-face {
   font-family: 'Inter';
-  font-style: normal;
-  font-weight: 400;
-  font-display: optional; /* prevents CLS */
   src: url('/fonts/inter-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-700.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
 }
 
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 700;
-  font-display: optional; /* prevents CLS */
-  src: url('/fonts/inter-700.woff2') format('woff2');
-}
 
 /* Tailwind layer overrides */
 @layer base {

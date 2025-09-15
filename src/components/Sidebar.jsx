@@ -1,7 +1,9 @@
 import { useEffect, useState, useContext } from "react";
 import axios from "../axios";
 import toast from "react-hot-toast";
-import { PlusCircleIcon, TrashIcon } from "@heroicons/react/24/outline";
+const PlusCircleIcon = lazy(() => import("@heroicons/react/24/outline/PlusCircleIcon"));
+const TrashIcon = lazy(() => import("@heroicons/react/24/outline/TrashIcon"));
+
 import { AuthContext } from "../auth/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 

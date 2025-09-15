@@ -57,7 +57,6 @@ const PetWeightMonitoring = lazy(() =>
 const PetMedicationTracker = lazy(() =>
   import("./PetDashboard/PetMedicationTracker")
 );
-const AdminLogin = lazy(() => import("./admin/AdminLogin"));
 const CallPage = lazy(() => import("./CallPage"));
 function App() {
   return (
@@ -340,11 +339,6 @@ function App() {
               }
             />
             <Route path="/call" element={<CallPage />} />
-            <Route path="/super/admin" element={<AdminLogin />} />
-            <Route
-              path="/super/admin/admin-slider/*"
-              element={<AdminLogin />}
-            />
           </Routes>
         </Suspense>
       </div>

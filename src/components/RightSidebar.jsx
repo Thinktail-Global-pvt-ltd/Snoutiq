@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { lazy, useEffect, useState } from "react";
 import axiosClient from "../axios";
 import VetList from "./VetList";
 import GroomerList from "./GroomerList";
+const GroomerList = lazy(()=> import('./GroomerList'))
 import playstore from '../assets/images/googlePlay.webp'
 
 export default function RightSidebar({ isMobile = false, onItemClick }) {
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
   const [data, setData] = useState({ vets: [], groomers: [] });
-  const [activeTab, setActiveTab] = useState('vets'); // 'vets' or 'groomers'
+  const [activeTab, setActiveTab] = useState('vets');
 
   const handleItemClick = () => {
     if (isMobile && onItemClick) {
@@ -171,6 +172,7 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
         >
           <img
             src={playstore}
+            loading="lazy"
             alt="Get it on Google Play"
             // className="h-8 mx-auto"
           />
