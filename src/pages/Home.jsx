@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
-
+const StatsSection = lazy(() => import("./StatsSection"));
 const ChatInput = lazy(() => import("../components/ChatInput"));
 const Footer = lazy(() => import("../components/Footer"));
 
@@ -90,30 +90,22 @@ const Home = () => {
             </div>
           </section>
 
-          <section
-            className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"
-            style={{ minHeight: "200px" }}
-          >
-            {[
-              { value: "10K+", label: "Happy Pets" },
-              { value: "24/7", label: "Support" },
-              { value: "98%", label: "Accuracy" },
-              { value: "500+", label: "Pet Experts" },
-            ].map((stat, i) => (
-              <div
-                key={i}
-                className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[80px]"
-                style={{ minHeight: "160px" }}
-              >
-                <div className="text-3xl font-bold text-blue-600 mb-2 h-8 flex items-center justify-center">
-                  {stat.value}
-                </div>
-                <div className="text-gray-600 h-6 flex items-center justify-center">
-                  {stat.label}
-                </div>
+          <Suspense
+            fallback={
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20">
+                {Array(4)
+                  .fill(0)
+                  .map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-40 bg-gray-100 rounded-xl animate-pulse"
+                    />
+                  ))}
               </div>
-            ))}
-          </section>
+            }
+          >
+            <StatsSection />
+          </Suspense>
 
           {/* Features */}
           <section className="w-full mb-20">
