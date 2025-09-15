@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
-import StatsSection from "./StatsSection";
 
 const ChatInput = lazy(() => import("../components/ChatInput"));
 const Footer = lazy(() => import("../components/Footer"));
@@ -25,27 +24,6 @@ const Home = () => {
       navigate("/register");
     }
   };
-
-  const features = useMemo(
-    () => [
-      {
-        icon: "✅",
-        title: "24/7 Pet Care Support",
-        description: "Instant answers anytime, anywhere",
-      },
-      {
-        icon: "👩‍⚕️",
-        title: "Personalized Pet Plans",
-        description: "Tailored advice for your pet",
-      },
-      {
-        icon: "🐾",
-        title: "Behavior Training Tips",
-        description: "Train and bond with your pet",
-      },
-    ],
-    []
-  );
 
   return (
     <>
@@ -83,33 +61,6 @@ const Home = () => {
               <p className="text-sm text-gray-500 mt-3">
                 Ask anything about your pet's health, behavior, or training
               </p>
-            </div>
-          </section>
-
-          {/* Features */}
-          <section className="w-full mb-20">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                Why Pet Owners Love Us
-              </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Advanced AI + veterinary expertise for the best pet care
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {features.map((f, idx) => (
-                <div
-                  key={idx}
-                  className="bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-2xl p-6 shadow-lg transform transition-all duration-300 hover:-translate-y-2"
-                >
-                  <div className="w-14 h-14 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mb-5 text-2xl">
-                    {f.icon}
-                  </div>
-                  <h3 className="text-xl font-bold mb-3">{f.title}</h3>
-                  <p className="text-blue-100 opacity-90">{f.description}</p>
-                </div>
-              ))}
             </div>
           </section>
 
