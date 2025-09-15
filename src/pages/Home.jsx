@@ -63,22 +63,6 @@ const Home = () => {
               </p>
             </div>
           </section>
-
-          {/* CTA */}
-          <section className="text-center py-12 px-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl text-white mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to Transform Your Pet's Life?
-            </h2>
-            <p className="text-lg text-blue-100 max-w-2xl mx-auto mb-8">
-              Join thousands of pet owners who trust our AI assistant
-            </p>
-            <button
-              onClick={() => navigate("/register")}
-              className="bg-white text-blue-600 font-semibold py-3 px-8 rounded-full hover:bg-gray-100 transition-colors duration-300 shadow-lg"
-            >
-              Get Started Now
-            </button>
-          </section>
         </div>
 
         <Suspense fallback={null}>
