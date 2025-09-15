@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
-const StatsSection = lazy(() => import("./StatsSection"));
-const ChatInput = lazy(() => import("../components/ChatInput"));
-const Footer = lazy(() => import("../components/Footer"));
+import StatsSection from "./StatsSection"; // directly import, no lazy
+import ChatInput from "../components/ChatInput";
+import Footer from "../components/Footer";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -72,17 +72,7 @@ const Home = () => {
             {/* Chat Input */}
             <div className="max-w-xl mx-auto mb-16">
               <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
-                <Suspense
-                  fallback={
-                    <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-200 h-20">
-                      <div className="animate-pulse text-gray-300">
-                        Loading chat…
-                      </div>
-                    </div>
-                  }
-                >
-                  <ChatInput onSendMessage={handleSendMessage} />
-                </Suspense>
+                <ChatInput onSendMessage={handleSendMessage} />
               </div>
               <p className="text-sm text-gray-500 mt-3">
                 Ask anything about your pet's health, behavior, or training
@@ -91,31 +81,7 @@ const Home = () => {
           </section>
 
           {/* Stats */}
-          <div id="stats-anchor">
-            <Suspense
-              fallback={
-                <section
-                  id="stats-anchor"
-                  className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"
-                >
-                  {Array(4)
-                    .fill(0)
-                    .map((_, i) => (
-                      <div
-                        key={i}
-                        className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[120px]"
-                        style={{ minHeight: "160px" }}
-                      >
-                        <div className="h-8 bg-gray-200 rounded w-16 mx-auto mb-2 animate-pulse" />
-                        <div className="h-6 bg-gray-200 rounded w-20 mx-auto animate-pulse" />
-                      </div>
-                    ))}
-                </section>
-              }
-            >
-              <StatsSection />
-            </Suspense>
-          </div>
+          <StatsSection />
 
           {/* Features */}
           <section className="w-full mb-20">
@@ -161,13 +127,7 @@ const Home = () => {
           </section>
         </div>
 
-        <Suspense
-          fallback={
-            <div className="h-40 bg-gray-50 border-t border-gray-200 animate-pulse" />
-          }
-        >
-          <Footer />
-        </Suspense>
+        <Footer />
       </main>
     </>
   );

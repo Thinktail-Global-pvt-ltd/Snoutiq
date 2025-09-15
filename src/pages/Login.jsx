@@ -319,7 +319,7 @@ const Login = () => {
             {userType === "pet" && (
               <div className="flex justify-center">
                 <GoogleOAuthProvider
-                  clientId="635875509179-o5uue99oues26tr2ibqtdrc42tkvpigv.apps.googleusercontent.com"
+                  clientId="325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com"
                   onScriptLoadError={() =>
                     console.error("Google OAuth script failed to load")
                   }
