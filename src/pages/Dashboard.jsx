@@ -40,13 +40,13 @@ const Dashboard = () => {
   const { chat_room_token } = useParams();
   const currentChatRoomToken = chat_room_token || chatRoomToken;
 
-    if (user) {
-    if (user.role === "vet") {
-      return <Navigate to="/user-dashboard/bookings" replace />;
-    } else {
-      return <Navigate to="/dashboard" replace />;
-    }
-  }
+  //   if (user) {
+  //   if (user.role === "vet") {
+  //     return <Navigate to="/user-dashboard/bookings" replace />;
+  //   } else {
+  //     return <Navigate to="/dashboard" replace />;
+  //   }
+  // }
 
   const genId = () => Date.now() + Math.random();
 
