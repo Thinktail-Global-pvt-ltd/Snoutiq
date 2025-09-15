@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 
+// Lazy load components with proper fallbacks
 const ChatInput = lazy(() => import("../components/ChatInput"));
 const Footer = lazy(() => import("../components/Footer"));
+const StatsSection = lazy(() => import("./StatsSection"));
 
 const Home = () => {
   const navigate = useNavigate();
@@ -24,6 +26,27 @@ const Home = () => {
       navigate("/register");
     }
   };
+
+  const features = useMemo(
+    () => [
+      {
+        icon: "✅",
+        title: "24/7 Pet Care Support",
+        description: "Instant answers anytime, anywhere",
+      },
+      {
+        icon: "👩‍⚕️",
+        title: "Personalized Pet Plans",
+        description: "Tailored advice for your pet",
+      },
+      {
+        icon: "🐾",
+        title: "Behavior Training Tips",
+        description: "Train and bond with your pet",
+      },
+    ],
+    []
+  );
 
   return (
     <>
@@ -52,7 +75,9 @@ const Home = () => {
               <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
                 <Suspense
                   fallback={
-                    <div className="p-4 text-gray-400">Loading chat...</div>
+                    <div className="p-4 text-gray-400 text-center min-h-[60px] flex items-center justify-center">
+                      Loading chat...
+                    </div>
                   }
                 >
                   <ChatInput onSendMessage={handleSendMessage} />
@@ -62,6 +87,63 @@ const Home = () => {
                 Ask anything about your pet's health, behavior, or training
               </p>
             </div>
+          </section>
+           
+          {/* Stats Section */}
+          <Suspense
+            fallback={
+              <div 
+                className="mb-20 min-h-[200px] flex items-center justify-center" 
+                aria-hidden="true"
+              >
+                <div className="text-gray-400">Loading statistics...</div>
+              </div>
+            }
+          >
+            <StatsSection />
+          </Suspense>
+
+          {/* Features */}
+          <section className="w-full mb-20">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+                Why Pet Owners Love Us
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Advanced AI + veterinary expertise for the best pet care
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {features.map((f, idx) => (
+                <div
+                  key={idx}
+                  className="bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-2xl p-6 shadow-lg transform transition-all duration-300 hover:-translate-y-2"
+                >
+                  <div className="w-14 h-14 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mb-5 text-2xl">
+                    {f.icon}
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">{f.title}</h3>
+                  <p className="text-blue-100 opacity-90">{f.description}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* CTA */}
+          <section className="text-center py-12 px-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl text-white mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">
+              Ready to Transform Your Pet's Life?
+            </h2>
+            <p className="text-lg text-blue-100 max-w-2xl mx-auto mb-8">
+              Join thousands of pet owners who trust our AI assistant
+            </p>
+            <button
+              onClick={() => navigate("/register")}
+              className="bg-white text-blue-600 font-semibold py-3 px-8 rounded-full hover:bg-gray-100 transition-colors duration-300 shadow-lg"
+            >
+              Get Started Now
+            </button>
           </section>
         </div>
 
