@@ -1,4 +1,3 @@
-/* Tailwind base layers */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -22,22 +21,11 @@
 
 /* Tailwind layer overrides */
 @layer base {
-  /* Headings & paragraphs */
   h1, h2, p {
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
-      "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     margin: 0;
   }
-
-  h1 {
-    @apply font-bold text-4xl text-gray-900;
-  }
-
-  h2 {
-    @apply font-semibold text-2xl text-gray-800;
-  }
-
-  p {
-    @apply text-base text-gray-700;
-  }
+  h1 { @apply font-bold text-4xl text-gray-900; }
+  h2 { @apply font-semibold text-2xl text-gray-800; }
+  p { @apply text-base text-gray-700; }
 }
