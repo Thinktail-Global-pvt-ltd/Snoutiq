@@ -1,4 +1,3 @@
-// StatsSection.jsx
 import React from "react";
 
 const stats = [
@@ -17,14 +16,34 @@ const StatsSection = () => {
       {stats.map((stat, i) => (
         <div
           key={i}
-          className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[140px] min-h-[160px]"
+          className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center"
+          style={{
+            // Fixed dimensions to prevent CLS
+            minWidth: '140px',
+            minHeight: '160px',
+            width: '100%',
+            aspectRatio: '1 / 1.1' // Consistent aspect ratio
+          }}
         >
-          {/* Fix CLS: fixed height box for value */}
-          <div className="text-3xl font-bold text-blue-600 mb-2 h-8 flex items-center justify-center">
+          {/* Fixed height containers to prevent text shifting */}
+          <div 
+            className="text-blue-600 font-bold mb-2 flex items-center justify-center leading-none"
+            style={{
+              height: '40px', // Fixed height for value
+              fontSize: 'clamp(1.5rem, 4vw, 2rem)', // Responsive but consistent sizing
+              lineHeight: '1'
+            }}
+          >
             {stat.value}
           </div>
-          {/* Fix CLS: fixed height box for label */}
-          <div className="text-gray-600 h-6 flex items-center justify-center">
+          <div 
+            className="text-gray-600 flex items-center justify-center text-center leading-tight"
+            style={{
+              height: '24px', // Fixed height for label
+              fontSize: '0.875rem', // 14px equivalent
+              lineHeight: '1.2'
+            }}
+          >
             {stat.label}
           </div>
         </div>
