@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    target: 'esnext', // ✅ सिर्फ modern JS compile होगा
+    target: 'esnext',
     modulePreload: { polyfill: false },
     rollupOptions: {
       output: {
@@ -14,5 +14,8 @@ export default defineConfig({
         }
       }
     }
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom']
   }
 })
