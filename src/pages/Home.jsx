@@ -58,11 +58,12 @@ const Home = () => {
             </div>
             <h1
               ref={mainHeadingRef}
-              className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6"
+              className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight min-h-[3.5rem] sm:min-h-[4rem] md:min-h-[5rem]"
             >
               SnoutIQ - Your AI Pet Companion for{" "}
               <span className="text-blue-600">Smart Pet Care</span>
             </h1>
+
             <p className="text-lg sm:text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
               Intelligent pet care guidance, health advice, and training tips
               powered by advanced AI technology
@@ -73,7 +74,11 @@ const Home = () => {
               <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
                 <Suspense
                   fallback={
-                    <div className="p-4 text-gray-400">Loading chat...</div>
+                    <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-200 h-20">
+                      <div className="animate-pulse text-gray-300">
+                        Loading chat…
+                      </div>
+                    </div>
                   }
                 >
                   <ChatInput onSendMessage={handleSendMessage} />
@@ -97,16 +102,13 @@ const Home = () => {
             ].map((stat, i) => (
               <div
                 key={i}
-                className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-100 aspect-[1/1] flex flex-col justify-center"
-                style={{ contentVisibility: "auto" }}
+                className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[80px]"
+                style={{ minHeight: "160px" }}
               >
-                <div
-                  className="text-3xl font-bold text-blue-600 mb-2"
-                  style={{ minHeight: "3rem" }}
-                >
+                <div className="text-3xl font-bold text-blue-600 mb-2 h-8 flex items-center justify-center">
                   {stat.value}
                 </div>
-                <div className="text-gray-600" style={{ minHeight: "1.5rem" }}>
+                <div className="text-gray-600 h-6 flex items-center justify-center">
                   {stat.label}
                 </div>
               </div>
@@ -157,7 +159,11 @@ const Home = () => {
           </section>
         </div>
 
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div className="h-40 bg-gray-50 border-t border-gray-200 animate-pulse" />
+          }
+        >
           <Footer />
         </Suspense>
       </main>
