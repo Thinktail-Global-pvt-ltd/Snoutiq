@@ -195,10 +195,8 @@ const Header = () => {
             <img
               src={logo}
               alt="SnoutIQ Logo"
-              width={120}
-              height={40}
               loading="lazy"
-              className="h-8 cursor-pointer transition-transform hover:scale-105"
+              className="h-5 cursor-pointer transition-transform hover:scale-105"
               onClick={() => navigate(user ? "/dashboard" : "/")}
             />
           </div>
@@ -296,15 +294,14 @@ const Header = () => {
                 </button>
               </Suspense>
             )}
+
             <img
               src={logo}
               alt="SnoutIQ Logo"
-              width={100}
-              height={30}
-              className="h-6 cursor-pointer"
+              loading="lazy"
+              className="h-5 cursor-pointer transition-transform hover:scale-105"
               onClick={() => navigate(user ? "/dashboard" : "/")}
             />
-
             <div className="flex items-center">
               {!user ? (
                 <div className="flex gap-1 flex-shrink-0">

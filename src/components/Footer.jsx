@@ -32,9 +32,7 @@ export default function Footer() {
                   src={logo}
                   alt="SnoutIQ Logo"
                   loading="lazy"
-                  width="160"
-                  height="60"
-                  className="w-40 p-3 rounded-lg"
+                  className="h-5 cursor-pointer transition-transform hover:scale-105"
                 />
               </div>
               <p className="text-gray-700 leading-relaxed mb-6 max-w-md text-sm">
