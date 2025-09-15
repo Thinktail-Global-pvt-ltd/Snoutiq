@@ -22,23 +22,9 @@ const Header = () => {
   const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState(false);
   const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalUser: 0, totalQuery: 0 });
 
   const navigate = useNavigate();
   const { user, setUser } = useContext(AuthContext);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await axiosClient.get("/ai-stats");
-        setStats(res.data);
-      } catch (error) {
-        console.error("Error:", error);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   // ✅ Better logout (no full reload)
   const handleLogout = () => {
