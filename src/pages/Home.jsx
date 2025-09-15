@@ -94,16 +94,23 @@ const Home = () => {
           <div id="stats-anchor">
             <Suspense
               fallback={
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20">
+                <section
+                  id="stats-anchor"
+                  className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"
+                >
                   {Array(4)
                     .fill(0)
                     .map((_, i) => (
                       <div
                         key={i}
-                        className="h-[208px] bg-gray-100 rounded-xl animate-pulse"
-                      />
+                        className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[120px]"
+                        style={{ minHeight: "160px" }}
+                      >
+                        <div className="h-8 bg-gray-200 rounded w-16 mx-auto mb-2 animate-pulse" />
+                        <div className="h-6 bg-gray-200 rounded w-20 mx-auto animate-pulse" />
+                      </div>
                     ))}
-                </div>
+                </section>
               }
             >
               <StatsSection />

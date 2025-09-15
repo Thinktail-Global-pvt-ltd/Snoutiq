@@ -10,16 +10,16 @@ const StatsSection = () => {
 
   return (
     <section
+      id="stats-anchor"
       className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"
-      style={{ minHeight: "200px" }}
     >
       {stats.map((stat, i) => (
         <div
           key={i}
-          className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[80px] items-center"
-          style={{ minHeight: "208px" }} // matches skeleton height
+          className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[120px]"
+          style={{ minHeight: "160px" }}
         >
-          <div className="text-3xl font-bold text-blue-600 mb-2 h-8 flex items-center justify-center font-mono tabular-nums w-[72px]">
+          <div className="text-3xl font-bold text-blue-600 mb-2 h-8 flex items-center justify-center">
             {stat.value}
           </div>
           <div className="text-gray-600 h-6 flex items-center justify-center">
