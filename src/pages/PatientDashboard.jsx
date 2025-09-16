@@ -7,7 +7,7 @@ export default function PatientDashboard() {
   const startCall = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/call/request", {
+      const res = await fetch("https://snoutiq.com/backend/api/call/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
