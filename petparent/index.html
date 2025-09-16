@@ -1,329 +1,1077 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SnoutIQ - Your AI Pet Companion for Smart Pet Care</title>
-  <meta name="description" content="AI-powered pet care assistant: instant help, health guidance, and training tips for your pets." />
-  <link rel="icon" href="https://snoutiq.com/favicon.webp" sizes="32x32" type="image/png" />
-
-  <!-- Speed: prepare connection + load FA CSS without render-blocking -->
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-  <link rel="preload"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-        as="style" crossorigin
-        onload="this.onload=null;this.rel='stylesheet'">
-  <noscript>
-    <link rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-          crossorigin>
-  </noscript>
-
-  <!-- (Optional) Preload the two icon fonts used above-the-fold -->
-  <link rel="preload" as="font" type="font/woff2" crossorigin
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2">
-  <link rel="preload" as="font" type="font/woff2" crossorigin
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-brands-400.woff2">
-
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Ubuntu,'Helvetica Neue',sans-serif}
-    body{color:#1f2937;line-height:1.6;overflow-x:hidden;background:#fff}
-    /* Header */
-    nav{background:#fff;border-bottom:1px solid #e5e7eb;position:fixed;inset:0 0 auto 0;z-index:50;box-shadow:0 1px 3px rgba(0,0,0,.05)}
-    .nav-container{display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:70px}
-    .logo{height:1.25rem;cursor:pointer;transition:.2s;font-weight:700;font-size:1.25rem;color:#2563eb}
-    .logo:hover{transform:scale(1.05)}
-    .btn-primary{background:linear-gradient(to right,#2563eb,#1d4ed8);color:#fff;padding:.75rem 1.5rem;border-radius:.75rem;font-weight:600;box-shadow:0 10px 15px -3px rgba(0,0,0,.1);transition:.3s;border:none;cursor:pointer;font-size:1rem}
-    .btn-primary:hover{box-shadow:0 20px 25px -5px rgba(0,0,0,.1);transform:translateY(-2px)}
-    .nav-actions{display:flex;gap:.5rem}
-    /* Desktop/Mobile */
-    .mobile-nav{display:none}
-    @media (max-width:768px){
-      .desktop-nav{display:none}
-      .mobile-nav{display:flex}
-      .nav-container{justify-content:space-between;align-items:center}
-      .btn-primary{padding:.5rem .75rem;font-size:.875rem}
-    }
-
-    /* Main */
-    main{min-height:100vh;background:linear-gradient(to bottom,#fff,#f0f9ff);display:flex;flex-direction:column}
-    .container{flex:1;display:flex;flex-direction:column;padding:1rem;max-width:72rem;margin:0 auto;width:100%}
-    .hero{text-align:center;padding:3rem 0}
-    @media (min-width:768px){.hero{padding:5rem 0}}
-    .badge{display:inline-flex;align-items:center;justify-content:center;margin-bottom:1rem;background:#dbeafe;color:#1e40af;border-radius:9999px;padding:.25rem 1rem;font-size:.875rem;font-weight:500}
-    h1{font-size:2.25rem;font-weight:700;color:#111827;margin-bottom:1.5rem}
-    @media (min-width:640px){h1{font-size:3rem}} @media (min-width:768px){h1{font-size:3.75rem}}
-    .highlight{color:#2563eb}
-    .subheading{font-size:1.125rem;color:#4b5563;max-width:42rem;margin:0 auto 2.5rem;line-height:1.625}
-    @media (min-width:640px){.subheading{font-size:1.25rem}} @media (min-width:768px){.subheading{font-size:1.5rem}}
-    .chat-container{max-width:36rem;margin:0 auto 4rem}
-    .chat-input-container{background:#fff;border-radius:1rem;box-shadow:0 10px 15px -3px rgba(0,0,0,.1);padding:.25rem;border:1px solid #e5e7eb}
-    .chat-input-wrapper{width:100%;max-width:42rem;margin:0 auto}
-    .chat-form{position:relative;display:flex;align-items:center}
-    .mic-icon{position:absolute;left:.75rem;color:#9ca3af;pointer-events:none}
-    @media (min-width:640px){.mic-icon{left:1rem}}
-    .chat-input{width:100%;padding:.75rem 3.5rem .75rem 2.5rem;border:1px solid #e5e7eb;border-radius:.5rem;outline:none;color:#1f2937}
-    .chat-input:focus{border-color:transparent;box-shadow:0 0 0 2px #2761E8}
-    @media (min-width:640px){.chat-input{padding:1rem 4rem 1rem 3rem}}
-    .send-btn{position:absolute;right:.5rem;width:2rem;height:2rem;background:#2761E8;color:#fff;border-radius:9999px;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:.2s}
-    .send-btn:hover{background:#1e4bd8}
-    @media (min-width:640px){.send-btn{width:2.5rem;height:2.5rem}}
-    .chat-hint{font-size:.875rem;color:#6b7280;margin-top:.75rem;text-align:center}
-
-    /* Stats */
-    .stats-section{width:100%;margin-bottom:5rem}
-    .stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem}
-    @media (min-width:768px){.stats-grid{grid-template-columns:repeat(4,1fr)}}
-    .stat-card{background:#EFF6FF;border-radius:1rem;padding:1.5rem;text-align:center}
-    .stat-number{font-size:2.25rem;font-weight:700;color:#2563eb;margin-bottom:.5rem}
-    .stat-label{font-size:.875rem;color:#6b7280}
-    @media (max-width:768px){.stat-number{font-size:1.5rem;line-height:2rem}}
-
-    /* Features */
-    .features-section{width:100%;margin-bottom:5rem}
-    .section-header{text-align:center;margin-bottom:4rem}
-    .section-title{font-size:1.875rem;font-weight:700;color:#111827;margin-bottom:1rem}
-    @media (min-width:768px){.section-title{font-size:2.25rem}}
-    .section-description{font-size:1.125rem;color:#4b5563;max-width:42rem;margin:0 auto}
-    .features-grid{display:grid;grid-template-columns:1fr;gap:2rem}
-    @media (min-width:768px){.features-grid{grid-template-columns:repeat(3,1fr)}}
-    .feature-card{background:linear-gradient(to bottom right,#2563eb,#9333ea);color:#fff;border-radius:1rem;padding:1.5rem;box-shadow:0 10px 15px -3px rgba(0,0,0,.1);transform:translateY(0);transition:.3s}
-    .feature-card:hover{transform:translateY(-8px)}
-    .feature-icon{width:3.5rem;height:3.5rem;background:rgba(255,255,255,.2);border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:1.25rem}
-    .feature-title{font-size:1.25rem;font-weight:700;margin-bottom:.75rem}
-    .feature-description{color:rgba(219,234,254,.9)}
-
-    /* CTA */
-    .cta-section{text-align:center;padding:3rem 1rem;background:linear-gradient(to right,#2563eb,#9333ea);border-radius:1rem;color:#fff;margin-bottom:4rem}
-    .cta-title{font-size:1.875rem;font-weight:700;margin-bottom:1.5rem}
-    @media (min-width:768px){.cta-title{font-size:2.25rem}}
-    .cta-description{font-size:1.125rem;color:#dbeafe;max-width:42rem;margin:0 auto 2rem}
-    .cta-button{background:#fff;color:#2563eb;font-weight:600;padding:.75rem 2rem;border-radius:9999px;border:none;cursor:pointer;box-shadow:0 10px 15px -3px rgba(0,0,0,.1);transition:.2s}
-    .cta-button:hover{background:#f3f4f6}
-
-    /* Footer */
-    footer{background:#f0f9ff;color:#1f2937;position:relative;overflow:hidden;width:100%;border-top:1px solid #bfdbfe}
-    .footer-bg{position:absolute;inset:0;opacity:.1}
-    .footer-bg-circle{position:absolute;border-radius:9999px;mix-blend-mode:multiply;filter:blur(24px)}
-    .circle-1{top:0;left:0;width:16rem;height:16rem;background:#dbeafe}
-    .circle-2{top:0;right:0;width:16rem;height:16rem;background:#bfdbfe}
-    .circle-3{bottom:0;left:50%;transform:translateX(-50%);width:16rem;height:16rem;background:#dbeafe}
-    .footer-content{position:relative;z-index:10;max-width:80rem;margin:0 auto;padding:2.5rem 1.5rem}
-    .footer-grid{display:grid;grid-template-columns:1fr;gap:2.5rem}
-    @media (min-width:768px){.footer-grid{grid-template-columns:repeat(2,1fr)}}
-    @media (min-width:1024px){.footer-grid{grid-template-columns:repeat(4,1fr)}}
-    .footer-company{grid-column:span 2}
-    .company-description{color:#374151;line-height:1.625;margin-bottom:1.5rem;max-width:28rem;font-size:.875rem}
-    .social-links{display:flex;gap:.75rem;margin-bottom:2rem}
-    .social-link{width:2.5rem;height:2.5rem;background:#3b82f6;color:#fff;border-radius:.5rem;display:flex;align-items:center;justify-content:center;transition:.2s;box-shadow:0 1px 2px 0 rgba(0,0,0,.05)}
-    .social-link:hover{background:#2563eb;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}
-    .newsletter{background:#fff;border-radius:.75rem;padding:1.25rem;border:1px solid #bfdbfe;box-shadow:0 1px 2px 0 rgba(0,0,0,.05)}
-    .newsletter-title{font-size:1.125rem;font-weight:600;color:#1e40af;margin-bottom:.75rem}
-    .newsletter-text{color:#2563eb;font-size:.875rem;margin-bottom:1rem}
-    .newsletter-form{display:flex}
-    .newsletter-input{flex:1;background:#f0f9ff;color:#1f2937;padding:.5rem 1rem;border-radius:.5rem 0 0 .5rem;border:1px solid #bfdbfe;outline:none;font-size:.875rem}
-    .newsletter-input:focus{box-shadow:0 0 0 2px #3b82f6}
-    .newsletter-button{background:#2563eb;color:#fff;padding:.5rem 1rem;border-radius:0 .5rem .5rem 0;border:none;font-size:.875rem;font-weight:500;cursor:pointer;transition:.2s;box-shadow:0 1px 2px 0 rgba(0,0,0,.05)}
-    .newsletter-button:hover{background:#1d4ed8}
-    .footer-heading{font-size:1.125rem;font-weight:600;color:#1e40af;margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:1px solid #bfdbfe}
-    .footer-links{display:flex;flex-direction:column;gap:.75rem}
-    .footer-link{color:#374151;font-size:.875rem;transition:.2s}
-    .footer-link:hover{color:#2563eb;transform:translateX(.25rem)}
-    .contact-info{display:flex;flex-direction:column;gap:1rem}
-    .contact-item{display:flex;align-items:flex-start;gap:.75rem}
-    .contact-icon{color:#3b82f6;margin-top:.25rem;flex-shrink:0}
-    .contact-text{color:#374151;font-size:.875rem}
-    .business-hours{padding-top:1rem;border-top:1px solid #bfdbfe}
-    .hours-title{color:#2563eb;font-size:.75rem;font-weight:500;margin-bottom:.25rem}
-    .hours-text{color:#374151;font-size:.875rem}
-    .footer-bottom{border-top:1px solid #bfdbfe;background:#dbeafe}
-    .footer-bottom-content{max-width:80rem;margin:0 auto;padding:1.5rem;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:.75rem}
-    @media (min-width:768px){.footer-bottom-content{flex-direction:row}}
-    .copyright{color:#1d4ed8;font-size:.875rem}
-    .made-with{display:flex;align-items:center;gap:.5rem;color:#1d4ed8;font-size:.875rem}
-    .heart{color:#f87171}
-  </style>
-</head>
-<body>
-  <!-- Header -->
-  <nav>
-    <!-- Desktop -->
-    <div class="desktop-nav">
-      <div class="nav-container">
-        <div class="logo" onclick="location.href='https://snoutiq.com/'">
-          <!-- NOTE: your previous base64 logo was very heavy. Using text logo here for speed. -->
-          SnoutIQ
-        </div>
-        <div class="nav-actions">
-          <button class="btn-primary" onclick="location.href='https://snoutiq.com/register'">Register</button>
-          <button class="btn-primary" onclick="location.href='https://snoutiq.com/login'">Login</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Mobile -->
-    <div class="mobile-nav">
-      <div class="nav-container">
-        <div class="logo" onclick="location.href='https://snoutiq.com/'">SnoutIQ</div>
-        <div class="nav-actions">
-          <button class="btn-primary" onclick="location.href='https://snoutiq.com/register'">Register</button>
-          <button class="btn-primary" onclick="location.href='https://snoutiq.com/login'">Login</button>
-        </div>
-      </div>
-    </div>
-  </nav>
-
-  <!-- Main -->
-  <main>
-    <div class="container">
-      <!-- Hero -->
-      <section class="hero">
-        <div class="badge">🐶 AI-Powered Pet Care Assistant</div>
-        <h1>SnoutIQ — Your AI Pet Companion for <span class="highlight">Smart Pet Care</span></h1>
-        <p class="subheading">Intelligent pet care guidance, health advice, and training tips powered by advanced AI technology.</p>
-
-        <!-- Chat Input -->
-        <div class="chat-container">
-          <div class="chat-input-container">
-            <div class="chat-input-wrapper">
-              <form class="chat-form" onsubmit="event.preventDefault(); location.href='https://snoutiq.com/register'">
-                <div class="mic-icon"><i class="fas fa-microphone"></i></div>
-                <input type="text" class="chat-input" placeholder="Ask anything about your pet" aria-label="Your question">
-                <button type="submit" class="send-btn" aria-label="Send"><i class="fas fa-paper-plane" style="font-size:.875rem"></i></button>
-              </form>
-            </div>
-          </div>
-          <p class="chat-hint">Ask anything about your pet's health, behavior, or training</p>
-        </div>
-      </section>
-
-      <!-- Stats -->
-      <section class="stats-section">
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-number">10K+</div><div class="stat-label">Happy Pets</div></div>
-          <div class="stat-card"><div class="stat-number">24/7</div><div class="stat-label">Support</div></div>
-          <div class="stat-card"><div class="stat-number">98%</div><div class="stat-label">Accuracy</div></div>
-          <div class="stat-card"><div class="stat-number">500+</div><div class="stat-label">Pet Experts</div></div>
-        </div>
-      </section>
-
-      <!-- Features -->
-      <section class="features-section">
-        <div class="section-header">
-          <h2 class="section-title">Why Pet Owners Love Us</h2>
-          <p class="section-description">Advanced AI + veterinary expertise for the best pet care</p>
-        </div>
-        <div class="features-grid">
-          <div class="feature-card">
-            <div class="feature-icon">✅</div>
-            <h3 class="feature-title">24/7 Pet Care Support</h3>
-            <p class="feature-description">Instant answers anytime, anywhere</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">👩‍⚕️</div>
-            <h3 class="feature-title">Personalized Pet Plans</h3>
-            <p class="feature-description">Tailored advice for your pet</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🐾</div>
-            <h3 class="feature-title">Behavior Training Tips</h3>
-            <p class="feature-description">Train and bond with your pet</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- CTA -->
-      <section class="cta-section">
-        <h2 class="cta-title">Ready to Transform Your Pet's Life?</h2>
-        <p class="cta-description">Join thousands of pet owners who trust our AI assistant</p>
-        <button class="cta-button" onclick="location.href='https://snoutiq.com/register'">Get Started Now</button>
-      </section>
-    </div>
-
-    <!-- Footer -->
-    <footer>
-      <div class="footer-bg">
-        <div class="footer-bg-circle circle-1"></div>
-        <div class="footer-bg-circle circle-2"></div>
-        <div class="footer-bg-circle circle-3"></div>
-      </div>
-
-      <div class="footer-content">
-        <div class="footer-grid">
-          <div class="footer-company">
-            <div style="margin-bottom:1.5rem;">
-              <div class="logo" style="display:inline-block;margin-bottom:0" onclick="location.href='https://snoutiq.com/register'">SnoutIQ</div>
-            </div>
-            <p class="company-description">
-              We're Tanul and Nisha—passionate pet parents to Sherif (our resilient rescue dog) and three incredible cats: Shadow, Tokyo, and Tiger.
-            </p>
-
-            <div class="social-links">
-              <a href="https://www.facebook.com/people/Snoutiq/61578226867078/" class="social-link" aria-label="Facebook"><i class="fab fa-facebook"></i></a>
-              <a href="https://www.instagram.com/snoutiq_marketplace/#" class="social-link" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
-              <a href="https://snoutiq.com/" class="social-link" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
-              <a href="https://snoutiq.com/" class="social-link" aria-label="Pinterest"><i class="fab fa-pinterest"></i></a>
-            </div>
-
-            <div class="newsletter">
-              <h3 class="newsletter-title">Stay Updated</h3>
-              <p class="newsletter-text">Get pet care tips and exclusive offers</p>
-              <form class="newsletter-form" onsubmit="subscribeNewsletter(event)">
-                <input type="email" class="newsletter-input" placeholder="Your email address" required aria-label="Email address">
-                <button type="submit" class="newsletter-button">Subscribe</button>
-              </form>
-            </div>
-          </div>
-
-          <div class="footer-links-container">
-            <h4 class="footer-heading">Policies</h4>
-            <div class="footer-links">
-              <a href="https://snoutiq.com/privacy-policy" class="footer-link">Privacy Policy</a>
-              <a href="https://snoutiq.com/terms-of-service" class="footer-link">Terms of Service</a>
-              <a href="https://snoutiq.com/cancellation-policy" class="footer-link">Refund Policy</a>
-              <a href="https://snoutiq.com/shipping-policy" class="footer-link">Shipping Policy</a>
-              <a href="https://snoutiq.com/cookie-policy" class="footer-link">Cookie Policy</a>
-              <a href="https://snoutiq.com/medical-data-consent" class="footer-link">Medical Disclaimer</a>
-              <a href="https://snoutiq.com/user-consent" class="footer-link">User Consent</a>
-              <a href="https://snoutiq.com/vendor-seller-agreement" class="footer-link">Vendor Agreement</a>
-            </div>
-          </div>
-
-          <div class="footer-contact">
-            <h4 class="footer-heading">Contact</h4>
-            <div class="contact-info">
-              <div class="contact-item"><i class="fas fa-location-dot contact-icon"></i><p class="contact-text">Plot no 20, Block: H-1/A, Sector-63, Noida-201301</p></div>
-              <div class="contact-item"><i class="fas fa-mobile-alt contact-icon"></i><a href="tel:+918588007466" class="contact-text">+91 85880 07466</a></div>
-              <div class="contact-item"><i class="fas fa-paper-plane contact-icon"></i><a href="mailto:info@snoutiq.com" class="contact-text">info@snoutiq.com</a></div>
-              <div class="business-hours">
-                <p class="hours-title">Business Hours</p>
-                <p class="hours-text"><time datetime="Mo-Fr 09:00-18:00">Mon–Fri: 9AM–6PM</time></p>
-                <p class="hours-text"><time datetime="Sa 10:00-16:00">Sat: 10AM–4PM</time></p>
-                <p class="hours-text"><time datetime="Su Closed">Sun: Closed</time></p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer-bottom">
-        <div class="footer-bottom-content">
-          <div class="copyright">© 2024 SnoutIQ. All rights reserved.</div>
-          <div class="made-with"><span>Made with</span><i class="fas fa-heart heart" aria-label="love"></i><span>for pets</span></div>
-        </div>
-      </div>
-    </footer>
-  </main>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnoutIQ - Your AI Pet Companion for Smart Pet Care</title>
+    <script>
+  setTimeout(function() {
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '1909812439872823');
+    fbq('track', 'PageView');
+  }, 7000); // 7000 milliseconds = 7 seconds
+</script>
 
   <script>
-    function subscribeNewsletter(e){
-      e.preventDefault();
-      const email = e.target.querySelector('input[type="email"]').value.trim();
-      if(!email) return;
-      // TODO: hook your API here
-      alert("Thanks! We'll keep you posted.");
-      e.target.reset();
-    }
-  </script>
+  setTimeout(function() {
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '1909812439872823');
+    fbq('track', 'PageView');
+  }, 7000); // 7000 milliseconds = 7 seconds
+</script>
+
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="https://snoutiq.com/favicon.webp" sizes="32x32" type="image/png" />
+    <style>
+        /* Global Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+
+        body {
+            color: #1f2937;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Header Styles */
+        nav {
+            background-color: white;
+            border-bottom: 1px solid #e5e7eb;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            height: 70px;
+        }
+
+        .logo {
+            height: 1.25rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-weight: bold;
+            font-size: 1.25rem;
+            color: #2563eb;
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, #2563eb, #1d4ed8);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            transform: translateY(-0.125rem);
+        }
+
+        .user-profile {
+            background-color: white;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: box-shadow 0.3s;
+        }
+
+        .user-profile:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-avatar {
+            width: 2rem;
+            height: 2rem;
+            background: linear-gradient(to right, #3b82f6, #a855f7);
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .user-avatar i {
+            color: white;
+            font-size: 0.75rem;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .user-role {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+      
+        /* Mobile Nav */
+        .mobile-nav {
+            display: none;
+        }
+
+        .mobile-menu-btn {
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            background-color: #f3f4f6;
+            transition: background-color 0.3s;
+        }
+
+        .mobile-menu-btn:hover {
+            background-color: #e0e7ff;
+        }
+
+        /* Main Content */
+        main {
+            min-height: 100vh;
+            background: linear-gradient(to bottom, white, #f0f9ff);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            max-width: 72rem;
+            margin: 0 auto;
+            width: 100%;
+            /* padding-top: 5rem; */
+        }
+
+        .hero {
+            text-align: center;
+            padding: 3rem 0;
+        }
+
+        @media (min-width: 768px) {
+            .hero {
+                padding: 5rem 0;
+            }
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            background-color: #dbeafe;
+            color: #1e40af;
+            border-radius: 9999px;
+            padding: 0.25rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (min-width: 640px) {
+            h1 {
+                font-size: 3rem;
+            }
+        }
+
+        @media (min-width: 768px) {
+            h1 {
+                font-size: 3.75rem;
+            }
+        }
+
+        .highlight {
+            color: #2563eb;
+        }
+
+        .subheading {
+            font-size: 1.125rem;
+            color: #4b5563;
+            max-width: 42rem;
+            margin: 0 auto 2.5rem;
+            line-height: 1.625;
+        }
+
+        @media (min-width: 640px) {
+            .subheading {
+                font-size: 1.25rem;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .subheading {
+                font-size: 1.5rem;
+            }
+        }
+
+        .chat-container {
+            max-width: 36rem;
+            margin: 0 auto 4rem;
+        }
+
+        .chat-input-container {
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            padding: 0.25rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        .chat-input-wrapper {
+            width: 100%;
+            max-width: 42rem;
+            margin: 0 auto;
+        }
+
+        .chat-form {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .mic-icon {
+            position: absolute;
+            left: 0.75rem;
+            color: #9ca3af;
+            pointer-events: none;
+        }
+
+        @media (min-width: 640px) {
+            .mic-icon {
+                left: 1rem;
+            }
+        }
+
+        .chat-input {
+            width: 100%;
+            padding-left: 2.5rem;
+            padding-right: 3.5rem;
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            outline: none;
+            color: #1f2937;
+        }
+
+        .chat-input:focus {
+            border-color: transparent;
+            box-shadow: 0 0 0 2px #2761E8;
+        }
+
+        @media (min-width: 640px) {
+            .chat-input {
+                padding-left: 3rem;
+                padding-right: 4rem;
+                padding-top: 1rem;
+                padding-bottom: 1rem;
+            }
+        }
+
+        .send-btn {
+            position: absolute;
+            right: 0.5rem;
+            width: 2rem;
+            height: 2rem;
+            background-color: #2761E8;
+            color: white;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .send-btn:hover {
+            background-color: #1e4bd8;
+        }
+
+        @media (min-width: 640px) {
+            .send-btn {
+                width: 2.5rem;
+                height: 2.5rem;
+            }
+        }
+
+        .chat-hint {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 0.75rem;
+            text-align: center;
+        }
+
+        /* Stats Section */
+        .stats-section {
+            width: 100%;
+            margin-bottom: 5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .stat-card {
+            background: #EFF6FF;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            /* box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); */
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: #2563eb;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        /* Features Section */
+        .features-section {
+            width: 100%;
+            margin-bottom: 5rem;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            .section-title {
+                font-size: 2.25rem;
+            }
+     
+        }
+
+        .section-description {
+            font-size: 1.125rem;
+            color: #4b5563;
+            max-width: 42rem;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 768px) {
+            .features-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .feature-card {
+            background: linear-gradient(to bottom right, #2563eb, #9333ea);
+            color: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transform: translateY(0);
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-0.5rem);
+        }
+
+        .feature-icon {
+            width: 3.5rem;
+            height: 3.5rem;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .feature-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+
+        .feature-description {
+            color: rgba(219, 234, 254, 0.9);
+        }
+
+        /* CTA Section */
+        .cta-section {
+            text-align: center;
+            padding: 3rem 1rem;
+            background: linear-gradient(to right, #2563eb, #9333ea);
+            border-radius: 1rem;
+            color: white;
+            margin-bottom: 4rem;
+        }
+
+        .cta-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+            .cta-title {
+                font-size: 2.25rem;
+            }
+        }
+
+        .cta-description {
+            font-size: 1.125rem;
+            color: #dbeafe;
+            max-width: 42rem;
+            margin: 0 auto 2rem;
+        }
+
+        .cta-button {
+            background-color: white;
+            color: #2563eb;
+            font-weight: 600;
+            padding: 0.75rem 2rem;
+            border-radius: 9999px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s;
+        }
+
+        .cta-button:hover {
+            background-color: #f3f4f6;
+        }
+
+        /* Footer */
+        footer {
+            background-color: #f0f9ff;
+            color: #1f2937;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            border-top: 1px solid #bfdbfe;
+        }
+
+        .footer-bg {
+            position: absolute;
+            inset: 0;
+            opacity: 0.1;
+        }
+
+        .footer-bg-circle {
+            position: absolute;
+            border-radius: 9999px;
+            mix-blend-mode: multiply;
+            filter: blur(24px);
+        }
+
+        .circle-1 {
+            top: 0;
+            left: 0;
+            width: 16rem;
+            height: 16rem;
+            background-color: #dbeafe;
+        }
+
+        .circle-2 {
+            top: 0;
+            right: 0;
+            width: 16rem;
+            height: 16rem;
+            background-color: #bfdbfe;
+        }
+
+        .circle-3 {
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16rem;
+            height: 16rem;
+            background-color: #dbeafe;
+        }
+
+        .footer-content {
+            position: relative;
+            z-index: 10;
+            max-width: 80rem;
+            margin: 0 auto;
+            padding: 2.5rem 1.5rem;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2.5rem;
+        }
+
+        @media (min-width: 768px) {
+            .footer-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .footer-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .footer-company {
+            grid-column: span 2;
+        }
+
+        .company-description {
+            color: #374151;
+            line-height: 1.625;
+            margin-bottom: 1.5rem;
+            max-width: 28rem;
+            font-size: 0.875rem;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .social-link {
+            width: 2.5rem;
+            height: 2.5rem;
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .social-link:hover {
+            background-color: #2563eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .newsletter {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            border: 1px solid #bfdbfe;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .newsletter-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 0.75rem;
+        }
+
+        .newsletter-text {
+            color: #2563eb;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+
+        .newsletter-form {
+            display: flex;
+        }
+
+        .newsletter-input {
+            flex: 1;
+            background-color: #f0f9ff;
+            color: #1f2937;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem 0 0 0.5rem;
+            border: 1px solid #bfdbfe;
+            outline: none;
+            font-size: 0.875rem;
+        }
+
+        .newsletter-input:focus {
+            box-shadow: 0 0 0 2px #3b82f6;
+        }
+
+        .newsletter-button {
+            background-color: #2563eb;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0 0.5rem 0.5rem 0;
+            border: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .newsletter-button:hover {
+            background-color: #1d4ed8;
+        }
+
+        .footer-heading {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #bfdbfe;
+        }
+
+        .footer-links {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .footer-link {
+            color: #374151;
+            font-size: 0.875rem;
+            transition: color 0.3s;
+        }
+
+        .footer-link:hover {
+            color: #2563eb;
+            transform: translateX(0.25rem);
+        }
+
+        .contact-info {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .contact-icon {
+            color: #3b82f6;
+            margin-top: 0.25rem;
+            flex-shrink: 0;
+        }
+
+        .contact-text {
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .business-hours {
+            padding-top: 1rem;
+            border-top: 1px solid #bfdbfe;
+        }
+
+        .hours-title {
+            color: #2563eb;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .hours-text {
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #bfdbfe;
+            background-color: #dbeafe;
+        }
+
+        .footer-bottom-content {
+            max-width: 80rem;
+            margin: 0 auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        @media (min-width: 768px) {
+            .footer-bottom-content {
+                flex-direction: row;
+            }
+        }
+
+        .copyright {
+            color: #1d4ed8;
+            font-size: 0.875rem;
+        }
+
+        .made-with {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #1d4ed8;
+            font-size: 0.875rem;
+        }
+
+        .heart {
+            color: #f87171;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .desktop-nav {
+                display: none;
+            }
+  .nav-container {
+    display: flex;
+    justify-content: space-between; 
+    align-items: center;
+    width: 100%;
+}
+
+.nav-actions {
+    display: flex;  
+    gap: 0.5rem;   
+}
+
+            
+            .mobile-nav {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 1rem;
+                height: 60px;
+                    gap: 0.25rem; /* buttons ke beech spacing */
+            }
+   
+
+            .container {
+                padding-top: 4rem;
+            }
+            
+            .footer-company {
+                grid-column: 1;
+            }
+                 .stat-number {
+           font-size: 1.5rem;
+           line-height: 2rem;
+        }
+       
+        }
+    </style>
+</head>
+<body>
+    <!-- Header/Navigation -->
+    <nav>
+        <!-- Desktop Navigation -->
+        <div class="desktop-nav">
+            <div class="nav-container">
+                <!-- Logo -->
+                <div class="logo" onclick="window.location.href='https://snoutiq.com/'">
+                                        <img src="data:image/webp;base64,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">
+
+                </div>
+
+                <!-- User Actions -->
+                <div class="nav-actions">
+                    <div>
+                        <button class="btn-primary" onclick="window.location.href='https://snoutiq.com/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion'">Register</button>
+                        <button class="btn-primary" onclick="window.location.href='https://snoutiq.com/login'">Login</button>
+                    </div>
+                    
+                  
+                </div>
+            </div>
+        </div>
+
+
+        <div class="mobile-nav">
+  <div class="nav-container">
+     <div class="logo" onclick="window.location.href='https://snoutiq.com/'">
+                      <img src="data:image/webp;base64,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">
+                </div>
+    <div class="nav-actions">
+                              <button class="btn-primary" onclick="window.location.href='https://snoutiq.com/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion'" style="padding: 0.5rem 0.75rem; font-size: 0.875rem;">Register</button>
+
+                             <button class="btn-primary" onclick="window.location.href='https://snoutiq.com/login'" style="padding: 0.5rem 0.75rem; font-size: 0.875rem; margin-left: 0.25rem;">Login</button>
+
+    </div>
+  </div>
+</div>
+
+       
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <div class="container">
+            <!-- Hero Section -->
+            <section class="hero">
+                <div class="badge">
+                    🐶 AI-Powered Pet Care Assistant
+                </div>
+                <h1>SnoutIQ - Your AI Pet Companion for <span class="highlight">Smart Pet Care</span></h1>
+                <p class="subheading">Intelligent pet care guidance, health advice, and training tips powered by advanced AI technology</p>
+
+                <!-- Chat Input -->
+                <div class="chat-container">
+                    <div class="chat-input-container">
+                        <div class="chat-input-wrapper">
+                            <form class="chat-form">
+                                <div class="mic-icon">
+                                    <i class="fas fa-microphone"></i>
+                                </div>
+                                <input type="text" class="chat-input" placeholder="Ask anything about your pet">
+                                <button type="button" class="send-btn" onclick="window.location.href='https://snoutiq.com/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion'">
+                                    <i class="fas fa-paper-plane" style="font-size: 0.875rem;"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <p class="chat-hint">Ask anything about your pet's health, behavior, or training</p>
+                </div>
+            </section>
+            
+            <!-- Stats Section -->
+            <section class="stats-section">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">10K+</div>
+                        <div class="stat-label">Happy Pets</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-number">24/7</div>
+                        <div class="stat-label">Support</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">98%</div>
+                        <div class="stat-label">Accuracy</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">500+</div>
+                        <div class="stat-label">Pet Experts</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Features Section -->
+            <section class="features-section">
+                <div class="section-header">
+                    <h2 class="section-title">Why Pet Owners Love Us</h2>
+                    <p class="section-description">Advanced AI + veterinary expertise for the best pet care</p>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">✅</div>
+                        <h3 class="feature-title">24/7 Pet Care Support</h3>
+                        <p class="feature-description">Instant answers anytime, anywhere</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">👩‍⚕️</div>
+                        <h3 class="feature-title">Personalized Pet Plans</h3>
+                        <p class="feature-description">Tailored advice for your pet</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🐾</div>
+                        <h3 class="feature-title">Behavior Training Tips</h3>
+                        <p class="feature-description">Train and bond with your pet</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CTA Section -->
+            <section class="cta-section">
+                <h2 class="cta-title">Ready to Transform Your Pet's Life?</h2>
+                <p class="cta-description">Join thousands of pet owners who trust our AI assistant</p>
+                <button class="cta-button" onclick="window.location.href='https://snoutiq.com/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion'">Get Started Now</button>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-bg">
+                <div class="footer-bg-circle circle-1"></div>
+                <div class="footer-bg-circle circle-2"></div>
+                <div class="footer-bg-circle circle-3"></div>
+            </div>
+
+            <div class="footer-content">
+                <div class="footer-grid">
+                    <div class="footer-company">
+                        <div style="margin-bottom: 1.5rem;">
+                            <div class="logo" style="display: inline-block; margin-bottom: 0;" onclick="window.location.href='https://snoutiq.com/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion'">                    <img src="data:image/webp;base64,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">
+</div>
+                        </div>
+                        <p class="company-description">
+                            We're Tanul and Nisha—passionate pet parents to Sherif (our resilient rescue dog) and three incredible cats: Shadow, Tokyo, and Tiger. Each of our pets came into our lives through unique, sometimes challenging circumstances.
+                        </p>
+
+                        <div class="social-links">
+                            <a href="https://www.facebook.com/people/Snoutiq/61578226867078/" class="social-link" aria-label="Facebook">
+                                <i class="fab fa-facebook"></i>
+                            </a>
+                            <a href="https://www.instagram.com/snoutiq_marketplace/#" class="social-link" aria-label="Twitter">
+                                <i class="fab fa-twitter"></i>
+                            </a>
+                            <a href="https://snoutiq.com/" class="social-link" aria-label="LinkedIn">
+                                <i class="fab fa-linkedin"></i>
+                            </a>
+                            <a href="https://snoutiq.com/" class="social-link" aria-label="Pinterest">
+                                <i class="fab fa-pinterest"></i>
+                            </a>
+                        </div>
+
+                        <div class="newsletter">
+                            <h3 class="newsletter-title">Stay Updated</h3>
+                            <p class="newsletter-text">Get pet care tips and exclusive offers</p>
+                            <form class="newsletter-form" onsubmit="subscribeNewsletter(event)">
+                                <input type="email" class="newsletter-input" placeholder="Your email address" required aria-label="Email address">
+                                <button type="submit" class="newsletter-button">Subscribe</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="footer-links-container">
+                        <h4 class="footer-heading">Policies</h4>
+                        <div class="footer-links">
+                            <a href="https://snoutiq.com/privacy-policy" class="footer-link">Privacy Policy</a>
+                            <a href="https://snoutiq.com/terms-of-service" class="footer-link">Terms of Service</a>
+                            <a href="https://snoutiq.com/cancellation-policy" class="footer-link">Refund Policy</a>
+                            <a href="https://snoutiq.com/shipping-policy" class="footer-link">Shipping Policy</a>
+                            <a href="https://snoutiq.com/cookie-policy" class="footer-link">Cookie Policy</a>
+                            <a href="https://snoutiq.com/medical-data-consent" class="footer-link">Medical Disclaimer</a>
+                            <a href="https://snoutiq.com/user-consent" class="footer-link">User Consent</a>
+                            <a href="https://snoutiq.com/vendor-seller-agreement" class="footer-link">Vendor Agreement</a>
+                        </div>
+                    </div>
+
+                    <div class="footer-contact">
+                        <h4 class="footer-heading">Contact</h4>
+                        <div class="contact-info">
+                            <div class="contact-item">
+                                <i class="fas fa-location-dot contact-icon"></i>
+                                <p class="contact-text">Plot no 20, Block: H-1/A, Sector-63, Noida-201301</p>
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-mobile-alt contact-icon"></i>
+                                <a href="tel:+918588007466" class="contact-text">+91 85880 07466</a>
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-paper-plane contact-icon"></i>
+                                <a href="mailto:info@snoutiq.com" class="contact-text">info@snoutiq.com</a>
+                            </div>
+                            <div class="business-hours">
+                                <p class="hours-title">Business Hours</p>
+                                <p class="hours-text"><time datetime="Mo-Fr 09:00-18:00">Mon-Fri: 9AM-6PM</time></p>
+                                <p class="hours-text"><time datetime="Sa 10:00-16:00">Sat: 10AM-4PM</time></p>
+                                <p class="hours-text"><time datetime="Su Closed">Sun: Closed</time></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <div class="footer-bottom-content">
+                    <div class="copyright">© 2024 SnoutIQ. All rights reserved.</div>
+                    <div class="made-with">
+                        <span>Made with</span>
+                        <i class="fas fa-heart heart" aria-label="love"></i>
+                        <span>for pets</span>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </main>
+<!-- Meta Pixel Code with 7 seconds delay -->
+
+<noscript>
+  <img height="1" width="1" style="display:none"
+  src="https://www.facebook.com/tr?id=1909812439872823&ev=PageView&noscript=1"
+  />
+</noscript>
+
+  <noscript>
+    <iframe
+      src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
+      height="0"
+      width="0"
+      style="display:none;visibility:hidden"
+    ></iframe>
+  </noscript>
+
 </body>
 </html>
