@@ -1529,7 +1529,7 @@ const DoctorRegistration = () => {
                   <img
                     src={logo}
                     alt="Snoutiq Logo"
-                    className="w-full h-full object-contain"
+                       className="h-5 cursor-pointer transition-transform hover:scale-105"
                   />
                 </div>
                 <div>

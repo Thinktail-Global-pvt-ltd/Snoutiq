@@ -1,7 +1,5 @@
 import React, { lazy, useEffect, useState } from "react";
 import axiosClient from "../axios";
-import VetList from "./VetList";
-const GroomerList = lazy(()=> import('./GroomerList'))
 import playstore from '../assets/images/googlePlay.webp'
 
 export default function RightSidebar({ isMobile = false, onItemClick }) {
@@ -74,11 +72,11 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
           </div>
           
           <div className="p-4 max-h-60 overflow-y-auto">
-            {activeTab === 'vets' ? (
+            {/* {activeTab === 'vets' ? (
               <VetList data={data} handleItemClick={handleItemClick} />
             ) : (
               <GroomerList data={data} handleItemClick={handleItemClick} />
-            )}
+            )} */}
           </div>
         </div>
 
@@ -134,11 +132,11 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
         </div>
         
         <div className="p-3 max-h-48 overflow-y-auto">
-          {activeTab === 'vets' ? (
+          {/* {activeTab === 'vets' ? (
             <VetList data={data} handleItemClick={handleItemClick} />
           ) : (
             <GroomerList data={data} handleItemClick={handleItemClick} />
-          )}
+          )} */}
         </div>
       </div>
 

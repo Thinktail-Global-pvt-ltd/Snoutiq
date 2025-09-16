@@ -6,7 +6,7 @@ import {
   FaPaperPlane,
   FaHeart,
 } from "react-icons/fa";
-import { FaSquareXTwitter, FaLocationDot } from "react-icons/fa6";
+import { FaSquareXTwitter, FaLocationDot, FaSquareInstagram} from "react-icons/fa6";
 import { Link } from "react-router-dom";
 import logo from "../assets/images/logo.webp";
 import React from "react";
@@ -47,8 +47,13 @@ export default function Footer() {
                 {[
                   {
                     icon: <FaFacebookSquare className="text-lg" />,
-                    url: "https://facebook.com/snoutiq",
+                    url: "https://www.facebook.com/people/Snoutiq/61578226867078/",
                     label: "Facebook",
+                  },
+                  {
+                    icon: <FaSquareInstagram className="text-lg" />,
+                    url: "https://www.instagram.com/snoutiq_marketplace/#",
+                    label: "Instagram",
                   },
                   {
                     icon: <FaSquareXTwitter className="text-lg" />,

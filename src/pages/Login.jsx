@@ -200,7 +200,7 @@ const Login = () => {
               <img
                 src={logo}
                 alt="Snoutiq Logo"
-                className="h-12 sm:h-14 mx-auto mb-3"
+                className="h-6 mx-auto mb-3"
               />
             </div>
 

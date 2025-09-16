@@ -1,99 +1,44 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { AuthContext } from "../auth/AuthContext";
 
+// Heroicons (outline set)
 import {
   Bars3Icon,
+  XMarkIcon,
   UserIcon,
   ArrowRightOnRectangleIcon,
   VideoCameraIcon,
+  HomeIcon,
+  CalendarIcon,
+  CogIcon,
+  HeartIcon,
+  UserGroupIcon,
+  ExclamationTriangleIcon,
+  StarIcon,
 } from "@heroicons/react/24/outline";
-import {
-  HiOutlineViewGrid,
-  HiOutlineCalendar,
-  HiOutlineUser,
-  HiOutlineExclamation,
-  HiOutlineHeart,
-  HiOutlineCog,
-  HiOutlineStar,
-  HiOutlineUserGroup,
-} from "react-icons/hi";
-import logo from "../assets/images/dark bg.webp";
-import { AuthContext } from "../auth/AuthContext";
-import axios from "axios";
-import RingtonePopup from "../pages/RingtonePopup";
 
 const HeaderWithSidebar = ({ children }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeNavItem, setActiveNavItem] = useState("");
+  const [activeNavItem, setActiveNavItem] = useState("Dashboard");
   const [isLive, setIsLive] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useContext(AuthContext);
 
-  // Other existing functions remain the same...
-  useEffect(() => {
-    const currentItem = allNavItems.find(
-      (item) => item.path === location.pathname
-    );
-    if (currentItem) {
-      setActiveNavItem(currentItem.text);
-    }
-  }, [location.pathname]);
-
-  useEffect(() => {
-    const checkLiveStatus = async () => {
-      try {
-        const response = await axios.get("/user/live-status");
-        setIsLive(response.data.isLive);
-      } catch (error) {
-        console.error("Error fetching live status:", error);
-      }
-    };
-
-    if (user) {
-      checkLiveStatus();
-    }
-  }, [user]);
-
-  const handleLiveToggle = async () => {
-    setIsLive(!isLive);
-  };
-
-  const handleLogin = () => navigate("/login");
-  const handleRegister = () => navigate("/register");
-
-  const handleLogout = () => {
-    if (isLive) {
-      axios
-        .post("/user/update-live-status", { isLive: false })
-        .catch((error) =>
-          console.error("Error updating live status on logout:", error)
-        );
-    }
-    localStorage.clear();
-    navigate("/");
-    window.location.reload();
-  };
-
-  const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
-
-  const handleNavItemClick = (path, text) => {
-    navigate(path);
-    setActiveNavItem(text);
-    if (window.innerWidth < 1024) {
-      setIsSidebarOpen(false);
-    }
-  };
-
-  // Navigation config (keeping same as original)
+  // ✅ Navigation config with correct heroicons
   const navConfig = {
     common1: [
       {
         category: "Home",
         items: [
-          { text: "Home", icon: <HiOutlineViewGrid />, path: "/dashboard" },
+          {
+            text: "Home",
+            icon: <HomeIcon className="w-5 h-5" />,
+            path: "/dashboard",
+          },
         ],
       },
     ],
@@ -103,12 +48,12 @@ const HeaderWithSidebar = ({ children }) => {
         items: [
           {
             text: "Pet Owner",
-            icon: <HiOutlineStar />,
+            icon: <StarIcon className="w-5 h-5" />,
             path: "/user-dashboard/pet-owner",
           },
           {
             text: "Vet Owner",
-            icon: <HiOutlineCog />,
+            icon: <CogIcon className="w-5 h-5" />,
             path: "/user-dashboard/vet-owner",
           },
         ],
@@ -120,57 +65,57 @@ const HeaderWithSidebar = ({ children }) => {
         items: [
           {
             text: "My Pets",
-            icon: <HiOutlineHeart />,
+            icon: <HeartIcon className="w-5 h-5" />,
             path: "/user-dashboard/pet-info",
           },
           {
             text: "Health Records",
-            icon: <HiOutlineHeart />,
+            icon: <HeartIcon className="w-5 h-5" />,
             path: "/user-dashboard/pet-health",
           },
           {
             text: "Daily Care",
-            icon: <HiOutlineHeart />,
+            icon: <HeartIcon className="w-5 h-5" />,
             path: "/user-dashboard/pet-daily-care",
           },
           {
             text: "My Bookings",
-            icon: <HiOutlineCalendar />,
+            icon: <CalendarIcon className="w-5 h-5" />,
             path: "/user-dashboard/my-bookings",
           },
           {
             text: "History",
-            icon: <HiOutlineUserGroup />,
+            icon: <UserGroupIcon className="w-5 h-5" />,
             path: "/user-dashboard/history",
           },
           {
             text: "Vaccinations",
-            icon: <HiOutlineExclamation />,
+            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
             path: "/user-dashboard/vaccination-tracker",
           },
           {
             text: "Medication Tracker",
-            icon: <HiOutlineExclamation />,
+            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
             path: "/user-dashboard/medical-tracker",
           },
           {
             text: "Weight Monitoring",
-            icon: <HiOutlineExclamation />,
+            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
             path: "/user-dashboard/weight-monitoring",
           },
           {
             text: "Vet Visits",
-            icon: <HiOutlineExclamation />,
+            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
             path: "/user-dashboard/vet-visits",
           },
           {
             text: "Photo Timeline",
-            icon: <HiOutlineExclamation />,
+            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
             path: "/user-dashboard/photo-timeline",
           },
           {
             text: "Emergency Contacts",
-            icon: <HiOutlineExclamation />,
+            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
             path: "/user-dashboard/emergency-contacts",
           },
         ],
@@ -182,22 +127,22 @@ const HeaderWithSidebar = ({ children }) => {
         items: [
           {
             text: "Booking Requests",
-            icon: <HiOutlineCalendar />,
+            icon: <CalendarIcon className="w-5 h-5" />,
             path: "/user-dashboard/bookings",
           },
           {
             text: "Profile & Settings",
-            icon: <HiOutlineUser />,
+            icon: <UserIcon className="w-5 h-5" />,
             path: "/user-dashboard/vet-profile",
           },
           {
             text: "My Document",
-            icon: <HiOutlineStar />,
+            icon: <StarIcon className="w-5 h-5" />,
             path: "/user-dashboard/vet-document",
           },
           {
             text: "Payment",
-            icon: <HiOutlineExclamation />,
+            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
             path: "/user-dashboard/vet-payment",
           },
         ],
@@ -209,12 +154,12 @@ const HeaderWithSidebar = ({ children }) => {
         items: [
           {
             text: "Ratings & Reviews",
-            icon: <HiOutlineStar />,
+            icon: <StarIcon className="w-5 h-5" />,
             path: "/user-dashboard/rating",
           },
           {
             text: "Support",
-            icon: <HiOutlineCog />,
+            icon: <CogIcon className="w-5 h-5" />,
             path: "/user-dashboard/support",
           },
         ],
@@ -232,32 +177,54 @@ const HeaderWithSidebar = ({ children }) => {
     ...(navConfig.common || []),
   ];
 
-  const allNavItems = mainNavItems.flatMap((category) => category.items);
+  // set active nav item
+  useEffect(() => {
+    const currentPath = location.pathname;
+    for (const category of mainNavItems) {
+      const item = category.items.find((item) => item.path === currentPath);
+      if (item) {
+        setActiveNavItem(item.text);
+        break;
+      }
+    }
+  }, [location.pathname, mainNavItems]);
+
+  // toggle
+  const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const toggleLiveStatus = () => setIsLive(!isLive);
+
+  const handleNavItemClick = (path, text) => {
+    navigate(path);
+    setActiveNavItem(text);
+    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+  };
+
+  const handleLogin = () => navigate("/login");
+  const handleRegister = () => navigate("/register");
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/");
+    window.location.reload();
+  };
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Incoming Call Dialog */}
-
-      {user?.role === "vet" && <RingtonePopup />}
-
-      {/* Rest of your component remains the same... */}
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex lg:flex-shrink-0">
         <div className="w-64 flex flex-col bg-gradient-to-b from-indigo-800 to-purple-700 text-white">
           <div className="flex items-center justify-between h-16 px-4 border-b border-indigo-700">
-            <div className="flex items-center">
-              <img
-                src={logo}
-                alt="Snoutiq Logo"
-                className="h-8 cursor-pointer"
-                onClick={() => navigate(user ? "/dashboard" : "/")}
-              />
+            <div
+              className="text-xl font-bold cursor-pointer"
+              onClick={() => navigate(user ? "/dashboard" : "/")}
+            >
+              SnoutIQ
             </div>
           </div>
 
           <nav className="flex-1 px-2 py-4 overflow-y-auto">
-            {mainNavItems.map((category, categoryIndex) => (
-              <div key={categoryIndex} className="mb-6">
+            {mainNavItems.map((category, i) => (
+              <div key={i} className="mb-6">
                 <h3 className="px-3 text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">
                   {category.category}
                 </h3>
@@ -274,13 +241,7 @@ const HeaderWithSidebar = ({ children }) => {
                             : "text-indigo-100 hover:bg-indigo-700 hover:text-white"
                         }`}
                       >
-                        <span
-                          className={`text-lg mr-3 ${
-                            isActive ? "text-indigo-600" : "text-indigo-300"
-                          }`}
-                        >
-                          {item.icon}
-                        </span>
+                        <span className="mr-3">{item.icon}</span>
                         {item.text}
                       </button>
                     );
@@ -292,7 +253,7 @@ const HeaderWithSidebar = ({ children }) => {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main content with header */}
       <div className="flex flex-col flex-1 overflow-hidden">
         <header className="bg-white border-b border-gray-200 shadow-sm">
           <div className="flex items-center justify-between px-4 py-3 h-16">
@@ -300,23 +261,23 @@ const HeaderWithSidebar = ({ children }) => {
               <button
                 type="button"
                 className="px-3 py-2 rounded-md text-gray-500 hover:text-indigo-600 lg:hidden"
-                onClick={() => setIsSidebarOpen(true)}
+                onClick={toggleSidebar}
               >
                 <Bars3Icon className="h-6 w-6" />
               </button>
               <h1 className="ml-2 text-xl font-semibold text-gray-800 lg:ml-4">
-                {activeNavItem || "Dashboard"}
+                {activeNavItem}
               </h1>
             </div>
 
             <div className="flex items-center space-x-4">
-              {user.business_status && (
+              {user?.business_status && (
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600 hidden md:block">
                     {isLive ? "Live" : "Offline"}
                   </span>
                   <button
-                    onClick={handleLiveToggle}
+                    onClick={toggleLiveStatus}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
                       isLive ? "bg-green-500" : "bg-gray-300"
                     }`}
@@ -388,29 +349,83 @@ const HeaderWithSidebar = ({ children }) => {
           </div>
         </header>
 
-        <main className="flex-1 bg-gray-50 overflow-y-auto">
-          <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            {user && isLive && (
-              <div className="mb-6 flex items-center rounded-lg border border-green-200 bg-green-50 p-4">
-                <div className="relative flex-shrink-0">
-                  <span className="absolute inline-flex h-3 w-3 animate-ping rounded-full bg-green-500"></span>
-                  <span className="relative inline-flex h-3 w-3 rounded-full bg-green-500"></span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-green-800">
-                    You are currently live
-                  </p>
-                  <p className="text-sm text-green-600">
-                    Video calls can be received. Toggle off when you're
-                    unavailable.
-                  </p>
-                </div>
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+          {user && isLive && (
+            <div className="mb-6 flex items-center rounded-lg border border-green-200 bg-green-50 p-4">
+              <div className="relative flex-shrink-0">
+                <span className="absolute inline-flex h-3 w-3 animate-ping rounded-full bg-green-500 opacity-75"></span>
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-green-500"></span>
               </div>
-            )}
+              <div className="ml-3">
+                <p className="text-sm font-medium text-green-800">
+                  You are currently live
+                </p>
+                <p className="text-sm text-green-600">
+                  Video calls can be received. Toggle off when you're
+                  unavailable.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div>
             <div>{children}</div>
           </div>
         </main>
       </div>
+
+      {/* Mobile Sidebar */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div
+            className="fixed inset-0 bg-gray-900 bg-opacity-50"
+            onClick={() => setIsSidebarOpen(false)}
+          ></div>
+
+          <div className="relative flex flex-col w-64 max-w-xs bg-gradient-to-b from-indigo-800 to-purple-700 text-white z-50">
+            <div className="flex items-center justify-between h-16 px-4 border-b border-indigo-700">
+              <div className="text-xl font-bold">SnoutIQ</div>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="text-white hover:text-gray-200"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <nav className="flex-1 px-2 py-4 overflow-y-auto">
+              {mainNavItems.map((category, i) => (
+                <div key={i} className="mb-6">
+                  <h3 className="px-3 text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">
+                    {category.category}
+                  </h3>
+                  <div className="space-y-1">
+                    {category.items.map((item) => {
+                      const isActive = location.pathname === item.path;
+                      return (
+                        <button
+                          key={item.text}
+                          onClick={() =>
+                            handleNavItemClick(item.path, item.text)
+                          }
+                          className={`flex items-center w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                            isActive
+                              ? "bg-white text-indigo-700 shadow-md"
+                              : "text-indigo-100 hover:bg-indigo-700 hover:text-white"
+                          }`}
+                        >
+                          <span className="mr-3">{item.icon}</span>
+                          {item.text}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

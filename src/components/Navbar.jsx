@@ -228,11 +228,10 @@ const Navbar = () => {
                           type="button"
                           className="rounded-md text-white hover:text-gray-200 transition-colors"
                           onClick={() => setIsRightDrawerOpen(false)}
-                            aria-label="Close menu"
+                          aria-label="Close menu"
                         >
-                          <XMarkIcon className="w-6 h-6" aria-hidden="true"  />
+                          <XMarkIcon className="w-6 h-6" aria-hidden="true" />
                         </button>
-
                       </div>
                       <div className="flex-1 overflow-y-auto">
                         <div className="w-full">
@@ -264,7 +263,7 @@ const Navbar = () => {
               src={logo}
               alt="Snoutiq Logo"
               loading="lazy"
-              className="h-8 cursor-pointer transition-transform hover:scale-105"
+              className="h-6 cursor-pointer transition-transform hover:scale-105"
               onClick={() => navigate(user ? "/dashboard" : "/")}
             />
           </div>
@@ -424,15 +423,17 @@ const Navbar = () => {
             <div className="flex space-x-3">
               {/* Policies Dropdown for Mobile */}
               <div className="relative">
-               <button
-  onClick={togglePoliciesDropdown}
-  className="bg-white rounded-lg p-2 flex items-center shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
-  aria-label="Open policies menu"
-  aria-expanded={isPoliciesDropdownOpen}
->
-  <DocumentTextIcon className="w-6 h-6 text-gray-700" aria-hidden="true" />
-</button>
-
+                <button
+                  onClick={togglePoliciesDropdown}
+                  className="bg-white rounded-lg p-2 flex items-center shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
+                  aria-label="Open policies menu"
+                  aria-expanded={isPoliciesDropdownOpen}
+                >
+                  <DocumentTextIcon
+                    className="w-6 h-6 text-gray-700"
+                    aria-hidden="true"
+                  />
+                </button>
 
                 {isPoliciesDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">

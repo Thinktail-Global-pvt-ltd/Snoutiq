@@ -60,7 +60,7 @@ const Login = ({ checkIfLoggedIn }) => {
         <Card className="text-center shadow-lg p-6 sm:p-8">
           {/* Logo */}
           <div className="mb-6">
-            <img src={logo} alt="Snoutiq Logo" className="h-10 sm:h-12 mx-auto mb-2" />
+            <img src={logo} alt="Snoutiq Logo" className="h-6 mx-auto mb-2" />
           </div>
 
           {/* Welcome Message */}

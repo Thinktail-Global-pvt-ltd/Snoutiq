@@ -3,12 +3,12 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./ProtectedRoute";
 import { FaPaw } from "react-icons/fa";
+import RegisterPetOwner from "./pages/RegisterPetOwner";
 
 // Public pages
 const Login = lazy(() => import("./pages/Login"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const Register = lazy(() => import("./pages/Register"));
-const TokenLogin = lazy(() => import("./components/TokenLogin"));
 const PrivacyPolicy = lazy(() => import("./policies/PrivacyPolicy"));
 const TearmsCondition = lazy(() => import("./policies/TearmsCondition"));
 const Cancelation = lazy(() => import("./policies/Cancelation"));
@@ -97,8 +97,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/register" element={<Register />} />
             <Route path="/vet-register" element={<DoctorRegistration />} />
-
-            <Route path="/token-login/:token" element={<TokenLogin />} />
+            <Route path="/pet-data-register" element={<RegisterPetOwner/>}/>
 
             {/* privacy policy */}
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
