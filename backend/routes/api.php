@@ -24,10 +24,15 @@ use App\Models\User;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\CallController;
+// use App\Http\Controllers\CallController;
 // routes/api.php
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AgoraController;
+use App\Http\Controllers\Api\CallController;
+
+Route::post('/call/request', [CallController::class, 'requestCall']);
+
+
 
 
 Route::get('/agora/appid', function () {
