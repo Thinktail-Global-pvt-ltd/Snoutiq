@@ -15,7 +15,9 @@ const Cancelation = lazy(() => import("./policies/Cancelation"));
 const CookiePolicy = lazy(() => import("./policies/CookiePolicy"));
 const MedicalDataConsent = lazy(() => import("./policies/MedicalDataConsent"));
 const ShippingPolicy = lazy(() => import("./policies/ShippingPolicy"));
-
+import PatientDashboard from "./pages/PatientDashboard";
+import DoctorDashboard from "./pages/DoctorDashboard";
+import CallTestPage from "./pages/CallTestPage";
 // Core app pages
 const Home = lazy(() => import("./pages/Home"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -26,7 +28,7 @@ const Videocall = lazy(() => import("./pages/VideoCall"));
 const SearchingDoctor = lazy(() => import("./pages/SearchingDoctor"));
 const PaymentPage = lazy(() => import("./PetDashboard/Payment"));
 const WaitingForDoctor = lazy(() => import("./PetDashboard/WaitingForDoctor"));
-const CallTestPage = lazy(() => import("./CallTestPage"));
+// const CallTestPage = lazy(() => import("./CallTestPage"));
 
 // Vet/Admin pages
 const DoctorRegistration = lazy(() =>
@@ -82,7 +84,15 @@ function App() {
               }
             />
 
-            {/* Public Routes */}
+            {/* Public Routes */}.
+              {/* Patient ka route */}
+        <Route path="/patient" element={<PatientDashboard />} />
+
+        {/* Doctor ka route */}
+        <Route path="/doctor" element={<DoctorDashboard doctorId={501} />} />
+
+        {/* Common call page (doctor + patient dono yaha connect honge) */}
+        <Route path="/call-page/:channel" element={<CallTestPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/register" element={<Register />} />
