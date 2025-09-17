@@ -265,7 +265,7 @@ public function createInitialRegistration(Request $request)
         //     ->where('phone', $request->mobileNumber)
         //     ->exists();
 
-        if ($emailExists || $mobileExists) {
+        if ($emailExists ) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'enter unique mobile or email'
