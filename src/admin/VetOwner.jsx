@@ -26,7 +26,8 @@ const AdminVetsDashboard = () => {
           "https://snoutiq.com/backend/api/vets?email=admin@gmail.com"
         );
         const data = await response.json();
-        setVets(data || []);
+        console.log(data, "data"); // shows the structure
+        setVets(data.data || []); // <-- corrected
       } catch (err) {
         console.error("Error fetching vets:", err);
       } finally {
@@ -244,6 +245,62 @@ const AdminVetsDashboard = () => {
                 <div>
                   <strong>Bio:</strong> {selectedVet.bio || "N/A"}
                 </div>
+              </div>
+              <div className="grid grid-cols-1 gap-2 text-sm text-gray-700">
+                <div>
+                  <strong>City:</strong> {selectedVet.city}
+                </div>
+                <div>
+                  <strong>Address:</strong> {selectedVet.address}
+                </div>
+                <div>
+                  <strong>Business Status:</strong>{" "}
+                  {selectedVet.business_status || "N/A"}
+                </div>
+                <div>
+                  <strong>Chat Price:</strong> {selectedVet.chat_price || "-"}
+                </div>
+                <div>
+                  <strong>Rating:</strong> {selectedVet.rating || "-"} (
+                  {selectedVet.user_ratings_total || 0} ratings)
+                </div>
+                <div>
+                  <strong>Coordinates:</strong>{" "}
+                  {selectedVet.coordinates ||
+                    `${selectedVet.lat},${selectedVet.lng}`}
+                </div>
+                <div>
+                  <strong>Bio:</strong> {selectedVet.bio || "N/A"}
+                </div>
+
+                {/* --- Doctors Loop --- */}
+                {selectedVet.doctors && selectedVet.doctors.length > 0 && (
+                  <div className="mt-4">
+                    <strong>Doctors:</strong>
+                    <div className="grid grid-cols-1 gap-2 mt-1">
+                      {selectedVet.doctors.map((doc, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2 border rounded-md bg-gray-50 shadow-sm"
+                        >
+                          <div>
+                            <strong>Name:</strong> {doc.doctor_name}
+                          </div>
+                          <div>
+                            <strong>Email:</strong> {doc.doctor_email}
+                          </div>
+                          <div>
+                            <strong>Mobile:</strong> {doc.doctor_mobile}
+                          </div>
+                          <div>
+                            <strong>License:</strong>{" "}
+                            {doc.doctor_license || "N/A"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {selectedVet.photos && (

@@ -453,7 +453,7 @@ const RegisterPetDetails = () => {
               {/* Document Uploads */}
               <div className="text-left">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Prescription Document (Optional)
+                  Vaccination Record History (Optional)
                 </label>
                 <div className="flex items-center justify-center w-full">
                   <label
@@ -500,7 +500,7 @@ const RegisterPetDetails = () => {
 
               <div className="text-left">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Medical Document (Optional)
+                  Medical History (Optional)
                 </label>
                 <div className="flex items-center justify-center w-full">
                   <label
