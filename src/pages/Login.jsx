@@ -164,7 +164,7 @@ const Login = () => {
         formData.password === "5f4dcc3b5d"
       ) {
         finalUser = { ...user, role: "super_admin" };
-      }
+      } 
 
       // save session
       login(finalUser, token, chatRoomToken);
