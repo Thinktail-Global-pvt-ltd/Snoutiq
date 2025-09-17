@@ -19,17 +19,11 @@ class VetController extends Controller
 public function index()
 {
     try {
-        // vets + doctors join karke fetch karo
         $vetsWithDoctors = DB::table('vet_registerations_temp as v')
             ->leftJoin('doctors as d', 'd.vet_registeration_id', '=', 'v.id')
             ->select(
-                'v.id as vet_id',
-                'v.name as vet_name',
-                'v.email as vet_email',
-                'v.phone as vet_phone',
-                'v.created_at as vet_created_at',
-                'v.updated_at as vet_updated_at',
-                'd.id as doctor_id',
+                'v.*',                  // ✅ saare vet columns
+                'd.id as doctor_id',    // ✅ doctor id alias
                 'd.doctor_name',
                 'd.doctor_email',
                 'd.doctor_mobile',
@@ -41,19 +35,12 @@ public function index()
             ->get();
 
         // group vets and doctors
-        $grouped = $vetsWithDoctors->groupBy('vet_id')->map(function ($items) {
-            $vet = [
-                'vet_id'     => $items[0]->vet_id,
-                'vet_name'   => $items[0]->vet_name,
-                'vet_email'  => $items[0]->vet_email,
-                'vet_phone'  => $items[0]->vet_phone,
-                'created_at' => $items[0]->vet_created_at,
-                'updated_at' => $items[0]->vet_updated_at,
-                'doctors'    => []
-            ];
+        $grouped = $vetsWithDoctors->groupBy('id')->map(function ($items) {
+            $vet = (array) $items[0]; // convert object to array
+            $vet['doctors'] = [];
 
             foreach ($items as $row) {
-                if ($row->doctor_id) { // doctor exist karta hai
+                if ($row->doctor_id) {
                     $vet['doctors'][] = [
                         'doctor_id'      => $row->doctor_id,
                         'doctor_name'    => $row->doctor_name,
@@ -84,6 +71,8 @@ public function index()
         ], 500);
     }
 }
+
+
 
 
 
