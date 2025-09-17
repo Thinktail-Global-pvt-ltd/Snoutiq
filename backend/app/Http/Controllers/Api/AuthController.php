@@ -255,37 +255,49 @@ class AuthController extends Controller
 
 public function createInitialRegistration(Request $request)
 {
-    // ✅ check agar email ya phone already exist hai
-    $emailExists = DB::table('users')
-        ->where('email', $request->email)
-        ->exists();
+    try {
+        // ✅ check agar email ya phone already exist hai
+        $emailExists = DB::table('users')
+            ->where('email', $request->email)
+            ->exists();
 
-    $mobileExists = DB::table('users')
-        ->where('phone', $request->mobileNumber)
-        ->exists();
+        $mobileExists = DB::table('users')
+            ->where('phone', $request->mobileNumber)
+            ->exists();
 
-    if ($emailExists || $mobileExists) {
+        if ($emailExists || $mobileExists) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'enter unique mobile or email'
+            ], 422);
+        }
+
+        // ✅ sirf basic fields save karo
+        $user = User::create([
+            'name'         => $request->fullName,
+            'email'        => $request->email,
+            //'phone'      => $request->mobileNumber, // agar phone chahiye toh uncomment karo
+            'password'     => null, // abhi blank rakho
+            'google_token' => $request->google_token,
+        ]);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Initial registration created',
+            'user_id' => $user->id,   // ye id next step me use hogi
+            'user'    => $user,
+        ], 201);
+
+    } catch (\Exception $e) {
+        // ⚠️ Agar koi error aaya toh usko catch karo
         return response()->json([
             'status'  => 'error',
-            'message' => 'enter unique mobile or email'
-        ], 422);
+            'message' => 'Something went wrong while creating initial registration',
+            'error'   => $e->getMessage()
+        ], 500);
     }
-
-    // ✅ sirf basic fields save karo
-    $user = User::create([
-        'name'     => $request->fullName,
-        'email'    => $request->email,
-        'phone'    => $request->mobileNumber,
-        'password' => null, // abhi blank rakho,
-        'google_token'=> $request->google_token,
-    ]);
-
-    return response()->json([
-        'message' => 'Initial registration created',
-        'user_id' => $user->id,   // ye id next step me use hogi
-        'user'    => $user,
-    ], 201);
 }
+
 public function register(Request $request)
 {
     // ✅ user find karo id se jo initial step me aayi thi
