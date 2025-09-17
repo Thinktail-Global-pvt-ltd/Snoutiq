@@ -22,8 +22,8 @@ public function index()
         $vetsWithDoctors = DB::table('vet_registerations_temp as v')
             ->leftJoin('doctors as d', 'd.vet_registeration_id', '=', 'v.id')
             ->select(
-                'v.*',
-                'd.id as doctor_id',
+                'v.*',                  // ✅ saare vet columns
+                'd.id as doctor_id',    // ✅ doctor id alias
                 'd.doctor_name',
                 'd.doctor_email',
                 'd.doctor_mobile',
@@ -36,16 +36,8 @@ public function index()
 
         // group vets and doctors
         $grouped = $vetsWithDoctors->groupBy('id')->map(function ($items) {
-            // ✅ start vet only with v.* fields
-            $vet = [
-                'id'         => $items[0]->id,
-                'name'       => $items[0]->name,
-                'email'      => $items[0]->email,
-                'phone'      => $items[0]->phone,
-                'created_at' => $items[0]->created_at,
-                'updated_at' => $items[0]->updated_at,
-                'doctors'    => []
-            ];
+            $vet = (array) $items[0]; // convert object to array
+            $vet['doctors'] = [];
 
             foreach ($items as $row) {
                 if ($row->doctor_id) {
@@ -79,7 +71,6 @@ public function index()
         ], 500);
     }
 }
-
 
 
 
