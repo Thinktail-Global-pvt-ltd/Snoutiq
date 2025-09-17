@@ -253,9 +253,112 @@ class AuthController extends Controller
 
     // --------------------------- REGISTER -----------------------------------
 
+public function createInitialRegistration(Request $request)
+{
+    // ✅ check agar email ya phone already exist hai
+    $emailExists = DB::table('users')
+        ->where('email', $request->email)
+        ->exists();
 
+    $mobileExists = DB::table('users')
+        ->where('phone', $request->mobileNumber)
+        ->exists();
 
+    if ($emailExists || $mobileExists) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => 'enter unique mobile or email'
+        ], 422);
+    }
+
+    // ✅ sirf basic fields save karo
+    $user = User::create([
+        'name'     => $request->fullName,
+        'email'    => $request->email,
+        'phone'    => $request->mobileNumber,
+        'password' => null, // abhi blank rakho
+    ]);
+
+    return response()->json([
+        'message' => 'Initial registration created',
+        'user_id' => $user->id,   // ye id next step me use hogi
+        'user'    => $user,
+    ], 201);
+}
 public function register(Request $request)
+{
+    // ✅ user find karo id se jo initial step me aayi thi
+    $user = User::find($request->user_id);
+
+    if (!$user) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => 'User not found for update'
+        ], 404);
+    }
+
+    $doc1Path = null;
+    $doc2Path = null;
+    $summaryText = null;
+
+    // ✅ ensure directory exists
+    $uploadPath = public_path('uploads/pet_docs');
+    if (!File::exists($uploadPath)) {
+        File::makeDirectory($uploadPath, 0777, true, true);
+    }
+
+    // ✅ file upload
+    if ($request->hasFile('pet_doc1')) {
+        $doc1Name = time().'_'.uniqid().'_'.$request->file('pet_doc1')->getClientOriginalName();
+        File::put($uploadPath.'/'.$doc1Name, file_get_contents($request->file('pet_doc1')->getRealPath()));
+        $doc1Path = $uploadPath.'/'.$doc1Name;
+    }
+
+    if ($request->hasFile('pet_doc2')) {
+        $doc2Name = time().'_'.uniqid().'_'.$request->file('pet_doc2')->getClientOriginalName();
+        File::put($uploadPath.'/'.$doc2Name, file_get_contents($request->file('pet_doc2')->getRealPath()));
+        $doc2Path = $uploadPath.'/'.$doc2Name;
+    }
+
+    // ✅ Gemini summary
+    if ($doc1Path || $doc2Path) {
+        $imagePath = $doc1Path ?? $doc2Path;
+        $summaryText = $this->describePetImageDynamic($imagePath);
+    }
+
+    // ✅ Update user with final details
+    $user->update([
+        'name'        => $request->fullName,
+        'email'       => $request->email,
+        'phone'       => $request->mobileNumber,
+        'password'    => $request->password, // ⚠ plain (unsafe in prod)
+        'pet_name'    => $request->pet_name,
+        'pet_gender'  => $request->pet_gender,
+        'pet_age'     => $request->pet_age,
+        'pet_doc1'    => $doc1Path,
+        'pet_doc2'    => $doc2Path,
+        'summary'     => $summaryText,
+        'google_token'=> $request->google_token,
+        'breed'       => $request->breed,
+        'latitude'    => $request->latitude,
+        'longitude'   => $request->longitude,
+    ]);
+
+    // ✅ plain token generate and save
+    $plainToken = bin2hex(random_bytes(32));
+    $user->api_token_hash = $plainToken;
+    $user->save();
+
+    return response()->json([
+        'message'    => 'User registered successfully (updated)',
+        'user'       => $user,
+        'token'      => $plainToken,
+        'token_type' => 'Bearer',
+    ], 200);
+}
+
+
+public function register_latest_backup(Request $request)
 {
     
     // check email
@@ -538,7 +641,6 @@ public function login(Request $request)
             ], 200);
 
         } elseif ($role === 'vet') {
-            // 🔹 Search in vet_registerations_temp
             $tempVet = DB::table('vet_registerations_temp')
                 ->where('email', $email)
                 ->first();
