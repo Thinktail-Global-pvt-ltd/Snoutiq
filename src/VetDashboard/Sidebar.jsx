@@ -201,7 +201,7 @@ const HeaderWithSidebar = ({ children }) => {
   };
 
   const handleLogin = () => navigate("/login");
-  const handleRegister = () => navigate("/register");
+  const handleRegister = () => navigate("/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion");
   const handleLogout = () => {
     localStorage.clear();
     navigate("/");

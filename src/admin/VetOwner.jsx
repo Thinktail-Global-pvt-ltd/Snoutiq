@@ -1,6 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { EyeIcon, HeartIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import logo from '../assets/images/dark bg.webp'
+import React, { useState, useEffect, useContext } from "react";
+import {
+  EyeIcon,
+  HeartIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import logo from "../assets/images/dark bg.webp";
+import { AuthContext } from "../auth/AuthContext";
+import axios from "axios";
 
 const AdminVetsDashboard = () => {
   const [vets, setVets] = useState([]);
@@ -9,6 +16,7 @@ const AdminVetsDashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedVet, setSelectedVet] = useState(null); // Modal state
   const rowsPerPage = 10;
+  const { user } = useContext(AuthContext);
 
   useEffect(() => {
     const fetchVets = async () => {
@@ -46,8 +54,29 @@ const AdminVetsDashboard = () => {
 
   const handleView = (vet) => setSelectedVet(vet);
   const handleCloseModal = () => setSelectedVet(null);
-  const handleDelete = (id) =>
-    window.confirm("Are you sure?") && alert(`🗑️ Deleted vet: ${id}`);
+
+  // const handleDelete = (id) =>
+  //   window.confirm("Are you sure?") && alert(`🗑️ Deleted vet: ${id}`);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this vet?")) return;
+
+    try {
+      const res = await axios.delete(
+        `https://snoutiq.com/backend/api/vets/${id}`
+      );
+
+      if (res.status === 200) {
+        setVets((prev) => prev.filter((vet) => vet.id !== id));
+        toast.success(`🗑️ Vet with ID ${id} deleted successfully.`);
+      } else {
+        toast.error("❌ Could not delete vet. Try again.");
+      }
+    } catch (error) {
+      console.error("Error deleting vet:", error.response || error);
+      toast.error("❌ Failed to delete vet. Please try again.");
+    }
+  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -68,7 +97,8 @@ const AdminVetsDashboard = () => {
           />
           <span className="text-gray-600 text-sm ml-4">
             Showing {indexOfFirstVet + 1}–
-            {Math.min(indexOfLastVet, filteredVets.length)} of {filteredVets.length}
+            {Math.min(indexOfLastVet, filteredVets.length)} of{" "}
+            {filteredVets.length}
           </span>
         </div>
 
@@ -88,7 +118,9 @@ const AdminVetsDashboard = () => {
                   <th className="px-6 py-3 text-left font-semibold">License</th>
                   <th className="px-6 py-3 text-left font-semibold">Rating</th>
                   <th className="px-6 py-3 text-left font-semibold">Status</th>
-                  <th className="px-6 py-3 text-center font-semibold">Actions</th>
+                  <th className="px-6 py-3 text-center font-semibold">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -97,7 +129,11 @@ const AdminVetsDashboard = () => {
                     <td className="px-6 py-3">{vet.email}</td>
                     <td className="px-6 py-3">{vet.mobile}</td>
                     <td className="px-6 py-3">{vet.city}</td>
-                    <td className="px-6 py-3">{vet.license_no || <span className="text-red-500">Missing</span>}</td>
+                    <td className="px-6 py-3">
+                      {vet.license_no || (
+                        <span className="text-red-500">Missing</span>
+                      )}
+                    </td>
                     <td className="px-6 py-3">{vet.rating || "-"}</td>
                     <td className="px-6 py-3">
                       <span
@@ -111,10 +147,16 @@ const AdminVetsDashboard = () => {
                       </span>
                     </td>
                     <td className="px-6 py-3 flex justify-center gap-3">
-                      <button onClick={() => handleView(vet)} className="text-blue-600 hover:text-blue-800">
+                      <button
+                        onClick={() => handleView(vet)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
                         <EyeIcon className="h-5 w-5" />
                       </button>
-                      <button onClick={() => handleDelete(vet.id)} className="text-red-600 hover:text-red-800">
+                      <button
+                        onClick={() => handleDelete(vet.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
                         <TrashIcon className="h-5 w-5" />
                       </button>
                     </td>
@@ -136,7 +178,9 @@ const AdminVetsDashboard = () => {
                 Page {currentPage} of {totalPages}
               </span>
               <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                }
                 disabled={currentPage === totalPages}
                 className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
               >
@@ -150,7 +194,7 @@ const AdminVetsDashboard = () => {
         {selectedVet && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div>
-            <img src={logo} alt="logo" className="h-6"/>
+              <img src={logo} alt="logo" className="h-6" />
             </div>
             {/* Overlay */}
             <div
@@ -169,30 +213,51 @@ const AdminVetsDashboard = () => {
 
               <h3 className="text-2xl font-bold mb-4">{selectedVet.email}</h3>
               <div className="grid grid-cols-1 gap-2 text-sm text-gray-700">
-                <div><strong>Mobile:</strong> {selectedVet.mobile}</div>
-                <div><strong>City:</strong> {selectedVet.city}</div>
-                <div><strong>Address:</strong> {selectedVet.address}</div>
-                <div><strong>License:</strong> {selectedVet.license_no || "N/A"}</div>
-                <div><strong>Business Status:</strong> {selectedVet.business_status || "N/A"}</div>
-                <div><strong>Chat Price:</strong> {selectedVet.chat_price || "-"}</div>
-                <div><strong>Rating:</strong> {selectedVet.rating || "-"} ({selectedVet.user_ratings_total || 0} ratings)</div>
-                <div><strong>Coordinates:</strong> {selectedVet.coordinates || `${selectedVet.lat},${selectedVet.lng}`}</div>
-                <div><strong>Bio:</strong> {selectedVet.bio || "N/A"}</div>
+                <div>
+                  <strong>Mobile:</strong> {selectedVet.mobile}
+                </div>
+                <div>
+                  <strong>City:</strong> {selectedVet.city}
+                </div>
+                <div>
+                  <strong>Address:</strong> {selectedVet.address}
+                </div>
+                <div>
+                  <strong>License:</strong> {selectedVet.license_no || "N/A"}
+                </div>
+                <div>
+                  <strong>Business Status:</strong>{" "}
+                  {selectedVet.business_status || "N/A"}
+                </div>
+                <div>
+                  <strong>Chat Price:</strong> {selectedVet.chat_price || "-"}
+                </div>
+                <div>
+                  <strong>Rating:</strong> {selectedVet.rating || "-"} (
+                  {selectedVet.user_ratings_total || 0} ratings)
+                </div>
+                <div>
+                  <strong>Coordinates:</strong>{" "}
+                  {selectedVet.coordinates ||
+                    `${selectedVet.lat},${selectedVet.lng}`}
+                </div>
+                <div>
+                  <strong>Bio:</strong> {selectedVet.bio || "N/A"}
+                </div>
               </div>
 
               {selectedVet.photos && (
-  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-    {JSON.parse(selectedVet.photos).map((photo, idx) => (
-      <img
-        key={idx}
-        src={photo.photo_reference}
-        alt={`vet-photo-${idx}`}
-        className="w-full h-48 object-cover rounded-lg shadow-md"
-      />
-    ))}
-  </div>
-)}
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                  {JSON.parse(selectedVet.photos).map((photo, idx) => (
+                    <img
+                      key={idx}
+                      src={photo.photo_reference}
+                      alt={`vet-photo-${idx}`}
+                      className="w-full h-48 object-cover rounded-lg shadow-md"
+                    />
+                  ))}
+                </div>
+              )}
 
               <div className="text-gray-500 text-xs mt-4 border-t pt-2">
                 Created: {new Date(selectedVet.created_at).toLocaleString()}

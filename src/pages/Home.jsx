@@ -23,7 +23,7 @@ const Home = () => {
   const handleSendMessage = (msg) => {
     if (msg?.trim()) {
       localStorage.setItem("messageIntended", msg);
-      navigate("/register");
+      navigate("/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion");
     }
   };
 

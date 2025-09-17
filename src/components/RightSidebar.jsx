@@ -3,9 +3,6 @@ import axiosClient from "../axios";
 import playstore from '../assets/images/googlePlay.webp'
 
 export default function RightSidebar({ isMobile = false, onItemClick }) {
-  const [location, setLocation] = useState(null);
-  const [error, setError] = useState(null);
-  const [data, setData] = useState({ vets: [], groomers: [] });
   const [activeTab, setActiveTab] = useState('vets');
 
   const handleItemClick = () => {
@@ -14,38 +11,8 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
     }
   };
 
-  // Fetch location
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (err) => {
-          setError(err.message);
-        }
-      );
-    }
-  }, []);
 
-  // Fetch nearby vets/groomers
-  useEffect(() => {
-    const fetch = async () => {
-      try {
-        const res = await axiosClient.get(
-          `/fetchNearbyPlaces?lat=${location.lat}&lng=${location.lng}`
-        );
-        setData(res.data);
-      } catch (e) {
-        console.error("Error fetching places", e);
-      }
-    };
-    if (location !== null) fetch();
-  }, [location]);
-
+ 
   // ---------------- MOBILE VERSION ----------------
   if (isMobile) {
     return (

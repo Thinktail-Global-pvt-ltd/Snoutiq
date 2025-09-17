@@ -108,7 +108,7 @@ const Login = ({ checkIfLoggedIn }) => {
           <div className="mt-4">
             <p className="text-gray-600 text-sm">
               Don't have an account?{' '}
-              <Link to="/register" className="text-blue-600 hover:underline">
+              <Link to="/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion" className="text-blue-600 hover:underline">
                 Register
               </Link>
             </p>

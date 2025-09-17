@@ -1,5 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { EyeIcon, HeartIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect, useContext } from "react";
+import {
+  EyeIcon,
+  HeartIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import axios from "axios";
+import { AuthContext } from "../auth/AuthContext";
+import toast from "react-hot-toast";
 
 const AdminPetsDashboard = () => {
   const [vets, setVets] = useState([]);
@@ -8,6 +16,7 @@ const AdminPetsDashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedVet, setSelectedVet] = useState(null); // Modal state
   const rowsPerPage = 10;
+  const { user } = useContext(AuthContext);
 
   useEffect(() => {
     const fetchVets = async () => {
@@ -44,8 +53,29 @@ const AdminPetsDashboard = () => {
 
   const handleView = (vet) => setSelectedVet(vet);
   const handleCloseModal = () => setSelectedVet(null);
-  const handleDelete = (id) =>
-    window.confirm("Are you sure?") && alert(`🗑️ Deleted: ${id}`);
+
+  // const handleDelete = (id) =>
+  //   window.confirm("Are you sure?") && alert(`🗑️ Deleted: ${id}`);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this pet?")) return;
+
+    try {
+      const res = await axios.delete(
+        `https://snoutiq.com/backend/api/petparents/${id}`
+      );
+
+      if (res.status === 200) {
+        setVets((prev) => prev.filter((vet) => vet.id !== id));
+        toast.success(`🗑️ Pet with ID ${id} deleted successfully.`);
+      } else {
+        toast.error("❌ Could not delete pet. Try again.");
+      }
+    } catch (error) {
+      console.error("Error deleting pet:", error.response || error);
+      toast.error("❌ Failed to delete pet. Please try again.");
+    }
+  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -65,7 +95,9 @@ const AdminPetsDashboard = () => {
             className="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:outline-none"
           />
           <span className="text-gray-600 text-sm">
-            Showing {indexOfFirstVet + 1}–{Math.min(indexOfLastVet, filteredVets.length)} of {filteredVets.length}
+            Showing {indexOfFirstVet + 1}–
+            {Math.min(indexOfLastVet, filteredVets.length)} of{" "}
+            {filteredVets.length}
           </span>
         </div>
 
@@ -159,12 +191,17 @@ const AdminPetsDashboard = () => {
                 <div>Pet Gender: {selectedVet.pet_gender || "N/A"}</div>
                 {selectedVet.breed && <div>Breed: {selectedVet.breed}</div>}
                 {selectedVet.latitude && selectedVet.longitude && (
-                  <div>Location: {selectedVet.latitude}, {selectedVet.longitude}</div>
+                  <div>
+                    Location: {selectedVet.latitude}, {selectedVet.longitude}
+                  </div>
                 )}
                 {selectedVet.pet_doc1 && (
                   <div>
                     <a
-                      href={`https://snoutiq.com/${selectedVet.pet_doc1.replace("/var/www/html/project/backend/public/", "backend/")}`}
+                      href={`https://snoutiq.com/${selectedVet.pet_doc1.replace(
+                        "/var/www/html/project/backend/public/",
+                        "backend/"
+                      )}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-orange-600 hover:text-orange-800"
@@ -176,7 +213,10 @@ const AdminPetsDashboard = () => {
                 {selectedVet.pet_doc2 && (
                   <div>
                     <a
-                      href={`https://snoutiq.com/${selectedVet.pet_doc2.replace("/var/www/html/project/backend/public/", "backend/")}`}
+                      href={`https://snoutiq.com/${selectedVet.pet_doc2.replace(
+                        "/var/www/html/project/backend/public/",
+                        "backend/"
+                      )}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-orange-600 hover:text-orange-800"
@@ -185,10 +225,14 @@ const AdminPetsDashboard = () => {
                     </a>
                   </div>
                 )}
-                {selectedVet.summary && <div className="mt-2">{selectedVet.summary}</div>}
+                {selectedVet.summary && (
+                  <div className="mt-2">{selectedVet.summary}</div>
+                )}
                 <div className="text-gray-500 text-xs mt-2">
-                  Created: {new Date(selectedVet.created_at).toLocaleDateString()} <br />
-                  Updated: {new Date(selectedVet.updated_at).toLocaleDateString()}
+                  Created:{" "}
+                  {new Date(selectedVet.created_at).toLocaleDateString()} <br />
+                  Updated:{" "}
+                  {new Date(selectedVet.updated_at).toLocaleDateString()}
                 </div>
               </div>
             </div>

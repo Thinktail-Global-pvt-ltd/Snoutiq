@@ -18,6 +18,9 @@ const ShippingPolicy = lazy(() => import("./policies/ShippingPolicy"));
 import PatientDashboard from "./pages/PatientDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import CallTestPage from "./pages/CallTestPage";
+import RegisterPassword from "./pages/RegisterPetPassword";
+import RegisterPetDetails from "./pages/RegisterPetOwner";
+import { RegistrationProvider } from "./auth/RegistrationContext";
 // Core app pages
 const Home = lazy(() => import("./pages/Home"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -29,6 +32,7 @@ const SearchingDoctor = lazy(() => import("./pages/SearchingDoctor"));
 const PaymentPage = lazy(() => import("./PetDashboard/Payment"));
 const WaitingForDoctor = lazy(() => import("./PetDashboard/WaitingForDoctor"));
 // const CallTestPage = lazy(() => import("./CallTestPage"));
+
 
 // Vet/Admin pages
 const DoctorRegistration = lazy(() =>
@@ -88,6 +92,10 @@ function App() {
               {/* Patient ka route */}
         <Route path="/patient" element={<PatientDashboard />} />
 
+              <Route path="/register" element={<RegistrationProvider><Register /></RegistrationProvider>} />
+          <Route path="/register-pet-details" element={<RegistrationProvider><RegisterPetDetails /></RegistrationProvider>} />
+              <Route path="/register-password" element={<RegistrationProvider><RegisterPassword /></RegistrationProvider>} />
+
         {/* Doctor ka route */}
         <Route path="/doctor" element={<DoctorDashboard doctorId={501} />} />
 
@@ -95,7 +103,7 @@ function App() {
         <Route path="/call-page/:channel" element={<CallTestPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/register" element={<Register />} />
+      
             <Route path="/vet-register" element={<DoctorRegistration />} />
             <Route path="/pet-data-register" element={<RegisterPetOwner/>}/>
 

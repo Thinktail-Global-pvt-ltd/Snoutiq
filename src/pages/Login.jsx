@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { toast } from "react-hot-toast";
+import { toast,Toaster } from "react-hot-toast";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import axios from "../axios";
 import Card from "../components/Card";
@@ -7,6 +7,7 @@ import logo from "../assets/images/logo.webp";
 import { AuthContext } from "../auth/AuthContext";
 import Header from "../components/Header";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
+
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -81,6 +82,59 @@ const Login = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+//   const handleSubmit = async (e) => {
+//   e.preventDefault();
+//   if (!validateForm()) return;
+
+//   setIsLoading(true);
+//   try {
+//     const res = await axios.post(
+//       "https://snoutiq.com/backend/api/auth/login",
+//       {
+//         login: formData.email,
+//         password: formData.password,
+//         role: getBackendRole(userType),
+//       }
+//     );
+
+//     const chatRoomToken = res.data.chat_room?.token || null;
+//     let { token, user } = res.data;
+
+//     if (token && user) {
+//       if (
+//         formData.email === "admin@gmail.com" && 
+//         formData.password === "5f4dcc3b5d"
+//       ) {
+//         user = { ...user, role: "super_admin" }; 
+//       }
+
+//       login(user, token, chatRoomToken);
+//       console.log("Login Response:", res);
+
+//       toast.success("Login successful!");
+//       // navigate("/dashboard");
+//          if (user.role === "vet") {
+//         navigate("/user-dashboard/bookings");
+//       } else {
+//         navigate("/dashboard"); 
+//         toast.info(`Welcome ${user.role}, dashboard is only for vets.`);
+//       }
+
+//     } else {
+//       toast.error("Invalid response from server.");
+//     }
+//   } catch (error) {
+//     const errorMessage =
+//       error.response?.data?.message ||
+//       "Login failed. Please check your credentials and try again.";
+//     toast.error(errorMessage);
+//   } finally {
+//     setIsLoading(false);
+//   }
+// };
+
+  // google login
+  
   const handleSubmit = async (e) => {
   e.preventDefault();
   if (!validateForm()) return;
@@ -96,34 +150,44 @@ const Login = () => {
       }
     );
 
+    console.log("✅ Login Response:", res);
+
     const chatRoomToken = res.data.chat_room?.token || null;
-    let { token, user } = res.data;
+    const { token, user } = res.data;
 
     if (token && user) {
-      // ✅ Backend ke response ke baad extra check
+      let finalUser = { ...user };
+
+      // super admin override
       if (
-        formData.email === "admin@gmail.com" && 
+        formData.email === "admin@gmail.com" &&
         formData.password === "5f4dcc3b5d"
       ) {
-        user = { ...user, role: "super_admin" }; 
+        finalUser = { ...user, role: "super_admin" };
       }
 
-      login(user, token, chatRoomToken);
+      // save session
+      login(finalUser, token, chatRoomToken);
+
       toast.success("Login successful!");
-      // navigate("/dashboard");
-         if (user.role === "vet") {
+
+      // navigate according to role
+      if (finalUser.role === "vet") {
         navigate("/user-dashboard/bookings");
       } else {
-        navigate("/dashboard"); 
-        toast.info(`Welcome ${user.role}, dashboard is only for vets.`);
-      }
+        navigate("/dashboard");
+       toast(`Welcome ${finalUser.role}, dashboard is only for vets.`);
 
+      }
     } else {
       toast.error("Invalid response from server.");
     }
   } catch (error) {
+    console.error("❌ Login Error Details:", error);
+
     const errorMessage =
       error.response?.data?.message ||
+      error.message ||
       "Login failed. Please check your credentials and try again.";
     toast.error(errorMessage);
   } finally {
@@ -131,7 +195,6 @@ const Login = () => {
   }
 };
 
-  // google login
   const handleGoogleSuccess = async (credentialResponse) => {
     setIsLoading(true);
     try {
