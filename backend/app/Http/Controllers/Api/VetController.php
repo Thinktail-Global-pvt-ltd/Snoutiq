@@ -9,11 +9,33 @@ use Illuminate\Support\Facades\DB;
 class VetController extends Controller
 {
     // 🔹 All vets list
+    // public function index()
+    // {
+    //     $vets = DB::table('vet_registerations_temp')->get();
+    //     return response()->json($vets);
+    // }
+
+
     public function index()
-    {
-        $vets = DB::table('vet_registerations_temp')->get();
-        return response()->json($vets);
-    }
+{
+    $vets = DB::table('vet_registerations_temp as v')
+        ->leftJoin('doctors as d', 'd.vet_registeration_id', '=', 'v.id')
+        ->select(
+            'v.*',                  // saare vets columns
+            'd.id as doctor_id',    // doctor id ka alias
+            'd.doctor_name',
+            'd.doctor_email',
+            'd.doctor_mobile',
+            'd.doctor_license',
+            'd.doctor_image',
+            'd.created_at as doctor_created_at',
+            'd.updated_at as doctor_updated_at'
+        )
+        ->get();
+
+    return response()->json($vets);
+}
+
 
     // 🔹 View single vet by ID
     public function show($id)
