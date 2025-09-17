@@ -307,3 +307,9 @@ Route::post('/webhook/deploy', function () {
 
 // routes/api.php
 Route::post('/agora/token', [CallController::class, 'generateToken']);
+
+use App\Http\Controllers\Api\PetParentController;
+
+Route::get('/petparents/{id}', [PetParentController::class, 'show']);     // Single pet parent
+Route::delete('/petparents/{id}', [PetParentController::class, 'destroy']); // Delete pet parent
+
