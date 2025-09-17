@@ -276,7 +276,8 @@ public function createInitialRegistration(Request $request)
         'name'     => $request->fullName,
         'email'    => $request->email,
         'phone'    => $request->mobileNumber,
-        'password' => null, // abhi blank rakho
+        'password' => null, // abhi blank rakho,
+        'google_token'=> $request->google_token,
     ]);
 
     return response()->json([
@@ -338,7 +339,7 @@ public function register(Request $request)
         'pet_doc1'    => $doc1Path,
         'pet_doc2'    => $doc2Path,
         'summary'     => $summaryText,
-        'google_token'=> $request->google_token,
+       // 'google_token'=> $request->google_token,
         'breed'       => $request->breed,
         'latitude'    => $request->latitude,
         'longitude'   => $request->longitude,
