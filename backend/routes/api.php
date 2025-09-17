@@ -32,7 +32,11 @@ use App\Http\Controllers\Api\CallController;
 
 Route::post('/call/request', [CallController::class, 'requestCall']);
 
+use App\Http\Controllers\Api\VetController;
 
+Route::get('/vets', [VetController::class, 'index']);        // All vets
+Route::get('/vets/{id}', [VetController::class, 'show']);    // Single vet
+Route::delete('/vets/{id}', [VetController::class, 'destroy']); // Delete vet
 
 
 Route::get('/agora/appid', function () {
@@ -59,7 +63,7 @@ Route::post('/call/{id}/accept', [CallController::class, 'acceptCall']);
 Route::post('/call/{id}/payment-success', [CallController::class, 'paymentSuccess']);
 
 Route::get('/users', [AdminController::class, 'getUsers']);
-Route::get('/vets', [AdminController::class, 'getVets']);
+// Route::get('/vets', [AdminController::class, 'getVets']);
 
 Route::get('/dog-breed/{breed}', [\App\Http\Controllers\Api\DogBreedController::class, 'getBreedImage']);
 Route::get('/dog-breeds/all', [\App\Http\Controllers\Api\DogBreedController::class, 'allBreeds']);
@@ -163,10 +167,10 @@ Route::get('/users', function () {
     $users = User::all();
     return response()->json($users);
 });
-Route::get('/vets', function () {
-    $vets = DB::table('vet_registerations_temp')->get();
-    return response()->json($vets);
-});
+// Route::get('/vets', function () {
+//     $vets = DB::table('vet_registerations_temp')->get();
+//     return response()->json($vets);
+// });
 
 Route::prefix('groomer')->middleware('auth:sanctum')->group(function () {
 Route::post('/profile', [GroomerProfileController::class, 'store']);
