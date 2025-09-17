@@ -261,9 +261,9 @@ public function createInitialRegistration(Request $request)
             ->where('email', $request->email)
             ->exists();
 
-        $mobileExists = DB::table('users')
-            ->where('phone', $request->mobileNumber)
-            ->exists();
+        // $mobileExists = DB::table('users')
+        //     ->where('phone', $request->mobileNumber)
+        //     ->exists();
 
         if ($emailExists || $mobileExists) {
             return response()->json([
