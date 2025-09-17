@@ -10,15 +10,26 @@ export default function DoctorDashboard({ doctorId = 501 }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // const echo = new Echo({
+    //   broadcaster: "pusher",
+    //   key: "base64:yT9RzP3vXl9lJ2pB2g==",
+    //   cluster: "mt1",
+    //   wsHost: "127.0.0.1",
+    //   wsPort: 8080,
+    //   forceTLS: false,
+    //   disableStats: true,
+    // });
     const echo = new Echo({
-      broadcaster: "pusher",
-      key: "base64:yT9RzP3vXl9lJ2pB2g==",
-      cluster: "mt1",
-      wsHost: "127.0.0.1",
-      wsPort: 8080,
-      forceTLS: false,
-      disableStats: true,
-    });
+  broadcaster: "pusher",
+  key: "base64:yT9RzP3vXl9lJ2pB2g==", // tumhara app key
+  wsHost: "snoutiq.com",           // ✅ Production domain
+  wsPort: 8080,                    // ✅ Reverb ka port
+  wssPort: 8080,                   // Agar TLS use karna ho
+  forceTLS: false,                 // Agar https + wss enable hai to true karna
+  enabledTransports: ["ws", "wss"], // ✅ sirf WebSockets use karo
+  disableStats: true,
+});
+
 
     // echo.channel(`doctor.${doctorId}`).listen("CallRequested", (e) => {
     //   console.log("📞 Incoming call:", e);
