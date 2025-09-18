@@ -2,18 +2,19 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 
-// yaha apne server ka URL use karo
-const socket = io("http://localhost:4000");
+// Production connect (via Apache reverse proxy)
+const socket = io("https://snoutiq.com", {
+  path: "/socket.io",
+  transports: ["websocket"],
+});
 
 export default function DoctorDashboard({ doctorId = 501 }) {
   const [incomingCall, setIncomingCall] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Doctor room join
     socket.emit("join-doctor", doctorId);
 
-    // Call request suno
     socket.on("call-requested", (e) => {
       console.log("📞 Incoming call:", e);
       setIncomingCall(e);
@@ -32,7 +33,7 @@ export default function DoctorDashboard({ doctorId = 501 }) {
 
   return (
     <div style={{ padding: 20 }}>
-      <h2>Doctor Dashboard (Socket.IO)</h2>
+      <h2>Doctor Dashboard</h2>
       {incomingCall ? (
         <div style={{ background: "#fef3c7", padding: 16, borderRadius: 8 }}>
           <h3>📞 Incoming Call</h3>
