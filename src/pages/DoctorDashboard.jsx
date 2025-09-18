@@ -7,33 +7,18 @@ export default function DoctorDashboard({ doctorId = 501 }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const isLocal =
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1";
-
     const echo = new Echo({
-      broadcaster: "pusher",
+      broadcaster: "reverb",   // 👈 yeh line fix hai
       key: "base64:yT9RzP3vXl9lJ2pB2g==",
-      cluster: "mt1",
-      wsHost: "127.0.0.1",
-      wsPort: 8080,
+      wsHost: window.location.hostname,
+      wsPort: 8080,            // local Reverb port
       forceTLS: false,
-      disableStats: true,
+      enabledTransports: ["ws"],
     });
-  })
-    // echo.channel(`doctor.${doctorId}`).listen("CallRequested", (e) => {
-    //   console.log("📞 Incoming call:", e);
-    //   setIncomingCall(e);
-    // });
 
-    // Doctor ke liye channel join
-echo.channel(`doctor.${doctorId}`)
-  .listen("CallRequested", (e) => {
-    console.log("📞 Incoming call event:", e);
-    setIncomingCall({
-      doctorId: e.doctorId,
-      patientId: e.patientId,
-      channel: e.channel,   // ✅ channel include karo
+    echo.channel(`doctor.${doctorId}`).listen("CallRequested", (e) => {
+      console.log("📞 Incoming call event:", e);
+      setIncomingCall(e);
     });
 
     return () => {
@@ -41,36 +26,13 @@ echo.channel(`doctor.${doctorId}`)
     };
   }, [doctorId]);
 
-  const handleAccept = () => {
-    if (incomingCall) {
-      navigate(
-        `/call-page/${incomingCall.channel}?uid=${doctorId}&role=host`
-      );
-    }
-  };
-
-  const handleReject = () => setIncomingCall(null);
-
   return (
-    <div style={{ padding: 20 }}>
+    <div>
       <h2>Doctor Dashboard</h2>
       {incomingCall ? (
-        <div
-          style={{
-            background: "#fef3c7",
-            padding: 16,
-            borderRadius: 8,
-            marginTop: 20,
-          }}
-        >
-          <h3>📞 Incoming Call</h3>
-          <p>
-            Patient <b>{incomingCall.patientId}</b> is calling you on{" "}
-            <b>{incomingCall.channel}</b>
-          </p>
-          <button onClick={handleAccept}>✅ Accept</button>
-          <button onClick={handleReject}>❌ Reject</button>
-        </div>
+        <p>
+          Patient {incomingCall.patientId} is calling on {incomingCall.channel}
+        </p>
       ) : (
         <p>No active calls.</p>
       )}
