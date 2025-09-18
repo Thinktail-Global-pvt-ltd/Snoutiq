@@ -94,9 +94,9 @@ function App() {
             <Route
               path="/"
               element={
-                <ProtectedRoute>
+                // <ProtectedRoute>
                   <Home />
-                </ProtectedRoute>
+                // </ProtectedRoute>
               }
             />
             {/* Public Routes */}.{/* Patient ka route */}
