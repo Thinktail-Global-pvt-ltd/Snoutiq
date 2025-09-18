@@ -345,10 +345,10 @@ public function register(Request $request)
 
     // ✅ Update user with final details
     $user->update([
-        'name'        => $request->fullName,
-        'email'       => $request->email,
-        'phone'       => $request->mobileNumber,
-        'password'    => $request->password, // ⚠ plain (unsafe in prod)
+        // 'home_visit'        => $request->home_visit,
+        // 'email'       => $request->email,
+        // 'phone'       => $request->mobileNumber,
+        // 'password'    => $request->password, // ⚠ plain (unsafe in prod)
         'pet_name'    => $request->pet_name,
         'pet_gender'  => $request->pet_gender,
         'pet_age'     => $request->pet_age,
