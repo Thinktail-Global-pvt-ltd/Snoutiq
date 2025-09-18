@@ -14,7 +14,7 @@ export default function DoctorDashboard({ doctorId = 501 }) {
       broadcaster: "pusher",
       key: "base64:yT9RzP3vXl9lJ2pB2g==",
       cluster: "mt1",
-      wsHost: "127.0.0.1",
+      wsHost: "https://snoutiq.com/backend",
       wsPort: 8080,
       forceTLS: false,
       disableStats: true,

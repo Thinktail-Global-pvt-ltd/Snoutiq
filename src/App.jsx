@@ -33,7 +33,6 @@ const PaymentPage = lazy(() => import("./PetDashboard/Payment"));
 const WaitingForDoctor = lazy(() => import("./PetDashboard/WaitingForDoctor"));
 // const CallTestPage = lazy(() => import("./CallTestPage"));
 
-
 // Vet/Admin pages
 const DoctorRegistration = lazy(() =>
   import("./VetDashboard/DoctorRegistration")
@@ -62,11 +61,24 @@ const PetMedicationTracker = lazy(() =>
   import("./PetDashboard/PetMedicationTracker")
 );
 const CallPage = lazy(() => import("./CallPage"));
+import NotificationSocket from "./components/NotificationSocket";
 function App() {
   return (
     <Router>
-      <Toaster position="bottom-right" reverseOrder={false} />
+      {/* <Toaster position="top-right" reverseOrder={false} /> */}
+      <Toaster
+  position="top-center"
+  containerStyle={{
+    top: 80,   // 👈 top se distance (px)
+    bottom: 80 // 👈 bottom se bhi adjust kar sakte ho
+  }}
+  toastOptions={{
+    duration: 4000,
+    style: { fontSize: "14px", borderRadius: "8px" }
+  }}
+/>
 
+      <NotificationSocket />
       <div className="bg-white text-black">
         <Suspense
           fallback={
@@ -87,26 +99,43 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
-            {/* Public Routes */}.
-              {/* Patient ka route */}
-        <Route path="/patient" element={<PatientDashboard />} />
-
-              <Route path="/register" element={<RegistrationProvider><Register /></RegistrationProvider>} />
-          <Route path="/register-pet-details" element={<RegistrationProvider><RegisterPetDetails /></RegistrationProvider>} />
-              <Route path="/register-password" element={<RegistrationProvider><RegisterPassword /></RegistrationProvider>} />
-
-        {/* Doctor ka route */}
-        <Route path="/doctor" element={<DoctorDashboard doctorId={501} />} />
-
-        {/* Common call page (doctor + patient dono yaha connect honge) */}
-        <Route path="/call-page/:channel" element={<CallTestPage />} />
+            {/* Public Routes */}.{/* Patient ka route */}
+            <Route path="/patient" element={<PatientDashboard />} />
+            <Route
+              path="/register"
+              element={
+                <RegistrationProvider>
+                  <Register />
+                </RegistrationProvider>
+              }
+            />
+            <Route
+              path="/register-pet-details"
+              element={
+                <RegistrationProvider>
+                  <RegisterPetDetails />
+                </RegistrationProvider>
+              }
+            />
+            <Route
+              path="/register-password"
+              element={
+                <RegistrationProvider>
+                  <RegisterPassword />
+                </RegistrationProvider>
+              }
+            />
+            {/* Doctor ka route */}
+            <Route
+              path="/doctor"
+              element={<DoctorDashboard doctorId={501} />}
+            />
+            {/* Common call page (doctor + patient dono yaha connect honge) */}
+            <Route path="/call-page/:channel" element={<CallTestPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-      
             <Route path="/vet-register" element={<DoctorRegistration />} />
-            <Route path="/pet-data-register" element={<RegisterPetOwner/>}/>
-
+            <Route path="/pet-data-register" element={<RegisterPetOwner />} />
             {/* privacy policy */}
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TearmsCondition />} />
@@ -117,7 +146,6 @@ function App() {
               element={<MedicalDataConsent />}
             />
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
-
             <Route
               path="/user/pets"
               element={
@@ -151,7 +179,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/video-call"
               element={
@@ -168,7 +195,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/*"
               element={
@@ -177,7 +203,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/pet-info"
               element={

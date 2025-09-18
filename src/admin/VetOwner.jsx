@@ -8,6 +8,8 @@ import {
 import logo from "../assets/images/dark bg.webp";
 import { AuthContext } from "../auth/AuthContext";
 import axios from "axios";
+import toast from "react-hot-toast";
+
 
 const AdminVetsDashboard = () => {
   const [vets, setVets] = useState([]);
@@ -258,7 +260,7 @@ const AdminVetsDashboard = () => {
                   {selectedVet.business_status || "N/A"}
                 </div>
                 <div>
-                  <strong>Chat Price:</strong> {selectedVet.chat_price || "-"}
+                  <strong>Consultation Fee:</strong> {selectedVet.chat_price || "-"}
                 </div>
                 <div>
                   <strong>Rating:</strong> {selectedVet.rating || "-"} (
