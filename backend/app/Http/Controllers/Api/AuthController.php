@@ -273,13 +273,17 @@ public function createInitialRegistration(Request $request)
         // }
 
         // ✅ sirf basic fields save karo
+        
         $user = User::create([
             'name'         => $request->fullName,
             'email'        => $request->email,
             //'phone'      => $request->mobileNumber, // agar phone chahiye toh uncomment karo
             'password'     => null, // abhi blank rakho
             'google_token' => $request->google_token,
+         'latitude'    => $request->latitude,
+        'longitude'   => $request->longitude,
         ]);
+
 
         return response()->json([
             'status'  => 'success',
@@ -353,8 +357,8 @@ public function register(Request $request)
         'summary'     => $summaryText,
        // 'google_token'=> $request->google_token,
         'breed'       => $request->breed,
-        'latitude'    => $request->latitude,
-        'longitude'   => $request->longitude,
+        // 'latitude'    => $request->latitude,
+        // 'longitude'   => $request->longitude,
     ]);
 
     // ✅ plain token generate and save
