@@ -304,6 +304,7 @@ const Login = () => {
             </div>
 
             {/* Form */}
+                 {userType === "vet" && (
             <form onSubmit={handleSubmit} className="space-y-4 mb-6">
               {/* Email */}
               <div className="text-left">
@@ -377,10 +378,11 @@ const Login = () => {
                 {isLoading ? "Logging in..." : "Login"}
               </button>
             </form>
+                 )}
 
             {/* Google login */}
             {userType === "pet" && (
-              <div className="flex justify-center">
+              <div className="w-full max-w-sm border rounded-xl shadow-md p-4 bg-white">
                 <GoogleOAuthProvider
                   clientId="325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com"
                   onScriptLoadError={() =>

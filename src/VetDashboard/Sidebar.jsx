@@ -27,6 +27,8 @@ const HeaderWithSidebar = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useContext(AuthContext);
+  console.log(user,"asdjashkd");
+  
 
   // ✅ Navigation config with correct heroicons
   const navConfig = {

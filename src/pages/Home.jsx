@@ -139,7 +139,7 @@ const Home = () => {
               Join thousands of pet owners who trust our AI assistant
             </p>
             <button
-              onClick={() => navigate("/register")}
+              onClick={() => navigate("/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion")}
               className="bg-white text-blue-600 font-semibold py-3 px-8 rounded-full hover:bg-gray-100 transition-colors duration-300 shadow-lg"
             >
               Get Started Now

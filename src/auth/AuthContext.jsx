@@ -176,6 +176,10 @@ export const AuthProvider = ({ children }) => {
       return merged;
     });
   };
+const updateUser = (newUserData) => {
+  setUser(newUserData);
+  localStorage.setItem("user", JSON.stringify(newUserData));
+};
 
   // Load on mount
   useEffect(() => {
@@ -197,6 +201,7 @@ export const AuthProvider = ({ children }) => {
         nearbyDoctors,
         updateNearbyDoctors,
         loading,
+        updateUser,
       }}
     >
       {children}

@@ -94,13 +94,7 @@ const RegisterPetPassword = () => {
       submitData.append("pet_gender", formData.petGender);
       submitData.append("pet_age", formData.petAge);
       submitData.append("breed", formData.petBreed);
-      submitData.append("latitude", coords.lat);
-      submitData.append("longitude", coords.lng);
 
-      // Add optional fields
-      if (formData.google_token) {
-        submitData.append("google_token", formData.google_token);
-      }
       if (formData.petDoc1) {
         submitData.append("pet_doc1", formData.petDoc1);
       }

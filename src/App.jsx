@@ -67,16 +67,16 @@ function App() {
     <Router>
       {/* <Toaster position="top-right" reverseOrder={false} /> */}
       <Toaster
-  position="top-center"
-  containerStyle={{
-    top: 80,   // 👈 top se distance (px)
-    bottom: 80 // 👈 bottom se bhi adjust kar sakte ho
-  }}
-  toastOptions={{
-    duration: 4000,
-    style: { fontSize: "14px", borderRadius: "8px" }
-  }}
-/>
+        position="top-center"
+        containerStyle={{
+          top: 80,
+          bottom: 80,
+        }}
+        toastOptions={{
+          duration: 4000,
+          style: { fontSize: "14px", borderRadius: "8px" },
+        }}
+      />
 
       <NotificationSocket />
       <div className="bg-white text-black">
@@ -104,17 +104,13 @@ function App() {
             <Route
               path="/register"
               element={
-                <RegistrationProvider>
                   <Register />
-                </RegistrationProvider>
               }
             />
             <Route
               path="/register-pet-details"
               element={
-                <RegistrationProvider>
                   <RegisterPetDetails />
-                </RegistrationProvider>
               }
             />
             <Route
