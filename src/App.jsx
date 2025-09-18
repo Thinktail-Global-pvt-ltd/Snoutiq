@@ -97,7 +97,7 @@ function App() {
               <Route path="/register-password" element={<RegistrationProvider><RegisterPassword /></RegistrationProvider>} />
 
         {/* Doctor ka route */}
-        <Route path="/doctorji" element={<DoctorDashboard doctorId={501} />} />
+        <Route path="/doctor" element={<DoctorDashboard doctorId={501} />} />
 
         {/* Common call page (doctor + patient dono yaha connect honge) */}
         <Route path="/call-page/:channel" element={<CallTestPage />} />
