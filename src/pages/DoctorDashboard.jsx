@@ -20,7 +20,7 @@ export default function DoctorDashboard({ doctorId = 501 }) {
       forceTLS: false,
       disableStats: true,
     });
-
+  })
     // echo.channel(`doctor.${doctorId}`).listen("CallRequested", (e) => {
     //   console.log("📞 Incoming call:", e);
     //   setIncomingCall(e);
