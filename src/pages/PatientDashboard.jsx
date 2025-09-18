@@ -1,4 +1,8 @@
 import React, { useState } from "react";
+import { io } from "socket.io-client";
+
+// Socket.IO client init
+const socket = io("http://localhost:4000"); // 🚨 prod pe apna domain daalna
 
 export default function PatientDashboard() {
   const [loading, setLoading] = useState(false);
@@ -7,18 +11,24 @@ export default function PatientDashboard() {
   const startCall = async () => {
     setLoading(true);
     try {
-      const res = await fetch("https://snoutiq.com/backend/api/call/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctor_id: 501, // dynamically doctor id
-          patient_id: 101, // dynamically patient id
-        }),
+      const callData = {
+        doctorId: 501,   // yahan doctor id dynamic kar sakte ho
+        patientId: 101,  // yahan patient id dynamic kar sakte ho
+        channel: `call_${Math.random().toString(36).substring(2, 8)}`, // random channel
+      };
+
+      // socket.io emit
+      socket.emit("call-requested", callData);
+
+      // locally response set karo (simulate backend response)
+      setResponse({
+        success: true,
+        message: "Call request sent via socket.io",
+        ...callData,
       });
-      const data = await res.json();
-      setResponse(data);
     } catch (err) {
       console.error("Error starting call:", err);
+      setResponse({ success: false, message: "Failed to request call" });
     } finally {
       setLoading(false);
     }
@@ -26,7 +36,7 @@ export default function PatientDashboard() {
 
   return (
     <div style={{ padding: 20 }}>
-      <h2>Patient Dashboard</h2>
+      <h2>Patient Dashboard (Socket.IO)</h2>
       <button
         onClick={startCall}
         disabled={loading}

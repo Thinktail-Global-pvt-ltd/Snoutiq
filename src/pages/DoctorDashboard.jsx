@@ -1,38 +1,47 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Echo from "laravel-echo";
+import { io } from "socket.io-client";
+
+// yaha apne server ka URL use karo
+const socket = io("http://localhost:4000");
 
 export default function DoctorDashboard({ doctorId = 501 }) {
   const [incomingCall, setIncomingCall] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const echo = new Echo({
-      broadcaster: "reverb",   // 👈 yeh line fix hai
-      key: "base64:yT9RzP3vXl9lJ2pB2g==",
-      wsHost: window.location.hostname,
-      wsPort: 8080,            // local Reverb port
-      forceTLS: false,
-      enabledTransports: ["ws"],
-    });
+    // Doctor room join
+    socket.emit("join-doctor", doctorId);
 
-    echo.channel(`doctor.${doctorId}`).listen("CallRequested", (e) => {
-      console.log("📞 Incoming call event:", e);
+    // Call request suno
+    socket.on("call-requested", (e) => {
+      console.log("📞 Incoming call:", e);
       setIncomingCall(e);
     });
 
     return () => {
-      echo.disconnect();
+      socket.off("call-requested");
     };
   }, [doctorId]);
 
+  const handleAccept = () => {
+    if (incomingCall) {
+      navigate(`/call-page/${incomingCall.channel}?uid=${doctorId}&role=host`);
+    }
+  };
+
   return (
-    <div>
-      <h2>Doctor Dashboard</h2>
+    <div style={{ padding: 20 }}>
+      <h2>Doctor Dashboard (Socket.IO)</h2>
       {incomingCall ? (
-        <p>
-          Patient {incomingCall.patientId} is calling on {incomingCall.channel}
-        </p>
+        <div style={{ background: "#fef3c7", padding: 16, borderRadius: 8 }}>
+          <h3>📞 Incoming Call</h3>
+          <p>
+            Patient <b>{incomingCall.patientId}</b> is calling on{" "}
+            <b>{incomingCall.channel}</b>
+          </p>
+          <button onClick={handleAccept}>✅ Accept</button>
+        </div>
       ) : (
         <p>No active calls.</p>
       )}
