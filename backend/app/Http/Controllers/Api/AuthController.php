@@ -257,20 +257,20 @@ public function createInitialRegistration(Request $request)
 {
     try {
         // ✅ check agar email ya phone already exist hai
-        $emailExists = DB::table('users')
-            ->where('email', $request->email)
-            ->exists();
+        // $emailExists = DB::table('users')
+        //     ->where('email', $request->email)
+        //     ->exists();
 
         // $mobileExists = DB::table('users')
         //     ->where('phone', $request->mobileNumber)
         //     ->exists();
 
-        if ($emailExists ) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'enter unique mobile or email'
-            ], 422);
-        }
+        // if ($emailExists ) {
+        //     return response()->json([
+        //         'status'  => 'error',
+        //         'message' => 'enter unique mobile or email'
+        //     ], 422);
+        // }
 
         // ✅ sirf basic fields save karo
         
