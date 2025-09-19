@@ -436,7 +436,7 @@ const PetHealth = lazy(() => import("./PetDashboard/PetHealth"));
 const PetDailyCare = lazy(() => import("./PetDashboard/PetDailyCare"));
 const PetWeightMonitoring = lazy(() => import("./PetDashboard/PetWeightMonitoring"));
 const PetMedicationTracker = lazy(() => import("./PetDashboard/PetMedicationTracker"));
-const CallPage = lazy(() => import("./CallPage"));
+const CallPage = lazy(() => import("../src/pages/CallTestPage"));
 
 import NotificationSocket from "./components/NotificationSocket";
 import SuperAdminLogin from "./admin/SuperAdminLogin";
