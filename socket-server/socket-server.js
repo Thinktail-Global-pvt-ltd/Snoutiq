@@ -41,7 +41,7 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
     credentials: true
   },
-  path: "/socket.io/",
+  path: "/socket.io/",   // 👈 MUST MATCH Apache Proxy path
 });
 
 // Simple storage
