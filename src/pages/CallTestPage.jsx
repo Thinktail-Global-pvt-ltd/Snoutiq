@@ -531,6 +531,440 @@
 // }
 
 
+// import React, { useEffect, useMemo, useRef, useState } from "react";
+// import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+// import AgoraRTC from "agora-rtc-sdk-ng";
+// import { socket } from "./socket";
+
+// const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
+
+// export default function CallPage() {
+//   const { channelName } = useParams();
+//   const [qs] = useSearchParams();
+//   const navigate = useNavigate();
+
+//   // Sanitize channel name
+//   const safeChannel = useMemo(() => {
+//     return (channelName || "default_channel")
+//       .replace(/[^a-zA-Z0-9_]/g, "")
+//       .slice(0, 63);
+//   }, [channelName]);
+
+//   // Get UID and role from URL params
+//   const uid = useMemo(() => {
+//     const q = Number(qs.get("uid"));
+//     return Number.isFinite(q) ? q : Math.floor(Math.random() * 1e6);
+//   }, [qs]);
+
+//   const role = (qs.get("role") || "audience").toLowerCase();
+//   const isHost = role === "host";
+
+//   // Refs for video elements
+//   const localVideoRef = useRef(null);
+//   const remoteVideoRef = useRef(null);
+
+//   // State
+//   const [client] = useState(() => 
+//     AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
+//   );
+//   const [localTracks, setLocalTracks] = useState([]);
+//   const [remoteUsers, setRemoteUsers] = useState([]);
+//   const [joined, setJoined] = useState(false);
+//   const [callStatus, setCallStatus] = useState("connecting");
+//   const [isMuted, setIsMuted] = useState(false);
+//   const [isCameraOff, setIsCameraOff] = useState(false);
+
+//   useEffect(() => {
+//     let mounted = true;
+
+//     async function joinChannel() {
+//       try {
+//         setCallStatus("connecting");
+//         console.log(`Joining channel: ${safeChannel}, role=${role}, uid=${uid}`);
+
+//         // Initialize client events first
+//         setupClientEvents();
+
+//         // Join the channel
+//         await client.join(APP_ID, safeChannel, null, uid);
+        
+//         if (!mounted) return;
+//         setJoined(true);
+//         setCallStatus("connected");
+
+//         // Create and publish tracks for ALL users (both doctor and patient)
+//         try {
+//           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+//             encoderConfig: "music_standard",
+//           });
+//           const videoTrack = await AgoraRTC.createCameraVideoTrack({
+//             encoderConfig: "720p_1",
+//           });
+          
+//           if (!mounted) return;
+
+//           setLocalTracks([audioTrack, videoTrack]);
+          
+//           // Play local video
+//           if (localVideoRef.current) {
+//             videoTrack.play(localVideoRef.current);
+//           }
+          
+//           // Publish tracks for ALL users
+//           await client.publish([audioTrack, videoTrack]);
+//           console.log("✅ Published local tracks");
+          
+//         } catch (error) {
+//           console.error("❌ Error creating local tracks:", error);
+//           // If user denies camera/mic access, continue without tracks
+//           setCallStatus("connected");
+//         }
+
+//       } catch (error) {
+//         console.error("❌ Join channel error:", error);
+//         setCallStatus("error");
+//       }
+//     }
+
+//     function setupClientEvents() {
+//       // Handle remote users - FIXED VERSION
+//       client.on("user-published", async (user, mediaType) => {
+//         try {
+//           console.log(`📡 User ${user.uid} published ${mediaType}`);
+          
+//           await client.subscribe(user, mediaType);
+//           console.log(`✅ Subscribed to user ${user.uid} ${mediaType}`);
+
+//           if (mediaType === "video") {
+//             // Create a new video container for each remote user
+//             const remoteVideoContainer = document.createElement("div");
+//             remoteVideoContainer.id = `remote-video-${user.uid}`;
+//             remoteVideoContainer.style.width = "100%";
+//             remoteVideoContainer.style.height = "100%";
+            
+//             if (remoteVideoRef.current) {
+//               remoteVideoRef.current.innerHTML = "";
+//               remoteVideoRef.current.appendChild(remoteVideoContainer);
+              
+//               user.videoTrack.play(remoteVideoContainer);
+//               console.log(`🎥 Playing remote video for user ${user.uid}`);
+//             }
+            
+//             setRemoteUsers(prev => {
+//               const exists = prev.some(u => u.uid === user.uid);
+//               if (!exists) {
+//                 return [...prev, user];
+//               }
+//               return prev;
+//             });
+//           }
+          
+//           if (mediaType === "audio") {
+//             user.audioTrack.play();
+//             console.log(`🔊 Playing remote audio for user ${user.uid}`);
+//           }
+//         } catch (error) {
+//           console.error("❌ Error subscribing to user:", error);
+//         }
+//       });
+
+//       client.on("user-unpublished", (user, mediaType) => {
+//         console.log(`📡 User ${user.uid} unpublished ${mediaType}`);
+//         if (mediaType === "video") {
+//           // Remove the video element
+//           const videoElement = document.getElementById(`remote-video-${user.uid}`);
+//           if (videoElement) {
+//             videoElement.remove();
+//           }
+//           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+//         }
+//       });
+
+//       client.on("user-left", (user) => {
+//         console.log(`👋 User ${user.uid} left the channel`);
+//         // Remove the video element
+//         const videoElement = document.getElementById(`remote-video-${user.uid}`);
+//         if (videoElement) {
+//           videoElement.remove();
+//         }
+//         setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+//       });
+
+//       client.on("user-joined", (user) => {
+//         console.log(`🎉 User ${user.uid} joined the channel`);
+//       });
+
+//       client.on("user-failed", (user) => {
+//         console.log(`❌ User ${user.uid} failed to join`);
+//       });
+//     }
+
+//     joinChannel();
+
+//     // Cleanup on unmount
+//     return () => {
+//       mounted = false;
+//       cleanup();
+//     };
+//   }, [client, safeChannel, role, uid]);
+
+//   const cleanup = async () => {
+//     try {
+//       // Close local tracks
+//       localTracks.forEach(track => {
+//         track.stop();
+//         track.close();
+//       });
+      
+//       // Leave channel
+//       if (joined) {
+//         await client.leave();
+//         console.log("🚪 Left the channel");
+//       }
+      
+//       setLocalTracks([]);
+//       setRemoteUsers([]);
+//       setJoined(false);
+//     } catch (error) {
+//       console.error("❌ Cleanup error:", error);
+//     }
+//   };
+
+//   const toggleMute = async () => {
+//     if (localTracks[0]) {
+//       const audioTrack = localTracks[0];
+//       await audioTrack.setEnabled(isMuted);
+//       setIsMuted(!isMuted);
+//       console.log(isMuted ? "🎤 Unmuted" : "🔇 Muted");
+//     }
+//   };
+
+//   const toggleCamera = async () => {
+//     if (localTracks[1]) {
+//       const videoTrack = localTracks[1];
+//       await videoTrack.setEnabled(isCameraOff);
+//       setIsCameraOff(!isCameraOff);
+//       console.log(isCameraOff ? "📷 Camera On" : "📷 Camera Off");
+//     }
+//   };
+
+//   const handleEndCall = async () => {
+//     await cleanup();
+    
+//     // Notify server about call end
+//     socket.emit("call-ended", { channel: safeChannel });
+    
+//     // Navigate back
+//     if (isHost) {
+//       navigate("/doctor-dashboard");
+//     } else {
+//       navigate("/patient-dashboard");
+//     }
+//   };
+
+//   const getStatusColor = () => {
+//     switch (callStatus) {
+//       case "connected": return "#16a34a";
+//       case "connecting": return "#f59e0b";
+//       case "error": return "#dc2626";
+//       default: return "#6b7280";
+//     }
+//   };
+
+//   return (
+//     <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
+//       {/* Header */}
+//       <div style={{ marginBottom: 20 }}>
+//         <h2>Video Call</h2>
+//         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+//           <span>UID: <strong>{uid}</strong></span>
+//           <span>Channel: <strong>{safeChannel}</strong></span>
+//           <span>Role: <strong>{role}</strong></span>
+//           <span style={{
+//             padding: "4px 8px",
+//             borderRadius: 12,
+//             fontSize: 12,
+//             fontWeight: "bold",
+//             background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
+//             color: getStatusColor()
+//           }}>
+//             {callStatus.toUpperCase()}
+//           </span>
+//         </div>
+//       </div>
+
+//       {/* Video Grid */}
+//       <div style={{ 
+//         display: "grid", 
+//         gridTemplateColumns: "1fr 1fr",
+//         gap: 20, 
+//         marginBottom: 20,
+//         minHeight: 300
+//       }}>
+//         {/* Local Video */}
+//         <div style={{ position: "relative", border: "2px solid #4ade80", borderRadius: 12 }}>
+//           <div
+//             ref={localVideoRef}
+//             style={{
+//               width: "100%",
+//               height: 300,
+//               background: "#000",
+//               borderRadius: 10,
+//               overflow: "hidden"
+//             }}
+//           />
+//           <div style={{
+//             position: "absolute",
+//             bottom: 8,
+//             left: 8,
+//             background: "rgba(0,0,0,0.7)",
+//             color: "white",
+//             padding: "4px 8px",
+//             borderRadius: 4,
+//             fontSize: 12
+//           }}>
+//             You ({isHost ? "Doctor" : "Patient"})
+//           </div>
+//           {isCameraOff && (
+//             <div style={{
+//               position: "absolute",
+//               top: "50%",
+//               left: "50%",
+//               transform: "translate(-50%, -50%)",
+//               color: "white",
+//               fontSize: 18,
+//               background: "rgba(0,0,0,0.5)",
+//               padding: 8,
+//               borderRadius: 8
+//             }}>
+//               📷 Camera Off
+//             </div>
+//           )}
+//         </div>
+
+//         {/* Remote Video */}
+//         <div style={{ position: "relative", border: "2px solid #f87171", borderRadius: 12 }}>
+//           <div
+//             ref={remoteVideoRef}
+//             style={{
+//               width: "100%",
+//               height: 300,
+//               background: "#000",
+//               borderRadius: 10,
+//               overflow: "hidden"
+//             }}
+//           />
+//           <div style={{
+//             position: "absolute",
+//             bottom: 8,
+//             left: 8,
+//             background: "rgba(0,0,0,0.7)",
+//             color: "white",
+//             padding: "4px 8px",
+//             borderRadius: 4,
+//             fontSize: 12
+//           }}>
+//             {remoteUsers.length > 0 
+//               ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})`
+//               : "Waiting for other participant..."
+//             }
+//           </div>
+//           {remoteUsers.length === 0 && (
+//             <div style={{
+//               position: "absolute",
+//               top: "50%",
+//               left: "50%",
+//               transform: "translate(-50%, -50%)",
+//               color: "white",
+//               textAlign: "center",
+//               background: "rgba(0,0,0,0.5)",
+//               padding: 16,
+//               borderRadius: 8
+//             }}>
+//               <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
+//               <div>Waiting for {isHost ? "patient" : "doctor"} to join...</div>
+//             </div>
+//           )}
+//         </div>
+//       </div>
+
+//       {/* Debug Info */}
+//       <div style={{ 
+//         marginBottom: 20, 
+//         padding: 12, 
+//         background: "#f3f4f6", 
+//         borderRadius: 8,
+//         fontSize: 14 
+//       }}>
+//         <div><strong>Debug Info:</strong></div>
+//         <div>Remote Users: {remoteUsers.length}</div>
+//         <div>Local Tracks: {localTracks.length}</div>
+//         <div>Joined: {joined ? "Yes" : "No"}</div>
+//       </div>
+
+//       {/* Controls */}
+//       {joined && (
+//         <div style={{
+//           display: "flex",
+//           justifyContent: "center",
+//           gap: 12,
+//           padding: 16,
+//           background: "#f9fafb",
+//           borderRadius: 12
+//         }}>
+//           <button
+//             onClick={toggleMute}
+//             style={{
+//               padding: "12px 16px",
+//               borderRadius: 8,
+//               background: isMuted ? "#dc2626" : "#6b7280",
+//               color: "white",
+//               border: "none",
+//               cursor: "pointer",
+//               fontWeight: "bold",
+//               minWidth: 120
+//             }}
+//           >
+//             {isMuted ? "🔇 Unmute" : "🎤 Mute"}
+//           </button>
+          
+//           <button
+//             onClick={toggleCamera}
+//             style={{
+//               padding: "12px 16px",
+//               borderRadius: 8,
+//               background: isCameraOff ? "#dc2626" : "#6b7280",
+//               color: "white",
+//               border: "none",
+//               cursor: "pointer",
+//               fontWeight: "bold",
+//               minWidth: 120
+//             }}
+//           >
+//             {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
+//           </button>
+          
+//           <button
+//             onClick={handleEndCall}
+//             style={{
+//               padding: "12px 16px",
+//               borderRadius: 8,
+//               background: "#dc2626",
+//               color: "white",
+//               border: "none",
+//               cursor: "pointer",
+//               fontWeight: "bold",
+//               minWidth: 120
+//             }}
+//           >
+//             📞 End Call
+//           </button>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
@@ -564,7 +998,7 @@ export default function CallPage() {
   const remoteVideoRef = useRef(null);
 
   // State
-  const [client] = useState(() => 
+  const [client] = useState(() =>
     AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
   );
   const [localTracks, setLocalTracks] = useState([]);
@@ -587,39 +1021,40 @@ export default function CallPage() {
 
         // Join the channel
         await client.join(APP_ID, safeChannel, null, uid);
-        
+
         if (!mounted) return;
         setJoined(true);
         setCallStatus("connected");
 
-        // Create and publish tracks for ALL users (both doctor and patient)
-        try {
-          const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-            encoderConfig: "music_standard",
-          });
-          const videoTrack = await AgoraRTC.createCameraVideoTrack({
-            encoderConfig: "720p_1",
-          });
-          
-          if (!mounted) return;
+        // ✅ Only host will create & publish tracks
+        if (isHost) {
+          try {
+            const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+              encoderConfig: "music_standard",
+            });
+            const videoTrack = await AgoraRTC.createCameraVideoTrack({
+              encoderConfig: "720p_1",
+            });
 
-          setLocalTracks([audioTrack, videoTrack]);
-          
-          // Play local video
-          if (localVideoRef.current) {
-            videoTrack.play(localVideoRef.current);
+            if (!mounted) return;
+
+            setLocalTracks([audioTrack, videoTrack]);
+
+            // Play local video
+            if (localVideoRef.current) {
+              videoTrack.play(localVideoRef.current);
+            }
+
+            // Publish host tracks
+            await client.publish([audioTrack, videoTrack]);
+            console.log("✅ Host published local tracks");
+          } catch (error) {
+            console.error("❌ Error creating local tracks:", error);
+            setCallStatus("connected");
           }
-          
-          // Publish tracks for ALL users
-          await client.publish([audioTrack, videoTrack]);
-          console.log("✅ Published local tracks");
-          
-        } catch (error) {
-          console.error("❌ Error creating local tracks:", error);
-          // If user denies camera/mic access, continue without tracks
-          setCallStatus("connected");
+        } else {
+          console.log("👀 Audience joined - will only subscribe, not publish");
         }
-
       } catch (error) {
         console.error("❌ Join channel error:", error);
         setCallStatus("error");
@@ -627,38 +1062,35 @@ export default function CallPage() {
     }
 
     function setupClientEvents() {
-      // Handle remote users - FIXED VERSION
       client.on("user-published", async (user, mediaType) => {
         try {
           console.log(`📡 User ${user.uid} published ${mediaType}`);
-          
           await client.subscribe(user, mediaType);
           console.log(`✅ Subscribed to user ${user.uid} ${mediaType}`);
 
           if (mediaType === "video") {
-            // Create a new video container for each remote user
             const remoteVideoContainer = document.createElement("div");
             remoteVideoContainer.id = `remote-video-${user.uid}`;
             remoteVideoContainer.style.width = "100%";
             remoteVideoContainer.style.height = "100%";
-            
+
             if (remoteVideoRef.current) {
               remoteVideoRef.current.innerHTML = "";
               remoteVideoRef.current.appendChild(remoteVideoContainer);
-              
+
               user.videoTrack.play(remoteVideoContainer);
               console.log(`🎥 Playing remote video for user ${user.uid}`);
             }
-            
-            setRemoteUsers(prev => {
-              const exists = prev.some(u => u.uid === user.uid);
+
+            setRemoteUsers((prev) => {
+              const exists = prev.some((u) => u.uid === user.uid);
               if (!exists) {
                 return [...prev, user];
               }
               return prev;
             });
           }
-          
+
           if (mediaType === "audio") {
             user.audioTrack.play();
             console.log(`🔊 Playing remote audio for user ${user.uid}`);
@@ -671,57 +1103,48 @@ export default function CallPage() {
       client.on("user-unpublished", (user, mediaType) => {
         console.log(`📡 User ${user.uid} unpublished ${mediaType}`);
         if (mediaType === "video") {
-          // Remove the video element
           const videoElement = document.getElementById(`remote-video-${user.uid}`);
           if (videoElement) {
             videoElement.remove();
           }
-          setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+          setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
         }
       });
 
       client.on("user-left", (user) => {
         console.log(`👋 User ${user.uid} left the channel`);
-        // Remove the video element
         const videoElement = document.getElementById(`remote-video-${user.uid}`);
         if (videoElement) {
           videoElement.remove();
         }
-        setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+        setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
       });
 
       client.on("user-joined", (user) => {
         console.log(`🎉 User ${user.uid} joined the channel`);
       });
-
-      client.on("user-failed", (user) => {
-        console.log(`❌ User ${user.uid} failed to join`);
-      });
     }
 
     joinChannel();
 
-    // Cleanup on unmount
     return () => {
       mounted = false;
       cleanup();
     };
-  }, [client, safeChannel, role, uid]);
+  }, [client, safeChannel, role, uid, isHost]);
 
   const cleanup = async () => {
     try {
-      // Close local tracks
-      localTracks.forEach(track => {
+      localTracks.forEach((track) => {
         track.stop();
         track.close();
       });
-      
-      // Leave channel
+
       if (joined) {
         await client.leave();
         console.log("🚪 Left the channel");
       }
-      
+
       setLocalTracks([]);
       setRemoteUsers([]);
       setJoined(false);
@@ -750,11 +1173,7 @@ export default function CallPage() {
 
   const handleEndCall = async () => {
     await cleanup();
-    
-    // Notify server about call end
     socket.emit("call-ended", { channel: safeChannel });
-    
-    // Navigate back
     if (isHost) {
       navigate("/doctor-dashboard");
     } else {
@@ -764,10 +1183,14 @@ export default function CallPage() {
 
   const getStatusColor = () => {
     switch (callStatus) {
-      case "connected": return "#16a34a";
-      case "connecting": return "#f59e0b";
-      case "error": return "#dc2626";
-      default: return "#6b7280";
+      case "connected":
+        return "#16a34a";
+      case "connecting":
+        return "#f59e0b";
+      case "error":
+        return "#dc2626";
+      default:
+        return "#6b7280";
     }
   };
 
@@ -780,70 +1203,76 @@ export default function CallPage() {
           <span>UID: <strong>{uid}</strong></span>
           <span>Channel: <strong>{safeChannel}</strong></span>
           <span>Role: <strong>{role}</strong></span>
-          <span style={{
-            padding: "4px 8px",
-            borderRadius: 12,
-            fontSize: 12,
-            fontWeight: "bold",
-            background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
-            color: getStatusColor()
-          }}>
+          <span
+            style={{
+              padding: "4px 8px",
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: "bold",
+              background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
+              color: getStatusColor(),
+            }}
+          >
             {callStatus.toUpperCase()}
           </span>
         </div>
       </div>
 
       {/* Video Grid */}
-      <div style={{ 
-        display: "grid", 
-        gridTemplateColumns: "1fr 1fr",
-        gap: 20, 
-        marginBottom: 20,
-        minHeight: 300
-      }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 20,
+          marginBottom: 20,
+          minHeight: 300,
+        }}
+      >
         {/* Local Video */}
-        <div style={{ position: "relative", border: "2px solid #4ade80", borderRadius: 12 }}>
-          <div
-            ref={localVideoRef}
-            style={{
-              width: "100%",
-              height: 300,
-              background: "#000",
-              borderRadius: 10,
-              overflow: "hidden"
-            }}
-          />
-          <div style={{
-            position: "absolute",
-            bottom: 8,
-            left: 8,
-            background: "rgba(0,0,0,0.7)",
-            color: "white",
-            padding: "4px 8px",
-            borderRadius: 4,
-            fontSize: 12
-          }}>
-            You ({isHost ? "Doctor" : "Patient"})
-          </div>
-          {isCameraOff && (
-            <div style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              color: "white",
-              fontSize: 18,
-              background: "rgba(0,0,0,0.5)",
-              padding: 8,
-              borderRadius: 8
-            }}>
-              📷 Camera Off
+        <div
+          style={{
+            position: "relative",
+            border: "2px solid #4ade80",
+            borderRadius: 12,
+          }}
+        >
+          {isHost ? (
+            <div
+              ref={localVideoRef}
+              style={{
+                width: "100%",
+                height: 300,
+                background: "#000",
+                borderRadius: 10,
+                overflow: "hidden",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "100%",
+                height: 300,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#000",
+                borderRadius: 10,
+                color: "white",
+              }}
+            >
+              👀 Viewer Mode
             </div>
           )}
         </div>
 
         {/* Remote Video */}
-        <div style={{ position: "relative", border: "2px solid #f87171", borderRadius: 12 }}>
+        <div
+          style={{
+            position: "relative",
+            border: "2px solid #f87171",
+            borderRadius: 12,
+          }}
+        >
           <div
             ref={remoteVideoRef}
             style={{
@@ -851,67 +1280,40 @@ export default function CallPage() {
               height: 300,
               background: "#000",
               borderRadius: 10,
-              overflow: "hidden"
+              overflow: "hidden",
             }}
           />
-          <div style={{
-            position: "absolute",
-            bottom: 8,
-            left: 8,
-            background: "rgba(0,0,0,0.7)",
-            color: "white",
-            padding: "4px 8px",
-            borderRadius: 4,
-            fontSize: 12
-          }}>
-            {remoteUsers.length > 0 
-              ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})`
-              : "Waiting for other participant..."
-            }
-          </div>
-          {remoteUsers.length === 0 && (
-            <div style={{
+          <div
+            style={{
               position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
+              bottom: 8,
+              left: 8,
+              background: "rgba(0,0,0,0.7)",
               color: "white",
-              textAlign: "center",
-              background: "rgba(0,0,0,0.5)",
-              padding: 16,
-              borderRadius: 8
-            }}>
-              <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
-              <div>Waiting for {isHost ? "patient" : "doctor"} to join...</div>
-            </div>
-          )}
+              padding: "4px 8px",
+              borderRadius: 4,
+              fontSize: 12,
+            }}
+          >
+            {remoteUsers.length > 0
+              ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})`
+              : "Waiting for other participant..."}
+          </div>
         </div>
       </div>
 
-      {/* Debug Info */}
-      <div style={{ 
-        marginBottom: 20, 
-        padding: 12, 
-        background: "#f3f4f6", 
-        borderRadius: 8,
-        fontSize: 14 
-      }}>
-        <div><strong>Debug Info:</strong></div>
-        <div>Remote Users: {remoteUsers.length}</div>
-        <div>Local Tracks: {localTracks.length}</div>
-        <div>Joined: {joined ? "Yes" : "No"}</div>
-      </div>
-
       {/* Controls */}
-      {joined && (
-        <div style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: 12,
-          padding: 16,
-          background: "#f9fafb",
-          borderRadius: 12
-        }}>
+      {joined && isHost && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 12,
+            padding: 16,
+            background: "#f9fafb",
+            borderRadius: 12,
+          }}
+        >
           <button
             onClick={toggleMute}
             style={{
@@ -922,12 +1324,12 @@ export default function CallPage() {
               border: "none",
               cursor: "pointer",
               fontWeight: "bold",
-              minWidth: 120
+              minWidth: 120,
             }}
           >
             {isMuted ? "🔇 Unmute" : "🎤 Mute"}
           </button>
-          
+
           <button
             onClick={toggleCamera}
             style={{
@@ -938,12 +1340,12 @@ export default function CallPage() {
               border: "none",
               cursor: "pointer",
               fontWeight: "bold",
-              minWidth: 120
+              minWidth: 120,
             }}
           >
             {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
           </button>
-          
+
           <button
             onClick={handleEndCall}
             style={{
@@ -954,7 +1356,7 @@ export default function CallPage() {
               border: "none",
               cursor: "pointer",
               fontWeight: "bold",
-              minWidth: 120
+              minWidth: 120,
             }}
           >
             📞 End Call
