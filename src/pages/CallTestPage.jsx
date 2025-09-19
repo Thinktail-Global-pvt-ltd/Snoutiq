@@ -963,7 +963,8 @@
 //       )}
 //     </div>
 //   );
-// }
+// }// CallPage.js - Fixed version for video visibility issue
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
@@ -1018,6 +1019,11 @@ export default function CallPage() {
         // Setup client events first
         setupClientEvents();
         
+        // CRITICAL FIX: Set client role to HOST for both doctor and patient
+        // This ensures both can publish and subscribe properly
+        console.log("Setting client role to HOST for publishing capability");
+        await client.setClientRole("host");
+        
         // Join the channel
         await client.join(APP_ID, safeChannel, null, uid);
         
@@ -1042,13 +1048,25 @@ export default function CallPage() {
       try {
         console.log("📹 Creating local tracks...");
         
-        // Create audio and video tracks
+        // Request permissions explicitly first
+        await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: true 
+        }).then(stream => {
+          // Close the test stream immediately
+          stream.getTracks().forEach(track => track.stop());
+        });
+        
+        // Create audio and video tracks with explicit configurations
         const [audioTrack, videoTrack] = await Promise.all([
           AgoraRTC.createMicrophoneAudioTrack({
-            encoderConfig: "music_standard"
+            encoderConfig: "music_standard",
+            ANS: true, // Automatic Noise Suppression
+            AEC: true  // Acoustic Echo Cancellation
           }),
           AgoraRTC.createCameraVideoTrack({
-            encoderConfig: "720p_1"
+            encoderConfig: "720p_1",
+            optimizationMode: "motion" // Better for video calls
           })
         ]);
         
@@ -1060,26 +1078,40 @@ export default function CallPage() {
         
         setLocalTracks({ audio: audioTrack, video: videoTrack });
         
-        // Play local video immediately
+        // CRITICAL: Play local video BEFORE publishing
         if (localVideoRef.current) {
-          videoTrack.play(localVideoRef.current);
-          console.log("🎥 Local video playing");
+          await videoTrack.play(localVideoRef.current);
+          console.log("🎥 Local video playing successfully");
         }
         
-        // Publish tracks - IMPORTANT: Both host and audience must publish
-        await client.publish([audioTrack, videoTrack]);
-        console.log("✅ Published local tracks successfully");
+        // CRITICAL: Publish tracks with retry mechanism
+        let publishAttempts = 0;
+        const maxPublishAttempts = 3;
+        
+        while (publishAttempts < maxPublishAttempts) {
+          try {
+            await client.publish([audioTrack, videoTrack]);
+            console.log("✅ Published local tracks successfully");
+            break;
+          } catch (publishError) {
+            publishAttempts++;
+            console.error(`❌ Publish attempt ${publishAttempts} failed:`, publishError);
+            
+            if (publishAttempts === maxPublishAttempts) {
+              throw publishError;
+            }
+            
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
         
       } catch (error) {
         console.error("❌ Error creating/publishing tracks:", error);
         setCallStatus("error");
         
-        // Try to continue without media (graceful degradation)
-        try {
-          await client.publish([]);
-        } catch (publishError) {
-          console.error("❌ Failed to publish empty tracks:", publishError);
-        }
+        // Show user-friendly error message
+        alert("Unable to access camera/microphone. Please check permissions and refresh the page.");
       }
     };
 
@@ -1089,11 +1121,28 @@ export default function CallPage() {
         try {
           console.log(`📡 User ${user.uid} published ${mediaType}`);
           
-          // Subscribe to the user's media
-          await client.subscribe(user, mediaType);
-          console.log(`✅ Subscribed to user ${user.uid} ${mediaType}`);
+          // Subscribe to the user's media with retry
+          let subscribeAttempts = 0;
+          const maxSubscribeAttempts = 3;
           
-          if (mediaType === "video") {
+          while (subscribeAttempts < maxSubscribeAttempts) {
+            try {
+              await client.subscribe(user, mediaType);
+              console.log(`✅ Subscribed to user ${user.uid} ${mediaType}`);
+              break;
+            } catch (subscribeError) {
+              subscribeAttempts++;
+              console.error(`❌ Subscribe attempt ${subscribeAttempts} failed:`, subscribeError);
+              
+              if (subscribeAttempts === maxSubscribeAttempts) {
+                throw subscribeError;
+              }
+              
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+          
+          if (mediaType === "video" && user.videoTrack) {
             // Update remote users state
             setRemoteUsers(prev => {
               const newMap = new Map(prev);
@@ -1101,30 +1150,56 @@ export default function CallPage() {
               return newMap;
             });
             
-            // Play the remote video
-            if (remoteVideoRef.current && user.videoTrack) {
-              // Clear previous content
-              remoteVideoRef.current.innerHTML = '';
-              user.videoTrack.play(remoteVideoRef.current);
-              console.log(`🎥 Playing remote video for user ${user.uid}`);
+            // CRITICAL: Play remote video with proper error handling
+            if (remoteVideoRef.current) {
+              try {
+                // Clear previous content
+                remoteVideoRef.current.innerHTML = '';
+                
+                // Play with timeout to prevent hanging
+                await Promise.race([
+                  user.videoTrack.play(remoteVideoRef.current),
+                  new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Video play timeout')), 5000)
+                  )
+                ]);
+                
+                console.log(`🎥 Playing remote video for user ${user.uid}`);
+              } catch (videoError) {
+                console.error(`❌ Failed to play remote video for user ${user.uid}:`, videoError);
+                
+                // Retry once after a delay
+                setTimeout(async () => {
+                  try {
+                    await user.videoTrack.play(remoteVideoRef.current);
+                    console.log(`🎥 Retry successful - Playing remote video for user ${user.uid}`);
+                  } catch (retryError) {
+                    console.error(`❌ Video retry failed:`, retryError);
+                  }
+                }, 1000);
+              }
             }
           }
           
           if (mediaType === "audio" && user.audioTrack) {
-            user.audioTrack.play();
-            console.log(`🔊 Playing remote audio for user ${user.uid}`);
-            
-            // Update remote users state
-            setRemoteUsers(prev => {
-              const newMap = new Map(prev);
-              const existingUser = newMap.get(user.uid) || {};
-              newMap.set(user.uid, { ...existingUser, ...user, hasAudio: true });
-              return newMap;
-            });
+            try {
+              user.audioTrack.play();
+              console.log(`🔊 Playing remote audio for user ${user.uid}`);
+              
+              // Update remote users state
+              setRemoteUsers(prev => {
+                const newMap = new Map(prev);
+                const existingUser = newMap.get(user.uid) || {};
+                newMap.set(user.uid, { ...existingUser, ...user, hasAudio: true });
+                return newMap;
+              });
+            } catch (audioError) {
+              console.error(`❌ Failed to play remote audio:`, audioError);
+            }
           }
           
         } catch (error) {
-          console.error(`❌ Failed to subscribe to user ${user.uid}:`, error);
+          console.error(`❌ Failed to handle user-published event for user ${user.uid}:`, error);
         }
       });
 
@@ -1145,6 +1220,7 @@ export default function CallPage() {
           // Clear remote video
           if (remoteVideoRef.current) {
             remoteVideoRef.current.innerHTML = '';
+            console.log(`🎥 Cleared remote video for user ${user.uid}`);
           }
         }
       });
@@ -1173,6 +1249,22 @@ export default function CallPage() {
           return newMap;
         });
       });
+
+      // CRITICAL: Add connection state change handler
+      client.on("connection-state-change", (curState, revState) => {
+        console.log(`🔗 Connection state changed from ${revState} to ${curState}`);
+        
+        if (curState === "DISCONNECTED" || curState === "FAILED") {
+          setCallStatus("connection_error");
+        } else if (curState === "CONNECTED") {
+          setCallStatus("connected");
+        }
+      });
+
+      // Add error handler
+      client.on("exception", (event) => {
+        console.error("🚨 Agora client exception:", event);
+      });
     };
 
     initializeCall();
@@ -1182,11 +1274,19 @@ export default function CallPage() {
       mounted = false;
       cleanup();
     };
-  }, [client, safeChannel, uid]);
+  }, [client, safeChannel, uid, role]); // Added role to dependencies
 
   const cleanup = async () => {
     try {
       console.log("🧹 Cleaning up call resources...");
+      
+      // Clear video elements first
+      if (localVideoRef.current) {
+        localVideoRef.current.innerHTML = '';
+      }
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.innerHTML = '';
+      }
       
       // Close local tracks
       if (localTracks.audio) {
@@ -1243,6 +1343,26 @@ export default function CallPage() {
     }
   };
 
+  // CRITICAL: Add refresh/retry function for patients
+  const retryConnection = async () => {
+    setIsInitializing(true);
+    setCallStatus("reconnecting");
+    
+    try {
+      await cleanup();
+      
+      // Wait a moment before retrying
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Re-initialize
+      window.location.reload();
+    } catch (error) {
+      console.error("❌ Retry failed:", error);
+      setCallStatus("error");
+      setIsInitializing(false);
+    }
+  };
+
   const remoteUsersArray = Array.from(remoteUsers.values());
   const hasRemoteUser = remoteUsersArray.length > 0 && remoteUsersArray.some(user => user.hasVideo);
 
@@ -1251,8 +1371,20 @@ export default function CallPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-900">Initializing Call...</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {callStatus === "reconnecting" ? "Reconnecting..." : "Initializing Call..."}
+          </h2>
           <p className="text-gray-600">Please wait while we set up your video call</p>
+          
+          {/* Add retry button for patients */}
+          {!isHost && callStatus !== "reconnecting" && (
+            <button 
+              onClick={retryConnection}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Retry Connection
+            </button>
+          )}
         </div>
       </div>
     );
@@ -1261,7 +1393,7 @@ export default function CallPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Header with enhanced status */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -1269,17 +1401,31 @@ export default function CallPage() {
               <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                 <span>UID: <span className="font-semibold">{uid}</span></span>
                 <span>Channel: <span className="font-semibold">{safeChannel}</span></span>
-                <span>Role: <span className="font-semibold capitalize">{role}</span></span>
+                <span>Role: <span className="font-semibold capitalize">
+                  {isHost ? "Doctor (Host)" : "Patient (Audience)"}
+                </span></span>
               </div>
             </div>
-            <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
-              callStatus === "connected" 
-                ? "bg-green-100 text-green-800" 
-                : callStatus === "connecting"
-                ? "bg-yellow-100 text-yellow-800"
-                : "bg-red-100 text-red-800"
-            }`}>
-              {callStatus.toUpperCase()}
+            <div className="flex items-center gap-3">
+              <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                callStatus === "connected" 
+                  ? "bg-green-100 text-green-800" 
+                  : callStatus === "connecting" || callStatus === "reconnecting"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : "bg-red-100 text-red-800"
+              }`}>
+                {callStatus.toUpperCase()}
+              </div>
+              
+              {/* Retry button for connection issues */}
+              {(callStatus === "error" || callStatus === "connection_error") && (
+                <button 
+                  onClick={retryConnection}
+                  className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                >
+                  🔄 Retry
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1294,7 +1440,7 @@ export default function CallPage() {
               style={{ minHeight: '300px' }}
             />
             <div className="absolute bottom-3 left-3 bg-black bg-opacity-70 text-white px-3 py-1 rounded-lg text-sm font-medium">
-              You ({isHost ? "Doctor" : "Patient"})
+              You ({isHost ? "Doctor" : "Patient"}) - Local Video
             </div>
             {isCameraOff && (
               <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
@@ -1315,7 +1461,7 @@ export default function CallPage() {
             />
             <div className="absolute bottom-3 left-3 bg-black bg-opacity-70 text-white px-3 py-1 rounded-lg text-sm font-medium">
               {hasRemoteUser 
-                ? `${isHost ? "Patient" : "Doctor"} (${remoteUsersArray[0]?.uid})`
+                ? `${isHost ? "Patient" : "Doctor"} (${remoteUsersArray[0]?.uid}) - Remote Video`
                 : "Waiting for participant..."
               }
             </div>
@@ -1326,35 +1472,59 @@ export default function CallPage() {
                   <div className="text-xl font-medium mb-2">
                     Waiting for {isHost ? "patient" : "doctor"}
                   </div>
-                  <div className="text-gray-300">
+                  <div className="text-gray-300 mb-4">
                     They will appear here once they join
                   </div>
+                  
+                  {/* Additional help for patients */}
+                  {!isHost && (
+                    <div className="text-sm text-gray-400">
+                      <p>If you don't see video after 30 seconds:</p>
+                      <button 
+                        onClick={retryConnection}
+                        className="mt-2 px-3 py-1 bg-blue-600 rounded text-white hover:bg-blue-700"
+                      >
+                        🔄 Refresh Connection
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Debug Info */}
+        {/* Enhanced Debug Info */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-          <h3 className="font-semibold text-gray-900 mb-2">Debug Information</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <h3 className="font-semibold text-gray-900 mb-2">Connection Status</h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <span className="text-gray-600">Remote Users:</span>
-              <span className="ml-2 font-semibold">{remoteUsersArray.length}</span>
+              <span className="ml-2 font-semibold text-blue-600">{remoteUsersArray.length}</span>
             </div>
             <div>
               <span className="text-gray-600">Local Tracks:</span>
-              <span className="ml-2 font-semibold">{Object.keys(localTracks).length}</span>
+              <span className="ml-2 font-semibold text-green-600">{Object.keys(localTracks).length}</span>
             </div>
             <div>
               <span className="text-gray-600">Joined:</span>
-              <span className="ml-2 font-semibold">{joined ? "Yes" : "No"}</span>
+              <span className="ml-2 font-semibold">{joined ? "✅ Yes" : "❌ No"}</span>
             </div>
             <div>
-              <span className="text-gray-600">Has Remote Video:</span>
-              <span className="ml-2 font-semibold">{hasRemoteUser ? "Yes" : "No"}</span>
+              <span className="text-gray-600">Remote Video:</span>
+              <span className="ml-2 font-semibold">{hasRemoteUser ? "✅ Yes" : "❌ No"}</span>
             </div>
+            <div>
+              <span className="text-gray-600">Client Role:</span>
+              <span className="ml-2 font-semibold text-purple-600">HOST (Fixed)</span>
+            </div>
+          </div>
+          
+          {/* Additional debug info for troubleshooting */}
+          <div className="mt-3 pt-3 border-t text-xs text-gray-500">
+            <div>Channel: {safeChannel}</div>
+            <div>User Role: {isHost ? "Doctor (Host)" : "Patient (Audience → Host for publishing)"}</div>
+            <div>SDK Mode: RTC with VP8 codec</div>
           </div>
         </div>
 
