@@ -5,10 +5,10 @@ const isDevelopment = window.location.hostname === "localhost" ||
                      window.location.hostname === "127.0.0.1" ||
                      window.location.hostname === "0.0.0.0";
 
-// Socket server URLs
+// Use the same domain for production, Apache will proxy to the Socket.IO server
 const SOCKET_URLS = {
   development: "http://localhost:4000",
-  production: "https://your-socket-server.railway.app" // Replace with your deployed server URL
+  production: window.location.origin // This will be https://snoutiq.com
 };
 
 const socketUrl = isDevelopment ? SOCKET_URLS.development : SOCKET_URLS.production;
