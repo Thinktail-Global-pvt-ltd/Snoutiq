@@ -801,6 +801,8 @@ export default function DoctorDashboard({ doctorId = 501 }) {
           )}
         </div>
       </div>
+      
+
     </div>
   );
 }
