@@ -23,23 +23,13 @@ const Header = () => {
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
-  const { user, setUser } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
 
   const [isUserLoaded, setIsUserLoaded] = useState(false);
-
-  useEffect(() => {
-    // Simulate checking localStorage or API call
-    const storedUser = JSON.parse(localStorage.getItem("user"));
-    if (storedUser) {
-      setUser(storedUser);
-    }
-    setIsUserLoaded(true); // Now we know if user exists
-  }, []);
 
   // ✅ Better logout (no full reload)
   const handleLogout = () => {
     localStorage.clear();
-    setUser(null);
     navigate("/");
   };
 
