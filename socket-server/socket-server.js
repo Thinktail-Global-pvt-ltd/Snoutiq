@@ -10,6 +10,7 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
   },
   path: "/socket.io/",   // 👈 MUST MATCH Apache Proxy path
+   transports: ["polling", "websocket"],
 });
 
 io.on("connection", (socket) => {
