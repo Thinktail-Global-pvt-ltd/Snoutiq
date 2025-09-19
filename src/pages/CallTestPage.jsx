@@ -582,6 +582,9 @@ export default function CallPage() {
         setCallStatus("connecting");
         console.log(`Joining channel: ${safeChannel}, role=${role}, uid=${uid}`);
 
+        // Initialize client events first
+        setupClientEvents();
+
         // Join the channel
         await client.join(APP_ID, safeChannel, null, uid);
         
@@ -617,49 +620,83 @@ export default function CallPage() {
           setCallStatus("connected");
         }
 
-        // Handle remote users
-        client.on("user-published", async (user, mediaType) => {
-          try {
-            await client.subscribe(user, mediaType);
-            console.log(`📡 Subscribed to user ${user.uid} ${mediaType}`);
-
-            if (mediaType === "video") {
-              if (remoteVideoRef.current) {
-                user.videoTrack?.play(remoteVideoRef.current);
-              }
-              setRemoteUsers(prev => {
-                const exists = prev.some(u => u.uid === user.uid);
-                if (!exists) {
-                  return [...prev, user];
-                }
-                return prev;
-              });
-            }
-            
-            if (mediaType === "audio") {
-              user.audioTrack?.play();
-            }
-          } catch (error) {
-            console.error("❌ Error subscribing to user:", error);
-          }
-        });
-
-        client.on("user-unpublished", (user, mediaType) => {
-          console.log(`📡 User ${user.uid} unpublished ${mediaType}`);
-          if (mediaType === "video") {
-            setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-          }
-        });
-
-        client.on("user-left", (user) => {
-          console.log(`👋 User ${user.uid} left the channel`);
-          setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-        });
-
       } catch (error) {
         console.error("❌ Join channel error:", error);
         setCallStatus("error");
       }
+    }
+
+    function setupClientEvents() {
+      // Handle remote users - FIXED VERSION
+      client.on("user-published", async (user, mediaType) => {
+        try {
+          console.log(`📡 User ${user.uid} published ${mediaType}`);
+          
+          await client.subscribe(user, mediaType);
+          console.log(`✅ Subscribed to user ${user.uid} ${mediaType}`);
+
+          if (mediaType === "video") {
+            // Create a new video container for each remote user
+            const remoteVideoContainer = document.createElement("div");
+            remoteVideoContainer.id = `remote-video-${user.uid}`;
+            remoteVideoContainer.style.width = "100%";
+            remoteVideoContainer.style.height = "100%";
+            
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.innerHTML = "";
+              remoteVideoRef.current.appendChild(remoteVideoContainer);
+              
+              user.videoTrack.play(remoteVideoContainer);
+              console.log(`🎥 Playing remote video for user ${user.uid}`);
+            }
+            
+            setRemoteUsers(prev => {
+              const exists = prev.some(u => u.uid === user.uid);
+              if (!exists) {
+                return [...prev, user];
+              }
+              return prev;
+            });
+          }
+          
+          if (mediaType === "audio") {
+            user.audioTrack.play();
+            console.log(`🔊 Playing remote audio for user ${user.uid}`);
+          }
+        } catch (error) {
+          console.error("❌ Error subscribing to user:", error);
+        }
+      });
+
+      client.on("user-unpublished", (user, mediaType) => {
+        console.log(`📡 User ${user.uid} unpublished ${mediaType}`);
+        if (mediaType === "video") {
+          // Remove the video element
+          const videoElement = document.getElementById(`remote-video-${user.uid}`);
+          if (videoElement) {
+            videoElement.remove();
+          }
+          setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+        }
+      });
+
+      client.on("user-left", (user) => {
+        console.log(`👋 User ${user.uid} left the channel`);
+        // Remove the video element
+        const videoElement = document.getElementById(`remote-video-${user.uid}`);
+        if (videoElement) {
+          videoElement.remove();
+        }
+        setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+      });
+
+      client.on("user-joined", (user) => {
+        console.log(`🎉 User ${user.uid} joined the channel`);
+      });
+
+      client.on("user-failed", (user) => {
+        console.log(`❌ User ${user.uid} failed to join`);
+      });
     }
 
     joinChannel();
@@ -761,17 +798,18 @@ export default function CallPage() {
         display: "grid", 
         gridTemplateColumns: "1fr 1fr",
         gap: 20, 
-        marginBottom: 20 
+        marginBottom: 20,
+        minHeight: 300
       }}>
         {/* Local Video */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", border: "2px solid #4ade80", borderRadius: 12 }}>
           <div
             ref={localVideoRef}
             style={{
               width: "100%",
               height: 300,
               background: "#000",
-              borderRadius: 12,
+              borderRadius: 10,
               overflow: "hidden"
             }}
           />
@@ -794,7 +832,10 @@ export default function CallPage() {
               left: "50%",
               transform: "translate(-50%, -50%)",
               color: "white",
-              fontSize: 18
+              fontSize: 18,
+              background: "rgba(0,0,0,0.5)",
+              padding: 8,
+              borderRadius: 8
             }}>
               📷 Camera Off
             </div>
@@ -802,14 +843,14 @@ export default function CallPage() {
         </div>
 
         {/* Remote Video */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", border: "2px solid #f87171", borderRadius: 12 }}>
           <div
             ref={remoteVideoRef}
             style={{
               width: "100%",
               height: 300,
               background: "#000",
-              borderRadius: 12,
+              borderRadius: 10,
               overflow: "hidden"
             }}
           />
@@ -835,13 +876,30 @@ export default function CallPage() {
               left: "50%",
               transform: "translate(-50%, -50%)",
               color: "white",
-              textAlign: "center"
+              textAlign: "center",
+              background: "rgba(0,0,0,0.5)",
+              padding: 16,
+              borderRadius: 8
             }}>
               <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
-              <div>Waiting for {isHost ? "patient" : "doctor"}...</div>
+              <div>Waiting for {isHost ? "patient" : "doctor"} to join...</div>
             </div>
           )}
         </div>
+      </div>
+
+      {/* Debug Info */}
+      <div style={{ 
+        marginBottom: 20, 
+        padding: 12, 
+        background: "#f3f4f6", 
+        borderRadius: 8,
+        fontSize: 14 
+      }}>
+        <div><strong>Debug Info:</strong></div>
+        <div>Remote Users: {remoteUsers.length}</div>
+        <div>Local Tracks: {localTracks.length}</div>
+        <div>Joined: {joined ? "Yes" : "No"}</div>
       </div>
 
       {/* Controls */}
