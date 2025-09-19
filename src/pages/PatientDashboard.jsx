@@ -81,7 +81,7 @@ export default function PatientDashboard() {
       setCallStatus({ type: "accepted", ...data });
       // Auto-navigate to call page
       setTimeout(() => {
-        navigate(`/call-page/${data.channel}?uid=${patientId}&role=audience`);
+        navigate(`/call-page/${data.channel}?uid=${patientId}&role=host`);
       }, 2000);
     });
 
