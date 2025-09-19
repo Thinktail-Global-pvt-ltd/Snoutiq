@@ -1,5 +1,16 @@
 import { io } from "socket.io-client";
-
+const io = new Server(httpServer, {
+  cors: {
+    origin: [
+      "http://localhost:3000", 
+      "http://127.0.0.1:3000",
+      "https://snoutiq.com"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  path: "/socket.io/",
+});
 // Determine if we're in development or production
 const isDevelopment = window.location.hostname === "localhost" || 
                      window.location.hostname === "127.0.0.1" ||
@@ -24,6 +35,21 @@ export const socket = io(socketUrl, {
 });
 
 // Enhanced connection event handlers with better error handling
+socket.on("connect", () => {
+  console.log("✅ Connected to server:", socket.id);
+  console.log("🌐 Connected to:", socketUrl);
+});
+
+socket.on("disconnect", (reason) => {
+  console.log("❌ Disconnected from server. Reason:", reason);
+});
+
+socket.on("connect_error", (error) => {
+  console.error("❌ Connection error:", error.message);
+  console.error("🔍 Trying to connect to:", socketUrl);
+  console.error("🛠️ Environment:", isDevelopment ? "Development" : "Production");
+});
+
 socket.on("connect", () => {
   console.log("✅ Connected to server:", socket.id);
   console.log("🌐 Connected to:", socketUrl);
