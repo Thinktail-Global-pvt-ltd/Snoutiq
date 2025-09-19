@@ -257,20 +257,20 @@ public function createInitialRegistration(Request $request)
 {
     try {
         // ✅ check agar email ya phone already exist hai
-        // $emailExists = DB::table('users')
-        //     ->where('email', $request->email)
-        //     ->exists();
+        $emailExists = DB::table('users')
+            ->where('email', $request->email)
+            ->exists();
 
         // $mobileExists = DB::table('users')
         //     ->where('phone', $request->mobileNumber)
         //     ->exists();
 
-        // if ($emailExists ) {
-        //     return response()->json([
-        //         'status'  => 'error',
-        //         'message' => 'enter unique mobile or email'
-        //     ], 422);
-        // }
+        if ($emailExists ) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'enter unique mobile or email'
+            ], 422);
+        }
 
         // ✅ sirf basic fields save karo
         
@@ -838,8 +838,124 @@ public function login_bkp(Request $request)
 //     }
 // }
 
-
 public function googleLogin(Request $request)
+{
+    $request->validate([
+        'email'        => 'required|email',
+        'google_token' => 'required|string',
+        'role'         => 'required|string|in:pet,vet',
+        'room_title'   => 'nullable|string',
+    ]);
+
+    try {
+        $room = null;
+        $plainToken = null;
+        $role = $request->role;
+
+        if ($role === 'pet') {
+            // 🔹 Pet users table check
+            $user = User::where('email', $request->email)
+                        ->where('google_token', $request->google_token)
+                        ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid pet credentials',
+                ], 401);
+            }
+
+            DB::transaction(function () use (&$plainToken, &$room, $user, $request) {
+                $plainToken = bin2hex(random_bytes(32));
+                $user->api_token_hash = $plainToken;
+                $user->save();
+
+                $room = ChatRoom::create([
+                    'user_id'         => $user->id,
+                    'chat_room_token' => 'room_' . Str::uuid()->toString(),
+                    'name'            => $request->room_title ?? ('New chat - ' . now()->format('d M Y H:i')),
+                ]);
+            });
+
+            $userData = $user->toArray();
+            unset($userData['password']);
+            $userData['role'] = 'pet';
+
+            return response()->json([
+                'success'    => true,
+                'message'    => 'Login success',
+                'role'       => 'pet',
+                'email'      => $user->email,
+                'token'      => $plainToken,
+                'token_type' => 'Bearer',
+                'chat_room'  => [
+                    'id'    => $room->id,
+                    'token' => $room->chat_room_token,
+                    'name'  => $room->name,
+                ],
+                'user'       => $userData,
+            ], 200);
+
+        } elseif ($role === 'vet') {
+            // 🔹 Vet table check
+            $tempVet = DB::table('vet_registerations_temp')
+                ->where('email', $request->email)
+                ->where('google_token', $request->google_token)
+                ->first();
+
+            if (!$tempVet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid vet credentials',
+                ], 401);
+            }
+
+            DB::transaction(function () use (&$plainToken, &$room, $tempVet, $request) {
+                $plainToken = bin2hex(random_bytes(32));
+
+                DB::table('vet_registerations_temp')
+                    ->where('id', $tempVet->id)
+                    ->update(['api_token_hash' => $plainToken]);
+
+                $room = ChatRoom::create([
+                    'user_id'         => $tempVet->id,
+                    'chat_room_token' => 'room_' . Str::uuid()->toString(),
+                    'name'            => $request->room_title ?? ('New chat - ' . now()->format('d M Y H:i')),
+                ]);
+            });
+
+            $vetData = (array) $tempVet;
+            unset($vetData['password']);
+            $vetData['role'] = 'vet';
+
+            return response()->json([
+                'success'    => true,
+                'message'    => 'Login success',
+                'role'       => 'vet',
+                'email'      => $tempVet->email,
+                'token'      => $plainToken,
+                'token_type' => 'Bearer',
+                'chat_room'  => [
+                    'id'    => $room->id,
+                    'token' => $room->chat_room_token,
+                    'name'  => $room->name,
+                ],
+                'user'       => $vetData,
+            ], 200);
+        }
+
+        return response()->json(['message' => 'Invalid role'], 400);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Google login failed',
+            'error'   => $e->getMessage(),
+        ], 500);
+    }
+}
+
+public function googleLogin_bkp(Request $request)
 {
     $request->validate([
         'email'        => 'required|email',
