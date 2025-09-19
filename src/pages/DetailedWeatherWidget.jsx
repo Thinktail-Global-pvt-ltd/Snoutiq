@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import axios from "../axios";
 import { AuthContext } from "../auth/AuthContext";
 
+
 const DetailedWeatherWidget = () => {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
