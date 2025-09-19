@@ -1008,6 +1008,8 @@ export default function CallPage() {
   const [callStatus, setCallStatus] = useState("connecting");
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true); // Add the missing state variable
+
   // Add manual permission check function
   const checkPermissions = async () => {
     try {
@@ -1362,7 +1364,7 @@ export default function CallPage() {
 
       // Handle when a remote user leaves
       client.on("user-left", (user) => {
-        console.log(`👋 User ${user.uid} left the channel`);
+        console.log("👋 User ${user.uid} left the channel");
         setRemoteUsers(prev => {
           const newMap = new Map(prev);
           newMap.delete(user.uid);
@@ -1659,6 +1661,8 @@ export default function CallPage() {
           <div className="mt-3 pt-3 border-t text-xs text-gray-500">
             <div>Channel: {safeChannel}</div>
             <div>User Role: {isHost ? "Doctor (Host)" : "Patient (Audience → Host for publishing)"}</div>
+          </div>
+          
           {/* Enhanced Debug Panel with Device Info */}
           {callStatus === "error" && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -1720,7 +1724,6 @@ export default function CallPage() {
           </div>
         )}
       </div>
-    </div>
     </div>
   );
 }
