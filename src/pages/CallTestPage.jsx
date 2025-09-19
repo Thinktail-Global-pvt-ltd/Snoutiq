@@ -556,7 +556,7 @@ export default function CallPage() {
     return Number.isFinite(q) ? q : Math.floor(Math.random() * 1e6);
   }, [qs]);
 
-  const role = (qs.get("role") || "audience").toLowerCase();
+  const role = (qs.get("host") || "audience").toLowerCase();
   const isHost = role === "host";
 
   // Refs for video elements
