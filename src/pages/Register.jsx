@@ -1690,7 +1690,7 @@ const RegisterBasicDetails = () => {
       // ✅ After registration, login again
       const finalLoginRes = await axios.post(
         "https://snoutiq.com/backend/api/google-login",
-        { email, google_token: googleToken } // ❌ remove role
+        { email, google_token: googleToken,role:frontendRole } // ❌ remove role
       );
 
       const chatRoomToken = finalLoginRes.data.chat_room?.token || null;

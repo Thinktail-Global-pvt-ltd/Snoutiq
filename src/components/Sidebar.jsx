@@ -1,7 +1,9 @@
 import { useEffect, useState, useContext, lazy } from "react";
 import axios from "../axios";
 import toast from "react-hot-toast";
-const PlusCircleIcon = lazy(() => import("@heroicons/react/24/outline/PlusCircleIcon"));
+const PlusCircleIcon = lazy(() =>
+  import("@heroicons/react/24/outline/PlusCircleIcon")
+);
 const TrashIcon = lazy(() => import("@heroicons/react/24/outline/TrashIcon"));
 
 import { AuthContext } from "../auth/AuthContext";
@@ -52,6 +54,8 @@ const Sidebar = () => {
       setLoading(false);
     }
   };
+
+  console.log(history, "history");
 
   // Start new chat
   const handleNewChat = async () => {
@@ -195,11 +199,13 @@ const Sidebar = () => {
               className="group flex items-center justify-between p-2 rounded-md hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all duration-200"
             >
               <div className="flex-1 min-w-0">
-                <span className="font-medium text-gray-700 text-sm truncate block">
+                {/* <span className="font-medium text-gray-700 text-sm truncate block">
                   {item.name || "New Chat"}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {formatDate(item.created_at)}
+                </span> */}
+                <span className="font-medium text-gray-700 text-sm truncate block">
+                  {item.name && !item.name.startsWith("New chat -")
+                    ? item.name
+                    : "New Chat"}
                 </span>
               </div>
               <button

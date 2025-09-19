@@ -1,4 +1,4 @@
-import React, { useState,useContext } from "react";
+import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-hot-toast";
@@ -12,77 +12,70 @@ export default function SuperAdminLogin() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
-    const { user, login } = useContext(AuthContext);
+  const { user, login } = useContext(AuthContext);
 
   const validate = () => {
     if (!email.trim()) return "Email is required.";
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return "Enter a valid email.";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+      return "Enter a valid email.";
     if (!password) return "Password is required.";
     if (password.length < 6) return "Password must be at least 6 characters.";
     return null;
   };
 
-   const handleSubmit = async (e) => {
-       
-       e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     //    if (!validate()) return;
-       
-       console.log('hii');
-  setLoading(true);
-  try {
-    const res = await axios.post(
-      "https://snoutiq.com/backend/api/auth/login",
-      {
-        login: email,
-        password: password,
-        role: 'pet',
-      }
-    );
 
-    console.log("✅ Login Response:", res);
+    console.log("hii");
+    setLoading(true);
+    try {
+      const res = await axios.post(
+        "https://snoutiq.com/backend/api/auth/login",
+        {
+          login: email,
+          password: password,
+          role: "pet",
+        }
+      );
 
-    const chatRoomToken = res.data.chat_room?.token || null;
-    const { token, user } = res.data;
+      console.log("✅ Login Response:", res);
 
-    if (token && user) {
-      let finalUser = { ...user };
+      const chatRoomToken = res.data.chat_room?.token || null;
+      const { token, user } = res.data;
 
-      // super admin override
-      if (
-       email === "admin@gmail.com" &&
-        password === "5f4dcc3b5d"
-      ) {
-        finalUser = { ...user, role: "super_admin" };
-      } 
+      if (token && user) {
+        let finalUser = { ...user };
 
-      // save session
-      login(finalUser, token, chatRoomToken);
+        if (email === "admin@gmail.com" && password === "5f4dcc3b5d") {
+          finalUser = { ...user, role: "super_admin" };
+        }
 
-      toast.success("Login successful!");
+        login(finalUser, token, chatRoomToken);
 
-      // navigate according to role
-      if (finalUser.role === "vet") {
-        navigate("/user-dashboard/bookings");
+        toast.success("Login successful!");
+
+        if (finalUser.role === "vet") {
+          navigate("/user-dashboard/bookings");
+        } else {
+          navigate("/dashboard");
+          toast(`Welcome ${finalUser.role}, dashboard is only for vets.`);
+        }
       } else {
-        navigate("/dashboard");
-       toast(`Welcome ${finalUser.role}, dashboard is only for vets.`);
-
+        toast.error("Invalid response from server.");
       }
-    } else {
-      toast.error("Invalid response from server.");
-    }
-  } catch (error) {
-    console.error("❌ Login Error Details:", error);
+    } catch (error) {
+      console.error("❌ Login Error Details:", error);
 
-    const errorMessage =
-      error.response?.data?.message ||
-      error.message ||
-      "Login failed. Please check your credentials and try again.";
-    toast.error(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Login failed. Please check your credentials and try again.";
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
