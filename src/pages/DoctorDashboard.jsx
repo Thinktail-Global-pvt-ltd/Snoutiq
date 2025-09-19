@@ -9,7 +9,7 @@ const isLocal =
 
 const socket = io(isLocal ? "http://localhost:4000" : "https://snoutiq.com", {
   path: "/socket.io",
-  transports: ["polling"],
+  transports: ["websocket","polling"],
 });
 
 export default function DoctorDashboard({ doctorId = 501 }) {
