@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { io } from "socket.io-client";
 
-const socket = io("https://snoutiq.com", {
+const isLocal =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
+
+const socket = io(isLocal ? "http://localhost:4000" : "https://snoutiq.com", {
   path: "/socket.io",
   transports: ["websocket"],
 });

@@ -2,8 +2,12 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 
-// Production connect (via Apache reverse proxy)
-const socket = io("https://snoutiq.com", {
+// ✅ Auto detect env
+const isLocal =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
+
+const socket = io(isLocal ? "http://localhost:4000" : "https://snoutiq.com", {
   path: "/socket.io",
   transports: ["websocket"],
 });

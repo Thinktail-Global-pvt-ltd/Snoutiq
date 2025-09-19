@@ -3,30 +3,21 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 
 const httpServer = createServer();
+
 const io = new Server(httpServer, {
   cors: {
-    origin: "*", // apne frontend domain set karo
+    origin: "*",  // testing ke liye; baad me sirf snoutiq.com set karo
     methods: ["GET", "POST"],
   },
+  path: "/socket.io/",   // 👈 MUST MATCH Apache Proxy path
 });
 
 io.on("connection", (socket) => {
   console.log("✅ Client connected:", socket.id);
 
-  // Doctor channel join
-  socket.on("join-doctor", (doctorId) => {
-    socket.join(`doctor-${doctorId}`);
-    console.log(`Doctor ${doctorId} joined room`);
-  });
-
-  // Patient se call request
-  socket.on("call-requested", ({ doctorId, patientId, channel }) => {
-    io.to(`doctor-${doctorId}`).emit("call-requested", {
-      doctorId,
-      patientId,
-      channel,
-    });
-    console.log("📞 Call requested:", doctorId, patientId);
+  socket.on("call:request", (data) => {
+    console.log("📞 Call request:", data);
+    io.emit("call:incoming", data);
   });
 
   socket.on("disconnect", () => {
@@ -35,5 +26,5 @@ io.on("connection", (socket) => {
 });
 
 httpServer.listen(4000, () => {
-  console.log("🚀 Socket.IO server running on http://localhost:4000");
+  console.log("🚀 Socket.IO server running on http://127.0.0.1:4000");
 });
