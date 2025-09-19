@@ -439,6 +439,7 @@ const PetMedicationTracker = lazy(() => import("./PetDashboard/PetMedicationTrac
 const CallPage = lazy(() => import("./CallPage"));
 
 import NotificationSocket from "./components/NotificationSocket";
+import SuperAdminLogin from "./admin/SuperAdminLogin";
 
 // Create a component for authenticated user redirect
 const AuthenticatedUserRedirect = () => {
@@ -481,6 +482,7 @@ function App() {
             
             {/* Public Routes - authenticated users will be redirected from these */}
             <Route path="/login" element={<Login />} />
+            <Route path="/superadmin/login" element={<SuperAdminLogin/>}/>
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/register" element={<Register />} />
             <Route path="/register-pet-details" element={<RegisterPetDetails />} />
