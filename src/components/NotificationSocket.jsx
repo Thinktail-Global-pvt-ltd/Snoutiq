@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 export default function NotificationSocket() {
   useEffect(() => {
     // Socket server connect
-    const socket = io("http://YOUR_SERVER_IP:3000");
+    const socket = io("http://localhost:4000");
 
     // Request browser notification permission
     Notification.requestPermission().then((permission) => {

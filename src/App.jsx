@@ -445,7 +445,7 @@ import SuperAdminLogin from "./admin/SuperAdminLogin";
 const AuthenticatedUserRedirect = () => {
   return (
     <ProtectedRoute>
-      <div></div> {/* This will trigger redirect in ProtectedRoute */}
+      <div></div> 
     </ProtectedRoute>
   );
 };
@@ -506,10 +506,18 @@ function App() {
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
 
             {/* Test pages for patient/doctor (these might need protection too) */}
-            <Route path="/patient" element={<PatientDashboard />} />
+            {/* <Route path="/patient" element={<PatientDashboard />} />
             <Route path="/doctor" element={<DoctorDashboard doctorId={501} />} />
-            <Route path="/call-page/:channel" element={<CallTestPage />} />
+            <Route path="/call-page/:channel" element={<CallTestPage />} /> */}
 
+          <Route path="/patient-dashboard" element={<PatientDashboard />} />
+          <Route path="/doctor-dashboard" element={<DoctorDashboard doctorId={501} />} />
+          <Route path="/call-page/:channelName" element={<CallPage />} />
+          
+          {/* Multiple doctor routes if needed */}
+          <Route path="/doctor-dashboard/:doctorId" element={
+            <DoctorDashboard doctorId={parseInt(window.location.pathname.split('/')[2]) || 501} />
+          } />
             {/* Protected Routes - require authentication */}
             <Route
               path="/user/pets"
