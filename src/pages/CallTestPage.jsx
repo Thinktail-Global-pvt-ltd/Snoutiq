@@ -964,6 +964,7 @@
 //     </div>
 //   );
 // }// CallPage.js - Fixed version for video visibility issue
+// CallPage.js - Fixed version for video visibility issue
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
@@ -1007,7 +1008,45 @@ export default function CallPage() {
   const [callStatus, setCallStatus] = useState("connecting");
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+  // Add manual permission check function
+  const checkPermissions = async () => {
+    try {
+      const permissions = await navigator.permissions.query({ name: 'camera' });
+      console.log('Camera permission:', permissions.state);
+      
+      const micPermissions = await navigator.permissions.query({ name: 'microphone' });
+      console.log('Microphone permission:', micPermissions.state);
+      
+      return {
+        camera: permissions.state,
+        microphone: micPermissions.state
+      };
+    } catch (error) {
+      console.log('Permission API not supported, will check via getUserMedia');
+      return null;
+    }
+  };
+
+  // Add device check function
+  const checkDevices = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      const audioDevices = devices.filter(device => device.kind === 'audioinput');
+      
+      console.log(`📱 Found ${videoDevices.length} video devices`);
+      console.log(`🎤 Found ${audioDevices.length} audio devices`);
+      
+      return {
+        videoDevices: videoDevices.length,
+        audioDevices: audioDevices.length,
+        allDevices: devices
+      };
+    } catch (error) {
+      console.error('Failed to enumerate devices:', error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -1016,16 +1055,37 @@ export default function CallPage() {
       try {
         console.log(`🚀 Initializing call - Channel: ${safeChannel}, Role: ${role}, UID: ${uid}`);
         
+        // STEP 0: Check permissions and devices first
+        console.log("🔍 Checking permissions and devices...");
+        const permissions = await checkPermissions();
+        const devices = await checkDevices();
+        
+        if (devices) {
+          if (devices.videoDevices === 0) {
+            throw new Error("No video devices found. Please connect a camera.");
+          }
+          if (devices.audioDevices === 0) {
+            throw new Error("No audio devices found. Please connect a microphone.");
+          }
+        }
+        
         // Setup client events first
         setupClientEvents();
         
         // CRITICAL FIX: Set client role to HOST for both doctor and patient
         // This ensures both can publish and subscribe properly
-        console.log("Setting client role to HOST for publishing capability");
+        console.log("🏥 Setting client role to HOST for publishing capability");
         await client.setClientRole("host");
         
-        // Join the channel
-        await client.join(APP_ID, safeChannel, null, uid);
+        // Add connection timeout
+        console.log("🚪 Joining channel with timeout...");
+        const joinPromise = client.join(APP_ID, safeChannel, null, uid);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Join channel timeout')), 10000)
+        );
+        
+        await Promise.race([joinPromise, timeoutPromise]);
+        console.log("✅ Successfully joined channel");
         
         if (!mounted) return;
         
@@ -1048,70 +1108,145 @@ export default function CallPage() {
       try {
         console.log("📹 Creating local tracks...");
         
-        // Request permissions explicitly first
-        await navigator.mediaDevices.getUserMedia({ 
-          video: true, 
-          audio: true 
-        }).then(stream => {
-          // Close the test stream immediately
-          stream.getTracks().forEach(track => track.stop());
-        });
+        // STEP 1: Check if browser supports required APIs
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Browser doesn't support media devices");
+        }
         
-        // Create audio and video tracks with explicit configurations
-        const [audioTrack, videoTrack] = await Promise.all([
-          AgoraRTC.createMicrophoneAudioTrack({
-            encoderConfig: "music_standard",
-            ANS: true, // Automatic Noise Suppression
-            AEC: true  // Acoustic Echo Cancellation
-          }),
-          AgoraRTC.createCameraVideoTrack({
-            encoderConfig: "720p_1",
-            optimizationMode: "motion" // Better for video calls
-          })
-        ]);
+        // STEP 2: Request permissions and test access
+        console.log("🔐 Requesting media permissions...");
+        let testStream;
+        try {
+          testStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 30 }
+            }, 
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          });
+          
+          console.log("✅ Media permissions granted");
+          console.log(`📱 Video devices: ${testStream.getVideoTracks().length}`);
+          console.log(`🎤 Audio devices: ${testStream.getAudioTracks().length}`);
+          
+          // Stop test stream
+          testStream.getTracks().forEach(track => {
+            console.log(`🛑 Stopping test track: ${track.kind}`);
+            track.stop();
+          });
+          
+        } catch (permissionError) {
+          console.error("❌ Media permission denied:", permissionError);
+          throw new Error(`Camera/Microphone access denied: ${permissionError.message}`);
+        }
+        
+        // STEP 3: Create Agora tracks
+        console.log("🎬 Creating Agora tracks...");
+        let audioTrack, videoTrack;
+        
+        try {
+          // Create tracks separately for better error handling
+          console.log("🎤 Creating audio track...");
+          audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+            encoderConfig: "music_standard"
+          });
+          
+          console.log("📹 Creating video track...");
+          videoTrack = await AgoraRTC.createCameraVideoTrack({
+            encoderConfig: "720p_1"
+          });
+          
+          console.log("✅ Both tracks created successfully");
+          
+        } catch (trackError) {
+          console.error("❌ Failed to create tracks:", trackError);
+          
+          // Cleanup any created tracks
+          if (audioTrack) {
+            audioTrack.close();
+            audioTrack = null;
+          }
+          if (videoTrack) {
+            videoTrack.close();
+            videoTrack = null;
+          }
+          
+          throw new Error(`Failed to create media tracks: ${trackError.message}`);
+        }
         
         if (!mounted) {
-          audioTrack.close();
-          videoTrack.close();
+          console.log("⚠️ Component unmounted, cleaning up tracks");
+          audioTrack?.close();
+          videoTrack?.close();
           return;
         }
         
+        // STEP 4: Store tracks in state
         setLocalTracks({ audio: audioTrack, video: videoTrack });
+        console.log("💾 Tracks stored in state");
         
-        // CRITICAL: Play local video BEFORE publishing
-        if (localVideoRef.current) {
-          await videoTrack.play(localVideoRef.current);
-          console.log("🎥 Local video playing successfully");
+        // STEP 5: Play local video
+        if (localVideoRef.current && videoTrack) {
+          try {
+            console.log("🎥 Playing local video...");
+            await videoTrack.play(localVideoRef.current);
+            console.log("✅ Local video playing successfully");
+          } catch (playError) {
+            console.error("❌ Failed to play local video:", playError);
+            // Continue anyway, don't fail the entire process
+          }
         }
         
-        // CRITICAL: Publish tracks with retry mechanism
+        // STEP 6: Publish tracks with detailed retry
+        console.log("📡 Publishing tracks to channel...");
         let publishAttempts = 0;
         const maxPublishAttempts = 3;
         
         while (publishAttempts < maxPublishAttempts) {
           try {
+            publishAttempts++;
+            console.log(`📡 Publish attempt ${publishAttempts}/${maxPublishAttempts}`);
+            
             await client.publish([audioTrack, videoTrack]);
             console.log("✅ Published local tracks successfully");
             break;
+            
           } catch (publishError) {
-            publishAttempts++;
             console.error(`❌ Publish attempt ${publishAttempts} failed:`, publishError);
             
             if (publishAttempts === maxPublishAttempts) {
-              throw publishError;
+              throw new Error(`Failed to publish after ${maxPublishAttempts} attempts: ${publishError.message}`);
             }
             
             // Wait before retry
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log(`⏳ Waiting before retry...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
         
+        console.log("🎉 Track creation and publishing completed successfully!");
+        
       } catch (error) {
-        console.error("❌ Error creating/publishing tracks:", error);
+        console.error("💥 CRITICAL ERROR in createAndPublishTracks:", error);
         setCallStatus("error");
         
-        // Show user-friendly error message
-        alert("Unable to access camera/microphone. Please check permissions and refresh the page.");
+        // Show detailed error to user
+        const errorMsg = error.message || "Unknown error occurred";
+        alert(`Unable to initialize video call:\n\n${errorMsg}\n\nPlease:\n1. Allow camera/microphone permissions\n2. Check if camera/mic are being used by other apps\n3. Refresh the page and try again`);
+        
+        // Try to continue without media (audio-only or no media)
+        try {
+          console.log("🔄 Attempting to join without media...");
+          await client.publish([]);
+          console.log("✅ Joined channel without media");
+        } catch (fallbackError) {
+          console.error("❌ Fallback failed:", fallbackError);
+        }
       }
     };
 
@@ -1524,8 +1659,29 @@ export default function CallPage() {
           <div className="mt-3 pt-3 border-t text-xs text-gray-500">
             <div>Channel: {safeChannel}</div>
             <div>User Role: {isHost ? "Doctor (Host)" : "Patient (Audience → Host for publishing)"}</div>
-            <div>SDK Mode: RTC with VP8 codec</div>
-          </div>
+          {/* Enhanced Debug Panel with Device Info */}
+          {callStatus === "error" && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <h4 className="text-red-800 font-semibold mb-2">Troubleshooting Steps:</h4>
+              <ol className="text-sm text-red-700 space-y-1">
+                <li>1. Check if camera/microphone are connected</li>
+                <li>2. Allow browser permissions for camera/microphone</li>
+                <li>3. Close other apps using camera (Zoom, Teams, etc.)</li>
+                <li>4. Try refreshing the page</li>
+                <li>5. Try a different browser (Chrome recommended)</li>
+              </ol>
+              <button 
+                onClick={async () => {
+                  const perms = await checkPermissions();
+                  const devs = await checkDevices();
+                  alert(`Permissions: ${JSON.stringify(perms, null, 2)}\n\nDevices: Video: ${devs?.videoDevices}, Audio: ${devs?.audioDevices}`);
+                }}
+                className="mt-3 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              >
+                🔍 Check System Info
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Controls */}
@@ -1564,6 +1720,7 @@ export default function CallPage() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
