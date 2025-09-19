@@ -37,11 +37,15 @@ const httpServer = createServer();
 
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+    origin: [
+      "http://localhost:3000", 
+      "http://127.0.0.1:3000",
+      "https://snoutiq.com"  // Add your live domain
+    ],
     methods: ["GET", "POST"],
     credentials: true
   },
-  path: "/socket.io/",   // 👈 MUST MATCH Apache Proxy path
+  path: "/socket.io/",
 });
 
 // Simple storage
@@ -98,6 +102,12 @@ io.on("connection", (socket) => {
       uptime: process.uptime(),
       timestamp: new Date().toISOString()
     });
+  });
+
+  // Get active doctors list
+  socket.on("get-active-doctors", () => {
+    console.log(`📋 get-active-doctors requested by ${socket.id}`);
+    socket.emit("active-doctors", Array.from(activeDoctors.keys()));
   });
 
   // Ping-pong test
@@ -210,6 +220,6 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 4000;
 httpServer.listen(PORT, () => {
-  console.log(`🚀 Test Socket.IO server running on http://127.0.0.1:${PORT}`);
+  console.log(`🚀 Test Socket.IO server running on port ${PORT}`);
   console.log(`📡 Ready for doctor connections...`);
 });
