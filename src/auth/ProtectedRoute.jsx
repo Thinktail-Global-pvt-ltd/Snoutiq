@@ -1,6 +1,54 @@
+// import React, { useContext } from "react";
+// import { Navigate, useLocation } from "react-router-dom";
+// import { AuthContext } from "./auth/AuthContext";
+
+// // 🔹 Role to Path Mapping
+// const roleRoutes = {
+//   vet: "/user-dashboard/bookings",
+//   pet: "/dashboard",
+//   super_admin: "/user-dashboard",
+// };
+
+// const ProtectedRoute = ({ children }) => {
+//   const { token, loading, user } = useContext(AuthContext);
+//   const location = useLocation();
+
+//   // Show loading spinner while checking authentication
+//   if (loading) {
+//     return (
+//       <div className="flex justify-center items-center h-screen">
+//         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+//         <span className="ml-3 text-gray-600">Loading...</span>
+//       </div>
+//     );
+//   }
+
+//   if (!token) {
+//     return <Navigate to="/login" state={{ from: location }} replace />;
+//   }
+
+//   if (
+//     location.pathname === "/login" ||
+//     location.pathname === "/register" ||
+//     location.pathname === "/forgot-password"
+//   ) {
+//     const redirectPath = roleRoutes[user?.role] || "/dashboard"; 
+//     return <Navigate to={redirectPath} replace />;
+//   }
+
+//   if (location.pathname === "/") {
+//     const redirectPath = roleRoutes[user?.role] || "/dashboard";
+//     return <Navigate to={redirectPath} replace />;
+//   }
+
+//   return children;
+// };
+
+// export default ProtectedRoute;
+
 import React, { useContext } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { AuthContext } from "./auth/AuthContext";
+import { AuthContext } from "./AuthContext";
 
 // 🔹 Role to Path Mapping
 const roleRoutes = {
@@ -23,29 +71,27 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
+  // If user not logged in → go to login
   if (!token) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // If already logged in and tries to access public routes
   if (
     location.pathname === "/login" ||
     location.pathname === "/register" ||
     location.pathname === "/forgot-password"
   ) {
-    const redirectPath = roleRoutes[user?.role] || "/dashboard"; 
-    return <Navigate to={redirectPath} replace />;
-  }
-
-  if (location.pathname === "/") {
     const redirectPath = roleRoutes[user?.role] || "/dashboard";
     return <Navigate to={redirectPath} replace />;
   }
+
+  // ✅ Remove "/" check from here, handled by AuthenticatedUserRedirect
 
   return children;
 };
 
 export default ProtectedRoute;
-
 
 
 // import React,{ useContext } from "react";

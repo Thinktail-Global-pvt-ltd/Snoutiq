@@ -386,7 +386,7 @@
 import React, { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import ProtectedRoute from "./ProtectedRoute";
+import ProtectedRoute from "./auth/ProtectedRoute";
 import { FaPaw } from "react-icons/fa";
 import RegisterPetOwner from "./pages/RegisterPetOwner";
 
@@ -440,15 +440,8 @@ const CallPage = lazy(() => import("../src/pages/CallTestPage"));
 
 import NotificationSocket from "./components/NotificationSocket";
 import SuperAdminLogin from "./admin/SuperAdminLogin";
+import AuthenticatedUserRedirect from "./auth/AuthenticatedUserRedirect";
 
-// Create a component for authenticated user redirect
-const AuthenticatedUserRedirect = () => {
-  return (
-    <ProtectedRoute>
-      <div></div> 
-    </ProtectedRoute>
-  );
-};
 
 function App() {
   return (
@@ -504,11 +497,6 @@ function App() {
             <Route path="/cookie-policy" element={<CookiePolicy />} />
             <Route path="/medical-data-consent" element={<MedicalDataConsent />} />
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
-
-            {/* Test pages for patient/doctor (these might need protection too) */}
-            {/* <Route path="/patient" element={<PatientDashboard />} />
-            <Route path="/doctor" element={<DoctorDashboard doctorId={501} />} />
-            <Route path="/call-page/:channel" element={<CallTestPage />} /> */}
 
           <Route path="/patient-dashboard" element={<PatientDashboard />} />
           <Route path="/doctor-dashboard" element={<DoctorDashboard doctorId={501} />} />
