@@ -441,6 +441,7 @@ const CallPage = lazy(() => import("../src/pages/CallTestPage"));
 import NotificationSocket from "./components/NotificationSocket";
 import SuperAdminLogin from "./admin/SuperAdminLogin";
 import AuthenticatedUserRedirect from "./auth/AuthenticatedUserRedirect";
+import DoctorWaitingRoom from "./VetDashboard/DoctorWaitingRoom";
 
 
 function App() {
@@ -759,6 +760,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <PaymentPage />
+                </ProtectedRoute>
+              }
+            />
+
+             <Route
+              path="/doctor-waiting-room"
+              element={
+                <ProtectedRoute>
+                  <DoctorWaitingRoom />
                 </ProtectedRoute>
               }
             />

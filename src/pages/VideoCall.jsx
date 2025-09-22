@@ -1,94 +1,94 @@
-import React, { useState, useEffect, useContext } from 'react';
-import AgoraUIKit from 'agora-react-uikit';
-import { useNavigate, useParams } from 'react-router-dom';
-import { AuthContext } from '../auth/AuthContext';
+// import React, { useState, useEffect, useContext } from 'react';
+// import AgoraUIKit from 'agora-react-uikit';
+// import { useNavigate, useParams } from 'react-router-dom';
+// import { AuthContext } from '../auth/AuthContext';
 
-const Videocall = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [canAccessMedia, setCanAccessMedia] = useState(null);
-  const [error, setError] = useState("");
-  const { token } = useContext(AuthContext);
+// const Videocall = () => {
+//   const { id } = useParams();
+//   const navigate = useNavigate();
+//   const [canAccessMedia, setCanAccessMedia] = useState(null);
+//   const [error, setError] = useState("");
+//   const { token } = useContext(AuthContext);
 
-  const callbacks = {
-    EndCall: () => {
-      navigate('/dashboard');
-    },
-  };
+//   const callbacks = {
+//     EndCall: () => {
+//       navigate('/dashboard');
+//     },
+//   };
 
-  // Check if camera/mic is accessible
-  useEffect(() => {
-    const checkMedia = async () => {
-      try {
-        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        setCanAccessMedia(true);
-      } catch (err) {
-        console.error("Cannot access camera/mic:", err);
-        setError("Cannot access camera or microphone. Please check permissions or use HTTPS/localhost.");
-        setCanAccessMedia(false);
-      }
-    };
-    checkMedia();
-  }, []);
+//   // Check if camera/mic is accessible
+//   useEffect(() => {
+//     const checkMedia = async () => {
+//       try {
+//         await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+//         setCanAccessMedia(true);
+//       } catch (err) {
+//         console.error("Cannot access camera/mic:", err);
+//         setError("Cannot access camera or microphone. Please check permissions or use HTTPS/localhost.");
+//         setCanAccessMedia(false);
+//       }
+//     };
+//     checkMedia();
+//   }, []);
 
-  if (canAccessMedia === null) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="flex items-center space-x-3">
-          <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-lg text-gray-700">Checking camera and microphone...</p>
-        </div>
-      </div>
-    );
-  }
+//   if (canAccessMedia === null) {
+//     return (
+//       <div className="flex items-center justify-center h-screen">
+//         <div className="flex items-center space-x-3">
+//           <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+//           <p className="text-lg text-gray-700">Checking camera and microphone...</p>
+//         </div>
+//       </div>
+//     );
+//   }
 
-  if (canAccessMedia === false) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen space-y-4">
-        <p className="text-lg text-red-600">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
+//   if (canAccessMedia === false) {
+//     return (
+//       <div className="flex flex-col items-center justify-center h-screen space-y-4">
+//         <p className="text-lg text-red-600">{error}</p>
+//         <button
+//           onClick={() => window.location.reload()}
+//           className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700"
+//         >
+//           Retry
+//         </button>
+//       </div>
+//     );
+//   }
 
-  const [agoraToken, setAgoraToken] = useState(null);
-const [channelName, setChannelName] = useState(null);
+//   const [agoraToken, setAgoraToken] = useState(null);
+// const [channelName, setChannelName] = useState(null);
 
-useEffect(() => {
-  const fetchAgoraToken = async () => {
-    try {
-      const res = await axios.post(`/api/agora-token`, {
-        channel: "booking_" + id
-      });
-      setAgoraToken(res.data.token);
-      setChannelName(res.data.channel);
-    } catch (error) {
-      console.error("Error fetching Agora token:", error);
-    }
-  };
-  fetchAgoraToken();
-}, [id]);
+// useEffect(() => {
+//   const fetchAgoraToken = async () => {
+//     try {
+//       const res = await axios.post(`/api/agora-token`, {
+//         channel: "booking_" + id
+//       });
+//       setAgoraToken(res.data.token);
+//       setChannelName(res.data.channel);
+//     } catch (error) {
+//       console.error("Error fetching Agora token:", error);
+//     }
+//   };
+//   fetchAgoraToken();
+// }, [id]);
 
-const rtcProps = {
-  appId: "88a602d093ed47d6b77a29726aa6c35e",
-  channel: channelName,
-  token: agoraToken
-};
+// const rtcProps = {
+//   appId: "88a602d093ed47d6b77a29726aa6c35e",
+//   channel: channelName,
+//   token: agoraToken
+// };
 
 
-  return (
-    <div className="h-screen w-full bg-gray-100">
-      <AgoraUIKit rtcProps={rtcProps} callbacks={callbacks} />
-    </div>
-  );
-};
+//   return (
+//     <div className="h-screen w-full bg-gray-100">
+//       <AgoraUIKit rtcProps={rtcProps} callbacks={callbacks} />
+//     </div>
+//   );
+// };
 
-export default Videocall;
+// export default Videocall;
 
 // import React, { useState, useEffect, useContext } from 'react';
 // import AgoraUIKit from 'agora-react-uikit';
@@ -668,3 +668,238 @@ const VideocallFlow = () => {
 };
 
 export default VideocallFlow; */}
+import React, { useState, useEffect, useContext } from 'react';
+import AgoraUIKit from 'agora-react-uikit';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { AuthContext } from '../auth/AuthContext';
+import axios from 'axios';
+import { socket } from './socket';
+
+const Videocall = () => {
+  const { channel } = useParams(); // Get channel from URL params
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
+  
+  const [canAccessMedia, setCanAccessMedia] = useState(null);
+  const [error, setError] = useState("");
+  const [agoraToken, setAgoraToken] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Get params from URL
+  const uid = searchParams.get('uid');
+  const role = searchParams.get('role'); // 'host' for doctor, 'audience' for patient
+  const callId = searchParams.get('callId');
+
+  // Generate UID if not provided
+  const userId = uid || Math.floor(Math.random() * 10000);
+  
+  const callbacks = {
+    EndCall: () => {
+      // Notify other party that call ended
+      socket.emit('call-ended', { 
+        callId, 
+        channel, 
+        userId: user?.id || userId,
+        role 
+      });
+      navigate('/dashboard');
+    },
+  };
+
+  // Check if camera/mic is accessible
+  useEffect(() => {
+    const checkMedia = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: true 
+        });
+        
+        // Stop the test stream
+        stream.getTracks().forEach(track => track.stop());
+        
+        setCanAccessMedia(true);
+      } catch (err) {
+        console.error("Cannot access camera/mic:", err);
+        setError("Cannot access camera or microphone. Please check permissions and ensure you're using HTTPS or localhost.");
+        setCanAccessMedia(false);
+      }
+    };
+    checkMedia();
+  }, []);
+
+  // Fetch Agora token
+  useEffect(() => {
+    const fetchAgoraToken = async () => {
+      if (!channel || !canAccessMedia) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Call your backend to generate Agora token
+        const response = await axios.post('https://snoutiq.com/backend/api/agora-token', {
+          channel: channel,
+          uid: userId,
+          role: role === 'host' ? 'publisher' : 'subscriber', // Agora role
+          expireTime: 3600 // 1 hour
+        });
+        
+        if (response.data.token) {
+          setAgoraToken(response.data.token);
+        } else {
+          throw new Error('No token received from server');
+        }
+      } catch (error) {
+        console.error("Error fetching Agora token:", error);
+        setError("Failed to get video call token. Please refresh and try again.");
+        setCanAccessMedia(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAgoraToken();
+  }, [channel, userId, role, canAccessMedia]);
+
+  // Socket listeners for call events
+  useEffect(() => {
+    const handleCallEnded = (data) => {
+      if (data.channel === channel && data.userId !== (user?.id || userId)) {
+        // Other party ended the call
+        alert('The other party has ended the call');
+        navigate('/dashboard');
+      }
+    };
+
+    const handleCallError = (error) => {
+      console.error('Call error:', error);
+      setError('Call connection error: ' + error.message);
+    };
+
+    socket.on('call-ended', handleCallEnded);
+    socket.on('call-error', handleCallError);
+
+    return () => {
+      socket.off('call-ended', handleCallEnded);
+      socket.off('call-error', handleCallError);
+    };
+  }, [channel, user, userId, navigate]);
+
+  // Loading state
+  if (canAccessMedia === null || isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="flex flex-col items-center space-y-4 text-white">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-lg">
+            {canAccessMedia === null 
+              ? "Checking camera and microphone..." 
+              : "Connecting to video call..."}
+          </p>
+          <div className="text-sm text-gray-300">
+            <p>Channel: {channel}</p>
+            <p>Role: {role}</p>
+            <p>User ID: {userId}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (canAccessMedia === false || error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen space-y-6 bg-gray-900 text-white">
+        <div className="bg-red-600 p-4 rounded-lg max-w-md text-center">
+          <h2 className="text-xl font-bold mb-2">Connection Error</h2>
+          <p className="text-red-100">{error}</p>
+        </div>
+        
+        <div className="space-y-2">
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"
+          >
+            Retry Connection
+          </button>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="block px-6 py-2 text-gray-300 hover:text-white transition-colors"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+
+        <div className="text-xs text-gray-400 text-center">
+          <p>Make sure you:</p>
+          <ul className="list-disc list-inside mt-2 space-y-1">
+            <li>Allow camera and microphone permissions</li>
+            <li>Use HTTPS or localhost</li>
+            <li>Have a stable internet connection</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
+  // Main video call interface
+  const rtcProps = {
+    appId: "88a602d093ed47d6b77a29726aa6c35e", // Your Agora App ID
+    channel: channel,
+    token: agoraToken,
+    uid: userId,
+    layout: role === 'host' ? 0 : 1, // Different layouts for doctor vs patient
+  };
+
+  const styleProps = {
+    localBtnContainer: {
+      backgroundColor: '#1f2937',
+      bottom: '20px',
+    },
+    localBtnStyles: {
+      muteLocalAudio: {
+        backgroundColor: '#ef4444',
+        borderRadius: '8px',
+      },
+      muteLocalVideo: {
+        backgroundColor: '#ef4444', 
+        borderRadius: '8px',
+      },
+      endCall: {
+        backgroundColor: '#dc2626',
+        borderRadius: '8px',
+      },
+    },
+  };
+
+  return (
+    <div className="h-screen w-full bg-gray-900 relative">
+      {/* Call Info Header */}
+      <div className="absolute top-4 left-4 z-10 bg-black bg-opacity-50 text-white px-4 py-2 rounded-lg">
+        <div className="text-sm">
+          <p>Call ID: {callId}</p>
+          <p>Role: {role === 'host' ? 'Doctor' : 'Patient'}</p>
+          <p>Channel: {channel}</p>
+        </div>
+      </div>
+
+      {/* Agora Video Component */}
+      <AgoraUIKit 
+        rtcProps={rtcProps} 
+        callbacks={callbacks} 
+        styleProps={styleProps}
+      />
+
+      {/* Connection Status */}
+      <div className="absolute top-4 right-4 z-10">
+        <div className="flex items-center bg-green-600 text-white px-3 py-1 rounded-full text-sm">
+          <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+          Connected
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Videocall;

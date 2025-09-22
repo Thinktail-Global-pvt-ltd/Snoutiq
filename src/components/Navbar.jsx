@@ -353,7 +353,7 @@ const Navbar = () => {
                         {user.name || user.business_status}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {!user.business_status ? "Pet Owner" : "Vet Owner"}
+                        {user.role + " Owner"}
                       </div>
                     </div>
                     <svg
