@@ -43,198 +43,6 @@ class GeminiChatController extends Controller
         ]);
     }
 
-//        private function buildGeminiPayload(array $req, ?Chat $lastChat): array
-//     {
-//         $petContextBlock = "";
-//         if (!empty($req['pet_name']) || !empty($req['pet_breed']) || !empty($req['pet_age']) || !empty($req['pet_location'])) {
-//             $petContextBlock =
-//                 "Pet Profile:\n" .
-//                 "- Pet Name: " . ($req['pet_name'] ?? 'Not specified') . "\n" .
-//                 "- Breed: " . ($req['pet_breed'] ?? 'Mixed/Unknown breed') . "\n" .
-//                 "- Age: " . ($req['pet_age'] ?? 'Age not specified') . " years old\n" .
-//                 "- Location: " . ($req['pet_location'] ?? 'India (general advice)');
-//         }
-
-//         $lastQnA = "";
-//         if ($lastChat) {
-//             $lastQnA =
-//                 "Previous Exchange:\n" .
-//                 "- Last Question: " . trim($lastChat->question) . "\n" .
-//                 "- Last Answer: " . mb_substr(trim($lastChat->answer), 0, 800) . (mb_strlen($lastChat->answer) > 800 ? "..." : "");
-//         }
-
-//         $system = <<<SYS
-// Role: Act as SnoutAI Assistant, an empathetic guide for Indian pet parents. You are NOT a vet and cannot diagnose or treat. Your role is to comfort worried pet parents and guide them to appropriate care.
-
-// Response Structure:
-// 1) Acknowledge emotion first (e.g., "I understand how worrying this must be...")
-// 2) Safety first: "It's important to have a veterinarian examine the pet for this."
-// 3) Short educational context
-// 4) Natural guidance (no sales tone)
-
-// Safety Rules:
-// - Never diagnose or prescribe treatment/medicines
-// - For symptoms: emotion → vet recommendation → context → guidance
-// - For emergencies: be urgent but compassionate
-
-// Branding:
-// - Never call yourself Gemini/Google
-// - Introduce as "SnoutAI Assistant" only
-
-// Output Formatting:
-// - PLAIN TEXT only. No Markdown, *, **, headings, or code blocks.
-// - If needed, use simple numbered points like "1)".
-// SYS;
-
-//         $userParts = array_filter([
-//             $petContextBlock,
-//             $lastQnA,
-//             "Current Question: " . ($req['question'] ?? '')
-//         ]);
-//         $userPrompt = implode("\n\n", $userParts);
-
-//         return [
-//             "systemInstruction" => [
-//                 "role"  => "system",
-//                 "parts" => [ [ "text" => $system ] ],
-//             ],
-//             "contents" => [
-//                 [
-//                     "role"  => "user",
-//                     "parts" => [ [ "text" => $userPrompt ] ],
-//                 ],
-//             ],
-//             "generationConfig" => [
-//                 "temperature"      => 0.7,
-//                 "topK"             => 40,
-//                 "topP"             => 0.95,
-//                 "maxOutputTokens"  => 800,
-//                 "stopSequences"    => [],
-//             ],
-//         ];
-//     }
-
-//     private function detectEmergencyLevel(string $question): string
-//     {
-//         $map = [
-//             '🚨 CRITICAL' => ['unconscious','not breathing','severe bleeding','seizure','collapse'],
-//             '⚠️ URGENT'   => ['chocolate','vomiting blood','poisoned','ate poison','toxic'],
-//             '🟡 PRIORITY' => ['difficulty breathing','vomiting repeatedly','severe pain',"won't eat",'lethargic'],
-//         ];
-//         $q = strtolower($question);
-//         foreach ($map as $tag => $list) {
-//             foreach ($list as $kw) {
-//                 if (str_contains($q, $kw)) {
-//                     return "$tag - Seek immediate veterinary care!";
-//                 }
-//             }
-//         }
-//         return "ℹ️ Routine inquiry";
-//     }
-
-//     /** SEND MESSAGE: Requires existing room; refresh room name each message */
-//     public function sendMessage(Request $request)
-//     {
-       
-//         $request->validate([
-//             'user_id'         => 'required|integer',
-//             'chat_room_token' => 'required|string',
-//             'chat_room_id'    => 'required_without:chat_room_token|integer',
-//             'question'        => 'required|string',
-//             'context_token'   => 'nullable|string',
-//             'title'           => 'nullable|string', // if you want to override name from frontend
-//             'pet_name'        => 'nullable|string',
-//             'pet_breed'       => 'nullable|string',
-//             'pet_age'         => 'nullable|string',
-//             'pet_location'    => 'nullable|string',
-//         ]);
-
-//         $userId  = (int) $request->user_id;
-
-//         // Find room by id or token, ensuring it belongs to user
-//         if ($request->filled('chat_room_id')) {
-//             $room = ChatRoom::where('id', $request->chat_room_id)
-//                 ->where('user_id', $userId)
-//                 ->firstOrFail();
-//         } else {
-//           //dd($request->chat_room_token);
-//             $room = ChatRoom::where('chat_room_token', $request->chat_room_token)
-//               //  ->where('user_id', $userId)
-//                 ->firstOrFail();
-             
-//         }
-        
-        
-
-
-//         $contextToken = $request->context_token ?: Str::uuid()->toString();
-
-//         // Last chat in SAME room (for short context)
-//         $lastChat = Chat::where('chat_room_id', $room->id)
-//             ->latest()
-//             ->first();
-
-//         // Build Gemini payload (systemInstruction + contents)
-//         $payload = $this->buildGeminiPayload($request->all(), $lastChat);
-
-//         // Emergency level
-//         $level = $this->detectEmergencyLevel((string) $request->question);
-
-//         // Call Gemini
-//         $apiKey = env('GEMINI_API_KEY');
-//         if (!$apiKey) {
-//             return response()->json(['error' => 'GEMINI_API_KEY missing in .env'], 500);
-//         }
-
-//         $resp = Http::withHeaders([
-//             'Content-Type'   => 'application/json',
-//             'X-goog-api-key' => $apiKey,
-//         ])->post(
-//             'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-//             $payload
-//         );
-
-//         if (!$resp->successful()) {
-//             return response()->json([
-//                 'error'   => 'Gemini API call failed',
-//                 'details' => $resp->json(),
-//             ], 500);
-//         }
-
-//         $answerRaw = $resp->json('candidates.0.content.parts.0.text') ?? "No response.";
-//         $answerRaw = $this->enforceSnoutBrand($answerRaw);
-//         $answer    = $this->stripMarkdownToPlain($answerRaw);
-
-//         // Save message
-//         $chat = Chat::create([
-//             'user_id'         => $userId,
-//             'chat_room_id'    => $room->id,               // 🔵 FK
-//             'chat_room_token' => $room->chat_room_token,  // (optional legacy)
-//             'context_token'   => $contextToken,
-//             'question'        => $request->question,
-//             'answer'          => $answer,
-//             'pet_name'        => $request->pet_name,
-//             'pet_breed'       => $request->pet_breed,
-//             'pet_age'         => $request->pet_age,
-//             'pet_location'    => $request->pet_location,
-//         ]);
-
-//         // 🔄 Refresh room name on every question
-//         $newName = $request->title ?: $this->autoTitleFromQuestion($request->question);
-//         $room->name = $newName;
-//         $room->touch(); // updates updated_at
-//         $room->save();
-
-//         return response()->json([
-//             'status'           => 'success',
-//             'chat_room_id'     => $room->id,
-//             'chat_room_token'  => $room->chat_room_token,
-//             'room_name'        => $room->name,
-//             'context_token'    => $contextToken,
-//             'emergency_status' => $level,
-//             'chat'             => $chat,
-//         ]);
-//     }
 
 
 
@@ -264,10 +72,11 @@ class GeminiChatController extends Controller
     /** ---- Public Endpoint ---- */
     public function sendMessage(Request $request)
     {
+       //dd($request->all());
         $request->validate([
             'user_id'         => 'required|integer',
-            'chat_room_token' => 'required_without:chat_room_id|string',
-            'chat_room_id'    => 'required_without:chat_room_token|integer',
+           // 'chat_room_token' => 'required_without:chat_room_id|string',
+           // 'chat_room_id'    => 'required_without:chat_room_token|integer',
             'question'        => 'required|string',
             'context_token'   => 'nullable|string',
             'title'           => 'nullable|string',
@@ -277,6 +86,7 @@ class GeminiChatController extends Controller
             'pet_age'         => 'nullable|string',
             'pet_location'    => 'nullable|string',
         ]);
+       
 
         $userId = (int) $request->user_id;
 
@@ -334,7 +144,7 @@ class GeminiChatController extends Controller
         $raw = $resp->json('candidates.0.content.parts.0.text') ?? '{}';
        // dd($raw);
         [$answerTxt, $diagnosisTxt, $systemTag] = $this->parseModelJson($raw);
-       
+       $answerTxt = $this->formatStarsToPoints($answerTxt); // ← add this line
 
         // Save chat with diagnosis + emergency_status
         $emergencyStatus = $systemTag; // EMERGENCY | URGENT | ROUTINE | INFO
@@ -378,6 +188,56 @@ class GeminiChatController extends Controller
             'chat'             => $chat,
         ]);
     }
+
+
+    /**
+ * Convert inline or line-start '***' stars into bullet-point lines.
+ * Preserves the disclaimer line at the end of the answer.
+ */
+private function formatStarsToPoints(string $txt): string
+{
+    $t = trim($txt);
+    if ($t === '') return $txt;
+
+    // Try to protect the disclaimer (usually the last line)
+    $lines = preg_split('/\R/', $t);
+    $disclaimer = '';
+    if (!empty($lines)) {
+        $maybeLast = trim(end($lines));
+        if (preg_match('/⚠️\s*AI advice|Consult veterinarian/i', $maybeLast)) {
+            array_pop($lines);
+            $disclaimer = $maybeLast;
+            $t = implode("\n", $lines);
+        }
+    }
+
+    $out = $t;
+
+    // Case A: inline separators like "Intro *** point1 *** point2"
+    if (strpos($t, '***') !== false) {
+        $chunks = preg_split('/\*{3,}/', $t);
+        $chunks = array_map('trim', $chunks);
+        $chunks = array_filter($chunks, function ($c) { return $c !== ''; });
+
+        if (count($chunks) > 1) {
+            // Keep an optional intro (first chunk) and bullet the rest
+            $head = array_shift($chunks);
+            $bullets = '• ' . implode("\n• ", $chunks);
+            $out = (strlen($head) ? ($head . "\n\n" . $bullets) : $bullets);
+        }
+    }
+
+    // Case B: lines that *start* with *** (convert to bullets)
+    $out = preg_replace('/^\s*\*{3,}\s*/m', '• ', $out);
+
+    // Re-attach disclaimer if we pulled it off
+    if ($disclaimer !== '') {
+        $out = rtrim($out) . "\n\n" . $disclaimer;
+    }
+
+    return $out;
+}
+
 
     /** ---- Payload builder (JSON-only output) ---- */
     private function buildGeminiPayload(array $req, ?Chat $lastChat, int $exchanges): array
@@ -848,121 +708,6 @@ private function attemptJsonFixes(string $json): string
         ]);
     }
 
-    // ---------------- Helpers ----------------
-
-    // private function autoTitleFromQuestion(string $q): string
-    // {
-    //     // First 6–8 words as title
-    //     $clean = trim(preg_replace('/\s+/', ' ', strip_tags($q)));
-    //     $words = explode(' ', $clean);
-    //     $take  = array_slice($words, 0, 8);
-    //     $title = implode(' ', $take);
-    //     if (count($words) > 8) $title .= '…';
-    //     return $title ?: 'New chat';
-    // }
-
-//     private function buildGeminiPayload(array $req, ?Chat $lastChat): array
-//     {
-//         $petContextBlock = "";
-//         if (!empty($req['pet_name']) || !empty($req['pet_breed']) || !empty($req['pet_age']) || !empty($req['pet_location'])) {
-//             $petContextBlock =
-//                 "Pet Profile:\n" .
-//                 "- Pet Name: " . ($req['pet_name'] ?? 'Not specified') . "\n" .
-//                 "- Breed: " . ($req['pet_breed'] ?? 'Mixed/Unknown breed') . "\n" .
-//                 "- Age: " . ($req['pet_age'] ?? 'Age not specified') . " years old\n" .
-//                 "- Location: " . ($req['pet_location'] ?? 'India (general advice)');
-//         }
-
-//         $lastQnA = "";
-//         if ($lastChat) {
-//             $lastQnA =
-//                 "Previous Exchange:\n" .
-//                 "- Last Question: " . trim($lastChat->question) . "\n" .
-//                 "- Last Answer: " . mb_substr(trim($lastChat->answer), 0, 800) . (mb_strlen($lastChat->answer) > 800 ? "..." : "");
-//         }
-
-//         $system = <<<SYS
-// Role: Act as SnoutAI Assistant, an empathetic guide for Indian pet parents. You are NOT a vet and cannot diagnose or treat. Your role is to comfort worried pet parents and guide them to appropriate care.
-
-// Response Structure:
-// 1) Acknowledge emotion first (e.g., "I understand how worrying this must be...")
-// 2) Safety first: "It's important to have a veterinarian examine the pet for this."
-// 3) Short educational context
-// 4) Natural guidance (no sales tone)
-
-// Safety Rules:
-// - Never diagnose or prescribe treatment/medicines
-// - For symptoms: emotion → vet recommendation → context → guidance
-// - For emergencies: be urgent but compassionate
-
-// Branding:
-// - Never call yourself Gemini/Google
-// - Introduce as "SnoutAI Assistant" only
-
-// Output Formatting:
-// - PLAIN TEXT only. No Markdown, *, **, headings, or code blocks.
-// - If needed, use simple numbered points like "1)".
-// SYS;
-
-//         $userParts = array_filter([
-//             $petContextBlock,
-//             $lastQnA,
-//             "Current Question: " . ($req['question'] ?? '')
-//         ]);
-//         $userPrompt = implode("\n\n", $userParts);
-
-//         return [
-//             "systemInstruction" => [
-//                 "role"  => "system",
-//                 "parts" => [ [ "text" => $system ] ],
-//             ],
-//             "contents" => [
-//                 [
-//                     "role"  => "user",
-//                     "parts" => [ [ "text" => $userPrompt ] ],
-//                 ],
-//             ],
-//             "generationConfig" => [
-//                 "temperature"      => 0.7,
-//                 "topK"             => 40,
-//                 "topP"             => 0.95,
-//                 "maxOutputTokens"  => 800,
-//                 "stopSequences"    => [],
-//             ],
-//         ];
-//     }
-
-//     private function detectEmergencyLevel(string $question): string
-//     {
-//         $map = [
-//             '🚨 CRITICAL' => ['unconscious','not breathing','severe bleeding','seizure','collapse'],
-//             '⚠️ URGENT'   => ['chocolate','vomiting blood','poisoned','ate poison','toxic'],
-//             '🟡 PRIORITY' => ['difficulty breathing','vomiting repeatedly','severe pain',"won't eat",'lethargic'],
-//         ];
-//         $q = strtolower($question);
-//         foreach ($map as $tag => $list) {
-//             foreach ($list as $kw) {
-//                 if (str_contains($q, $kw)) {
-//                     return "$tag - Seek immediate veterinary care!";
-//                 }
-//             }
-//         }
-//         return "ℹ️ Routine inquiry";
-//     }
-
-    // private function stripMarkdownToPlain(string $text): string
-    // {
-    //     $out = preg_replace('/[*_`>#-]+/', ' ', $text);
-    //     $out = preg_replace('/[ \t]+/', ' ', $out);
-    //     $out = preg_replace('/\n{3,}/', "\n\n", $out);
-    //     return trim($out ?? $text);
-    // }
-
-    // private function enforceSnoutBrand(string $text): string
-    // {
-    //     $out = preg_replace('/\b(Google\s+Gemini|Gemini|Google Assistant)\b/i', 'SnoutAI Assistant', $text);
-    //     return $out ?? $text;
-    // }
 
     public function getRoomChats(Request $request, string $chat_room_token)
 {
