@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axiosClient from '../axios';
 
-import ringtone from './../assets/ringtone.mp3';
+import ringtone from '../../public/ringtone.mp3'
 import { AuthContext } from '../auth/AuthContext';
 
 // Modal component to show the emergency request
