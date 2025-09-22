@@ -326,7 +326,7 @@ Route::get('/razorpay-ping', function () {
     }
 });
 
-  Route::post('/rzp/verify', [PaymentController::class, 'verifyAndCapture']);
+  Route::post('/rzp/verify', [PaymentController::class, 'verifyPayment']);
 
   Route::get('/rzp-test', [PaymentController::class, 'testView']); // view render
 
