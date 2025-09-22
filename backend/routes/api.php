@@ -333,3 +333,5 @@ Route::get('/razorpay-ping', function () {
   Route::post('/create-order', [PaymentController::class, 'createOrder']);
 
   Route::get('/user-chats/{user_id}', [GeminiChatController::class, 'getUserChats']);
+
+  Route::post('/chats/{chat_id}/feedback', [GeminiChatController::class, 'setFeedback']);

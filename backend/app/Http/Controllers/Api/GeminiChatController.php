@@ -919,6 +919,33 @@ public function getUserChats($user_id)
 }
 
 
+public function setFeedback(Request $request, $chat_id)
+{
+    $data = $request->validate([
+        'feedback' => 'required|in:0,1',
+    ]);
+
+    $chat = DB::table('chats')->where('id', $chat_id)->first();
+
+    if (!$chat) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Chat not found'
+        ], 404);
+    }
+
+    DB::table('chats')->where('id', $chat_id)->update([
+        'feedback' => $data['feedback'],
+        'updated_at' => now()
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Feedback updated',
+        'chat_id' => $chat_id,
+        'feedback' => (int)$data['feedback']
+    ]);
+}
 
 
 }
