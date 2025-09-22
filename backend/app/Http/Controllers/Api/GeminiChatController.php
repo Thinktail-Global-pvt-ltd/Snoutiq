@@ -131,6 +131,7 @@ class GeminiChatController extends Controller
             'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
             $payload
         );
+      
        
 
         if (!$resp->successful()) {
@@ -142,7 +143,7 @@ class GeminiChatController extends Controller
 
         // Parse single-line JSON result
         $raw = $resp->json('candidates.0.content.parts.0.text') ?? '{}';
-       // dd($raw);
+        
         [$answerTxt, $diagnosisTxt, $systemTag] = $this->parseModelJson($raw);
        $answerTxt = $this->formatStarsToPoints($answerTxt); // ← add this line
 
@@ -780,6 +781,144 @@ public function deleteRoom(Request $request, string $chat_room_token)
         ],
     ]);
 }
+
+
+// public function getUserChats($user_id)
+//     {
+//         // check user exists
+//         $user = DB::table('users')->where('id', $user_id)->first();
+//         if (!$user) {
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'User not found'
+//             ], 404);
+//         }
+
+//         // fetch chats with chat_rooms
+//         $data = DB::table('chats as c')
+//             ->leftJoin('chat_rooms as cr', 'c.chat_room_id', '=', 'cr.id')
+//             ->where('c.user_id', $user_id)
+//             ->select(
+//                 'c.id as chat_id',
+//                 'c.question',
+//                 'c.answer',
+//                 'c.response_tag',
+//                 'c.pet_name',
+//                 'c.pet_breed',
+//                 'c.pet_age',
+//                 'c.pet_location',
+//                 'c.diagnosis',
+//                 'c.emergency_status',
+//                 'c.created_at as chat_created_at',
+//                 'cr.id as room_id',
+//                 'cr.chat_room_token',
+//                 'cr.name as room_name',
+//                 'cr.last_emergency_status',
+//                 'cr.created_at as room_created_at'
+//             )
+//             ->orderBy('cr.id')
+//             ->orderBy('c.created_at')
+//             ->get();
+            
+
+//         return response()->json([
+//             'success' => true,
+//             'user' => $user,
+//             'chats' => $data
+//         ]);
+//     }
+
+
+
+
+public function getUserChats($user_id)
+{
+    $user = DB::table('users')->where('id', $user_id)->first();
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'User not found'
+        ], 404);
+    }
+
+    $chats = DB::table('chats as c')
+        ->leftJoin('chat_rooms as cr', 'c.chat_room_id', '=', 'cr.id')
+        ->where('c.user_id', $user_id)
+        ->select(
+            'c.id as chat_id',
+            'c.question',
+            'c.answer',
+            'c.chat_room_id',
+            'cr.name as room_name'
+        )
+        ->orderBy('c.chat_room_id')
+        ->orderBy('c.created_at')
+        ->get();
+
+    if ($chats->isEmpty()) {
+        return response()->json([
+            'success' => true,
+            'user' => $user,
+            'rooms' => []
+        ]);
+    }
+
+    // group by room
+    $grouped = $chats->groupBy('chat_room_id');
+    $roomsData = [];
+
+    foreach ($grouped as $roomId => $roomChats) {
+        $conversation = $roomChats->map(fn($c) => "Q: {$c->question}\nA: {$c->answer}")->implode("\n\n");
+
+        // send to Gemini for summary
+        $apiKey = 'AIzaSyCIB0yfzSQGGwpVUruqy_sd2WqujTLa1Rk';
+        $payload = [
+            "contents" => [[
+                "parts" => [[
+                    "text" => "Summarize this pet consultation chat for doctor:\n\n{$conversation}"
+                ]]
+            ]]
+        ];
+
+        $resp = Http::withHeaders([
+            'Content-Type'   => 'application/json',
+            'X-goog-api-key' => $apiKey,
+        ])->timeout(30)->post(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+            $payload
+        );
+
+        $summary = null;
+        if ($resp->ok()) {
+            $json = $resp->json();
+            $summary = $json['candidates'][0]['content']['parts'][0]['text'] ?? null;
+        }
+
+        // save summary in DB
+        if ($summary) {
+            DB::table('chat_rooms')->where('id', $roomId)->update(['summary' => $summary]);
+        }
+
+        $roomsData[] = [
+            'room_id'   => $roomId,
+            'room_name' => $roomChats->first()->room_name,
+            'summary'   => $summary,
+            'chats'     => $roomChats->map(fn($c) => [
+                'chat_id'  => $c->chat_id,
+                'question' => $c->question,
+                'answer'   => $c->answer,
+            ])
+        ];
+    }
+
+    return response()->json([
+        'success' => true,
+        'user'    => $user,
+        'rooms'   => $roomsData
+    ]);
+}
+
+
 
 
 }

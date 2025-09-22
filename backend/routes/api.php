@@ -331,3 +331,5 @@ Route::get('/razorpay-ping', function () {
   Route::get('/rzp-test', [PaymentController::class, 'testView']); // view render
 
   Route::post('/create-order', [PaymentController::class, 'createOrder']);
+
+  Route::get('/user-chats/{user_id}', [GeminiChatController::class, 'getUserChats']);
