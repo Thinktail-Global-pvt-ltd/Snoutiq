@@ -541,7 +541,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { socket } from '../pages/socket';
 
-const HeaderWithSidebar = ({ children, doctorId = 501 }) => {
+const HeaderWithSidebar = ({ children, doctorId = 34 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeNavItem, setActiveNavItem] = useState("Dashboard");
@@ -557,6 +557,8 @@ const HeaderWithSidebar = ({ children, doctorId = 501 }) => {
   const { user } = useContext(AuthContext);
   const hasListeners = useRef(false);
   const hasSetUpListeners = useRef(false);
+  console.log(user,'sadf');
+  
 
   // Add debug log function
   const addDebugLog = (message) => {

@@ -1386,6 +1386,7 @@ const Dashboard = () => {
   const [contextToken, setContextToken] = useState("");
   const typingTimeouts = useRef(new Map());
   const isAutoScrolling = useRef(false);
+  const [nearbyDoctors, setNearbyDoctors] = useState([]);
 
   // Get chat_room_token from URL params
   const { chat_room_token } = useParams();
@@ -1425,7 +1426,7 @@ const Dashboard = () => {
 
       if (res.data && Array.isArray(res.data.data)) {
         updateNearbyDoctors(res.data.data);
-        console.log("Doctors updated:", res.data.data);
+        setNearbyDoctors(res.data.data)
       }
     } catch (err) {
       console.error("Failed to fetch nearby doctors", err);
@@ -1434,6 +1435,7 @@ const Dashboard = () => {
       setIsLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchNearbyDoctors();
@@ -1534,7 +1536,6 @@ const Dashboard = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        console.log("Chat history API response:", res.data);
         let messagesFromAPI = [];
 
         if (res.data && Array.isArray(res.data)) {
@@ -1636,7 +1637,6 @@ const Dashboard = () => {
   useEffect(() => {
     const handleChatRoomChange = (event) => {
       const newChatRoomToken = event.detail;
-      console.log("Received chat room change event:", newChatRoomToken);
 
       if (newChatRoomToken && updateChatRoomToken) {
         updateChatRoomToken(newChatRoomToken);
@@ -1825,7 +1825,6 @@ const Dashboard = () => {
         // Start typing animation
         startTypingAnimation(aiId, fullText);
       } catch (error) {
-        console.error("Error sending chat:", error);
         toast.error("Something went wrong. Try again.");
 
         setMessages((prev) => {
@@ -1981,6 +1980,7 @@ const Dashboard = () => {
                       onFeedback={(value, timestamp) =>
                         handleFeedback(value, timestamp)
                       }
+                        nearbyDoctors={nearbyDoctors}
                     />
                   </div>
                 ))}

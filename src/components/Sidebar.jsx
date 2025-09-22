@@ -55,8 +55,6 @@ const Sidebar = () => {
     }
   };
 
-  console.log(history, "history");
-
   // Start new chat
   const handleNewChat = async () => {
     if (!user) return;

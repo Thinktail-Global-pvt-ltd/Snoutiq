@@ -668,238 +668,940 @@ const VideocallFlow = () => {
 };
 
 export default VideocallFlow; */}
-import React, { useState, useEffect, useContext } from 'react';
-import AgoraUIKit from 'agora-react-uikit';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { AuthContext } from '../auth/AuthContext';
-import axios from 'axios';
-import { socket } from './socket';
 
-const Videocall = () => {
-  const { channel } = useParams(); // Get channel from URL params
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
+
+// import React, { useState, useEffect, useContext } from 'react';
+// import AgoraUIKit from 'agora-react-uikit';
+// import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+// import { AuthContext } from '../auth/AuthContext';
+// import axios from 'axios';
+// import { socket } from './socket';
+
+// const EnhancedVideocall = () => {
+//   const { channel } = useParams();
+//   const [searchParams] = useSearchParams();
+//   const navigate = useNavigate();
+//   const { token } = useContext(AuthContext);
   
-  const [canAccessMedia, setCanAccessMedia] = useState(null);
-  const [error, setError] = useState("");
-  const [agoraToken, setAgoraToken] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Get params from URL
-  const uid = searchParams.get('uid');
-  const role = searchParams.get('role'); // 'host' for doctor, 'audience' for patient
-  const callId = searchParams.get('callId');
-
-  // Generate UID if not provided
-  const userId = uid || Math.floor(Math.random() * 10000);
+//   const uid = searchParams.get('uid');
+//   const role = searchParams.get('role');
+//   const callId = searchParams.get('callId');
   
-  const callbacks = {
-    EndCall: () => {
-      // Notify other party that call ended
-      socket.emit('call-ended', { 
-        callId, 
-        channel, 
-        userId: user?.id || userId,
-        role 
-      });
-      navigate('/dashboard');
-    },
-  };
+//   const [canAccessMedia, setCanAccessMedia] = useState(null);
+//   const [error, setError] = useState("");
+//   const [agoraToken, setAgoraToken] = useState(null);
+//   const [channelName, setChannelName] = useState(null);
+//   const [callStatus, setCallStatus] = useState('initializing');
+//   const [paymentVerified, setPaymentVerified] = useState(false);
 
-  // Check if camera/mic is accessible
-  useEffect(() => {
-    const checkMedia = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: true, 
-          audio: true 
-        });
-        
-        // Stop the test stream
-        stream.getTracks().forEach(track => track.stop());
-        
-        setCanAccessMedia(true);
-      } catch (err) {
-        console.error("Cannot access camera/mic:", err);
-        setError("Cannot access camera or microphone. Please check permissions and ensure you're using HTTPS or localhost.");
-        setCanAccessMedia(false);
-      }
-    };
-    checkMedia();
-  }, []);
-
-  // Fetch Agora token
-  useEffect(() => {
-    const fetchAgoraToken = async () => {
-      if (!channel || !canAccessMedia) return;
+//   // Enhanced callbacks
+//   const callbacks = {
+//     EndCall: () => {
+//       // Notify about call end
+//       socket.emit('call-ended', { 
+//         callId, 
+//         channel, 
+//         uid, 
+//         role,
+//         endedBy: uid 
+//       });
       
-      try {
-        setIsLoading(true);
-        
-        // Call your backend to generate Agora token
-        const response = await axios.post('https://snoutiq.com/backend/api/agora-token', {
-          channel: channel,
-          uid: userId,
-          role: role === 'host' ? 'publisher' : 'subscriber', // Agora role
-          expireTime: 3600 // 1 hour
-        });
-        
-        if (response.data.token) {
-          setAgoraToken(response.data.token);
-        } else {
-          throw new Error('No token received from server');
-        }
-      } catch (error) {
-        console.error("Error fetching Agora token:", error);
-        setError("Failed to get video call token. Please refresh and try again.");
-        setCanAccessMedia(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+//       navigate('/dashboard');
+//     },
+    
+//     UserJoined: (uid) => {
+//       console.log('User joined:', uid);
+//       setCallStatus('connected');
+//     },
+    
+//     UserLeft: (uid) => {
+//       console.log('User left:', uid);
+//       if (role === 'host') {
+//         // Doctor can continue or end call
+//         setCallStatus('patient-left');
+//       } else {
+//         // Patient should leave if doctor left
+//         setCallStatus('doctor-left');
+//         setTimeout(() => navigate('/dashboard'), 3000);
+//       }
+//     }
+//   };
 
-    fetchAgoraToken();
-  }, [channel, userId, role, canAccessMedia]);
+//   // Verify payment before allowing video call access
+//   useEffect(() => {
+//     const verifyCallAccess = async () => {
+//       try {
+//         if (callId) {
+//           // Verify payment status for this call
+//           const response = await axios.get(`/api/call/${callId}/verify-payment`);
+          
+//           if (response.data.paymentVerified) {
+//             setPaymentVerified(true);
+//             setCallStatus('payment-verified');
+//           } else {
+//             setError("Payment not completed. Please complete payment to join the call.");
+//             setCallStatus('payment-pending');
+//             return;
+//           }
+//         } else {
+//           // Fallback for calls without payment requirement
+//           setPaymentVerified(true);
+//           setCallStatus('no-payment-required');
+//         }
+        
+//       } catch (error) {
+//         console.error("Error verifying call access:", error);
+//         setError("Unable to verify call access. Please try again.");
+//         setCallStatus('verification-error');
+//       }
+//     };
 
-  // Socket listeners for call events
+//     verifyCallAccess();
+//   }, [callId]);
+
+//   // Check media permissions
+//   useEffect(() => {
+//     if (!paymentVerified) return;
+    
+//     const checkMedia = async () => {
+//       try {
+//         await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+//         setCanAccessMedia(true);
+//         setCallStatus('media-ready');
+//       } catch (err) {
+//         console.error("Cannot access camera/mic:", err);
+//         setError("Cannot access camera or microphone. Please check permissions or use HTTPS/localhost.");
+//         setCanAccessMedia(false);
+//         setCallStatus('media-error');
+//       }
+//     };
+    
+//     checkMedia();
+//   }, [paymentVerified]);
+
+//   // Get Agora token
+//   useEffect(() => {
+//     if (!canAccessMedia || !paymentVerified) return;
+    
+//     const fetchAgoraToken = async () => {
+//       try {
+//         const res = await axios.post(`/api/agora-token`, {
+//           channel: channel || `call_${callId}`,
+//           uid: uid,
+//           role: role === 'host' ? 1 : 2 // 1 for host/doctor, 2 for audience/patient
+//         });
+        
+//         setAgoraToken(res.data.token);
+//         setChannelName(res.data.channel);
+//         setCallStatus('ready');
+        
+//       } catch (error) {
+//         console.error("Error fetching Agora token:", error);
+//         setError("Unable to initialize video call. Please try again.");
+//         setCallStatus('token-error');
+//       }
+//     };
+    
+//     fetchAgoraToken();
+//   }, [channel, callId, uid, role, canAccessMedia, paymentVerified]);
+
+//   // Socket listeners for call events
+//   useEffect(() => {
+//     socket.on('call-ended', (data) => {
+//       if (data.callId === callId && data.endedBy !== uid) {
+//         setCallStatus('call-ended-by-other');
+//         setTimeout(() => navigate('/dashboard'), 3000);
+//       }
+//     });
+
+//     socket.on('payment-expired', (data) => {
+//       if (data.callId === callId) {
+//         setCallStatus('payment-expired');
+//         setError("Payment session has expired.");
+//       }
+//     });
+
+//     return () => {
+//       socket.off('call-ended');
+//       socket.off('payment-expired');
+//     };
+//   }, [callId, uid, navigate]);
+
+//   // Render different states
+//   if (callStatus === 'payment-pending' || callStatus === 'verification-error') {
+//     return (
+//       <div className="flex flex-col items-center justify-center h-screen bg-yellow-50">
+//         <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md">
+//           <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+//             <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 14.5c-.77.833.192 2.5 1.732 2.5z"></path>
+//             </svg>
+//           </div>
+//           <h2 className="text-2xl font-bold text-yellow-800 mb-2">Payment Required</h2>
+//           <p className="text-yellow-600 mb-4">{error}</p>
+//           <button
+//             onClick={() => navigate('/dashboard')}
+//             className="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+//           >
+//             Back to Dashboard
+//           </button>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (callStatus === 'initializing' || callStatus === 'payment-verified' || canAccessMedia === null) {
+//     return (
+//       <div className="flex items-center justify-center h-screen bg-blue-50">
+//         <div className="flex flex-col items-center space-y-4">
+//           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+//           <p className="text-lg text-blue-700">
+//             {callStatus === 'payment-verified' ? 'Initializing video call...' : 'Verifying call access...'}
+//           </p>
+//           {callId && (
+//             <p className="text-sm text-blue-600">Call ID: {callId}</p>
+//           )}
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (callStatus === 'media-error' || canAccessMedia === false) {
+//     return (
+//       <div className="flex flex-col items-center justify-center h-screen">
+//         <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md">
+//           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+//             <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+//             </svg>
+//           </div>
+//           <h2 className="text-2xl font-bold text-red-800 mb-2">Camera/Microphone Access Required</h2>
+//           <p className="text-red-600 mb-4">{error}</p>
+//           <button
+//             onClick={() => window.location.reload()}
+//             className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 mr-2"
+//           >
+//             Retry
+//           </button>
+//           <button
+//             onClick={() => navigate('/dashboard')}
+//             className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+//           >
+//             Back to Dashboard
+//           </button>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (callStatus === 'call-ended-by-other') {
+//     return (
+//       <div className="flex items-center justify-center h-screen bg-gray-50">
+//         <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md">
+//           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+//             <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 21v-4a2 2 0 012-2h4l2-2h4a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+//             </svg>
+//           </div>
+//           <h2 className="text-2xl font-bold text-gray-800 mb-2">Call Ended</h2>
+//           <p className="text-gray-600 mb-4">
+//             The {role === 'host' ? 'patient' : 'doctor'} has ended the call.
+//           </p>
+//           <p className="text-sm text-gray-500 mb-4">Redirecting to dashboard...</p>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (callStatus !== 'ready' || !agoraToken || !channelName) {
+//     return (
+//       <div className="flex items-center justify-center h-screen bg-blue-50">
+//         <div className="flex flex-col items-center space-y-4">
+//           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+//           <p className="text-lg text-blue-700">Connecting to video call...</p>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   // Configure Agora props
+//   const rtcProps = {
+//     appId: "88a602d093ed47d6b77a29726aa6c35e",
+//     channel: channelName,
+//     token: agoraToken,
+//     uid: parseInt(uid),
+//     layout: 1, // Grid layout
+//     enableScreensharing: role === 'host', // Only doctors can screen share
+//     enableVideo: true,
+//     enableAudio: true,
+//   };
+
+//   const styleProps = {
+//     localBtnStyles: {
+//       backgroundColor: '#4F46E5',
+//       borderRadius: '8px',
+//     },
+//     remoteBtnStyles: {
+//       backgroundColor: '#6366F1',
+//       borderRadius: '8px',
+//     },
+//     BtnTemplateStyles: {
+//       position: 'absolute',
+//       bottom: '20px',
+//       left: '50%',
+//       transform: 'translateX(-50%)',
+//       display: 'flex',
+//       gap: '10px',
+//     }
+//   };
+
+//   return (
+//     <div className="h-screen w-full bg-gray-900 relative">
+//       {/* Call Info Overlay */}
+//       <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white p-3 rounded-lg z-10">
+//         <div className="text-sm">
+//           <div>Call ID: {callId}</div>
+//           <div>Role: {role === 'host' ? 'Doctor' : 'Patient'}</div>
+//           <div className="flex items-center mt-1">
+//             <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+//             <span>Connected</span>
+//           </div>
+//         </div>
+//       </div>
+
+//       {/* Payment Success Badge for Patient */}
+//       {role !== 'host' && (
+//         <div className="absolute top-4 right-4 bg-green-500 text-white p-2 rounded-lg z-10">
+//           <div className="text-sm flex items-center">
+//             <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+//               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+//             </svg>
+//             Payment Verified
+//           </div>
+//         </div>
+//       )}
+
+//       {/* Agora Video Call UI */}
+//       <AgoraUIKit 
+//         rtcProps={rtcProps} 
+//         callbacks={callbacks}
+//         styleProps={styleProps}
+//       />
+//     </div>
+//   );
+// };
+
+// export default EnhancedVideocall;
+
+// import React, { useState, useEffect, useContext } from 'react';
+// import AgoraUIKit from 'agora-react-uikit';
+// import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+// import { AuthContext } from '../auth/AuthContext';
+// import axios from 'axios';
+// import { socket } from './socket';
+
+// const Videocall = () => {
+//   const { channel } = useParams(); // Get channel from URL params
+//   const [searchParams] = useSearchParams();
+//   const navigate = useNavigate();
+//   const { user } = useContext(AuthContext);
+  
+//   const [canAccessMedia, setCanAccessMedia] = useState(null);
+//   const [error, setError] = useState("");
+//   const [agoraToken, setAgoraToken] = useState(null);
+//   const [isLoading, setIsLoading] = useState(true);
+
+//   // Get params from URL
+//   const uid = searchParams.get('uid');
+//   const role = searchParams.get('role'); // 'host' for doctor, 'audience' for patient
+//   const callId = searchParams.get('callId');
+
+//   // Generate UID if not provided
+//   const userId = uid || Math.floor(Math.random() * 10000);
+  
+//   const callbacks = {
+//     EndCall: () => {
+//       // Notify other party that call ended
+//       socket.emit('call-ended', { 
+//         callId, 
+//         channel, 
+//         userId: user?.id || userId,
+//         role 
+//       });
+//       navigate('/dashboard');
+//     },
+//   };
+
+//   // Check if camera/mic is accessible
+//   useEffect(() => {
+//     const checkMedia = async () => {
+//       try {
+//         const stream = await navigator.mediaDevices.getUserMedia({ 
+//           video: true, 
+//           audio: true 
+//         });
+        
+//         // Stop the test stream
+//         stream.getTracks().forEach(track => track.stop());
+        
+//         setCanAccessMedia(true);
+//       } catch (err) {
+//         console.error("Cannot access camera/mic:", err);
+//         setError("Cannot access camera or microphone. Please check permissions and ensure you're using HTTPS or localhost.");
+//         setCanAccessMedia(false);
+//       }
+//     };
+//     checkMedia();
+//   }, []);
+
+//   // Fetch Agora token
+//   useEffect(() => {
+//     const fetchAgoraToken = async () => {
+//       if (!channel || !canAccessMedia) return;
+      
+//       try {
+//         setIsLoading(true);
+        
+//         // Call your backend to generate Agora token
+//         const response = await axios.post('https://snoutiq.com/backend/api/agora-token', {
+//           channel: channel,
+//           uid: userId,
+//           role: role === 'host' ? 'publisher' : 'subscriber', // Agora role
+//           expireTime: 3600 // 1 hour
+//         });
+        
+//         if (response.data.token) {
+//           setAgoraToken(response.data.token);
+//         } else {
+//           throw new Error('No token received from server');
+//         }
+//       } catch (error) {
+//         console.error("Error fetching Agora token:", error);
+//         setError("Failed to get video call token. Please refresh and try again.");
+//         setCanAccessMedia(false);
+//       } finally {
+//         setIsLoading(false);
+//       }
+//     };
+
+//     fetchAgoraToken();
+//   }, [channel, userId, role, canAccessMedia]);
+
+//   // Socket listeners for call events
+//   useEffect(() => {
+//     const handleCallEnded = (data) => {
+//       if (data.channel === channel && data.userId !== (user?.id || userId)) {
+//         // Other party ended the call
+//         alert('The other party has ended the call');
+//         navigate('/dashboard');
+//       }
+//     };
+
+//     const handleCallError = (error) => {
+//       console.error('Call error:', error);
+//       setError('Call connection error: ' + error.message);
+//     };
+
+//     socket.on('call-ended', handleCallEnded);
+//     socket.on('call-error', handleCallError);
+
+//     return () => {
+//       socket.off('call-ended', handleCallEnded);
+//       socket.off('call-error', handleCallError);
+//     };
+//   }, [channel, user, userId, navigate]);
+
+//   // Loading state
+//   if (canAccessMedia === null || isLoading) {
+//     return (
+//       <div className="flex items-center justify-center h-screen bg-gray-900">
+//         <div className="flex flex-col items-center space-y-4 text-white">
+//           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+//           <p className="text-lg">
+//             {canAccessMedia === null 
+//               ? "Checking camera and microphone..." 
+//               : "Connecting to video call..."}
+//           </p>
+//           <div className="text-sm text-gray-300">
+//             <p>Channel: {channel}</p>
+//             <p>Role: {role}</p>
+//             <p>User ID: {userId}</p>
+//           </div>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   // Error state
+//   if (canAccessMedia === false || error) {
+//     return (
+//       <div className="flex flex-col items-center justify-center h-screen space-y-6 bg-gray-900 text-white">
+//         <div className="bg-red-600 p-4 rounded-lg max-w-md text-center">
+//           <h2 className="text-xl font-bold mb-2">Connection Error</h2>
+//           <p className="text-red-100">{error}</p>
+//         </div>
+        
+//         <div className="space-y-2">
+//           <button
+//             onClick={() => window.location.reload()}
+//             className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"
+//           >
+//             Retry Connection
+//           </button>
+//           <button
+//             onClick={() => navigate('/dashboard')}
+//             className="block px-6 py-2 text-gray-300 hover:text-white transition-colors"
+//           >
+//             Back to Dashboard
+//           </button>
+//         </div>
+
+//         <div className="text-xs text-gray-400 text-center">
+//           <p>Make sure you:</p>
+//           <ul className="list-disc list-inside mt-2 space-y-1">
+//             <li>Allow camera and microphone permissions</li>
+//             <li>Use HTTPS or localhost</li>
+//             <li>Have a stable internet connection</li>
+//           </ul>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   // Main video call interface
+//   const rtcProps = {
+//     appId: "88a602d093ed47d6b77a29726aa6c35e", // Your Agora App ID
+//     channel: channel,
+//     token: agoraToken,
+//     uid: userId,
+//     layout: role === 'host' ? 0 : 1, // Different layouts for doctor vs patient
+//   };
+
+//   const styleProps = {
+//     localBtnContainer: {
+//       backgroundColor: '#1f2937',
+//       bottom: '20px',
+//     },
+//     localBtnStyles: {
+//       muteLocalAudio: {
+//         backgroundColor: '#ef4444',
+//         borderRadius: '8px',
+//       },
+//       muteLocalVideo: {
+//         backgroundColor: '#ef4444', 
+//         borderRadius: '8px',
+//       },
+//       endCall: {
+//         backgroundColor: '#dc2626',
+//         borderRadius: '8px',
+//       },
+//     },
+//   };
+
+//   return (
+//     <div className="h-screen w-full bg-gray-900 relative">
+//       {/* Call Info Header */}
+//       <div className="absolute top-4 left-4 z-10 bg-black bg-opacity-50 text-white px-4 py-2 rounded-lg">
+//         <div className="text-sm">
+//           <p>Call ID: {callId}</p>
+//           <p>Role: {role === 'host' ? 'Doctor' : 'Patient'}</p>
+//           <p>Channel: {channel}</p>
+//         </div>
+//       </div>
+
+//       {/* Agora Video Component */}
+//       <AgoraUIKit 
+//         rtcProps={rtcProps} 
+//         callbacks={callbacks} 
+//         styleProps={styleProps}
+//       />
+
+//       {/* Connection Status */}
+//       <div className="absolute top-4 right-4 z-10">
+//         <div className="flex items-center bg-green-600 text-white px-3 py-1 rounded-full text-sm">
+//           <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+//           Connected
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default Videocall;
+
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import AgoraRTC from "agora-rtc-sdk-ng";
+import { socket } from "./socket";
+
+const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
+
+export default function CallPage() {
+  const { channelName } = useParams();
+  const [qs] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Sanitize channel name
+  const safeChannel = useMemo(() => {
+    return (channelName || "default_channel")
+      .replace(/[^a-zA-Z0-9_]/g, "")
+      .slice(0, 63);
+  }, [channelName]);
+
+  // Get UID and role from URL params
+  const uid = useMemo(() => {
+    const q = Number(qs.get("uid"));
+    return Number.isFinite(q) ? q : Math.floor(Math.random() * 1e6);
+  }, [qs]);
+
+  const role = (qs.get("host") || "audience").toLowerCase();
+  const isHost = role === "host";
+
+  // Refs for video elements
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+
+  // State
+  const [client] = useState(() => 
+    AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
+  );
+  const [localTracks, setLocalTracks] = useState([]);
+  const [remoteUsers, setRemoteUsers] = useState([]);
+  const [joined, setJoined] = useState(false);
+  const [callStatus, setCallStatus] = useState("connecting");
+  const [isMuted, setIsMuted] = useState(false);
+  const [isCameraOff, setIsCameraOff] = useState(false);
+
   useEffect(() => {
-    const handleCallEnded = (data) => {
-      if (data.channel === channel && data.userId !== (user?.id || userId)) {
-        // Other party ended the call
-        alert('The other party has ended the call');
-        navigate('/dashboard');
-      }
-    };
+    let mounted = true;
 
-    const handleCallError = (error) => {
-      console.error('Call error:', error);
-      setError('Call connection error: ' + error.message);
-    };
+    async function joinChannel() {
+      try {
+        setCallStatus("connecting");
+        console.log(`Joining channel: ${safeChannel}, role=${role}, uid=${uid}`);
 
-    socket.on('call-ended', handleCallEnded);
-    socket.on('call-error', handleCallError);
-
-    return () => {
-      socket.off('call-ended', handleCallEnded);
-      socket.off('call-error', handleCallError);
-    };
-  }, [channel, user, userId, navigate]);
-
-  // Loading state
-  if (canAccessMedia === null || isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900">
-        <div className="flex flex-col items-center space-y-4 text-white">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-lg">
-            {canAccessMedia === null 
-              ? "Checking camera and microphone..." 
-              : "Connecting to video call..."}
-          </p>
-          <div className="text-sm text-gray-300">
-            <p>Channel: {channel}</p>
-            <p>Role: {role}</p>
-            <p>User ID: {userId}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (canAccessMedia === false || error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen space-y-6 bg-gray-900 text-white">
-        <div className="bg-red-600 p-4 rounded-lg max-w-md text-center">
-          <h2 className="text-xl font-bold mb-2">Connection Error</h2>
-          <p className="text-red-100">{error}</p>
-        </div>
+        // Join the channel
+        await client.join(APP_ID, safeChannel, null, uid);
         
-        <div className="space-y-2">
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"
-          >
-            Retry Connection
-          </button>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="block px-6 py-2 text-gray-300 hover:text-white transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
+        if (!mounted) return;
+        setJoined(true);
+        setCallStatus("connected");
 
-        <div className="text-xs text-gray-400 text-center">
-          <p>Make sure you:</p>
-          <ul className="list-disc list-inside mt-2 space-y-1">
-            <li>Allow camera and microphone permissions</li>
-            <li>Use HTTPS or localhost</li>
-            <li>Have a stable internet connection</li>
-          </ul>
-        </div>
-      </div>
-    );
-  }
+        // Create and publish tracks for ALL users (both doctor and patient)
+        try {
+          const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+            encoderConfig: "music_standard",
+          });
+          const videoTrack = await AgoraRTC.createCameraVideoTrack({
+            encoderConfig: "720p_1",
+          });
+          
+          if (!mounted) return;
 
-  // Main video call interface
-  const rtcProps = {
-    appId: "88a602d093ed47d6b77a29726aa6c35e", // Your Agora App ID
-    channel: channel,
-    token: agoraToken,
-    uid: userId,
-    layout: role === 'host' ? 0 : 1, // Different layouts for doctor vs patient
+          setLocalTracks([audioTrack, videoTrack]);
+          
+          // Play local video
+          if (localVideoRef.current) {
+            videoTrack.play(localVideoRef.current);
+          }
+          
+          // Publish tracks for ALL users
+          await client.publish([audioTrack, videoTrack]);
+          console.log("✅ Published local tracks");
+          
+        } catch (error) {
+          console.error("❌ Error creating local tracks:", error);
+          // If user denies camera/mic access, continue without tracks
+          setCallStatus("connected");
+        }
+
+        // Handle remote users
+        client.on("user-published", async (user, mediaType) => {
+          try {
+            await client.subscribe(user, mediaType);
+            console.log(`📡 Subscribed to user ${user.uid} ${mediaType}`);
+
+            if (mediaType === "video") {
+              if (remoteVideoRef.current) {
+                user.videoTrack?.play(remoteVideoRef.current);
+              }
+              setRemoteUsers(prev => {
+                const exists = prev.some(u => u.uid === user.uid);
+                if (!exists) {
+                  return [...prev, user];
+                }
+                return prev;
+              });
+            }
+            
+            if (mediaType === "audio") {
+              user.audioTrack?.play();
+            }
+          } catch (error) {
+            console.error("❌ Error subscribing to user:", error);
+          }
+        });
+
+        client.on("user-unpublished", (user, mediaType) => {
+          console.log(`📡 User ${user.uid} unpublished ${mediaType}`);
+          if (mediaType === "video") {
+            setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+          }
+        });
+
+        client.on("user-left", (user) => {
+          console.log(`👋 User ${user.uid} left the channel`);
+          setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+        });
+
+      } catch (error) {
+        console.error("❌ Join channel error:", error);
+        setCallStatus("error");
+      }
+    }
+
+    joinChannel();
+
+    // Cleanup on unmount
+    return () => {
+      mounted = false;
+      cleanup();
+    };
+  }, [client, safeChannel, role, uid]);
+
+  const cleanup = async () => {
+    try {
+      // Close local tracks
+      localTracks.forEach(track => {
+        track.stop();
+        track.close();
+      });
+      
+      // Leave channel
+      if (joined) {
+        await client.leave();
+        console.log("🚪 Left the channel");
+      }
+      
+      setLocalTracks([]);
+      setRemoteUsers([]);
+      setJoined(false);
+    } catch (error) {
+      console.error("❌ Cleanup error:", error);
+    }
   };
 
-  const styleProps = {
-    localBtnContainer: {
-      backgroundColor: '#1f2937',
-      bottom: '20px',
-    },
-    localBtnStyles: {
-      muteLocalAudio: {
-        backgroundColor: '#ef4444',
-        borderRadius: '8px',
-      },
-      muteLocalVideo: {
-        backgroundColor: '#ef4444', 
-        borderRadius: '8px',
-      },
-      endCall: {
-        backgroundColor: '#dc2626',
-        borderRadius: '8px',
-      },
-    },
+  const toggleMute = async () => {
+    if (localTracks[0]) {
+      const audioTrack = localTracks[0];
+      await audioTrack.setEnabled(isMuted);
+      setIsMuted(!isMuted);
+      console.log(isMuted ? "🎤 Unmuted" : "🔇 Muted");
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (localTracks[1]) {
+      const videoTrack = localTracks[1];
+      await videoTrack.setEnabled(isCameraOff);
+      setIsCameraOff(!isCameraOff);
+      console.log(isCameraOff ? "📷 Camera On" : "📷 Camera Off");
+    }
+  };
+
+  const handleEndCall = async () => {
+    await cleanup();
+    
+    // Notify server about call end
+    socket.emit("call-ended", { channel: safeChannel });
+    
+    // Navigate back
+    if (isHost) {
+      navigate("/doctor-dashboard");
+    } else {
+      navigate("/patient-dashboard");
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (callStatus) {
+      case "connected": return "#16a34a";
+      case "connecting": return "#f59e0b";
+      case "error": return "#dc2626";
+      default: return "#6b7280";
+    }
   };
 
   return (
-    <div className="h-screen w-full bg-gray-900 relative">
-      {/* Call Info Header */}
-      <div className="absolute top-4 left-4 z-10 bg-black bg-opacity-50 text-white px-4 py-2 rounded-lg">
-        <div className="text-sm">
-          <p>Call ID: {callId}</p>
-          <p>Role: {role === 'host' ? 'Doctor' : 'Patient'}</p>
-          <p>Channel: {channel}</p>
+    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <h2>Video Call</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span>UID: <strong>{uid}</strong></span>
+          <span>Channel: <strong>{safeChannel}</strong></span>
+          <span>Role: <strong>{role}</strong></span>
+          <span style={{
+            padding: "4px 8px",
+            borderRadius: 12,
+            fontSize: 12,
+            fontWeight: "bold",
+            background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
+            color: getStatusColor()
+          }}>
+            {callStatus.toUpperCase()}
+          </span>
         </div>
       </div>
 
-      {/* Agora Video Component */}
-      <AgoraUIKit 
-        rtcProps={rtcProps} 
-        callbacks={callbacks} 
-        styleProps={styleProps}
-      />
+      {/* Video Grid */}
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: "1fr 1fr",
+        gap: 20, 
+        marginBottom: 20 
+      }}>
+        {/* Local Video */}
+        <div style={{ position: "relative" }}>
+          <div
+            ref={localVideoRef}
+            style={{
+              width: "100%",
+              height: 300,
+              background: "#000",
+              borderRadius: 12,
+              overflow: "hidden"
+            }}
+          />
+          <div style={{
+            position: "absolute",
+            bottom: 8,
+            left: 8,
+            background: "rgba(0,0,0,0.7)",
+            color: "white",
+            padding: "4px 8px",
+            borderRadius: 4,
+            fontSize: 12
+          }}>
+            You ({isHost ? "Doctor" : "Patient"})
+          </div>
+          {isCameraOff && (
+            <div style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              color: "white",
+              fontSize: 18
+            }}>
+              📷 Camera Off
+            </div>
+          )}
+        </div>
 
-      {/* Connection Status */}
-      <div className="absolute top-4 right-4 z-10">
-        <div className="flex items-center bg-green-600 text-white px-3 py-1 rounded-full text-sm">
-          <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
-          Connected
+        {/* Remote Video */}
+        <div style={{ position: "relative" }}>
+          <div
+            ref={remoteVideoRef}
+            style={{
+              width: "100%",
+              height: 300,
+              background: "#000",
+              borderRadius: 12,
+              overflow: "hidden"
+            }}
+          />
+          <div style={{
+            position: "absolute",
+            bottom: 8,
+            left: 8,
+            background: "rgba(0,0,0,0.7)",
+            color: "white",
+            padding: "4px 8px",
+            borderRadius: 4,
+            fontSize: 12
+          }}>
+            {remoteUsers.length > 0 
+              ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})`
+              : "Waiting for other participant..."
+            }
+          </div>
+          {remoteUsers.length === 0 && (
+            <div style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              color: "white",
+              textAlign: "center"
+            }}>
+              <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
+              <div>Waiting for {isHost ? "patient" : "doctor"}...</div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Controls */}
+      {joined && (
+        <div style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 12,
+          padding: 16,
+          background: "#f9fafb",
+          borderRadius: 12
+        }}>
+          <button
+            onClick={toggleMute}
+            style={{
+              padding: "12px 16px",
+              borderRadius: 8,
+              background: isMuted ? "#dc2626" : "#6b7280",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: "bold",
+              minWidth: 120
+            }}
+          >
+            {isMuted ? "🔇 Unmute" : "🎤 Mute"}
+          </button>
+          
+          <button
+            onClick={toggleCamera}
+            style={{
+              padding: "12px 16px",
+              borderRadius: 8,
+              background: isCameraOff ? "#dc2626" : "#6b7280",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: "bold",
+              minWidth: 120
+            }}
+          >
+            {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
+          </button>
+          
+          <button
+            onClick={handleEndCall}
+            style={{
+              padding: "12px 16px",
+              borderRadius: 8,
+              background: "#dc2626",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: "bold",
+              minWidth: 120
+            }}
+          >
+            📞 End Call
+          </button>
+        </div>
+      )}
     </div>
   );
-};
-
-export default Videocall;
+}

@@ -32,7 +32,6 @@ const Navbar = () => {
   const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
-  console.log(user, "user");
 
   const handleLogin = () => {
     navigate("/login");
