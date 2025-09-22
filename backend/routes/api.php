@@ -56,7 +56,7 @@ Route::get('/debug/pusher', function () {
 });
 
 
-Route::post('/create-order', [PaymentController::class, 'createOrder']);
+
 
 Route::post('/call/create', [CallController::class, 'createSession']);
 Route::post('/call/{id}/accept', [CallController::class, 'acceptCall']);
@@ -272,6 +272,8 @@ Route::prefix('user')->middleware('auth:sanctum')->group(function () {
   Route::post('/booking/postBooking', [RatingController::class, 'postBooking']);
 
 
+
+
           
           
 });
@@ -314,3 +316,18 @@ use App\Http\Controllers\Api\PetParentController;
 Route::get('/petparents/{id}', [PetParentController::class, 'show']);     // Single pet parent
 Route::delete('/petparents/{id}', [PetParentController::class, 'destroy']); // Delete pet parent
 
+Route::get('/razorpay-ping', function () {
+    $api = new \Razorpay\Api\Api(trim(config('services.razorpay.key')), trim(config('services.razorpay.secret')));
+    try {
+        $api->order->all(['count' => 1]);
+        return ['auth' => 'ok'];
+    } catch (\Razorpay\Api\Errors\Error $e) {
+        return response(['auth' => 'fail', 'msg' => $e->getMessage()], 401);
+    }
+});
+
+  Route::post('/rzp/verify', [PaymentController::class, 'verifyAndCapture']);
+
+  Route::get('/rzp-test', [PaymentController::class, 'testView']); // view render
+
+  Route::post('/create-order', [PaymentController::class, 'createOrder']);
