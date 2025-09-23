@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SnoutIQ — Prompt engineering testing phase v2</title>
 
-  <!-- Tailwind (CDN). Fine for quick deploy; for long-term prod, compile locally. -->
+  <!-- ✅ Absolute API endpoint injected by Laravel (respects /backend subfolder) -->
+  <meta name="api-endpoint" content="{{ url('/api/unified/process') }}">
+
+  <!-- Tailwind CDN (quick deploy) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -22,6 +25,7 @@
   <style>
     .grain:before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1px);background-size:2px 2px;opacity:.25;pointer-events:none}
     #chat { scroll-behavior: smooth; }
+    .err-chip{background:#1f2937;border:1px solid #374151;color:#e5e7eb;border-radius:.5rem;padding:.5rem .75rem;display:inline-block}
   </style>
 </head>
 <body class="font-inter bg-ink-900 text-white antialiased min-h-screen relative">
@@ -65,8 +69,7 @@
                 </svg>
               </div>
 
-              <input id="prompt" type="text"
-                     placeholder="Ask anything about your pet"
+              <input id="prompt" type="text" placeholder="Ask anything about your pet"
                      class="w-full bg-transparent outline-none text-base sm:text-lg text-white placeholder-white/40 py-3.5 pr-24" />
 
               <input id="image" type="file" accept="image/*" class="hidden" />
@@ -107,22 +110,18 @@
   </main>
 
   <script>
-    const API_ENDPOINT = '/api/unified/process';
-    const DEFAULT_PROFILE = {
-      pet_name:   'Max',
-      pet_breed:  'Mixed Breed',
-      pet_age:    '3 years',
-      pet_weight: '12 kg',
-      location:   'Delhi'
-    };
+    // ---- API endpoint from meta (absolute; works with /backend) ----
+    const API_ENDPOINT = document.querySelector('meta[name="api-endpoint"]')?.content || '/api/unified/process';
 
+    // Default demo pet profile
+    const DEFAULT_PROFILE = { pet_name:'Max', pet_breed:'Mixed Breed', pet_age:'3 years', pet_weight:'12 kg', location:'Delhi' };
+
+    // Persist session id
     const SESSION_KEY = 'snoutiq_session_id';
     let sessionId = localStorage.getItem(SESSION_KEY);
-    if (!sessionId) {
-      sessionId = (Math.random().toString(36).slice(2) + Date.now().toString(36));
-      localStorage.setItem(SESSION_KEY, sessionId);
-    }
+    if (!sessionId) { sessionId = (Math.random().toString(36).slice(2) + Date.now().toString(36)); localStorage.setItem(SESSION_KEY, sessionId); }
 
+    // DOM
     const promptEl = document.getElementById('prompt');
     const sendBtn  = document.getElementById('sendBtn');
     const sendIcon = document.getElementById('sendIcon');
@@ -155,30 +154,28 @@
       fd.append('pet_weight', DEFAULT_PROFILE.pet_weight);
       fd.append('location',   DEFAULT_PROFILE.location);
       if (fileEl.files && fileEl.files[0]) {
-        if (fileEl.files[0].size > 6 * 1024 * 1024) {
-          statusEl.textContent = 'Image must be ≤ 6MB';
-          isSending = false; toggleSending(false); return;
-        }
+        if (fileEl.files[0].size > 6 * 1024 * 1024) { statusEl.textContent = 'Image must be ≤ 6MB'; isSending=false; toggleSending(false); return; }
         fd.append('image', fileEl.files[0]);
       }
 
       try {
         statusEl.textContent = 'Processing…';
-
-        // Force JSON; safely handle HTML error pages
         const res = await fetch(API_ENDPOINT, {
           method: 'POST',
           body: fd,
-          headers: { 'Accept': 'application/json' }
+          headers: { 'Accept': 'application/json' } // force JSON errors too
         });
 
-        const raw = await res.text();    // read as text first
-        let data;
-        try {
+        const raw = await res.text();
+        const ct  = (res.headers.get('content-type') || '').toLowerCase();
+
+        let data = null;
+        if (ct.includes('application/json')) {
           data = JSON.parse(raw);
-        } catch {
-          console.error('Non-JSON response', { status: res.status, raw });
-          throw new Error(`HTTP ${res.status}: ${raw.slice(0,200)}`);
+        } else {
+          // HTML came back – likely wrong URL or server HTML error page.
+          const title = (raw.match(/<title[^>]*>(.*?)<\/title>/i) || [])[1] || 'HTML';
+          throw new Error(`API returned ${ct || 'HTML'} (likely wrong URL). Endpoint: ${API_ENDPOINT}. Title: ${title}`);
         }
 
         if (!res.ok || data.success === false) {
@@ -190,11 +187,14 @@
         smoothScrollToChatEnd();
 
         statusEl.textContent = data.status_text || '';
-        helperEl.textContent = 'Session: ' + (data.session_id || sessionId);
+        helperEl.innerHTML = `Session: <span class="err-chip">${escapeHtml(data.session_id || sessionId)}</span>
+                               <span class="ml-2 text-white/50">API:</span> <span class="err-chip">${escapeHtml(API_ENDPOINT)}</span>`;
 
       } catch (err) {
-        statusEl.textContent = 'Error: ' + (err.message || err);
+        statusEl.innerHTML = `Error: <span class="err-chip">${escapeHtml(err.message || String(err))}</span>
+                              <span class="ml-2 text-white/50">API:</span> <span class="err-chip">${escapeHtml(API_ENDPOINT)}</span>`;
         addAiErrorBubble('AI error. Please try again.');
+        console.error('Unified UI error', err);
       } finally {
         promptEl.value = '';
         fileEl.value = '';
@@ -205,13 +205,8 @@
 
     function toggleSending(sending) {
       sendBtn.disabled = sending;
-      if (sending) {
-        sendIcon.classList.add('hidden');
-        spinner.classList.remove('hidden');
-      } else {
-        spinner.classList.add('hidden');
-        sendIcon.classList.remove('hidden');
-      }
+      if (sending) { sendIcon.classList.add('hidden'); spinner.classList.remove('hidden'); }
+      else { spinner.classList.add('hidden'); sendIcon.classList.remove('hidden'); }
     }
 
     function addAiErrorBubble(text) {
@@ -228,21 +223,13 @@
       smoothScrollToChatEnd();
     }
 
-    function ensureChatContainer() {
-      if (chatEl.textContent.includes('Ready — start typing')) chatEl.innerHTML = '';
-    }
-
-    function smoothScrollToChatEnd() {
-      requestAnimationFrame(() => {
-        chatEl.scrollTop = chatEl.scrollHeight;
-        chatEl.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      });
-    }
-
+    function ensureChatContainer(){ if (chatEl.textContent.includes('Ready — start typing')) chatEl.innerHTML=''; }
+    function smoothScrollToChatEnd(){ requestAnimationFrame(()=>{ chatEl.scrollTop = chatEl.scrollHeight; chatEl.lastElementChild?.scrollIntoView({behavior:'smooth', block:'end'}); }); }
     function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
 
-    sendBtn.addEventListener('click', sendMessage);
-    promptEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendMessage(); }});
+    document.getElementById('sendBtn').addEventListener('click', sendMessage);
+    document.getElementById('prompt').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendMessage(); }});
+    document.getElementById('attachBtn').addEventListener('click', ()=>document.getElementById('image').click());
   </script>
 </body>
 </html>
