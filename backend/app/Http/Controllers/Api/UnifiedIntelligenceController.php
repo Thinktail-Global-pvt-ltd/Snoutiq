@@ -20,6 +20,7 @@ class UnifiedIntelligenceController extends Controller
             'pet_age'    => 'nullable|string',
             'pet_weight' => 'nullable|string',
             'location'   => 'nullable|string',
+            'fresh'      => 'nullable|boolean',
         ]);
 
         $sessionId = $data['session_id'] ?? bin2hex(random_bytes(16));
@@ -27,7 +28,18 @@ class UnifiedIntelligenceController extends Controller
 
         $state = Cache::get($cacheKey, $this->defaultState());
 
-        // profile
+        // Optional reset (new chat) or auto-reset on greeting
+        $didReset = false;
+        if ($r->boolean('fresh')) {
+            $this->softResetEvidence($state);
+            $didReset = true;
+        }
+        if (!$didReset && $this->isGreeting($data['message']) && !empty($state['conversation_history'])) {
+            $this->softResetEvidence($state);
+            $didReset = true;
+        }
+
+        // Update pet profile from dynamic frontend values
         $state['pet_profile'] = [
             'name'     => $data['pet_name']   ?? 'Your pet',
             'breed'    => $data['pet_breed']  ?? 'Mixed breed',
@@ -36,24 +48,24 @@ class UnifiedIntelligenceController extends Controller
             'location' => $data['location']   ?? 'India',
         ];
 
-        // temp image path
+        // Image (temporary path)
         $imagePath = $r->hasFile('image') ? $r->file('image')->getRealPath() : null;
 
-        // a) update evidence/score
+        // Evidence/score
         $this->updateScoreAndEvidence($state, $data['message']);
 
-        // b) decision (+ backstop if too many turns)
-        $baseDecision = $this->makeDecision((int) $state['evidence_score']);
-        $userTurnsNow = count($state['conversation_history']) + 1; // include current
+        // Decision + backstop (>5 user turns → VIDEO_CONSULT)
+        $baseDecision = $this->makeDecision((int)$state['evidence_score']);
+        $userTurnsNow = count($state['conversation_history']) + 1;
         [$decision, $backstopApplied] = $this->backstopOverride($baseDecision, $userTurnsNow);
 
-        // c) build prompt from decision mode
+        // Prompt for model
         $prompt = $this->buildPrompt($decision, $data['message'], $state['pet_profile'], $state['conversation_history']);
 
-        // d) call Gemini (no external deps)
+        // Call Gemini
         $aiText = $this->callGeminiApi_curl($prompt, $imagePath);
 
-        // e) history
+        // Append history
         $state['service_decision'] = $decision;
         $state['conversation_history'][] = [
             'user'             => $data['message'],
@@ -63,18 +75,18 @@ class UnifiedIntelligenceController extends Controller
             'timestamp'        => now()->format('H:i:s'),
         ];
 
-        // f) helpers
+        // UI helpers
         $statusText = $this->statusLine($decision, (int)$state['evidence_score'], $backstopApplied);
         $vetSummary = $this->generateVetSummary($state);
         $html       = $this->renderBubbles($data['message'], $aiText, $decision);
 
-        // persist
-        $ttl = (int) env('UNIFIED_SESSION_TTL_MIN', 1440);
-        Cache::put($cacheKey, $state, now()->addMinutes($ttl));
+        // Save
+        Cache::put($cacheKey, $state, now()->addMinutes((int) env('UNIFIED_SESSION_TTL_MIN', 1440)));
 
         return response()->json([
             'success'           => true,
             'session_id'        => $sessionId,
+            'reset'             => $didReset,
             'ai_text'           => $aiText,
             'decision'          => $decision,
             'score'             => $state['evidence_score'],
@@ -115,7 +127,7 @@ class UnifiedIntelligenceController extends Controller
         return response()->json(['success' => true, 'message' => 'Session reset']);
     }
 
-    /* ----------------- Core Logic ----------------- */
+    /* ---------- Helpers ---------- */
 
     private function defaultState(): array
     {
@@ -124,23 +136,33 @@ class UnifiedIntelligenceController extends Controller
             'pet_profile' => [],
             'evidence_score' => 0,
             'evidence_details' => [
-                'symptoms' => [],
-                'severity' => [],
-                'environmental' => [],
-                'timeline' => [],
+                'symptoms' => [], 'severity' => [], 'environmental' => [], 'timeline' => [],
             ],
             'service_decision' => null,
         ];
     }
 
-    /**
-     * Evidence scoring with both string keywords and regex (for morphology).
-     */
+    private function isGreeting(string $m): bool
+    {
+        $m = trim(mb_strtolower($m));
+        return (bool) preg_match('/^(hi|hello|hey|hii|hlo|hola|namaste|namaskar|salaam|yo|hi there|hey there)[!. ]*$/i', $m);
+    }
+
+    private function softResetEvidence(array &$state): void
+    {
+        $state['evidence_score'] = 0;
+        $state['evidence_details'] = [
+            'symptoms' => [], 'severity' => [], 'environmental' => [], 'timeline' => [],
+        ];
+        $state['service_decision'] = null;
+        // keep history so we can show previous conversation if needed
+    }
+
     private function updateScoreAndEvidence(array &$state, string $message): void
     {
         $text = mb_strtolower($message);
 
-        // 1) simple keyword buckets
+        // String keywords
         $buckets = [
             ['critical', 4, [
                 "can't","won't","screaming","severe","extreme","emergency","urgent",
@@ -183,21 +205,16 @@ class UnifiedIntelligenceController extends Controller
             }
         }
 
-        // 2) regex buckets (morphology)
+        // Regex (morphology)
         $regexBuckets = [
             ['high', 3, [
-                '/\bbleed\w*\b/',                      // bleed, bleeding, bleeds, bled
-                '/\bbloody?\b/',                       // bloody
-                '/\bblood\s+from\b/',                  // blood from ...
-                '/\bblood\s+in\s+(stool|urine|vomit)\b/',
+                '/\bbleed\w*\b/', '/\bbloody?\b/', '/\bblood\s+from\b/', '/\bblood\s+in\s+(stool|urine|vomit)\b/',
             ]],
             ['high', 2, [
-                '/\bvomit\w*\b|throw(?:ing)?\s+up/',  // vomit/vomiting/threw up/throwing up
-                '/\bdiarrh?ea\b/',                    // diarrhea/diarrhoea
+                '/\bvomit\w*\b|throw(?:ing)?\s+up/', '/\bdiarrh?ea\b/',
                 '/\b(not\s+eating|refus(?:e|ing)\s+food|no\s+appetite|loss\s+of\s+appetite)\b/',
             ]],
         ];
-
         foreach ($regexBuckets as [$label, $weight, $patterns]) {
             foreach ($patterns as $rx) {
                 if (preg_match($rx, $text, $m)) {
@@ -209,19 +226,15 @@ class UnifiedIntelligenceController extends Controller
                             $already = true; break;
                         }
                     }
-                    if (!$already) {
-                        $state['evidence_details']['symptoms'][] = $tag;
-                    }
+                    if (!$already) $state['evidence_details']['symptoms'][] = $tag;
                 }
             }
         }
 
-        // 3) sum score
+        // Sum
         $sum = 0;
         foreach ($state['evidence_details']['symptoms'] as $detail) {
-            if (preg_match('/\+\s*(\d+)/', $detail, $m)) {
-                $sum += (int) $m[1];
-            }
+            if (preg_match('/\+\s*(\d+)/', $detail, $m)) $sum += (int) $m[1];
         }
         $state['evidence_score'] = max(0, $sum);
     }
@@ -234,15 +247,9 @@ class UnifiedIntelligenceController extends Controller
         return 'GATHER_INFO';
     }
 
-    /**
-     * Backstop: if user turns > 5 and still GATHER_INFO, force VIDEO_CONSULT.
-     * @return array{0:string,1:bool}
-     */
     private function backstopOverride(string $decision, int $userTurns): array
     {
-        if ($userTurns > 5 && $decision === 'GATHER_INFO') {
-            return ['VIDEO_CONSULT', true];
-        }
+        if ($userTurns > 5 && $decision === 'GATHER_INFO') return ['VIDEO_CONSULT', true];
         return [$decision, false];
     }
 
@@ -290,7 +297,6 @@ class UnifiedIntelligenceController extends Controller
                    "**WHAT TO EXPECT:**\n• Comprehensive physical examination\n• Diagnostic tests if indicated\n• Treatment plan based on findings\n• Follow-up care instructions\n\n".
                    "**NEXT STEPS:**\n• Call your veterinarian to schedule appointment\n• Mention symptoms when booking for priority scheduling\n• Prepare list of questions for the vet visit";
         }
-        // VIDEO
         return "💻 VIDEO CONSULTATION RECOMMENDATION:\n\n".
                "**A video consultation should be sufficient for this concern.**\n\n".
                "**WHY VIDEO IS APPROPRIATE:**\n• Symptoms can be assessed visually and behaviorally\n• No urgent physical examination required\n• Safe to monitor remotely with professional guidance\n\n".
@@ -372,7 +378,7 @@ class UnifiedIntelligenceController extends Controller
         $avatar = $decision === 'EMERGENCY' ? '🚨' : ($isReco ? '📋' : '🔍');
 
         $userEsc = htmlspecialchars($user, ENT_QUOTES, 'UTF-8');
-        $aiHtml  = $this->renderAiHtml($ai); // converts ** to headings/strong + bullets to UL
+        $aiHtml  = $this->renderAiHtml($ai);
 
         $userHtml = "<div style='display:flex;justify-content:flex-end;margin:15px 0;'>".
             "<div style='background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 20px;border-radius:20px 20px 5px 20px;max-width:70%;box-shadow:0 4px 15px rgba(102,126,234,.3);'>".
@@ -389,12 +395,6 @@ class UnifiedIntelligenceController extends Controller
         return $userHtml.$aiHtmlBlock;
     }
 
-    /**
-     * Convert simple markdown-like text:
-     *  ***Title*** -> <h1>, **Heading** -> <h2>, *Sub* -> <h3>, inline **bold** -> <strong>,
-     *  lines starting with "• " -> <ul><li>…</li></ul>
-     *  (All text safely escaped.)
-     */
     private function renderAiHtml(string $text): string
     {
         $lines = preg_split("/\r\n|\n|\r/", $text);
@@ -403,7 +403,6 @@ class UnifiedIntelligenceController extends Controller
 
         $e = fn($s) => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
         $inlineBold = function ($s) use ($e) {
-            // replace inline **bold** while escaping content
             return preg_replace_callback('/\*\*(.+?)\*\*/s', function ($m) use ($e) {
                 return '<strong>'.$e($m[1]).'</strong>';
             }, $e($s));
@@ -412,49 +411,29 @@ class UnifiedIntelligenceController extends Controller
         foreach ($lines as $raw) {
             $l = trim($raw);
 
-            // bullets
             if (preg_match('/^•\s+(.+)$/u', $l, $m)) {
                 if (!$inList) { $out[] = '<ul style="margin:6px 0 6px 18px;">'; $inList = true; }
                 $out[] = '<li>'.$inlineBold($m[1]).'</li>';
                 continue;
-            } elseif ($inList) {
-                $out[] = '</ul>';
-                $inList = false;
-            }
+            } elseif ($inList) { $out[] = '</ul>'; $inList = false; }
 
-            // headings by star degree on a line
-            if (preg_match('/^\*\*\*(.+?)\*\*\*$/s', $l, $m)) {
-                $out[] = '<h1 style="font-size:1.15rem;margin:.25rem 0">'.$e($m[1]).'</h1>';
-                continue;
-            }
-            if (preg_match('/^\*\*(.+?)\*\*$/s', $l, $m)) {
-                $out[] = '<h2 style="font-size:1.05rem;font-weight:700;margin:.25rem 0">'.$e($m[1]).'</h2>';
-                continue;
-            }
-            if (preg_match('/^\*(.+?)\*$/s', $l, $m)) {
-                $out[] = '<h3 style="font-size:.98rem;font-weight:700;margin:.25rem 0">'.$e($m[1]).'</h3>';
-                continue;
-            }
+            if (preg_match('/^\*\*\*(.+?)\*\*\*$/s', $l, $m)) { $out[] = '<h1 style="font-size:1.15rem;margin:.25rem 0">'.$e($m[1]).'</h1>'; continue; }
+            if (preg_match('/^\*\*(.+?)\*\*$/s', $l, $m))    { $out[] = '<h2 style="font-size:1.05rem;font-weight:700;margin:.25rem 0">'.$e($m[1]).'</h2>'; continue; }
+            if (preg_match('/^\*(.+?)\*$/s', $l, $m))        { $out[] = '<h3 style="font-size:.98rem;font-weight:700;margin:.25rem 0">'.$e($m[1]).'</h3>'; continue; }
 
-            // normal paragraph with inline strong
-            if ($l === '') { $out[] = '<br>'; }
-            else { $out[] = '<p style="margin:.25rem 0">'.$inlineBold($l).'</p>'; }
+            if ($l === '') $out[] = '<br>'; else $out[] = '<p style="margin:.25rem 0">'.$inlineBold($l).'</p>';
         }
-
         if ($inList) $out[] = '</ul>';
         return implode("", $out);
     }
 
-    /* ----------------- cURL HTTP (no Guzzle) ----------------- */
-
     private function callGeminiApi_curl(string $prompt, ?string $imagePath): string
     {
-        // 🔴 Hard-coded creds per your request (TEMP ONLY)
+        // TEMP: hard-coded creds (your request)
         $apiKey = 'AIzaSyCIB0yfzSQGGwpVUruqy_sd2WqujTLa1Rk';
         $url    = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
         $parts = [['text' => $prompt]];
-
         if ($imagePath && is_readable($imagePath)) {
             $mime = function_exists('mime_content_type') ? mime_content_type($imagePath) : 'application/octet-stream';
             $data = base64_encode(file_get_contents($imagePath));
@@ -467,16 +446,11 @@ class UnifiedIntelligenceController extends Controller
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'X-goog-api-key: '.$apiKey,
-            ],
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json','X-goog-api-key: '.$apiKey],
             CURLOPT_POSTFIELDS     => $payload,
             CURLOPT_TIMEOUT        => 40,
             CURLOPT_CONNECTTIMEOUT => 15,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-            // CA path may vary by distro; adjust if needed
-            CURLOPT_CAINFO         => '/etc/ssl/certs/ca-certificates.crt',
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
         ]);
