@@ -2,6 +2,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 // use App
+use App\Http\Controllers\Api\UnifiedIntelligenceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\Groomer\ProfileController as GroomerProfileController;
@@ -335,3 +336,13 @@ Route::get('/razorpay-ping', function () {
   Route::get('/user-chats/{user_id}', [GeminiChatController::class, 'getUserChats']);
 
   Route::post('/chats/{chat_id}/feedback', [GeminiChatController::class, 'setFeedback']);
+
+
+Route::prefix('unified')->group(function () {
+    Route::post('/process', [UnifiedIntelligenceController::class, 'process']);
+    Route::get('/status',   [UnifiedIntelligenceController::class, 'status']);
+    Route::post('/reset',   [UnifiedIntelligenceController::class, 'reset']);
+});
+
+Route::view('/prompt-test-v2', 'prompt-test-v2');
+
