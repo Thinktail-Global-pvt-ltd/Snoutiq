@@ -304,14 +304,26 @@ class UnifiedIntelligenceController extends Controller
                "**NEXT STEPS:**\n• Schedule a video consultation through our platform\n• Follow any preparation instructions provided\n• Be ready to implement recommended care plans";
     }
 
+    // private function statusLine(string $decision, int $score, bool $backstopApplied = false): string
+    // {
+    //     if (in_array($decision, ['EMERGENCY','IN_CLINIC','VIDEO_CONSULT'], true)) {
+    //         $tag = $backstopApplied ? " • ⛳ backstop" : "";
+    //         return "✅ {$decision} recommended{$tag} | Evidence: {$score}/10 | 📋 Summary ready for vet";
+    //     }
+    //     return "🔍 Evidence gathering | Score: {$score}/10 | Need: ".max(0, 2-$score)." more for decision";
+    // }
+
     private function statusLine(string $decision, int $score, bool $backstopApplied = false): string
-    {
-        if (in_array($decision, ['EMERGENCY','IN_CLINIC','VIDEO_CONSULT'], true)) {
-            $tag = $backstopApplied ? " • ⛳ backstop" : "";
-            return "✅ {$decision} recommended{$tag} | Evidence: {$score}/10 | 📋 Summary ready for vet";
-        }
-        return "🔍 Evidence gathering | Score: {$score}/10 | Need: ".max(0, 2-$score)." more for decision";
+{
+    if (in_array($decision, ['EMERGENCY','IN_CLINIC','VIDEO_CONSULT'], true)) {
+        $tag = $backstopApplied ? " • ⛳ backstop" : "";
+        return "✅ {$decision} recommended{$tag} | Evidence: {$score}/10 | 📋 Summary ready for vet";
     }
+
+    // ⬇️ Removed the “Need: X more for decision” part
+    return "🔍 Evidence gathering | Score: {$score}/10";
+}
+
 
     private function getIntelligenceStatus(array $state): string
     {
