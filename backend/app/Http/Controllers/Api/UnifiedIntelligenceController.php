@@ -42,10 +42,8 @@ class UnifiedIntelligenceController extends Controller
         // a) score
         $this->updateScoreAndEvidence($state, $data['message']);
 
-        // b) decision (with backstop override based on number of user turns)
-        $baseDecision = $this->makeDecision((int)$state['evidence_score']);
-        $userTurnsNow = count($state['conversation_history']) + 1; // include this incoming message
-        [$decision, $backstopApplied] = $this->backstopOverride($baseDecision, $userTurnsNow);
+        // b) decision
+        $decision = $this->makeDecision((int)$state['evidence_score']);
 
         // c) prompt
         $prompt = $this->buildPrompt($decision, $data['message'], $state['pet_profile'], $state['conversation_history']);
@@ -64,7 +62,7 @@ class UnifiedIntelligenceController extends Controller
         ];
 
         // f) display helpers
-        $statusText = $this->statusLine($decision, (int)$state['evidence_score'], $backstopApplied);
+        $statusText = $this->statusLine($decision, (int)$state['evidence_score']);
         $vetSummary = $this->generateVetSummary($state);
         $html       = $this->renderBubbles($data['message'], $aiText, $decision);
 
@@ -73,15 +71,15 @@ class UnifiedIntelligenceController extends Controller
         Cache::put($cacheKey, $state, now()->addMinutes($ttl));
 
         return response()->json([
-            'success'           => true,
-            'session_id'        => $sessionId,
-            'ai_text'           => $aiText,
-            'decision'          => $decision,
-            'score'             => $state['evidence_score'],
-            'evidence_tags'     => $state['evidence_details']['symptoms'],
-            'status_text'       => $statusText,
-            'vet_summary'       => $vetSummary,
-            'conversation_html' => $html,
+            'success'          => true,
+            'session_id'       => $sessionId,
+            'ai_text'          => $aiText,
+            'decision'         => $decision,
+            'score'            => $state['evidence_score'],
+            'evidence_tags'    => $state['evidence_details']['symptoms'],
+            'status_text'      => $statusText,
+            'vet_summary'      => $vetSummary,
+            'conversation_html'=> $html,
         ]);
     }
 
@@ -92,20 +90,10 @@ class UnifiedIntelligenceController extends Controller
         if (!$state) {
             return response()->json(['success' => false, 'message' => 'No session found'], 404);
         }
-
-        // compute current decision with backstop for consistency
-        $score     = (int)($state['evidence_score'] ?? 0);
-        $decision  = $this->makeDecision($score);
-        $userTurns = count($state['conversation_history']);
-        [$decision, $backstopApplied] = $this->backstopOverride($decision, $userTurns);
-
         return response()->json([
             'success'     => true,
             'status'      => $this->getIntelligenceStatus($state),
             'vet_summary' => $this->generateVetSummary($state),
-            'decision'    => $decision,
-            'score'       => $score,
-            'backstop'    => $backstopApplied,
         ]);
     }
 
@@ -161,21 +149,6 @@ class UnifiedIntelligenceController extends Controller
                 "started","began","since","yesterday","today","few days",
                 "sometimes","occasionally","comes and goes",
             ]],
-
-            // ---- optional extra tokens (help users hit threshold faster) ----
-            ['high', 3, [
-                'not bearing weight','non weight bearing','no weight on leg',
-                'refuses to stand','unable to stand','dragging leg',
-                'leg looks very swollen','open wound','bleeding a lot'
-            ]],
-            ['high', 2, [
-                'whimpering','whining','yelp','yelps','tender',
-                'flinches on touch',"won't use leg","won't put weight","reluctant to put weight"
-            ]],
-            ['mild', 1, [
-                'limp','limping','favoring the leg','favoring one leg',
-                'stiff','sore','reluctant to walk','hobble','hobbling'
-            ]],
         ];
 
         $seenTokens = [];
@@ -207,21 +180,6 @@ class UnifiedIntelligenceController extends Controller
         if ($score >= 4) return 'IN_CLINIC';
         if ($score >= 2) return 'VIDEO_CONSULT';
         return 'GATHER_INFO';
-    }
-
-    /**
-     * Backstop rule:
-     * If user has sent > 5 messages (turns), and we're still at GATHER_INFO,
-     * force VIDEO_CONSULT to avoid loops.
-     *
-     * @return array{0:string,1:bool} [decision, applied?]
-     */
-    private function backstopOverride(string $decision, int $userTurns): array
-    {
-        if ($userTurns > 5 && $decision === 'GATHER_INFO') {
-            return ['VIDEO_CONSULT', true];
-        }
-        return [$decision, false];
     }
 
     private function buildPrompt(string $decision, string $userMessage, array $pet, array $history): string
@@ -276,29 +234,25 @@ class UnifiedIntelligenceController extends Controller
                "**NEXT STEPS:**\n• Schedule a video consultation through our platform\n• Follow any preparation instructions provided\n• Be ready to implement recommended care plans";
     }
 
-    private function statusLine(string $decision, int $score, bool $backstopApplied = false): string
+    private function statusLine(string $decision, int $score): string
     {
         if (in_array($decision, ['EMERGENCY','IN_CLINIC','VIDEO_CONSULT'], true)) {
-            $tag = $backstopApplied ? " • ⛳ backstop" : "";
-            return "✅ {$decision} recommended{$tag} | Evidence: {$score}/10 | 📋 Summary ready for vet";
+            return "✅ {$decision} recommended | Evidence: {$score}/10 | 📋 Summary ready for vet";
         }
         return "🔍 Evidence gathering | Score: {$score}/10 | Need: ".max(0, 2-$score)." more for decision";
     }
 
     private function getIntelligenceStatus(array $state): string
     {
-        $score    = (int) ($state['evidence_score'] ?? 0);
+        $score = (int) ($state['evidence_score'] ?? 0);
         $decision = $this->makeDecision($score);
-        $userTurns= count($state['conversation_history']);
-        [$decision, $backstop] = $this->backstopOverride($decision, $userTurns);
-
-        $sym   = $state['evidence_details']['symptoms'] ?? ['No evidence collected yet'];
+        $sym = $state['evidence_details']['symptoms'] ?? ['No evidence collected yet'];
         $depth = count($state['conversation_history'] ?? []);
         $lines = implode("\n", $sym);
 
         return "UNIFIED INTELLIGENCE SYSTEM STATUS:\n\n".
                "🎯 EVIDENCE SCORE: {$score}/10\n".
-               "🚀 SERVICE DECISION: {$decision}".($backstop ? " (backstop)" : "")."\n".
+               "🚀 SERVICE DECISION: {$decision}\n".
                "📊 DECISION THRESHOLD: ".($score >= 2 ? "✅ REACHED" : "Need ".max(0, 2-$score)." more points")."\n\n".
                "🔍 EVIDENCE BREAKDOWN:\n{$lines}\n\n".
                "💬 CONVERSATION DEPTH: {$depth} exchanges\n\n".
@@ -307,7 +261,7 @@ class UnifiedIntelligenceController extends Controller
                "• 🏥 In-Clinic: 4+ points → Physical examination needed\n".
                "• 💻 Video Consult: 2-3 points → Remote assessment sufficient\n".
                "• 🔍 Gather Info: 0-1 points → Need more evidence\n\n".
-               "🔄 CURRENT STATUS: ".($score >= 2 || $backstop ? "🚨 PROVIDING SERVICE RECOMMENDATION" : "🔍 GATHERING EVIDENCE");
+               "🔄 CURRENT STATUS: ".($score >= 2 ? "🚨 PROVIDING SERVICE RECOMMENDATION" : "🔍 GATHERING EVIDENCE");
     }
 
     private function generateVetSummary(array $state): string
@@ -317,11 +271,6 @@ class UnifiedIntelligenceController extends Controller
         $petBreed= $profile['breed'] ?? 'Unknown breed';
         $petAge  = $profile['age']   ?? 'Unknown age';
         $score   = (int) ($state['evidence_score'] ?? 0);
-
-        $decisionBase = $this->makeDecision($score);
-        $userTurns    = count($state['conversation_history']);
-        [$finalDecision, $backstop] = $this->backstopOverride($decisionBase, $userTurns);
-
         $severity= $score >= 8 ? 'Emergency' : ($score >= 4 ? 'High Priority' : ($score >= 2 ? 'Standard' : 'Assessment Needed'));
         $symList = $state['evidence_details']['symptoms'] ?? [];
         $symptoms= array_map(function($s){ return ucwords(str_replace('_',' ', explode(':',$s)[0])); }, $symList);
@@ -339,8 +288,80 @@ class UnifiedIntelligenceController extends Controller
                "⚠️  TRIAGE: {$severity} (Score: {$score}/10)\n".
                "🎯 SYMPTOMS: {$symText}\n".
                "⏰ TIMELINE: {$timeline}\n".
-               "📍 RECOMMENDATION: {$finalDecision}".($backstop ? " (backstop)" : "")."\n\n".
+               "📍 RECOMMENDATION: ".$this->makeDecision($score)."\n\n".
                "💬 OWNER REPORTS:\n".implode("\n", $ownerLines);
+    }
+
+    /* ----------------- Formatting helpers: turn **stars** into real HTML ----------------- */
+
+    private function h(string $s): string
+    {
+        return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+    }
+
+    // Inline: "**text**" -> <strong>text</strong> (safe)
+    private function renderInline(string $s): string
+    {
+        $parts = preg_split('/(\*\*[^*]+?\*\*)/', $s, -1, PREG_SPLIT_DELIM_CAPTURE);
+        $out = '';
+        foreach ($parts as $p) {
+            if (preg_match('/^\*\*(.+)\*\*$/s', $p, $m)) {
+                $out .= '<strong>'.$this->h($m[1]).'</strong>';
+            } else {
+                $out .= $this->h($p);
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Markdown-ish to HTML:
+     * - lines starting with "•", "*" or "-" => <ul><li>…</li></ul>
+     * - lines fully enclosed in **…** (optional colon) => <h2>/<h3>
+     *   (contains "recommendation" -> h2, otherwise h3)
+     * - inline **bold** kept as <strong>
+     */
+    private function formatAiText(string $text): string
+    {
+        $lines  = preg_split("/\r\n|\n|\r/", $text);
+        $html   = '';
+        $inList = false;
+
+        foreach ($lines as $line) {
+            $raw = trim($line);
+            if ($raw === '') {
+                if ($inList) { $html .= '</ul>'; $inList = false; }
+                continue;
+            }
+
+            // bullets
+            if (preg_match('/^\s*[•\*\-]\s+(.*)$/u', $raw, $m)) {
+                if (!$inList) {
+                    $html .= '<ul style="margin:.25rem 0 1rem 0; padding-left:1.25rem;">';
+                    $inList = true;
+                }
+                $html .= '<li style="margin:.2rem 0;">'.$this->renderInline($m[1]).'</li>';
+                continue;
+            }
+
+            // headings surrounded by **…**
+            if (preg_match('/^\*\*(.+?)\*\*:?$/u', $raw, $m)) {
+                if ($inList) { $html .= '</ul>'; $inList = false; }
+                $title = $m[1];
+                if (stripos($title, 'recommendation') !== false) {
+                    $html .= '<h2 style="margin:.4rem 0 .6rem 0; font-weight:800; font-size:1.25rem;">'.$this->h($title).'</h2>';
+                } else {
+                    $html .= '<h3 style="margin:.5rem 0 .25rem 0; font-weight:700; font-size:1.05rem;">'.$this->h($title).'</h3>';
+                }
+                continue;
+            }
+
+            // paragraph with inline bold
+            if ($inList) { $html .= '</ul>'; $inList = false; }
+            $html .= '<p style="margin:.35rem 0 .6rem 0; line-height:1.6;">'.$this->renderInline($raw).'</p>';
+        }
+        if ($inList) $html .= '</ul>';
+        return $html;
     }
 
     private function renderBubbles(string $user, string $ai, string $decision): string
@@ -349,19 +370,20 @@ class UnifiedIntelligenceController extends Controller
         $isReco = in_array($decision, ['EMERGENCY','IN_CLINIC','VIDEO_CONSULT'], true);
         $avatar = $decision === 'EMERGENCY' ? '🚨' : ($isReco ? '📋' : '🔍');
 
-        $userEsc = htmlspecialchars($user, ENT_QUOTES, 'UTF-8');
-        $aiEsc   = nl2br(htmlspecialchars($ai, ENT_QUOTES, 'UTF-8'));
-
+        // USER bubble (plain)
+        $userEsc = $this->h($user);
         $userHtml = "<div style='display:flex;justify-content:flex-end;margin:15px 0;'>".
             "<div style='background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 20px;border-radius:20px 20px 5px 20px;max-width:70%;box-shadow:0 4px 15px rgba(102,126,234,.3);'>".
             "<div style='font-size:12px;opacity:.8;margin-bottom:5px;'>You • {$ts}</div>".
             "<div>{$userEsc}</div>".
             "</div></div>";
 
+        // AI bubble (formatted markdown-ish -> HTML)
+        $aiHtmlBody = $this->formatAiText($ai);
         $aiHtml = "<div style='display:flex;justify-content:flex-start;margin:15px 0;'>".
             "<div style='background:white;border:2px solid #f0f0f0;padding:15px 20px;border-radius:20px 20px 20px 5px;max-width:75%;box-shadow:0 4px 15px rgba(0,0,0,.1);'>".
             "<div style='font-size:12px;color:#666;margin-bottom:8px;'>{$avatar} PetPal AI • {$ts}</div>".
-            "<div style='line-height:1.6;color:#333;'>{$aiEsc}</div>".
+            "<div style='color:#111;'>".$aiHtmlBody."</div>".
             "</div></div>";
 
         return $userHtml.$aiHtml;
@@ -395,31 +417,24 @@ class UnifiedIntelligenceController extends Controller
             ],
             CURLOPT_POSTFIELDS     => $payload,
             CURLOPT_TIMEOUT        => 40,
-            CURLOPT_CONNECTTIMEOUT => 15,
-            CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-            CURLOPT_CAINFO         => '/etc/ssl/certs/ca-certificates.crt',
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
         ]);
 
         $resp = curl_exec($ch);
         if ($resp === false) {
             $err = curl_error($ch);
-            $info = curl_getinfo($ch);
             curl_close($ch);
-            Log::error('Gemini cURL error', ['err'=>$err, 'info'=>$info]);
+            \Log::error('Gemini cURL error: '.$err);
             return "AI error: ".$err;
         }
         $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
         if ($http < 200 || $http >= 300) {
-            Log::error('Gemini HTTP non-2xx', ['status'=>$http, 'body'=>$resp]);
+            \Log::error('Gemini HTTP '.$http.': '.$resp);
             return "AI error: HTTP {$http}";
         }
 
         $json = json_decode($resp, true);
-        return $json['candidates'][0]['content']['parts'][0]['text']
-            ?? "No response.";
+        return $json['candidates'][0]['content']['parts'][0]['text'] ?? "No response.";
     }
 }
