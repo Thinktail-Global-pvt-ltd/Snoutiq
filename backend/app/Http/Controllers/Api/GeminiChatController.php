@@ -4,948 +4,498 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\DB;
-use App\Models\Chat;
-use App\Models\ChatRoom;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class GeminiChatController extends Controller
 {
-    /** CREATE ROOM: DB row + token */
-    public function newRoom(Request $request)
+    /**
+     * Unified chat: evidence → decision → prompt → Gemini call
+     */
+    public function process(Request $r)
     {
-        //dd($request->all());
-        $data = $request->validate([
-            'user_id'        => 'required|integer',
-            'title'          => 'nullable|string',
-            'pet_name'       => 'nullable|string',
-            'pet_breed'      => 'nullable|string',
-            'pet_age'        => 'nullable|string',
-            'pet_location'   => 'nullable|string',
+        $data = $r->validate([
+            'session_id' => 'nullable|string',
+            'message'    => 'required|string',
+            'image'      => 'nullable|image|max:6144', // 6 MB
+            'pet_name'   => 'nullable|string',
+            'pet_breed'  => 'nullable|string',
+            'pet_age'    => 'nullable|string',
+            'pet_weight' => 'nullable|string',
+            'location'   => 'nullable|string',
+            'fresh'      => 'nullable|boolean',
         ]);
 
-        $chatRoomToken = 'room_' . Str::uuid()->toString();
+        $sessionId = $data['session_id'] ?? bin2hex(random_bytes(16));
+        $cacheKey  = "unified:{$sessionId}";
 
-        $room = ChatRoom::create([
-            'user_id'        => (int) $data['user_id'],
-            'chat_room_token'=> $chatRoomToken,
-            'name'           => $data['title'] ?? null,
-        ]);
+        // Load or initialize state
+        $state = Cache::get($cacheKey, $this->defaultState());
 
-        return response()->json([
-            'status'          => 'success',
-            'chat_room_id'    => $room->id,
-            'chat_room_token' => $room->chat_room_token,
-            'name'            => $room->name,
-            'note' => 'Use this chat_room_token in /api/gemini/send for all messages in this room.',
-        ]);
-    }
-
-
-
-
-
- /** ---------- NEW: Helpers ported from Python version ---------- */
-
-       private array $cityCoords = [
-        'delhi'     => ['lat' => 28.6139, 'lon' => 77.2090],
-        'mumbai'    => ['lat' => 19.0760, 'lon' => 72.8777],
-        'bangalore' => ['lat' => 12.9716, 'lon' => 77.5946],
-        'bengaluru' => ['lat' => 12.9716, 'lon' => 77.5946],
-        'gurgaon'   => ['lat' => 28.4595, 'lon' => 77.0266],
-        'gurugram'  => ['lat' => 28.4595, 'lon' => 77.0266],
-        'pune'      => ['lat' => 18.5204, 'lon' => 73.8567],
-        'chennai'   => ['lat' => 13.0827, 'lon' => 80.2707],
-        'hyderabad' => ['lat' => 17.3850, 'lon' => 78.4867],
-        'kolkata'   => ['lat' => 22.5726, 'lon' => 88.3639],
-    ];
-
-    private array $breedAdvisories = [
-        'high_maintenance_heat' => ['Siberian Husky','German Shepherd','Golden Retriever','Saint Bernard','Persian'],
-        'heat_sensitive'        => ['Bulldog','Pug','Boxer','British Shorthair','Himalayan Sheepdog'],
-        'monsoon_prone'         => ['Cocker Spaniel','Beagle','Persian','Maine Coon'],
-        'hardy_breeds'          => ['Indian Pariah Dog','Rajapalayam','Indian Street Cat'],
-    ];
-
-    /** ---- Public Endpoint ---- */
-    public function sendMessage(Request $request)
-    {
-       //dd($request->all());
-        $request->validate([
-            'user_id'         => 'required|integer',
-           // 'chat_room_token' => 'required_without:chat_room_id|string',
-           // 'chat_room_id'    => 'required_without:chat_room_token|integer',
-            'question'        => 'required|string',
-            'context_token'   => 'nullable|string',
-            'title'           => 'nullable|string',
-            'pet_name'        => 'nullable|string',
-            'pet_type'        => 'nullable|string', // Dog/Cat
-            'pet_breed'       => 'nullable|string',
-            'pet_age'         => 'nullable|string',
-            'pet_location'    => 'nullable|string',
-        ]);
-       
-
-        $userId = (int) $request->user_id;
-
-        // Find room by id or token (token-based share supported)
-        if ($request->filled('chat_room_id')) {
-            $room = ChatRoom::where('id', $request->chat_room_id)
-                ->where('user_id', $userId)
-                ->firstOrFail();
-        } else {
-            $room = ChatRoom::where('chat_room_token', $request->chat_room_token)->firstOrFail();
+        // Optional soft reset
+        $didReset = false;
+        if ($r->boolean('fresh')) {
+            $this->softResetEvidence($state);
+            $didReset = true;
+        }
+        if (!$didReset && $this->isGreeting($data['message']) && !empty($state['conversation_history'])) {
+            $this->softResetEvidence($state);
+            $didReset = true;
         }
 
-        $contextToken = $request->context_token ?: Str::uuid()->toString();
+        // Dynamic pet profile from frontend
+        $state['pet_profile'] = [
+            'name'     => $data['pet_name']   ?? 'Your pet',
+            'breed'    => $data['pet_breed']  ?? 'Mixed breed',
+            'age'      => $data['pet_age']    ?? 'Unknown',
+            'weight'   => $data['pet_weight'] ?? 'Unknown',
+            'location' => $data['location']   ?? 'India',
+        ];
 
-        // Previous context
-        $lastChat  = Chat::where('chat_room_id', $room->id)->latest()->first();
-        $exchanges = Chat::where('chat_room_id', $room->id)->count();
+        // Image (tmp path)
+        $imagePath = $r->hasFile('image') ? $r->file('image')->getRealPath() : null;
 
-        // Climate snapshot for prompt + response
-        $wx       = $this->getWeatherData($request->pet_location ?? null);
-        $aqi      = $this->getAirQualityData($request->pet_location ?? null);
-        [$season] = $this->getCurrentSeason();
-        $climateAlerts = $this->generateClimateAlerts([
-            'name'     => $request->pet_name,
-            'breed'    => $request->pet_breed,
-            'location' => $request->pet_location,
-        ], $wx, $aqi);
+        // Evidence scoring
+        $this->updateScoreAndEvidence($state, $data['message']);
 
-        // Build payload (single request expected to return JSON {answer, diagnosis, tag})
-        $payload = $this->buildGeminiPayload($request->all(), $lastChat, $exchanges);
+        // Decision + backstop
+        $baseDecision = $this->makeDecision((int)$state['evidence_score']);
+        $userTurnsNow = count($state['conversation_history']) + 1;
+        [$decision, $backstopApplied] = $this->backstopOverride($baseDecision, $userTurnsNow);
+
+        // Prompt
+        $prompt = $this->buildPrompt($decision, $data['message'], $state['pet_profile'], $state['conversation_history']);
 
         // Call Gemini
-        $apiKey = 'AIzaSyCIB0yfzSQGGwpVUruqy_sd2WqujTLa1Rk';
-        if (!$apiKey) {
-            return response()->json(['error' => 'GEMINI_API_KEY missing in .env'], 500);
-        }
+        $aiText = $this->callGeminiApi_curl($prompt, $imagePath);
 
-        $resp = Http::withHeaders([
-            'Content-Type'   => 'application/json',
-            'X-goog-api-key' => $apiKey,
-        ])->timeout(30)->post(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-            $payload
+        // Append history
+        $state['service_decision'] = $decision;
+        $state['conversation_history'][] = [
+            'user'             => $data['message'],
+            'response'         => $aiText,
+            'evidence_score'   => $state['evidence_score'],
+            'service_decision' => $decision,
+            'timestamp'        => now()->format('H:i:s'),
+        ];
+
+        // UI helpers
+        $statusText = $this->statusLine($decision, (int)$state['evidence_score'], $backstopApplied);
+        $vetSummary = $this->generateVetSummary($state);
+        $html       = $this->renderBubbles($data['message'], $aiText, $decision);
+
+        // Persist state (TTL from .env directly)
+        Cache::put(
+            $cacheKey,
+            $state,
+            now()->addMinutes((int) env('UNIFIED_SESSION_TTL_MIN', 1440))
         );
-      
-       
-
-        if (!$resp->successful()) {
-            return response()->json([
-                'error'   => 'Gemini API call failed',
-                'details' => $resp->json(),
-            ], 500);
-        }
-
-        // Parse single-line JSON result
-        $raw = $resp->json('candidates.0.content.parts.0.text') ?? '{}';
-        
-        [$answerTxt, $diagnosisTxt, $systemTag] = $this->parseModelJson($raw);
-       $answerTxt = $this->formatStarsToPoints($answerTxt); // ← add this line
-
-        // Save chat with diagnosis + emergency_status
-        $emergencyStatus = $systemTag; // EMERGENCY | URGENT | ROUTINE | INFO
-
-        $chat = Chat::create([
-            'user_id'         => $userId,
-            'chat_room_id'    => $room->id,
-            'chat_room_token' => $room->chat_room_token,
-            'context_token'   => $contextToken,
-            'question'        => $request->question,
-            'answer'          => $answerTxt,
-            'diagnosis'       => $diagnosisTxt,
-            'pet_name'        => $request->pet_name,
-            'pet_breed'       => $request->pet_breed,
-            'pet_age'         => $request->pet_age,
-            'pet_location'    => $request->pet_location,
-            'response_tag'    => $systemTag,
-            'emergency_status'=> $emergencyStatus,
-        ]);
-
-        // Update room name + last emergency status
-        $room->last_emergency_status = $emergencyStatus;
-        $room->name = $request->title ?: $this->autoTitleFromQuestion($request->question);
-        $room->touch();
-        $room->save();
 
         return response()->json([
-            'status'           => 'success',
-            'chat_room_id'     => $room->id,
-            'chat_room_token'  => $room->chat_room_token,
-            'room_name'        => $room->name,
-            'context_token'    => $contextToken,
-            'system_tag'       => $systemTag,
-            'emergency_status' => $emergencyStatus,
-            'diagnosis'        => $diagnosisTxt,
-           // 'booking_options'  => $this->bookingOptions($systemTag),
-            'climate_alerts'   => $climateAlerts,
-            'weather'          => $wx,
-            'air_quality'      => $aqi,
-            'season'           => $season,
-            'chat'             => $chat,
+            'success'           => true,
+            'session_id'        => $sessionId,
+            'reset'             => $didReset,
+            'ai_text'           => $aiText,
+            'decision'          => $decision,
+            'score'             => $state['evidence_score'],
+            'evidence_tags'     => $state['evidence_details']['symptoms'],
+            'status_text'       => $statusText,
+            'vet_summary'       => $vetSummary,
+            'conversation_html' => $html,
         ]);
     }
 
-
-    /**
- * Convert inline or line-start '***' stars into bullet-point lines.
- * Preserves the disclaimer line at the end of the answer.
- */
-private function formatStarsToPoints(string $txt): string
-{
-    $t = trim($txt);
-    if ($t === '') return $txt;
-
-    // Try to protect the disclaimer (usually the last line)
-    $lines = preg_split('/\R/', $t);
-    $disclaimer = '';
-    if (!empty($lines)) {
-        $maybeLast = trim(end($lines));
-        if (preg_match('/⚠️\s*AI advice|Consult veterinarian/i', $maybeLast)) {
-            array_pop($lines);
-            $disclaimer = $maybeLast;
-            $t = implode("\n", $lines);
-        }
-    }
-
-    $out = $t;
-
-    // Case A: inline separators like "Intro *** point1 *** point2"
-    if (strpos($t, '***') !== false) {
-        $chunks = preg_split('/\*{3,}/', $t);
-        $chunks = array_map('trim', $chunks);
-        $chunks = array_filter($chunks, function ($c) { return $c !== ''; });
-
-        if (count($chunks) > 1) {
-            // Keep an optional intro (first chunk) and bullet the rest
-            $head = array_shift($chunks);
-            $bullets = '• ' . implode("\n• ", $chunks);
-            $out = (strlen($head) ? ($head . "\n\n" . $bullets) : $bullets);
-        }
-    }
-
-    // Case B: lines that *start* with *** (convert to bullets)
-    $out = preg_replace('/^\s*\*{3,}\s*/m', '• ', $out);
-
-    // Re-attach disclaimer if we pulled it off
-    if ($disclaimer !== '') {
-        $out = rtrim($out) . "\n\n" . $disclaimer;
-    }
-
-    return $out;
-}
-
-
-    /** ---- Payload builder (JSON-only output) ---- */
-    private function buildGeminiPayload(array $req, ?Chat $lastChat, int $exchanges): array
+    /** Legacy alias (optional): keep old /chat/send working */
+    public function sendMessage(Request $r)
     {
-        // Pet context
-        $petContextBlock = "";
-        if (!empty($req['pet_name']) || !empty($req['pet_breed']) || !empty($req['pet_age']) || !empty($req['pet_location']) || !empty($req['pet_type'])) {
-            $petContextBlock =
-                "Pet Profile:\n" .
-                "- Pet Name: " . ($req['pet_name'] ?? 'Not specified') . "\n" .
-                "- Type: " . ($req['pet_type'] ?? 'Dog/Cat (unspecified)') . "\n" .
-                "- Breed: " . ($req['pet_breed'] ?? 'Mixed/Unknown breed') . "\n" .
-                "- Age: " . ($req['pet_age'] ?? 'Age not specified') . " years old\n" .
-                "- Location: " . ($req['pet_location'] ?? 'India (general advice)');
+        return $this->process($r);
+    }
+
+    /** Read-only status for a session */
+    public function status(Request $r)
+    {
+        $r->validate(['session_id' => 'required|string']);
+        $state = Cache::get("unified:".$r->session_id);
+        if (!$state) {
+            return response()->json(['success' => false, 'message' => 'No session found'], 404);
         }
 
-        // Climate snapshot
-        $wx  = $this->getWeatherData($req['pet_location'] ?? null);
-        $aqi = $this->getAirQualityData($req['pet_location'] ?? null);
-        [$season] = $this->getCurrentSeason();
+        $score     = (int)($state['evidence_score'] ?? 0);
+        $decision  = $this->makeDecision($score);
+        $userTurns = count($state['conversation_history']);
+        [$decision, $backstopApplied] = $this->backstopOverride($decision, $userTurns);
 
-        $climateSnapshot =
-            "Climate Snapshot:\n" .
-            "- Season: " . ucfirst($season) . "\n" .
-            "- Weather: " . ucfirst($wx['description'] ?? 'n/a') .
-              ", Temp: " . ($wx['temp'] ?? 'n/a') . "°C, Feels: " . ($wx['feels_like'] ?? 'n/a') . "°C, Humidity: " . ($wx['humidity'] ?? 'n/a') . "%\n" .
-            "- Air Quality: " . ucfirst(str_replace('_',' ',$aqi['level'] ?? 'moderate')) . " (AQI " . ($aqi['aqi'] ?? 'n/a') . ")";
-
-        // Last up to 3 exchanges
-        $historyBlock = "";
-        if ($lastChat) {
-            $recent = Chat::where('chat_room_id', $lastChat->chat_room_id)->orderByDesc('id')->limit(3)->get()->reverse();
-            if ($recent->count()) {
-                $lines = ["Previous conversation (last up to 3 exchanges):"];
-                foreach ($recent as $c) {
-                    $lines[] = "User: " . trim($c->question);
-                    $lines[] = "AI: "   . mb_substr(trim($c->answer), 0, 800) . (mb_strlen($c->answer) > 800 ? "..." : "");
-                }
-                $historyBlock = implode("\n", $lines);
-            }
-        }
-
-        // Strict JSON output system prompt
-        $system = <<<SYS
-You are SnoutAI Assistant for Indian pet parents. Do NOT diagnose or prescribe medicines. Be empathetic, short, practical, and consider climate/air quality context.
-
-Return ONLY a single-line JSON object with exactly these keys:
-{
-  "answer": "plain text guidance with empathy + 'It's important to have a veterinarian examine the pet for this.' + the line: '⚠️ AI advice. Consult veterinarian for health concerns.'",
-  "diagnosis": "plain text NON-DIAGNOSTIC possible causes and what a vet might check (no medicines).",
-  "tag": "EMERGENCY|URGENT|ROUTINE|INFO"
-}
-No extra text, no code fences, no Markdown.
-
-Rules:
-1) Acknowledge emotion first.
-2) Include: "It's important to have a veterinarian examine the pet for this."
-3) Keep concise and practical.
-4) Use climate/air-quality when relevant.
-5) Brand-safe: never say Gemini/Google; use "SnoutAI Assistant" if needed.
-6) If prior exchanges in this room are >= 5, append to 'answer':
-   "For continued detailed guidance, please start a new conversation or book a video consultation with our veterinarians."
-SYS;
-
-        $userParts = array_filter([
-            $petContextBlock,
-            $climateSnapshot,
-            "Prior exchange count: {$exchanges}",
-            $historyBlock,
-            "Current Question: " . ($req['question'] ?? '')
+        return response()->json([
+            'success'     => true,
+            'status'      => $this->getIntelligenceStatus($state),
+            'vet_summary' => $this->generateVetSummary($state),
+            'decision'    => $decision,
+            'score'       => $score,
+            'backstop'    => $backstopApplied,
         ]);
-        $userPrompt = implode("\n\n", $userParts);
+    }
 
+    /** Clear a session completely */
+    public function reset(Request $r)
+    {
+        $r->validate(['session_id' => 'required|string']);
+        Cache::forget("unified:".$r->session_id);
+        return response()->json(['success' => true, 'message' => 'Session reset']);
+    }
+
+    /* ---------------- Helpers ---------------- */
+
+    private function defaultState(): array
+    {
         return [
-            "systemInstruction" => [
-                "role"  => "system",
-                "parts" => [ [ "text" => $system ] ],
+            'conversation_history' => [],
+            'pet_profile'          => [],
+            'evidence_score'       => 0,
+            'evidence_details'     => [
+                'symptoms' => [], 'severity' => [], 'environmental' => [], 'timeline' => [],
             ],
-            "contents" => [
-                [
-                    "role"  => "user",
-                    "parts" => [ [ "text" => $userPrompt ] ],
-                ],
-            ],
-            "generationConfig" => [
-                "temperature"     => 0.7,
-                "topK"            => 40,
-                "topP"            => 0.95,
-                "maxOutputTokens" => 800,
-                "stopSequences"   => [],
-            ],
+            'service_decision'     => null,
         ];
     }
 
-    /** ---- Model JSON parser (answer, diagnosis, tag) ---- */
-   private function parseModelJson(string $raw): array
-{
-    // 0) Never halt here:
-    // dd($parsed); // ❌ REMOVE THIS
-
-    // 1) Clean obvious wrappers / BOM / code fences
-    $clean = trim($raw);
-    // Remove UTF-8 BOM if present
-    $clean = preg_replace('/^\xEF\xBB\xBF/', '', $clean);
-    // Strip ```json ... ``` fences (any language fence)
-    $clean = preg_replace('/^```(?:json)?\s*|\s*```$/m', '', $clean);
-
-    // Normalize curly quotes → straight quotes (helps JSON)
-    $clean = str_replace(["\u{201C}", "\u{201D}"], '"', $clean); // “ ”
-    $clean = str_replace(["\u{2018}", "\u{2019}"], "'", $clean); // ‘ ’
-
-    // 2) Try strict decode as-is
-    $parsed = json_decode($clean, true);
-    if (is_array($parsed)) {
-        return $this->finalizeParsed($parsed, $raw);
-    }
-
-    // 3) Try extracting FIRST balanced {...} block and decode that
-    if ($json = $this->extractFirstJsonObject($clean)) {
-        $parsed = json_decode($json, true);
-        if (is_array($parsed)) {
-            return $this->finalizeParsed($parsed, $raw);
-        }
-
-        // Light fixes for common LLM mistakes (single-quoted keys/values, trailing commas)
-        $fixed = $this->attemptJsonFixes($json);
-        $parsed = json_decode($fixed, true);
-        if (is_array($parsed)) {
-            return $this->finalizeParsed($parsed, $raw);
-        }
-    }
-
-    // 4) Regex fallback: pull fields even if it's not valid JSON
-    $answer = null; $diagnosis = null; $tag = 'INFO';
-
-    // answer: "..."  OR '...'  OR answer: ...
-    if (preg_match('/["\']?answer["\']?\s*:\s*("|\')(.*?)\1/s', $clean, $m)) {
-        $answer = $m[2];
-    }
-    if (!$answer && preg_match('/\banswer\s*:\s*(.+?)(?:,["\']?(diagnosis|tag)["\']?\s*:|}$)/si', $clean, $m)) {
-        $answer = trim($m[1]);
-    }
-
-    if (preg_match('/["\']?diagnosis["\']?\s*:\s*("|\')(.*?)\1/s', $clean, $m)) {
-        $diagnosis = $m[2];
-    } elseif (preg_match('/\bdiagnosis\s*:\s*(.+?)(?:,["\']?tag["\']?\s*:|}$)/si', $clean, $m)) {
-        $diagnosis = trim($m[1]);
-    }
-
-    if (preg_match('/["\']?tag["\']?\s*:\s*("|\')(EMERGENCY|URGENT|ROUTINE|INFO)\1/i', $clean, $m)) {
-        $tag = strtoupper($m[2]);
-    } else {
-        $tag = $this->parseSystemTagFromModel($raw); // last-line fallback
-    }
-
-    // If still no answer, use the raw body (not ideal, but better than empty)
-    if (!$answer) $answer = $clean;
-
-    // Branding + plain text + disclaimer
-    $answer    = $this->ensureDisclaimer($this->stripMarkdownToPlain($this->enforceSnoutBrand($answer)));
-    $diagnosis = $diagnosis ? $this->stripMarkdownToPlain($this->enforceSnoutBrand($diagnosis)) : null;
-
-    if (!in_array($tag, ['EMERGENCY','URGENT','ROUTINE','INFO'], true)) $tag = 'INFO';
-
-    return [$answer, $diagnosis, $tag];
-}
-/**
- * After decode, normalize fields and apply branding/disclaimer.
- */
-private function finalizeParsed(array $parsed, string $raw): array
-{
-    $answer    = (string)($parsed['answer'] ?? '');
-    $diagnosis = isset($parsed['diagnosis']) ? (string)$parsed['diagnosis'] : null;
-    $tag       = strtoupper((string)($parsed['tag'] ?? 'INFO'));
-
-    if (!in_array($tag, ['EMERGENCY','URGENT','ROUTINE','INFO'], true)) {
-        $tag = $this->parseSystemTagFromModel($raw);
-        if (!in_array($tag, ['EMERGENCY','URGENT','ROUTINE','INFO'], true)) $tag = 'INFO';
-    }
-
-    $answer    = $this->ensureDisclaimer($this->stripMarkdownToPlain($this->enforceSnoutBrand($answer)));
-    $diagnosis = $diagnosis ? $this->stripMarkdownToPlain($this->enforceSnoutBrand($diagnosis)) : null;
-
-    return [$answer, $diagnosis, $tag];
-}
-
-/**
- * Extract the first balanced JSON object from a string.
- * Handles braces inside quoted strings.
- */
-private function extractFirstJsonObject(string $s): ?string
-{
-    $len = strlen($s);
-    $start = strpos($s, '{');
-    if ($start === false) return null;
-
-    $depth = 0; $inStr = false; $esc = false;
-    for ($i = $start; $i < $len; $i++) {
-        $ch = $s[$i];
-
-        if ($inStr) {
-            if ($esc) {
-                $esc = false;
-            } elseif ($ch === '\\') {
-                $esc = true;
-            } elseif ($ch === '"') {
-                $inStr = false;
-            }
-        } else {
-            if ($ch === '"') {
-                $inStr = true;
-            } elseif ($ch === '{') {
-                $depth++;
-            } elseif ($ch === '}') {
-                $depth--;
-                if ($depth === 0) {
-                    return substr($s, $start, $i - $start + 1);
-                }
-            }
-        }
-    }
-    return null; // not balanced
-}
-
-/**
- * Try fixing common LLM JSON issues: trailing commas, single-quoted keys/values (best-effort).
- */
-private function attemptJsonFixes(string $json): string
-{
-    $s = $json;
-
-    // Remove trailing commas before } or ]
-    $s = preg_replace('/,\s*([}\]])/', '$1', $s);
-
-    // Convert single-quoted KEYS to double-quoted: {'answer': ...} -> {"answer": ...}
-    $s = preg_replace('/([{,\s])\'([A-Za-z0-9_\-]+)\'\s*:/', '$1"$2":', $s);
-
-    // Convert single-quoted simple string VALUES to double quotes (no inner quotes)
-    $s = preg_replace('/:\s*\'([^\'"\\\r\n]*)\'\s*([,}])/', ':"$1"$2', $s);
-
-    // Ensure true/false/null are lowercase (usually fine)
-    // $s = preg_replace('/\b(True|False|Null)\b/', strtolower('$1'), $s);
-
-    return $s;
-}
-
-    /** ---- Branding & formatting helpers ---- */
-    private function stripMarkdownToPlain(string $txt): string
+    private function isGreeting(string $m): bool
     {
-        $txt = preg_replace('/\*\*(.*?)\*\*/s', '$1', $txt);
-        $txt = preg_replace('/\*(.*?)\*/s', '$1', $txt);
-        $txt = preg_replace('/^#{1,6}\s*/m', '', $txt);
-        $txt = preg_replace('/^\s*[\*\-•]\s+/m', "• ", $txt);
-        $txt = preg_replace('/`{1,3}(.*?)`{1,3}/s', '$1', $txt);
-        $txt = preg_replace('/\[(.*?)\]\((.*?)\)/', '$1', $txt);
-        return trim($txt ?? '');
+        $m = trim(mb_strtolower($m));
+        return (bool) preg_match('/^(hi|hello|hey|hii|hlo|hola|namaste|namaskar|salaam|yo|hi there|hey there)[!. ]*$/i', $m);
     }
 
-    private function enforceSnoutBrand(string $txt): string
+    private function softResetEvidence(array &$state): void
     {
-        // prevent external brand mention
-        $txt = str_ireplace(['gemini','google ai','bard'], 'SnoutAI Assistant', $txt);
-        return $txt;
+        $state['evidence_score']   = 0;
+        $state['evidence_details'] = [
+            'symptoms' => [], 'severity' => [], 'environmental' => [], 'timeline' => [],
+        ];
+        $state['service_decision'] = null;
+        // Keep conversation history
     }
 
-    private function ensureDisclaimer(string $txt): string
+    private function updateScoreAndEvidence(array &$state, string $message): void
     {
-        $line = '⚠️ AI advice. Consult veterinarian for health concerns.';
-        return (stripos($txt, $line) === false) ? rtrim($txt) . "\n\n{$line}" : $txt;
-    }
+        $text = mb_strtolower($message);
 
-    private function autoTitleFromQuestion(string $q): string
-    {
-        $clean = trim(preg_replace('/\s+/', ' ', strip_tags($q)));
-        $words = explode(' ', $clean);
-        $take  = array_slice($words, 0, 8);
-        $title = implode(' ', $take);
-        if (count($words) > 8) $title .= '…';
-        return $title ?: 'New chat';
-    }
+        // Keyword buckets
+        $buckets = [
+            ['critical', 4, [
+                "can't","won't","screaming","severe","extreme","emergency","urgent",
+                "unable to","completely","totally","not responding","unresponsive",
+                "continuously","non-stop","won't stop","all night","for hours",
+                "getting worse","much worse","rapidly","suddenly",
+            ]],
+            ['high', 3, [
+                "thick","swollen","hot","red","discharge","blood","pus",
+                "drinking more","accidents in the house","unusually thirsty","urinating more","bathroom accidents",
+                "open wound","deep cut","gash","laceration","very swollen",
+                "not bearing weight","non weight bearing","no weight on leg",
+                "refuses to stand","unable to stand","dragging leg",
+            ]],
+            ['high', 2, [
+                "painful","hurts","yelps","cries","pulls away","won't let me",
+                "won't","can't","unable","difficulty","struggling",
+                "still","keeps","won't stop","always","constant",
+                "whimpering","whining","tender","flinches on touch","won't use leg","won't put weight","reluctant to put weight",
+            ]],
+            ['mild, 1', 1, [
+                "different","off","not normal","changed","unusual",
+                "little","slightly","somewhat","a bit","minor",
+                "started","began","since","yesterday","today","few days",
+                "sometimes","occasionally","comes and goes",
+                "limp","limping","favoring the leg","favoring one leg","stiff","sore","reluctant to walk","hobble","hobbling",
+            ]],
+        ];
 
-    private function parseSystemTagFromModel(string $aiText): string
-    {
-        $lines = preg_split("/\r\n|\n|\r/", trim($aiText));
-        $last  = strtoupper(trim(end($lines) ?: ''));
-        $valid = ['EMERGENCY','URGENT','ROUTINE','INFO'];
-        if (in_array($last, $valid, true)) return $last;
-        foreach ($valid as $v) {
-            if (stripos($aiText, $v) !== false) return $v;
-        }
-        return 'INFO';
-    }
-
-    /** ---- Climate / AQI ---- */
-    private function getCurrentSeason(): array
-    {
-        $m = (int) now()->month;
-        if (in_array($m, [3,4,5,6], true))  return ['summer',       ['temp' => '35-45°C','humidity'=>'high','risks'=>'heat stroke, dehydration']];
-        if (in_array($m, [7,8,9], true))    return ['monsoon',      ['temp' => '25-35°C','humidity'=>'very high','risks'=>'skin infections, fungal issues']];
-        if ($m === 10)                      return ['post_monsoon', ['temp' => '20-30°C','humidity'=>'moderate','risks'=>'allergies, vector diseases']];
-        return ['winter', ['temp'=>'5-25°C','humidity'=>'low','risks'=>'dry skin, respiratory issues']];
-    }
-
-    private function getWeatherData(?string $location): array
-    {
-        $locKey = strtolower(trim($location ?? 'delhi'));
-        $coords = $this->cityCoords[$locKey] ?? $this->cityCoords['delhi'];
-        $cacheKey = "wx_{$locKey}_" . now()->format('YmdH');
-
-        return Cache::remember($cacheKey, 3600, function () use ($coords) {
-            try {
-                $resp = Http::timeout(8)->get('https://api.open-meteo.com/v1/forecast', [
-                    'latitude'  => $coords['lat'],
-                    'longitude' => $coords['lon'],
-                    'hourly'    => 'temperature_2m,relative_humidity_2m,apparent_temperature',
-                    'forecast_days' => 1,
-                ]);
-                if ($resp->successful()) {
-                    $d = $resp->json();
-                    $h = $d['hourly'] ?? [];
-                    $t     = $h['temperature_2m'][0]          ?? null;
-                    $rh    = $h['relative_humidity_2m'][0]    ?? null;
-                    $feels = $h['apparent_temperature'][0]    ?? null;
-                    $desc  = $this->wxDescription((float)$t, (float)$rh);
-                    return [
-                        'temp'       => is_null($t) ? null : round((float)$t, 1),
-                        'humidity'   => is_null($rh) ? null : (int) round((float)$rh),
-                        'feels_like' => is_null($feels) ? null : round((float)$feels, 1),
-                        'description'=> $desc,
-                        'pressure'   => 1013,
-                    ];
-                }
-            } catch (\Throwable $e) {}
-            [$season] = $this->getCurrentSeason();
-            return ['temp'=>30,'humidity'=>65,'feels_like'=>32,'description'=>"typical {$season} weather",'pressure'=>1013];
-        });
-    }
-
-    private function wxDescription(float $t, float $rh): string
-    {
-        if ($t > 35)  return $rh > 80 ? 'hot and humid' : ($rh > 60 ? 'hot and muggy' : 'hot and dry');
-        if ($t > 25)  return $rh > 80 ? 'warm and humid' : ($rh > 60 ? 'warm and pleasant' : 'warm and dry');
-        return $rh > 80 ? 'cool and humid' : 'cool and pleasant';
-    }
-
-    private function getAirQualityData(?string $location): array
-    {
-        $locKey = trim($location ?? 'Delhi');
-        $cacheKey = "aqi_{$locKey}_" . now()->format('YmdH');
-
-        return Cache::remember($cacheKey, 3600, function () use ($locKey) {
-            try {
-                $resp = Http::timeout(6)->get('https://api.openaq.org/v2/latest', [
-                    'city'      => $locKey,
-                    'country'   => 'IN',
-                    'parameter' => 'pm25',
-                    'limit'     => 1,
-                ]);
-                if ($resp->successful()) {
-                    $d = $resp->json();
-                    if (!empty($d['results'][0]['measurements'][0]['value'])) {
-                        $pm25 = (float) $d['results'][0]['measurements'][0]['value'];
-                        $aqi  = (int) round($pm25 * 2); // rough surrogate
-                        return [
-                            'aqi'            => $aqi,
-                            'main_pollutant' => 'pm25',
-                            'level'          => $this->aqiLevel($aqi),
-                        ];
+        $seenTokens = [];
+        foreach ($buckets as [$label, $weight, $keywords]) {
+            foreach ($keywords as $kw) {
+                if (str_contains($text, $kw) && !in_array($kw, $seenTokens, true)) {
+                    $seenTokens[] = $kw;
+                    $tag = "{$label}_{$kw}: +{$weight}";
+                    if (!in_array($tag, $state['evidence_details']['symptoms'], true)) {
+                        $state['evidence_details']['symptoms'][] = $tag;
                     }
                 }
-            } catch (\Throwable $e) {}
-            return ['aqi'=>85,'main_pollutant'=>'pm25','level'=>'moderate'];
-        });
-    }
-
-    private function aqiLevel(int $aqi): string
-    {
-        if ($aqi <= 50)  return 'good';
-        if ($aqi <= 100) return 'moderate';
-        if ($aqi <= 150) return 'unhealthy_for_sensitive';
-        if ($aqi <= 200) return 'unhealthy';
-        return 'hazardous';
-    }
-
-    private function generateClimateAlerts(array $pet, array $wx, array $aqi): array
-    {
-        $alerts = [];
-        $breed  = (string) ($pet['breed'] ?? '');
-        $loc    = (string) ($pet['location'] ?? '');
-        $name   = $pet['name'] ?? 'your pet';
-
-        $temp = $wx['temp'] ?? null;
-        $hum  = $wx['humidity'] ?? null;
-
-        if (!is_null($temp)) {
-            if ($temp > 35 && in_array($breed, $this->breedAdvisories['heat_sensitive'], true)) {
-                $alerts[] = "🌡️ HIGH HEAT WARNING: {$temp}°C in {$loc} - {$breed}s are at risk!";
-            } elseif ($temp > 30 && in_array($breed, $this->breedAdvisories['high_maintenance_heat'], true)) {
-                $alerts[] = "⚠️ HEAT ALERT: {$temp}°C - Extra cooling needed for {$breed}";
             }
         }
-        if (!is_null($hum) && $hum > 80 && in_array($breed, $this->breedAdvisories['monsoon_prone'], true)) {
-            $alerts[] = "💧 HIGH HUMIDITY: {$hum}% - Increase grooming for {$breed}";
-        }
-        $lvl = $aqi['level'] ?? 'moderate';
-        if ($lvl === 'unhealthy' || $lvl === 'hazardous') {
-            $alerts[] = "🏭 POOR AIR QUALITY: Keep {$name} indoors today";
-        }
-        if (in_array($breed, $this->breedAdvisories['hardy_breeds'], true)) {
-            $alerts[] = "✅ HARDY BREED: {$breed} handles {$loc}'s climate well";
-        }
-        $desc = $wx['description'] ?? 'current conditions';
-        $alerts[] = "📊 CURRENT: " . ucfirst($desc) . " in {$loc}";
-        return $alerts;
-    }
-    /** List rooms for a user (from chat_rooms) */
-    public function listRooms(Request $request)
-    {
-        $data = $request->validate([
-            'user_id' => 'required|integer',
-        ]);
 
-        $rooms = ChatRoom::where('user_id', $data['user_id'])
-            ->orderBy('updated_at', 'desc')
-            ->get(['id', 'chat_room_token', 'name', 'created_at', 'updated_at']);
-
-        return response()->json([
-            'status' => 'success',
-            'rooms'  => $rooms,
-        ]);
-    }
-
-    /** History of one room */
-    public function history(Request $request)
-    {
-        $data = $request->validate([
-            'user_id'         => 'required|integer',
-            'chat_room_token' => 'required_without:chat_room_id|string',
-            'chat_room_id'    => 'required_without:chat_room_token|integer',
-            'sort'            => 'nullable|in:asc,desc',
-        ]);
-
-        $sort = $data['sort'] ?? 'asc';
-
-        if (!empty($data['chat_room_id'])) {
-            $room = ChatRoom::where('id', $data['chat_room_id'])
-                ->where('user_id', $data['user_id'])
-                ->firstOrFail();
-        } else {
-            $room = ChatRoom::where('chat_room_token', $data['chat_room_token'])
-                ->where('user_id', $data['user_id'])
-                ->firstOrFail();
-        }
-
-        $rows = Chat::where('chat_room_id', $room->id)
-            ->orderBy('created_at', $sort)
-            ->get();
-
-        return response()->json([
-            'status' => 'success',
-            'room'   => [
-                'id'              => $room->id,
-                'chat_room_token' => $room->chat_room_token,
-                'name'            => $room->name,
-            ],
-            'count'  => $rows->count(),
-            'chats'  => $rows,
-        ]);
-    }
-
-
-    public function getRoomChats(Request $request, string $chat_room_token)
-{
-    // ✅ Validate query inputs
-    $data = $request->validate([
-        'user_id' => 'required|integer',
-        'sort'    => 'nullable|in:asc,desc',   // optional
-    ]);
-
-    $sort = $data['sort'] ?? 'asc';
-
-    // ✅ Find room owned by this user
-    $room = ChatRoom::where('chat_room_token', $chat_room_token)
-        ->where('user_id', $data['user_id'])
-        ->firstOrFail();
-
-    // ✅ Fetch all chats for this room (oldest → newest by default)
-    $chats = Chat::where('chat_room_id', $room->id)
-        ->orderBy('created_at', $sort)
-        ->get([
-            'id','user_id','chat_room_id','context_token','question','answer',
-            'pet_name','pet_breed','pet_age','pet_location','created_at'
-        ]);
-
-    return response()->json([
-        'status' => 'success',
-        'room'   => [
-            'id'              => $room->id,
-            'chat_room_token' => $room->chat_room_token,
-            'name'            => $room->name,
-            'updated_at'      => $room->updated_at,
-        ],
-        'count'  => $chats->count(),
-        'chats'  => $chats,
-    ]);
-}
-
-public function deleteRoom(Request $request, string $chat_room_token)
-{
-    // ✅ Validate
-    $data = $request->validate([
-        'user_id' => 'required|integer',
-    ]);
-
-    // ✅ Room must belong to this user
-    $room = ChatRoom::where('chat_room_token', $chat_room_token)
-        ->where('user_id', $data['user_id'])
-        ->first();
-
-    if (!$room) {
-        return response()->json([
-            'status'  => 'error',
-            'message' => 'Room not found for this user',
-        ], 404);
-    }
-
-    // ✅ Delete with transaction (delete chats first, then room)
-    \DB::transaction(function () use ($room, &$deletedChats) {
-        $deletedChats = Chat::where('chat_room_id', $room->id)->delete();
-        $room->delete();
-    });
-
-    return response()->json([
-        'status' => 'success',
-        'message' => 'Chat room deleted successfully',
-        'deleted' => [
-            'chat_room_id' => $room->id,
-            'chat_room_token' => $room->chat_room_token,
-            'chats_deleted' => $deletedChats ?? 0,
-        ],
-    ]);
-}
-
-
-// public function getUserChats($user_id)
-//     {
-//         // check user exists
-//         $user = DB::table('users')->where('id', $user_id)->first();
-//         if (!$user) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'User not found'
-//             ], 404);
-//         }
-
-//         // fetch chats with chat_rooms
-//         $data = DB::table('chats as c')
-//             ->leftJoin('chat_rooms as cr', 'c.chat_room_id', '=', 'cr.id')
-//             ->where('c.user_id', $user_id)
-//             ->select(
-//                 'c.id as chat_id',
-//                 'c.question',
-//                 'c.answer',
-//                 'c.response_tag',
-//                 'c.pet_name',
-//                 'c.pet_breed',
-//                 'c.pet_age',
-//                 'c.pet_location',
-//                 'c.diagnosis',
-//                 'c.emergency_status',
-//                 'c.created_at as chat_created_at',
-//                 'cr.id as room_id',
-//                 'cr.chat_room_token',
-//                 'cr.name as room_name',
-//                 'cr.last_emergency_status',
-//                 'cr.created_at as room_created_at'
-//             )
-//             ->orderBy('cr.id')
-//             ->orderBy('c.created_at')
-//             ->get();
-            
-
-//         return response()->json([
-//             'success' => true,
-//             'user' => $user,
-//             'chats' => $data
-//         ]);
-//     }
-
-
-
-
-public function getUserChats($user_id)
-{
-    $user = DB::table('users')->where('id', $user_id)->first();
-    if (!$user) {
-        return response()->json([
-            'success' => false,
-            'message' => 'User not found'
-        ], 404);
-    }
-
-    $chats = DB::table('chats as c')
-        ->leftJoin('chat_rooms as cr', 'c.chat_room_id', '=', 'cr.id')
-        ->where('c.user_id', $user_id)
-        ->select(
-            'c.id as chat_id',
-            'c.question',
-            'c.answer',
-            'c.chat_room_id',
-            'cr.name as room_name'
-        )
-        ->orderBy('c.chat_room_id')
-        ->orderBy('c.created_at')
-        ->get();
-
-    if ($chats->isEmpty()) {
-        return response()->json([
-            'success' => true,
-            'user' => $user,
-            'rooms' => []
-        ]);
-    }
-
-    // group by room
-    $grouped = $chats->groupBy('chat_room_id');
-    $roomsData = [];
-
-    foreach ($grouped as $roomId => $roomChats) {
-        $conversation = $roomChats->map(fn($c) => "Q: {$c->question}\nA: {$c->answer}")->implode("\n\n");
-
-        // send to Gemini for summary
-        $apiKey = 'AIzaSyCIB0yfzSQGGwpVUruqy_sd2WqujTLa1Rk';
-        $payload = [
-            "contents" => [[
-                "parts" => [[
-                    "text" => "Summarize this pet consultation chat for doctor:\n\n{$conversation}"
-                ]]
-            ]]
+        // Regex buckets
+        $regexBuckets = [
+            ['high', 3, [
+                '/\bbleed\w*\b/', '/\bbloody?\b/', '/\bblood\s+from\b/', '/\bblood\s+in\s+(stool|urine|vomit)\b/',
+            ]],
+            ['high', 2, [
+                '/\bvomit\w*\b|throw(?:ing)?\s+up/', '/\bdiarrh?ea\b/',
+                '/\b(not\s+eating|refus(?:e|ing)\s+food|no\s+appetite|loss\s+of\s+appetite)\b/',
+            ]],
         ];
-
-        $resp = Http::withHeaders([
-            'Content-Type'   => 'application/json',
-            'X-goog-api-key' => $apiKey,
-        ])->timeout(30)->post(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-            $payload
-        );
-
-        $summary = null;
-        if ($resp->ok()) {
-            $json = $resp->json();
-            $summary = $json['candidates'][0]['content']['parts'][0]['text'] ?? null;
+        foreach ($regexBuckets as [$label, $weight, $patterns]) {
+            foreach ($patterns as $rx) {
+                if (preg_match($rx, $text, $m)) {
+                    $hit = $m[0];
+                    $tag = "{$label}_rx: +{$weight} ({$hit})";
+                    $already = false;
+                    foreach ($state['evidence_details']['symptoms'] as $existing) {
+                        if (str_contains($existing, "({$hit})") && str_contains($existing, "+{$weight}")) {
+                            $already = true; break;
+                        }
+                    }
+                    if (!$already) $state['evidence_details']['symptoms'][] = $tag;
+                }
+            }
         }
 
-        // save summary in DB
-        if ($summary) {
-            DB::table('chat_rooms')->where('id', $roomId)->update(['summary' => $summary]);
+        // Sum
+        $sum = 0;
+        foreach ($state['evidence_details']['symptoms'] as $detail) {
+            if (preg_match('/\+\s*(\d+)/', $detail, $m)) $sum += (int) $m[1];
+        }
+        $state['evidence_score'] = max(0, $sum);
+    }
+
+    private function makeDecision(int $score): string
+    {
+        if ($score >= 8) return 'EMERGENCY';
+        if ($score >= 4) return 'IN_CLINIC';
+        if ($score >= 2) return 'VIDEO_CONSULT';
+        return 'GATHER_INFO';
+    }
+
+    private function backstopOverride(string $decision, int $userTurns): array
+    {
+        if ($userTurns > 5 && $decision === 'GATHER_INFO') return ['VIDEO_CONSULT', true];
+        return [$decision, false];
+    }
+
+    private function buildPrompt(string $decision, string $userMessage, array $pet, array $history): string
+    {
+        $petLine = "PET: ".($pet['name'] ?? 'Pet').
+                   " (".($pet['breed'] ?? 'Mixed breed').", ".($pet['age'] ?? 'age unknown').")\n".
+                   "LOCATION: ".($pet['location'] ?? 'India');
+
+        if (in_array($decision, ['EMERGENCY','IN_CLINIC','VIDEO_CONSULT'], true)) {
+            return "You are PetPal AI, a veterinary triage assistant. Based on the evidence, provide a direct service recommendation.\n\n".
+                   $petLine."\n\n".
+                   'USER MESSAGE: "'.$userMessage."\"\n\n".
+                   $this->servicePrompt($decision).
+                   "\nRespond directly as PetPal AI - do not mention evidence scores or internal analysis.";
         }
 
-        $roomsData[] = [
-            'room_id'   => $roomId,
-            'room_name' => $roomChats->first()->room_name,
-            'summary'   => $summary,
-            'chats'     => $roomChats->map(fn($c) => [
-                'chat_id'  => $c->chat_id,
-                'question' => $c->question,
-                'answer'   => $c->answer,
-            ])
-        ];
+        $intro = empty($history)
+            ? "Hello! I'm PetPal AI, and I'm here to help you and your pet. I understand how worrying it can be when our furry family members aren't feeling well."
+            : "Thank you for that information.";
+
+        return "You are PetPal AI, a caring veterinary triage assistant.\n\n".
+               $petLine."\n\n".
+               'USER MESSAGE: "'.$userMessage."\"\n\n".
+               "Start with: \"$intro\"\n\n".
+               "Then ask 2-3 caring questions about:\n".
+               "1. How severe the symptoms seem (mild vs concerning)\n".
+               "2. Any other changes they've noticed\n".
+               "3. How it's affecting their pet's daily routine\n\n".
+               "Be warm, professional, and genuinely helpful.";
     }
 
-    return response()->json([
-        'success' => true,
-        'user'    => $user,
-        'rooms'   => $roomsData
-    ]);
-}
-
-
-public function setFeedback(Request $request, $chat_id)
-{
-    $data = $request->validate([
-        'feedback' => 'required|in:0,1',
-    ]);
-
-    $chat = DB::table('chats')->where('id', $chat_id)->first();
-
-    if (!$chat) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Chat not found'
-        ], 404);
+    private function servicePrompt(string $decision): string
+    {
+        if ($decision === 'EMERGENCY') {
+            return "🚨 EMERGENCY RECOMMENDATION:\n\n".
+                   "**This is an EMERGENCY situation requiring immediate veterinary care.**\n\n".
+                   "**IMMEDIATE ACTIONS:**\n• Find the nearest 24-hour emergency vet clinic\n• Call ahead to inform them you're coming\n• Leave for the emergency vet NOW\n\n".
+                   "**WHILE TRAVELING:**\n• Keep your pet calm and comfortable\n• Monitor breathing and symptoms\n• Do not give food, water, or medications\n• Note any changes in condition\n\n**NO DELAYS - ACT IMMEDIATELY**";
+        }
+        if ($decision === 'IN_CLINIC') {
+            return "🏥 IN-CLINIC APPOINTMENT RECOMMENDATION:\n\n".
+                   "**Schedule an in-clinic appointment within 24-48 hours.**\n\n".
+                   "**WHY IN-CLINIC IS NEEDED:**\n• Physical examination required for proper diagnosis\n• Potential diagnostic tests (blood work, imaging, cultures)\n• Hands-on assessment of symptoms needed\n\n".
+                   "**WHAT TO EXPECT:**\n• Comprehensive physical examination\n• Diagnostic tests if indicated\n• Treatment plan based on findings\n• Follow-up care instructions\n\n".
+                   "**NEXT STEPS:**\n• Call your veterinarian to schedule appointment\n• Mention symptoms when booking for priority scheduling\n• Prepare list of questions for the vet visit";
+        }
+        return "💻 VIDEO CONSULTATION RECOMMENDATION:\n\n".
+               "**A video consultation should be sufficient for this concern.**\n\n".
+               "**WHY VIDEO IS APPROPRIATE:**\n• Symptoms can be assessed visually and behaviorally\n• No urgent physical examination required\n• Safe to monitor remotely with professional guidance\n\n".
+               "**HOW TO PREPARE:**\n• Ensure good lighting in the consultation area\n• Have your pet comfortable and accessible\n• Prepare to show specific areas of concern to the camera\n• List any questions about care and treatment\n\n".
+               "**NEXT STEPS:**\n• Schedule a video consultation through our platform\n• Follow any preparation instructions provided\n• Be ready to implement recommended care plans";
     }
 
-    DB::table('chats')->where('id', $chat_id)->update([
-        'feedback' => $data['feedback'],
-        'updated_at' => now()
-    ]);
+    private function statusLine(string $decision, int $score, bool $backstopApplied = false): string
+    {
+        if (in_array($decision, ['EMERGENCY','IN_CLINIC','VIDEO_CONSULT'], true)) {
+            $tag = $backstopApplied ? " • ⛳ backstop" : "";
+            return "✅ {$decision} recommended{$tag} | Evidence: {$score}/10 | 📋 Summary ready for vet";
+        }
+        return "🔍 Evidence gathering | Score: {$score}/10";
+    }
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Feedback updated',
-        'chat_id' => $chat_id,
-        'feedback' => (int)$data['feedback']
-    ]);
-}
+    private function getIntelligenceStatus(array $state): string
+    {
+        $score     = (int) ($state['evidence_score'] ?? 0);
+        $decision  = $this->makeDecision($score);
+        $userTurns = count($state['conversation_history']);
+        [$decision, $backstop] = $this->backstopOverride($decision, $userTurns);
 
+        $sym   = $state['evidence_details']['symptoms'] ?? ['No evidence collected yet'];
+        $depth = count($state['conversation_history'] ?? []);
+        $lines = implode("\n", $sym);
 
+        return "UNIFIED INTELLIGENCE SYSTEM STATUS:\n\n".
+               "🎯 EVIDENCE SCORE: {$score}/10\n".
+               "🚀 SERVICE DECISION: {$decision}".($backstop ? " (backstop)" : "")."\n".
+               "📊 DECISION THRESHOLD: ".($score >= 2 ? "✅ REACHED" : "Need ".max(0, 2-$score)." more points")."\n\n".
+               "🔍 EVIDENCE BREAKDOWN:\n{$lines}\n\n".
+               "💬 CONVERSATION DEPTH: {$depth} exchanges\n\n".
+               "🚪 DECISION GATES:\n".
+               "• 🚨 Emergency: 8+ points → Immediate care\n".
+               "• 🏥 In-Clinic: 4+ points → Physical examination needed\n".
+               "• 💻 Video Consult: 2-3 points → Remote assessment sufficient\n".
+               "• 🔍 Gather Info: 0-1 points → Need more evidence\n\n".
+               "🔄 CURRENT STATUS: ".($score >= 2 || $backstop ? "🚨 PROVIDING SERVICE RECOMMENDATION" : "🔍 GATHERING EVIDENCE");
+    }
+
+    private function generateVetSummary(array $state): string
+    {
+        $profile = $state['pet_profile'] ?? [];
+        $petName = $profile['name']  ?? 'Pet';
+        $petBreed= $profile['breed'] ?? 'Unknown breed';
+        $petAge  = $profile['age']   ?? 'Unknown age';
+        $score   = (int) ($state['evidence_score'] ?? 0);
+
+        $decisionBase = $this->makeDecision($score);
+        $userTurns    = count($state['conversation_history']);
+        [$finalDecision, $backstop] = $this->backstopOverride($decisionBase, $userTurns);
+
+        $severity= $score >= 8 ? 'Emergency' : ($score >= 4 ? 'High Priority' : ($score >= 2 ? 'Standard' : 'Assessment Needed'));
+        $symList = $state['evidence_details']['symptoms'] ?? [];
+        $symptoms= array_map(function($s){ return ucwords(str_replace('_',' ', explode(':',$s)[0])); }, $symList);
+        $symText = $symptoms ? implode(', ', $symptoms) : 'Various symptoms reported';
+        $history = $state['conversation_history'] ?? [];
+        $timeline= count($history) > 1 ? 'Multiple interactions' : 'Initial report';
+
+        $recent = array_slice($history, -3);
+        $ownerLines = array_map(function($h){
+            $u = $h['user'] ?? '';
+            return '• '.(mb_strlen($u) > 80 ? mb_substr($u,0,80).'...' : $u);
+        }, $recent);
+
+        return "🐕 PATIENT: {$petName} | {$petBreed} | {$petAge}\n".
+               "⚠️  TRIAGE: {$severity} (Score: {$score}/10)\n".
+               "🎯 SYMPTOMS: {$symText}\n".
+               "⏰ TIMELINE: {$timeline}\n".
+               "📍 RECOMMENDATION: {$finalDecision}".($backstop ? " (backstop)" : "")."\n\n".
+               "💬 OWNER REPORTS:\n".implode("\n", $ownerLines);
+    }
+
+    private function renderBubbles(string $user, string $ai, string $decision): string
+    {
+        $ts = now()->format('H:i:s');
+        $isReco = in_array($decision, ['EMERGENCY','IN_CLINIC','VIDEO_CONSULT'], true);
+        $avatar = $decision === 'EMERGENCY' ? '🚨' : ($isReco ? '📋' : '🔍');
+
+        $userEsc = htmlspecialchars($user, ENT_QUOTES, 'UTF-8');
+        $aiHtml  = $this->renderAiHtml($ai);
+
+        $userHtml = "<div style='display:flex;justify-content:flex-end;margin:15px 0;'>".
+            "<div style='background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 20px;border-radius:20px 20px 5px 20px;max-width:70%;box-shadow:0 4px 15px rgba(102,126,234,.3);'>".
+            "<div style='font-size:12px;opacity:.8;margin-bottom:5px;'>You • {$ts}</div>".
+            "<div>{$userEsc}</div>".
+            "</div></div>";
+
+        $aiHtmlBlock = "<div style='display:flex;justify-content:flex-start;margin:15px 0;'>".
+            "<div style='background:white;border:2px solid #f0f0f0;padding:15px 20px;border-radius:20px 20px 20px 5px;max-width:75%;box-shadow:0 4px 15px rgba(0,0,0,.1);'>".
+            "<div style='font-size:12px;color:#666;margin-bottom:8px;'>{$avatar} PetPal AI • {$ts}</div>".
+            "<div style='line-height:1.6;color:#333;'>{$aiHtml}</div>".
+            "</div></div>";
+
+        return $userHtml.$aiHtmlBlock;
+    }
+
+    private function renderAiHtml(string $text): string
+    {
+        $lines = preg_split("/\r\n|\n|\r/", $text);
+        $out   = [];
+        $inList = false;
+
+        $e = fn($s) => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        $inlineBold = function ($s) use ($e) {
+            return preg_replace_callback('/\*\*(.+?)\*\*/s', function ($m) use ($e) {
+                return '<strong>'.$e($m[1]).'</strong>';
+            }, $e($s));
+        };
+
+        foreach ($lines as $raw) {
+            $l = trim($raw);
+
+            if (preg_match('/^•\s+(.+)$/u', $l, $m)) {
+                if (!$inList) { $out[] = '<ul style="margin:6px 0 6px 18px;">'; $inList = true; }
+                $out[] = '<li>'.$inlineBold($m[1]).'</li>';
+                continue;
+            } elseif ($inList) { $out[] = '</ul>'; $inList = false; }
+
+            if (preg_match('/^\*\*\*(.+?)\*\*\*$/s', $l, $m)) { $out[] = '<h1 style="font-size:1.15rem;margin:.25rem 0">'.$e($m[1]).'</h1>'; continue; }
+            if (preg_match('/^\*\*(.+?))\*\*$/s', $l)) { /* malformed, ignore */ }
+            if (preg_match('/^\*\*(.+?)\*\*$/s',  $l, $m)) { $out[] = '<h2 style="font-size:1.05rem;font-weight:700;margin:.25rem 0">'.$e($m[1]).'</h2>'; continue; }
+            if (preg_match('/^\*(.+?)\*$/s',      $l, $m)) { $out[] = '<h3 style="font-size:.98rem;font-weight:700;margin:.25rem 0">'.$e($m[1]).'</h3>'; continue; }
+
+            if ($l === '') $out[] = '<br>'; else $out[] = '<p style="margin:.25rem 0">'.$inlineBold($l).'</p>';
+        }
+        if ($inList) $out[] = '</ul>';
+        return implode("", $out);
+    }
+
+    private function callGeminiApi_curl(string $prompt, ?string $imagePath): string
+    {
+        // 🔑 Read API key directly from .env
+        $apiKey = env('GEMINI_API_KEY');
+        if (!$apiKey) {
+            Log::warning('GEMINI_API_KEY missing in .env');
+            return "AI error: Gemini API key not configured";
+        }
+
+        // Allow overriding model and endpoint via .env (optional)
+        $model    = env('GEMINI_MODEL', 'gemini-2.0-flash');
+        $endpoint = env('GEMINI_ENDPOINT', "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent");
+
+        $parts = [['text' => $prompt]];
+        if ($imagePath && is_readable($imagePath)) {
+            $mime = function_exists('mime_content_type') ? mime_content_type($imagePath) : 'application/octet-stream';
+            $data = base64_encode(file_get_contents($imagePath));
+            $parts[] = ['inline_data' => ['mime_type' => $mime, 'data' => $data]];
+        }
+
+        $payload = json_encode(['contents' => [[ 'role' => 'user', 'parts' => $parts ]]], JSON_UNESCAPED_SLASHES);
+
+        $ch = curl_init($endpoint);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json','X-goog-api-key: '.$apiKey],
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_TIMEOUT        => (int) env('GEMINI_TIMEOUT', 40),
+            CURLOPT_CONNECTTIMEOUT => (int) env('GEMINI_CONNECT_TIMEOUT', 15),
+            CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+
+        $resp = curl_exec($ch);
+        if ($resp === false) {
+            $err  = curl_error($ch);
+            $info = curl_getinfo($ch);
+            curl_close($ch);
+            Log::error('Gemini cURL error', ['err' => $err, 'info' => $info]);
+            return "AI error: ".$err;
+        }
+        $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http < 200 || $http >= 300) {
+            Log::error('Gemini HTTP non-2xx', ['status' => $http, 'body' => $resp]);
+            return "AI error: HTTP {$http}";
+        }
+
+        $json = json_decode($resp, true);
+        return $json['candidates'][0]['content']['parts'][0]['text'] ?? "No response.";
+    }
 }
