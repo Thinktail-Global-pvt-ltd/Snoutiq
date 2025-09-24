@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\VetRegisterationTemp; // assuming Vet model exists
+use Illuminate\Support\Str;
 
 class VetLandingController extends Controller
 {

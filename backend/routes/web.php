@@ -38,10 +38,7 @@ Route::get('/admin/bookings', [App\Http\Controllers\HomeController::class, 'book
 Route::get('/admin/supports', [App\Http\Controllers\HomeController::class, 'supports'])->name('admin.supports');
 
 
-Route::get('/backend/vet/{slug}', [VetLandingController::class, 'show'])->name('vet.landing');
-// Route::get('/vet/dr-john-doe', function () {
-//     return view('vet.landing');
-// });
+;
 
 
 
