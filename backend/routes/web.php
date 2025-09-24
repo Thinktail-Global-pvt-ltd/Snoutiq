@@ -42,5 +42,5 @@ Route::get('/admin/supports', [App\Http\Controllers\HomeController::class, 'supp
 
 
 
-Route::get('/backend/vet/{slug}', [VetLandingController::class, 'show'])
+Route::get('/vet/{slug}', [VetLandingController::class, 'show'])
      ->name('vet.landing');
