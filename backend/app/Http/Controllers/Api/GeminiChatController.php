@@ -30,6 +30,7 @@ class GeminiChatController extends Controller
      *  - pet_location:   nullable|string
      */
 
+    
     public function sendMessage(Request $request)
 {
     $data = $request->validate([
