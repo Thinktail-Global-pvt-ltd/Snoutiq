@@ -30,7 +30,7 @@ class GeminiChatController extends Controller
      *  - pet_location:   nullable|string
      */
 
-    
+
     public function sendMessage(Request $request)
 {
     $data = $request->validate([
@@ -116,7 +116,7 @@ class GeminiChatController extends Controller
 
     // update room meta
     $room->last_emergency_status = $emergencyStatus;
-    $room->name = $data['title'] ?: $room->name;
+   $room->name = $data['title'] ?? $room->name;
     $room->touch();
     $room->save();
     /** 🔥 DB SAVE END */
