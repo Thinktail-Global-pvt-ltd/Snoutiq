@@ -401,8 +401,7 @@ class GeminiChatController extends Controller
     }
         private function servicePrompt(string $decision, array $state): string
     {
-$diagnosis = $this->buildDiagnosisFromHistory($state, $data['user_id'], $sessionId);
-
+        $diagnosis = $this->buildDiagnosisFromHistory($state);
 
         if ($decision === 'EMERGENCY') {
             return "🚨 EMERGENCY RECOMMENDATION:\n\n".
@@ -754,50 +753,24 @@ public function newRoom(Request $request)
 // }
 
     /** ✅ NEW: Build diagnosis from all chats */
-private function buildDiagnosisFromHistory(array $state, int $userId, string $chatRoomToken): string
-{
-    // 1) DB से सभी chats लाओ
-    $chats = \App\Models\Chat::where('user_id', $userId)
-        ->where('chat_room_token', $chatRoomToken)
-        ->orderBy('created_at', 'asc')
-        ->get(['question', 'response', 'response_tag', 'created_at']);
+    private function buildDiagnosisFromHistory(array $state): string
+    {
+        $history  = $state['conversation_history'] ?? [];
+        $symptoms = $state['evidence_details']['symptoms'] ?? [];
 
-    // 2) अगर कोई चैट नहीं है
-    if ($chats->isEmpty()) {
-        \Log::info("Diagnosis: No chats found", [
-            'user_id' => $userId,
-            'chat_room_token' => $chatRoomToken
-        ]);
-        return "🩺 No significant diagnosis yet. Need more details.";
+        $userReports = array_map(fn($h) => $h['user'] ?? '', $history);
+        $recent = implode(" | ", array_slice($userReports, -5));
+
+        if (empty($symptoms) && empty($recent)) {
+            return "🩺 No significant diagnosis yet. Need more details.";
+        }
+
+        $symText = $symptoms ? implode(", ", $symptoms) : "No tagged symptoms yet";
+
+        return "🩺 AI-assisted Diagnosis:\n".
+               "- Reported symptoms: {$symText}\n".
+               "- Owner reports: {$recent}";
     }
-
-    // 3) Symptoms (from cached state भी साथ में रखो)
-    $symptoms = $state['evidence_details']['symptoms'] ?? [];
-
-    // 4) Owner के सारे questions इकट्ठे करो
-    $userReports = $chats->pluck('question')->toArray();
-    $recent      = implode(" | ", array_slice($userReports, -5));
-
-    // 5) Diagnosis बनाओ
-    $symText = $symptoms ? implode(", ", $symptoms) : "No tagged symptoms yet";
-
-    $diagnosis = "🩺 AI-assisted Diagnosis:\n".
-                 "- Reported symptoms: {$symText}\n".
-                 "- Owner reports: {$recent}";
-
-    // 6) ✅ Log into laravel.log
-    \Log::info('Diagnosis generated from DB', [
-        'user_id'        => $userId,
-        'chat_room_token'=> $chatRoomToken,
-        'symptoms'       => $symptoms,
-        'reports_count'  => count($userReports),
-        'diagnosis'      => $diagnosis,
-    ]);
-
-    return $diagnosis;
-}
-
-
 
 
 }
