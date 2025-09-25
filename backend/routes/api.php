@@ -101,13 +101,14 @@ Route::get('/test-cors', function (Request $request) {
     ]);
 });
 
-Route::get('/chats', [GeminiChatController::class, 'history']); 
+
 Route::post('/contact-request', [ContactRequestController::class, 'store']);
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
 Route::post('/chat/send', [GeminiChatController::class, 'sendMessage']);
 Route::get('/chat/listRooms', [GeminiChatController::class, 'listRooms']);
 // routes/api.php
-Route::get('/chats', [GeminiChatController::class, 'history']);
+Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'history']); // <= FE expects this
+Route::get('/chats', [GeminiChatController::class, 'history']); // <= keep existing
 Route::delete('/chat-rooms/{chat_room_token}', [GeminiChatController::class, 'deleteRoom']);
 Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
 
@@ -345,4 +346,15 @@ Route::prefix('unified')->group(function () {
 });
 
 Route::view('/prompt-test-v2', 'prompt-test-v2');
+
+
+
+// Old chat endpoint (kept as-is)
+Route::post('/chat/send', [GeminiChatController::class, 'sendMessage']);
+
+// New Unified Intelligence endpoints
+Route::post('/chat/unified', [GeminiChatController::class, 'unifiedProcess']);
+Route::get('/chat/unified/status', [GeminiChatController::class, 'unifiedStatus']);
+Route::post('/chat/unified/reset', [GeminiChatController::class, 'unifiedReset']);
+
 

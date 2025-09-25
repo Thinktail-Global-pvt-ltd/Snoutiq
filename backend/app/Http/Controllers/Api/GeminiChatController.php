@@ -596,41 +596,57 @@ class GeminiChatController extends Controller
         ]);
     }
     /** History of one room */
-    public function history(Request $request)
-    {
-        $data = $request->validate([
-            'user_id'         => 'required|integer',
-            'chat_room_token' => 'required_without:chat_room_id|string',
-            'chat_room_id'    => 'required_without:chat_room_token|integer',
-            'sort'            => 'nullable|in:asc,desc',
-        ]);
+    public function history(Request $request, string $chat_room_token = null)
+{
+    // 1) Basic validation of user_id/sort (token/id optional because route param aa sakta hai)
+    $data = $request->validate([
+        'user_id'         => 'required|integer',
+        'chat_room_token' => 'nullable|string',
+        'chat_room_id'    => 'nullable|integer',
+        'sort'            => 'nullable|in:asc,desc',
+    ]);
 
-        $sort = $data['sort'] ?? 'asc';
+    $sort = $data['sort'] ?? 'asc';
 
-        if (!empty($data['chat_room_id'])) {
-            $room = \App\Models\ChatRoom::where('id', $data['chat_room_id'])
-                ->where('user_id', $data['user_id'])
-                ->firstOrFail();
-        } else {
-            $room = \App\Models\ChatRoom::where('chat_room_token', $data['chat_room_token'])
-                ->where('user_id', $data['user_id'])
-                ->firstOrFail();
-        }
+    // 2) Resolve token/id from: route param -> query param -> id
+    $resolvedToken = $chat_room_token ?: ($data['chat_room_token'] ?? null);
+    $resolvedId    = $data['chat_room_id'] ?? null;
 
-        $rows = \App\Models\Chat::where('chat_room_id', $room->id)
-            ->orderBy('created_at', $sort)
-            ->get();
-
+    if (!$resolvedToken && !$resolvedId) {
         return response()->json([
-            'status' => 'success',
-            'room'   => [
-                'id'              => $room->id,
-                'chat_room_token' => $room->chat_room_token,
-                'name'            => $room->name,
-            ],
-            'count'  => $rows->count(),
-            'chats'  => $rows,
-        ]);
+            'status'  => 'error',
+            'message' => 'chat_room_token or chat_room_id is required',
+        ], 422);
     }
+
+    // 3) Fetch room by token (preferred) or id
+    if ($resolvedToken) {
+        $room = ChatRoom::where('chat_room_token', $resolvedToken)
+            ->where('user_id', $data['user_id'])
+            ->firstOrFail();
+    } else {
+        $room = ChatRoom::where('id', $resolvedId)
+            ->where('user_id', $data['user_id'])
+            ->firstOrFail();
+    }
+
+    // 4) Fetch chats
+    $rows = Chat::where('chat_room_id', $room->id)
+        ->orderBy('created_at', $sort)
+        ->get();
+
+    // 5) Response shape the same your FE expects
+    return response()->json([
+        'status' => 'success',
+        'room'   => [
+            'id'              => $room->id,
+            'chat_room_token' => $room->chat_room_token,
+            'name'            => $room->name,
+        ],
+        'count'  => $rows->count(),
+        'chats'  => $rows,
+    ]);
+}
+
 
 }
