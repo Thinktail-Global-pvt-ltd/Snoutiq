@@ -345,13 +345,22 @@ class GeminiChatController extends Controller
         $state['evidence_score'] = max(0, $sum);
     }
 
+    // private function makeDecision(int $score): string
+    // {
+    //     if ($score >= 8) return 'EMERGENCY';
+    //     if ($score >= 4) return 'IN_CLINIC';
+    //     if ($score >= 2) return 'VIDEO_CONSULT';
+    //     return 'GATHER_INFO';
+    // }
+
     private function makeDecision(int $score): string
-    {
-        if ($score >= 8) return 'EMERGENCY';
-        if ($score >= 4) return 'IN_CLINIC';
-        if ($score >= 2) return 'VIDEO_CONSULT';
-        return 'GATHER_INFO';
-    }
+{
+    if ($score >= 10) return 'EMERGENCY';
+    if ($score >= 7)  return 'IN_CLINIC';
+    if ($score >= 4)  return 'VIDEO_CONSULT';
+    return 'GATHER_INFO';
+}
+
 
     private function backstopOverride(string $decision, int $userTurns): array
     {
