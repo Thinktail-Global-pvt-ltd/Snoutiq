@@ -10,17 +10,17 @@
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
   <style>
-    /* Same styles as before */
     body{margin:0;font-family:Inter,system-ui,sans-serif;background:#f9fafb;}
     .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;
       padding:.7rem .9rem;border-radius:.6rem;box-shadow:0 10px 24px rgba(0,0,0,.25);
       opacity:0;transform:translateY(8px);transition:.3s}
     .toast.show{opacity:1;transform:translateY(0)}
+    .tab.active{background:#2563eb;color:#fff}
   </style>
 </head>
 <body>
 
-  <!-- UI Simplified -->
+  <!-- UI -->
   <main style="max-width:400px;margin:40px auto;background:#fff;padding:24px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.1)">
     <h1 style="text-align:center;margin-bottom:10px">Welcome to SnoutIQ!</h1>
     <p style="text-align:center;color:#64748b">Let's start by getting to know you</p>
@@ -65,11 +65,13 @@
     // Tab switching
     document.getElementById("tab-pet").onclick=()=>{
       document.getElementById("vetPanel").style.display="none";
-      toast("Pet Owner selected");
+      document.getElementById("tab-pet").classList.add("active");
+      document.getElementById("tab-vet").classList.remove("active");
     };
     document.getElementById("tab-vet").onclick=()=>{
       document.getElementById("vetPanel").style.display="block";
-      toast("Veterinarian selected");
+      document.getElementById("tab-vet").classList.add("active");
+      document.getElementById("tab-pet").classList.remove("active");
     };
 
     // Location
@@ -105,8 +107,8 @@
       const email=googleData.email; const googleToken=googleData.sub;
 
       try{
-        // 1. Try login
-        let loginRes=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken });
+        // 1. Try login with role pet
+        let loginRes=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
         if(loginRes.data.status==="success"){
           toast("Login successful!","success");
           location.href="/dashboard"; return;
@@ -121,8 +123,8 @@
       let regData=await reg.json();
       if(regData.status==="error"){ document.getElementById("googleMsg").textContent=regData.message; return; }
 
-      // 3. Login again
-      let finalLogin=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken });
+      // 3. Login again with role pet
+      let finalLogin=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
       if(finalLogin.data.token){ toast("Registered & logged in!","success"); location.href="/dashboard"; }
     };
 
