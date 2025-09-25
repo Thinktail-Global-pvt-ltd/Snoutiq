@@ -92,17 +92,31 @@ class GeminiChatController extends Controller
         // Persist session
         Cache::put($cacheKey, $state, now()->addMinutes(self::UNIFIED_SESSION_TTL_MIN));
 
-        // Response: ai_text + richer triage fields
+        // Map decision to an emergency_status field expected by the dashboard (string or null)
+        $emergencyStatus = in_array($decision, ['EMERGENCY', 'IN_CLINIC'], true) ? $decision : null;
+
+        // 🔁 RESPONSE FORMAT adjusted to what the Dashboard expects:
+        // {
+        //   context_token: "...",
+        //   chat: { answer: "..." },
+        //   emergency_status: "EMERGENCY" | "IN_CLINIC" | null,
+        //   ... (extra fields are fine)
+        // }
         return response()->json([
-            'success'           => true,
-            'session_id'        => $sessionId,
-            'ai_text'           => $aiText,
-            'decision'          => $decision,
-            'score'             => $state['evidence_score'],
-            'evidence_tags'     => $state['evidence_details']['symptoms'],
-            'status_text'       => $statusText,
-            'vet_summary'       => $vetSummary,
-            'conversation_html' => $html,
+            'success'          => true,
+            'context_token'    => $sessionId,
+            'session_id'       => $sessionId, // optional, harmless
+            'chat'             => [
+                'answer' => (string) ($aiText ?? 'No response.'),
+            ],
+            'emergency_status' => $emergencyStatus,
+            // Extra context (optional for UI/analytics)
+            'decision'         => $decision,
+            'score'            => $state['evidence_score'],
+            'evidence_tags'    => $state['evidence_details']['symptoms'],
+            'status_text'      => $statusText,
+            'vet_summary'      => $vetSummary,
+            'conversation_html'=> $html,
         ]);
     }
 
@@ -402,7 +416,7 @@ class GeminiChatController extends Controller
             } elseif ($inList) { $out[] = '</ul>'; $inList = false; }
 
             if (preg_match('/^\*\*\*(.+?)\*\*\*$/s', $l, $m)) { $out[] = '<h1 style="font-size:1.15rem;margin:.25rem 0">'.$e($m[1]).'</h1>'; continue; }
-            if (preg_match('/^\*\*(.+?)\*\*$/s', $l, $m))    { $out[] = '<h2 style="font-size:1.05rem;font-weight:700;margin:.25rem 0)">'.$e($m[1]).'</h2>'; continue; }
+            if (preg_match('/^\*\*(.+?)\*\*$/s', $l, $m))    { $out[] = '<h2 style="font-size:1.05rem;font-weight:700;margin:.25rem 0">'.$e($m[1]).'</h2>'; continue; }
             if (preg_match('/^\*(.+?)\*$/s', $l, $m))        { $out[] = '<h3 style="font-size:.98rem;font-weight:700;margin:.25rem 0">'.$e($m[1]).'</h3>'; continue; }
 
             if ($l === '') $out[] = '<br>'; else $out[] = '<p style="margin:.25rem 0">'.$inlineBold($l).'</p>';
