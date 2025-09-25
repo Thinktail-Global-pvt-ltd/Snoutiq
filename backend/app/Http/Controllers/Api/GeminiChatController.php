@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use App\Models\Chat;
+use App\Models\ChatRoom;
 
 class GeminiChatController extends Controller
 {
@@ -27,7 +29,113 @@ class GeminiChatController extends Controller
      *  - pet_age:        nullable|string
      *  - pet_location:   nullable|string
      */
+
     public function sendMessage(Request $request)
+{
+    $data = $request->validate([
+        'user_id'        => 'required|integer',
+        'question'       => 'required|string',
+        'context_token'  => 'nullable|string',
+        'title'          => 'nullable|string',
+        'pet_name'       => 'nullable|string',
+        'pet_type'       => 'nullable|string', // Dog/Cat
+        'pet_breed'      => 'nullable|string',
+        'pet_age'        => 'nullable|string',
+        'pet_location'   => 'nullable|string',
+    ]);
+
+    $sessionId = $data['context_token'] ?? ('user:'.$data['user_id']);
+    $cacheKey  = "unified:{$sessionId}";
+    $state     = Cache::get($cacheKey, $this->defaultState());
+
+    if ($this->isGreeting($data['question']) && !empty($state['conversation_history'])) {
+        $this->softResetEvidence($state);
+    }
+
+    $state['pet_profile'] = [
+        'name'     => $data['pet_name']     ?? 'Your pet',
+        'type'     => $data['pet_type']     ?? 'Pet',
+        'breed'    => $data['pet_breed']    ?? 'Mixed breed',
+        'age'      => $data['pet_age']      ?? 'Unknown',
+        'location' => $data['pet_location'] ?? 'India',
+    ];
+
+    $this->updateScoreAndEvidence($state, $data['question']);
+
+    $baseDecision = $this->makeDecision((int) $state['evidence_score']);
+    $userTurnsNow = count($state['conversation_history']) + 1;
+    [$decision, $backstopApplied] = $this->backstopOverride($baseDecision, $userTurnsNow);
+
+    $prompt = $this->buildPrompt($decision, $data['question'], $state['pet_profile'], $state['conversation_history']);
+    $aiText = $this->callGeminiApi_curl($prompt);
+
+    $state['service_decision'] = $decision;
+    $state['conversation_history'][] = [
+        'user'             => $data['question'],
+        'response'         => $aiText,
+        'evidence_score'   => $state['evidence_score'],
+        'service_decision' => $decision,
+        'timestamp'        => now()->format('H:i:s'),
+    ];
+
+    $statusText = $this->statusLine($decision, (int) $state['evidence_score'], $backstopApplied);
+    $vetSummary = $this->generateVetSummary($state);
+    $html       = $this->renderBubbles($data['question'], $aiText, $decision);
+
+    Cache::put($cacheKey, $state, now()->addMinutes(self::UNIFIED_SESSION_TTL_MIN));
+
+    $emergencyStatus = in_array($decision, ['EMERGENCY', 'IN_CLINIC'], true) ? $decision : null;
+
+    /** 🔥 DB SAVE START */
+    // Ensure ChatRoom exists (or create one with sessionId as token)
+    $room = ChatRoom::firstOrCreate(
+        ['chat_room_token' => $sessionId],
+        [
+            'user_id' => $data['user_id'],
+            'name'    => $data['title'] ?? 'New Chat',
+        ]
+    );
+
+    // Save Chat row
+    $chat = Chat::create([
+        'user_id'         => $data['user_id'],
+        'chat_room_id'    => $room->id,
+        'chat_room_token' => $room->chat_room_token,
+        'context_token'   => $sessionId,
+        'question'        => $data['question'],
+        'answer'          => $aiText,
+        'diagnosis'       => null, // you can add parsing later
+        'pet_name'        => $data['pet_name'] ?? null,
+        'pet_breed'       => $data['pet_breed'] ?? null,
+        'pet_age'         => $data['pet_age'] ?? null,
+        'pet_location'    => $data['pet_location'] ?? null,
+        'response_tag'    => $decision,
+        'emergency_status'=> $emergencyStatus,
+    ]);
+
+    // update room meta
+    $room->last_emergency_status = $emergencyStatus;
+    $room->name = $data['title'] ?: $room->name;
+    $room->touch();
+    $room->save();
+    /** 🔥 DB SAVE END */
+
+    return response()->json([
+        'success'          => true,
+        'context_token'    => $sessionId,
+        'session_id'       => $sessionId,
+        'chat'             => $chat, // return full DB row now
+        'emergency_status' => $emergencyStatus,
+        'decision'         => $decision,
+        'score'            => $state['evidence_score'],
+        'evidence_tags'    => $state['evidence_details']['symptoms'],
+        'status_text'      => $statusText,
+        'vet_summary'      => $vetSummary,
+        'conversation_html'=> $html,
+    ]);
+}
+
+    public function sendMessage_old(Request $request)
     {
         $data = $request->validate([
             'user_id'        => 'required|integer',
