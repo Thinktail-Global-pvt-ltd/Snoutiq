@@ -47,7 +47,7 @@ class GeminiChatController extends Controller
         'pet_location'   => 'nullable|string',
     ]);
 
-    $sessionId = $data['context_token'] ?? ('user:'.$data['user_id']);
+   $sessionId = $data['chat_room_token'] ?? $data['context_token'] ?? ('user:'.$data['user_id']);
     $cacheKey  = "unified:{$sessionId}";
     $state     = Cache::get($cacheKey, $this->defaultState());
 
@@ -660,8 +660,6 @@ class GeminiChatController extends Controller
     ]);
 }
 
-
-
 public function newRoom(Request $request)
 {
     $data = $request->validate([
@@ -673,22 +671,63 @@ public function newRoom(Request $request)
         'pet_location' => 'nullable|string',
     ]);
 
+    // unique room token
     $chatRoomToken = 'room_' . Str::uuid()->toString();
 
+    // create DB row
     $room = ChatRoom::create([
-        'user_id'        => (int) $data['user_id'],
-        'chat_room_token'=> $chatRoomToken,
-        'name'           => $data['title'] ?? null,
+        'user_id'         => (int) $data['user_id'],
+        'chat_room_token' => $chatRoomToken,
+        'name'            => $data['title'] ?? null,
     ]);
 
+    // 🔥 Reset unified session state so userTurns starts at 0
+    $freshState = $this->defaultState(); // conversation_history = []
+    Cache::put(
+        "unified:{$chatRoomToken}",
+        $freshState,
+        now()->addMinutes(self::UNIFIED_SESSION_TTL_MIN)
+    );
+
     return response()->json([
-        'status'          => 'success',
-        'chat_room_id'    => $room->id,
-        'chat_room_token' => $room->chat_room_token,
-        'name'            => $room->name,
-        'note'            => 'Use this chat_room_token in /api/chat/send for all messages in this room.',
+        'status'           => 'success',
+        'chat_room_id'     => $room->id,
+        'chat_room_token'  => $room->chat_room_token,
+        // convenience: FE can treat this as the session/context token
+        'context_token'    => $room->chat_room_token,
+        'name'             => $room->name,
+        'note'             => 'Use this chat_room_token as context_token in /api/chat/send for this room.',
     ]);
 }
+
+
+// public function newRoom(Request $request)
+// {
+//     $data = $request->validate([
+//         'user_id'      => 'required|integer',
+//         'title'        => 'nullable|string',
+//         'pet_name'     => 'nullable|string',
+//         'pet_breed'    => 'nullable|string',
+//         'pet_age'      => 'nullable|string',
+//         'pet_location' => 'nullable|string',
+//     ]);
+
+//     $chatRoomToken = 'room_' . Str::uuid()->toString();
+
+//     $room = ChatRoom::create([
+//         'user_id'        => (int) $data['user_id'],
+//         'chat_room_token'=> $chatRoomToken,
+//         'name'           => $data['title'] ?? null,
+//     ]);
+
+//     return response()->json([
+//         'status'          => 'success',
+//         'chat_room_id'    => $room->id,
+//         'chat_room_token' => $room->chat_room_token,
+//         'name'            => $room->name,
+//         'note'            => 'Use this chat_room_token in /api/chat/send for all messages in this room.',
+//     ]);
+// }
 
 
 
