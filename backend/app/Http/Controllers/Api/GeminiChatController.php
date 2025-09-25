@@ -471,4 +471,58 @@ class GeminiChatController extends Controller
         $json = json_decode($resp, true);
         return $json['candidates'][0]['content']['parts'][0]['text'] ?? "No response.";
     }
+        /** List rooms for a user (from chat_rooms) */
+    public function listRooms(Request $request)
+    {
+        $data = $request->validate([
+            'user_id' => 'required|integer',
+        ]);
+
+        $rooms = \App\Models\ChatRoom::where('user_id', $data['user_id'])
+            ->orderBy('updated_at', 'desc')
+            ->get(['id', 'chat_room_token', 'name', 'created_at', 'updated_at']);
+
+        return response()->json([
+            'status' => 'success',
+            'rooms'  => $rooms,
+        ]);
+    }
+    /** History of one room */
+    public function history(Request $request)
+    {
+        $data = $request->validate([
+            'user_id'         => 'required|integer',
+            'chat_room_token' => 'required_without:chat_room_id|string',
+            'chat_room_id'    => 'required_without:chat_room_token|integer',
+            'sort'            => 'nullable|in:asc,desc',
+        ]);
+
+        $sort = $data['sort'] ?? 'asc';
+
+        if (!empty($data['chat_room_id'])) {
+            $room = \App\Models\ChatRoom::where('id', $data['chat_room_id'])
+                ->where('user_id', $data['user_id'])
+                ->firstOrFail();
+        } else {
+            $room = \App\Models\ChatRoom::where('chat_room_token', $data['chat_room_token'])
+                ->where('user_id', $data['user_id'])
+                ->firstOrFail();
+        }
+
+        $rows = \App\Models\Chat::where('chat_room_id', $room->id)
+            ->orderBy('created_at', $sort)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'room'   => [
+                'id'              => $room->id,
+                'chat_room_token' => $room->chat_room_token,
+                'name'            => $room->name,
+            ],
+            'count'  => $rows->count(),
+            'chats'  => $rows,
+        ]);
+    }
+
 }
