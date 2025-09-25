@@ -122,7 +122,7 @@
 
     async function fetchNearbyVets() {
       try {
-        const res = await axios.get(`/api/nearby-vets?user_id=1`);
+        const res = await axios.get(`/api/nearby-vets?user_id=355`);
         document.getElementById("nearbyVets").innerHTML =
           res.data.data.map(v => `<div class="p-2 border rounded">${v.name}</div>`).join("");
       } catch (e) { console.error(e); }
