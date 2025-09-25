@@ -1,1352 +1,3 @@
-// import React, {
-//   useEffect,
-//   useState,
-//   useContext,
-//   useRef,
-//   useCallback,
-//   useMemo,
-// } from "react";
-// import ChatInput from "../components/ChatInput";
-// import RightSidebar from "../components/RightSidebar";
-// import axios from "../axios";
-// import toast from "react-hot-toast";
-// import { useNavigate } from "react-router-dom";
-// import Sidebar from "../components/Sidebar";
-// import { AuthContext } from "../auth/AuthContext";
-// import Navbar from "../components/Navbar";
-// import { useParams } from "react-router-dom";
-// import MessageBubble from "./MessageBubble";
-// import DetailedWeatherWidget from "./DetailedWeatherWidget";
-
-// const Dashboard = () => {
-//   const navigate = useNavigate();
-//   const {
-//     user,
-//     token,
-//     chatRoomToken,
-//     updateChatRoomToken,
-//     updateNearbyDoctors,
-//   } = useContext(AuthContext);
-//   const [isLoading, setIsLoading] = useState(false);
-//   const [messages, setMessages] = useState([]);
-//   const [sending, setSending] = useState(false);
-//   const messagesEndRef = useRef(null);
-//   const chatContainerRef = useRef(null);
-//   const [contextToken, setContextToken] = useState("");
-//   const typingTimeouts = useRef(new Map());
-//   const isAutoScrolling = useRef(false);
-
-//   // Get chat_room_token from URL params
-//   const { chat_room_token } = useParams();
-//   const currentChatRoomToken = chat_room_token || chatRoomToken;
-
-//   const genId = () => Date.now() + Math.random();
-
-//   const fetchNearbyDoctors = async () => {
-//   if (!token) return;
-
-//   try {
-//     setIsLoading(true);
-//     const res = await axios.get(
-//       `https://snoutiq.com/backend/api/nearby-vets?user_id=${user.id}`,
-//       { headers: { Authorization: `Bearer ${token}` } }
-//     );
-
-//     console.log(res.data, "Nearby doctors response");
-
-//     if (res.data && Array.isArray(res.data.data)) {
-//       updateNearbyDoctors(res.data.data); // ✅ correct
-//       console.log("Doctors updated:", res.data.data);
-//     }
-//   } catch (err) {
-//     console.error("Failed to fetch nearby doctors", err);
-//     toast.error("Failed to fetch doctors");
-//   } finally {
-//     setIsLoading(false);
-//   }
-// };
-
-//   useEffect(() => {
-//   fetchNearbyDoctors();
-//   const interval = setInterval(fetchNearbyDoctors, 5 * 60 * 1000);
-
-//   return () => clearInterval(interval);
-// }, []);
-
-//   // Optimized scroll function with debouncing
-//   const scrollToBottom = useCallback((behavior = "smooth") => {
-//     if (isAutoScrolling.current) return;
-
-//     isAutoScrolling.current = true;
-//     requestAnimationFrame(() => {
-//       if (messagesEndRef.current) {
-//         messagesEndRef.current.scrollIntoView({
-//           behavior: behavior,
-//           block: "end",
-//         });
-//       }
-//       setTimeout(() => {
-//         isAutoScrolling.current = false;
-//       }, 100);
-//     });
-//   }, []);
-
-//   // Cleanup function for typing animations
-//   const cleanupTypingAnimation = useCallback((messageId) => {
-//     if (typingTimeouts.current.has(messageId)) {
-//       clearTimeout(typingTimeouts.current.get(messageId));
-//       typingTimeouts.current.delete(messageId);
-//     }
-//   }, []);
-
-//   // Cleanup all animations on unmount
-//   useEffect(() => {
-//     return () => {
-//       typingTimeouts.current.forEach((timeout) => clearTimeout(timeout));
-//       typingTimeouts.current.clear();
-//     };
-//   }, []);
-
-//   // Auto-scroll when new messages are added
-//   useEffect(() => {
-//     if (messages.length > 0) {
-//       scrollToBottom("smooth");
-//     }
-//   }, [messages, scrollToBottom]);
-
-//   const handleFeedback = async (feedback, timestamp) => {
-//     try {
-//       const consultationId = messages.find(
-//         (msg) => msg.timestamp.getTime() === timestamp.getTime()
-//       )?.consultationId;
-
-//       if (!consultationId) return;
-
-//       await axios.post("/api/feedback", {
-//         consultationId,
-//         feedback,
-//       });
-
-//       toast.success("Thanks for your feedback!");
-//     } catch (err) {
-//       toast.error("Failed to submit feedback");
-//     }
-//   };
-
-//   const fetchChatHistory = useCallback(
-//     async (specificChatRoomToken = null) => {
-//       const token = localStorage.getItem("token");
-//       if (!token || !user) return;
-
-//       try {
-//         setIsLoading(true);
-
-//         // ✅ सही API endpoint format
-//         let url;
-//         if (specificChatRoomToken) {
-//           url = `https://snoutiq.com/backend/api/chat-rooms/${specificChatRoomToken}/chats?user_id=${user.id}`;
-//         } else {
-//           url = `https://snoutiq.com/backend/api/chat/listRooms?user_id=${user.id}`;
-//         }
-
-//         const res = await axios.get(url, {
-//           headers: { Authorization: `Bearer ${token}` },
-//         });
-
-//         console.log("Chat history API response:", res.data);
-//         let messagesFromAPI = [];
-
-//         if (res.data && Array.isArray(res.data)) {
-//           const emergencyStatus = res.data.emergency_status || null;
-
-//           messagesFromAPI =
-//             res.data.chats
-//               ?.map((chat) => {
-//                 const baseId =
-//                   Number(new Date(chat.created_at)) + Math.random();
-//                 return [
-//                   {
-//                     id: baseId + 1,
-//                     sender: "user",
-//                     text: chat.question,
-//                     timestamp: new Date(chat.created_at),
-//                   },
-//                   {
-//                     id: baseId + 2,
-//                     sender: "ai",
-//                     text: chat.answer,
-//                     displayedText: chat.answer,
-//                     timestamp: new Date(chat.created_at),
-//                     emergency_status: emergencyStatus,
-//                   },
-//                 ];
-//               })
-//               .flat() || [];
-//         } else if (res.data && res.data.chats) {
-//           messagesFromAPI = res.data.chats
-//             .filter((chat) => chat.question && chat.answer)
-//             .map((chat) => {
-//               const baseId = Number(new Date(chat.created_at)) + Math.random();
-//               return [
-//                 {
-//                   id: baseId + 1,
-//                   sender: "user",
-//                   text: chat.question,
-//                   timestamp: new Date(chat.created_at),
-//                 },
-//                 {
-//                   id: baseId + 2,
-//                   sender: "ai",
-//                   text: chat.answer,
-//                   displayedText: chat.answer,
-//                   timestamp: new Date(chat.created_at),
-//                 },
-//               ];
-//             })
-//             .flat();
-//         }
-
-//         setMessages(messagesFromAPI);
-
-//         // Update context if it exists in response
-//         if (
-//           res.data.length > 0 &&
-//           res.data[res.data.length - 1].context_token
-//         ) {
-//           setContextToken(res.data[res.data.length - 1].context_token);
-//         }
-//       } catch (err) {
-//         console.error("Failed to fetch history", err);
-//         if (specificChatRoomToken) {
-//           toast.error("Failed to load chat history");
-//         }
-//       } finally {
-//         setIsLoading(false);
-//       }
-//     },
-//     [user]
-//   );
-
-//   useEffect(() => {
-//     if (currentChatRoomToken) {
-//       // Save latest chat room in localStorage
-//       localStorage.setItem("lastChatRoomToken", currentChatRoomToken);
-
-//       if (updateChatRoomToken && chat_room_token) {
-//         updateChatRoomToken(chat_room_token);
-//       }
-
-//       setMessages([]);
-//       setContextToken("");
-//       fetchChatHistory(currentChatRoomToken);
-//     } else {
-//       fetchChatHistory();
-//     }
-//   }, [currentChatRoomToken]);
-
-//   // On mount, load last opened chat
-//   useEffect(() => {
-//     const savedRoom = localStorage.getItem("lastChatRoomToken");
-//     if (savedRoom && !chat_room_token) {
-//       navigate(`/chat/${savedRoom}`);
-//     }
-//   }, []);
-
-//   // ✅ FIX: Add event listener for sidebar clicks
-//   useEffect(() => {
-//     const handleChatRoomChange = (event) => {
-//       const newChatRoomToken = event.detail;
-//       console.log("Received chat room change event:", newChatRoomToken);
-
-//       if (newChatRoomToken && updateChatRoomToken) {
-//         updateChatRoomToken(newChatRoomToken);
-//         navigate(`/chat/${newChatRoomToken}`);
-//       }
-//     };
-
-//     window.addEventListener("chatRoomChanged", handleChatRoomChange);
-
-//     return () => {
-//       window.removeEventListener("chatRoomChanged", handleChatRoomChange);
-//     };
-//   }, [navigate, updateChatRoomToken]);
-
-//   // Save messages to localStorage (debounced)
-//   useEffect(() => {
-//     const timeoutId = setTimeout(() => {
-//       if (messages.length > 0) {
-//         const storageKey = currentChatRoomToken
-//           ? `chatMessages_${currentChatRoomToken}`
-//           : "chatMessages";
-//         localStorage.setItem(storageKey, JSON.stringify(messages));
-//       }
-//     }, 500);
-
-//     return () => clearTimeout(timeoutId);
-//   }, [messages, currentChatRoomToken]);
-
-//   // Load saved messages from localStorage on mount
-//   useEffect(() => {
-//     if (currentChatRoomToken) {
-//       const saved = localStorage.getItem(
-//         `chatMessages_${currentChatRoomToken}`
-//       );
-//       if (saved) {
-//         try {
-//           const parsedMessages = JSON.parse(saved);
-//           if (parsedMessages.length > 0) {
-//             setMessages(parsedMessages);
-//           }
-//         } catch (error) {
-//           console.error("Failed to parse saved messages:", error);
-//         }
-//       }
-//     }
-//   }, [currentChatRoomToken]);
-
-//   // Optimized typing animation with better performance
-//   const startTypingAnimation = useCallback(
-//     (messageId, fullText) => {
-//       cleanupTypingAnimation(messageId);
-
-//       let charIndex = 0;
-//       const typingSpeed = 15;
-//       const batchSize = 2;
-
-//       const typeNextBatch = () => {
-//         if (charIndex >= fullText.length) {
-//           cleanupTypingAnimation(messageId);
-//           requestAnimationFrame(() => scrollToBottom("smooth"));
-//           return;
-//         }
-
-//         const nextIndex = Math.min(charIndex + batchSize, fullText.length);
-
-//         setMessages((prev) =>
-//           prev.map((m) =>
-//             m.id === messageId
-//               ? { ...m, displayedText: fullText.slice(0, nextIndex) }
-//               : m
-//           )
-//         );
-
-//         charIndex = nextIndex;
-
-//         requestAnimationFrame(() => scrollToBottom("auto"));
-
-//         const timeoutId = setTimeout(typeNextBatch, typingSpeed);
-//         typingTimeouts.current.set(messageId, timeoutId);
-//       };
-
-//       const initialTimeout = setTimeout(typeNextBatch, 200);
-//       typingTimeouts.current.set(messageId, initialTimeout);
-//     },
-//     [cleanupTypingAnimation, scrollToBottom]
-//   );
-
-//   const handleSendMessage = useCallback(
-//     async (inputMessage) => {
-//       if (inputMessage.trim() === "" || sending) return;
-
-//       setSending(true);
-
-//       const userMsgId = genId();
-//       const loaderId = "__loader__";
-
-//       const userMessage = {
-//         id: userMsgId,
-//         text: inputMessage,
-//         sender: "user",
-//         timestamp: new Date(),
-//       };
-
-//       const loaderMessage = {
-//         id: loaderId,
-//         type: "loading",
-//         sender: "ai",
-//         text: "",
-//         timestamp: new Date(),
-//       };
-
-//       // FIXED: Add new messages to the end, not the beginning
-//       setMessages((prev) => [...prev, userMessage, loaderMessage]);
-
-//       try {
-//         const token = localStorage.getItem("token");
-//         if (!token) {
-//           toast.error("Please log in to continue");
-//           setMessages((prev) => prev.filter((m) => m.id !== loaderId));
-//           setSending(false);
-//           return;
-//         }
-
-//         const petData = {
-//           pet_name: user?.pet_name || "Unknown",
-//           pet_breed: "Unknown Breed",
-//           pet_age: user?.pet_age?.toString() || "Unknown",
-//           pet_location: "Unknown Location",
-//         };
-
-//         const payload = {
-//           user_id: user.id,
-//           question: inputMessage,
-//           context_token: contextToken || "",
-//           chat_room_token: currentChatRoomToken || "",
-//           ...petData,
-//         };
-
-//         const res = await axios.post(
-//           "https://snoutiq.com/backend/api/chat/send",
-//           payload,
-//           {
-//             headers: { Authorization: `Bearer ${token}` },
-//             timeout: 30000,
-//           }
-//         );
-
-//         // CORRECTED: Properly destructure the response
-//         const {
-//           context_token: newCtx,
-//           chat = {},
-//           emergency_status,
-//         } = res.data || {};
-
-//         if (newCtx) setContextToken(newCtx);
-
-//         const fullText = String(chat.answer || "");
-//         const aiId = genId();
-
-//         setMessages((prev) =>
-//           prev.map((m) =>
-//             m.id === loaderId
-//               ? {
-//                   id: aiId,
-//                   sender: "ai",
-//                   text: fullText,
-//                   displayedText: "",
-//                   timestamp: new Date(),
-//                   emergency_status: emergency_status,
-//                 }
-//               : m
-//           )
-//         );
-
-//         startTypingAnimation(aiId, fullText);
-//       } catch (error) {
-//         console.error("Error sending chat:", error);
-//         toast.error("Something went wrong. Try again.");
-
-//         setMessages((prev) => [
-//           ...prev.filter((m) => m.id !== loaderId),
-//           {
-//             id: genId(),
-//             text: "⚠️ Sorry, I'm having trouble connecting right now.",
-//             sender: "ai",
-//             timestamp: new Date(),
-//             isError: true,
-//             displayedText: "⚠️ Sorry, I'm having trouble connecting right now.",
-//           },
-//         ]);
-//       } finally {
-//         setSending(false);
-//       }
-//     },
-//     [contextToken, currentChatRoomToken, user, sending, startTypingAnimation]
-//   );
-
-//   const clearChat = useCallback(() => {
-//     if (window.confirm("Are you sure you want to clear the chat history?")) {
-//       typingTimeouts.current.forEach((timeout) => clearTimeout(timeout));
-//       typingTimeouts.current.clear();
-
-//       setMessages([]);
-//       setContextToken("");
-
-//       // Clear from localStorage
-//       const storageKey = currentChatRoomToken
-//         ? `chatMessages_${currentChatRoomToken}`
-//         : "chatMessages";
-//       localStorage.removeItem(storageKey);
-//       localStorage.removeItem("contextToken");
-
-//       toast.success("Chat cleared");
-//     }
-//   }, [currentChatRoomToken]);
-
-//   // Context token persistence
-//   useEffect(() => {
-//     if (contextToken) {
-//       localStorage.setItem("contextToken", contextToken);
-//     }
-//   }, [contextToken]);
-
-//   useEffect(() => {
-//     const saved = localStorage.getItem("contextToken");
-//     if (saved) setContextToken(saved);
-//   }, []);
-
-//   // const fetchAvailableVet = async () => {
-//   //   try {
-//   //     setIsLoading(true);
-//   //     const response = await axios.get(
-//   //       `https://snoutiq.com/api/nearby-vets?user_id=1`
-//   //     );
-
-//   //     if (response.data.status === "success") {
-//   //       setWeather(response.data);
-//   //       setError(null);
-//   //     } else {
-//   //       setError("Unable to fetch weather data");
-//   //     }
-//   //   } catch (err) {
-//   //     console.error("Weather fetch error:", err);
-//   //     setError("Failed to load weather");
-//   //   } finally {
-//   //     setIsLoading(false);
-//   //   }
-//   // };
-
-//   // useEffect(() => {
-//   //   fetchAvailableVet();
-
-//   //   const interval = setInterval(fetchWeather, 30 * 60 * 1000);
-
-//   //   return () => clearInterval(interval);
-//   // }, []);
-
-//   const ChatContent = useMemo(() => {
-//     return (
-//       <div className="flex flex-col h-full">
-//         {/* Header */}
-//         <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm flex justify-between items-center">
-//           <div>
-//             <h1 className="text-2xl font-bold text-gray-900">Snoutiq AI</h1>
-//             <p className="text-gray-600 mt-1 text-sm">
-//               {currentChatRoomToken
-//                 ? `Ask questions about ${user?.pet_name || "your pet"}'s health`
-//                 : ``}
-//             </p>
-//           </div>
-//           <DetailedWeatherWidget />
-//           <div className="flex gap-2">
-//             {messages.length > 0 && (
-//               <button
-//                 onClick={clearChat}
-//                 className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-md transition-colors"
-//                 disabled={sending}
-//               >
-//                 Clear Chat
-//               </button>
-//             )}
-//           </div>
-//         </div>
-//         <div
-//           ref={chatContainerRef}
-//           className="flex-1 overflow-y-auto px-4 bg-gray-50 flex flex-col-reverse justify-between"
-//         >
-//           <div className="max-w-4xl mx-auto py-4">
-//             {isLoading ? (
-//               <div className="flex justify-center items-center h-40">
-//                 <div className="text-center">
-//                   <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full mb-4 mx-auto"></div>
-//                   <p className="text-gray-600">Loading chat history...</p>
-//                 </div>
-//               </div>
-//             ) : messages.length === 0 ? (
-//               <div className="flex flex-col items-center justify-center h-full text-center py-8">
-//                 <div className="bg-white rounded-xl shadow-md p-6 lg:p-8 max-w-md">
-//                   <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-4 mx-auto">
-//                     <svg
-//                       className="w-7 h-7 text-blue-600"
-//                       fill="none"
-//                       stroke="currentColor"
-//                       viewBox="0 0 24 24"
-//                     >
-//                       <path
-//                         strokeLinecap="round"
-//                         strokeLinejoin="round"
-//                         strokeWidth={2}
-//                         d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-//                       />
-//                     </svg>
-//                   </div>
-//                   <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-2">
-//                     {currentChatRoomToken
-//                       ? "No messages in this chat"
-//                       : "Welcome to Pet Health Assistant"}
-//                   </h2>
-//                   <p className="text-gray-600 mb-4 text-sm lg:text-base">
-//                     {currentChatRoomToken
-//                       ? "Start the conversation by asking a question about your pet."
-//                       : "Start a conversation about your pet's health. Describe symptoms, ask questions, or seek advice about pet care."}
-//                   </p>
-//                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-left">
-//                     <h3 className="font-medium text-blue-800 mb-2 text-sm">
-//                       Try asking:
-//                     </h3>
-//                     <ul className="text-xs lg:text-sm text-blue-700 space-y-1">
-//                       <li>
-//                         • "My dog is scratching constantly, what could it be?"
-//                       </li>
-//                       <li>• "What's the best diet for a senior cat?"</li>
-//                       <li>• "How often should I groom my golden retriever?"</li>
-//                     </ul>
-//                   </div>
-//                 </div>
-//               </div>
-//             ) : (
-//               <div>
-//                 {messages.map((msg, index) => (
-//                   <div
-//                     key={msg.id || `msg-${index}`}
-//                     className="mb-4 last:mb-0"
-//                   >
-//                     <MessageBubble
-//                       msg={msg}
-//                       index={index}
-//                       onFeedback={(value, timestamp) =>
-//                         handleFeedback(value, timestamp)
-//                       }
-//                     />
-//                   </div>
-//                 ))}
-//                 <div ref={messagesEndRef} />
-//               </div>
-//             )}
-//           </div>
-//         </div>
-
-//         {/* Chat Input */}
-//         <div className="border-t border-gray-200 bg-white p-4 shadow-lg">
-//           <div className="max-w-4xl mx-auto px-4">
-//             <ChatInput onSendMessage={handleSendMessage} isLoading={sending} />
-//             <div className="mt-2 text-xs text-gray-500 text-center">
-//               ⚠️ AI-generated advice. Consult a licensed veterinarian for
-//               serious health concerns.
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-//     );
-//   }, [
-//     messages,
-//     user,
-//     sending,
-//     clearChat,
-//     handleSendMessage,
-//     isLoading,
-//     currentChatRoomToken,
-//   ]);
-
-//   return (
-//     <>
-//       <Navbar />
-//       <div className="hidden lg:flex h-[calc(100vh-64px)] mt-16 bg-gray-50">
-//         {/* Left Sidebar */}
-//         <div className="w-64 bg-white border-r border-gray-200 shadow-sm overflow-y-auto">
-//           <Sidebar />
-//         </div>
-
-//         {/* Center */}
-//         <div className="flex-1 flex flex-col overflow-hidden">
-//           {ChatContent}
-//         </div>
-
-//         {/* Right Sidebar */}
-//         <div className="w-64 bg-white border-l border-gray-200 shadow-sm overflow-y-auto custom-scroll">
-//           <RightSidebar />
-//         </div>
-//       </div>
-
-//       {/* Mobile Layout */}
-//       <div className="lg:hidden h-[calc(100vh-64px)] mt-16">{ChatContent}</div>
-//     </>
-//   );
-// };
-
-// export default Dashboard;
-
-// import React, {
-//   useEffect,
-//   useState,
-//   useContext,
-//   useRef,
-//   useCallback,
-//   useMemo,
-// } from "react";
-// import ChatInput from "../components/ChatInput";
-// import RightSidebar from "../components/RightSidebar";
-// import axios from "../axios";
-// import toast from "react-hot-toast";
-// import { useNavigate } from "react-router-dom";
-// import Sidebar from "../components/Sidebar";
-// import { AuthContext } from "../auth/AuthContext";
-// import Navbar from "../components/Navbar";
-// import { useParams } from "react-router-dom";
-// import MessageBubble from "./MessageBubble";
-// import DetailedWeatherWidget from "./DetailedWeatherWidget";
-// import PetDetailsModal from "./RegisterPetOwner";
-
-// const Dashboard = () => {
-//   const navigate = useNavigate();
-//   const {
-//     user,
-//     token,
-//     chatRoomToken,
-//     updateChatRoomToken,
-//     updateNearbyDoctors,
-//   } = useContext(AuthContext);
-//   const [isLoading, setIsLoading] = useState(false);
-//   const [messages, setMessages] = useState([]);
-//   const [sending, setSending] = useState(false);
-//   const messagesEndRef = useRef(null);
-//   const chatContainerRef = useRef(null);
-//   const [contextToken, setContextToken] = useState("");
-//   const typingTimeouts = useRef(new Map());
-//   const isAutoScrolling = useRef(false);
-
-//   // Get chat_room_token from URL params
-//   const { chat_room_token } = useParams();
-//   const currentChatRoomToken = chat_room_token || chatRoomToken;
-
-//   const [showPetModal , setShowPetModal] = useState(false)
-
-//   useEffect(() => {
-//   if (user && !user.pet_type) {
-//     setShowPetModal(true);
-//   } else {
-//     setShowPetModal(false);
-//   }
-// }, [user]);
-
-//   const genId = () => Date.now() + Math.random();
-
-//   const fetchNearbyDoctors = async () => {
-//     if (!token) return;
-
-//     try {
-//       setIsLoading(true);
-//       const res = await axios.get(
-//         `https://snoutiq.com/backend/api/nearby-vets?user_id=${user.id}`,
-//         { headers: { Authorization: `Bearer ${token}` } }
-//       );
-
-//       console.log(res.data, "Nearby doctors response");
-
-//       if (res.data && Array.isArray(res.data.data)) {
-//         updateNearbyDoctors(res.data.data);
-//         console.log("Doctors updated:", res.data.data);
-//       }
-//     } catch (err) {
-//       console.error("Failed to fetch nearby doctors", err);
-//       toast.error("Failed to fetch doctors");
-//     } finally {
-//       setIsLoading(false);
-//     }
-//   };
-
-//   useEffect(() => {
-//     fetchNearbyDoctors();
-//     const interval = setInterval(fetchNearbyDoctors, 5 * 60 * 1000);
-//     return () => clearInterval(interval);
-//   }, []);
-
-//   // FIXED: Improved scrollToBottom function with better timing
-//   const scrollToBottom = useCallback((behavior = "smooth") => {
-//     if (isAutoScrolling.current) return;
-
-//     isAutoScrolling.current = true;
-
-//     // Use multiple RAF to ensure DOM has updated
-//     requestAnimationFrame(() => {
-//       requestAnimationFrame(() => {
-//         if (messagesEndRef.current) {
-//           messagesEndRef.current.scrollIntoView({
-//             behavior: behavior,
-//             block: "end",
-//             inline: "nearest"
-//           });
-//         }
-
-//         setTimeout(() => {
-//           isAutoScrolling.current = false;
-//         }, behavior === "smooth" ? 500 : 100);
-//       });
-//     });
-//   }, []);
-
-//   // Cleanup function for typing animations
-//   const cleanupTypingAnimation = useCallback((messageId) => {
-//     if (typingTimeouts.current.has(messageId)) {
-//       clearTimeout(typingTimeouts.current.get(messageId));
-//       typingTimeouts.current.delete(messageId);
-//     }
-//   }, []);
-
-//   // Cleanup all animations on unmount
-//   useEffect(() => {
-//     return () => {
-//       typingTimeouts.current.forEach((timeout) => clearTimeout(timeout));
-//       typingTimeouts.current.clear();
-//     };
-//   }, []);
-
-//   // FIXED: Enhanced auto-scroll on messages change
-//   useEffect(() => {
-//     if (messages.length > 0) {
-//       // Delay scroll to ensure DOM has rendered
-//       const timeoutId = setTimeout(() => {
-//         scrollToBottom("smooth");
-//       }, 50);
-
-//       return () => clearTimeout(timeoutId);
-//     }
-//   }, [messages.length, scrollToBottom]); // Only trigger on length change, not content change
-
-//   const handleFeedback = async (feedback, timestamp) => {
-//     try {
-//       const consultationId = messages.find(
-//         (msg) => msg.timestamp.getTime() === timestamp.getTime()
-//       )?.consultationId;
-
-//       if (!consultationId) return;
-
-//       await axios.post("/api/feedback", {
-//         consultationId,
-//         feedback,
-//       });
-
-//       toast.success("Thanks for your feedback!");
-//     } catch (err) {
-//       toast.error("Failed to submit feedback");
-//     }
-//   };
-
-//   const fetchChatHistory = useCallback(
-//     async (specificChatRoomToken = null) => {
-//       const token = localStorage.getItem("token");
-//       if (!token || !user) return;
-
-//       try {
-//         setIsLoading(true);
-
-//         let url;
-//         if (specificChatRoomToken) {
-//           url = `https://snoutiq.com/backend/api/chat-rooms/${specificChatRoomToken}/chats?user_id=${user.id}`;
-//         } else {
-//           url = `https://snoutiq.com/backend/api/chat/listRooms?user_id=${user.id}`;
-//         }
-
-//         const res = await axios.get(url, {
-//           headers: { Authorization: `Bearer ${token}` },
-//         });
-
-//         console.log("Chat history API response:", res.data);
-//         let messagesFromAPI = [];
-
-//         if (res.data && Array.isArray(res.data)) {
-//           const emergencyStatus = res.data.emergency_status || null;
-
-//           messagesFromAPI =
-//             res.data.chats
-//               ?.map((chat) => {
-//                 const baseId =
-//                   Number(new Date(chat.created_at)) + Math.random();
-//                 return [
-//                   {
-//                     id: baseId + 1,
-//                     sender: "user",
-//                     text: chat.question,
-//                     timestamp: new Date(chat.created_at),
-//                   },
-//                   {
-//                     id: baseId + 2,
-//                     sender: "ai",
-//                     text: chat.answer,
-//                     displayedText: chat.answer,
-//                     timestamp: new Date(chat.created_at),
-//                     emergency_status: emergencyStatus,
-//                   },
-//                 ];
-//               })
-//               .flat() || [];
-//         } else if (res.data && res.data.chats) {
-//           messagesFromAPI = res.data.chats
-//             .filter((chat) => chat.question && chat.answer)
-//             .map((chat) => {
-//               const baseId = Number(new Date(chat.created_at)) + Math.random();
-//               return [
-//                 {
-//                   id: baseId + 1,
-//                   sender: "user",
-//                   text: chat.question,
-//                   timestamp: new Date(chat.created_at),
-//                 },
-//                 {
-//                   id: baseId + 2,
-//                   sender: "ai",
-//                   text: chat.answer,
-//                   displayedText: chat.answer,
-//                   timestamp: new Date(chat.created_at),
-//                 },
-//               ];
-//             })
-//             .flat();
-//         }
-
-//         setMessages(messagesFromAPI);
-
-//         // Update context if it exists in response
-//         if (
-//           res.data.length > 0 &&
-//           res.data[res.data.length - 1].context_token
-//         ) {
-//           setContextToken(res.data[res.data.length - 1].context_token);
-//         }
-//       } catch (err) {
-//         console.error("Failed to fetch history", err);
-//         if (specificChatRoomToken) {
-//           toast.error("Failed to load chat history");
-//         }
-//       } finally {
-//         setIsLoading(false);
-//       }
-//     },
-//     [user]
-//   );
-
-//   useEffect(() => {
-//     if (currentChatRoomToken) {
-//       localStorage.setItem("lastChatRoomToken", currentChatRoomToken);
-
-//       if (updateChatRoomToken && chat_room_token) {
-//         updateChatRoomToken(chat_room_token);
-//       }
-
-//       setMessages([]);
-//       setContextToken("");
-//       fetchChatHistory(currentChatRoomToken);
-//     } else {
-//       fetchChatHistory();
-//     }
-//   }, [currentChatRoomToken]);
-
-//   // On mount, load last opened chat
-//   useEffect(() => {
-//     const savedRoom = localStorage.getItem("lastChatRoomToken");
-//     if (savedRoom && !chat_room_token) {
-//       navigate(`/chat/${savedRoom}`);
-//     }
-//   }, []);
-
-//   // Add event listener for sidebar clicks
-//   useEffect(() => {
-//     const handleChatRoomChange = (event) => {
-//       const newChatRoomToken = event.detail;
-//       console.log("Received chat room change event:", newChatRoomToken);
-
-//       if (newChatRoomToken && updateChatRoomToken) {
-//         updateChatRoomToken(newChatRoomToken);
-//         navigate(`/chat/${newChatRoomToken}`);
-//       }
-//     };
-
-//     window.addEventListener("chatRoomChanged", handleChatRoomChange);
-
-//     return () => {
-//       window.removeEventListener("chatRoomChanged", handleChatRoomChange);
-//     };
-//   }, [navigate, updateChatRoomToken]);
-
-//   // Save messages to localStorage (debounced)
-//   useEffect(() => {
-//     const timeoutId = setTimeout(() => {
-//       if (messages.length > 0) {
-//         const storageKey = currentChatRoomToken
-//           ? `chatMessages_${currentChatRoomToken}`
-//           : "chatMessages";
-//         localStorage.setItem(storageKey, JSON.stringify(messages));
-//       }
-//     }, 500);
-
-//     return () => clearTimeout(timeoutId);
-//   }, [messages, currentChatRoomToken]);
-
-//   // Load saved messages from localStorage on mount
-//   useEffect(() => {
-//     if (currentChatRoomToken) {
-//       const saved = localStorage.getItem(
-//         `chatMessages_${currentChatRoomToken}`
-//       );
-//       if (saved) {
-//         try {
-//           const parsedMessages = JSON.parse(saved);
-//           if (parsedMessages.length > 0) {
-//             setMessages(parsedMessages);
-//           }
-//         } catch (error) {
-//           console.error("Failed to parse saved messages:", error);
-//         }
-//       }
-//     }
-//   }, [currentChatRoomToken]);
-
-//   // FIXED: Improved typing animation with better scroll handling
-//   const startTypingAnimation = useCallback(
-//     (messageId, fullText) => {
-//       cleanupTypingAnimation(messageId);
-
-//       let charIndex = 0;
-//       const typingSpeed = 25; // Slightly slower for better readability
-//       const batchSize = 3; // Larger batches for smoother animation
-
-//       const typeNextBatch = () => {
-//         if (charIndex >= fullText.length) {
-//           cleanupTypingAnimation(messageId);
-//           // Final scroll when typing is complete
-//           setTimeout(() => scrollToBottom("smooth"), 200);
-//           return;
-//         }
-
-//         const nextIndex = Math.min(charIndex + batchSize, fullText.length);
-
-//         setMessages((prev) =>
-//           prev.map((m) =>
-//             m.id === messageId
-//               ? { ...m, displayedText: fullText.slice(0, nextIndex) }
-//               : m
-//           )
-//         );
-
-//         charIndex = nextIndex;
-
-//         // Smooth scroll during typing
-//         setTimeout(() => scrollToBottom("auto"), 10);
-
-//         const timeoutId = setTimeout(typeNextBatch, typingSpeed);
-//         typingTimeouts.current.set(messageId, timeoutId);
-//       };
-
-//       // Start typing animation
-//       const initialTimeout = setTimeout(typeNextBatch, 300);
-//       typingTimeouts.current.set(messageId, initialTimeout);
-//     },
-//     [cleanupTypingAnimation, scrollToBottom]
-//   );
-
-//   // FIXED: Better message handling in handleSendMessage
-//   const handleSendMessage = useCallback(
-//     async (inputMessage) => {
-//       if (inputMessage.trim() === "" || sending) return;
-
-//       setSending(true);
-
-//       const userMsgId = genId();
-//       const loaderId = "__loader__";
-
-//       const userMessage = {
-//         id: userMsgId,
-//         text: inputMessage,
-//         sender: "user",
-//         timestamp: new Date(),
-//       };
-
-//       const loaderMessage = {
-//         id: loaderId,
-//         type: "loading",
-//         sender: "ai",
-//         text: "",
-//         timestamp: new Date(),
-//       };
-
-//       // Add messages and immediately scroll
-//       setMessages((prev) => {
-//         const newMessages = [...prev, userMessage, loaderMessage];
-//         // Trigger scroll after state update
-//         setTimeout(() => scrollToBottom("smooth"), 100);
-//         return newMessages;
-//       });
-
-//       try {
-//         const token = localStorage.getItem("token");
-//         if (!token) {
-//           toast.error("Please log in to continue");
-//           setMessages((prev) => prev.filter((m) => m.id !== loaderId));
-//           setSending(false);
-//           return;
-//         }
-
-//         const petData = {
-//           pet_name: user?.pet_name || "Unknown",
-//           pet_breed: "Unknown Breed",
-//           pet_age: user?.pet_age?.toString() || "Unknown",
-//           pet_location: "Unknown Location",
-//         };
-
-//         const payload = {
-//           user_id: user.id,
-//           question: inputMessage,
-//           context_token: contextToken || "",
-//           chat_room_token: currentChatRoomToken || "",
-//           ...petData,
-//         };
-
-//         const res = await axios.post(
-//           "https://snoutiq.com/backend/api/chat/send",
-//           payload,
-//           {
-//             headers: { Authorization: `Bearer ${token}` },
-//             timeout: 30000,
-//           }
-//         );
-
-//         const {
-//           context_token: newCtx,
-//           chat = {},
-//           emergency_status,
-//         } = res.data || {};
-
-//         if (newCtx) setContextToken(newCtx);
-
-//         const fullText = String(chat.answer || "");
-//         const aiId = genId();
-
-//         // Replace loader with AI message
-//         setMessages((prev) => {
-//           const newMessages = prev.map((m) =>
-//             m.id === loaderId
-//               ? {
-//                   id: aiId,
-//                   sender: "ai",
-//                   text: fullText,
-//                   displayedText: "",
-//                   timestamp: new Date(),
-//                   emergency_status: emergency_status,
-//                 }
-//               : m
-//           );
-//           // Scroll after replacing loader
-//           setTimeout(() => scrollToBottom("smooth"), 100);
-//           return newMessages;
-//         });
-
-//         // Start typing animation
-//         startTypingAnimation(aiId, fullText);
-
-//       } catch (error) {
-//         console.error("Error sending chat:", error);
-//         toast.error("Something went wrong. Try again.");
-
-//         setMessages((prev) => {
-//           const filteredMessages = prev.filter((m) => m.id !== loaderId);
-//           const errorMessage = {
-//             id: genId(),
-//             text: "⚠️ Sorry, I'm having trouble connecting right now.",
-//             sender: "ai",
-//             timestamp: new Date(),
-//             isError: true,
-//             displayedText: "⚠️ Sorry, I'm having trouble connecting right now.",
-//           };
-//           return [...filteredMessages, errorMessage];
-//         });
-//       } finally {
-//         setSending(false);
-//       }
-//     },
-//     [contextToken, currentChatRoomToken, user, sending, startTypingAnimation, scrollToBottom]
-//   );
-
-//   const clearChat = useCallback(() => {
-//     if (window.confirm("Are you sure you want to clear the chat history?")) {
-//       typingTimeouts.current.forEach((timeout) => clearTimeout(timeout));
-//       typingTimeouts.current.clear();
-
-//       setMessages([]);
-//       setContextToken("");
-
-//       // Clear from localStorage
-//       const storageKey = currentChatRoomToken
-//         ? `chatMessages_${currentChatRoomToken}`
-//         : "chatMessages";
-//       localStorage.removeItem(storageKey);
-//       localStorage.removeItem("contextToken");
-
-//       toast.success("Chat cleared");
-//     }
-//   }, [currentChatRoomToken]);
-
-//   // Context token persistence
-//   useEffect(() => {
-//     if (contextToken) {
-//       localStorage.setItem("contextToken", contextToken);
-//     }
-//   }, [contextToken]);
-
-//   useEffect(() => {
-//     const saved = localStorage.getItem("contextToken");
-//     if (saved) setContextToken(saved);
-//   }, []);
-
-//   // FIXED: ChatContent with proper structure
-//   const ChatContent = useMemo(() => {
-//     return (
-//       <div className="flex flex-col h-full">
-//         {/* Header */}
-//         <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm flex justify-between items-center">
-//           <div>
-//             <h1 className="text-2xl font-bold text-gray-900">Snoutiq AI</h1>
-//             <p className="text-gray-600 mt-1 text-sm">
-//               {currentChatRoomToken
-//                 ? `Ask questions about ${user?.pet_name || "your pet"}'s health`
-//                 : ``}
-//             </p>
-//           </div>
-//           <DetailedWeatherWidget />
-//           <div className="flex gap-2">
-//             {messages.length > 0 && (
-//               <button
-//                 onClick={clearChat}
-//                 className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-md transition-colors"
-//                 disabled={sending}
-//               >
-//                 Clear Chat
-//               </button>
-//             )}
-//           </div>
-//         </div>
-
-//         {/* Chat Container - FIXED: Removed flex-col-reverse */}
-//         <div
-//           ref={chatContainerRef}
-//           className="flex-1 overflow-y-auto px-4 bg-gray-50 custom-scroll"
-//         >
-//           <div className="max-w-4xl mx-auto py-4">
-//             {isLoading ? (
-//               <div className="flex justify-center items-center h-40">
-//                 <div className="text-center">
-//                   <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full mb-4 mx-auto"></div>
-//                   <p className="text-gray-600">Loading chat history...</p>
-//                 </div>
-//               </div>
-//             ) : messages.length === 0 ? (
-//               <div className="flex flex-col items-center justify-center h-full text-center py-8">
-//                 <div className="bg-white rounded-xl shadow-md p-6 lg:p-8 max-w-md">
-//                   <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-4 mx-auto">
-//                     <svg
-//                       className="w-7 h-7 text-blue-600"
-//                       fill="none"
-//                       stroke="currentColor"
-//                       viewBox="0 0 24 24"
-//                     >
-//                       <path
-//                         strokeLinecap="round"
-//                         strokeLinejoin="round"
-//                         strokeWidth={2}
-//                         d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-//                       />
-//                     </svg>
-//                   </div>
-//                   <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-2">
-//                     {currentChatRoomToken
-//                       ? "No messages in this chat"
-//                       : "Welcome to Pet Health Assistant"}
-//                   </h2>
-//                   <p className="text-gray-600 mb-4 text-sm lg:text-base">
-//                     {currentChatRoomToken
-//                       ? "Start the conversation by asking a question about your pet."
-//                       : "Start a conversation about your pet's health. Describe symptoms, ask questions, or seek advice about pet care."}
-//                   </p>
-//                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-left">
-//                     <h3 className="font-medium text-blue-800 mb-2 text-sm">
-//                       Try asking:
-//                     </h3>
-//                     <ul className="text-xs lg:text-sm text-blue-700 space-y-1">
-//                       <li>
-//                         • "My dog is scratching constantly, what could it be?"
-//                       </li>
-//                       <li>• "What's the best diet for a senior cat?"</li>
-//                       <li>• "How often should I groom my golden retriever?"</li>
-//                     </ul>
-//                   </div>
-//                 </div>
-//               </div>
-//             ) : (
-//               <div>
-//                 {messages.map((msg, index) => (
-//                   <div
-//                     key={msg.id || `msg-${index}`}
-//                     className="mb-4 last:mb-0"
-//                   >
-//                     <MessageBubble
-//                       msg={msg}
-//                       index={index}
-//                       onFeedback={(value, timestamp) =>
-//                         handleFeedback(value, timestamp)
-//                       }
-//                     />
-//                   </div>
-//                 ))}
-//                 {/* Scroll anchor */}
-//                 <div ref={messagesEndRef} className="h-1" />
-//               </div>
-//             )}
-//           </div>
-//         </div>
-
-//         {/* Chat Input - Fixed positioning */}
-//         <div className="border-t border-gray-200 bg-white p-4 shadow-lg">
-//           <div className="max-w-4xl mx-auto px-4">
-//             <ChatInput onSendMessage={handleSendMessage} isLoading={sending} />
-//             <div className="mt-2 text-xs text-gray-500 text-center">
-//               ⚠️ AI-generated advice. Consult a licensed veterinarian for
-//               serious health concerns.
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-//     );
-//   }, [
-//     messages,
-//     user,
-//     sending,
-//     clearChat,
-//     handleSendMessage,
-//     isLoading,
-//     currentChatRoomToken,
-//   ]);
-
-//   return (
-//     <>
-//   {showPetModal && (
-//   <PetDetailsModal onComplete={() => setShowPetModal(false)} />
-// )}
-
-//       <Navbar />
-//       <div className="hidden lg:flex h-[calc(100vh-64px)] mt-16 bg-gray-50">
-//         {/* Left Sidebar */}
-//         <div className="w-64 bg-white border-r border-gray-200 shadow-sm overflow-y-auto">
-//           <Sidebar />
-//         </div>
-
-//         {/* Center */}
-//         <div className="flex-1 flex flex-col overflow-hidden">
-//           {ChatContent}
-//         </div>
-
-//         {/* Right Sidebar */}
-//         <div className="w-64 bg-white border-l border-gray-200 shadow-sm overflow-y-auto custom-scroll">
-//           <RightSidebar />
-//         </div>
-//       </div>
-
-//       {/* Mobile Layout */}
-//       <div className="lg:hidden h-[calc(100vh-64px)] mt-16">{ChatContent}</div>
-//     </>
-//   );
-// };
-
-// export default Dashboard;
-
 import React, {
   useEffect,
   useState,
@@ -1378,6 +29,7 @@ const Dashboard = () => {
     updateChatRoomToken,
     updateNearbyDoctors,
   } = useContext(AuthContext);
+
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
@@ -1387,6 +39,51 @@ const Dashboard = () => {
   const typingTimeouts = useRef(new Map());
   const isAutoScrolling = useRef(false);
   const [nearbyDoctors, setNearbyDoctors] = useState([]);
+
+  // NEW: last decision/score shown in the Pet Profile bar
+  const [lastDecision, setLastDecision] = useState(null);
+  const [lastScore, setLastScore] = useState(null);
+
+  // ===== NEW: Editable Pet Profile state =====
+  const deriveInitialPetProfile = (u) => {
+    if (!u) {
+      return {
+        pet_name: "Unknown",
+        pet_breed: "Unknown Breed",
+        pet_age: "Unknown",
+        pet_weight: "",
+        pet_location: "Unknown Location",
+      };
+    }
+    const lat = u.latitude ? String(u.latitude).trim() : "";
+    const lon = u.longitude ? String(u.longitude).trim() : "";
+    const loc = lat && lon ? `${lat},${lon}` : "Unknown Location";
+
+    return {
+      pet_name: u.pet_name || "Unknown",
+      pet_breed: u.breed || u.pet_breed || "Unknown Breed",
+      pet_age: u.pet_age != null ? String(u.pet_age) : "Unknown",
+      pet_weight: u.pet_weight ? String(u.pet_weight) : "",
+      pet_location: loc,
+    };
+  };
+
+  const [petProfile, setPetProfile] = useState(deriveInitialPetProfile(user));
+
+  const onPetChange = (key) => (e) => {
+    const v = e?.target?.value ?? "";
+    setPetProfile((prev) => ({ ...prev, [key]: v }));
+  };
+
+  const resetFromUser = () => {
+    setPetProfile(deriveInitialPetProfile(user));
+  };
+
+  const canEditPetProfile = Boolean(
+    user?.email &&
+      ["admin@gmail.com", "ankitkumarjha306@gmail.com"].includes(user.email)
+  );
+  // ===========================================
 
   // Get chat_room_token from URL params
   const { chat_room_token } = useParams();
@@ -1398,13 +95,8 @@ const Dashboard = () => {
     if (user) {
       const hasPetData =
         user.pet_name && user.pet_gender && user.breed && user.pet_age;
-      if (!hasPetData) {
-        console.log("Missing pet data, showing modal");
-        setShowPetModal(true);
-      } else {
-        console.log("Pet data complete, hiding modal");
-        setShowPetModal(false);
-      }
+      setShowPetModal(!hasPetData);
+      setPetProfile(deriveInitialPetProfile(user)); // keep in sync
     } else {
       setShowPetModal(false);
     }
@@ -1413,7 +105,7 @@ const Dashboard = () => {
   const genId = () => Date.now() + Math.random();
 
   const fetchNearbyDoctors = async () => {
-    if (!token) return;
+    if (!token || !user?.id) return;
 
     try {
       setIsLoading(true);
@@ -1422,11 +114,9 @@ const Dashboard = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      console.log(res.data, "Nearby doctors response");
-
       if (res.data && Array.isArray(res.data.data)) {
         updateNearbyDoctors(res.data.data);
-        setNearbyDoctors(res.data.data)
+        setNearbyDoctors(res.data.data);
       }
     } catch (err) {
       console.error("Failed to fetch nearby doctors", err);
@@ -1436,41 +126,34 @@ const Dashboard = () => {
     }
   };
 
-
   useEffect(() => {
     fetchNearbyDoctors();
     const interval = setInterval(fetchNearbyDoctors, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // FIXED: Improved scrollToBottom function with better timing
+  // Improved scrollToBottom
   const scrollToBottom = useCallback((behavior = "smooth") => {
     if (isAutoScrolling.current) return;
 
     isAutoScrolling.current = true;
-
-    // Use multiple RAF to ensure DOM has updated
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (messagesEndRef.current) {
           messagesEndRef.current.scrollIntoView({
-            behavior: behavior,
+            behavior,
             block: "end",
             inline: "nearest",
           });
         }
-
-        setTimeout(
-          () => {
-            isAutoScrolling.current = false;
-          },
-          behavior === "smooth" ? 500 : 100
-        );
+        setTimeout(() => {
+          isAutoScrolling.current = false;
+        }, behavior === "smooth" ? 500 : 100);
       });
     });
   }, []);
 
-  // Cleanup function for typing animations
+  // Cleanup typing animations
   const cleanupTypingAnimation = useCallback((messageId) => {
     if (typingTimeouts.current.has(messageId)) {
       clearTimeout(typingTimeouts.current.get(messageId));
@@ -1478,22 +161,17 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Cleanup all animations on unmount
   useEffect(() => {
     return () => {
-      typingTimeouts.current.forEach((timeout) => clearTimeout(timeout));
+      typingTimeouts.current.forEach((t) => clearTimeout(t));
       typingTimeouts.current.clear();
     };
   }, []);
 
-  // FIXED: Enhanced auto-scroll on messages change
+  // Auto-scroll when length changes
   useEffect(() => {
     if (messages.length > 0) {
-      // Delay scroll to ensure DOM has rendered
-      const timeoutId = setTimeout(() => {
-        scrollToBottom("smooth");
-      }, 50);
-
+      const timeoutId = setTimeout(() => scrollToBottom("smooth"), 50);
       return () => clearTimeout(timeoutId);
     }
   }, [messages.length, scrollToBottom]);
@@ -1501,26 +179,22 @@ const Dashboard = () => {
   const handleFeedback = async (feedback, timestamp) => {
     try {
       const consultationId = messages.find(
-        (msg) => msg.timestamp.getTime() === timestamp.getTime()
+        (m) => m.timestamp.getTime() === timestamp.getTime()
       )?.consultationId;
 
       if (!consultationId) return;
 
-      await axios.post("/api/feedback", {
-        consultationId,
-        feedback,
-      });
-
+      await axios.post("/api/feedback", { consultationId, feedback });
       toast.success("Thanks for your feedback!");
-    } catch (err) {
+    } catch {
       toast.error("Failed to submit feedback");
     }
   };
 
   const fetchChatHistory = useCallback(
     async (specificChatRoomToken = null) => {
-      const token = localStorage.getItem("token");
-      if (!token || !user) return;
+      const tk = localStorage.getItem("token");
+      if (!tk || !user) return;
 
       try {
         setIsLoading(true);
@@ -1533,7 +207,7 @@ const Dashboard = () => {
         }
 
         const res = await axios.get(url, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${tk}` },
         });
 
         let messagesFromAPI = [];
@@ -1590,18 +264,11 @@ const Dashboard = () => {
 
         setMessages(messagesFromAPI);
 
-        // Update context if it exists in response
-        if (
-          res.data.length > 0 &&
-          res.data[res.data.length - 1].context_token
-        ) {
+        if (res.data.length > 0 && res.data[res.data.length - 1].context_token)
           setContextToken(res.data[res.data.length - 1].context_token);
-        }
       } catch (err) {
         console.error("Failed to fetch history", err);
-        if (specificChatRoomToken) {
-          toast.error("Failed to load chat history");
-        }
+        if (specificChatRoomToken) toast.error("Failed to load chat history");
       } finally {
         setIsLoading(false);
       }
@@ -1612,11 +279,9 @@ const Dashboard = () => {
   useEffect(() => {
     if (currentChatRoomToken) {
       localStorage.setItem("lastChatRoomToken", currentChatRoomToken);
-
       if (updateChatRoomToken && chat_room_token) {
         updateChatRoomToken(chat_room_token);
       }
-
       setMessages([]);
       setContextToken("");
       fetchChatHistory(currentChatRoomToken);
@@ -1633,25 +298,21 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Add event listener for sidebar clicks
+  // Sidebar events
   useEffect(() => {
     const handleChatRoomChange = (event) => {
       const newChatRoomToken = event.detail;
-
       if (newChatRoomToken && updateChatRoomToken) {
         updateChatRoomToken(newChatRoomToken);
         navigate(`/chat/${newChatRoomToken}`);
       }
     };
-
     window.addEventListener("chatRoomChanged", handleChatRoomChange);
-
-    return () => {
+    return () =>
       window.removeEventListener("chatRoomChanged", handleChatRoomChange);
-    };
   }, [navigate, updateChatRoomToken]);
 
-  // Save messages to localStorage (debounced)
+  // Save to localStorage
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (messages.length > 0) {
@@ -1661,11 +322,10 @@ const Dashboard = () => {
         localStorage.setItem(storageKey, JSON.stringify(messages));
       }
     }, 500);
-
     return () => clearTimeout(timeoutId);
   }, [messages, currentChatRoomToken]);
 
-  // Load saved messages from localStorage on mount
+  // Load saved messages for this room
   useEffect(() => {
     if (currentChatRoomToken) {
       const saved = localStorage.getItem(
@@ -1673,25 +333,22 @@ const Dashboard = () => {
       );
       if (saved) {
         try {
-          const parsedMessages = JSON.parse(saved);
-          if (parsedMessages.length > 0) {
-            setMessages(parsedMessages);
-          }
-        } catch (error) {
-          console.error("Failed to parse saved messages:", error);
+          const parsed = JSON.parse(saved);
+          if (parsed.length > 0) setMessages(parsed);
+        } catch (e) {
+          console.error("Failed to parse saved messages:", e);
         }
       }
     }
   }, [currentChatRoomToken]);
 
-  // FIXED: Improved typing animation with better scroll handling
+  // Typing animation
   const startTypingAnimation = useCallback(
     (messageId, fullText) => {
       cleanupTypingAnimation(messageId);
-
       let charIndex = 0;
-      const typingSpeed = 25; 
-      const batchSize = 3; 
+      const typingSpeed = 25;
+      const batchSize = 3;
 
       const typeNextBatch = () => {
         if (charIndex >= fullText.length) {
@@ -1699,9 +356,7 @@ const Dashboard = () => {
           setTimeout(() => scrollToBottom("smooth"), 200);
           return;
         }
-
         const nextIndex = Math.min(charIndex + batchSize, fullText.length);
-
         setMessages((prev) =>
           prev.map((m) =>
             m.id === messageId
@@ -1709,24 +364,19 @@ const Dashboard = () => {
               : m
           )
         );
-
         charIndex = nextIndex;
-
-        // Smooth scroll during typing
         setTimeout(() => scrollToBottom("auto"), 10);
-
         const timeoutId = setTimeout(typeNextBatch, typingSpeed);
         typingTimeouts.current.set(messageId, timeoutId);
       };
 
-      // Start typing animation
       const initialTimeout = setTimeout(typeNextBatch, 300);
       typingTimeouts.current.set(messageId, initialTimeout);
     },
     [cleanupTypingAnimation, scrollToBottom]
   );
 
-  // FIXED: Better message handling in handleSendMessage
+  // Send Message
   const handleSendMessage = useCallback(
     async (inputMessage) => {
       if (inputMessage.trim() === "" || sending) return;
@@ -1751,32 +401,35 @@ const Dashboard = () => {
         timestamp: new Date(),
       };
 
-      // Add messages and immediately scroll
       setMessages((prev) => {
         const newMessages = [...prev, userMessage, loaderMessage];
-        // Trigger scroll after state update
         setTimeout(() => scrollToBottom("smooth"), 100);
         return newMessages;
       });
 
       try {
-        const token = localStorage.getItem("token");
-        if (!token) {
+        const tk = localStorage.getItem("token");
+        if (!tk) {
           toast.error("Please log in to continue");
           setMessages((prev) => prev.filter((m) => m.id !== loaderId));
           setSending(false);
           return;
         }
 
+        // use editable petProfile for payload
         const petData = {
-          pet_name: user?.pet_name || "Unknown",
-          pet_breed: "Unknown Breed",
-          pet_age: user?.pet_age?.toString() || "Unknown",
-          pet_location: "Unknown Location",
+          pet_name: (petProfile.pet_name || "Unknown").trim(),
+          pet_breed: (petProfile.pet_breed || "Unknown Breed").trim(),
+          pet_age:
+            petProfile.pet_age != null && String(petProfile.pet_age).length
+              ? String(petProfile.pet_age).trim()
+              : "Unknown",
+          pet_location:
+            (petProfile.pet_location || "Unknown Location").trim(),
         };
 
         const payload = {
-          user_id: user.id,
+          user_id: user?.id,
           question: inputMessage,
           context_token: contextToken || "",
           chat_room_token: currentChatRoomToken || "",
@@ -1787,7 +440,7 @@ const Dashboard = () => {
           "https://snoutiq.com/backend/api/chat/send",
           payload,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${tk}` },
             timeout: 30000,
           }
         );
@@ -1796,14 +449,21 @@ const Dashboard = () => {
           context_token: newCtx,
           chat = {},
           emergency_status,
+          decision,
+          score,
         } = res.data || {};
 
         if (newCtx) setContextToken(newCtx);
 
+        // 🔴 update decision/score chips shown in the bar
+        setLastDecision(decision ?? null);
+        setLastScore(
+          typeof score === "number" ? score : score ? Number(score) : null
+        );
+
         const fullText = String(chat.answer || "");
         const aiId = genId();
 
-        // Replace loader with AI message
         setMessages((prev) => {
           const newMessages = prev.map((m) =>
             m.id === loaderId
@@ -1814,21 +474,27 @@ const Dashboard = () => {
                   displayedText: "",
                   timestamp: new Date(),
                   emergency_status: emergency_status,
+                  // (optional) keep per-message decision/score if you want later
+                  decision: decision ?? null,
+                  score:
+                    typeof score === "number"
+                      ? score
+                      : score
+                      ? Number(score)
+                      : null,
                 }
               : m
           );
-          // Scroll after replacing loader
           setTimeout(() => scrollToBottom("smooth"), 100);
           return newMessages;
         });
 
-        // Start typing animation
         startTypingAnimation(aiId, fullText);
       } catch (error) {
         toast.error("Something went wrong. Try again.");
 
         setMessages((prev) => {
-          const filteredMessages = prev.filter((m) => m.id !== loaderId);
+          const filtered = prev.filter((m) => m.id !== loaderId);
           const errorMessage = {
             id: genId(),
             text: "⚠️ Sorry, I'm having trouble connecting right now.",
@@ -1837,7 +503,7 @@ const Dashboard = () => {
             isError: true,
             displayedText: "⚠️ Sorry, I'm having trouble connecting right now.",
           };
-          return [...filteredMessages, errorMessage];
+          return [...filtered, errorMessage];
         });
       } finally {
         setSending(false);
@@ -1846,22 +512,23 @@ const Dashboard = () => {
     [
       contextToken,
       currentChatRoomToken,
-      user,
+      user?.id,
       sending,
       startTypingAnimation,
       scrollToBottom,
+      petProfile,
     ]
   );
 
   const clearChat = useCallback(() => {
     if (window.confirm("Are you sure you want to clear the chat history?")) {
-      typingTimeouts.current.forEach((timeout) => clearTimeout(timeout));
+      typingTimeouts.current.forEach((t) => clearTimeout(t));
       typingTimeouts.current.clear();
-
       setMessages([]);
       setContextToken("");
+      setLastDecision(null);
+      setLastScore(null);
 
-      // Clear from localStorage
       const storageKey = currentChatRoomToken
         ? `chatMessages_${currentChatRoomToken}`
         : "chatMessages";
@@ -1874,9 +541,7 @@ const Dashboard = () => {
 
   // Context token persistence
   useEffect(() => {
-    if (contextToken) {
-      localStorage.setItem("contextToken", contextToken);
-    }
+    if (contextToken) localStorage.setItem("contextToken", contextToken);
   }, [contextToken]);
 
   useEffect(() => {
@@ -1884,7 +549,6 @@ const Dashboard = () => {
     if (saved) setContextToken(saved);
   }, []);
 
-  // FIXED: ChatContent with proper structure
   const ChatContent = useMemo(() => {
     return (
       <div className="flex flex-col h-full">
@@ -1912,7 +576,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Chat Container - FIXED: Removed flex-col-reverse */}
+        {/* Chat Container */}
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto px-4 bg-gray-50 custom-scroll"
@@ -1980,20 +644,85 @@ const Dashboard = () => {
                       onFeedback={(value, timestamp) =>
                         handleFeedback(value, timestamp)
                       }
-                        nearbyDoctors={nearbyDoctors}
+                      nearbyDoctors={nearbyDoctors}
                     />
                   </div>
                 ))}
-                {/* Scroll anchor */}
                 <div ref={messagesEndRef} className="h-1" />
               </div>
             )}
           </div>
         </div>
 
-        {/* Chat Input - Fixed positioning */}
+        {/* Chat Input */}
         <div className="border-t border-gray-200 bg-white p-4 shadow-lg">
           <div className="max-w-4xl mx-auto px-4">
+
+            {/* ===== Editable Pet Profile Bar (restricted to admins) ===== */}
+            {canEditPetProfile && (
+              <div className="bg-gray-900 text-white px-4 py-3 rounded-xl mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🐶</span>
+                    <span className="font-semibold">Pet Profile</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* NEW: Decision & Score chips */}
+                    <span className="text-[11px] px-2 py-1 rounded-md bg-blue-600/90">
+                      Decision: {lastDecision ?? "—"}
+                    </span>
+                    <span className="text-[11px] px-2 py-1 rounded-md bg-gray-700">
+                      Score: {lastScore != null ? `${lastScore}/10` : "—"}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={resetFromUser}
+                      className="text-xs px-2 py-1 rounded-md bg-gray-800 hover:bg-gray-700"
+                      title="Reset from saved profile"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Name"
+                    value={petProfile.pet_name}
+                    onChange={onPetChange("pet_name")}
+                  />
+                  <input
+                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Breed (e.g. Pug)"
+                    value={petProfile.pet_breed}
+                    onChange={onPetChange("pet_breed")}
+                  />
+                  <input
+                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Age (e.g. 3 years)"
+                    value={petProfile.pet_age}
+                    onChange={onPetChange("pet_age")}
+                  />
+                  <input
+                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Weight (e.g. 12 kg)"
+                    value={petProfile.pet_weight}
+                    onChange={onPetChange("pet_weight")}
+                  />
+                  <input
+                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 min-w-[220px]"
+                    placeholder="Location (e.g. Delhi or 28.5, 77.0)"
+                    value={petProfile.pet_location}
+                    onChange={onPetChange("pet_location")}
+                  />
+                </div>
+              </div>
+            )}
+            {/* ========================================= */}
+
             <ChatInput onSendMessage={handleSendMessage} isLoading={sending} />
             <div className="mt-2 text-xs text-gray-500 text-center">
               ⚠️ AI-generated advice. Consult a licensed veterinarian for
@@ -2011,14 +740,16 @@ const Dashboard = () => {
     handleSendMessage,
     isLoading,
     currentChatRoomToken,
+    canEditPetProfile,
+    petProfile,
+    lastDecision,
+    lastScore,
   ]);
 
   return (
     <>
-    
-
       <Navbar />
-        {showPetModal && (
+      {showPetModal && (
         <PetDetailsModal
           onComplete={() => setShowPetModal(false)}
           updateUser={updateUser}
@@ -2026,6 +757,7 @@ const Dashboard = () => {
           user={user}
         />
       )}
+
       <div className="hidden lg:flex h-[calc(100vh-64px)] mt-16 bg-gray-50">
         {/* Left Sidebar */}
         <div className="w-64 bg-white border-r border-gray-200 shadow-sm overflow-y-auto">
@@ -2033,9 +765,7 @@ const Dashboard = () => {
         </div>
 
         {/* Center */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {ChatContent}
-        </div>
+        <div className="flex-1 flex flex-col overflow-hidden">{ChatContent}</div>
 
         {/* Right Sidebar */}
         <div className="w-64 bg-white border-l border-gray-200 shadow-sm overflow-y-auto custom-scroll">
