@@ -1,133 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Snoutiq Dashboard</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard | SnoutIQ</title>
+  <link rel="icon" href="https://snoutiq.com/favicon.webp" type="image/png"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
 </head>
 <body class="bg-gray-50">
 
   <!-- Navbar -->
-  <header class="bg-white border-b shadow-sm px-6 py-3 flex justify-between items-center">
-    <div class="flex items-center space-x-2 font-bold text-xl text-blue-600">
-      <img src="https://snoutiq.com/favicon.webp" class="h-6" alt="Snoutiq">
-      SnoutIQ
-    </div>
-    <div class="flex items-center space-x-4">
-      <button class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">Policies</button>
-      <button class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">Tail Talks</button>
-      <div class="flex items-center space-x-2">
-        <i class="fa-solid fa-user-circle text-gray-600 text-xl"></i>
-        <div>
-          <p class="font-semibold">Demo User</p>
-          <p class="text-xs text-gray-500">pet_owner</p>
+  <nav class="fixed top-0 w-full bg-white border-b border-gray-200 shadow-sm z-50">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+      <div class="flex items-center gap-2 font-bold text-xl text-blue-600">
+        <img src="https://snoutiq.com/favicon.webp" class="h-6" alt="SnoutIQ">
+        SnoutIQ
+      </div>
+      <div class="flex items-center gap-4">
+        <button class="bg-blue-600 text-white px-3 py-1.5 rounded-md">Policies</button>
+        <button class="bg-blue-600 text-white px-3 py-1.5 rounded-md">Tail Talks</button>
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-user-circle text-gray-600 text-xl"></i>
+          <div>
+            <p id="userName" class="font-semibold">Demo User</p>
+            <p id="userRole" class="text-xs text-gray-500">pet_owner</p>
+          </div>
         </div>
       </div>
     </div>
-  </header>
+  </nav>
 
-  <!-- Layout -->
-  <div class="flex h-[calc(100vh-64px)]">
-
-    <!-- LEFT SIDEBAR -->
-    <aside class="w-64 bg-white border-r p-4 overflow-y-auto">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-sm font-semibold">Chat History</h2>
+  <div class="flex h-screen pt-16">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 shadow-sm overflow-y-auto">
+      <div class="p-4 border-b">
+        <h2 class="text-sm font-semibold mb-2">Chat History</h2>
         <button onclick="newChat()" class="text-blue-600 text-xs flex items-center gap-1">
           <i class="fa-solid fa-plus"></i> New Chat
         </button>
       </div>
-      <div id="chatHistory" class="space-y-2 text-sm"></div>
-
-      <h2 class="mt-6 mb-2 text-sm font-semibold">Pet of the Day</h2>
-      <div class="bg-orange-50 rounded-lg p-3 text-center shadow">
-        <img src="https://placekitten.com/200/140" class="rounded-lg mb-2 mx-auto">
-        <p class="font-bold">Lucy</p>
-        <p class="text-xs text-gray-600">7 years, Pune</p>
-        <span class="bg-red-500 text-white px-2 py-0.5 text-xs rounded-full">LIVE</span>
-      </div>
+      <div id="chatHistory" class="p-4 space-y-2 text-sm"></div>
     </aside>
 
-    <!-- CENTER CHAT -->
+    <!-- Chat Section -->
     <main class="flex-1 flex flex-col">
-      <div class="border-b bg-white px-6 py-3 flex justify-between items-center">
+      <!-- Header -->
+      <div class="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shadow-sm">
         <div>
-          <h1 class="text-xl font-bold">Snoutiq AI</h1>
-          <p class="text-sm text-gray-500">Ask questions about your pet's health</p>
+          <h1 class="text-2xl font-bold text-gray-900">SnoutIQ AI</h1>
+          <p class="text-sm text-gray-500">Ask questions about your pet’s health</p>
         </div>
-        <div id="weather" class="text-sm bg-blue-50 px-3 py-1 rounded-full">☀️ 34°C Sunny • Feels like 34°C</div>
+        <div id="weather" class="text-sm bg-blue-50 px-3 py-1 rounded-full">☀️ 34°C Sunny</div>
       </div>
 
-      <div id="chatBox" class="flex-1 overflow-y-auto px-4 bg-gray-50 py-4">
-        <div class="text-center text-gray-600">
-          No messages yet. Start by asking something about your pet 🐾
+      <!-- Chat Messages -->
+      <div id="chatBox" class="flex-1 overflow-y-auto px-4 py-4 bg-gray-50">
+        <div class="text-center text-gray-500 mt-20">
+          Start by asking something about your pet 🐾
         </div>
       </div>
 
       <!-- Input -->
-      <div class="border-t bg-white px-4 py-3">
-        <div class="flex items-center space-x-2 max-w-3xl mx-auto">
-          <input id="chatInput" type="text" placeholder="Type your message..." class="flex-1 border rounded-lg px-4 py-2">
-          <button onclick="sendMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-lg">
-            <i class="fa-solid fa-paper-plane"></i>
-          </button>
+      <div class="border-t border-gray-200 bg-white p-4 shadow-lg">
+        <div class="max-w-4xl mx-auto">
+          <!-- Pet Profile bar (editable for admins) -->
+          <div id="petProfileBar" class="bg-gray-900 text-white px-4 py-3 rounded-xl mb-3 hidden">
+            <div class="flex justify-between items-center mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-lg">🐶</span>
+                <span class="font-semibold">Pet Profile</span>
+              </div>
+              <div class="flex gap-2">
+                <span id="decisionChip" class="text-[11px] px-2 py-1 rounded-md bg-blue-600/90">Decision: —</span>
+                <span id="scoreChip" class="text-[11px] px-2 py-1 rounded-md bg-gray-700">Score: —</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <input id="petName" class="bg-gray-800 text-white px-3 py-1 rounded-lg" placeholder="Name">
+              <input id="petBreed" class="bg-gray-800 text-white px-3 py-1 rounded-lg" placeholder="Breed">
+              <input id="petAge" class="bg-gray-800 text-white px-3 py-1 rounded-lg" placeholder="Age">
+              <input id="petWeight" class="bg-gray-800 text-white px-3 py-1 rounded-lg" placeholder="Weight">
+              <input id="petLocation" class="bg-gray-800 text-white px-3 py-1 rounded-lg min-w-[200px]" placeholder="Location">
+            </div>
+          </div>
+
+          <!-- Input box -->
+          <div class="flex gap-2">
+            <input id="chatInput" type="text" placeholder="Type your message..." class="flex-1 border rounded-lg px-4 py-2">
+            <button onclick="sendMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-lg">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 text-center mt-2">
+            ⚠️ AI-generated advice. Consult a licensed veterinarian.
+          </p>
         </div>
-        <p class="text-xs text-gray-500 text-center mt-2">⚠️ AI-generated advice. Consult a licensed veterinarian.</p>
       </div>
     </main>
 
-    <!-- RIGHT SIDEBAR -->
-    <aside class="w-72 bg-white border-l p-4 space-y-4 overflow-y-auto">
-      <div>
-        <div class="flex space-x-4 border-b">
-          <button class="font-semibold text-blue-600 border-b-2 border-blue-600 pb-1">Nearby Vets</button>
-          <button class="text-gray-500 pb-1">Groomers</button>
-        </div>
-        <div id="nearbyVets" class="space-y-2 mt-3"></div>
-      </div>
+    <!-- Right Sidebar -->
+    <aside class="w-64 bg-white border-l border-gray-200 shadow-sm p-4 space-y-4 overflow-y-auto">
+      <h2 class="font-semibold text-sm border-b pb-1">Nearby Vets</h2>
+      <div id="nearbyVets" class="space-y-2"></div>
       <div class="bg-blue-600 text-white rounded-lg p-4">
-        ✨ Limited Time Offer<br>
-        <span class="font-bold">First Vet Consultation FREE!</span>
-        <button class="bg-white text-blue-600 font-semibold w-full mt-2 px-3 py-2 rounded-lg">Claim Offer</button>
+        ✨ First Consultation FREE!
+        <button class="bg-white text-blue-600 w-full mt-2 py-2 rounded-lg">Claim Offer</button>
       </div>
       <div class="bg-red-50 text-red-700 rounded-lg p-4">
-        🚨 Emergency<br>
-        <span class="text-sm">Immediate veterinary care</span>
-        <button class="bg-red-600 text-white w-full mt-2 px-3 py-2 rounded-lg">Call Emergency Vet</button>
-      </div>
-      <div class="bg-gray-50 rounded-lg p-3 text-center">
-        <p class="text-sm mb-2">Better experience on our app</p>
-        <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Google Play">
+        🚨 Emergency<br/>
+        <button class="bg-red-600 text-white w-full mt-2 py-2 rounded-lg">Call Emergency Vet</button>
       </div>
     </aside>
   </div>
 
   <script>
-    let currentChatRoomToken = "";
+    let currentChatRoomToken = localStorage.getItem("lastChatRoomToken") || "";
+    let contextToken = localStorage.getItem("contextToken") || "";
+    let lastDecision = null;
+    let lastScore = null;
 
     async function fetchNearbyVets() {
       try {
-        const res = await axios.get(`http://127.0.0.1:8000/api/nearby-vets?user_id=1`);
-        document.getElementById("nearbyVets").innerHTML = res.data.data.map(v => `
-          <div class="p-2 border rounded">${v.name}</div>
-        `).join("");
-      } catch(e) { console.error(e); }
+        const res = await axios.get(`/api/nearby-vets?user_id=1`);
+        document.getElementById("nearbyVets").innerHTML =
+          res.data.data.map(v => `<div class="p-2 border rounded">${v.name}</div>`).join("");
+      } catch (e) { console.error(e); }
     }
 
     async function fetchChatHistory() {
       try {
         let url = currentChatRoomToken
-          ? `http://127.0.0.1:8000/api/chat-rooms/${currentChatRoomToken}/chats?user_id=1`
-          : `http://127.0.0.1:8000/api/chat/listRooms?user_id=1`;
+          ? `/api/chat-rooms/${currentChatRoomToken}/chats?user_id=1`
+          : `/api/chat/listRooms?user_id=1`;
 
         const res = await axios.get(url);
         const chats = res.data?.chats || [];
         let html = "";
         chats.forEach(chat => {
           html += `
-            <div class="mb-2">
+            <div class="mb-3">
               <div class="text-right"><span class="bg-blue-100 px-3 py-2 rounded">${chat.question}</span></div>
               <div class="text-left mt-1"><span class="bg-gray-200 px-3 py-2 rounded">${chat.answer}</span></div>
             </div>
@@ -146,39 +158,44 @@
       input.value = "";
 
       document.getElementById("chatBox").innerHTML += `
-        <div class="text-right mb-2">
-          <span class="bg-blue-100 px-3 py-2 rounded">${question}</span>
-        </div>
+        <div class="text-right mb-2"><span class="bg-blue-100 px-3 py-2 rounded">${question}</span></div>
       `;
 
       try {
-        const res = await axios.post("http://127.0.0.1:8000/api/chat/send", {
-          user_id: 1,  // ✅ Static user
+        const payload = {
+          user_id: 1,
           question,
-          chat_room_token: currentChatRoomToken || "",
-        });
+          context_token: contextToken,
+          chat_room_token: currentChatRoomToken
+        };
 
-        const answer = res.data.chat?.answer || "No response";
+        const res = await axios.post(`/api/chat/send`, payload);
+        const { chat = {}, context_token: newCtx, decision, score } = res.data || {};
+        if (newCtx) { contextToken = newCtx; localStorage.setItem("contextToken", newCtx); }
+
+        lastDecision = decision || null;
+        lastScore = score || null;
+        document.getElementById("decisionChip").innerText = "Decision: " + (lastDecision ?? "—");
+        document.getElementById("scoreChip").innerText = "Score: " + (lastScore ?? "—");
+
+        const answer = chat.answer || "No response";
         document.getElementById("chatBox").innerHTML += `
-          <div class="text-left mb-2">
-            <span class="bg-gray-200 px-3 py-2 rounded">${answer}</span>
-          </div>
+          <div class="text-left mb-2"><span class="bg-gray-200 px-3 py-2 rounded">${answer}</span></div>
         `;
-      } catch(e) {
+      } catch (e) {
         document.getElementById("chatBox").innerHTML += `
-          <div class="text-left text-red-600 mb-2">
-            ⚠️ Error sending message
-          </div>
+          <div class="text-left text-red-600 mb-2">⚠️ Error sending message</div>
         `;
       }
     }
 
     function newChat() {
       currentChatRoomToken = "";
+      localStorage.removeItem("lastChatRoomToken");
       document.getElementById("chatBox").innerHTML = "<div class='text-center text-gray-500'>New chat started</div>";
     }
 
-    // init
+    // Init
     fetchNearbyVets();
     fetchChatHistory();
   </script>
