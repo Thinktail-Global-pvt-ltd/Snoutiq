@@ -131,8 +131,8 @@
     async function fetchChatHistory() {
       try {
         let url = currentChatRoomToken
-          ? `/api/chat-rooms/${currentChatRoomToken}/chats?user_id=1`
-          : `/api/chat/listRooms?user_id=1`;
+          ? `/api/chat-rooms/${currentChatRoomToken}/chats?user_id=355`
+          : `/api/chat/listRooms?user_id=355`;
 
         const res = await axios.get(url);
         const chats = res.data?.chats || [];
@@ -163,7 +163,7 @@
 
       try {
         const payload = {
-          user_id: 1,
+          user_id: 355,
           question,
           context_token: contextToken,
           chat_room_token: currentChatRoomToken
