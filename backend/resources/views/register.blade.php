@@ -4,139 +4,148 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Register | SnoutIQ</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Identity Services -->
+  <link rel="icon" href="https://snoutiq.com/favicon.webp" sizes="32x32" type="image/png"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  <style>
+    body{margin:0;font-family:Inter,system-ui,sans-serif;background:#f9fafb;}
+    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;
+      padding:.7rem .9rem;border-radius:.6rem;box-shadow:0 10px 24px rgba(0,0,0,.25);
+      opacity:0;transform:translateY(8px);transition:.3s}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .tab.active{background:#2563eb;color:#fff}
+  </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center px-4 py-8">
+<body>
 
-  <div class="w-full max-w-sm sm:max-w-md">
-    <div class="bg-white rounded-xl shadow-xl p-6 sm:p-8 text-center">
+  <!-- UI -->
+  <main style="max-width:400px;margin:40px auto;background:#fff;padding:24px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.1)">
+    <h1 style="text-align:center;margin-bottom:10px">Welcome to SnoutIQ!</h1>
+    <p style="text-align:center;color:#64748b">Let's start by getting to know you</p>
 
-      <!-- Logo -->
-      <div class="mb-6">
-        <img src="{{ asset('images/logo.webp') }}" alt="Snoutiq Logo" class="h-6 mx-auto mb-3 cursor-pointer"/>
-      </div>
-
-      <!-- Welcome Message -->
-      <div class="mb-4 sm:mb-6">
-        <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Welcome to Snoutiq!</h1>
-        <p class="text-sm sm:text-base text-gray-600">Let's start by getting to know you</p>
-      </div>
-
-      <!-- Tabs -->
-      <div class="mb-6">
-        <div class="flex bg-gray-100 rounded-lg p-1">
-          <button id="tab-owner" class="flex-1 py-2 px-4 rounded-md text-sm font-medium bg-white text-blue-600 shadow-sm">Pet Owner</button>
-          <button id="tab-vet" class="flex-1 py-2 px-4 rounded-md text-sm font-medium text-gray-600 hover:text-gray-800">Veterinarian</button>
-        </div>
-      </div>
-
-      <!-- Location Badge -->
-      <div id="locationStatus" class="mb-4 text-sm"></div>
-
-      <!-- Google Login -->
-      <div class="mb-6">
-        <div class="flex justify-center">
-          <div id="googleBtn" class="w-full max-w-sm border rounded-xl shadow-md p-4 bg-white flex justify-center"></div>
-        </div>
-        <p id="googleMessage" class="mt-3 text-sm text-center"></p>
-      </div>
-
-      <!-- Footer -->
-      <div class="mt-6 pt-4 border-t border-gray-200">
-        <p class="text-gray-600 text-sm">
-          Already have an account?
-          <a href="{{ route('login') }}" class="text-blue-600 hover:underline font-medium">Login here</a>
-        </p>
-      </div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:8px;margin:16px 0">
+      <button id="tab-pet" class="tab active" style="flex:1;padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:#2563eb;color:#fff">Pet Owner</button>
+      <button id="tab-vet" class="tab" style="flex:1;padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb">Veterinarian</button>
     </div>
-  </div>
+
+    <!-- Location Badge -->
+    <div id="locBadge" style="padding:10px;border-radius:8px;text-align:center;border:1px solid #e5e7eb;background:#f3f4f6;margin-bottom:16px">
+      Checking location permission...
+    </div>
+
+    <!-- Google login -->
+    <div id="googleBtn" style="margin:12px auto;text-align:center;min-height:44px"></div>
+    <p id="googleMsg" style="text-align:center;font-size:14px;margin-top:8px;color:#dc2626"></p>
+
+    <!-- Vet email -->
+    <div id="vetPanel" style="display:none;margin-top:16px">
+      <input id="vetEmail" placeholder="Work email" style="width:100%;padding:10px;margin-bottom:8px;border:1px solid #e5e7eb;border-radius:8px"/>
+      <input id="vetPass" type="password" placeholder="Password" style="width:100%;padding:10px;margin-bottom:8px;border:1px solid #e5e7eb;border-radius:8px"/>
+      <button id="vetCta" style="width:100%;padding:10px;background:#2563eb;color:#fff;border:none;border-radius:8px">Continue</button>
+    </div>
+  </main>
+
+  <div id="toast" class="toast"></div>
 
   <script>
-    let userType = "pet_owner";
-    let coords = { lat: null, lng: null };
+    let locationStatus = "checking";
+    let coords = { lat:null, lng:null };
+
+    const toast = (msg,type="info")=>{
+      const el=document.getElementById("toast");
+      el.textContent=msg;
+      el.style.background = type==="error" ? "#dc2626" : (type==="success"?"#16a34a":"#111827");
+      el.classList.add("show");
+      setTimeout(()=>el.classList.remove("show"),2500);
+    };
 
     // Tab switching
-    const tabOwner = document.getElementById("tab-owner");
-    const tabVet = document.getElementById("tab-vet");
-    tabOwner.addEventListener("click", () => {
-      userType = "pet_owner";
-      tabOwner.classList.add("bg-white", "text-blue-600", "shadow-sm");
-      tabVet.classList.remove("bg-white", "text-blue-600", "shadow-sm");
-      tabVet.classList.add("text-gray-600");
-    });
-    tabVet.addEventListener("click", () => {
-      userType = "veterinarian";
-      tabVet.classList.add("bg-white", "text-blue-600", "shadow-sm");
-      tabOwner.classList.remove("bg-white", "text-blue-600", "shadow-sm");
-      tabOwner.classList.add("text-gray-600");
-      // redirect if vet
-      window.location.href = "/vet-register";
-    });
+    document.getElementById("tab-pet").onclick=()=>{
+      document.getElementById("vetPanel").style.display="none";
+      document.getElementById("tab-pet").classList.add("active");
+      document.getElementById("tab-vet").classList.remove("active");
+    };
+    document.getElementById("tab-vet").onclick=()=>{
+      document.getElementById("vetPanel").style.display="block";
+      document.getElementById("tab-vet").classList.add("active");
+      document.getElementById("tab-pet").classList.remove("active");
+    };
 
-    // Location handling
-    const statusEl = document.getElementById("locationStatus");
-    function setStatus(msg, color) {
-      statusEl.innerHTML = `<div class="p-2 rounded-lg ${color}">${msg}</div>`;
+    // Location
+    const badge=document.getElementById("locBadge");
+    function setBadge(status,msg,color){
+      badge.textContent=msg;
+      badge.style.background=color;
     }
+    function requestLocation(){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        locationStatus="granted";
+        coords.lat=pos.coords.latitude; coords.lng=pos.coords.longitude;
+        setBadge("granted","✅ Location access granted","#dcfce7");
+        toast("Location access granted","success");
+      },err=>{
+        locationStatus="denied";
+        setBadge("denied","❌ Location denied","#fee2e2");
+        toast("Location access denied","error");
+      });
+    }
+    if(navigator.geolocation){ requestLocation(); } else { setBadge("denied","Not supported","#fee2e2"); }
 
-    function requestLocation() {
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setStatus("✅ Location access granted", "bg-green-50 text-green-600");
-        },
-        err => {
-          console.error("Location error:", err);
-          setStatus("❌ Location denied. Please enable it.", "bg-red-50 text-red-600");
+    // Google login
+    window.onGoogleCredential = async (response)=>{
+      if(locationStatus!=="granted"){ 
+        document.getElementById("googleMsg").textContent="❌ Please allow location access first";
+        toast("Location required","error"); return;
+      }
+      const base64Url = response.credential.split(".")[1];
+      const base64 = base64Url.replace(/-/g,"+").replace(/_/g,"/");
+      const jsonPayload = decodeURIComponent(atob(base64).split("").map(c=>"%"+("00"+c.charCodeAt(0).toString(16)).slice(-2)).join(""));
+      const googleData = JSON.parse(jsonPayload);
+      const email=googleData.email; const googleToken=googleData.sub;
+
+      try{
+        // 1. Try login with role pet
+        let loginRes=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
+        if(loginRes.data.status==="success"){
+          toast("Login successful!","success");
+          location.href="/dashboard"; return;
         }
-      );
-    }
-    if (navigator.geolocation) {
-      requestLocation();
-    } else {
-      setStatus("❌ Location not supported", "bg-red-50 text-red-600");
-    }
+      }catch(e){ console.warn("Login failed, will register"); }
 
-    // Google Login
-    window.onGoogleCredential = async (response) => {
-      const messageEl = document.getElementById("googleMessage");
-      try {
-        const base64Url = response.credential.split(".")[1];
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        const jsonPayload = decodeURIComponent(atob(base64).split("").map(function(c) {
-          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(""));
-        const googleData = JSON.parse(jsonPayload);
+      // 2. Register
+      let reg=await fetch("https://snoutiq.com/backend/api/auth/initial-register",{
+        method:"POST",headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({ fullName:googleData.name,email,google_token:googleToken,latitude:coords.lat,longitude:coords.lng })
+      });
+      let regData=await reg.json();
+      if(regData.status==="error"){ document.getElementById("googleMsg").textContent=regData.message; return; }
 
-        const email = googleData.email;
-        const googleToken = googleData.sub;
+      // 3. Login again with role pet
+      let finalLogin=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
+      if(finalLogin.data.token){ toast("Registered & logged in!","success"); location.href="/dashboard"; }
+    };
 
-        // TODO: call backend login/register
-        messageEl.textContent = "✅ Google credential received: " + email;
-        messageEl.className = "text-green-600 text-sm text-center";
-        // Example redirect
-        // window.location.href = "/dashboard";
-      } catch (err) {
-        console.error(err);
-        messageEl.textContent = "❌ Google login failed";
-        messageEl.className = "text-red-600 text-sm text-center";
+    window.onload=()=>{
+      if(window.google && google.accounts){
+        google.accounts.id.initialize({
+          client_id:"325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com",
+          callback:onGoogleCredential
+        });
+        google.accounts.id.renderButton(document.getElementById("googleBtn"),{ theme:"filled_blue", size:"large" });
       }
     };
 
-    window.addEventListener("load", function(){
-      if (window.google && google.accounts && google.accounts.id) {
-        google.accounts.id.initialize({
-          client_id: "325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com",
-          callback: onGoogleCredential
-        });
-        google.accounts.id.renderButton(
-          document.getElementById("googleBtn"),
-          { theme:"filled_blue", size:"large", text:"continue_with", shape:"rectangular" }
-        );
-      }
-    });
+    // Vet CTA
+    document.getElementById("vetCta").onclick=()=>{
+      const email=document.getElementById("vetEmail").value;
+      const pass=document.getElementById("vetPass").value;
+      if(!email||!pass){ toast("Email & password required","error"); return; }
+      toast("Vet register flow started","info");
+      // TODO: call your API
+    };
   </script>
 </body>
 </html>
