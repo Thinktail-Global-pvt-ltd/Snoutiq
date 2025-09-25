@@ -370,8 +370,7 @@ class GeminiChatController extends Controller
         return [$decision, false];
     }
 
-    private function buildPrompt(string $decision, string $userMessage, array $pet, array $history, array $state): string
-
+    private function buildPrompt(string $decision, string $userMessage, array $pet, array $history): string
     {
         $petLine = "PET: ".($pet['name'] ?? 'Pet').
                    " (".($pet['type'] ?? 'Pet').", ".($pet['breed'] ?? 'Mixed breed').", ".($pet['age'] ?? 'age unknown').")\n".
@@ -381,7 +380,7 @@ class GeminiChatController extends Controller
             return "You are PetPal AI, a veterinary triage assistant. Based on the evidence, provide a direct service recommendation.\n\n".
                    $petLine."\n\n".
                    'USER MESSAGE: "'.$userMessage."\"\n\n".
-                   $this->servicePrompt($decision, $state).
+                   $this->servicePrompt($decision).
                    "\nRespond directly as PetPal AI - do not mention evidence scores or internal analysis.";
         }
 
@@ -399,30 +398,8 @@ class GeminiChatController extends Controller
                "3. How it's affecting their pet's daily routine\n\n".
                "Be warm, professional, and genuinely helpful.";
     }
-        private function servicePrompt(string $decision, array $state): string
-    {
-        $diagnosis = $this->buildDiagnosisFromHistory($state);
 
-        if ($decision === 'EMERGENCY') {
-            return "🚨 EMERGENCY RECOMMENDATION:\n\n".
-                   $diagnosis."\n\n".
-                   "**This is an EMERGENCY situation requiring immediate care.**\n".
-                   "• Go to the nearest 24-hour vet immediately\n";
-        }
-
-        if ($decision === 'IN_CLINIC') {
-            return "🏥 IN-CLINIC APPOINTMENT RECOMMENDATION:\n\n".
-                   $diagnosis."\n\n".
-                   "**Schedule an in-clinic appointment within 24-48 hours.**\n";
-        }
-
-        return "💻 VIDEO CONSULTATION RECOMMENDATION:\n\n".
-               $diagnosis."\n\n".
-               "**A video consultation should be sufficient.**\n";
-    }
-
-
-    private function servicePrompt_old(string $decision): string
+    private function servicePrompt(string $decision): string
     {
         if ($decision === 'EMERGENCY') {
             return "🚨 EMERGENCY RECOMMENDATION:\n\n".
@@ -752,25 +729,6 @@ public function newRoom(Request $request)
 //     ]);
 // }
 
-    /** ✅ NEW: Build diagnosis from all chats */
-    private function buildDiagnosisFromHistory(array $state): string
-    {
-        $history  = $state['conversation_history'] ?? [];
-        $symptoms = $state['evidence_details']['symptoms'] ?? [];
-
-        $userReports = array_map(fn($h) => $h['user'] ?? '', $history);
-        $recent = implode(" | ", array_slice($userReports, -5));
-
-        if (empty($symptoms) && empty($recent)) {
-            return "🩺 No significant diagnosis yet. Need more details.";
-        }
-
-        $symText = $symptoms ? implode(", ", $symptoms) : "No tagged symptoms yet";
-
-        return "🩺 AI-assisted Diagnosis:\n".
-               "- Reported symptoms: {$symText}\n".
-               "- Owner reports: {$recent}";
-    }
 
 
 }
