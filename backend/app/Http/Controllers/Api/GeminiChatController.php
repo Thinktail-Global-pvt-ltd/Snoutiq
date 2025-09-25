@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use App\Models\Chat;
 use App\Models\ChatRoom;
+use Illuminate\Support\Str;
+
 
 class GeminiChatController extends Controller
 {
@@ -648,6 +650,37 @@ class GeminiChatController extends Controller
         'chats'  => $rows,
     ]);
 }
+
+
+
+public function newRoom(Request $request)
+{
+    $data = $request->validate([
+        'user_id'      => 'required|integer',
+        'title'        => 'nullable|string',
+        'pet_name'     => 'nullable|string',
+        'pet_breed'    => 'nullable|string',
+        'pet_age'      => 'nullable|string',
+        'pet_location' => 'nullable|string',
+    ]);
+
+    $chatRoomToken = 'room_' . Str::uuid()->toString();
+
+    $room = ChatRoom::create([
+        'user_id'        => (int) $data['user_id'],
+        'chat_room_token'=> $chatRoomToken,
+        'name'           => $data['title'] ?? null,
+    ]);
+
+    return response()->json([
+        'status'          => 'success',
+        'chat_room_id'    => $room->id,
+        'chat_room_token' => $room->chat_room_token,
+        'name'            => $room->name,
+        'note'            => 'Use this chat_room_token in /api/chat/send for all messages in this room.',
+    ]);
+}
+
 
 
 }
