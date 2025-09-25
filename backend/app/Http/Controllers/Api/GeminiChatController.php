@@ -370,7 +370,8 @@ class GeminiChatController extends Controller
         return [$decision, false];
     }
 
-    private function buildPrompt(string $decision, string $userMessage, array $pet, array $history): string
+    private function buildPrompt(string $decision, string $userMessage, array $pet, array $history, array $state): string
+
     {
         $petLine = "PET: ".($pet['name'] ?? 'Pet').
                    " (".($pet['type'] ?? 'Pet').", ".($pet['breed'] ?? 'Mixed breed').", ".($pet['age'] ?? 'age unknown').")\n".
@@ -380,7 +381,7 @@ class GeminiChatController extends Controller
             return "You are PetPal AI, a veterinary triage assistant. Based on the evidence, provide a direct service recommendation.\n\n".
                    $petLine."\n\n".
                    'USER MESSAGE: "'.$userMessage."\"\n\n".
-                   $this->servicePrompt($decision).
+                   $this->servicePrompt($decision, $state).
                    "\nRespond directly as PetPal AI - do not mention evidence scores or internal analysis.";
         }
 
@@ -398,8 +399,31 @@ class GeminiChatController extends Controller
                "3. How it's affecting their pet's daily routine\n\n".
                "Be warm, professional, and genuinely helpful.";
     }
+        private function servicePrompt(string $decision, array $state): string
+    {
+$diagnosis = $this->buildDiagnosisFromHistory($state, $data['user_id'], $sessionId);
 
-    private function servicePrompt(string $decision): string
+
+        if ($decision === 'EMERGENCY') {
+            return "🚨 EMERGENCY RECOMMENDATION:\n\n".
+                   $diagnosis."\n\n".
+                   "**This is an EMERGENCY situation requiring immediate care.**\n".
+                   "• Go to the nearest 24-hour vet immediately\n";
+        }
+
+        if ($decision === 'IN_CLINIC') {
+            return "🏥 IN-CLINIC APPOINTMENT RECOMMENDATION:\n\n".
+                   $diagnosis."\n\n".
+                   "**Schedule an in-clinic appointment within 24-48 hours.**\n";
+        }
+
+        return "💻 VIDEO CONSULTATION RECOMMENDATION:\n\n".
+               $diagnosis."\n\n".
+               "**A video consultation should be sufficient.**\n";
+    }
+
+
+    private function servicePrompt_old(string $decision): string
     {
         if ($decision === 'EMERGENCY') {
             return "🚨 EMERGENCY RECOMMENDATION:\n\n".
@@ -728,6 +752,51 @@ public function newRoom(Request $request)
 //         'note'            => 'Use this chat_room_token in /api/chat/send for all messages in this room.',
 //     ]);
 // }
+
+    /** ✅ NEW: Build diagnosis from all chats */
+private function buildDiagnosisFromHistory(array $state, int $userId, string $chatRoomToken): string
+{
+    // 1) DB से सभी chats लाओ
+    $chats = \App\Models\Chat::where('user_id', $userId)
+        ->where('chat_room_token', $chatRoomToken)
+        ->orderBy('created_at', 'asc')
+        ->get(['question', 'response', 'response_tag', 'created_at']);
+
+    // 2) अगर कोई चैट नहीं है
+    if ($chats->isEmpty()) {
+        \Log::info("Diagnosis: No chats found", [
+            'user_id' => $userId,
+            'chat_room_token' => $chatRoomToken
+        ]);
+        return "🩺 No significant diagnosis yet. Need more details.";
+    }
+
+    // 3) Symptoms (from cached state भी साथ में रखो)
+    $symptoms = $state['evidence_details']['symptoms'] ?? [];
+
+    // 4) Owner के सारे questions इकट्ठे करो
+    $userReports = $chats->pluck('question')->toArray();
+    $recent      = implode(" | ", array_slice($userReports, -5));
+
+    // 5) Diagnosis बनाओ
+    $symText = $symptoms ? implode(", ", $symptoms) : "No tagged symptoms yet";
+
+    $diagnosis = "🩺 AI-assisted Diagnosis:\n".
+                 "- Reported symptoms: {$symText}\n".
+                 "- Owner reports: {$recent}";
+
+    // 6) ✅ Log into laravel.log
+    \Log::info('Diagnosis generated from DB', [
+        'user_id'        => $userId,
+        'chat_room_token'=> $chatRoomToken,
+        'symptoms'       => $symptoms,
+        'reports_count'  => count($userReports),
+        'diagnosis'      => $diagnosis,
+    ]);
+
+    return $diagnosis;
+}
+
 
 
 

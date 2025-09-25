@@ -44,3 +44,21 @@ Route::get('/admin/supports', [App\Http\Controllers\HomeController::class, 'supp
 
 Route::get('/vet/{slug}', [VetLandingController::class, 'show'])
      ->name('vet.landing');
+
+
+
+Route::get('/custom-doctor-register', function () {
+    return view('custom-register-doctor');
+})->name('custom-doctor-register');
+
+
+Route::get('/dashboard', function () {
+    return view('dashboard'); // yeh resources/views/dashboard.blade.php ko load karega
+})->name('dashboard');
+
+
+
+Route::get('/vet/register', function () {
+    return view('register'); 
+})->name('register');
+

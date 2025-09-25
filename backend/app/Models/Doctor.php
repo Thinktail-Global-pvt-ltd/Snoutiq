@@ -25,4 +25,8 @@ class Doctor extends Model
     {
         return $this->belongsTo(VetRegisterationTemp::class, 'vet_registeration_id');
     }
+      public function clinic()
+    {
+        return $this->belongsTo(VetRegisterationTemp::class, 'vet_registeration_id');
+    }
 }
