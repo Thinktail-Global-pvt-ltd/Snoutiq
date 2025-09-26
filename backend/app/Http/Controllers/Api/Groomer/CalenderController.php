@@ -45,7 +45,7 @@ class CalenderController extends Controller
 public function store_booking(Request $request)
 {
     try {
-        // Debug incoming request
+       // // Debug incoming request
         // dd($request->all());
 
         $request->validate([
@@ -69,7 +69,8 @@ public function store_booking(Request $request)
             $total += $dd['price'];
         }
 
-        $blockedTime = self::blockedTime($request->user()->id, $request->date);
+        $blockedTime = self::blockedTime($request->user_id, $request->date);
+       // dd( $blockedTime);
 
         if (!self::isSlotAvailable(
             $request->start_time,
@@ -82,7 +83,7 @@ public function store_booking(Request $request)
             ], 500);
         }
 
-        $old_booking = GroomerBooking::where('user_id', $request->user()->id)
+        $old_booking = GroomerBooking::where('user_id', $request->user_id)
             ->orderBy('serial_number', 'desc')
             ->first();
 
@@ -97,7 +98,7 @@ public function store_booking(Request $request)
             'services'            => json_encode($request->services),
             'total'               => $total,
             'paid'                => 0,
-            'user_id'             => $request->user()->id,
+            'user_id'             => $request->user_id,
             'groomer_employees_id'=> $request->groomer_employees_id,
             'status'              => 'Pending'
         ]);
