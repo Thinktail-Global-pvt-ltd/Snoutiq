@@ -43,7 +43,7 @@ class CalenderController extends Controller
     ]);
  }
  public function store_booking(Request $request){
-    dd($request->all());
+  //  dd($request->all());
     $request->validate([
  
         'customer_type'=>'required',
