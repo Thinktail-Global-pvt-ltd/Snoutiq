@@ -135,7 +135,7 @@
   <!-- ===== HERO (Screenshot-like) ===== -->
   <section class="container ai-hero">
     <div class="ai-pill">🩺 AI-Powered Pet Care Assistant</div>
-  <h1>{{ $vet->name }} – Your AI Pet Companion for <span class="accent">Smart Pet Care</span></h1>
+    <h1>{{ $vet->name }} – Your AI Pet Companion for <span class="accent">Smart Pet Care</span></h1>
 
     <p class="sub">Intelligent pet care guidance, health advice, and training tips powered by advanced AI technology</p>
 
@@ -148,66 +148,6 @@
       </button>
     </div>
     <div class="ai-hint">Ask anything about your pet's health, behavior, or training</div>
-  </section>
-
-  <!-- ===== AI CHAT (hidden until first send) ===== -->
-  <section id="ai-chat" class="container section" style="display:none;padding-top:1.25rem">
-    <div class="heading" style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
-      <span class="badge-blue">SnoutIQ AI</span>
-      <h2 class="heading" style="font-size:1.35rem">Ask about your pet's health</h2>
-    </div>
-
-    <div class="chat-wrap">
-      <!-- Rooms -->
-      <div class="chat-card">
-        <div style="padding:.8rem;border-bottom:1px solid #e5efff;display:flex;justify-content:space-between;align-items:center">
-          <strong>Chat Rooms</strong>
-          <button id="btn-new-chat" class="btn btn-outline" style="padding:.45rem .75rem;font-size:.85rem">New</button>
-        </div>
-        <div id="rooms" class="rooms"></div>
-      </div>
-
-      <!-- Messages -->
-      <div class="chat-card" style="display:flex;flex-direction:column">
-        <div style="padding:.8rem;border-bottom:1px solid #e5efff;display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:800">SnoutIQ AI Assistant</div>
-            <div class="muted" style="font-size:.9rem" id="room-subtitle"></div>
-          </div>
-          <button id="btn-clear" class="btn btn-outline" style="padding:.45rem .75rem;font-size:.85rem">Clear</button>
-        </div>
-        <div id="msgs" class="msgs">
-          <div id="empty-state" style="display:flex;align-items:center;justify-content:center;height:100%;padding:1rem">
-            <div style="text-align:center;max-width:420px" class="card">
-              <div style="padding:1rem">
-                <div class="muted" style="margin:.25rem 0">Start a conversation about your pet's health.</div>
-                <div style="margin-top:.5rem;background:#eef6ff;border:1px solid var(--border);padding:.6rem;border-radius:.6rem;text-align:left">
-                  <div style="font-weight:700;color:#1e40af;margin-bottom:.25rem;font-size:.9rem">Try asking:</div>
-                  <ul style="color:#1e3a8a;font-size:.9rem;line-height:1.5">
-                    <li>• My dog is scratching constantly, what could it be?</li>
-                    <li>• What's the best diet for a senior cat?</li>
-                    <li>• How often should I groom my golden retriever?</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Chat input -->
-        <div class="chat-input-wrap">
-          <input id="chat-input" class="input" placeholder="Type your question…" />
-          <button id="btn-send" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i>&nbsp;Send</button>
-        </div>
-        <div style="padding:.4rem 1rem .9rem" class="muted">⚠️ AI-generated advice. For serious concerns, consult a licensed vet.</div>
-      </div>
-
-      <!-- Right Column: Nearby Doctors -->
-      <div class="chat-card right-col">
-        <div style="padding:.8rem;border-bottom:1px solid var(--border)"><strong>Nearby Doctors</strong></div>
-        <div id="nearby" style="padding:.8rem;display:grid;gap:.6rem"></div>
-      </div>
-    </div>
   </section>
 
   <!-- Hero (Clinic profile) -->
@@ -455,7 +395,7 @@
     const storageKey = (token) => token ? `chatMessages_${token}` : 'chatMessages';
     const scrollToBottom = (smooth = true) => {
       setTimeout(() => {
-        els.msgs.scrollTo({ top: els.msgs.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+        if (els.msgs) els.msgs.scrollTo({ top: els.msgs.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
       }, 50);
     };
     function getToken(){ if (token) return token; token = localStorage.getItem('token'); return token; }
@@ -483,6 +423,7 @@
       } catch(e){ console.error(e); }
     }
     function renderRooms(rooms){
+      if (!els.rooms) return;
       els.rooms.innerHTML = '';
       if (!rooms || rooms.length === 0) { els.rooms.innerHTML = `<div class="room-item muted">No rooms</div>`; return; }
       rooms.forEach(r => {
@@ -527,11 +468,12 @@
     }
 
     function renderMessages(){
+      if (!els.msgs || !els.empty) return;
       els.msgs.innerHTML = '';
       if (!messages.length) {
         els.msgs.appendChild(els.empty);
         els.empty.style.display = 'flex';
-        els.roomSubtitle.textContent = currentRoom ? `Room: ${currentRoom}` : '';
+        if (els.roomSubtitle) els.roomSubtitle.textContent = currentRoom ? `Room: ${currentRoom}` : '';
         return;
       }
       els.empty.style.display = 'none';
@@ -543,7 +485,7 @@
         els.msgs.appendChild(div);
       });
       const end = document.createElement('div'); end.style.height = '1px'; els.msgs.appendChild(end);
-      els.roomSubtitle.textContent = currentRoom ? `Room: ${currentRoom}` : '';
+      if (els.roomSubtitle) els.roomSubtitle.textContent = currentRoom ? `Room: ${currentRoom}` : '';
       scrollToBottom();
     }
     function persistMessages(){ localStorage.setItem(storageKey(currentRoom), JSON.stringify(messages)); }
@@ -560,108 +502,40 @@
       setTimeout(step, 250);
     }
 
-    function loginRedirect() {
-    const next = encodeURIComponent(location.href);
-    // optional: a source tag to know from where login came
-    location.href = `/custom-doctor-register?next=${next}&source=chat`;
-  }
+    // ✅ ALWAYS redirect to custom-doctor-register (with prefill + next + vet_slug)
+    function loginRedirect(prefill = "") {
+      try {
+        if (prefill) localStorage.setItem("pendingChatQuestion", prefill);
+      } catch(_) {}
+      const params = new URLSearchParams({
+        next: location.href,
+        source: "chat",
+        vet_slug: (typeof vetSlug !== "undefined" ? vetSlug : "")
+      });
+      if (prefill) params.set("prefill", prefill);
+      location.href = `/custom-doctor-register?${params.toString()}`;
+    }
 
-  // 1) Hero ask bar → chat (sendFromHero)
-  function sendFromHero(){
-    const text = (els.heroInput.value || '').trim();
-    if (!text) return;
-    const u = getUser(); const t = getToken();
-    if (!u || !t) { loginRedirect(); return; }   // 🔁 redirect if not logged in
-    revealChat();
-    els.input.value = text;
-    els.heroInput.value = '';
-    sendMessage();
-  }
+    // ✅ Hero ask bar → redirect
+    function sendFromHero(){
+      const text = (els.heroInput?.value || '').trim();
+      if (!text) return;
+      loginRedirect(text);
+    }
 
-  // 2) Chat Send button (sendMessage)
-  async function sendMessage(){
-    const text = els.input.value.trim(); if (!text || isSending) return;
-
-    const u = getUser(); const t = getToken();
-    if (!u || !t) { loginRedirect(); return; }   // 🔁 redirect if not logged in
-
-    // (baaki aapka original sendMessage code yahi se chalta rahe)
-    isSending = true;
-    const now = new Date();
-    const userMsg = { id: genId(), sender:'user', text, displayedText:text, timestamp: now };
-    const loaderId = '__loader__';
-    messages.push(userMsg, { id: loaderId, sender:'ai', text:'', displayedText:`<span class="typing"><span></span><span></span><span></span></span>`, timestamp: now });
-    renderMessages();
-    try {
-      const petData = { pet_name: u?.pet_name || 'Unknown', pet_breed: u?.breed || 'Unknown Breed', pet_age: String(u?.pet_age ?? 'Unknown'), pet_location: u?.city || 'Unknown' };
-      const payload = { user_id: u.id, question: text, context_token: contextToken || '', chat_room_token: currentRoom || '', ...petData };
-      const res = await axios.post(`${API_BASE}/chat/send`, payload, { headers: { Authorization: `Bearer ${t}` }, timeout: 30000 });
-      const newCtx = res.data?.context_token; if (newCtx) { contextToken = newCtx; localStorage.setItem('contextToken', newCtx); }
-      const returnedRoom = res.data?.chat_room_token || res.data?.chat?.chat_room_token || '';
-      if (!currentRoom && returnedRoom) { currentRoom = returnedRoom; localStorage.setItem('lastChatRoomToken', currentRoom); }
-      const loaderIdx = messages.findIndex(m => m.id === loaderId); if (loaderIdx !== -1) messages.splice(loaderIdx, 1);
-      const full = String(res.data?.chat?.answer || res.data?.answer || 'OK');
-      const aiId = genId();
-      messages.push({ id: aiId, sender:'ai', text: full, displayedText:'', timestamp: new Date() });
-      renderMessages(); typeAI(full, aiId);
-      persistMessages(); els.input.value = ''; loadRooms();
-    } catch(e) {
-      console.error(e);
-      const loaderIdx = messages.findIndex(m => m.id === '__loader__'); if (loaderIdx !== -1) messages.splice(loaderIdx, 1);
-      messages.push({ id: genId(), sender:'ai', text:'⚠️ Sorry, I am having trouble connecting right now.', displayedText:'⚠️ Sorry, I am having trouble connecting right now.', timestamp:new Date() });
-      renderMessages();
-    } finally { isSending = false; }
-  }
-
-
-    // async function sendMessage(){
-    //   const text = els.input.value.trim(); if (!text || isSending) return;
-    //   const u = getUser(); const t = getToken();
-    //   if (!u || !t) { toast.show('Login required'); return; }
-
-    //   isSending = true;
-    //   const now = new Date();
-    //   const userMsg = { id: genId(), sender:'user', text, displayedText:text, timestamp: now };
-    //   const loaderId = '__loader__';
-    //   messages.push(userMsg, { id: loaderId, sender:'ai', text:'', displayedText:`<span class="typing"><span></span><span></span><span></span></span>`, timestamp: now });
-    //   renderMessages();
-
-    //   try{
-    //     const petData = {
-    //       pet_name: u?.pet_name || 'Unknown',
-    //       pet_breed: u?.breed || 'Unknown Breed',
-    //       pet_age: String(u?.pet_age ?? 'Unknown'),
-    //       pet_location: u?.city || 'Unknown'
-    //     };
-    //     const payload = { user_id: u.id, question: text, context_token: contextToken || '', chat_room_token: currentRoom || '', ...petData };
-    //     const res = await axios.post(`${API_BASE}/chat/send`, payload, { headers: { Authorization: `Bearer ${t}` }, timeout: 30000 });
-
-    //     const newCtx = res.data?.context_token; if (newCtx) { contextToken = newCtx; localStorage.setItem('contextToken', newCtx); }
-    //     const returnedRoom = res.data?.chat_room_token || res.data?.chat?.chat_room_token || '';
-    //     if (!currentRoom && returnedRoom) { currentRoom = returnedRoom; localStorage.setItem('lastChatRoomToken', currentRoom); }
-
-    //     const loaderIdx = messages.findIndex(m => m.id === loaderId); if (loaderIdx !== -1) messages.splice(loaderIdx, 1);
-    //     const full = String(res.data?.chat?.answer || res.data?.answer || 'OK');
-    //     const aiId = genId();
-    //     messages.push({ id: aiId, sender:'ai', text: full, displayedText:'', timestamp: new Date() });
-    //     renderMessages(); typeAI(full, aiId);
-
-    //     persistMessages();
-    //     els.input.value = '';
-    //     loadRooms();
-    //   } catch(e){
-    //     console.error(e); toast.show('Something went wrong');
-    //     const loaderIdx = messages.findIndex(m => m.id === '__loader__'); if (loaderIdx !== -1) messages.splice(loaderIdx, 1);
-    //     messages.push({ id: genId(), sender:'ai', text:'⚠️ Sorry, I am having trouble connecting right now.', displayedText:'⚠️ Sorry, I am having trouble connecting right now.', timestamp:new Date() });
-    //     renderMessages();
-    //   } finally { isSending = false; }
-    // }
+    // ✅ Chat send → redirect
+    async function sendMessage(){
+      const text = (els.input?.value || '').trim();
+      if (!text || isSending) return;
+      loginRedirect(text);
+      return;
+    }
 
     function clearChat(){ if (!confirm('Clear this chat?')) return; messages = []; persistMessages(); renderMessages(); toast.show('Chat cleared'); }
     function newChat(){ currentRoom = ''; localStorage.removeItem('lastChatRoomToken'); messages = []; renderMessages(); toast.show('New chat'); }
 
     async function loadNearbyDoctors(){
-      const u = getUser(); const t = getToken(); if (!u || !t) return;
+      const u = getUser(); const t = getToken(); if (!u || !t || !els.nearby) return;
       try{
         const res = await axios.get(`${API_BASE}/nearby-vets?user_id=${u.id}`, { headers: { Authorization: `Bearer ${t}` }});
         const docs = res.data?.data || [];
@@ -683,29 +557,17 @@
       } catch(e){ console.log('nearby doctors error', e); }
     }
 
-    // // wire up hero ask bar -> chat
-    // function sendFromHero(){
-    //   const text = (els.heroInput.value || '').trim();
-    //   if (!text) return;
-    //   const u = getUser(); const t = getToken();
-    //   if (!u || !t) { toast.show('Login required'); return; }
-    //   revealChat();
-    //   els.input.value = text;  // move into chat input
-    //   els.heroInput.value = '';
-    //   sendMessage();
-    // }
-
-    // listeners
-    els.send.addEventListener('click', sendMessage);
-    els.input.addEventListener('keydown', (e)=> { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }});
-    els.clear.addEventListener('click', clearChat);
-    els.newChat.addEventListener('click', newChat);
-    els.heroSend.addEventListener('click', sendFromHero);
-    els.heroInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') { e.preventDefault(); sendFromHero(); }});
+    // listeners (safe with optional chaining)
+    els.send?.addEventListener('click', sendMessage);
+    els.input?.addEventListener('keydown', (e)=> { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }});
+    els.clear?.addEventListener('click', clearChat);
+    els.newChat?.addEventListener('click', newChat);
+    els.heroSend?.addEventListener('click', sendFromHero);
+    els.heroInput?.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') { e.preventDefault(); sendFromHero(); }});
 
     // init
     (function init(){
-      if (!getToken()) console.warn('No token found. Expect login flow to populate localStorage("token").');
+      if (!getToken()) console.warn('No token found. Redirect will still work on send.');
       loadRooms();
       loadNearbyDoctors();
       if (currentRoom) { revealChat(); openRoom(currentRoom); }
