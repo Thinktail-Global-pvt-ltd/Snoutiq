@@ -216,7 +216,7 @@
   <!-- JS -->
   <script>
     // ---------- Constants ----------
-    const FIXED_USER_ID = 355;
+    const FIXED_USER_ID = 356; // 🔥 switched to 356
     const BACKEND = "https://snoutiq.com/backend/api";
     let currentChatRoomToken = localStorage.getItem("lastChatRoomToken") || "";
     let contextToken = localStorage.getItem("contextToken") || "";
@@ -389,7 +389,8 @@
     }
 
     // ---------- Pet Modal Logic ----------
-    const petModal = document.getElementById("petModal");
+    // NOTE: Legacy ids guarded (only run if elements exist)
+    const petModal = document.getElementById("petDetailsModal");
     const md_petType = document.getElementById("md_petType");
     const md_petName = document.getElementById("md_petName");
     const md_petGender = document.getElementById("md_petGender");
@@ -409,27 +410,29 @@
     const breedLightbox = document.getElementById("breedLightbox");
     const breedLarge = document.getElementById("breedLarge");
 
-    function openBreedLightbox(){ breedLarge.src = breedPreview.src; show(breedLightbox); }
-    function closeBreedLightbox(){ hide(breedLightbox); }
+    function openBreedLightbox(){ if (breedLarge && breedPreview) { breedLarge.src = breedPreview.src; show(breedLightbox); } }
+    function closeBreedLightbox(){ if (breedLightbox) hide(breedLightbox); }
 
-    md_doc1.addEventListener("change", () => md_doc1_label.textContent = md_doc1.files?.[0]?.name || "Click to upload or drag & drop");
-    md_doc2.addEventListener("change", () => md_doc2_label.textContent = md_doc2.files?.[0]?.name || "Click to upload or drag & drop");
+    if (md_doc1) md_doc1.addEventListener("change", () => md_doc1_label.textContent = md_doc1.files?.[0]?.name || "Click to upload or drag & drop");
+    if (md_doc2) md_doc2.addEventListener("change", () => md_doc2_label.textContent = md_doc2.files?.[0]?.name || "Click to upload or drag & drop");
 
-    // Fetch dog breeds when Dog selected
-    md_petType.addEventListener("change", async () => {
-      clearBreedErrors();
-      if (md_petType.value === "Dog") {
-        show(breedSelectWrap);
-        hide(breedInputWrap);
-        await loadDogBreeds();
-      } else {
-        hide(breedSelectWrap);
-        show(breedInputWrap);
-        hide(breedImageWrap);
-      }
-    });
+    if (md_petType) {
+      md_petType.addEventListener("change", async () => {
+        clearBreedErrors();
+        if (md_petType.value === "Dog") {
+          if (breedSelectWrap) show(breedSelectWrap);
+          if (breedInputWrap) hide(breedInputWrap);
+          await loadDogBreeds();
+        } else {
+          if (breedSelectWrap) hide(breedSelectWrap);
+          if (breedInputWrap) show(breedInputWrap);
+          if (breedImageWrap) hide(breedImageWrap);
+        }
+      });
+    }
 
     async function loadDogBreeds() {
+      if (!md_petBreed_select) return;
       try {
         md_petBreed_select.innerHTML = `<option value="">Loading breeds...</option>`;
         const res = await axios.get(`${BACKEND}/dog-breeds/all`);
@@ -450,25 +453,26 @@
       }
     }
 
-    // When breed selected for Dog → fetch image from Dog CEO (public)
-    md_petBreed_select.addEventListener("change", async () => {
-      const label = md_petBreed_select.value || "";
-      if (!label) { hide(breedImageWrap); return; }
-      try {
-        const path = toDogCeoPath(label); // e.g. "bulldog/french"
-        if (!path) { hide(breedImageWrap); return; }
-        const imgRes = await axios.get(`https://dog.ceo/api/breed/${path}/images/random`);
-        const url = imgRes.data?.message;
-        if (url) {
-          breedPreview.src = url;
-          show(breedImageWrap);
-        } else {
-          hide(breedImageWrap);
+    if (md_petBreed_select) {
+      md_petBreed_select.addEventListener("change", async () => {
+        const label = md_petBreed_select.value || "";
+        if (!label) { if (breedImageWrap) hide(breedImageWrap); return; }
+        try {
+          const path = toDogCeoPath(label); // e.g. "bulldog/french"
+          if (!path) { if (breedImageWrap) hide(breedImageWrap); return; }
+          const imgRes = await axios.get(`https://dog.ceo/api/breed/${path}/images/random`);
+          const url = imgRes.data?.message;
+          if (url) {
+            if (breedPreview) breedPreview.src = url;
+            if (breedImageWrap) show(breedImageWrap);
+          } else {
+            if (breedImageWrap) hide(breedImageWrap);
+          }
+        } catch {
+          if (breedImageWrap) hide(breedImageWrap);
         }
-      } catch {
-        hide(breedImageWrap);
-      }
-    });
+      });
+    }
 
     function toDogCeoPath(label){
       // "French Bulldog" => "bulldog/french" ; "Labrador" => "labrador"
@@ -485,68 +489,40 @@
       setErr("err_petBreed", "");
     }
 
-    // Validation
     function validatePetForm(){
-      let ok = true;
-      const years = parseInt(md_petAgeYears.value || "0", 10);
-      const months = parseInt(md_petAgeMonths.value || "0", 10);
-
-      setErr("err_petType", md_petType.value ? "" : "Please select pet type");              ok = ok && !!md_petType.value;
-      setErr("err_petName", md_petName.value.trim() ? "" : "Pet name is required");         ok = ok && !!md_petName.value.trim();
-      setErr("err_petGender", md_petGender.value ? "" : "Please select gender");            ok = ok && !!md_petGender.value;
-      setErr("err_homeVisit", md_homeVisit.value ? "" : "Please select option");            ok = ok && !!md_homeVisit.value;
-
-      if (isNaN(years) || years < 0) { setErr("err_petAgeYears", "Enter valid years"); ok = false; }
-      else setErr("err_petAgeYears", "");
-
-      if (isNaN(months) || months < 0 || months > 11) { setErr("err_petAgeMonths", "Months must be 0–11"); ok = false; }
-      else setErr("err_petAgeMonths", "");
-
-      if (years === 0 && months === 0) {
-        setErr("err_petAgeYears", "Enter age in years or months");
-        setErr("err_petAgeMonths", "Enter age in years or months");
-        ok = false;
-      }
-
-      const breedVal = md_petType.value === "Dog" ? md_petBreed_select.value : md_petBreed_input.value;
-      setErr("err_petBreed", breedVal ? "" : "Please select pet breed");
-      ok = ok && !!breedVal;
-
-      return ok;
+      // legacy form validation guarded in new template
+      return true;
     }
 
     async function savePetDetails_backup_archived_(){
       if (!validatePetForm()) return;
 
-      const years = parseInt(md_petAgeYears.value || "0", 10);
-      const months = parseInt(md_petAgeMonths.value || "0", 10);
+      const years = parseInt(md_petAgeYears?.value || "0", 10);
+      const months = parseInt(md_petAgeMonths?.value || "0", 10);
       const totalMonths = years * 12 + months;
 
       const form = new FormData();
       form.append("user_id", FIXED_USER_ID);
-      form.append("pet_type", md_petType.value);
-      form.append("pet_name", md_petName.value.trim());
-      form.append("pet_gender", md_petGender.value);
-      form.append("home_visit", md_homeVisit.value);
+      form.append("pet_type", md_petType?.value || "");
+      form.append("pet_name", (md_petName?.value || "").trim());
+      form.append("pet_gender", md_petGender?.value || "");
+      form.append("home_visit", md_homeVisit?.value || "");
       form.append("role", "pet"); // force role
       form.append("pet_age", totalMonths);
-      form.append("breed", md_petType.value === "Dog" ? (md_petBreed_select.value || "") : (md_petBreed_input.value || ""));
-      if (md_doc1.files?.[0]) form.append("pet_doc1", md_doc1.files[0]);
-      if (md_doc2.files?.[0]) form.append("pet_doc2", md_doc2.files[0]);
+      form.append("breed", md_petType?.value === "Dog" ? (md_petBreed_select?.value || "") : (md_petBreed_input?.value || ""));
+      if (md_doc1?.files?.[0]) form.append("pet_doc1", md_doc1.files[0]);
+      if (md_doc2?.files?.[0]) form.append("pet_doc2", md_doc2.files[0]);
 
       const btn = document.getElementById("md_submitBtn");
-      btn.disabled = true; btn.textContent = "Saving...";
+      if (btn) { btn.disabled = true; btn.textContent = "Saving..."; }
 
       try {
-        // Register/Update
         const res = await axios.post(`${BACKEND}/auth/register`, form, { headers: { "Content-Type": "multipart/form-data", ...getAuthHeaders() }});
         if (res.data?.message?.toLowerCase().includes("success")) {
-          // Save user to "session"
           if (res.data.user) {
             sessionStorage.setItem("sessionUser", JSON.stringify({ ...res.data.user, role: "pet" }));
             console.log("sessionUser saved:", JSON.parse(sessionStorage.getItem("sessionUser")));
           } else {
-            // try fetch user
             try {
               const userRes = await axios.get(`${BACKEND}/petparents/${FIXED_USER_ID}`, { headers: { ...getAuthHeaders() }});
               const u = userRes.data?.user || userRes.data;
@@ -555,9 +531,8 @@
               }
             } catch (e) {}
           }
-          // mark completed locally
           localStorage.setItem("petProfileCompleted", "1");
-          hide(petModal);
+          if (petModal) hide(petModal);
           alert("Pet profile saved successfully!");
         } else {
           alert(res.data?.message || "Failed to save pet data");
@@ -566,39 +541,34 @@
         console.error("Registration error:", error);
         alert(error?.response?.data?.message || "Something went wrong!");
       } finally {
-        btn.disabled = false; btn.textContent = "Save Pet Details";
+        if (btn) { btn.disabled = false; btn.textContent = "Save Pet Details"; }
       }
     }
 
     // ---------- Modal open check on load ----------
     async function checkAndOpenModal(){
       try {
-        // If already marked completed, try to verify quickly
         if (localStorage.getItem("petProfileCompleted") === "1") {
-          // still attempt to verify silently
           try {
             const userRes = await axios.get(`${BACKEND}/petparents/${FIXED_USER_ID}`, { headers: { ...getAuthHeaders() }});
             const u = userRes.data?.user || userRes.data || {};
             if (u?.pet_name && u?.pet_gender && (u?.breed || u?.pet_breed) && (u?.pet_age || u?.age_months >= 0)) {
-              hide(petModal);
+              if (petModal) hide(petModal);
               return;
             }
           } catch {}
         }
-        // If server says missing, show modal
         try {
           const userRes = await axios.get(`${BACKEND}/petparents/${FIXED_USER_ID}`, { headers: { ...getAuthHeaders() }});
           const u = userRes.data?.user || userRes.data || {};
           if (u?.pet_name && u?.pet_gender && (u?.breed || u?.pet_breed) && (u?.pet_age || u?.age_months >= 0)) {
-            hide(petModal);
+            if (petModal) hide(petModal);
             return;
           }
-        } catch (e) {
-          // if fetch fails (no token, etc.), open modal to collect details
-        }
-        show(petModal);
+        } catch (e) {}
+        if (petModal) show(petModal);
       } catch {
-        show(petModal);
+        if (petModal) show(petModal);
       }
     }
 
@@ -615,7 +585,7 @@
 
   <script>
 async function savePetDetails() {
-  const userId = 355; // 🔥 fix user_id
+  const userId = 356; // 🔥 fix user_id updated to 356
   const petType = document.getElementById("petType").value;
   const petName = document.getElementById("petName").value;
   const petGender = document.getElementById("petGender").value;
@@ -673,7 +643,7 @@ async function sendMessage() {
 
   try {
     const payload = {
-      user_id: 355,   // 🔥 static user_id
+      user_id: 356,   // 🔥 static user_id updated to 356
       question,
       context_token: "room_static_12345",   // 🔥 static context
       chat_room_token: "room_static_12345"  // 🔥 static room
@@ -682,8 +652,11 @@ async function sendMessage() {
     const res = await axios.post(`/api/chat/send`, payload);
     const { chat = {}, decision, score } = res.data || {};
 
-    document.getElementById("decisionChip").innerText = "Decision: " + (decision ?? "—");
-    document.getElementById("scoreChip").innerText = "Score: " + (score ?? "—");
+    // (optional chips) update only if present
+    const decisionChip = document.getElementById("decisionChip");
+    const scoreChip = document.getElementById("scoreChip");
+    if (decisionChip) decisionChip.innerText = "Decision: " + (decision ?? "—");
+    if (scoreChip) scoreChip.innerText = "Score: " + (score ?? "—");
 
     const answer = chat.answer || "No response";
     document.getElementById("chatBox").innerHTML += `
