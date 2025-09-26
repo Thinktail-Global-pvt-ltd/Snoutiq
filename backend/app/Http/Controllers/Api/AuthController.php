@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use Illuminate\Http\Request;
 use App\Models\Otp;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
@@ -864,6 +865,15 @@ public function googleLogin(Request $request)
                     'message' => 'Invalid pet credentials',
                 ], 401);
             }
+             // ✅ User ko login karao (session me save)
+    Auth::login($user);
+
+    // ✅ Laravel session me directly save (extra key agar chahiye)
+    session([
+        'user_id' => $user->id,
+        'user_email' => $user->email,
+        'role' => $user->role
+    ]);
 
             DB::transaction(function () use (&$plainToken, &$room, $user, $request) {
                 $plainToken = bin2hex(random_bytes(32));

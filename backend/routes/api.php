@@ -101,14 +101,14 @@ Route::get('/test-cors', function (Request $request) {
     ]);
 });
 
-
+Route::get('/chats', [GeminiChatController::class, 'history']); 
 Route::post('/contact-request', [ContactRequestController::class, 'store']);
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
 Route::post('/chat/send', [GeminiChatController::class, 'sendMessage']);
 Route::get('/chat/listRooms', [GeminiChatController::class, 'listRooms']);
 // routes/api.php
-Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'history']); // <= FE expects this
-Route::get('/chats', [GeminiChatController::class, 'history']); // <= keep existing
+Route::get('/chat-rooms/{chat_room_token}/chats', [\App\Http\Controllers\Api\GeminiChatController::class, 'history']);
+
 Route::delete('/chat-rooms/{chat_room_token}', [GeminiChatController::class, 'deleteRoom']);
 Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
 
