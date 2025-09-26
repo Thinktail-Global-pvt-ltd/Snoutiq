@@ -125,7 +125,7 @@
 
       // 3. Login again with role pet
       let finalLogin=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
-      if(finalLogin.data.token){ toast("Registered & logged in!","success"); location.href="/dashboard"; }
+      if(finalLogin.data.token){ toast("Registered & logged in!","success"); location.href="https://snoutiq.com/backend/dashboard"; }
     };
 
     window.onload=()=>{
