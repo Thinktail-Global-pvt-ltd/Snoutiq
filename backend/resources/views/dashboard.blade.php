@@ -160,9 +160,9 @@
     const FIXED_USER_ID = 356;
     const STATIC_CONTEXT = "room_static_12345";        // keep context static (as requested)
     const SEND_API = "https://snoutiq.com/backend/api/chat/send";  // hard-coded prod
-    const LIST_ROOMS_API = "https://snoutiq.com/api/chat/listRooms";
-    const NEW_ROOM_API = "https://snoutiq.com/api/chat-rooms/new";
-    const ROOM_BASE_API = "https://snoutiq.com/api/chat-rooms";    // for history & delete
+    const LIST_ROOMS_API = "https://snoutiq.com/backend/api/chat/listRooms";
+    const NEW_ROOM_API = "https://snoutiq.com/backend/api/chat-rooms/new";
+    const ROOM_BASE_API = "https://snoutiq.com/backend/api/chat-rooms";    // for history & delete
 
     let currentChatRoomToken = localStorage.getItem("lastChatRoomToken") || "";
 
