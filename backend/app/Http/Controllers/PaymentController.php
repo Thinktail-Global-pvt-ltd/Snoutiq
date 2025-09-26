@@ -10,8 +10,8 @@ use App\Models\Payment;
 class PaymentController extends Controller
 {
     // ⚠️ TEST ONLY — keys hardcoded as requested
-    private string $key    = 'rzp_live_RGBIfjaGxq1Ma4';
-    private string $secret = 'WypJ2plLEmScSrVjrLzixWyN';
+    private string $key    = 'rzp_test_1nhE9190sR3rkP';
+    private string $secret = 'L6CPZlUwrKQpdC9N3TRX8gIh';
     // app/Http/Controllers/RazorpayTestController.php
 
 public function testView()
