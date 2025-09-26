@@ -55,10 +55,10 @@ class CalenderController extends Controller
         'groomer_employees_id'=>'required'
        
     ]);
-    // dd($request->all());
-    // return response()->json([
-    //     'd'=>$request->all(),
-    // ],404);
+    dd($request->all());
+    return response()->json([
+        'd'=>$request->all(),
+    ],404);
     $total = 0;
     foreach($request->services as $dd){
         if($dd['service_id']==0 || $dd['service_id']==""){
