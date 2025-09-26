@@ -7,6 +7,10 @@
   <link rel="icon" href="https://snoutiq.com/favicon.webp" type="image/png"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    /* nicer bubbles + wrapping */
+    .bubble{word-break:break-word;overflow-wrap:anywhere;line-height:1.45}
+  </style>
 </head>
 <body class="bg-gray-50">
 
@@ -36,11 +40,9 @@
     <aside class="w-64 bg-white border-r border-gray-200 shadow-sm overflow-y-auto">
       <div class="p-4 border-b flex justify-between items-center">
         <h2 class="text-sm font-semibold mb-0">Chat History</h2>
-        <button onclick="createNewChat()" class="text-blue-600 text-xs flex items-center gap-1">
-          ➕ New Chat
-        </button>
+        <button id="newChatBtn" class="text-blue-600 text-xs flex items-center gap-1">➕ New Chat</button>
       </div>
-      <div id="chatHistory" class="p-4 space-y-2 text-sm"></div>
+      <div id="chatHistory" class="p-3 space-y-1 text-sm"></div>
     </aside>
 
     <!-- Chat Section -->
@@ -67,9 +69,7 @@
           <div class="flex gap-2">
             <input id="chatInput" type="text" placeholder="Type your message..."
                    class="flex-1 border rounded-lg px-4 py-2">
-            <button onclick="sendMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-lg">
-              <span>Send</span>
-            </button>
+            <button id="sendBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Send</button>
           </div>
           <p class="text-xs text-gray-500 text-center mt-2">
             ⚠️ AI-generated advice. Consult a licensed veterinarian.
@@ -93,592 +93,185 @@
     </aside>
   </div>
 
-  <!-- ========================================= -->
-  <!-- Pet Details Modal -->
-<div id="petDetailsModal" class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col mx-auto my-auto shadow-lg">
-
-    <!-- Header with Close Button -->
-    <div class="p-6 border-b border-gray-200 flex justify-between items-start">
-      <div>
-        <h2 class="text-xl font-bold mb-2">Complete Your Pet Profile</h2>
-        <p class="text-gray-600 text-sm">
-          Please fill your pet's details to unlock the full Test Clinic experience.  
-          You cannot access the dashboard until this form is complete.
-        </p>
-      </div>
-      <button onclick="closePetModal()" class="text-gray-400 hover:text-gray-600 ml-4">
-        ✖
-      </button>
-    </div>
-
-    <!-- Scrollable Content -->
-    <div class="overflow-y-auto px-6 py-4 flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
-
-      <!-- Pet Type -->
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Pet Type *</label>
-        <select id="petType" class="w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
-          <option value="">Select Pet Type</option>
-          <option value="Dog">Dog</option>
-          <option value="Cat">Cat</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-
-      <!-- Pet Name -->
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Pet Name *</label>
-        <input id="petName" type="text" placeholder="e.g., Bruno"
-          class="w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-      </div>
-
-      <!-- Pet Gender -->
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Pet Gender *</label>
-        <select id="petGender" class="w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
-          <option value="">Select Gender</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-        </select>
-      </div>
-
-      <!-- Allow Home Visit -->
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Allow Home Visit *</label>
-        <select id="homeVisit" class="w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
-          <option value="">Select Option</option>
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
-        </select>
-      </div>
-
-      <!-- Pet Age -->
-      <div class="mb-4 flex gap-4 col-span-2">
-        <div class="flex-1">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Pet Age (Years) *</label>
-          <input id="petAgeYears" type="number" min="0" value="0"
-            class="w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-        </div>
-        <div class="flex-1">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Pet Age (Months)</label>
-          <input id="petAgeMonths" type="number" min="0" max="11" value="0"
-            class="w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-        </div>
-      </div>
-
-      <!-- Pet Breed -->
-      <div class="mb-4 col-span-2">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Pet Breed *</label>
-        <input id="petBreed" type="text" placeholder="Breed"
-          class="w-full px-4 py-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-      </div>
-
-    </div>
-
-    <!-- Footer -->
-    <div class="p-6 border-t border-gray-200">
-      <button onclick="savePetDetails()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">
-        Save Pet Details
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Script -->
-<script>
-  function closePetModal() {
-    const modal = document.getElementById("petDetailsModal");
-    if (modal) {
-      modal.classList.add("hidden"); // Hide modal
-    }
-  }
-
-  function savePetDetails() {
-    // Example only - hook your API here
-    const petName = document.getElementById("petName").value;
-    alert(`Pet Details Saved for: ${petName}`);
-    closePetModal();
-  }
-</script>
-
-  <!-- Breed lightbox -->
-  <div id="breedLightbox" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg p-4 max-w-2xl w-full">
-      <div class="flex justify-between items-center mb-3">
-        <h3 class="font-semibold">Breed Image</h3>
-        <button onclick="closeBreedLightbox()" class="text-gray-600 hover:text-gray-800">✖</button>
-      </div>
-      <img id="breedLarge" class="w-full h-[60vh] object-cover rounded"/>
-    </div>
-  </div>
-
-  <!-- JS -->
   <script>
-    // ---------- Constants ----------
-    const FIXED_USER_ID = 356; // 🔥 switched to 356
-    const BACKEND = "https://snoutiq.com/backend/api";
+    // ======= CONSTANTS =======
+    const FIXED_USER_ID = 356;
+    const STATIC_ROOM = "room_fa86a154-5fe0-4a27-bef7-110adfe3d637";
     let currentChatRoomToken = localStorage.getItem("lastChatRoomToken") || "";
-    let contextToken = localStorage.getItem("contextToken") || "";
-    // Log session on load (as requested earlier)
-    console.log("sessionUser:", sessionStorage.getItem("sessionUser"));
 
-    // ---------- Helpers ----------
-    const getAuthHeaders = () => {
-      const token = localStorage.getItem("token");
-      return token ? { Authorization: `Bearer ${token}` } : {};
-    };
-    const show = (el) => el.classList.remove("hidden");
-    const hide = (el) => el.classList.add("hidden");
-    const setErr = (id, msg) => {
-      const p = document.getElementById(id);
-      if (!p) return;
-      if (msg) { p.textContent = msg; show(p); }
-      else { p.textContent = ""; hide(p); }
-    };
+    // ======= HELPERS =======
+    const chatBoxEl = document.getElementById("chatBox");
+    function scrollToBottom(){ chatBoxEl.scrollTop = chatBoxEl.scrollHeight; }
 
-    // ---------- Nearby Vets ----------
+    // ======= NEARBY VETS =======
     async function fetchNearbyVets() {
       try {
         const res = await axios.get(`/api/nearby-vets?user_id=${FIXED_USER_ID}`);
+        const vets = res.data?.data || [];
         document.getElementById("nearbyVets").innerHTML =
-          (res.data?.data || []).map(v => `<div class="p-2 border rounded">${v.name}</div>`).join("");
-      } catch (e) { console.error("Failed to fetch vets", e); }
+          vets.map(v => `<div class="p-2 border rounded">${v.name}</div>`).join("") || `
+          <div class="text-gray-500 text-sm">No vets found</div>`;
+      } catch (e) {
+        console.error("Failed to fetch vets", e);
+      }
     }
 
-    // ---------- Rooms ----------
+    // ======= ROOMS (ALL CHATS LIST) =======
     async function fetchChatRooms() {
       try {
         const res = await axios.get(`/api/chat/listRooms?user_id=${FIXED_USER_ID}`);
-        const rooms = res.data?.rooms || [];
-        let html = "";
-        if (rooms.length === 0) {
-          html = `<div class="text-gray-500 text-sm">No chat history</div>`;
-        } else {
-          rooms.forEach(room => {
-            html += `
-              <div class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-100 mb-1 cursor-pointer"
-                   onclick="openChatRoom('${room.chat_room_token}')">
-                <span class="text-sm font-medium text-gray-700 truncate">${room.name || "New Chat"}</span>
-                <button onclick="deleteChatRoom(event, ${room.id}, '${room.chat_room_token}')"
-                        class="text-xs text-red-500 hover:text-red-700">✖</button>
-              </div>
-            `;
-          });
+        const rooms = res.data?.rooms || res.data || [];
+        const list = rooms.map(r => `
+          <div class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-100 cursor-pointer"
+               onclick="openChatRoom('${r.chat_room_token || ""}')">
+            <span class="truncate pr-2">${r.name && !r.name.startsWith("New chat -") ? r.name : "New Chat"}</span>
+            <button class="text-xs text-red-500 hover:text-red-700"
+                    onclick="event.stopPropagation(); deleteChatRoom('${r.chat_room_token || ""}')">✖</button>
+          </div>
+        `).join("");
+
+        document.getElementById("chatHistory").innerHTML =
+          list || `<div class="text-gray-500 text-sm px-2">No chat history</div>`;
+
+        // Auto-open last room or first available
+        if (!currentChatRoomToken) {
+          const firstToken = rooms[0]?.chat_room_token;
+          if (firstToken) openChatRoom(firstToken);
         }
-        document.getElementById("chatHistory").innerHTML = html;
-      } catch (err) {
-        console.error("Failed to fetch rooms", err);
+      } catch (e) {
+        console.error("Failed to fetch chat rooms", e);
+        document.getElementById("chatHistory").innerHTML =
+          `<div class="text-gray-500 text-sm px-2">Failed to load chat history</div>`;
       }
     }
-    function openChatRoom(token) {
-      currentChatRoomToken = token;
-      localStorage.setItem("lastChatRoomToken", token);
-      document.getElementById("chatBox").innerHTML = "<div class='text-center text-gray-500'>Loading chat...</div>";
-      fetchChatHistory();
-    }
+
     async function createNewChat() {
       try {
         const res = await axios.get(`/api/chat-rooms/new?user_id=${FIXED_USER_ID}`);
-        const { chat_room_token } = res.data || {};
-        if (chat_room_token) {
-          currentChatRoomToken = chat_room_token;
-          localStorage.setItem("lastChatRoomToken", chat_room_token);
+        const token = res.data?.chat_room_token;
+        if (token) {
+          currentChatRoomToken = token;
+          localStorage.setItem("lastChatRoomToken", token);
           await fetchChatRooms();
-          document.getElementById("chatBox").innerHTML = "<div class='text-center text-gray-500'>New chat started</div>";
+          await fetchChatHistory(); // show empty state for new room
         }
-      } catch (err) {
-        console.error("Failed to create room", err);
-      }
-    }
-    async function deleteChatRoom(e, chatId, token) {
-      e.stopPropagation();
-      if (!confirm("Are you sure you want to delete this chat?")) return;
-      try {
-        await axios.delete(`/api/chat-rooms/${token}`, { data: { user_id: FIXED_USER_ID } });
-        await fetchChatRooms();
-        if (token === currentChatRoomToken) {
-          currentChatRoomToken = "";
-          localStorage.removeItem("lastChatRoomToken");
-          document.getElementById("chatBox").innerHTML =
-            "<div class='text-center text-gray-500'>Chat deleted. Start a new chat.</div>";
-        }
-      } catch (err) {
-        console.error("Failed to delete chat", err);
+      } catch (e) {
+        console.error("Failed to create room", e);
       }
     }
 
-    // ---------- Chat ----------
+    async function deleteChatRoom(roomToken) {
+      if (!roomToken) return;
+      if (!confirm("Delete this chat?")) return;
+      try {
+        await axios.delete(`/api/chat-rooms/${roomToken}`, {
+          data: { user_id: FIXED_USER_ID }
+        });
+        if (currentChatRoomToken === roomToken) {
+          currentChatRoomToken = "";
+          localStorage.removeItem("lastChatRoomToken");
+          chatBoxEl.innerHTML = `<div class='text-center text-gray-500 mt-20'>Chat deleted. Start a new chat.</div>`;
+        }
+        await fetchChatRooms();
+      } catch (e) {
+        console.error("Failed to delete chat", e);
+      }
+    }
+
+    function openChatRoom(token){
+      if (!token) return;
+      currentChatRoomToken = token;
+      localStorage.setItem("lastChatRoomToken", token);
+      chatBoxEl.innerHTML = `<div class='text-center text-gray-500'>Loading chat...</div>`;
+      fetchChatHistory();
+    }
+
+    // ======= CHAT HISTORY (MESSAGES IN A ROOM) =======
     async function fetchChatHistory() {
-      if (!currentChatRoomToken) return;
+      if (!currentChatRoomToken) {
+        chatBoxEl.innerHTML = `<div class="text-center text-gray-500 mt-20">Start by creating a new chat.</div>`;
+        return;
+      }
       try {
         const res = await axios.get(`/api/chat-rooms/${currentChatRoomToken}/chats?user_id=${FIXED_USER_ID}`);
         const chats = res.data?.chats || [];
-        let html = "";
-        chats.forEach(chat => {
-          html += `
-            <div class="mb-3">
-              <div class="flex justify-end">
-                <div class="max-w-[75%] bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-sm shadow text-sm leading-relaxed break-words">
-                  ${chat.question}
-                </div>
-              </div>
-              <div class="flex justify-start mt-1">
-                <div class="max-w-[75%] bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl rounded-bl-sm shadow text-sm leading-relaxed break-words">
-                  ${chat.answer}
-                </div>
-              </div>
+        if (chats.length === 0) {
+          chatBoxEl.innerHTML = `<div class="text-center text-gray-500 mt-12">No messages yet</div>`;
+          return;
+        }
+        const html = chats.map(c => `
+          <div class="mb-3">
+            <div class="flex justify-end">
+              <div class="max-w-[75%] bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-sm shadow bubble">${c.question || ""}</div>
             </div>
-          `;
-        });
-        document.getElementById("chatBox").innerHTML =
-          html || "<div class='text-center text-gray-500'>No messages yet</div>";
-        // Auto-scroll bottom
-        const chatBox = document.getElementById("chatBox");
-        chatBox.scrollTop = chatBox.scrollHeight;
-      } catch (err) {
-        console.error("Failed to fetch chat history", err);
+            <div class="flex justify-start mt-1">
+              <div class="max-w-[75%] bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl rounded-bl-sm shadow bubble">${c.answer || ""}</div>
+            </div>
+          </div>
+        `).join("");
+        chatBoxEl.innerHTML = html;
+        scrollToBottom();
+      } catch (e) {
+        console.error("Failed to fetch chat history", e);
+        chatBoxEl.innerHTML = `<div class="text-center text-red-600 mt-12">Failed to load messages</div>`;
       }
     }
 
-    
-    async function sendMessage_001() {
+    // ======= SEND MESSAGE (STATIC PAYLOAD) =======
+    async function sendMessage() {
       const input = document.getElementById("chatInput");
-      const question = (input.value || "").trim();
-      if (!question) return;
+      const uiMsg = (input.value || "").trim();
       input.value = "";
 
-      // append user bubble
-      const chatBox = document.getElementById("chatBox");
-      chatBox.innerHTML += `
-        <div class="flex justify-end mb-3">
-          <div class="max-w-[75%] bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-sm shadow text-sm leading-relaxed break-words">
-            ${question}
+      // Show user's typed text in UI (even though payload stays static)
+      if (uiMsg) {
+        chatBoxEl.insertAdjacentHTML("beforeend", `
+          <div class="flex justify-end mb-3">
+            <div class="max-w-[75%] bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-sm shadow bubble">${uiMsg}</div>
           </div>
-        </div>
-      `;
-      chatBox.scrollTop = chatBox.scrollHeight;
+        `);
+        scrollToBottom();
+      }
 
       try {
         const payload = {
-          user_id: FIXED_USER_ID,
-          question,
-          context_token: contextToken,
-          chat_room_token: currentChatRoomToken
+          user_id: 356,
+          question: "hi", // << static
+          context_token: STATIC_ROOM,
+          chat_room_token: STATIC_ROOM
         };
-        const res = await axios.post(`/api/chat/send`, payload);
-        const { chat = {}, context_token: newCtx } = res.data || {};
-        if (newCtx) {
-          contextToken = newCtx;
-          localStorage.setItem("contextToken", newCtx);
-        }
-        const answer = chat.answer || "No response";
-        chatBox.innerHTML += `
-          <div class="flex justify-start mb-3">
-            <div class="max-w-[75%] bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl rounded-bl-sm shadow text-sm leading-relaxed break-words">
-              ${answer}
-            </div>
-          </div>
-        `;
-        chatBox.scrollTop = chatBox.scrollHeight;
-      } catch (e) {
-        chatBox.innerHTML += `
-          <div class="text-left text-red-600 mb-2">⚠️ Error sending message</div>
-        `;
-      }
-    }
 
-    // ---------- Pet Modal Logic ----------
-    // NOTE: Legacy ids guarded (only run if elements exist)
-    const petModal = document.getElementById("petDetailsModal");
-    const md_petType = document.getElementById("md_petType");
-    const md_petName = document.getElementById("md_petName");
-    const md_petGender = document.getElementById("md_petGender");
-    const md_homeVisit = document.getElementById("md_homeVisit");
-    const md_petAgeYears = document.getElementById("md_petAgeYears");
-    const md_petAgeMonths = document.getElementById("md_petAgeMonths");
-    const breedSelectWrap = document.getElementById("breedSelectWrap");
-    const breedInputWrap = document.getElementById("breedInputWrap");
-    const md_petBreed_select = document.getElementById("md_petBreed_select");
-    const md_petBreed_input = document.getElementById("md_petBreed_input");
-    const md_doc1 = document.getElementById("md_doc1");
-    const md_doc2 = document.getElementById("md_doc2");
-    const md_doc1_label = document.getElementById("md_doc1_label");
-    const md_doc2_label = document.getElementById("md_doc2_label");
-    const breedImageWrap = document.getElementById("breedImageWrap");
-    const breedPreview = document.getElementById("breedPreview");
-    const breedLightbox = document.getElementById("breedLightbox");
-    const breedLarge = document.getElementById("breedLarge");
-
-    function openBreedLightbox(){ if (breedLarge && breedPreview) { breedLarge.src = breedPreview.src; show(breedLightbox); } }
-    function closeBreedLightbox(){ if (breedLightbox) hide(breedLightbox); }
-
-    if (md_doc1) md_doc1.addEventListener("change", () => md_doc1_label.textContent = md_doc1.files?.[0]?.name || "Click to upload or drag & drop");
-    if (md_doc2) md_doc2.addEventListener("change", () => md_doc2_label.textContent = md_doc2.files?.[0]?.name || "Click to upload or drag & drop");
-
-    if (md_petType) {
-      md_petType.addEventListener("change", async () => {
-        clearBreedErrors();
-        if (md_petType.value === "Dog") {
-          if (breedSelectWrap) show(breedSelectWrap);
-          if (breedInputWrap) hide(breedInputWrap);
-          await loadDogBreeds();
-        } else {
-          if (breedSelectWrap) hide(breedSelectWrap);
-          if (breedInputWrap) show(breedInputWrap);
-          if (breedImageWrap) hide(breedImageWrap);
-        }
-      });
-    }
-
-    async function loadDogBreeds() {
-      if (!md_petBreed_select) return;
-      try {
-        md_petBreed_select.innerHTML = `<option value="">Loading breeds...</option>`;
-        const res = await axios.get(`${BACKEND}/dog-breeds/all`);
-        const breedsData = res.data?.breeds || {};
-        const list = [];
-        Object.entries(breedsData).forEach(([breed, subs]) => {
-          if (Array.isArray(subs) && subs.length) {
-            subs.forEach(sub => list.push(`${capitalize(sub)} ${capitalize(breed)}`));
-          } else {
-            list.push(capitalize(breed));
-          }
+        const res = await axios.post(`/api/chat/send`, payload, {
+          headers: { "Content-Type": "application/json" }
         });
-        list.sort();
-        md_petBreed_select.innerHTML = `<option value="">Select Breed</option>` + list.map(b => `<option>${b}</option>`).join("");
+
+        const answer = res.data?.chat?.answer || "No response";
+        chatBoxEl.insertAdjacentHTML("beforeend", `
+          <div class="flex justify-start mb-3">
+            <div class="max-w-[75%] bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl rounded-bl-sm shadow bubble">${answer}</div>
+          </div>
+        `);
+        scrollToBottom();
+
+        // refresh left list so latest room titles/snippets feel current
+        fetchChatRooms();
       } catch (e) {
-        console.error("Failed to load dog breeds", e);
-        md_petBreed_select.innerHTML = `<option value="">Failed to load</option>`;
+        console.error(e);
+        chatBoxEl.insertAdjacentHTML("beforeend",
+          `<div class="text-left text-red-600 mb-2">⚠️ Error sending message</div>`);
       }
     }
 
-    if (md_petBreed_select) {
-      md_petBreed_select.addEventListener("change", async () => {
-        const label = md_petBreed_select.value || "";
-        if (!label) { if (breedImageWrap) hide(breedImageWrap); return; }
-        try {
-          const path = toDogCeoPath(label); // e.g. "bulldog/french"
-          if (!path) { if (breedImageWrap) hide(breedImageWrap); return; }
-          const imgRes = await axios.get(`https://dog.ceo/api/breed/${path}/images/random`);
-          const url = imgRes.data?.message;
-          if (url) {
-            if (breedPreview) breedPreview.src = url;
-            if (breedImageWrap) show(breedImageWrap);
-          } else {
-            if (breedImageWrap) hide(breedImageWrap);
-          }
-        } catch {
-          if (breedImageWrap) hide(breedImageWrap);
-        }
-      });
-    }
+    // ======= INIT =======
+    document.getElementById("newChatBtn").addEventListener("click", createNewChat);
+    document.getElementById("sendBtn").addEventListener("click", sendMessage);
+    document.getElementById("chatInput").addEventListener("keydown", (e)=>{ if(e.key==="Enter") sendMessage(); });
 
-    function toDogCeoPath(label){
-      // "French Bulldog" => "bulldog/french" ; "Labrador" => "labrador"
-      const parts = label.trim().toLowerCase().split(" ");
-      if (parts.length === 1) return parts[0];
-      // assume "<sub> <breed>"
-      const sub = parts.slice(0, parts.length - 1).join("");
-      const breed = parts[parts.length - 1];
-      return `${breed}/${sub}`;
-    }
-    const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1);
-
-    function clearBreedErrors(){
-      setErr("err_petBreed", "");
-    }
-
-    function validatePetForm(){
-      // legacy form validation guarded in new template
-      return true;
-    }
-
-    async function savePetDetails_backup_archived_(){
-      if (!validatePetForm()) return;
-
-      const years = parseInt(md_petAgeYears?.value || "0", 10);
-      const months = parseInt(md_petAgeMonths?.value || "0", 10);
-      const totalMonths = years * 12 + months;
-
-      const form = new FormData();
-      form.append("user_id", FIXED_USER_ID);
-      form.append("pet_type", md_petType?.value || "");
-      form.append("pet_name", (md_petName?.value || "").trim());
-      form.append("pet_gender", md_petGender?.value || "");
-      form.append("home_visit", md_homeVisit?.value || "");
-      form.append("role", "pet"); // force role
-      form.append("pet_age", totalMonths);
-      form.append("breed", md_petType?.value === "Dog" ? (md_petBreed_select?.value || "") : (md_petBreed_input?.value || ""));
-      if (md_doc1?.files?.[0]) form.append("pet_doc1", md_doc1.files[0]);
-      if (md_doc2?.files?.[0]) form.append("pet_doc2", md_doc2.files[0]);
-
-      const btn = document.getElementById("md_submitBtn");
-      if (btn) { btn.disabled = true; btn.textContent = "Saving..."; }
-
-      try {
-        const res = await axios.post(`${BACKEND}/auth/register`, form, { headers: { "Content-Type": "multipart/form-data", ...getAuthHeaders() }});
-        if (res.data?.message?.toLowerCase().includes("success")) {
-          if (res.data.user) {
-            sessionStorage.setItem("sessionUser", JSON.stringify({ ...res.data.user, role: "pet" }));
-            console.log("sessionUser saved:", JSON.parse(sessionStorage.getItem("sessionUser")));
-          } else {
-            try {
-              const userRes = await axios.get(`${BACKEND}/petparents/${FIXED_USER_ID}`, { headers: { ...getAuthHeaders() }});
-              const u = userRes.data?.user || userRes.data;
-              if (u) {
-                sessionStorage.setItem("sessionUser", JSON.stringify({ ...u, role: "pet" }));
-              }
-            } catch (e) {}
-          }
-          localStorage.setItem("petProfileCompleted", "1");
-          if (petModal) hide(petModal);
-          alert("Pet profile saved successfully!");
-        } else {
-          alert(res.data?.message || "Failed to save pet data");
-        }
-      } catch (error) {
-        console.error("Registration error:", error);
-        alert(error?.response?.data?.message || "Something went wrong!");
-      } finally {
-        if (btn) { btn.disabled = false; btn.textContent = "Save Pet Details"; }
-      }
-    }
-
-    // ---------- Modal open check on load ----------
-    async function checkAndOpenModal(){
-      try {
-        if (localStorage.getItem("petProfileCompleted") === "1") {
-          try {
-            const userRes = await axios.get(`${BACKEND}/petparents/${FIXED_USER_ID}`, { headers: { ...getAuthHeaders() }});
-            const u = userRes.data?.user || userRes.data || {};
-            if (u?.pet_name && u?.pet_gender && (u?.breed || u?.pet_breed) && (u?.pet_age || u?.age_months >= 0)) {
-              if (petModal) hide(petModal);
-              return;
-            }
-          } catch {}
-        }
-        try {
-          const userRes = await axios.get(`${BACKEND}/petparents/${FIXED_USER_ID}`, { headers: { ...getAuthHeaders() }});
-          const u = userRes.data?.user || userRes.data || {};
-          if (u?.pet_name && u?.pet_gender && (u?.breed || u?.pet_breed) && (u?.pet_age || u?.age_months >= 0)) {
-            if (petModal) hide(petModal);
-            return;
-          }
-        } catch (e) {}
-        if (petModal) show(petModal);
-      } catch {
-        if (petModal) show(petModal);
-      }
-    }
-
-    // ---------- Init ----------
     (async function init(){
-      fetchNearbyVets();
-      fetchChatRooms();
+      await fetchNearbyVets();
+      await fetchChatRooms();
       if (currentChatRoomToken) fetchChatHistory();
-
-      // open modal on load (with profile check)
-      await checkAndOpenModal();
     })();
   </script>
-
-  <script>
-async function savePetDetails() {
-  const userId = 356; // 🔥 fix user_id updated to 356
-  const petType = document.getElementById("petType").value;
-  const petName = document.getElementById("petName").value;
-  const petGender = document.getElementById("petGender").value;
-  const homeVisit = document.getElementById("homeVisit").value;
-  const petAgeYears = parseInt(document.getElementById("petAgeYears").value || 0);
-  const petAgeMonths = parseInt(document.getElementById("petAgeMonths").value || 0);
-  const petBreed = document.getElementById("petBreed").value;
-
-  // ✅ total months
-  const totalMonths = petAgeYears * 12 + petAgeMonths;
-
-  const formData = new FormData();
-  formData.append("user_id", userId);
-  formData.append("pet_type", petType);
-  formData.append("pet_name", petName.trim());
-  formData.append("pet_gender", petGender);
-  formData.append("home_visit", homeVisit);
-  formData.append("role", "pet"); // force role
-  formData.append("pet_age", totalMonths);
-  formData.append("breed", petBreed);
-
-  try {
-    const res = await axios.post(
-      "https://snoutiq.com/backend/api/auth/register",
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    );
-
-    if (res.data.message && res.data.message.includes("successfully")) {
-      alert("✅ Pet profile saved successfully!");
-      closePetModal();
-    } else {
-      alert("⚠️ Failed: " + (res.data.message || "Unknown error"));
-    }
-  } catch (err) {
-    console.error("Error saving pet details", err);
-    alert("❌ Server error saving pet profile");
-  }
-}
-</script>
-
-<script>
-async function sendMessage() {
-  const input = document.getElementById("chatInput");
-  if (!input.value.trim()) return;
-
-  // static payload as per your request
-  const payload = {
-    user_id: 356,
-    question: "hi", // 👈 always hi
-    context_token: "room_fa86a154-5fe0-4a27-bef7-110adfe3d637",
-    chat_room_token: "room_fa86a154-5fe0-4a27-bef7-110adfe3d637"
-  };
-
-  // UI show user msg
-  document.getElementById("chatBox").innerHTML += `
-    <div class="text-right mb-2">
-      <span class="bg-blue-100 px-3 py-2 rounded">${payload.question}</span>
-    </div>
-  `;
-
-  try {
-    const res = await axios.post(
-      "https://snoutiq.com/backend/api/chat/send",
-      payload,
-      { headers: { "Content-Type": "application/json" } }
-    );
-
-    const { chat = {}, decision, score } = res.data || {};
-    const answer = chat.answer || "No response";
-
-    // decision/score chips
-    if (document.getElementById("decisionChip"))
-      document.getElementById("decisionChip").innerText = "Decision: " + (decision ?? "—");
-    if (document.getElementById("scoreChip"))
-      document.getElementById("scoreChip").innerText = "Score: " + (score ?? "—");
-
-    document.getElementById("chatBox").innerHTML += `
-      <div class="text-left mb-2">
-        <span class="bg-gray-200 px-3 py-2 rounded">${answer}</span>
-      </div>
-    `;
-  } catch (err) {
-    console.error(err);
-    document.getElementById("chatBox").innerHTML += `
-      <div class="text-left text-red-600 mb-2">⚠️ Error sending message</div>
-    `;
-  }
-}
-</script>
-
-
-
-  
 </body>
 </html>
