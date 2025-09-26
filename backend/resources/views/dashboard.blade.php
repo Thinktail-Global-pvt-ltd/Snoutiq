@@ -187,66 +187,32 @@
     }
 
     // ======= CHAT HISTORY (MESSAGES IN A ROOM) =======
-    // async function fetchChatHistory() {
-    //   if (!currentChatRoomToken) {
-    //     chatBoxEl.innerHTML = `<div class="text-center text-gray-500 mt-20">Start by creating a new chat.</div>`;
-    //     return;
-    //   }
-    //   try {
-    //     const res = await axios.get(`/api/chat-rooms/${currentChatRoomToken}/chats?user_id=${FIXED_USER_ID}`);
-    //     const chats = res.data?.chats || [];
-    //     if (chats.length === 0) {
-    //       chatBoxEl.innerHTML = `<div class="text-center text-gray-500 mt-12">No messages yet</div>`;
-    //       return;
-    //     }
-    //     const html = chats.map(c => `
-    //       <div class="mb-3">
-    //         <div class="flex justify-end">
-    //           <div class="max-w-[75%] bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-sm shadow bubble">${c.question || ""}</div>
-    //         </div>
-    //         <div class="flex justify-start mt-1">
-    //           <div class="max-w-[75%] bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl rounded-bl-sm shadow bubble">${c.answer || ""}</div>
-    //         </div>
-    //       </div>
-    //     `).join("");
-    //     chatBoxEl.innerHTML = html;
-    //     scrollToBottom();
-    //   } catch (e) {
-    //     console.error("Failed to fetch chat history", e);
-    //     chatBoxEl.innerHTML = `<div class="text-center text-red-600 mt-12">Failed to load messages</div>`;
-    //   }
-    // }
-
-    async function fetchChatHistory() {
-  // ab hamesha static token use hoga
-  const STATIC_ROOM = "room_fa86a154-5fe0-4a27-bef7-110adfe3d637";
-
+async function fetchChatRooms() {
   try {
-    const res = await axios.get(`/api/chat-rooms/${STATIC_ROOM}/chats?user_id=${FIXED_USER_ID}`);
-    const chats = res.data?.chats || [];
-    if (chats.length === 0) {
-      chatBoxEl.innerHTML = `<div class="text-center text-gray-500 mt-12">No messages yet</div>`;
-      return;
+    // 🔥 static user_id ke saath API hit
+    const res = await axios.get(`/api/chat/listRooms?user_id=${FIXED_USER_ID}`);
+    const rooms = res.data?.rooms || [];
+
+    let html = "";
+    if (rooms.length === 0) {
+      html = `<div class="text-gray-500 text-sm">No chat history</div>`;
+    } else {
+      rooms.forEach(room => {
+        html += `
+          <div class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-100 mb-1 cursor-pointer"
+               onclick="openChatRoom('${room.chat_room_token}')">
+            <span class="text-sm font-medium text-gray-700 truncate">${room.name || "New Chat"}</span>
+            <button onclick="deleteChatRoom(event, ${room.id}, '${room.chat_room_token}')"
+                    class="text-xs text-red-500 hover:text-red-700">✖</button>
+          </div>
+        `;
+      });
     }
-    const html = chats.map(c => `
-      <div class="mb-3">
-        <div class="flex justify-end">
-          <div class="max-w-[75%] bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-sm shadow bubble">
-            ${c.question || ""}
-          </div>
-        </div>
-        <div class="flex justify-start mt-1">
-          <div class="max-w-[75%] bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl rounded-bl-sm shadow bubble">
-            ${c.answer || ""}
-          </div>
-        </div>
-      </div>
-    `).join("");
-    chatBoxEl.innerHTML = html;
-    scrollToBottom();
-  } catch (e) {
-    console.error("Failed to fetch chat history", e);
-    chatBoxEl.innerHTML = `<div class="text-center text-red-600 mt-12">Failed to load messages</div>`;
+    document.getElementById("chatHistory").innerHTML = html;
+  } catch (err) {
+    console.error("Failed to fetch rooms", err);
+    document.getElementById("chatHistory").innerHTML =
+      `<div class="text-red-500 text-sm">Failed to load chat rooms</div>`;
   }
 }
 
