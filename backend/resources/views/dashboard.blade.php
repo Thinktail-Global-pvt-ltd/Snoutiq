@@ -366,7 +366,7 @@
           context_token: contextToken,
           chat_room_token: currentChatRoomToken
         };
-        const res = await axios.post(`/api/chat/send`, payload);
+        const res = await axios.post(`backend/api/chat/send`, payload);
         const { chat = {}, context_token: newCtx } = res.data || {};
         if (newCtx) {
           contextToken = newCtx;
@@ -649,7 +649,7 @@ async function sendMessage() {
       chat_room_token: "room_static_12345"  // 🔥 static room
     };
 
-    const res = await axios.post(`/api/chat/send`, payload);
+    const res = await axios.post(`backend/api/chat/send`, payload);
     const { chat = {}, decision, score } = res.data || {};
 
     // (optional chips) update only if present
