@@ -249,7 +249,7 @@
     // ---------- Rooms ----------
     async function fetchChatRooms() {
       try {
-     const res = await axios.get(`https://snoutiq.com/api/chat/listRooms?user_id=${FIXED_USER_ID}`);
+     const res = await axios.get(`https://snoutiq.com/backend/api/chat/listRooms?user_id=${FIXED_USER_ID}`);
         const rooms = res.data?.rooms || [];
         let html = "";
         if (rooms.length === 0) {
@@ -280,7 +280,7 @@
     async function createNewChat() {
       try {
         // const res = await axios.get(`/api/chat-rooms/new?user_id=${FIXED_USER_ID}`);
-        await axios.delete(`https://snoutiq.com/api/chat-rooms/${token}`, { data: { user_id: FIXED_USER_ID } });
+        await axios.delete(`https://snoutiq.com/backend/api/chat-rooms/${token}`, { data: { user_id: FIXED_USER_ID } });
         const { chat_room_token } = res.data || {};
         if (chat_room_token) {
           currentChatRoomToken = chat_room_token;
@@ -314,7 +314,7 @@
       if (!currentChatRoomToken) return;
       try {
         // const res = await axios.get(`/api/chat-rooms/${currentChatRoomToken}/chats?user_id=${FIXED_USER_ID}`);
-        const res = await axios.get(`https://snoutiq.com/api/chat-rooms/${currentChatRoomToken}/chats?user_id=${FIXED_USER_ID}`);
+        const res = await axios.get(`https://snoutiq.com/backend/api/chat-rooms/${currentChatRoomToken}/chats?user_id=${FIXED_USER_ID}`);
         const chats = res.data?.chats || [];
         let html = "";
         chats.forEach(chat => {
