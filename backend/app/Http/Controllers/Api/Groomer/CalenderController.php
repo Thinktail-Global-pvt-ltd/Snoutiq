@@ -42,59 +42,86 @@ class CalenderController extends Controller
         'message'=>'Block time added successfull!'
     ]);
  }
- public function store_booking(Request $request){
-  //  dd($request->all());
-    $request->validate([
- 
-        'customer_type'=>'required',
-        'customer_id'=>'required',
-        'customer_pet_id'=>'required',
-        'date'=>'required',
-        'start_time'=>'required',
-        'end_time'=>'required',
-        'services'=>'required',
-        'groomer_employees_id'=>'required'
-       
-    ]);
-    // dd($request->all());
-    // return response()->json([
-    //     'd'=>$request->all(),
-    // ],404);
-    $total = 0;
-    foreach($request->services as $dd){
-        if($dd['service_id']==0 || $dd['service_id']==""){
-            return response()->json([
-                'message'=>'Please don\'t keep service empty'
-            ],500);
+public function store_booking(Request $request)
+{
+    try {
+        // Debug incoming request
+        // dd($request->all());
+
+        $request->validate([
+            'customer_type'       => 'required',
+            'customer_id'         => 'required',
+            'customer_pet_id'     => 'required',
+            'date'                => 'required',
+            'start_time'          => 'required',
+            'end_time'            => 'required',
+            'services'            => 'required|array',
+            'groomer_employees_id'=> 'required'
+        ]);
+
+        $total = 0;
+        foreach ($request->services as $dd) {
+            if ($dd['service_id'] == 0 || $dd['service_id'] == "") {
+                return response()->json([
+                    'message' => 'Please don\'t keep service empty'
+                ], 500);
+            }
+            $total += $dd['price'];
         }
-         $total+=$dd['price'];
+
+        $blockedTime = self::blockedTime($request->user()->id, $request->date);
+
+        if (!self::isSlotAvailable(
+            $request->start_time,
+            $request->end_time,
+            $request->groomer_employees_id,
+            $blockedTime
+        )) {
+            return response()->json([
+                'message' => 'Time slot not available! It\'s conflicting with another booking'
+            ], 500);
+        }
+
+        $old_booking = GroomerBooking::where('user_id', $request->user()->id)
+            ->orderBy('serial_number', 'desc')
+            ->first();
+
+        GroomerBooking::create([
+            'serial_number'       => $old_booking ? $old_booking->serial_number + 1 : 1,
+            'customer_type'       => $request->customer_type,
+            'customer_id'         => $request->customer_id,
+            'customer_pet_id'     => $request->customer_pet_id,
+            'date'                => $request->date,
+            'start_time'          => $request->start_time,
+            'end_time'            => $request->end_time,
+            'services'            => json_encode($request->services),
+            'total'               => $total,
+            'paid'                => 0,
+            'user_id'             => $request->user()->id,
+            'groomer_employees_id'=> $request->groomer_employees_id,
+            'status'              => 'Pending'
+        ]);
+
+        return response()->json([
+            'message' => 'Booking booked successfully!'
+        ], 200);
+
+    } catch (\Throwable $e) {
+        // Debug the error in local
+        dd([
+            'error_message' => $e->getMessage(),
+            'file'          => $e->getFile(),
+            'line'          => $e->getLine(),
+            'trace'         => $e->getTraceAsString()
+        ]);
+
+        // Or if you want JSON in production instead of dd:
+        // return response()->json([
+        //     'error' => $e->getMessage()
+        // ], 500);
     }
-      $blockedTime = self::blockedTime($request->user()->id,$request->date);
-    if(!self::isSlotAvailable($request->start_time, $request->end_time, $request->groomer_employees_id, $blockedTime)){
- return response()->json([
-        'message'=>'Time slot not available! It\'s confliting with other'
-    ],500);
-    }
-    $old_booking = GroomerBooking::where('user_id',$request->user()->id)->orderBy('serial_number','desc')->first();
-   
-    GroomerBooking::create([
-         'serial_number'=>$old_booking?$old_booking->serial_number+1:1,
-        'customer_type'=>$request->customer_type,
-        'customer_id'=>$request->customer_id,
-        'customer_pet_id'=>$request->customer_pet_id,
-        'date'=>$request->date,
-        'start_time'=>$request->start_time,
-        'end_time'=>$request->end_time,
-        'services'=>json_encode($request->services),
-        'total'=>$total,
-        'paid'=>0,
-        'user_id'=>$request->user()->id,
-        'groomer_employees_id'=>$request->groomer_employees_id,'status'=>'Pending'
-    ]);
-    return response()->json([
-        'message'=>'Booking booked successfully!'
-    ]);
- }
+}
+
  public function bookings(Request $request){
     $uid = $request->user()->id;
     $GroomerBooking = GroomerBooking::where('user_id',$uid)->with("groomerEmployee");
