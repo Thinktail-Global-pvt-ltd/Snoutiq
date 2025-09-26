@@ -513,7 +513,7 @@
         vet_slug: (typeof vetSlug !== "undefined" ? vetSlug : "")
       });
       if (prefill) params.set("prefill", prefill);
-      location.href = `/custom-doctor-register?${params.toString()}`;
+      location.href = `backend/custom-doctor-register?${params.toString()}`;
     }
 
     // ✅ Hero ask bar → redirect
