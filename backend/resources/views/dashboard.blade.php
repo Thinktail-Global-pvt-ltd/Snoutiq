@@ -312,7 +312,8 @@
     async function fetchChatHistory() {
       if (!currentChatRoomToken) return;
       try {
-        const res = await axios.get(`/api/chat-rooms/${currentChatRoomToken}/chats?user_id=${FIXED_USER_ID}`);
+        // const res = await axios.get(`/api/chat-rooms/${currentChatRoomToken}/chats?user_id=${FIXED_USER_ID}`);
+        const res = await axios.get(`https://snoutiq.com/api/chat-rooms/${currentChatRoomToken}/chats?user_id=${FIXED_USER_ID}`);
         const chats = res.data?.chats || [];
         let html = "";
         chats.forEach(chat => {
