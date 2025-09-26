@@ -174,7 +174,10 @@ Route::get('/users', function () {
 //     $vets = DB::table('vet_registerations_temp')->get();
 //     return response()->json($vets);
 // });
-
+  Route::post('/store_booking', [GroomerCalenderController::class, 'store_booking']);
+          Route::get('/bookings', [GroomerCalenderController::class, 'bookings']);
+          Route::get('/bookings-v2', [GroomerCalenderController::class, 'bookingsV2']);
+          Route::get('/bookings/{id}', [GroomerCalenderController::class, 'booking_single']);
 Route::prefix('groomer')->middleware('auth:sanctum')->group(function () {
 Route::post('/profile', [GroomerProfileController::class, 'store']);
 Route::get('/ratings', [GroomerProfileController::class, 'ratings']);
@@ -208,10 +211,7 @@ Route::post('/service_categroy/{id}/delete', [GroomerServiceCategoryController::
           Route::put('/clients/{id}', [GroomerClientController::class, 'update']);
           Route::post('/clients', [GroomerClientController::class, 'store']);
 
-          Route::post('/store_booking', [GroomerCalenderController::class, 'store_booking']);
-          Route::get('/bookings', [GroomerCalenderController::class, 'bookings']);
-          Route::get('/bookings-v2', [GroomerCalenderController::class, 'bookingsV2']);
-          Route::get('/bookings/{id}', [GroomerCalenderController::class, 'booking_single']);
+        
           Route::post('/bookings/{id}/delete', [GroomerCalenderController::class, 'booking_single_delete']);
           Route::post('/bookings/{id}/payment', [GroomerCalenderController::class, 'booking_single_payment']);
           Route::post('/bookings/{id}/status', [GroomerCalenderController::class, 'booking_single_status']);
