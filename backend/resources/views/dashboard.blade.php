@@ -366,7 +366,7 @@
           context_token: contextToken,
           chat_room_token: currentChatRoomToken
         };
-        const res = await axios.post(`backend/api/chat/send`, payload);
+        const res = await axios.post(`api/chat/send`, payload);
         const { chat = {}, context_token: newCtx } = res.data || {};
         if (newCtx) {
           contextToken = newCtx;
@@ -630,47 +630,49 @@ async function savePetDetails() {
 <script>
 async function sendMessage() {
   const input = document.getElementById("chatInput");
-  if (!input.value.trim()) return;
-  const question = input.value;
+  const uiMsg = (input.value || "").trim();
   input.value = "";
 
-  // UI show user msg
-  document.getElementById("chatBox").innerHTML += `
-    <div class="text-right mb-2">
-      <span class="bg-blue-100 px-3 py-2 rounded">${question}</span>
-    </div>
-  `;
+  // Show user message in UI
+  if (uiMsg) {
+    chatBoxEl.insertAdjacentHTML("beforeend", `
+      <div class="flex justify-end mb-3">
+        <div class="max-w-[75%] bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-sm shadow bubble">${uiMsg}</div>
+      </div>
+    `);
+    scrollToBottom();
+  }
 
   try {
     const payload = {
-      user_id: 356,   // 🔥 static user_id updated to 356
-      question,
-      context_token: "room_static_12345",   // 🔥 static context
-      chat_room_token: "room_static_12345"  // 🔥 static room
+      user_id: 356,
+      question: "hi",  // static as you wanted
+      context_token: "room_fa86a154-5fe0-4a27-bef7-110adfe3d637",
+      chat_room_token: "room_fa86a154-5fe0-4a27-bef7-110adfe3d637"
     };
 
-    const res = await axios.post(`backend/api/chat/send`, payload);
-    const { chat = {}, decision, score } = res.data || {};
+    // Hardcoded API URL
+    const hardUrl = "https://snoutiq.com/backend/api/chat/send";
 
-    // (optional chips) update only if present
-    const decisionChip = document.getElementById("decisionChip");
-    const scoreChip = document.getElementById("scoreChip");
-    if (decisionChip) decisionChip.innerText = "Decision: " + (decision ?? "—");
-    if (scoreChip) scoreChip.innerText = "Score: " + (score ?? "—");
+    const res = await axios.post(hardUrl, payload, {
+      headers: { "Content-Type": "application/json" }
+    });
 
-    const answer = chat.answer || "No response";
-    document.getElementById("chatBox").innerHTML += `
-      <div class="text-left mb-2">
-        <span class="bg-gray-200 px-3 py-2 rounded">${answer}</span>
+    const answer = res.data?.chat?.answer || "No response";
+    chatBoxEl.insertAdjacentHTML("beforeend", `
+      <div class="flex justify-start mb-3">
+        <div class="max-w-[75%] bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl rounded-bl-sm shadow bubble">${answer}</div>
       </div>
-    `;
+    `);
+    scrollToBottom();
+
   } catch (e) {
-    console.error(e);
-    document.getElementById("chatBox").innerHTML += `
-      <div class="text-left text-red-600 mb-2">⚠️ Error sending message</div>
-    `;
+    console.error("Error in sendMessage:", e);
+    chatBoxEl.insertAdjacentHTML("beforeend",
+      `<div class="text-left text-red-600 mb-2">⚠️ Error sending message</div>`);
   }
 }
+
 </script>
 
 
