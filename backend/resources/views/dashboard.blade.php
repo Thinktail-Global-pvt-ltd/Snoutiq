@@ -340,7 +340,9 @@
         console.error("Failed to fetch chat history", err);
       }
     }
-    async function sendMessage() {
+
+    
+    async function sendMessage_001() {
       const input = document.getElementById("chatInput");
       const question = (input.value || "").trim();
       if (!question) return;
@@ -654,6 +656,50 @@ async function savePetDetails() {
   }
 }
 </script>
+
+<script>
+async function sendMessage() {
+  const input = document.getElementById("chatInput");
+  if (!input.value.trim()) return;
+  const question = input.value;
+  input.value = "";
+
+  // UI show user msg
+  document.getElementById("chatBox").innerHTML += `
+    <div class="text-right mb-2">
+      <span class="bg-blue-100 px-3 py-2 rounded">${question}</span>
+    </div>
+  `;
+
+  try {
+    const payload = {
+      user_id: 355,   // 🔥 static user_id
+      question,
+      context_token: "room_static_12345",   // 🔥 static context
+      chat_room_token: "room_static_12345"  // 🔥 static room
+    };
+
+    const res = await axios.post(`/api/chat/send`, payload);
+    const { chat = {}, decision, score } = res.data || {};
+
+    document.getElementById("decisionChip").innerText = "Decision: " + (decision ?? "—");
+    document.getElementById("scoreChip").innerText = "Score: " + (score ?? "—");
+
+    const answer = chat.answer || "No response";
+    document.getElementById("chatBox").innerHTML += `
+      <div class="text-left mb-2">
+        <span class="bg-gray-200 px-3 py-2 rounded">${answer}</span>
+      </div>
+    `;
+  } catch (e) {
+    console.error(e);
+    document.getElementById("chatBox").innerHTML += `
+      <div class="text-left text-red-600 mb-2">⚠️ Error sending message</div>
+    `;
+  }
+}
+</script>
+
 
   
 </body>
