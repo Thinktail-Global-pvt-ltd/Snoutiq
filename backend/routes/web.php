@@ -62,3 +62,57 @@ Route::get('/vet/register', function () {
     return view('register'); 
 })->name('register');
 
+
+use App\Http\Controllers\ChatController;
+
+
+
+
+// If you want to test the socket separately
+Route::get('/socket-test', function () {
+    return view('socket-test');
+});
+
+// --- Patient (chat) ---
+Route::get('/chat', function () {
+    $patientId = auth()->id() ?? 101;
+
+    // Demo doctors (replace with DB query if you have one)
+    $nearbyDoctors = collect([
+        (object)['id' => 501, 'name' => 'Dr. Demo One'],
+        (object)['id' => 502, 'name' => 'Dr. Demo Two'],
+    ]);
+
+    $nearbyDoctorsForJs = $nearbyDoctors->map(fn($d) => [
+        'id' => $d->id, 'name' => $d->name
+    ])->values();
+
+    $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
+
+    return view('chat', compact('patientId', 'nearbyDoctors', 'nearbyDoctorsForJs', 'socketUrl'));
+})->name('patient.chat');
+
+// --- Doctor dashboard ---
+Route::get('/doctor', function (\Illuminate\Http\Request $request) {
+    $doctorId  = (int) $request->query('doctorId', 501);
+    $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
+    return view('doctor-dashboard', compact('socketUrl','doctorId'));
+})->name('doctor.dashboard');
+
+// --- Payment + Call page (shared) ---
+Route::get('/payment/{callId}', function (string $callId) {
+    $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
+    return view('payment', compact('callId','socketUrl'));
+})->name('payment.show');
+
+Route::get('/call-page/{channel}', function (\Illuminate\Http\Request $request, string $channel) {
+    $uid    = $request->query('uid');
+    $role   = $request->query('role');
+    $callId = $request->query('callId');
+    return view('call-page', compact('channel','uid','role','callId'));
+})->name('call.show');
+
+
+
+
+
