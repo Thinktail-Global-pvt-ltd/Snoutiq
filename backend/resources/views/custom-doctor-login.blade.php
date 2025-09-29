@@ -46,6 +46,10 @@
     .toast.show{opacity:1;transform:translateY(0)}
     .google-box{border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
     .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;cursor:pointer}
+    /* user dump box */
+    .dump-wrap{margin-top:14px;display:none}
+    .dump-card{border:1px solid var(--border);background:#f8fafc;border-radius:12px;padding:12px}
+    pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:12px;color:#0b1220;max-height:260px;overflow:auto}
   </style>
 </head>
 <body>
@@ -91,6 +95,14 @@
         <p id="googleMsg" class="err" style="display:none;margin:10px 0 0"></p>
       </div>
 
+      <!-- 🔎 User dump appears here after success -->
+      <div id="dumpWrap" class="dump-wrap">
+        <div class="dump-card">
+          <strong>User dump (debug):</strong>
+          <pre id="userDump">{}</pre>
+        </div>
+      </div>
+
       <div class="foot">
         <p class="muted">Don't have an account?
           <a class="link" href="/register">Create an account</a>
@@ -112,12 +124,44 @@
       el._t = setTimeout(()=>el.classList.remove('show'), 2200);
     };
 
+    // ---------- small utils ----------
+    const maskToken = (t)=> typeof t === "string" && t.length > 16 ? (t.slice(0,6)+"…"+t.slice(-4)) : t || "";
+    const pick = (obj, keys)=> keys.reduce((a,k)=> (a[k]=obj?.[k], a), {});
+
     // ---------- redirect helper (role → url) ----------
     function routeAfterLogin(user){
-        console.log(user)
       const role = (user?.role || '').toString().toLowerCase();
-      const nextUrl = role === 'pet' ? '/pet-dashboard' : '/doctor';
+      const nextUrl = role === 'pet' ? 'backend/pet-dashboard' : 'backend/doctor';
       location.href = nextUrl;
+    }
+
+    // ---------- dump helper (console + alert + on-page JSON) ----------
+    function dumpUser(user, token){
+      try{
+        // 1) Console logs
+        console.log("✅ Login Success — User:", user);
+        console.log("🔑 Token (masked):", maskToken(token));
+
+        // 2) Page dump
+        const wrap = document.getElementById('dumpWrap');
+        const pre  = document.getElementById('userDump');
+        if(pre && wrap){
+          pre.textContent = JSON.stringify(user, null, 2);
+          wrap.style.display = 'block';
+        }
+
+        // 3) Alert (concise)
+        const summary = pick(user, ["id","name","full_name","email","role","mobile","phone"]);
+        alert(
+          "Login Success ✅\\n" +
+          "Role: " + (user?.role ?? "") + "\\n" +
+          "Name: " + (user?.name || user?.full_name || "") + "\\n" +
+          "Email: " + (user?.email || "") + "\\n" +
+          "User ID: " + (user?.id || "")
+        );
+      }catch(e){
+        console.warn("Dump failed:", e);
+      }
     }
 
     // ---------- state ----------
@@ -139,6 +183,8 @@
       loginBtn: document.getElementById('loginBtn'),
       googleBtn: document.getElementById('googleBtn'),
       googleMsg: document.getElementById('googleMsg'),
+      dumpWrap: document.getElementById('dumpWrap'),
+      userDump: document.getElementById('userDump'),
     };
 
     // ---------- role switching ----------
@@ -229,7 +275,8 @@
           saveSession(user, token, chatRoomToken);
           toast('Login successful!', 'success');
 
-          // ✅ role-based redirect (pet -> /pet-dashboard, else -> /doctor)
+          // 🔎 Dump + alert + console, then redirect
+          dumpUser(user, token);
           routeAfterLogin(user);
         }else{
           toast('Invalid response from server.', 'error');
@@ -269,7 +316,8 @@
           saveSession(user, token, chatRoomToken);
           toast('Login successful!', 'success');
 
-          // ✅ role-based redirect
+          // 🔎 Dump + alert + console, then redirect
+          dumpUser(user, token);
           routeAfterLogin(user);
         }else{
           toast('Invalid response from server.', 'error');
