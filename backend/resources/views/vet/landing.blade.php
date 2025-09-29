@@ -31,20 +31,24 @@
 
   <style>
     /* ======== Light Theme ======== */
-    :root{
-      --bg: #f6f9ff;
-      --bg-2:#ffffff;
-      --border:#dbe7ff;
-      --muted:#55607a;
-      --text:#0f172a;
-      --heading:#0b1220;
-      --accent:#2563eb;
-      --accent-2:#0ea5e9;
-      --ring: rgba(37,99,235,.25);
-      --success:#059669;
-      --sky1:#eaf2ff;
-      --sky2:#ffffff;
-    }
+:root{
+  --bg:   #cfe1ff; /* a notch darker blue */
+  --bg-2: #ffffff;
+  --border:#d1ddff;
+  --muted:#55607a;
+  --text:#0f172a;
+  --heading:#0b1220;
+  --accent:#2563eb;
+  --accent-2:#0ea5e9;
+  --ring: rgba(37,99,235,.25);
+  --success:#059669;
+
+  /* gradient ke blobs thode darker */
+  --sky1:#d7e6ff;
+  --sky2:#d7e6ff;
+}
+
+
     *{margin:0;padding:0;box-sizing:border-box}
     body{
       background:radial-gradient(1000px 500px at 20% -20%, var(--sky1), transparent 60%),
@@ -123,11 +127,11 @@
   <nav>
     <div class="container nav-wrap">
       <div class="logo" onclick="location.href='https://snoutiq.com'">
-        <img src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/> SnoutIQ
+        <img src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/> {{ $vet->name }}
       </div>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/login'">Login</button>
-        <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/register?utm_source=clinic-landing'">Register</button>
+ <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/backend/custom-doctor-register'">Login</button>
+      <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/backend/custom-doctor-register'">Register</button>
       </div>
     </div>
   </nav>

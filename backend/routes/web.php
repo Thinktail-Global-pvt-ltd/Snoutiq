@@ -51,6 +51,10 @@ Route::get('/custom-doctor-register', function () {
     return view('custom-register-doctor');
 })->name('custom-doctor-register');
 
+Route::get('/custom-doctor-login', function () {
+    return view('custom-doctor-login');
+})->name('custom-doctor-login');
+
 
 Route::get('/dashboard', function () {
     return view('dashboard'); // yeh resources/views/dashboard.blade.php ko load karega
