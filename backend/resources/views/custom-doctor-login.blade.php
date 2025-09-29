@@ -143,7 +143,7 @@
 
     function routeAfterLogin(user){
       const role = (user?.role || '').toString().toLowerCase();
-      const nextUrl = role === 'pet' ? '/pet-dashboard' : '/doctor';
+      const nextUrl = role === 'pet' ? '/backend/pet-dashboard' : '/backend/doctor';
       location.href = nextUrl;
     }
 
