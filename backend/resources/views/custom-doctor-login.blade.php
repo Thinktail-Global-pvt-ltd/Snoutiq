@@ -114,6 +114,7 @@
 
     // ---------- redirect helper (role → url) ----------
     function routeAfterLogin(user){
+        console.log(user)
       const role = (user?.role || '').toString().toLowerCase();
       const nextUrl = role === 'pet' ? '/pet-dashboard' : '/doctor';
       location.href = nextUrl;
