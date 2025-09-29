@@ -93,7 +93,7 @@
     </aside>
   </div>
 
-  <!-- =============== Pet Details Modal (centered) =============== -->
+  <!-- =============== Pet Details Modal =============== -->
   <div id="petDetailsModal" class="fixed inset-0 z-50 bg-black/50 hidden items-center justify-center p-4">
     <div class="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col shadow-lg mx-auto my-auto">
       <div class="p-6 border-b border-gray-200 flex justify-between items-start">
@@ -156,29 +156,48 @@
 
   <!-- ==================== Scripts ==================== -->
   <script>
-    // ----------- Constants ----------- //
-    const FIXED_USER_ID = 361;
-    const STATIC_CONTEXT = "room_static_12345";        // keep context static (as requested)
-    const SEND_API = "https://snoutiq.com/backend/api/chat/send";  // hard-coded prod
-    const LIST_ROOMS_API = "https://snoutiq.com/backend/api/chat/listRooms";
-    const NEW_ROOM_API = "https://snoutiq.com/backend/api/chat-rooms/new";
-    const ROOM_BASE_API = "https://snoutiq.com/backend/api/chat-rooms";    // for history & delete
+    // ====== Read login session saved by custom-doctor-login ======
+    function readAuthFull() {
+      try {
+        const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
+        return raw ? JSON.parse(raw) : null;
+      } catch(_) { return null; }
+    }
 
-    let currentChatRoomToken = localStorage.getItem("lastChatRoomToken") || "";
+    const AUTH = readAuthFull();
+    const USER_ID = Number(
+      (AUTH && (AUTH.user_id || (AUTH.user && AUTH.user.id))) || 0
+    ) || 0;
 
-    // ----------- Helpers ----------- //
+    // Header: set name/role if present
+    (function hydrateHeader(){
+      const nm = (AUTH && (AUTH.user?.name || AUTH.user_name)) || 'User';
+      const rl = (AUTH && (AUTH.user?.role || AUTH.role)) || 'member';
+      document.getElementById('userName').textContent = nm;
+      document.getElementById('userRole').textContent = rl;
+      console.log('[dashboard] session USER_ID:', USER_ID, '| name:', nm, '| role:', rl);
+    })();
+
+    // ====== Constants (APIs unchanged) ======
+    const STATIC_CONTEXT = "room_static_12345"; // keep your static context
+    const SEND_API      = "https://snoutiq.com/backend/api/chat/send";
+    const LIST_ROOMS_API= "https://snoutiq.com/backend/api/chat/listRooms";
+    const NEW_ROOM_API  = "https://snoutiq.com/backend/api/chat-rooms/new";
+    const ROOM_BASE_API = "https://snoutiq.com/backend/api/chat-rooms";
+
+    // Prefer last used room, else room from login payload, else ""
+    let currentChatRoomToken =
+      localStorage.getItem("lastChatRoomToken") ||
+      (AUTH && AUTH.chat_room && AUTH.chat_room.token) ||
+      "";
+
+    // ====== Helpers ======
     const chatBoxEl = document.getElementById("chatBox");
     const historyEl = document.getElementById("chatHistory");
 
     function escapeHTML(s=""){return s.replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
     function renderText(s=""){ return escapeHTML(String(s)).replace(/\n/g,"<br>"); }
-
-    function scrollToBottom() {
-      requestAnimationFrame(() => {
-        chatBoxEl.scrollTop = chatBoxEl.scrollHeight;
-      });
-    }
-
+    function scrollToBottom(){ requestAnimationFrame(()=>{ chatBoxEl.scrollTop = chatBoxEl.scrollHeight; }); }
     function appendMessage(text, isUser=false) {
       const wrap = document.createElement("div");
       wrap.className = "mb-3 flex " + (isUser ? "justify-end" : "justify-start");
@@ -190,7 +209,6 @@
       chatBoxEl.appendChild(wrap);
       scrollToBottom();
     }
-
     function setActiveRoom(token) {
       [...historyEl.querySelectorAll("[data-room]")].forEach(n => {
         n.classList.toggle("bg-blue-50", n.dataset.room === token);
@@ -198,10 +216,10 @@
       });
     }
 
-    // ----------- Nearby vets demo ----------- //
+    // ====== Nearby vets demo (uses dynamic USER_ID) ======
     async function fetchNearbyVets() {
       try {
-        const res = await axios.get(`/api/nearby-vets?user_id=${FIXED_USER_ID}`);
+        const res = await axios.get(`/api/nearby-vets?user_id=${USER_ID}`);
         const vets = res.data?.data || [];
         document.getElementById("nearbyVets").innerHTML =
           vets.map(v => `<div class="p-2 border rounded">${escapeHTML(v.name || "")}</div>`).join("") || 
@@ -212,10 +230,14 @@
       }
     }
 
-    // ----------- Rooms: list / open / new / delete ----------- //
+    // ====== Rooms: list / open / new / delete ======
     async function fetchChatRooms() {
+      if (!USER_ID) {
+        historyEl.innerHTML = `<div class="text-red-600 text-sm px-3 py-2">Not logged in (no user_id)</div>`;
+        return;
+      }
       try {
-        const res = await axios.get(`${LIST_ROOMS_API}?user_id=${FIXED_USER_ID}`);
+        const res = await axios.get(`${LIST_ROOMS_API}?user_id=${USER_ID}`);
         const rooms = res.data?.rooms || [];
         if (!rooms.length) {
           historyEl.innerHTML = `<div class="text-gray-500 text-sm px-3 py-2">No chat history</div>`;
@@ -255,8 +277,9 @@
     };
 
     async function createNewChat() {
+      if (!USER_ID) return alert("Not logged in.");
       try {
-        const res = await axios.get(`${NEW_ROOM_API}?user_id=${FIXED_USER_ID}`);
+        const res = await axios.get(`${NEW_ROOM_API}?user_id=${USER_ID}`);
         const token = res.data?.chat_room_token;
         if (token) {
           currentChatRoomToken = token;
@@ -275,9 +298,10 @@
 
     window.deleteChatRoom = async function (ev, token) {
       ev.stopPropagation();
+      if (!USER_ID) return alert("Not logged in.");
       if (!confirm("Delete this chat?")) return;
       try {
-        await axios.delete(`${ROOM_BASE_API}/${token}`, { data: { user_id: FIXED_USER_ID } });
+        await axios.delete(`${ROOM_BASE_API}/${token}`, { data: { user_id: USER_ID } });
         if (token === currentChatRoomToken) {
           currentChatRoomToken = "";
           localStorage.removeItem("lastChatRoomToken");
@@ -290,14 +314,18 @@
       }
     };
 
-    // ----------- History & Send ----------- //
+    // ====== History & Send ======
     async function fetchChatHistory() {
       if (!currentChatRoomToken) {
         chatBoxEl.innerHTML = `<div class="text-center text-gray-500 mt-20">Start by creating a new chat.</div>`;
         return;
       }
+      if (!USER_ID) {
+        chatBoxEl.innerHTML = `<div class="text-center text-red-600 mt-12">Not logged in (no user_id)</div>`;
+        return;
+      }
       try {
-        const url = `${ROOM_BASE_API}/${currentChatRoomToken}/chats?user_id=${FIXED_USER_ID}`;
+        const url = `${ROOM_BASE_API}/${currentChatRoomToken}/chats?user_id=${USER_ID}`;
         const res = await axios.get(url);
         const chats = res.data?.chats || [];
         chatBoxEl.innerHTML = "";
@@ -319,18 +347,18 @@
       const input = document.getElementById("chatInput");
       const question = (input.value || "").trim();
       if (!question) return;
-      input.value = "";
+      if (!USER_ID) return alert("Not logged in.");
 
-      // Show immediately
+      input.value = "";
       appendMessage(question, true);
 
       try {
         const payload = {
-          user_id: FIXED_USER_ID,
+          user_id: USER_ID,
           question,
-          // Keep context static (per your request)
+          // keep static context as requested
           context_token: STATIC_CONTEXT,
-          // But let the room token be the selected room (fallback to static if none)
+          // but send selected chat room if available
           chat_room_token: currentChatRoomToken || STATIC_CONTEXT
         };
 
@@ -343,28 +371,24 @@
       }
     }
 
-    // ----------- Pet Modal (simple wiring) ----------- //
+    // ====== Pet Modal (uses dynamic USER_ID) ======
     const petModal = document.getElementById("petDetailsModal");
     const petModalSave = document.getElementById("petModalSave");
     const petModalClose = document.getElementById("petModalClose");
 
     function openPetModal(){ petModal.classList.remove("hidden"); petModal.classList.add("flex"); }
     function closePetModal(){ petModal.classList.add("hidden"); petModal.classList.remove("flex"); }
-
-    // (Demo) show once per device until saved
-    function maybeOpenPetModal(){
-      if (!localStorage.getItem("petProfileDone")) openPetModal();
-    }
+    function maybeOpenPetModal(){ if (!localStorage.getItem("petProfileDone")) openPetModal(); }
 
     petModalClose.addEventListener("click", closePetModal);
     petModalSave.addEventListener("click", async () => {
+      if (!USER_ID) return alert("Not logged in.");
       try {
-        // Minimal validation & hit register (optional)
         const years = parseInt(document.getElementById("petAgeYears").value || 0,10);
         const months = parseInt(document.getElementById("petAgeMonths").value || 0,10);
         const totalMonths = years*12 + months;
         const fd = new FormData();
-        fd.append("user_id", FIXED_USER_ID);
+        fd.append("user_id", USER_ID);
         fd.append("pet_type", document.getElementById("petType").value);
         fd.append("pet_name", document.getElementById("petName").value.trim());
         fd.append("pet_gender", document.getElementById("petGender").value);
@@ -386,13 +410,13 @@
       }
     });
 
-    // ----------- Init ----------- //
+    // ====== Init ======
     document.getElementById("btnSend").addEventListener("click", sendMessage);
     document.getElementById("btnNewChat").addEventListener("click", createNewChat);
     document.getElementById("chatInput").addEventListener("keydown", (e)=>{ if(e.key==="Enter") sendMessage(); });
 
     (async function init(){
-      fetchNearbyVets();
+      await fetchNearbyVets();
       await fetchChatRooms();
       if (currentChatRoomToken) await fetchChatHistory();
       maybeOpenPetModal();
