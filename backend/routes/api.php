@@ -144,7 +144,7 @@ if(App\Models\UserProfile::where('user_id', $Request->user()->id)->count() == 0)
 
 
 
-//Route::post('/google-login', [AuthController::class, 'googleLogin']);
+Route::post('/google-login', [AuthController::class, 'googleLogin']);
 Route::post('/auth/register',   [AuthController::class, 'register']);
 Route::post('/auth/initial-register', [AuthController::class, 'createInitialRegistration']);
 Route::post('/auth/login',      [AuthController::class, 'login']);

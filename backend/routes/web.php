@@ -121,14 +121,6 @@ Route::get('/clinic-dashboard', fn () => view('clinic-dashboard'))
     ->name('clinic-dashboard');
 
 
-use App\Http\Controllers\AuthController;
 
-
-// sabhi /backend/api/* ko web (session) ke sath chalao
-Route::prefix('backend/api')->group(function () {
-    // POST https://snoutiq.com/backend/api/google-login
-    Route::post('/google-login', [AuthController::class, 'googleLogin'])
-        ->name('google.login');
-});
 
 
