@@ -20,7 +20,7 @@
       background:linear-gradient(135deg,var(--bg1),var(--bg2));}
     .wrap{min-height:100dvh;display:grid;place-items:center;padding:32px}
     .card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);
-      border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.08);padding:24px 22px}
+      border-radius:16px;box-shadow:0 12px 40px rgba(0, 0, 0, .08);padding:24px 22px}
     .logo{height:22px;margin:0 auto 14px;display:block}
     h1{font-size:24px;margin:0 0 6px;text-align:center}
     .sub{color:var(--muted);text-align:center;margin:0 0 16px}
@@ -30,16 +30,16 @@
     label{display:block;font-size:13px;font-weight:600;color:#334155;margin:0 0 6px}
     .input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#fff;outline:none}
     .input:focus{border-color:transparent;box-shadow:0 0 0 3px var(--ring)}
-    .row{margin-bottom:14px}
+    .row{margin-bottom:14px;position:relative}
     .btn{width:100%;padding:12px 14px;border-radius:10px;border:0;font-weight:700;cursor:pointer}
     .btn-primary{background:var(--blue);color:#fff}
     .btn-primary:hover{background:var(--blue-d)}
+    .muted{color:var(--muted)}
+    .foot{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:center}
     .link{color:var(--blue);text-decoration:none;font-weight:600}
     .right{float:right;font-size:12px}
-    /* debug dump */
-    .dump-wrap{margin-top:16px;display:none}
-    .dump-card{border:1px solid var(--border);background:#f8fafc;border-radius:12px;padding:12px}
-    pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:12px;color:#0b1220;max-height:320px;overflow:auto}
+    .google-box{border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
+    .pw-toggle{position:absolute;right:10px;top:38px;background:transparent;border:0;cursor:pointer}
   </style>
 </head>
 <body>
@@ -47,7 +47,7 @@
     <main class="card">
       <img class="logo" src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/>
       <h1>Welcome Back!</h1>
-      <p class="sub">Sign in to continue to your Test Clinic account</p>
+      <p class="sub">Sign in to continue to your SnoutIQ account</p>
 
       <!-- Role switch -->
       <div class="seg" role="tablist" aria-label="Login role">
@@ -62,97 +62,85 @@
           <input id="email" type="email" class="input" placeholder="Enter your email address" autocomplete="email"/>
         </div>
 
-        <div class="row" style="position:relative">
+        <div class="row">
           <div>
             <label for="password">Password
               <a class="right link" href="/forgot-password">Forgot Password?</a>
             </label>
           </div>
           <input id="password" type="password" class="input" placeholder="Enter your password" autocomplete="current-password"/>
-          <button id="pwBtn" type="button" aria-label="Show password"
-                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;cursor:pointer">👁️</button>
+          <button id="pwBtn" class="pw-toggle" type="button" aria-label="Show password">👁️</button>
         </div>
 
         <button id="loginBtn" class="btn btn-primary" type="submit">Login</button>
       </form>
 
       <!-- Pet Google login -->
-      <div id="petBox" style="border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)">
+      <div id="petBox" class="google-box">
         <div style="display:grid;place-items:center;min-height:42px">
           <div id="googleBtn"></div>
         </div>
+        <p id="googleMsg" style="display:none;margin:10px 0 0;color:#b91c1c;font-size:13px"></p>
       </div>
 
-      <!-- Full API dump -->
-      <div id="dumpWrap" class="dump-wrap">
-        <div class="dump-card">
-          <strong>Full API Response (debug):</strong>
-          <pre id="fullDump">{}</pre>
-        </div>
+      <div class="foot">
+        <p class="muted">Don't have an account?
+          <a class="link" href="/register">Create an account</a>
+        </p>
       </div>
     </main>
   </div>
 
   <script>
-    // ===== helpers =====
-    function persistLoginResponse(data){
-      if(!data || typeof data !== 'object') return;
+    // ---------- helpers: frontend "session" ----------
+    function saveFrontSession(fullResp) {
+      try {
+        sessionStorage.setItem('auth_full', JSON.stringify(fullResp));
+        sessionStorage.setItem('token', fullResp.token || '');
+        sessionStorage.setItem('role', fullResp.role || (fullResp.user && fullResp.user.role) || '');
+        sessionStorage.setItem('user', JSON.stringify(fullResp.user || {}));
+        sessionStorage.setItem('user_id', String((fullResp.user && fullResp.user.id) || ''));
+        sessionStorage.setItem('chat_room_token', (fullResp.chat_room && fullResp.chat_room.token) || '');
 
-      // raw payload
-      sessionStorage.setItem('auth_full', JSON.stringify(data));
+        // optional copy
+        localStorage.setItem('auth_full', JSON.stringify(fullResp));
+        localStorage.setItem('user', JSON.stringify(fullResp.user || {}));
+        localStorage.setItem('token', fullResp.token || '');
 
-      // convenience keys
-      sessionStorage.setItem('success', String(!!data.success));
-      sessionStorage.setItem('message', data.message ?? '');
-      sessionStorage.setItem('email', data.email ?? '');
-      sessionStorage.setItem('role', (data.user?.role || data.role || ''));
-      sessionStorage.setItem('token', data.token || '');
-      sessionStorage.setItem('token_type', data.token_type || '');
-
-      // chat room
-      if (data.chat_room){
-        sessionStorage.setItem('chat_room', JSON.stringify(data.chat_room));
-        if (data.chat_room.token){
-          sessionStorage.setItem('chatRoomToken', data.chat_room.token);
-        }
-      }
-
-      // user object + flattened scalars
-      if (data.user){
-        sessionStorage.setItem('user', JSON.stringify(data.user));
-        Object.entries(data.user).forEach(([k, v])=>{
-          if (v === null || v === undefined) return;
-          const t = typeof v;
-          if (t === 'string' || t === 'number' || t === 'boolean'){
-            sessionStorage.setItem(`user.${k}`, String(v));
-          }
+        console.log('✅ Frontend session saved:', {
+          token: fullResp.token,
+          role: sessionStorage.getItem('role'),
+          user_id: sessionStorage.getItem('user_id'),
+          chat_room_token: sessionStorage.getItem('chat_room_token')
         });
+      } catch (e) {
+        console.log('Storage error:', e);
       }
     }
 
-    function dumpFullResponse(data){
-      const pre  = document.getElementById('fullDump');
-      const wrap = document.getElementById('dumpWrap');
-      if(pre && wrap){
-        pre.textContent = JSON.stringify(data || {}, null, 2);
-        wrap.style.display = 'block';
+    function loadFrontSession() {
+      try {
+        const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
+        return raw ? JSON.parse(raw) : null;
+      } catch { return null; }
+    }
+
+    // robust prefix so /backend doesn't double up
+    function prefix() {
+      const onBackendPath = location.pathname.startsWith('/backend');
+      const onSnoutiq = location.hostname.endsWith('snoutiq.com');
+      return (onBackendPath || onSnoutiq) ? '/backend' : '';
+    }
+    function routeAfterLoginByRole(role) {
+      const p = prefix();
+      if ((role || '').toLowerCase() === 'pet') {
+        window.location.href = `${p}/pet-dashboard`;
+      } else {
+        window.location.href = `${p}/doctor`;
       }
-      // optional console for dev
-      console.log("✅ Full API response:", data);
     }
 
-    function routeAfterLogin(user){
-      const role = (user?.role || '').toString().toLowerCase();
-      const nextUrl = role === 'pet' ? '/backend/pet-dashboard' : '/backend/doctor';
-      location.href = nextUrl;
-    }
-
-    // ===== state & els =====
-    let userType = "pet";
-    let isLoading = false;
-    const ADMIN_EMAIL = "admin@gmail.com";
-    const ADMIN_PASS  = "5f4dcc3b5d";
-
+    // ---------- role toggle ----------
     const els = {
       tabPet: document.getElementById('tab-pet'),
       tabVet: document.getElementById('tab-vet'),
@@ -160,97 +148,88 @@
       vetForm: document.getElementById('vetForm'),
       email: document.getElementById('email'),
       password: document.getElementById('password'),
-      pwBtn: document.getElementById('pwBtn'),
       loginBtn: document.getElementById('loginBtn'),
+      pwBtn: document.getElementById('pwBtn'),
       googleBtn: document.getElementById('googleBtn'),
-      dumpWrap: document.getElementById('dumpWrap'),
-      fullDump: document.getElementById('fullDump'),
+      googleMsg: document.getElementById('googleMsg')
     };
 
-    // ===== role switch =====
+    let userType = 'pet';
     function setRole(type){
       userType = type;
-      if(type === 'vet'){
+      if(type==='vet'){
         els.tabVet.classList.add('active'); els.tabVet.setAttribute('aria-selected','true');
         els.tabPet.classList.remove('active'); els.tabPet.setAttribute('aria-selected','false');
-        els.vetForm.style.display = 'block';
-        els.petBox.style.display = 'none';
+        els.vetForm.style.display='block'; els.petBox.style.display='none';
       }else{
         els.tabPet.classList.add('active'); els.tabPet.setAttribute('aria-selected','true');
         els.tabVet.classList.remove('active'); els.tabVet.setAttribute('aria-selected','false');
-        els.vetForm.style.display = 'none';
-        els.petBox.style.display = 'block';
+        els.vetForm.style.display='none'; els.petBox.style.display='block';
       }
     }
     els.tabPet.onclick = ()=> setRole('pet');
     els.tabVet.onclick = ()=> setRole('vet');
 
-    // ===== show/hide password =====
-    els.pwBtn.addEventListener('click', ()=>{
+    // show/hide password
+    els.pwBtn?.addEventListener('click', ()=>{
       const isText = els.password.type === 'text';
       els.password.type = isText ? 'password' : 'text';
       els.pwBtn.textContent = isText ? '👁️' : '🙈';
     });
 
-    // ===== Vet Login (no alerts/error toasts) =====
-    els.vetForm.addEventListener('submit', async (e)=>{
+    // ---------- VET login (form) ----------
+    els.vetForm?.addEventListener('submit', async (e)=>{
       e.preventDefault();
-      if(isLoading) return;
-
-      isLoading = true;
       els.loginBtn.disabled = true;
       els.loginBtn.textContent = 'Logging in...';
-
       try{
-        const payload = {
-          login: els.email.value,
-          password: els.password.value,
-          role: 'vet',
-        };
+        const payload = { login: els.email.value, password: els.password.value, role: 'vet' };
         const res = await axios.post('https://snoutiq.com/backend/api/auth/login', payload);
-        const data = res?.data || {};
 
-        // optional super_admin override to match React behavior
-        if(els.email.value === ADMIN_EMAIL && els.password.value === ADMIN_PASS && data.user){
-          data.user = { ...data.user, role: 'super_admin' };
-        }
-
-        // persist + dump + redirect
-        persistLoginResponse(data);
-        dumpFullResponse(data);
-        routeAfterLogin(data.user || {});
-      } finally {
-        isLoading = false;
+        console.log('🔔 API login response (vet):', res.data);
+        saveFrontSession(res.data);
+        const role = (res.data.role || (res.data.user && res.data.user.role) || '').toLowerCase();
+        routeAfterLoginByRole(role);
+      }catch(err){
+        console.log('❌ Login error (vet):', err?.response?.data || err);
+      }finally{
         els.loginBtn.disabled = false;
         els.loginBtn.textContent = 'Login';
       }
     });
 
-    // ===== Google Sign-In (Pet) =====
+    // ---------- Google login (PET) ----------
     async function onGoogleCredential(response){
-      const base64Url = response.credential.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(atob(base64).split("").map(c=>"%"+("00"+c.charCodeAt(0).toString(16)).slice(-2)).join(""));
-      const googleData = JSON.parse(jsonPayload);
+      try{
+        const base64Url = response.credential.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(atob(base64).split("").map(c=>"%"+("00"+c.charCodeAt(0).toString(16)).slice(-2)).join(""));
+        const googleData = JSON.parse(jsonPayload);
+        const email = googleData.email || "";
+        const uniqueUserId = googleData.sub;
 
-      const uniqueUserId = googleData.sub;
-      const email = googleData.email || "";
+        const res = await axios.post('https://snoutiq.com/backend/api/google-login', {
+          email, google_token: uniqueUserId, role: 'pet'
+        });
 
-      const res = await axios.post('https://snoutiq.com/backend/api/google-login', {
-        email,
-        google_token: uniqueUserId,
-        role: 'pet',
-      });
-
-      const data = res?.data || {};
-      persistLoginResponse(data);
-      dumpFullResponse(data);
-      routeAfterLogin(data.user || {});
+        console.log('🔔 API google-login response (pet):', res.data);
+        saveFrontSession(res.data);
+        const role = (res.data.role || (res.data.user && res.data.user.role) || '').toLowerCase();
+        routeAfterLoginByRole(role);
+      }catch(err){
+        console.log('❌ Google login error:', err?.response?.data || err);
+        if(els.googleMsg){
+          els.googleMsg.textContent = (err?.response?.data?.message || 'Google login failed.');
+          els.googleMsg.style.display='block';
+        }
+      }
     }
 
-    // ===== init =====
+    // ---------- init ----------
     window.onload = ()=>{
       setRole('pet');
+      // log current frontend session on load
+      console.log('🗃️ Frontend session (on load):', loadFrontSession());
 
       if(window.google && window.google.accounts){
         window.google.accounts.id.initialize({
