@@ -10,17 +10,11 @@
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
   <style>
-    :root{
-      --bg1:#eef4ff; --bg2:#e9eefe;
-      --card:#ffffff; --text:#0f172a; --muted:#64748b;
-      --blue:#2563eb; --blue-d:#1e40af; --border:#e5e7eb; --ring:rgba(37,99,235,.25);
-    }
+    :root{--bg1:#eef4ff;--bg2:#e9eefe;--card:#ffffff;--text:#0f172a;--muted:#64748b;--blue:#2563eb;--blue-d:#1e40af;--border:#e5e7eb;--ring:rgba(37,99,235,.25)}
     *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;color:var(--text);
-      background:linear-gradient(135deg,var(--bg1),var(--bg2));}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text)}
     .wrap{min-height:100dvh;display:grid;place-items:center;padding:32px}
-    .card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);
-      border-radius:16px;box-shadow:0 12px 40px rgba(0, 0, 0, .08);padding:24px 22px}
+    .card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.08);padding:24px 22px}
     .logo{height:22px;margin:0 auto 14px;display:block}
     h1{font-size:24px;margin:0 0 6px;text-align:center}
     .sub{color:var(--muted);text-align:center;margin:0 0 16px}
@@ -30,233 +24,183 @@
     label{display:block;font-size:13px;font-weight:600;color:#334155;margin:0 0 6px}
     .input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#fff;outline:none}
     .input:focus{border-color:transparent;box-shadow:0 0 0 3px var(--ring)}
-    .row{margin-bottom:14px;position:relative}
+    .row{margin-bottom:14px}
     .btn{width:100%;padding:12px 14px;border-radius:10px;border:0;font-weight:700;cursor:pointer}
     .btn-primary{background:var(--blue);color:#fff}
     .btn-primary:hover{background:var(--blue-d)}
-    .muted{color:var(--muted)}
-    .foot{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:center}
-    .link{color:var(--blue);text-decoration:none;font-weight:600}
-    .right{float:right;font-size:12px}
     .google-box{border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
-    .pw-toggle{position:absolute;right:10px;top:38px;background:transparent;border:0;cursor:pointer}
+    .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;cursor:pointer}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <main class="card">
-      <img class="logo" src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/>
-      <h1>Welcome Back!</h1>
-      <p class="sub">Sign in to continue to your SnoutIQ account</p>
+<div class="wrap">
+  <main class="card">
+    <img class="logo" src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/>
+    <h1>Welcome Back!</h1>
+    <p class="sub">Sign in to continue to your Test Clinic account</p>
 
-      <!-- Role switch -->
-      <div class="seg" role="tablist" aria-label="Login role">
-        <button id="tab-pet" class="active" type="button" aria-selected="true">Pet Owner</button>
-        <button id="tab-vet" type="button" aria-selected="false">Veterinarian</button>
+    <div class="seg" role="tablist" aria-label="Login role">
+      <button id="tab-pet" class="active" type="button" aria-selected="true">Pet Owner</button>
+      <button id="tab-vet" type="button" aria-selected="false">Veterinarian</button>
+    </div>
+
+    <!-- Vet form -->
+    <form id="vetForm" style="display:none;">
+      <div class="row">
+        <label for="email">Email Address</label>
+        <input id="email" type="email" class="input" placeholder="Enter your email address" autocomplete="email"/>
       </div>
 
-      <!-- Vet form -->
-      <form id="vetForm" style="display:none;">
-        <div class="row">
-          <label for="email">Email Address</label>
-          <input id="email" type="email" class="input" placeholder="Enter your email address" autocomplete="email"/>
+      <div class="row" style="position:relative">
+        <div>
+          <label for="password">Password
+            <a class="right" style="float:right;color:#2563eb;text-decoration:none;font-weight:600" href="/forgot-password">Forgot Password?</a>
+          </label>
         </div>
-
-        <div class="row">
-          <div>
-            <label for="password">Password
-              <a class="right link" href="/forgot-password">Forgot Password?</a>
-            </label>
-          </div>
-          <input id="password" type="password" class="input" placeholder="Enter your password" autocomplete="current-password"/>
-          <button id="pwBtn" class="pw-toggle" type="button" aria-label="Show password">👁️</button>
-        </div>
-
-        <button id="loginBtn" class="btn btn-primary" type="submit">Login</button>
-      </form>
-
-      <!-- Pet Google login -->
-      <div id="petBox" class="google-box">
-        <div style="display:grid;place-items:center;min-height:42px">
-          <div id="googleBtn"></div>
-        </div>
-        <p id="googleMsg" style="display:none;margin:10px 0 0;color:#b91c1c;font-size:13px"></p>
+        <input id="password" type="password" class="input" placeholder="Enter your password" autocomplete="current-password"/>
+        <button id="pwBtn" class="pw-toggle" type="button" aria-label="Show password">👁️</button>
       </div>
 
-      <div class="foot">
-        <p class="muted">Don't have an account?
-          <a class="link" href="/register">Create an account</a>
-        </p>
+      <button id="loginBtn" class="btn btn-primary" type="submit">Login</button>
+    </form>
+
+    <!-- Pet Google login -->
+    <div id="petBox" class="google-box">
+      <div style="display:grid;place-items:center;min-height:42px">
+        <div id="googleBtn"></div>
       </div>
-    </main>
-  </div>
+    </div>
 
-  <script>
-    // ---------- helpers: frontend "session" ----------
-    function saveFrontSession(fullResp) {
-      try {
-        // Save everything
-        sessionStorage.setItem('auth_full', JSON.stringify(fullResp));
-        sessionStorage.setItem('token', fullResp.token || '');
-        sessionStorage.setItem('role', fullResp.role || (fullResp.user && fullResp.user.role) || '');
-        sessionStorage.setItem('user', JSON.stringify(fullResp.user || {}));
-        sessionStorage.setItem('user_id', String((fullResp.user && fullResp.user.id) || ''));
-        sessionStorage.setItem('chat_room_token', (fullResp.chat_room && fullResp.chat_room.token) || '');
+    <div class="foot" style="margin-top:16px;padding-top:14px;border-top:1px solid #e5e7eb;text-align:center">
+      <p style="color:#64748b">Don't have an account?
+        <a class="link" style="color:#2563eb;text-decoration:none;font-weight:600" href="/register">Create an account</a>
+      </p>
+    </div>
+  </main>
+</div>
 
-        // Optional copy to localStorage
-        localStorage.setItem('auth_full', JSON.stringify(fullResp));
-        localStorage.setItem('user', JSON.stringify(fullResp.user || {}));
-        localStorage.setItem('token', fullResp.token || '');
+<script>
+  // ---------------- Role tabs ----------------
+  let userType = 'pet';
+  const els = {
+    tabPet: document.getElementById('tab-pet'),
+    tabVet: document.getElementById('tab-vet'),
+    petBox: document.getElementById('petBox'),
+    vetForm: document.getElementById('vetForm'),
+    email: document.getElementById('email'),
+    password: document.getElementById('password'),
+    pwBtn: document.getElementById('pwBtn'),
+    loginBtn: document.getElementById('loginBtn'),
+    googleBtn: document.getElementById('googleBtn'),
+  };
+  function setRole(type){
+    userType = type;
+    if(type==='vet'){ els.tabVet.classList.add('active'); els.tabPet.classList.remove('active'); els.vetForm.style.display='block'; els.petBox.style.display='none'; }
+    else{ els.tabPet.classList.add('active'); els.tabVet.classList.remove('active'); els.vetForm.style.display='none'; els.petBox.style.display='block'; }
+  }
+  els.tabPet.onclick = ()=> setRole('pet');
+  els.tabVet.onclick = ()=> setRole('vet');
+  setRole('pet');
 
-        // Build a readable snapshot for debugging
-        const snapshot = {
-          token: fullResp.token,
-          token_type: fullResp.token_type,
-          role: sessionStorage.getItem('role'),
-          user_id: sessionStorage.getItem('user_id'),
-          user_email: (fullResp.user && fullResp.user.email) || fullResp.email || null,
-          user_name: (fullResp.user && fullResp.user.name) || null,
-          chat_room: {
-            id: fullResp.chat_room && fullResp.chat_room.id,
-            token: fullResp.chat_room && fullResp.chat_room.token,
-            name: fullResp.chat_room && fullResp.chat_room.name
-          }
-        };
+  // ---------------- show/hide password ----------------
+  els.pwBtn.addEventListener('click', ()=>{
+    const isText = els.password.type === 'text';
+    els.password.type = isText ? 'password' : 'text';
+    els.pwBtn.textContent = isText ? '👁️' : '🙈';
+  });
 
-        // Console + Alert the stored data
-        console.log('✅ Frontend session saved (snapshot):', snapshot);
-        alert('Session saved:\\n' + JSON.stringify(snapshot, null, 2));
-      } catch (e) {
-        console.log('Storage error:', e);
-      }
-    }
+  // ---------------- helpers ----------------
+  function saveAuthFull(obj){
+    try{
+      const json = JSON.stringify(obj);
+      sessionStorage.setItem('auth_full', json);
+      localStorage.setItem('auth_full', json); // optional
+      console.log('[login] auth_full saved:', obj);
+    }catch(e){ console.warn('auth_full save failed', e); }
+  }
 
-    function loadFrontSession() {
-      try {
-        const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
-        return raw ? JSON.parse(raw) : null;
-      } catch { return null; }
-    }
+  // ---------------- Vet email/password login ----------------
+  els.vetForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    els.loginBtn.disabled = true; els.loginBtn.textContent = 'Logging in...';
+    try{
+      const res = await axios.post('https://snoutiq.com/backend/api/auth/login', {
+        login: els.email.value,
+        password: els.password.value,
+        role: 'vet',
+      });
 
-    // robust prefix so /backend doesn't double up
-    function prefix() {
-      const onBackendPath = location.pathname.startsWith('/backend');
-      const onSnoutiq = location.hostname.endsWith('snoutiq.com');
-      return (onBackendPath || onSnoutiq) ? '/backend' : '';
-    }
-    function routeAfterLoginByRole(role) {
-      const p = prefix();
-      if ((role || '').toLowerCase() === 'pet') {
-        window.location.href = `${p}/pet-dashboard`;
+      const payload = {
+        success: true,
+        message: res.data?.message || 'Login success',
+        role: 'vet',
+        email: res.data?.user?.email,
+        token: res.data?.token,
+        token_type: res.data?.token_type || 'Bearer',
+        chat_room: res.data?.chat_room || null,
+        user: res.data?.user || null,
+        user_id: res.data?.user?.id || null,
+      };
+      saveAuthFull(payload);
+
+      const docId = payload.user_id;
+      const prefix = '/backend';
+      if (docId) {
+        window.location.href = `${prefix}/doctor?doctorId=${encodeURIComponent(docId)}`;
       } else {
-        window.location.href = `${p}/doctor`;
+        window.location.href = `${prefix}/doctor`;
       }
+    }catch(err){
+      console.error('Vet login failed:', err?.response?.data || err);
+    }finally{
+      els.loginBtn.disabled = false; els.loginBtn.textContent = 'Login';
     }
+  });
 
-    // ---------- role toggle ----------
-    const els = {
-      tabPet: document.getElementById('tab-pet'),
-      tabVet: document.getElementById('tab-vet'),
-      petBox: document.getElementById('petBox'),
-      vetForm: document.getElementById('vetForm'),
-      email: document.getElementById('email'),
-      password: document.getElementById('password'),
-      loginBtn: document.getElementById('loginBtn'),
-      pwBtn: document.getElementById('pwBtn'),
-      googleBtn: document.getElementById('googleBtn'),
-      googleMsg: document.getElementById('googleMsg')
-    };
+  // ---------------- Pet Google login ----------------
+  window.onGoogleCredential = async (response)=>{
+    try{
+      const base64Url = response.credential.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(atob(base64).split("").map(c=>"%"+("00"+c.charCodeAt(0).toString(16)).slice(-2)).join(""));
+      const googleData = JSON.parse(jsonPayload);
+      const email = googleData.email || '';
+      const uniqueUserId = googleData.sub;
 
-    let userType = 'pet';
-    function setRole(type){
-      userType = type;
-      if(type==='vet'){
-        els.tabVet.classList.add('active'); els.tabVet.setAttribute('aria-selected','true');
-        els.tabPet.classList.remove('active'); els.tabPet.setAttribute('aria-selected','false');
-        els.vetForm.style.display='block'; els.petBox.style.display='none';
-      }else{
-        els.tabPet.classList.add('active'); els.tabPet.setAttribute('aria-selected','true');
-        els.tabVet.classList.remove('active'); els.tabVet.setAttribute('aria-selected','false');
-        els.vetForm.style.display='none'; els.petBox.style.display='block';
-      }
+      const res = await axios.post('https://snoutiq.com/backend/api/google-login',{
+        email,
+        google_token: uniqueUserId,
+        role: 'pet'
+      });
+
+      const payload = {
+        success: true,
+        message: res.data?.message || 'Login success',
+        role: 'pet',
+        email: res.data?.user?.email,
+        token: res.data?.token,
+        token_type: res.data?.token_type || 'Bearer',
+        chat_room: res.data?.chat_room || null,
+        user: res.data?.user || null,
+        user_id: res.data?.user?.id || null,
+      };
+      saveAuthFull(payload);
+      window.location.href = '/backend/pet-dashboard';
+    }catch(err){
+      console.error('Google login failed:', err?.response?.data || err);
     }
-    els.tabPet.onclick = ()=> setRole('pet');
-    els.tabVet.onclick = ()=> setRole('vet');
+  };
 
-    // show/hide password
-    els.pwBtn?.addEventListener('click', ()=>{
-      const isText = els.password.type === 'text';
-      els.password.type = isText ? 'password' : 'text';
-      els.pwBtn.textContent = isText ? '👁️' : '🙈';
-    });
-
-    // ---------- VET login (form) ----------
-    els.vetForm?.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      els.loginBtn.disabled = true;
-      els.loginBtn.textContent = 'Logging in...';
-      try{
-        const payload = { login: els.email.value, password: els.password.value, role: 'vet' };
-        const res = await axios.post('https://snoutiq.com/backend/api/auth/login', payload);
-
-        console.log('🔔 API login response (vet):', res.data);
-        saveFrontSession(res.data); // <-- will alert + console.log snapshot
-        const role = (res.data.role || (res.data.user && res.data.user.role) || '').toLowerCase();
-        routeAfterLoginByRole(role);
-      }catch(err){
-        console.log('❌ Login error (vet):', err?.response?.data || err);
-      }finally{
-        els.loginBtn.disabled = false;
-        els.loginBtn.textContent = 'Login';
-      }
-    });
-
-    // ---------- Google login (PET) ----------
-    async function onGoogleCredential(response){
-      try{
-        const base64Url = response.credential.split(".")[1];
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        const jsonPayload = decodeURIComponent(atob(base64).split("").map(c=>"%"+("00"+c.charCodeAt(0).toString(16)).slice(-2)).join(""));
-        const googleData = JSON.parse(jsonPayload);
-        const email = googleData.email || "";
-        const uniqueUserId = googleData.sub;
-
-        const res = await axios.post('https://snoutiq.com/backend/api/google-login', {
-          email, google_token: uniqueUserId, role: 'pet'
-        });
-
-        console.log('🔔 API google-login response (pet):', res.data);
-        saveFrontSession(res.data); // <-- will alert + console.log snapshot
-        const role = (res.data.role || (res.data.user && res.data.user.role) || '').toLowerCase();
-        routeAfterLoginByRole(role);
-      }catch(err){
-        console.log('❌ Google login error:', err?.response?.data || err);
-        if(els.googleMsg){
-          els.googleMsg.textContent = (err?.response?.data?.message || 'Google login failed.');
-          els.googleMsg.style.display='block';
-        }
-      }
+  window.onload=()=>{
+    if(window.google && window.google.accounts){
+      window.google.accounts.id.initialize({
+        client_id:"325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com",
+        callback:onGoogleCredential
+      });
+      window.google.accounts.id.renderButton(els.googleBtn,{ theme:"filled_blue", size:"large", text:"continue_with", shape:"rectangular" });
+      try{ window.google.accounts.id.prompt(); }catch(_){}
     }
-
-    // ---------- init ----------
-    window.onload = ()=>{
-      setRole('pet');
-
-      // Log current stored session on load (no alert here to avoid popup on refresh)
-      const existing = loadFrontSession();
-      console.log('🗃️ Frontend session (on load):', existing);
-
-      if(window.google && window.google.accounts){
-        window.google.accounts.id.initialize({
-          client_id: "325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com",
-          callback: onGoogleCredential
-        });
-        window.google.accounts.id.renderButton(els.googleBtn, {
-          theme: "filled_blue", size: "large", text: "continue_with", shape: "rectangular"
-        });
-        try{ window.google.accounts.id.prompt(); }catch(_){}
-      }
-    };
-  </script>
+  };
+</script>
 </body>
 </html>
