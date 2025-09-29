@@ -94,33 +94,60 @@
   </div>
 
   <script>
-    // ---- helpers ----
-    const maskToken = (t)=> typeof t === "string" && t.length > 16 ? (t.slice(0,6)+"…"+t.slice(-4)) : (t || "");
-    function saveSessionFrontend(user, token, chatRoomToken, raw){
-      try{
-        sessionStorage.setItem('token', token || '');
-        sessionStorage.setItem('user', JSON.stringify(user || {}));
-        if(chatRoomToken) sessionStorage.setItem('chatRoomToken', chatRoomToken);
-        if(raw) sessionStorage.setItem('loginResponse', JSON.stringify(raw));
-      }catch(_){}
+    // ===== helpers =====
+    function persistLoginResponse(data){
+      if(!data || typeof data !== 'object') return;
+
+      // raw payload
+      sessionStorage.setItem('auth_full', JSON.stringify(data));
+
+      // convenience keys
+      sessionStorage.setItem('success', String(!!data.success));
+      sessionStorage.setItem('message', data.message ?? '');
+      sessionStorage.setItem('email', data.email ?? '');
+      sessionStorage.setItem('role', (data.user?.role || data.role || ''));
+      sessionStorage.setItem('token', data.token || '');
+      sessionStorage.setItem('token_type', data.token_type || '');
+
+      // chat room
+      if (data.chat_room){
+        sessionStorage.setItem('chat_room', JSON.stringify(data.chat_room));
+        if (data.chat_room.token){
+          sessionStorage.setItem('chatRoomToken', data.chat_room.token);
+        }
+      }
+
+      // user object + flattened scalars
+      if (data.user){
+        sessionStorage.setItem('user', JSON.stringify(data.user));
+        Object.entries(data.user).forEach(([k, v])=>{
+          if (v === null || v === undefined) return;
+          const t = typeof v;
+          if (t === 'string' || t === 'number' || t === 'boolean'){
+            sessionStorage.setItem(`user.${k}`, String(v));
+          }
+        });
+      }
     }
+
     function dumpFullResponse(data){
-      console.log("✅ Login Success — Full API response:", data);
-      if(data?.token) console.log("🔑 Token (masked):", maskToken(data.token));
-      const wrap = document.getElementById('dumpWrap');
       const pre  = document.getElementById('fullDump');
-      if(wrap && pre){
+      const wrap = document.getElementById('dumpWrap');
+      if(pre && wrap){
         pre.textContent = JSON.stringify(data || {}, null, 2);
         wrap.style.display = 'block';
       }
+      // optional console for dev
+      console.log("✅ Full API response:", data);
     }
+
     function routeAfterLogin(user){
       const role = (user?.role || '').toString().toLowerCase();
       const nextUrl = role === 'pet' ? '/pet-dashboard' : '/doctor';
       location.href = nextUrl;
     }
 
-    // ---- state & els ----
+    // ===== state & els =====
     let userType = "pet";
     let isLoading = false;
     const ADMIN_EMAIL = "admin@gmail.com";
@@ -140,7 +167,7 @@
       fullDump: document.getElementById('fullDump'),
     };
 
-    // ---- role switch ----
+    // ===== role switch =====
     function setRole(type){
       userType = type;
       if(type === 'vet'){
@@ -158,14 +185,14 @@
     els.tabPet.onclick = ()=> setRole('pet');
     els.tabVet.onclick = ()=> setRole('vet');
 
-    // ---- show/hide password ----
+    // ===== show/hide password =====
     els.pwBtn.addEventListener('click', ()=>{
       const isText = els.password.type === 'text';
       els.password.type = isText ? 'password' : 'text';
       els.pwBtn.textContent = isText ? '👁️' : '🙈';
     });
 
-    // ---- Vet submit (no alerts/error toasts) ----
+    // ===== Vet Login (no alerts/error toasts) =====
     els.vetForm.addEventListener('submit', async (e)=>{
       e.preventDefault();
       if(isLoading) return;
@@ -181,33 +208,17 @@
           role: 'vet',
         };
         const res = await axios.post('https://snoutiq.com/backend/api/auth/login', payload);
-
         const data = res?.data || {};
-        const chatRoomToken = data?.chat_room?.token || null;
-        let   user  = data?.user || {};
-        const token = data?.token || '';
 
-        // super_admin override (as in React)
-        if(els.email.value === ADMIN_EMAIL && els.password.value === ADMIN_PASS){
-          user = { ...user, role: 'super_admin' };
+        // optional super_admin override to match React behavior
+        if(els.email.value === ADMIN_EMAIL && els.password.value === ADMIN_PASS && data.user){
+          data.user = { ...data.user, role: 'super_admin' };
         }
 
-        // store & dump
-        saveSessionFrontend(user, token, chatRoomToken, data);
-        dumpFullResponse({
-          success: true,
-          message: 'Login success',
-          role: user?.role || 'vet',
-          email: user?.email || '',
-          token: token,
-          token_type: 'Bearer',
-          chat_room: data?.chat_room || null,
-          user: user
-        });
-
-        // redirect
-        routeAfterLogin(user);
-
+        // persist + dump + redirect
+        persistLoginResponse(data);
+        dumpFullResponse(data);
+        routeAfterLogin(data.user || {});
       } finally {
         isLoading = false;
         els.loginBtn.disabled = false;
@@ -215,7 +226,7 @@
       }
     });
 
-    // ---- Google Sign-In (Pet) (no alerts/error toasts) ----
+    // ===== Google Sign-In (Pet) =====
     async function onGoogleCredential(response){
       const base64Url = response.credential.split(".")[1];
       const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -232,28 +243,12 @@
       });
 
       const data = res?.data || {};
-      const chatRoomToken = data?.chat_room?.token || null;
-      const user  = data?.user || {};
-      const token = data?.token || '';
-
-      // store & dump (include server fields as-is)
-      saveSessionFrontend(user, token, chatRoomToken, data);
-      dumpFullResponse({
-        success: true,
-        message: 'Login success',
-        role: data?.role || 'pet',
-        email: data?.email || '',
-        token: token,
-        token_type: 'Bearer',
-        chat_room: data?.chat_room || null,
-        user: user
-      });
-
-      // redirect
-      routeAfterLogin(user);
+      persistLoginResponse(data);
+      dumpFullResponse(data);
+      routeAfterLogin(data.user || {});
     }
 
-    // ---- init ----
+    // ===== init =====
     window.onload = ()=>{
       setRole('pet');
 
