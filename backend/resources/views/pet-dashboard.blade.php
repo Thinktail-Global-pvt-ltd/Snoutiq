@@ -13,11 +13,11 @@
   $backendPrefix = '/backend';
 
   // Final URLs
-  $dashUrl = $backendPrefix . '/pet-dashboard';
+  $dashUrl = $backendPrefix . '/dashboard';
   $chatUrl = $backendPrefix . '/chat';
 
   // Active states
-  $dashPath = ltrim(trim($backendPrefix, '/') . '/pet-dashboard', '/');
+  $dashPath = ltrim(trim($backendPrefix, '/') . '/dashboard', '/');
   $chatPath = ltrim(trim($backendPrefix, '/') . '/chat', '/');
 
   $aiActive = request()->is($dashPath);
