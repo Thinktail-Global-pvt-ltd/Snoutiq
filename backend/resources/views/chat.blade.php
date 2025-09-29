@@ -13,14 +13,15 @@
 @php
   /**
    * If your Laravel app runs under /backend in prod, set APP_PATH_PREFIX=/backend in .env
+   * This code still auto-forces /backend on snoutiq.com if not set.
    */
   $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
 
   // Socket server URL
   $socketUrl = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
 
-  // ✅ Prefer PHP session user_id; fall back to stored 'user.id' in session array; else auth()->id(); else 101
-  $sessionUserId = session('user_id') ?? data_get(session()->all(), 'user.id');
+  // ✅ Patient identity: use user_id from SESSION first, then auth()->id(), else 101
+  $sessionUserId = session('user_id') ?? data_get(session('user'), 'id');  // supports both shapes
   $authUserId    = optional(auth()->user())->id;
   $patientId     = (int)($sessionUserId ?? $authUserId ?? 101);
 
@@ -28,46 +29,54 @@
   $dashUrl = ($pathPrefix ? '/'.$pathPrefix : '') . '/pet-dashboard';
   $chatUrl = ($pathPrefix ? '/'.$pathPrefix : '') . '/chat';
 
-  // Optional: dump session for quick debug
+  // Dump session (debug)
   $sessionDump = session()->all();
 @endphp
 
 <script>
-  // ----- server → client config -----
-  const RAW_PATH_PREFIX = @json($pathPrefix);
+  // ===== Prefix utils =====
+  const RAW_PATH_PREFIX = @json($pathPrefix);            // may be ""
   const SOCKET_URL      = @json($socketUrl);
 
-  // robust prefix
   const resolvePrefix = () => {
     const given = (RAW_PATH_PREFIX || "").trim();
     if (given) return given.startsWith('/') ? given : `/${given}`;
-    const pathStartsWithBackend = location.pathname.startsWith('/backend');
+    const pathStartsWithBackend = window.location.pathname.startsWith('/backend');
     const isSnoutiq = location.hostname.endsWith('snoutiq.com');
     if (pathStartsWithBackend) return '/backend';
-    if (isSnoutiq) return '/backend';
+    if (isSnoutiq) return '/backend'; // force backend on live
     return '';
   };
   const PATH_PREFIX = resolvePrefix();
 
-  // ✅ Start with PHP session/auth value, then override from frontend sessionStorage/localStorage if available
-  let PATIENT_ID = Number(@json($patientId));
+  // ===== user_id logging + resolution =====
+  const PHP_SESSION_USER_ID = @json($sessionUserId);
+  const PHP_AUTH_USER_ID    = @json($authUserId);
+  let   PATIENT_ID          = Number(@json($patientId)); // initial from PHP
 
-  (function overrideFromFrontStorage(){
-    try {
-      const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
-      if (!raw) return;
+  console.log('[chat] PHP session user_id:', PHP_SESSION_USER_ID);
+  console.log('[chat] PHP auth()->id():',    PHP_AUTH_USER_ID);
+
+  // Try to override from frontend session/localStorage (what you saved on login)
+  let STORAGE_USER_ID = null;
+  try {
+    const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
+    if (raw) {
       const obj = JSON.parse(raw);
-      const uid = obj?.user?.id ?? obj?.user_id;
-      if (uid) {
-        PATIENT_ID = Number(uid);
-        console.log('PATIENT_ID overridden from frontend storage:', PATIENT_ID);
+      STORAGE_USER_ID = Number(obj?.user?.id ?? obj?.user_id ?? NaN);
+      console.log('[chat] frontend storage auth_full object:', obj);
+      console.log('[chat] frontend storage user_id:', STORAGE_USER_ID);
+      if (!Number.isNaN(STORAGE_USER_ID) && STORAGE_USER_ID) {
+        PATIENT_ID = STORAGE_USER_ID; // final override
       }
-    } catch (e) {
-      console.log('Could not read frontend session storage:', e);
+    } else {
+      console.log('[chat] no auth_full found in web storage');
     }
-  })();
+  } catch (e) {
+    console.log('[chat] storage parse error:', e);
+  }
 
-  console.log('PATIENT_ID (final):', PATIENT_ID);
+  console.log('[chat] PATIENT_ID (final user_id used):', PATIENT_ID);
 </script>
 
 <div class="flex h-full">
@@ -118,7 +127,7 @@
 
     {{-- Content --}}
     <section class="flex-1 p-6">
-      {{-- Debug session (optional) --}}
+      {{-- Session dump (debug) --}}
       <details class="mb-4">
         <summary class="text-sm text-indigo-700 cursor-pointer">Show Session Dump</summary>
         <pre class="mt-2 p-3 bg-white border rounded-lg text-xs overflow-auto max-h-64">{{ json_encode($sessionDump, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES) }}</pre>
@@ -138,7 +147,10 @@
                 Refresh
               </button>
             </div>
-            <div id="doctors-list" class="grid sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
+            <div id="doctors-list" class="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {{-- populated by JS --}}
+            </div>
+
             <div id="no-docs" class="text-sm text-gray-500 border rounded-lg p-4 hidden">
               No doctors are currently online. Please try again in a moment.
             </div>
@@ -171,7 +183,8 @@
       </div>
 
       {{-- Requesting modal --}}
-      <div id="modal" class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden items-center justify-center z-50">
+      <div id="modal"
+           class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden items-center justify-center z-50">
         <div class="bg-white rounded-xl p-5 shadow-xl w-full max-w-sm text-center">
           <div class="w-10 h-10 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin mx-auto mb-3"></div>
           <div class="font-semibold text-gray-800 mb-1">Requesting Call…</div>
@@ -187,7 +200,7 @@
   const socket = io(SOCKET_URL, {
     transports: ['websocket','polling'],
     withCredentials: false,
-    path: '/socket.io/'
+    path: '/socket.io/' // keep trailing slash to match server
   });
 
   // ===== DOM =====
@@ -200,9 +213,9 @@
   const elSelCount = document.getElementById('selected-count');
 
   // ===== State =====
-  let activeDoctors   = [];
-  let selectedDoctors = new Set();
-  let callDataMap     = {};
+  let activeDoctors   = [];            // [501, 502, ...]
+  let selectedDoctors = new Set();     // chosen doctorIds
+  let callDataMap     = {};            // { doctorId: {callId, channel, ...} }
 
   // ===== Helpers =====
   const uid = () => Math.random().toString(36).slice(2,8);
@@ -245,7 +258,7 @@
         if (e.target.checked) selectedDoctors.add(id); else selectedDoctors.delete(id);
         elSelCount.textContent = `${selectedDoctors.size} doctor${selectedDoctors.size===1?'':'s'} selected`;
         elStart.disabled = selectedDoctors.size === 0;
-        renderDoctors();
+        renderDoctors(); // update visual label
       });
     });
 
@@ -274,6 +287,7 @@
 
   socket.on('call-accepted', (data) => {
     setStatus(`✅ Doctor <b>${data.doctorId}</b> accepted.`);
+
     if (data.requiresPayment) {
       const payUrl =
         `${PATH_PREFIX}/payment/${encodeURIComponent(data.callId)}`
@@ -298,7 +312,7 @@
   });
 
   socket.on('payment-completed', (data) => {
-    if (Number(data?.patientId) === Number(PATIENT_ID)) {
+    if (data?.patientId === PATIENT_ID) {
       setStatus('💳 Payment verified. Connecting…');
       const url =
         `${PATH_PREFIX}/call-page/${encodeURIComponent(data.channel)}`
@@ -309,9 +323,11 @@
   });
 
   // ===== Actions =====
-  elRefresh.addEventListener('click', () => { socket.emit('get-active-doctors'); });
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    socket.emit('get-active-doctors');
+  });
 
-  elStart.addEventListener('click', () => {
+  document.getElementById('start-btn').addEventListener('click', () => {
     if (!selectedDoctors.size) return;
     setStatus('Requesting call…');
     showModal(true);
