@@ -56,7 +56,7 @@
   function formatTime(s){ const m = Math.floor(s/60); const sec = s%60; return `${m}:${String(sec).padStart(2,'0')}`; }
 
   // ===== Socket =====
-  const socket = io(SOCKET_URL, { transports: ['websocket','polling'], withCredentials: false, path: '/socket.io' });
+  const socket = io(SOCKET_URL, { transports: ['websocket','polling'], withCredentials: false, path: '/socket.io/' });
 
   // ===== Razorpay loader =====
   function loadRazorpay() {
