@@ -865,15 +865,9 @@ public function googleLogin(Request $request)
                     'message' => 'Invalid pet credentials',
                 ], 401);
             }
-             // ✅ User ko login karao (session me save)
-    Auth::login($user);
 
-    // ✅ Laravel session me directly save (extra key agar chahiye)
-    session([
-        'user_id' => $user->id,
-        'user_email' => $user->email,
-        'role' => $user->role
-    ]);
+            // ✅ Laravel login
+            Auth::login($user);
 
             DB::transaction(function () use (&$plainToken, &$room, $user, $request) {
                 $plainToken = bin2hex(random_bytes(32));
@@ -891,7 +885,7 @@ public function googleLogin(Request $request)
             unset($userData['password']);
             $userData['role'] = 'pet';
 
-            return response()->json([
+            $response = [
                 'success'    => true,
                 'message'    => 'Login success',
                 'role'       => 'pet',
@@ -904,7 +898,12 @@ public function googleLogin(Request $request)
                     'name'  => $room->name,
                 ],
                 'user'       => $userData,
-            ], 200);
+            ];
+
+            // ✅ Save everything in session
+            session($response);
+
+            return response()->json($response, 200);
 
         } elseif ($role === 'vet') {
             // 🔹 Vet table check
@@ -938,7 +937,7 @@ public function googleLogin(Request $request)
             unset($vetData['password']);
             $vetData['role'] = 'vet';
 
-            return response()->json([
+            $response = [
                 'success'    => true,
                 'message'    => 'Login success',
                 'role'       => 'vet',
@@ -951,7 +950,12 @@ public function googleLogin(Request $request)
                     'name'  => $room->name,
                 ],
                 'user'       => $vetData,
-            ], 200);
+            ];
+
+            // ✅ Save everything in session
+            session($response);
+
+            return response()->json($response, 200);
         }
 
         return response()->json(['message' => 'Invalid role'], 400);
@@ -964,6 +968,133 @@ public function googleLogin(Request $request)
         ], 500);
     }
 }
+
+
+// public function googleLogin(Request $request)
+// {
+//     $request->validate([
+//         'email'        => 'required|email',
+//         'google_token' => 'required|string',
+//         'role'         => 'required|string|in:pet,vet',
+//         'room_title'   => 'nullable|string',
+//     ]);
+
+//     try {
+//         $room = null;
+//         $plainToken = null;
+//         $role = $request->role;
+
+//         if ($role === 'pet') {
+//             // 🔹 Pet users table check
+//             $user = User::where('email', $request->email)
+//                         ->where('google_token', $request->google_token)
+//                         ->first();
+
+//             if (!$user) {
+//                 return response()->json([
+//                     'success' => false,
+//                     'message' => 'Invalid pet credentials',
+//                 ], 401);
+//             }
+//              // ✅ User ko login karao (session me save)
+//     Auth::login($user);
+
+//     // ✅ Laravel session me directly save (extra key agar chahiye)
+//     session([
+//         'user_id' => $user->id,
+//         'user_email' => $user->email,
+//         'role' => $user->role
+//     ]);
+
+//             DB::transaction(function () use (&$plainToken, &$room, $user, $request) {
+//                 $plainToken = bin2hex(random_bytes(32));
+//                 $user->api_token_hash = $plainToken;
+//                 $user->save();
+
+//                 $room = ChatRoom::create([
+//                     'user_id'         => $user->id,
+//                     'chat_room_token' => 'room_' . Str::uuid()->toString(),
+//                     'name'            => $request->room_title ?? ('New chat - ' . now()->format('d M Y H:i')),
+//                 ]);
+//             });
+
+//             $userData = $user->toArray();
+//             unset($userData['password']);
+//             $userData['role'] = 'pet';
+
+//             return response()->json([
+//                 'success'    => true,
+//                 'message'    => 'Login success',
+//                 'role'       => 'pet',
+//                 'email'      => $user->email,
+//                 'token'      => $plainToken,
+//                 'token_type' => 'Bearer',
+//                 'chat_room'  => [
+//                     'id'    => $room->id,
+//                     'token' => $room->chat_room_token,
+//                     'name'  => $room->name,
+//                 ],
+//                 'user'       => $userData,
+//             ], 200);
+
+//         } elseif ($role === 'vet') {
+//             // 🔹 Vet table check
+//             $tempVet = DB::table('vet_registerations_temp')
+//                 ->where('email', $request->email)
+//                 ->where('google_token', $request->google_token)
+//                 ->first();
+
+//             if (!$tempVet) {
+//                 return response()->json([
+//                     'success' => false,
+//                     'message' => 'Invalid vet credentials',
+//                 ], 401);
+//             }
+
+//             DB::transaction(function () use (&$plainToken, &$room, $tempVet, $request) {
+//                 $plainToken = bin2hex(random_bytes(32));
+
+//                 DB::table('vet_registerations_temp')
+//                     ->where('id', $tempVet->id)
+//                     ->update(['api_token_hash' => $plainToken]);
+
+//                 $room = ChatRoom::create([
+//                     'user_id'         => $tempVet->id,
+//                     'chat_room_token' => 'room_' . Str::uuid()->toString(),
+//                     'name'            => $request->room_title ?? ('New chat - ' . now()->format('d M Y H:i')),
+//                 ]);
+//             });
+
+//             $vetData = (array) $tempVet;
+//             unset($vetData['password']);
+//             $vetData['role'] = 'vet';
+
+//             return response()->json([
+//                 'success'    => true,
+//                 'message'    => 'Login success',
+//                 'role'       => 'vet',
+//                 'email'      => $tempVet->email,
+//                 'token'      => $plainToken,
+//                 'token_type' => 'Bearer',
+//                 'chat_room'  => [
+//                     'id'    => $room->id,
+//                     'token' => $room->chat_room_token,
+//                     'name'  => $room->name,
+//                 ],
+//                 'user'       => $vetData,
+//             ], 200);
+//         }
+
+//         return response()->json(['message' => 'Invalid role'], 400);
+
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'success' => false,
+//             'message' => 'Google login failed',
+//             'error'   => $e->getMessage(),
+//         ], 500);
+//     }
+// }
 
 public function googleLogin_bkp(Request $request)
 {
