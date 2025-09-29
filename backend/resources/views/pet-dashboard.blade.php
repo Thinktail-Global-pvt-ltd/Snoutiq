@@ -9,18 +9,19 @@
 <body class="h-screen bg-gray-50">
 
 @php
-  // prod me agar app /backend ke niche chal rahi ho to .env me APP_PATH_PREFIX=/backend
-  $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
+  // Force /backend prefix for menu links
+  $backendPrefix = '/backend';
 
-  $dashUrl = $pathPrefix . '/dashboard';
-  $chatUrl = $pathPrefix . '/chat';
+  // Final URLs
+  $dashUrl = $backendPrefix . '/pet-dashboard';
+  $chatUrl = $backendPrefix . '/chat';
 
-  // active states (nice highlight)
-  $dashPath = ltrim(($pathPrefix ? $pathPrefix.'/' : '').'backend/pet-dashboard', '/');
-  $chatPath = ltrim(($pathPrefix ? $pathPrefix.'/' : '').'backend/chat', '/');
+  // Active states
+  $dashPath = ltrim(trim($backendPrefix, '/') . '/pet-dashboard', '/');
+  $chatPath = ltrim(trim($backendPrefix, '/') . '/chat', '/');
 
-  $aiActive   = request()->is($dashPath);
-  $vcActive   = request()->is($chatPath);
+  $aiActive = request()->is($dashPath);
+  $vcActive = request()->is($chatPath);
 @endphp
 
 <div class="flex h-full">
@@ -35,7 +36,7 @@
         Menu
       </div>
 
-      <!-- AI Chat => /pet-dashboard -->
+      <!-- AI Chat => /backend/pet-dashboard -->
       <a href="{{ $dashUrl }}"
          class="group flex items-center gap-3 px-3 py-2 rounded-lg transition
                 {{ $aiActive ? 'bg-white/15' : 'hover:bg-white/10' }}">
@@ -46,7 +47,7 @@
         <span class="text-sm font-medium">AI Chat</span>
       </a>
 
-      <!-- Video Consultation => /chat -->
+      <!-- Video Consultation => /backend/chat -->
       <a href="{{ $chatUrl }}"
          class="group flex items-center gap-3 px-3 py-2 rounded-lg transition
                 {{ $vcActive ? 'bg-white/15' : 'hover:bg-white/10' }}">
