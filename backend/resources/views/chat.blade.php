@@ -11,29 +11,52 @@
 <body class="h-screen bg-gray-50">
 
 @php
-  // ===== App mounts under /backend in prod? put APP_PATH_PREFIX=/backend in .env
+  /**
+   * If your Laravel app runs under /backend in prod, set APP_PATH_PREFIX=/backend in .env
+   * This code still auto-forces /backend on snoutiq.com if not set.
+   */
   $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
 
-  // ===== Socket server URL (HTTPS in prod). Trailing slash handled in JS path.
+  // Socket server URL
   $socketUrl = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
 
-  // ===== Patient identity (use your auth/user id in real app)
+  // Patient identity (replace with your auth)
   $patientId = $patientId ?? (request('patientId') ?? 101);
 
-  // Nav links (match pet-dashboard)
-  $dashUrl = $pathPrefix . '/pet-dashboard';
-  $chatUrl = $pathPrefix . '/chat'; // keep if you still use /chat, or change menu to this page's route
+  // Sidebar links
+  $dashUrl = ($pathPrefix ? '/'.$pathPrefix : '') . '/pet-dashboard';
+  $chatUrl = ($pathPrefix ? '/'.$pathPrefix : '') . '/chat';
 @endphp
 
 <script>
-  // Expose prefix/ids to JS
-  const PATH_PREFIX = @json($pathPrefix);
-  const SOCKET_URL  = @json($socketUrl);
-  const PATIENT_ID  = Number(@json($patientId));
+  // Expose config to JS
+  const RAW_PATH_PREFIX = @json($pathPrefix);            // may be ""
+  const SOCKET_URL      = @json($socketUrl);
+  const PATIENT_ID      = Number(@json($patientId));
+
+  /**
+   * Robust prefix resolver:
+   * - Use RAW_PATH_PREFIX if provided.
+   * - If domain ends with snoutiq.com and no prefix given, force "/backend".
+   * - If current path already lives under "/backend", use "/backend".
+   */
+  const resolvePrefix = () => {
+    const given = (RAW_PATH_PREFIX || "").trim();
+    if (given) return given.startsWith('/') ? given : `/${given}`;
+
+    const pathStartsWithBackend = window.location.pathname.startsWith('/backend');
+    const isSnoutiq = location.hostname.endsWith('snoutiq.com');
+
+    if (pathStartsWithBackend) return '/backend';
+    if (isSnoutiq) return '/backend';     // <-- force backend on live
+    return '';                             // local/dev root
+  };
+
+  const PATH_PREFIX = resolvePrefix();     // final, normalized ('' or '/backend')
 </script>
 
 <div class="flex h-full">
-  {{-- Sidebar (same as pet-dashboard) --}}
+  {{-- Sidebar --}}
   <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white">
     <div class="h-16 flex items-center px-6 border-b border-white/10">
       <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
@@ -85,7 +108,6 @@
           Schedule a convenient video consultation with a veterinary professional.
         </p>
 
-        {{-- Active doctors + selection --}}
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div class="lg:col-span-2">
             <div class="flex items-center justify-between mb-3">
@@ -96,7 +118,7 @@
               </button>
             </div>
             <div id="doctors-list" class="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {{-- filled by JS --}}
+              {{-- populated by JS --}}
             </div>
 
             <div id="no-docs" class="text-sm text-gray-500 border rounded-lg p-4 hidden">
@@ -148,7 +170,7 @@
   const socket = io(SOCKET_URL, {
     transports: ['websocket','polling'],
     withCredentials: false,
-    path: '/socket.io/' // IMPORTANT: trailing slash to match Nginx/server
+    path: '/socket.io/' // keep trailing slash to match server
   });
 
   // ===== DOM =====
@@ -162,13 +184,15 @@
 
   // ===== State =====
   let activeDoctors   = [];            // [501, 502, ...]
-  let selectedDoctors = new Set();     // doctorId numbers
-  let callDataMap     = {};            // { [doctorId]: { callId, channel, doctorId, patientId } }
+  let selectedDoctors = new Set();     // chosen doctorIds
+  let callDataMap     = {};            // { doctorId: {callId, channel, ...} }
 
   // ===== Helpers =====
   const uid = () => Math.random().toString(36).slice(2,8);
   const mkCallId = () => `call_${Date.now()}_${uid()}`;
   const channelFrom = (callId) => `channel_${callId}`;
+  const showModal = (flag) => elModal.classList.toggle('hidden', !flag);
+  const setStatus = (html) => { elStatus.innerHTML = html || ''; };
 
   function renderDoctors() {
     elList.innerHTML = '';
@@ -204,7 +228,7 @@
         if (e.target.checked) selectedDoctors.add(id); else selectedDoctors.delete(id);
         elSelCount.textContent = `${selectedDoctors.size} doctor${selectedDoctors.size===1?'':'s'} selected`;
         elStart.disabled = selectedDoctors.size === 0;
-        renderDoctors(); // re-render to update "Selected" label
+        renderDoctors(); // re-render to update visual label
       });
     });
 
@@ -212,10 +236,7 @@
     elSelCount.textContent = `${selectedDoctors.size} doctor${selectedDoctors.size===1?'':'s'} selected`;
   }
 
-  function setStatus(html) { elStatus.innerHTML = html || ''; }
-  const showModal = (flag) => elModal.classList.toggle('hidden', !flag);
-
-  // ===== Socket handlers =====
+  // ===== Socket events =====
   socket.on('connect', () => {
     setStatus(`<span class="text-green-700">Connected.</span>`);
     socket.emit('get-active-doctors');
@@ -226,20 +247,18 @@
   });
 
   socket.on('active-doctors', (doctors) => {
-    // server may send strings — normalize to number
     activeDoctors = (doctors || []).map(d => Number(d));
     renderDoctors();
   });
 
   socket.on('call-sent', (data) => {
-    // Feedback to user
     setStatus(`📤 Call request sent to doctor <b>${data.doctorId}</b>.`);
   });
 
   socket.on('call-accepted', (data) => {
     setStatus(`✅ Doctor <b>${data.doctorId}</b> accepted.`);
 
-    // Payment gate?
+    // Build URLs with the resolved PATH_PREFIX (forces /backend on prod)
     if (data.requiresPayment) {
       const payUrl =
         `${PATH_PREFIX}/payment/${encodeURIComponent(data.callId)}`
@@ -263,7 +282,6 @@
     showModal(false);
   });
 
-  // In case backend directly confirms payment
   socket.on('payment-completed', (data) => {
     if (data?.patientId === PATIENT_ID) {
       setStatus('💳 Payment verified. Connecting…');
@@ -276,11 +294,12 @@
   });
 
   // ===== Actions =====
-  elRefresh.addEventListener('click', () => socket.emit('get-active-doctors'));
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    socket.emit('get-active-doctors');
+  });
 
-  elStart.addEventListener('click', () => {
+  document.getElementById('start-btn').addEventListener('click', () => {
     if (!selectedDoctors.size) return;
-
     setStatus('Requesting call…');
     showModal(true);
     callDataMap = {};
@@ -289,14 +308,13 @@
       const doctorId = Number(doctorIdNum);
       const callId   = mkCallId();
       const channel  = channelFrom(callId);
-
       const callData = { doctorId, patientId: PATIENT_ID, channel, callId };
       callDataMap[doctorId] = callData;
       socket.emit('call-requested', callData);
     });
   });
 
-  // initial UI
+  // initial render
   renderDoctors();
 </script>
 
