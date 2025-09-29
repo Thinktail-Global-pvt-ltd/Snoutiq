@@ -1,242 +1,303 @@
+{{-- resources/views/video-consult.blade.php --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SnoutIQ Chat</title>
+  <title>SnoutIQ • Video Consultation</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
-  <style>
-    .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:50}
-    .modal-mask.show{display:flex}
-  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-@php
-  // unified default to 127.0.0.1:4000
-  $socketUrl = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
-  $patientId = $patientId ?? (auth()->id() ?? 101);
+<body class="h-screen bg-gray-50">
 
-  if (!isset($nearbyDoctorsForJs)) {
-    $docs = collect($nearbyDoctors ?? []);
-    $nearbyDoctorsForJs = $docs->map(fn($d)=>['id'=>$d->id,'name'=>$d->name])->values();
-  }
+@php
+  // ===== App mounts under /backend in prod? put APP_PATH_PREFIX=/backend in .env
+  $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
+
+  // ===== Socket server URL (HTTPS in prod). Trailing slash handled in JS path.
+  $socketUrl = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
+
+  // ===== Patient identity (use your auth/user id in real app)
+  $patientId = $patientId ?? (request('patientId') ?? 101);
+
+  // Nav links (match pet-dashboard)
+  $dashUrl = $pathPrefix . '/pet-dashboard';
+  $chatUrl = $pathPrefix . '/chat'; // keep if you still use /chat, or change menu to this page's route
 @endphp
 
-<div class="max-w-4xl mx-auto p-4 sm:p-6">
-  <h1 class="text-2xl font-bold text-gray-800 mb-2">SnoutIQ Chat</h1>
-  <p class="text-blue-700 text-sm mb-4 font-medium">
-    Schedule a convenient video consultation with a veterinary professional.
-  </p>
+<script>
+  // Expose prefix/ids to JS
+  const PATH_PREFIX = @json($pathPrefix);
+  const SOCKET_URL  = @json($socketUrl);
+  const PATIENT_ID  = Number(@json($patientId));
+</script>
 
-  <div id="messages" class="space-y-4"></div>
+<div class="flex h-full">
+  {{-- Sidebar (same as pet-dashboard) --}}
+  <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white">
+    <div class="h-16 flex items-center px-6 border-b border-white/10">
+      <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
+    </div>
 
-  <div class="mt-4 space-y-3">
-    <button id="start-call-btn"
-      class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-      <span>📞 Start Video Consultation</span>
-    </button>
+    <nav class="px-3 py-4 space-y-1">
+      <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
 
-    <button id="clinic-btn"
-      class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-      <span>In-Person Clinic Visit</span>
-    </button>
+      <a href="{{ $dashUrl }}"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v7a2 2 0 01-2 2h-4l-5 4v-4z"/>
+        </svg>
+        <span class="text-sm font-medium">AI Chat</span>
+      </a>
 
-    <div id="call-status" class="text-sm font-medium text-gray-700"></div>
-  </div>
+      <a href="{{ $chatUrl }}"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        <span class="text-sm font-medium">Video Consultation</span>
+      </a>
+    </nav>
+  </aside>
 
-  <div class="mt-6 flex items-center gap-3">
-    <input id="chat-input" type="text" placeholder="Type your message..."
-           class="flex-1 px-4 py-3 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-    <button id="send-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl shadow-lg">Send</button>
-  </div>
-</div>
+  {{-- Main --}}
+  <main class="flex-1 flex flex-col">
+    {{-- Topbar --}}
+    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+      <h1 class="text-lg font-semibold text-gray-800">Video Consultation</h1>
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? 'User' }}</div>
+          <div class="text-xs text-gray-500">{{ auth()->user()->role ?? 'member' }}</div>
+        </div>
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+          {{ strtoupper(substr(auth()->user()->name ?? 'U',0,1)) }}
+        </div>
+      </div>
+    </header>
 
-<div id="loading-modal" class="modal-mask">
-  <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
-    <p id="loading-text" class="text-gray-700 font-medium">📞 Requesting Call...</p>
-  </div>
+    {{-- Content --}}
+    <section class="flex-1 p-6">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <p class="text-sm text-gray-600 mb-4">
+          Schedule a convenient video consultation with a veterinary professional.
+        </p>
+
+        {{-- Active doctors + selection --}}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div class="lg:col-span-2">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-sm font-semibold text-gray-800">Online Doctors</h2>
+              <button id="refresh-btn"
+                      class="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700">
+                Refresh
+              </button>
+            </div>
+            <div id="doctors-list" class="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {{-- filled by JS --}}
+            </div>
+
+            <div id="no-docs" class="text-sm text-gray-500 border rounded-lg p-4 hidden">
+              No doctors are currently online. Please try again in a moment.
+            </div>
+          </div>
+
+          <div class="lg:col-span-1">
+            <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+              <div class="flex items-center mb-3">
+                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-2">
+                  <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="text-sm font-semibold text-indigo-800">Start Video Consultation</div>
+                  <div id="selected-count" class="text-xs text-indigo-700">0 doctor selected</div>
+                </div>
+              </div>
+
+              <button id="start-btn"
+                      class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                📞 Start Video Consultation
+              </button>
+
+              <div id="status" class="mt-3 text-xs text-gray-600"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {{-- Requesting modal --}}
+      <div id="modal"
+           class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-5 shadow-xl w-full max-w-sm text-center">
+          <div class="w-10 h-10 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin mx-auto mb-3"></div>
+          <div class="font-semibold text-gray-800 mb-1">Requesting Call…</div>
+          <div class="text-xs text-gray-500">Waiting for doctor to respond</div>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
 
 <script>
-  // ===== server-config
-  const SOCKET_URL     = @json($socketUrl);
-  const PATIENT_ID     = @json($patientId);
-  const NEARBY_DOCTORS = @json($nearbyDoctorsForJs);
-
-  // ===== elements
-  const $messages=document.getElementById('messages');
-  const $input=document.getElementById('chat-input');
-  const $sendBtn=document.getElementById('send-btn');
-  const $startCallBtn=document.getElementById('start-call-btn');
-  const $clinicBtn=document.getElementById('clinic-btn');
-  const $status=document.getElementById('call-status');
-  const $loading=document.getElementById('loading-modal');
-  const $loadingText=document.getElementById('loading-text');
-
-  // ===== state
-  let loading=false;
-  let callStatus=null;
-  let activeDoctors=[];
-
-  // Always cast IDs to Number
-  let selectedDoctors=(NEARBY_DOCTORS||[]).map(d=>Number(d.id));
-
-  // Per-doctor call data + aggregates
-  let callDataMap={};            // doctorId -> { callId, channel, state: 'sent'|'failed'|'rejected' }
-  let pendingDoctors=new Set();  // doctorIds whose response is still pending
-  let accepted=false;            // any doctor accepted?
-
-  // unified socket init
-  const socket=io(SOCKET_URL,{transports:['websocket','polling'],withCredentials:false,path:'/socket.io'});
-
-  // bootstrap
-  socket.emit('get-active-doctors');
-  socket.on('active-doctors',(ids)=>{
-    // normalize to Number
-    activeDoctors = (Array.isArray(ids)?ids:[]).map(n=>Number(n));
-    hideLoading();
+  // ===== Socket client =====
+  const socket = io(SOCKET_URL, {
+    transports: ['websocket','polling'],
+    withCredentials: false,
+    path: '/socket.io/' // IMPORTANT: trailing slash to match Nginx/server
   });
 
-  // chat demo
-  $sendBtn.addEventListener('click',sendMessage);
-  $input.addEventListener('keydown',e=>{if(e.key==='Enter') sendMessage();});
-  function sendMessage(){
-    const text=($input.value||'').trim();
-    if(!text) return;
-    addMessage({sender:'user',text});
-    socket.emit('chat-message',{patientId:PATIENT_ID,text});
-    $input.value='';
-  }
-  socket.on('chat-message',(msg)=>{
-    addMessage({sender:'ai',text:msg?.text||'',emergency_status:(msg?.emergency_status||'').trim()});
-  });
+  // ===== DOM =====
+  const elList     = document.getElementById('doctors-list');
+  const elNoDocs   = document.getElementById('no-docs');
+  const elStart    = document.getElementById('start-btn');
+  const elRefresh  = document.getElementById('refresh-btn');
+  const elStatus   = document.getElementById('status');
+  const elModal    = document.getElementById('modal');
+  const elSelCount = document.getElementById('selected-count');
 
-  // ===== Start Call (multi-doctor safe)
-  $startCallBtn.addEventListener('click', startCall);
+  // ===== State =====
+  let activeDoctors   = [];            // [501, 502, ...]
+  let selectedDoctors = new Set();     // doctorId numbers
+  let callDataMap     = {};            // { [doctorId]: { callId, channel, doctorId, patientId } }
 
-  function startCall(){
-    if(loading) return;
+  // ===== Helpers =====
+  const uid = () => Math.random().toString(36).slice(2,8);
+  const mkCallId = () => `call_${Date.now()}_${uid()}`;
+  const channelFrom = (callId) => `channel_${callId}`;
 
-    // Prefer only online doctors if we have the list
-    let targets = selectedDoctors;
-    if (activeDoctors.length) {
-      targets = selectedDoctors.filter(id => activeDoctors.includes(id));
-    }
-    // If nothing online, still allow dialing all selected (optional). Here: show message.
-    if (!targets.length) {
-      updateStatus('❌ No selected doctors are currently online.');
+  function renderDoctors() {
+    elList.innerHTML = '';
+    if (!activeDoctors.length) {
+      elNoDocs.classList.remove('hidden');
+      elStart.disabled = true;
+      elSelCount.textContent = '0 doctor selected';
       return;
     }
+    elNoDocs.classList.add('hidden');
 
-    // Reset aggregates
-    accepted = false;
-    callStatus = null;
-    callDataMap = {};
-    pendingDoctors = new Set(targets);
-
-    loading = true;
-    updateStatus();
-    showLoading('📞 Requesting Call...');
-
-    targets.forEach((doctorId)=>{
-      const channel=`channel_${Date.now()}_${Math.random().toString(36).substring(2,8)}`;
-      callDataMap[doctorId]={callId:null, channel, state:'sent'};
-      // IMPORTANT: ensure doctorId is number
-      socket.emit('call-requested', { doctorId:Number(doctorId), patientId:PATIENT_ID, channel });
+    activeDoctors.forEach(id => {
+      const checked = selectedDoctors.has(Number(id));
+      const card = document.createElement('label');
+      card.className =
+        'cursor-pointer flex items-center gap-3 p-3 rounded-lg border ' +
+        (checked ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-gray-300');
+      card.innerHTML = `
+        <input type="checkbox" class="peer sr-only" data-id="${id}" ${checked ? 'checked':''}/>
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center text-xs font-bold">D</div>
+        <div class="flex-1">
+          <div class="text-sm font-medium text-gray-800">Doctor ${id}</div>
+          <div class="text-[11px] text-gray-500">Online</div>
+        </div>
+        <div class="text-indigo-600 text-xs font-semibold">${checked ? 'Selected' : 'Select'}</div>
+      `;
+      elList.appendChild(card);
     });
+
+    elList.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const id = Number(e.target.dataset.id);
+        if (e.target.checked) selectedDoctors.add(id); else selectedDoctors.delete(id);
+        elSelCount.textContent = `${selectedDoctors.size} doctor${selectedDoctors.size===1?'':'s'} selected`;
+        elStart.disabled = selectedDoctors.size === 0;
+        renderDoctors(); // re-render to update "Selected" label
+      });
+    });
+
+    elStart.disabled = selectedDoctors.size === 0;
+    elSelCount.textContent = `${selectedDoctors.size} doctor${selectedDoctors.size===1?'':'s'} selected`;
   }
 
-  // ===== Server responses
-  socket.on('call-sent',(data)=>{
-    console.log('call-sent', data);
-    callStatus={type:'sent',...data};
-    const did = Number(data.doctorId);
-    if (callDataMap[did]) {
-      callDataMap[did].callId = data.callId;
-      callDataMap[did].channel = data.channel;
-    }
-    // Keep waiting for others
-    updateStatus('📤 Call request sent. Waiting for doctors...');
+  function setStatus(html) { elStatus.innerHTML = html || ''; }
+  const showModal = (flag) => elModal.classList.toggle('hidden', !flag);
+
+  // ===== Socket handlers =====
+  socket.on('connect', () => {
+    setStatus(`<span class="text-green-700">Connected.</span>`);
+    socket.emit('get-active-doctors');
   });
 
-  socket.on('call-failed',(data)=>{
-    console.warn('call-failed', data);
-    const did = Number(data.doctorId);
-    if (pendingDoctors.has(did)) pendingDoctors.delete(did);
-    if (callDataMap[did]) callDataMap[did].state='failed';
-    // Only show final error if nobody left & not accepted
-    maybeFinishIfAllResolved();
+  socket.on('disconnect', () => {
+    setStatus(`<span class="text-red-600">Disconnected from server.</span>`);
   });
 
-  socket.on('call-rejected',(data)=>{
-    console.warn('call-rejected', data);
-    const did = Number(data.doctorId);
-    if (pendingDoctors.has(did)) pendingDoctors.delete(did);
-    if (callDataMap[did]) callDataMap[did].state='rejected';
-    maybeFinishIfAllResolved();
+  socket.on('active-doctors', (doctors) => {
+    // server may send strings — normalize to number
+    activeDoctors = (doctors || []).map(d => Number(d));
+    renderDoctors();
   });
 
-  socket.on('call-accepted',(data)=>{
-    console.log('call-accepted', data);
-    if (accepted) return; // already going somewhere
-    accepted = true;
-    hideLoading();
-    callStatus={type:'accepted',...data};
+  socket.on('call-sent', (data) => {
+    // Feedback to user
+    setStatus(`📤 Call request sent to doctor <b>${data.doctorId}</b>.`);
+  });
 
-    if (data.requiresPayment){
-      updateStatus('✅ Doctor accepted! Redirecting to payment...');
-      const url=`/payment/${encodeURIComponent(data.callId)}?doctorId=${encodeURIComponent(data.doctorId)}&channel=${encodeURIComponent(data.channel)}&patientId=${encodeURIComponent(PATIENT_ID)}`;
-      window.location.href=url;
+  socket.on('call-accepted', (data) => {
+    setStatus(`✅ Doctor <b>${data.doctorId}</b> accepted.`);
+
+    // Payment gate?
+    if (data.requiresPayment) {
+      const payUrl =
+        `${PATH_PREFIX}/payment/${encodeURIComponent(data.callId)}`
+        + `?doctorId=${encodeURIComponent(data.doctorId)}`
+        + `&channel=${encodeURIComponent(data.channel)}`
+        + `&patientId=${encodeURIComponent(PATIENT_ID)}`
+        + `&amount=${encodeURIComponent(Number(data.paymentAmount||499))}`;
+      window.location.href = payUrl;
     } else {
-      updateStatus('✅ Doctor accepted! Connecting...');
-      setTimeout(()=>{
-        window.location.href=`/call-page/${encodeURIComponent(data.channel)}?uid=${encodeURIComponent(PATIENT_ID)}&role=audience&callId=${encodeURIComponent(data.callId)}`;
-      }, 300);
+      const callUrl =
+        `${PATH_PREFIX}/call-page/${encodeURIComponent(data.channel)}`
+        + `?uid=${encodeURIComponent(PATIENT_ID)}&role=audience`
+        + `&callId=${encodeURIComponent(data.callId)}`;
+      window.location.href = callUrl;
+    }
+    showModal(false);
+  });
+
+  socket.on('call-rejected', (data) => {
+    setStatus(`❌ Doctor <b>${data.doctorId}</b> is unavailable. Try another.`);
+    showModal(false);
+  });
+
+  // In case backend directly confirms payment
+  socket.on('payment-completed', (data) => {
+    if (data?.patientId === PATIENT_ID) {
+      setStatus('💳 Payment verified. Connecting…');
+      const url =
+        `${PATH_PREFIX}/call-page/${encodeURIComponent(data.channel)}`
+        + `?uid=${encodeURIComponent(PATIENT_ID)}&role=audience`
+        + `&callId=${encodeURIComponent(data.callId)}`;
+      window.location.href = url;
     }
   });
 
-  function maybeFinishIfAllResolved(){
-    if (accepted) return; // success path already taken
-    if (pendingDoctors.size > 0) {
-      // Some doctors still pending → keep spinner/status
-      updateStatus('⏳ Waiting for other doctors to respond...');
-      return;
-    }
-    // Reached here means: all failed/rejected and nobody accepted
-    hideLoading();
-    updateStatus('❌ Doctor not available. Please try another doctor.');
-  }
+  // ===== Actions =====
+  elRefresh.addEventListener('click', () => socket.emit('get-active-doctors'));
 
-  // ===== UI helpers
-  function showLoading(txt){$loadingText.textContent=txt||'Loading…';$loading.classList.add('show');}
-  function hideLoading(){$loading.classList.remove('show');loading=false;}
-  function updateStatus(text){ if(text){$status.textContent=text;return;}
-    if(!callStatus){$status.textContent='';return;}
-    switch(callStatus.type){
-      case 'sent': $status.textContent='📤 Call request sent. Waiting for doctors...'; break;
-      case 'accepted': $status.textContent=callStatus.requiresPayment?'✅ Doctor accepted! Redirecting to payment...':'✅ Doctor accepted! Connecting...'; break;
-      case 'rejected': $status.textContent='❌ Doctor is currently unavailable. Please try again later.'; break;
-      default: $status.textContent=''; }
-  }
-  $clinicBtn.addEventListener('click',()=>{window.location.href='/book-clinic-visit';});
+  elStart.addEventListener('click', () => {
+    if (!selectedDoctors.size) return;
 
-  function addMessage({sender,text,isError=false}){
-    const wrap=document.createElement('div'); wrap.className=`flex ${sender==='user'?'justify-end':'justify-start'} mb-6`;
-    const bubbleClass = sender==='user'?'bg-gradient-to-r from-blue-600 to-indigo-600 text-white ml-auto'
-      : (isError?'bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 text-red-800':'bg-white/90 backdrop-blur-sm border border-gray-200 text-gray-800');
-    const avatarAI= sender==='ai'?`<div class="flex-shrink-0 mr-3"><div class="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg"><svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></div></div>`:'';
-    const avatarUser= sender==='user'?`<div class="flex-shrink-0 ml-3"><div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-lg"><svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div></div>`:'';
-    const safeText=(text||'').replace(/</g,'&lt;');
-    wrap.innerHTML=`<div class="flex max-w-[85%] lg:max-w-[75%]">${avatarAI}
-      <div class="rounded-2xl px-4 py-3 shadow-lg relative ${bubbleClass}">
-        <div class="whitespace-pre-line leading-relaxed text-sm lg:text-base break-words"><div class="prose prose-sm max-w-full">${safeText}</div></div>
-        <div class="flex items-center justify-between mt-3 pt-2"><div class="text-xs ${sender==='user'?'text-blue-200':'text-gray-500'}">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div></div>
-      </div>${avatarUser}</div>`;
-    $messages.appendChild(wrap); $messages.scrollTop=$messages.scrollHeight;
-  }
+    setStatus('Requesting call…');
+    showModal(true);
+    callDataMap = {};
+
+    selectedDoctors.forEach((doctorIdNum) => {
+      const doctorId = Number(doctorIdNum);
+      const callId   = mkCallId();
+      const channel  = channelFrom(callId);
+
+      const callData = { doctorId, patientId: PATIENT_ID, channel, callId };
+      callDataMap[doctorId] = callData;
+      socket.emit('call-requested', callData);
+    });
+  });
+
+  // initial UI
+  renderDoctors();
 </script>
 
 </body>

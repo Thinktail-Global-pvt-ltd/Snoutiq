@@ -7,63 +7,194 @@
   <title>Doctor Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
+  <style>
+    @keyframes ring {
+      0% { transform: rotate(0deg) }
+      10% { transform: rotate(15deg) }
+      20% { transform: rotate(-15deg) }
+      30% { transform: rotate(10deg) }
+      40% { transform: rotate(-10deg) }
+      50% { transform: rotate(5deg) }
+      60% { transform: rotate(-5deg) }
+      100% { transform: rotate(0deg) }
+    }
+    .ringing { animation: ring 1s infinite }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="h-screen bg-gray-50">
+
 @php
-  // unified default to 127.0.0.1:4000
+  // ===== App + Socket config =====
+  $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
+  $socketUrl  = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
+  $doctorId   = (int) ($doctorId ?? request('doctorId', 501));
+
+  // Sidebar links
+  $aiChatUrl     = $pathPrefix . '/pet-dashboard';
+  $thisPageUrl   = $pathPrefix . '/doctor?doctorId=' . urlencode($doctorId);
+
+  // Active states
+  $doctorPath    = ltrim(($pathPrefix ? $pathPrefix.'/' : '').'doctor', '/');
+  $aiActive      = request()->is(ltrim(($pathPrefix ? $pathPrefix.'/' : '').'pet-dashboard','/'));
+  $vcActive      = request()->is($doctorPath);
+@endphp
+
+<script>
+  const PATH_PREFIX = @json($pathPrefix);
+</script>
+
+<div class="flex h-full">
+  {{-- Sidebar --}}
+  <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white">
+    <div class="h-16 flex items-center px-6 border-b border-white/10">
+      <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
+    </div>
+
+    <nav class="px-3 py-4 space-y-1">
+      <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
+
+      <a href="{{ $aiChatUrl }}"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition {{ $aiActive ? 'bg-white/15' : 'hover:bg-white/10' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v7a2 2 0 01-2 2h-4l-5 4v-4z"/>
+        </svg>
+        <span class="text-sm font-medium">AI Chat</span>
+      </a>
+
+      <a href="{{ $thisPageUrl }}"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition {{ $vcActive ? 'bg-white/15' : 'hover:bg-white/10' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        <span class="text-sm font-medium">Video Consultation</span>
+      </a>
+    </nav>
+  </aside>
+
+  {{-- Main --}}
+  <main class="flex-1 flex flex-col">
+    {{-- Topbar --}}
+    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+      <div class="flex items-center gap-3">
+        <h1 class="text-lg font-semibold text-gray-800">Doctor Dashboard</h1>
+        <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Connecting…"></span>
+        <span id="status-pill" class="hidden px-3 py-1 rounded-full text-xs font-bold">…</span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button id="toggle-diag"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800">
+          Diagnostics
+        </button>
+        <div class="text-right">
+          <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? 'Doctor' }}</div>
+          <div class="text-xs text-gray-500">{{ auth()->user()->role ?? 'doctor' }}</div>
+        </div>
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+          {{ strtoupper(substr(auth()->user()->name ?? 'D',0,1)) }}
+        </div>
+      </div>
+    </header>
+
+    {{-- Content --}}
+    <section class="flex-1 p-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {{-- Incoming calls list (kept) --}}
+        <div class="lg:col-span-2 order-1">
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-base font-semibold text-gray-800">
+                Incoming Calls (<span id="calls-count">0</span>)
+              </h2>
+              <div class="text-xs text-gray-500">Keep this page open to receive calls</div>
+            </div>
+
+            <div id="calls" class="space-y-3">
+              <div id="no-calls" class="bg-gray-50 text-gray-600 rounded-lg p-6 text-center border border-dashed border-gray-200">
+                <p>No incoming calls at the moment</p>
+                <p class="text-xs mt-1" id="no-calls-sub">Connect to receive calls</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {{-- Diagnostics (toggle) --}}
+        <div class="lg:col-span-1 order-2">
+          <div id="diagnostics" class="hidden space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div class="text-sm text-gray-700 mb-2">Doctor ID: <strong id="doctor-id">{{ $doctorId }}</strong></div>
+              <div class="text-sm space-y-1">
+                <div>Socket ID: <code id="socket-id" class="text-gray-600">Not connected</code></div>
+                <div>Connection Status: <strong id="conn-status" class="text-gray-800">connecting</strong></div>
+                <div>Socket Connected: <strong id="socket-connected" class="text-gray-800">No</strong></div>
+                <div>Is Online: <strong id="is-online" class="text-gray-800">No</strong></div>
+              </div>
+              <div class="mt-4 grid grid-cols-3 gap-2">
+                <button id="btn-rejoin" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">🔄 Rejoin</button>
+                <button id="btn-test" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm font-medium hover:bg-black">🧪 Test</button>
+                <button id="btn-clear" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm font-medium hover:bg-gray-300">🗑️ Clear</button>
+              </div>
+            </div>
+
+            <div class="bg-black text-green-400 rounded-xl p-4 text-xs font-mono max-h-64 overflow-y-auto border border-gray-800">
+              <div class="font-bold mb-2">Debug Logs</div>
+              <div id="logs"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+{{-- Animated Incoming Call Modal --}}
+<div id="incoming-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl w-[92%] max-w-md p-6 animate-[bounce_0.8s_ease]">
+    <div class="flex items-center gap-3 mb-4">
+      <svg class="w-9 h-9 text-rose-600 ringing" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+      </svg>
+      <h3 class="text-xl font-semibold text-gray-800">Incoming Call</h3>
+    </div>
+
+    <div class="space-y-2 text-gray-700">
+      <div><span class="font-semibold">Patient:</span> <span id="m-patient"></span></div>
+      <div><span class="font-semibold">Channel:</span> <span id="m-channel" class="break-all"></span></div>
+      <div class="text-xs text-gray-500"><span class="font-semibold">Time:</span> <span id="m-time"></span></div>
+    </div>
+
+    <div class="mt-6 grid grid-cols-2 gap-3">
+      <button id="m-accept" class="py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow">✅ Accept</button>
+      <button id="m-reject" class="py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow">❌ Reject</button>
+    </div>
+  </div>
+</div>
+
+@php
+  // (kept) unified defaults
   $socketUrl = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
   $doctorId  = (int) ($doctorId ?? request('doctorId', 501));
 @endphp
 
-<div class="max-w-4xl mx-auto p-6">
-  <div class="flex items-center gap-3 mb-4">
-    <h1 class="text-2xl font-bold">Doctor Dashboard</h1>
-    <span id="status-pill" class="px-3 py-1 rounded-full text-xs font-bold">…</span>
-  </div>
-
-  <div class="mb-3 text-sm text-gray-700">
-    Doctor ID: <strong id="doctor-id">{{ $doctorId }}</strong>
-  </div>
-
-  <div class="bg-white rounded-xl shadow p-4 mb-6 text-sm">
-    <div>Socket ID: <code id="socket-id">Not connected</code></div>
-    <div>Connection Status: <strong id="conn-status">connecting</strong></div>
-    <div>Socket Connected: <strong id="socket-connected">No</strong></div>
-    <div>Is Online: <strong id="is-online">No</strong></div>
-    <div class="mt-3 flex gap-2">
-      <button id="btn-rejoin" class="px-3 py-2 rounded bg-blue-600 text-white">🔄 Rejoin Room</button>
-      <button id="btn-test" class="px-3 py-2 rounded bg-gray-800 text-white">🧪 Test Server</button>
-      <button id="btn-clear" class="px-3 py-2 rounded bg-gray-200 text-gray-900">🗑️ Clear Logs</button>
-    </div>
-  </div>
-
-  <h2 class="text-xl font-semibold mb-2">Incoming Calls (<span id="calls-count">0</span>)</h2>
-  <div id="calls" class="space-y-3">
-    <div id="no-calls" class="bg-gray-100 text-gray-600 rounded-lg p-6 text-center">
-      <p>No incoming calls at the moment</p>
-      <p class="text-xs mt-1" id="no-calls-sub">Connect to receive calls</p>
-    </div>
-  </div>
-
-  <div class="mt-6 bg-black text-green-400 rounded-lg p-4 text-xs font-mono max-h-64 overflow-y-auto">
-    <div class="font-bold mb-2">Debug Logs</div>
-    <div id="logs"></div>
-  </div>
-</div>
-
 <script>
-  // ===== server-config
+  // ===== server-config (UNCHANGED) =====
   const SOCKET_URL=@json($socketUrl);
   const DOCTOR_ID=Number(@json($doctorId));
 
-  // ===== state
-  let incomingCalls=[]; let isOnline=false; let connectionStatus='connecting'; let debugLogs=[];
-  // ===== dom
+  // ===== state =====
+  let incomingCalls=[];      // list UI
+  let activeModalCall=null;  // modal UI
+  let isOnline=false; let connectionStatus='connecting'; let debugLogs=[];
+
+  // ===== dom (existing) =====
   const elSocketId=document.getElementById('socket-id');
   const elConnStatus=document.getElementById('conn-status');
   const elSockConnected=document.getElementById('socket-connected');
   const elIsOnline=document.getElementById('is-online');
   const elStatusPill=document.getElementById('status-pill');
+  const elStatusDot=document.getElementById('status-dot');
   const elCallsWrap=document.getElementById('calls');
   const elCallsCount=document.getElementById('calls-count');
   const elNoCalls=document.getElementById('no-calls');
@@ -72,32 +203,130 @@
   const btnRejoin=document.getElementById('btn-rejoin');
   const btnTest=document.getElementById('btn-test');
   const btnClear=document.getElementById('btn-clear');
+  const btnToggleDiag=document.getElementById('toggle-diag');
+  const diagPanel=document.getElementById('diagnostics');
 
-  function addLog(m){const ts=new Date().toLocaleTimeString();const line=`${ts}: ${m}`;console.log(line);debugLogs=[...debugLogs.slice(-9),line];renderLogs();}
-  function statusColor(){if(isOnline)return{bg:'#dcfce7',color:'#16a34a',text:'🟢 ONLINE'};if(['connecting','joining','rejoining','connected'].includes(connectionStatus))return{bg:'#fef9c3',color:'#f59e0b',text:connectionStatus==='connecting'?'🟡 CONNECTING':connectionStatus==='joining'?'🟡 JOINING ROOM':connectionStatus==='rejoining'?'🟡 REJOINING':'🟡 CONNECTED (Not in room)'};return{bg:'#fee2e2',color:'#dc2626',text:'🔴 OFFLINE'};}
-  function renderHeader(){elConnStatus.textContent=connectionStatus;elSockConnected.textContent=socket.connected?'Yes':'No';elIsOnline.textContent=isOnline?'Yes':'No';elSocketId.textContent=socket.id||'Not connected';const s=statusColor();elStatusPill.style.background=s.bg;elStatusPill.style.color=s.color;elStatusPill.textContent=s.text;}
-  function renderCalls(){elCallsWrap.querySelectorAll('.call-card').forEach(n=>n.remove());elCallsCount.textContent=String(incomingCalls.length);elNoCalls.style.display=incomingCalls.length?'none':'block';elNoCallsSub.textContent=isOnline?"You'll be notified when patients request calls":"Connect to receive calls";for(const call of incomingCalls){const card=document.createElement('div');card.className='call-card bg-amber-100 border-2 border-amber-400 rounded-lg p-4';card.innerHTML=`<div class="font-semibold mb-1">📞 Incoming Call</div><div class="text-sm"><strong>Patient:</strong> ${call.patientId}</div><div class="text-sm"><strong>Channel:</strong> ${call.channel}</div><div class="text-[11px] text-gray-600 mt-1"><strong>Time:</strong> ${new Date(call.timestamp).toLocaleTimeString()}</div><div class="mt-3 flex gap-2"><button data-action="accept" data-id="${call.id}" class="px-3 py-2 rounded bg-green-600 text-white font-semibold">✅ Accept Call</button><button data-action="reject" data-id="${call.id}" class="px-3 py-2 rounded bg-red-600 text-white font-semibold">❌ Reject</button></div>`;elCallsWrap.appendChild(card);}}
-  function renderLogs(){elLogs.innerHTML=debugLogs.map(l=>`<div>${l}</div>`).join('');elLogs.parentElement.scrollTop=elLogs.parentElement.scrollHeight;}
-  function removeCallById(id){incomingCalls=incomingCalls.filter(c=>c.id!==id);renderCalls();}
+  // ===== modal dom =====
+  const modal=document.getElementById('incoming-modal');
+  const mPatient=document.getElementById('m-patient');
+  const mChannel=document.getElementById('m-channel');
+  const mTime=document.getElementById('m-time');
+  const mAccept=document.getElementById('m-accept');
+  const mReject=document.getElementById('m-reject');
 
-  // CHANGED: unified init (websocket first, no credentials, exact path)
+  // toggle diagnostics
+  btnToggleDiag.addEventListener('click',()=>diagPanel.classList.toggle('hidden'));
+
+  function addLog(m){
+    const ts=new Date().toLocaleTimeString();
+    const line=`${ts}: ${m}`;
+    console.log(line);
+    debugLogs=[...debugLogs.slice(-9),line];
+    renderLogs();
+  }
+
+  function statusColor(){
+    if(isOnline) return {bg:'#dcfce7',color:'#16a34a',text:'🟢 ONLINE',dot:'bg-green-500',title:'Online'};
+    if(['connecting','joining','rejoining','connected'].includes(connectionStatus))
+      return {bg:'#fef9c3',color:'#f59e0b',text:connectionStatus==='connecting'?'🟡 CONNECTING':connectionStatus==='joining'?'🟡 JOINING ROOM':connectionStatus==='rejoining'?'🟡 REJOINING':'🟡 CONNECTED (Not in room)',dot:'bg-yellow-400',title:'Connecting…'};
+    return {bg:'#fee2e2',color:'#dc2626',text:'🔴 OFFLINE',dot:'bg-red-500',title:'Offline'};
+  }
+
+  function renderHeader(){
+    elConnStatus.textContent=connectionStatus;
+    elSockConnected.textContent=socket.connected?'Yes':'No';
+    elIsOnline.textContent=isOnline?'Yes':'No';
+    elSocketId.textContent=socket.id||'Not connected';
+    const s=statusColor();
+    elStatusPill.style.background=s.bg; elStatusPill.style.color=s.color; elStatusPill.textContent=s.text;
+    elStatusDot.className=`inline-block w-2.5 h-2.5 rounded-full ${s.dot}`;
+    elStatusDot.title=s.title;
+  }
+
+  function renderCalls(){
+    elCallsWrap.querySelectorAll('.call-card').forEach(n=>n.remove());
+    elCallsCount.textContent=String(incomingCalls.length);
+    elNoCalls.style.display=incomingCalls.length?'none':'block';
+    elNoCallsSub.textContent=isOnline?"You'll be notified when patients request calls":"Connect to receive calls";
+
+    for (const call of incomingCalls){
+      const card=document.createElement('div');
+      card.className='call-card bg-amber-50 border border-amber-300 rounded-lg p-4';
+      card.innerHTML=`
+        <div class="font-semibold mb-1">📞 Incoming Call</div>
+        <div class="text-sm"><strong>Patient:</strong> ${call.patientId}</div>
+        <div class="text-sm"><strong>Channel:</strong> ${call.channel}</div>
+        <div class="text-[11px] text-gray-600 mt-1"><strong>Time:</strong> ${new Date(call.timestamp).toLocaleTimeString()}</div>
+        <div class="mt-3 flex gap-2">
+          <button data-action="accept" data-id="${call.id}" class="px-3 py-2 rounded bg-green-600 text-white text-sm font-semibold hover:bg-green-700">✅ Accept</button>
+          <button data-action="reject" data-id="${call.id}" class="px-3 py-2 rounded bg-red-600 text-white text-sm font-semibold hover:bg-red-700">❌ Reject</button>
+        </div>`;
+      elCallsWrap.appendChild(card);
+    }
+  }
+
+  function renderLogs(){
+    if(!elLogs) return;
+    elLogs.innerHTML=debugLogs.map(l=>`<div>${l}</div>`).join('');
+    elLogs.parentElement.scrollTop=elLogs.parentElement.scrollHeight;
+  }
+
+  function removeCallById(id){
+    incomingCalls = incomingCalls.filter(c => c.id !== id);
+    renderCalls();
+    if (activeModalCall && activeModalCall.callId === id) hideModal();
+  }
+
+  // ===== Modal helpers =====
+  function showModalFor(call){
+    activeModalCall = call;
+    mPatient.textContent = call.patientId;
+    mChannel.textContent = call.channel;
+    mTime.textContent    = new Date(call.timestamp).toLocaleTimeString();
+    modal.classList.remove('hidden');
+  }
+  function hideModal(){
+    modal.classList.add('hidden');
+    activeModalCall = null;
+  }
+
+  // ===== Socket (kept) =====
   const socket=io(SOCKET_URL,{transports:['websocket','polling'],withCredentials:false,path:'/socket.io'});
 
-  function joinDoctorRoom(){if(isOnline){addLog('⚠️ Already online, skipping join-doctor');return;}addLog(`🏥 Emitting join-doctor for ID: ${DOCTOR_ID}`);connectionStatus='joining';renderHeader();socket.emit('join-doctor',DOCTOR_ID);setTimeout(()=>{if(!isOnline && socket.connected){addLog('⚠️ TIMEOUT: No doctor-online in 3s → retrying');socket.emit('join-doctor',DOCTOR_ID);}},3000);}
+  function joinDoctorRoom(){
+    if(isOnline){addLog('⚠️ Already online, skipping join-doctor');return;}
+    addLog(`🏥 Emitting join-doctor for ID: ${DOCTOR_ID}`);
+    connectionStatus='joining'; renderHeader();
+    socket.emit('join-doctor',DOCTOR_ID);
+    setTimeout(()=>{ if(!isOnline && socket.connected){ addLog('⚠️ TIMEOUT: No doctor-online in 3s → retrying'); socket.emit('join-doctor',DOCTOR_ID); }}, 3000);
+  }
 
-  socket.on('connect',()=>{addLog('✅ Socket connected');connectionStatus='connected';renderHeader();joinDoctorRoom();});
-  socket.on('disconnect',(r)=>{addLog(`❌ Socket disconnected (${r})`);connectionStatus='disconnected';isOnline=false;renderHeader();});
-  socket.on('connect_error',(e)=>{addLog(`❌ connect_error: ${e.message}`);connectionStatus='error';renderHeader();});
+  socket.on('connect',()=>{ addLog('✅ Socket connected'); connectionStatus='connected'; renderHeader(); joinDoctorRoom(); });
+  socket.on('disconnect',(r)=>{ addLog(`❌ Socket disconnected (${r})`); connectionStatus='disconnected'; isOnline=false; renderHeader(); });
+  socket.on('connect_error',(e)=>{ addLog(`❌ connect_error: ${e.message}`); connectionStatus='error'; renderHeader(); });
 
-  socket.on('doctor-online',(d)=>{addLog(`👨‍⚕️ doctor-online: ${JSON.stringify(d)}`);if(Number(d.doctorId)===DOCTOR_ID){isOnline=true;connectionStatus='online';renderHeader();}});
-  socket.on('doctor-offline',(d)=>{addLog(`👨‍⚕️ doctor-offline: ${JSON.stringify(d)}`);if(Number(d.doctorId)===DOCTOR_ID){isOnline=false;connectionStatus='offline';renderHeader();}});
-  socket.on('call-requested',(callData)=>{addLog(`📞 call-requested: ${JSON.stringify(callData)}`);const id=callData.callId;if(incomingCalls.some(c=>c.id===id)){addLog(`⚠️ Duplicate call ignored: ${id}`);return;}incomingCalls.push({...callData,id});renderCalls();});
-  socket.on('join-error',(err)=>{addLog(`❌ join-error: ${err?.message||'unknown'}`);connectionStatus='error';renderHeader();});
-  socket.onAny((evt,...args)=>{if(!['ping','pong'].includes(evt))addLog(`📡 ${evt} ${JSON.stringify(args)}`)});
+  socket.on('doctor-online',(d)=>{ if(Number(d.doctorId)===DOCTOR_ID){ isOnline=true; connectionStatus='online'; renderHeader(); }});
+  socket.on('doctor-offline',(d)=>{ if(Number(d.doctorId)===DOCTOR_ID){ isOnline=false; connectionStatus='offline'; renderHeader(); }});
+
+  // When a call arrives → list + animated modal
+  socket.on('call-requested',(callData)=>{
+    addLog(`📞 call-requested: ${JSON.stringify(callData)}`);
+    const id=callData.callId;
+    if (incomingCalls.some(c=>c.id===id)) { addLog(`⚠️ Duplicate call ignored: ${id}`); return; }
+    const enriched = { ...callData, id };
+    incomingCalls.push(enriched);
+    renderCalls();
+    // open animated modal for newest call
+    showModalFor(enriched);
+  });
+
+  socket.on('join-error',(err)=>{ addLog(`❌ join-error: ${err?.message||'unknown'}`); connectionStatus='error'; renderHeader(); });
+  socket.onAny((evt,...args)=>{ if(!['ping','pong'].includes(evt)) addLog(`📡 ${evt} ${JSON.stringify(args)}`) });
   socket.emit('get-server-status');
   socket.on('server-status',(s)=>addLog(`📊 server-status: ${JSON.stringify(s)}`));
 
-  elCallsWrap.addEventListener('click', (e)=>{
+  // ===== Accept/Reject from LIST (kept) =====
+  document.getElementById('calls').addEventListener('click',(e)=>{
     const btn=e.target.closest('button[data-action]'); if(!btn) return;
     const action=btn.dataset.action; const id=btn.dataset.id;
     const call=incomingCalls.find(c=>c.id===id); if(!call) return;
@@ -105,7 +334,10 @@
     if(action==='accept'){
       addLog(`✅ Accepting call: ${id}`); removeCallById(id);
       socket.emit('call-accepted',{callId:call.id,doctorId:call.doctorId,patientId:call.patientId,channel:call.channel});
-      window.location.href=`/call-page/${encodeURIComponent(call.channel)}?uid=${encodeURIComponent(DOCTOR_ID)}&role=host`;
+      window.location.href =
+        `${PATH_PREFIX}/call-page/${encodeURIComponent(call.channel)}`
+        + `?uid=${encodeURIComponent(DOCTOR_ID)}&role=host`
+        + `&callId=${encodeURIComponent(call.id)}`;
     }
     if(action==='reject'){
       addLog(`❌ Rejecting call: ${id}`); removeCallById(id);
@@ -113,10 +345,39 @@
     }
   });
 
-  btnRejoin.addEventListener('click',()=>{addLog('🔄 Manual rejoin triggered');isOnline=false;connectionStatus='rejoining';renderHeader();socket.emit('join-doctor',DOCTOR_ID);});
-  btnTest.addEventListener('click',()=>{addLog('🧪 Sending ping');socket.emit('ping',{doctorId:DOCTOR_ID,timestamp:Date.now()});socket.once('pong',d=>addLog(`🏓 pong: ${JSON.stringify(d)}`));});
-  btnClear.addEventListener('click',()=>{debugLogs=[];renderLogs();});
-  window.addEventListener('beforeunload',()=>{if(socket.connected){addLog(`🚪 leave-doctor ${DOCTOR_ID}`);socket.emit('leave-doctor',DOCTOR_ID);}});
+  // ===== Accept/Reject from MODAL (new) =====
+  mAccept.addEventListener('click',()=>{
+    if(!activeModalCall) return;
+    const c = activeModalCall;
+    addLog(`✅ Accepting (modal) call: ${c.callId}`);
+    hideModal();
+    removeCallById(c.callId);
+    socket.emit('call-accepted',{callId:c.callId,doctorId:c.doctorId,patientId:c.patientId,channel:c.channel});
+    window.location.href =
+      `${PATH_PREFIX}/call-page/${encodeURIComponent(c.channel)}`
+      + `?uid=${encodeURIComponent(DOCTOR_ID)}&role=host`
+      + `&callId=${encodeURIComponent(c.callId)}`;
+  });
+
+  mReject.addEventListener('click',()=>{
+    if(!activeModalCall) return;
+    const c = activeModalCall;
+    addLog(`❌ Rejecting (modal) call: ${c.callId}`);
+    hideModal();
+    removeCallById(c.callId);
+    socket.emit('call-rejected',{callId:c.callId,doctorId:c.doctorId,patientId:c.patientId});
+  });
+
+  // Buttons inside diagnostics
+  const safeBind = (el, evt, fn)=>{ if(el) el.addEventListener(evt, fn); };
+  safeBind(btnRejoin,'click',()=>{ addLog('🔄 Manual rejoin triggered'); isOnline=false; connectionStatus='rejoining'; renderHeader(); socket.emit('join-doctor',DOCTOR_ID); });
+  safeBind(btnTest,'click',()=>{ addLog('🧪 Sending ping'); socket.emit('ping',{doctorId:DOCTOR_ID,timestamp:Date.now()}); socket.once('pong',d=>addLog(`🏓 pong: ${JSON.stringify(d)}`));});
+  safeBind(btnClear,'click',()=>{ debugLogs=[]; renderLogs(); });
+
+  // Leave room on unload
+  window.addEventListener('beforeunload',()=>{ if(socket.connected){ addLog(`🚪 leave-doctor ${DOCTOR_ID}`); socket.emit('leave-doctor',DOCTOR_ID); }});
+
+  // initial render
   renderHeader(); renderCalls(); renderLogs();
 </script>
 </body>

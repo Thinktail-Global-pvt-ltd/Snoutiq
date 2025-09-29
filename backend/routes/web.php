@@ -112,6 +112,10 @@ Route::get('/call-page/{channel}', function (\Illuminate\Http\Request $request, 
     return view('call-page', compact('channel','uid','role','callId'));
 })->name('call.show');
 
+Route::get('/pet-dashboard', fn () => view('pet-dashboard'))->name('pet-dashboard');
+Route::get('/clinic-dashboard', fn () => view('clinic-dashboard'))
+    ->name('clinic-dashboard');
+
 
 
 
