@@ -23,8 +23,8 @@
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-full bg-gray-200 grid place-items-center text-gray-600">👤</div>
           <div>
-            <p id="userName" class="font-semibold">Demo User</p>
-            <p id="userRole" class="text-xs text-gray-500">pet_owner</p>
+            <p id="userName" class="font-semibold">User</p>
+            <p id="userRole" class="text-xs text-gray-500">member</p>
           </div>
         </div>
       </div>
@@ -93,7 +93,7 @@
     </aside>
   </div>
 
-  <!-- =============== Pet Details Modal =============== -->
+  <!-- =============== Pet Details Modal (centered) =============== -->
   <div id="petDetailsModal" class="fixed inset-0 z-50 bg-black/50 hidden items-center justify-center p-4">
     <div class="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col shadow-lg mx-auto my-auto">
       <div class="p-6 border-b border-gray-200 flex justify-between items-start">
@@ -156,48 +156,75 @@
 
   <!-- ==================== Scripts ==================== -->
   <script>
-    // ====== Read login session saved by custom-doctor-login ======
+    // ---------- API endpoints (unchanged) ----------
+    const SEND_API        = "https://snoutiq.com/backend/api/chat/send";
+    const LIST_ROOMS_API  = "https://snoutiq.com/backend/api/chat/listRooms";
+    const NEW_ROOM_API    = "https://snoutiq.com/backend/api/chat-rooms/new";
+    const ROOM_BASE_API   = "https://snoutiq.com/backend/api/chat-rooms";
+    const NEARBY_VETS_API = "https://snoutiq.com/backend/api/nearby-vets";
+
+    // Keep a static context if you want; room token is still dynamic
+    const STATIC_CONTEXT = "room_static_12345";
+
+    // ---------- Read session saved on login (sn_session_v1) ----------
     function readAuthFull() {
       try {
-        const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
-        return raw ? JSON.parse(raw) : null;
-      } catch(_) { return null; }
+        const raw = localStorage.getItem("sn_session_v1");
+        if (raw) {
+          const s = JSON.parse(raw);
+          return {
+            token: s.token,
+            token_type: s.token_type || "Bearer",
+            role: s.role,
+            user_id: Number(s.user_id) || (s.user && Number(s.user.id)) || 0,
+            user_email: s.user_email || (s.user && s.user.email) || "",
+            user_name: s.user_name || (s.user && (s.user.name || s.user.fullName)) || "User",
+            chat_room: s.chat_room || null,
+            raw: s
+          };
+        }
+      } catch (_) {}
+
+      // fallbacks if someone already uses "token" / "user" keys
+      let userObj = null;
+      try { userObj = JSON.parse(localStorage.getItem("user") || "null"); } catch(_) {}
+      const token = localStorage.getItem("token");
+      const token_type = localStorage.getItem("token_type") || "Bearer";
+      const role = (userObj && userObj.role) || localStorage.getItem("role") || "member";
+
+      return {
+        token,
+        token_type,
+        role,
+        user_id: (userObj && (userObj.id || userObj.user_id)) || Number(localStorage.getItem("user_id")) || 0,
+        user_email: (userObj && userObj.email) || localStorage.getItem("user_email") || "",
+        user_name: (userObj && (userObj.name || userObj.fullName)) || localStorage.getItem("user_name") || "User",
+        chat_room: null,
+        raw: null
+      };
     }
 
     const AUTH = readAuthFull();
-    const USER_ID = Number(
-      (AUTH && (AUTH.user_id || (AUTH.user && AUTH.user.id))) || 0
-    ) || 0;
+    const USER_ID = Number(AUTH.user_id) || 0;
+    const AUTH_HEADER = AUTH.token ? { Authorization: `${AUTH.token_type || "Bearer"} ${AUTH.token}` } : {};
 
-    // Header: set name/role if present
-    (function hydrateHeader(){
-      const nm = (AUTH && (AUTH.user?.name || AUTH.user_name)) || 'User';
-      const rl = (AUTH && (AUTH.user?.role || AUTH.role)) || 'member';
-      document.getElementById('userName').textContent = nm;
-      document.getElementById('userRole').textContent = rl;
-      console.log('[dashboard] session USER_ID:', USER_ID, '| name:', nm, '| role:', rl);
-    })();
+    // Put basic user info into UI
+    document.getElementById("userName").textContent = AUTH.user_name || "User";
+    document.getElementById("userRole").textContent = AUTH.role || "member";
 
-    // ====== Constants (APIs unchanged) ======
-    const STATIC_CONTEXT = "room_static_12345"; // keep your static context
-    const SEND_API      = "https://snoutiq.com/backend/api/chat/send";
-    const LIST_ROOMS_API= "https://snoutiq.com/backend/api/chat/listRooms";
-    const NEW_ROOM_API  = "https://snoutiq.com/backend/api/chat-rooms/new";
-    const ROOM_BASE_API = "https://snoutiq.com/backend/api/chat-rooms";
-
-    // Prefer last used room, else room from login payload, else ""
-    let currentChatRoomToken =
-      localStorage.getItem("lastChatRoomToken") ||
-      (AUTH && AUTH.chat_room && AUTH.chat_room.token) ||
-      "";
-
-    // ====== Helpers ======
+    // ---------- DOM ----------
     const chatBoxEl = document.getElementById("chatBox");
     const historyEl = document.getElementById("chatHistory");
 
+    let currentChatRoomToken = localStorage.getItem("lastChatRoomToken") ||
+                               (AUTH.chat_room && AUTH.chat_room.token) ||
+                               "";
+
+    // ---------- Helpers ----------
     function escapeHTML(s=""){return s.replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
     function renderText(s=""){ return escapeHTML(String(s)).replace(/\n/g,"<br>"); }
     function scrollToBottom(){ requestAnimationFrame(()=>{ chatBoxEl.scrollTop = chatBoxEl.scrollHeight; }); }
+
     function appendMessage(text, isUser=false) {
       const wrap = document.createElement("div");
       wrap.className = "mb-3 flex " + (isUser ? "justify-end" : "justify-start");
@@ -209,6 +236,7 @@
       chatBoxEl.appendChild(wrap);
       scrollToBottom();
     }
+
     function setActiveRoom(token) {
       [...historyEl.querySelectorAll("[data-room]")].forEach(n => {
         n.classList.toggle("bg-blue-50", n.dataset.room === token);
@@ -216,13 +244,20 @@
       });
     }
 
-    // ====== Nearby vets demo (uses dynamic USER_ID) ======
+    // ---------- Nearby vets demo ----------
     async function fetchNearbyVets() {
+      if (!USER_ID) {
+        document.getElementById("nearbyVets").innerHTML =
+          `<div class="text-xs text-gray-500">Login required</div>`;
+        return;
+      }
       try {
-        const res = await axios.get(`/api/nearby-vets?user_id=${USER_ID}`);
+        const res = await axios.get(`${NEARBY_VETS_API}?user_id=${encodeURIComponent(USER_ID)}`, {
+          headers: { ...AUTH_HEADER }
+        });
         const vets = res.data?.data || [];
         document.getElementById("nearbyVets").innerHTML =
-          vets.map(v => `<div class="p-2 border rounded">${escapeHTML(v.name || "")}</div>`).join("") || 
+          vets.map(v => `<div class="p-2 border rounded">${escapeHTML(v.name || "")}</div>`).join("") ||
           `<div class="text-xs text-gray-500">No vets found</div>`;
       } catch (e) {
         document.getElementById("nearbyVets").innerHTML =
@@ -230,15 +265,17 @@
       }
     }
 
-    // ====== Rooms: list / open / new / delete ======
+    // ---------- Rooms: list / open / new / delete ----------
     async function fetchChatRooms() {
       if (!USER_ID) {
-        historyEl.innerHTML = `<div class="text-red-600 text-sm px-3 py-2">Not logged in (no user_id)</div>`;
+        historyEl.innerHTML = `<div class="text-red-600 text-sm px-3 py-2">Login required</div>`;
         return;
       }
       try {
-        const res = await axios.get(`${LIST_ROOMS_API}?user_id=${USER_ID}`);
-        const rooms = res.data?.rooms || [];
+        const res = await axios.get(`${LIST_ROOMS_API}?user_id=${encodeURIComponent(USER_ID)}`, {
+          headers: { ...AUTH_HEADER }
+        });
+        const rooms = res.data?.rooms || res.data?.data || [];
         if (!rooms.length) {
           historyEl.innerHTML = `<div class="text-gray-500 text-sm px-3 py-2">No chat history</div>`;
           return;
@@ -248,13 +285,12 @@
           <div class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-100 border border-transparent cursor-pointer"
                data-room="${escapeHTML(r.chat_room_token)}"
                onclick="openChatRoom('${escapeHTML(r.chat_room_token)}')">
-            <span class="text-sm font-medium text-gray-700 truncate">${escapeHTML(r.name || "New Chat")}</span>
+            <span class="text-sm font-medium text-gray-700 truncate">${escapeHTML(r.name || r.title || "New Chat")}</span>
             <button onclick="deleteChatRoom(event,'${escapeHTML(r.chat_room_token)}')"
                     class="text-xs text-red-500 hover:text-red-700 px-1">✖</button>
           </div>
         `).join("");
 
-        // Auto-select previously opened room (if exists), else first
         if (currentChatRoomToken) {
           setActiveRoom(currentChatRoomToken);
         } else {
@@ -277,10 +313,12 @@
     };
 
     async function createNewChat() {
-      if (!USER_ID) return alert("Not logged in.");
+      if (!USER_ID) return alert("Login required.");
       try {
-        const res = await axios.get(`${NEW_ROOM_API}?user_id=${USER_ID}`);
-        const token = res.data?.chat_room_token;
+        const res = await axios.get(`${NEW_ROOM_API}?user_id=${encodeURIComponent(USER_ID)}`, {
+          headers: { ...AUTH_HEADER }
+        });
+        const token = res.data?.chat_room_token || res.data?.token;
         if (token) {
           currentChatRoomToken = token;
           localStorage.setItem("lastChatRoomToken", token);
@@ -296,12 +334,16 @@
       }
     }
 
+    // ✅ DELETE /chat-rooms/{chat_room_token}?user_id=...
     window.deleteChatRoom = async function (ev, token) {
       ev.stopPropagation();
-      if (!USER_ID) return alert("Not logged in.");
+      if (!USER_ID) return alert("Login required.");
       if (!confirm("Delete this chat?")) return;
+
       try {
-        await axios.delete(`${ROOM_BASE_API}/${token}`, { data: { user_id: USER_ID } });
+        const url = `${ROOM_BASE_API}/${encodeURIComponent(token)}?user_id=${encodeURIComponent(USER_ID)}`;
+        await axios.delete(url, { headers: { ...AUTH_HEADER } });
+
         if (token === currentChatRoomToken) {
           currentChatRoomToken = "";
           localStorage.removeItem("lastChatRoomToken");
@@ -314,19 +356,19 @@
       }
     };
 
-    // ====== History & Send ======
+    // ---------- History & Send ----------
     async function fetchChatHistory() {
+      if (!USER_ID) {
+        chatBoxEl.innerHTML = `<div class="text-center text-red-600 mt-12">Login required</div>`;
+        return;
+      }
       if (!currentChatRoomToken) {
         chatBoxEl.innerHTML = `<div class="text-center text-gray-500 mt-20">Start by creating a new chat.</div>`;
         return;
       }
-      if (!USER_ID) {
-        chatBoxEl.innerHTML = `<div class="text-center text-red-600 mt-12">Not logged in (no user_id)</div>`;
-        return;
-      }
       try {
-        const url = `${ROOM_BASE_API}/${currentChatRoomToken}/chats?user_id=${USER_ID}`;
-        const res = await axios.get(url);
+        const url = `${ROOM_BASE_API}/${encodeURIComponent(currentChatRoomToken)}/chats?user_id=${encodeURIComponent(USER_ID)}`;
+        const res = await axios.get(url, { headers: { ...AUTH_HEADER } });
         const chats = res.data?.chats || [];
         chatBoxEl.innerHTML = "";
         if (!chats.length) {
@@ -344,25 +386,24 @@
     }
 
     async function sendMessage() {
+      if (!USER_ID) return alert("Login required.");
       const input = document.getElementById("chatInput");
       const question = (input.value || "").trim();
       if (!question) return;
-      if (!USER_ID) return alert("Not logged in.");
-
       input.value = "";
+
+      // Show immediately
       appendMessage(question, true);
 
       try {
         const payload = {
           user_id: USER_ID,
           question,
-          // keep static context as requested
-          context_token: STATIC_CONTEXT,
-          // but send selected chat room if available
+          context_token: STATIC_CONTEXT, // you asked to keep a static context
           chat_room_token: currentChatRoomToken || STATIC_CONTEXT
         };
 
-        const res = await axios.post(SEND_API, payload);
+        const res = await axios.post(SEND_API, payload, { headers: { ...AUTH_HEADER } });
         const answer = res.data?.chat?.answer || "No response";
         appendMessage(answer, false);
       } catch (e) {
@@ -371,34 +412,37 @@
       }
     }
 
-    // ====== Pet Modal (uses dynamic USER_ID) ======
+    // ---------- Pet Modal wiring ----------
     const petModal = document.getElementById("petDetailsModal");
     const petModalSave = document.getElementById("petModalSave");
     const petModalClose = document.getElementById("petModalClose");
 
     function openPetModal(){ petModal.classList.remove("hidden"); petModal.classList.add("flex"); }
     function closePetModal(){ petModal.classList.add("hidden"); petModal.classList.remove("flex"); }
-    function maybeOpenPetModal(){ if (!localStorage.getItem("petProfileDone")) openPetModal(); }
+
+    function maybeOpenPetModal(){
+      if (!localStorage.getItem("petProfileDone")) openPetModal();
+    }
 
     petModalClose.addEventListener("click", closePetModal);
     petModalSave.addEventListener("click", async () => {
-      if (!USER_ID) return alert("Not logged in.");
       try {
-        const years = parseInt(document.getElementById("petAgeYears").value || 0,10);
+        const years  = parseInt(document.getElementById("petAgeYears").value || 0,10);
         const months = parseInt(document.getElementById("petAgeMonths").value || 0,10);
         const totalMonths = years*12 + months;
+
         const fd = new FormData();
         fd.append("user_id", USER_ID);
-        fd.append("pet_type", document.getElementById("petType").value);
-        fd.append("pet_name", document.getElementById("petName").value.trim());
-        fd.append("pet_gender", document.getElementById("petGender").value);
-        fd.append("home_visit", document.getElementById("homeVisit").value);
+        fd.append("pet_type",  document.getElementById("petType").value);
+        fd.append("pet_name",  document.getElementById("petName").value.trim());
+        fd.append("pet_gender",document.getElementById("petGender").value);
+        fd.append("home_visit",document.getElementById("homeVisit").value);
         fd.append("role", "pet");
         fd.append("pet_age", totalMonths);
         fd.append("breed", document.getElementById("petBreed").value);
 
         await axios.post("https://snoutiq.com/backend/api/auth/register", fd, {
-          headers: { "Content-Type": "multipart/form-data" }
+          headers: { "Content-Type": "multipart/form-data", ...AUTH_HEADER }
         });
 
         localStorage.setItem("petProfileDone","1");
@@ -410,7 +454,7 @@
       }
     });
 
-    // ====== Init ======
+    // ---------- Init ----------
     document.getElementById("btnSend").addEventListener("click", sendMessage);
     document.getElementById("btnNewChat").addEventListener("click", createNewChat);
     document.getElementById("chatInput").addEventListener("keydown", (e)=>{ if(e.key==="Enter") sendMessage(); });
@@ -420,6 +464,8 @@
       await fetchChatRooms();
       if (currentChatRoomToken) await fetchChatHistory();
       maybeOpenPetModal();
+      console.log("[dashboard] session snapshot", AUTH);
+      console.log("[dashboard] USER_ID:", USER_ID, "room:", currentChatRoomToken);
     })();
   </script>
 
