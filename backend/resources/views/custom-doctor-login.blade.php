@@ -95,6 +95,7 @@
     // ---------- helpers: frontend "session" ----------
     function saveFrontSession(fullResp) {
       try {
+        // Save everything
         sessionStorage.setItem('auth_full', JSON.stringify(fullResp));
         sessionStorage.setItem('token', fullResp.token || '');
         sessionStorage.setItem('role', fullResp.role || (fullResp.user && fullResp.user.role) || '');
@@ -102,17 +103,29 @@
         sessionStorage.setItem('user_id', String((fullResp.user && fullResp.user.id) || ''));
         sessionStorage.setItem('chat_room_token', (fullResp.chat_room && fullResp.chat_room.token) || '');
 
-        // optional copy
+        // Optional copy to localStorage
         localStorage.setItem('auth_full', JSON.stringify(fullResp));
         localStorage.setItem('user', JSON.stringify(fullResp.user || {}));
         localStorage.setItem('token', fullResp.token || '');
 
-        console.log('✅ Frontend session saved:', {
+        // Build a readable snapshot for debugging
+        const snapshot = {
           token: fullResp.token,
+          token_type: fullResp.token_type,
           role: sessionStorage.getItem('role'),
           user_id: sessionStorage.getItem('user_id'),
-          chat_room_token: sessionStorage.getItem('chat_room_token')
-        });
+          user_email: (fullResp.user && fullResp.user.email) || fullResp.email || null,
+          user_name: (fullResp.user && fullResp.user.name) || null,
+          chat_room: {
+            id: fullResp.chat_room && fullResp.chat_room.id,
+            token: fullResp.chat_room && fullResp.chat_room.token,
+            name: fullResp.chat_room && fullResp.chat_room.name
+          }
+        };
+
+        // Console + Alert the stored data
+        console.log('✅ Frontend session saved (snapshot):', snapshot);
+        alert('Session saved:\\n' + JSON.stringify(snapshot, null, 2));
       } catch (e) {
         console.log('Storage error:', e);
       }
@@ -187,7 +200,7 @@
         const res = await axios.post('https://snoutiq.com/backend/api/auth/login', payload);
 
         console.log('🔔 API login response (vet):', res.data);
-        saveFrontSession(res.data);
+        saveFrontSession(res.data); // <-- will alert + console.log snapshot
         const role = (res.data.role || (res.data.user && res.data.user.role) || '').toLowerCase();
         routeAfterLoginByRole(role);
       }catch(err){
@@ -213,7 +226,7 @@
         });
 
         console.log('🔔 API google-login response (pet):', res.data);
-        saveFrontSession(res.data);
+        saveFrontSession(res.data); // <-- will alert + console.log snapshot
         const role = (res.data.role || (res.data.user && res.data.user.role) || '').toLowerCase();
         routeAfterLoginByRole(role);
       }catch(err){
@@ -228,8 +241,10 @@
     // ---------- init ----------
     window.onload = ()=>{
       setRole('pet');
-      // log current frontend session on load
-      console.log('🗃️ Frontend session (on load):', loadFrontSession());
+
+      // Log current stored session on load (no alert here to avoid popup on refresh)
+      const existing = loadFrontSession();
+      console.log('🗃️ Frontend session (on load):', existing);
 
       if(window.google && window.google.accounts){
         window.google.accounts.id.initialize({
