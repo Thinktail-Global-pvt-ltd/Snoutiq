@@ -27,20 +27,70 @@
   // ===== App + Socket config =====
   $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
   $socketUrl  = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
-  $doctorId   = (int) ($doctorId ?? request('doctorId', 501));
+
+  /**
+   * ✅ Doctor ID resolution priority:
+   * 1) PHP session user.id (from your login session payload)
+   * 2) PHP session user_id
+   * 3) auth()->user()->id
+   * 4) request('doctorId')
+   * 5) fallback 501
+   */
+  $sessUserArrayId = data_get(session('user'), 'id'); // when you stored the whole response in session
+  $sessUserId      = session('user_id');
+  $authId          = optional(auth()->user())->id;
+  $reqId           = request('doctorId');
+
+  $doctorIdResolved = (int) ($sessUserArrayId ?? $sessUserId ?? $authId ?? $reqId ?? 501);
 
   // Sidebar links
-  $aiChatUrl     = $pathPrefix . '/pet-dashboard';
-  $thisPageUrl   = $pathPrefix . '/doctor?doctorId=' . urlencode($doctorId);
+  $aiChatUrl   = ($pathPrefix ? "/$pathPrefix" : '') . '/pet-dashboard';
+  $thisPageUrl = ($pathPrefix ? "/$pathPrefix" : '') . '/doctor?doctorId=' . urlencode($doctorIdResolved);
 
   // Active states
-  $doctorPath    = ltrim(($pathPrefix ? $pathPrefix.'/' : '').'doctor', '/');
-  $aiActive      = request()->is(ltrim(($pathPrefix ? $pathPrefix.'/' : '').'pet-dashboard','/'));
-  $vcActive      = request()->is($doctorPath);
+  $doctorPath  = ltrim(($pathPrefix ? $pathPrefix.'/' : '').'doctor', '/');
+  $aiActive    = request()->is(ltrim(($pathPrefix ? $pathPrefix.'/' : '').'pet-dashboard','/'));
+  $vcActive    = request()->is($doctorPath);
+
+  // For optional debug panel
+  $sessionDump = session()->all();
 @endphp
 
 <script>
-  const PATH_PREFIX = @json($pathPrefix);
+  // Expose base config
+  const PATH_PREFIX    = @json($pathPrefix);
+  const SOCKET_URL     = @json($socketUrl);
+
+  // Where did the ID come from? (log clearly)
+  const PHP_SESSION_USER_ARRAY_ID = @json($sessUserArrayId);
+  const PHP_SESSION_USER_ID       = @json($sessUserId);
+  const PHP_AUTH_ID               = @json($authId);
+  const PHP_REQ_ID                = @json($reqId);
+
+  let DOCTOR_ID = Number(@json($doctorIdResolved));
+
+  console.log('[doctor-dashboard] ID sources ⇒ session.user.id:', PHP_SESSION_USER_ARRAY_ID,
+              '| session.user_id:', PHP_SESSION_USER_ID,
+              '| auth()->id():', PHP_AUTH_ID,
+              '| request("doctorId"):', PHP_REQ_ID);
+  console.log('[doctor-dashboard] DOCTOR_ID (final):', DOCTOR_ID);
+
+  // Optional enhancement: if your frontend stored auth_full, prefer that (only if PHP session missed)
+  try {
+    if (!DOCTOR_ID || Number.isNaN(DOCTOR_ID)) {
+      const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
+      if (raw) {
+        const obj = JSON.parse(raw);
+        const storageId = Number(obj?.user?.id ?? obj?.user_id);
+        if (storageId) {
+          DOCTOR_ID = storageId;
+          console.log('[doctor-dashboard] Overridden from web storage auth_full.user.id:', DOCTOR_ID);
+        }
+      }
+    }
+  } catch (e) {
+    console.log('[doctor-dashboard] storage parse error:', e);
+  }
 </script>
 
 <div class="flex h-full">
@@ -101,7 +151,8 @@
     {{-- Content --}}
     <section class="flex-1 p-6">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {{-- Incoming calls list (kept) --}}
+
+        {{-- Incoming calls --}}
         <div class="lg:col-span-2 order-1">
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
             <div class="flex items-center justify-between mb-3">
@@ -120,11 +171,11 @@
           </div>
         </div>
 
-        {{-- Diagnostics (toggle) --}}
+        {{-- Diagnostics --}}
         <div class="lg:col-span-1 order-2">
           <div id="diagnostics" class="hidden space-y-6">
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <div class="text-sm text-gray-700 mb-2">Doctor ID: <strong id="doctor-id">{{ $doctorId }}</strong></div>
+              <div class="text-sm text-gray-700 mb-2">Doctor ID: <strong id="doctor-id">{{ $doctorIdResolved }}</strong></div>
               <div class="text-sm space-y-1">
                 <div>Socket ID: <code id="socket-id" class="text-gray-600">Not connected</code></div>
                 <div>Connection Status: <strong id="conn-status" class="text-gray-800">connecting</strong></div>
@@ -144,6 +195,7 @@
             </div>
           </div>
         </div>
+
       </div>
     </section>
   </main>
@@ -172,23 +224,13 @@
   </div>
 </div>
 
-@php
-  // (kept) unified defaults
-  $socketUrl = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
-  $doctorId  = (int) ($doctorId ?? request('doctorId', 501));
-@endphp
-
 <script>
-  // ===== server-config (UNCHANGED) =====
-  const SOCKET_URL=@json($socketUrl);
-  const DOCTOR_ID=Number(@json($doctorId));
-
   // ===== state =====
   let incomingCalls=[];      // list UI
   let activeModalCall=null;  // modal UI
   let isOnline=false; let connectionStatus='connecting'; let debugLogs=[];
 
-  // ===== dom (existing) =====
+  // ===== dom =====
   const elSocketId=document.getElementById('socket-id');
   const elConnStatus=document.getElementById('conn-status');
   const elSockConnected=document.getElementById('socket-connected');
@@ -290,7 +332,7 @@
     activeModalCall = null;
   }
 
-  // ===== Socket (kept) =====
+  // ===== Socket =====
   const socket=io(SOCKET_URL,{transports:['websocket','polling'],withCredentials:false,path:'/socket.io'});
 
   function joinDoctorRoom(){
@@ -316,8 +358,7 @@
     const enriched = { ...callData, id };
     incomingCalls.push(enriched);
     renderCalls();
-    // open animated modal for newest call
-    showModalFor(enriched);
+    showModalFor(enriched); // open modal for newest call
   });
 
   socket.on('join-error',(err)=>{ addLog(`❌ join-error: ${err?.message||'unknown'}`); connectionStatus='error'; renderHeader(); });
@@ -325,7 +366,7 @@
   socket.emit('get-server-status');
   socket.on('server-status',(s)=>addLog(`📊 server-status: ${JSON.stringify(s)}`));
 
-  // ===== Accept/Reject from LIST (kept) =====
+  // ===== Accept/Reject from LIST =====
   document.getElementById('calls').addEventListener('click',(e)=>{
     const btn=e.target.closest('button[data-action]'); if(!btn) return;
     const action=btn.dataset.action; const id=btn.dataset.id;
@@ -335,7 +376,7 @@
       addLog(`✅ Accepting call: ${id}`); removeCallById(id);
       socket.emit('call-accepted',{callId:call.id,doctorId:call.doctorId,patientId:call.patientId,channel:call.channel});
       window.location.href =
-        `${PATH_PREFIX}/call-page/${encodeURIComponent(call.channel)}`
+        `${PATH_PREFIX ? '/'+PATH_PREFIX : ''}/call-page/${encodeURIComponent(call.channel)}`
         + `?uid=${encodeURIComponent(DOCTOR_ID)}&role=host`
         + `&callId=${encodeURIComponent(call.id)}`;
     }
@@ -345,7 +386,7 @@
     }
   });
 
-  // ===== Accept/Reject from MODAL (new) =====
+  // ===== Accept/Reject from MODAL =====
   mAccept.addEventListener('click',()=>{
     if(!activeModalCall) return;
     const c = activeModalCall;
@@ -354,7 +395,7 @@
     removeCallById(c.callId);
     socket.emit('call-accepted',{callId:c.callId,doctorId:c.doctorId,patientId:c.patientId,channel:c.channel});
     window.location.href =
-      `${PATH_PREFIX}/call-page/${encodeURIComponent(c.channel)}`
+      `${PATH_PREFIX ? '/'+PATH_PREFIX : ''}/call-page/${encodeURIComponent(c.channel)}`
       + `?uid=${encodeURIComponent(DOCTOR_ID)}&role=host`
       + `&callId=${encodeURIComponent(c.callId)}`;
   });
