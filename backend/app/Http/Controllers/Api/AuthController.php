@@ -839,6 +839,11 @@ public function login_bkp(Request $request)
 //     }
 // }
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
 public function googleLogin(Request $request)
 {
     $request->validate([
@@ -854,7 +859,7 @@ public function googleLogin(Request $request)
         $role = $request->role;
 
         if ($role === 'pet') {
-            // 🔹 Pet users table check
+            // Pet users table check
             $user = User::where('email', $request->email)
                         ->where('google_token', $request->google_token)
                         ->first();
@@ -866,7 +871,7 @@ public function googleLogin(Request $request)
                 ], 401);
             }
 
-            // ✅ Laravel login
+            // Laravel login (session user)
             Auth::login($user);
 
             DB::transaction(function () use (&$plainToken, &$room, $user, $request) {
@@ -900,13 +905,27 @@ public function googleLogin(Request $request)
                 'user'       => $userData,
             ];
 
-            // ✅ Save everything in session
-            session($response);
+            // 🔐 Save EVERYTHING in session (plus some canonical keys)
+            session([
+                'logged_in'     => true,
+                'user_id'       => $user->id,
+                'user_email'    => $user->email,
+                'role'          => 'pet',
+                'token'         => $plainToken,
+                'chat_room'     => $response['chat_room'],
+                'user'          => $response['user'],
+                'login_payload' => $response, // full response for convenience
+            ]);
+
+            // ✅ For Postman debug: hit ?debug_session=1 to dump session
+            if ($request->boolean('debug_session')) {
+                dd(session()->all());
+            }
 
             return response()->json($response, 200);
 
         } elseif ($role === 'vet') {
-            // 🔹 Vet table check
+            // Vet temp table check
             $tempVet = DB::table('vet_registerations_temp')
                 ->where('email', $request->email)
                 ->where('google_token', $request->google_token)
@@ -927,7 +946,7 @@ public function googleLogin(Request $request)
                     ->update(['api_token_hash' => $plainToken]);
 
                 $room = ChatRoom::create([
-                    'user_id'         => $tempVet->id,
+                    'user_id'         => $tempVet->id, // temp id as user_id for room
                     'chat_room_token' => 'room_' . Str::uuid()->toString(),
                     'name'            => $request->room_title ?? ('New chat - ' . now()->format('d M Y H:i')),
                 ]);
@@ -952,8 +971,20 @@ public function googleLogin(Request $request)
                 'user'       => $vetData,
             ];
 
-            // ✅ Save everything in session
-            session($response);
+            session([
+                'logged_in'     => true,
+                'user_id'       => $tempVet->id,
+                'user_email'    => $tempVet->email,
+                'role'          => 'vet',
+                'token'         => $plainToken,
+                'chat_room'     => $response['chat_room'],
+                'user'          => $response['user'],
+                'login_payload' => $response,
+            ]);
+
+            if ($request->boolean('debug_session')) {
+                dd(session()->all());
+            }
 
             return response()->json($response, 200);
         }
@@ -968,6 +999,7 @@ public function googleLogin(Request $request)
         ], 500);
     }
 }
+
 
 
 // public function googleLogin(Request $request)
