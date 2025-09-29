@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login | Test Clinic</title>
+  <title>Login | SnoutIQ</title>
   <link rel="icon" href="https://snoutiq.com/favicon.webp" sizes="32x32" type="image/png"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -42,7 +42,7 @@
     .link{color:var(--blue);text-decoration:none;font-weight:600}
     .right{float:right;font-size:12px}
     .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.7rem .9rem;border-radius:.6rem;
-      box-shadow:0 10px 24px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s}
+      box-shadow:0 10px 24px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s;z-index:50}
     .toast.show{opacity:1;transform:translateY(0)}
     .google-box{border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
     .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;cursor:pointer}
@@ -85,7 +85,9 @@
 
       <!-- Pet Google login -->
       <div id="petBox" class="google-box">
-        <div id="googleBtn" style="display:grid;place-items:center;min-height:42px"></div>
+        <div style="display:grid;place-items:center;min-height:42px">
+          <div id="googleBtn"></div>
+        </div>
         <p id="googleMsg" class="err" style="display:none;margin:10px 0 0"></p>
       </div>
 
@@ -100,20 +102,28 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    // --- tiny toast ---
+    // ---------- toast ----------
     const toast = (msg, type="info")=>{
       const el=document.getElementById('toast');
       el.textContent=msg;
       el.style.background = type==="error" ? "#dc2626" : (type==="success" ? "#16a34a" : "#111827");
       el.classList.add('show');
-      setTimeout(()=>el.classList.remove('show'), 2200);
+      clearTimeout(el._t);
+      el._t = setTimeout(()=>el.classList.remove('show'), 2200);
     };
 
-    // --- state ---
+    // ---------- redirect helper (role → url) ----------
+    function routeAfterLogin(user){
+      const role = (user?.role || '').toString().toLowerCase();
+      const nextUrl = role === 'pet' ? '/pet-dashboard' : '/doctor';
+      location.href = nextUrl;
+    }
+
+    // ---------- state ----------
     let userType = "pet"; // default tab
     let isLoading = false;
     const ADMIN_EMAIL = "admin@gmail.com";
-    const ADMIN_PASS  = "5f4dcc3b5d"; // as in your React override
+    const ADMIN_PASS  = "5f4dcc3b5d"; // super admin override (as per React)
 
     const els = {
       tabPet: document.getElementById('tab-pet'),
@@ -130,7 +140,7 @@
       googleMsg: document.getElementById('googleMsg'),
     };
 
-    // --- role switching (match React behavior: Pet → Google, Vet → form) ---
+    // ---------- role switching ----------
     function setRole(type){
       userType = type;
       if(type === 'vet'){
@@ -148,14 +158,14 @@
     els.tabPet.onclick = ()=> setRole('pet');
     els.tabVet.onclick = ()=> setRole('vet');
 
-    // --- show/hide password ---
+    // ---------- show/hide password ----------
     els.pwBtn.addEventListener('click', ()=>{
       const isText = els.password.type === 'text';
       els.password.type = isText ? 'password' : 'text';
       els.pwBtn.textContent = isText ? '👁️' : '🙈';
     });
 
-    // --- validation like React ---
+    // ---------- validation (like React) ----------
     function validate(){
       let ok = true;
       els.emailErr.style.display = 'none';
@@ -180,7 +190,7 @@
       return ok;
     }
 
-    // --- storage helpers (replace React AuthContext.login) ---
+    // ---------- storage helpers (replace React AuthContext.login) ----------
     function saveSession(user, token, chatRoomToken){
       try{
         localStorage.setItem('token', token);
@@ -189,7 +199,7 @@
       }catch(_){}
     }
 
-    // --- Login submit (Vet only) — API unchanged ---
+    // ---------- Vet Login submit — API unchanged ----------
     els.vetForm.addEventListener('submit', async (e)=>{
       e.preventDefault();
       if(isLoading) return;
@@ -211,20 +221,15 @@
         let user  = res.data?.user;
 
         if(token && user){
-          // super admin override (kept exactly as your React)
+          // super admin override (same as React)
           if(els.email.value === ADMIN_EMAIL && els.password.value === ADMIN_PASS){
             user = { ...user, role: 'super_admin' };
           }
           saveSession(user, token, chatRoomToken);
           toast('Login successful!', 'success');
 
-          // route like React
-          if(user.role === 'vet' || user.role === 'super_admin'){
-            location.href = '/user-dashboard/bookings';
-          }else{
-            location.href = '/dashboard';
-            setTimeout(()=>toast(`Welcome ${user.role}, dashboard is only for vets.`), 300);
-          }
+          // ✅ role-based redirect (pet -> /pet-dashboard, else -> /doctor)
+          routeAfterLogin(user);
         }else{
           toast('Invalid response from server.', 'error');
         }
@@ -238,7 +243,7 @@
       }
     });
 
-    // --- Google Sign-In (Pet) — API unchanged ---
+    // ---------- Google Sign-In (Pet) — API unchanged ----------
     async function onGoogleCredential(response){
       try{
         const base64Url = response.credential.split(".")[1];
@@ -262,7 +267,9 @@
         if(token && user){
           saveSession(user, token, chatRoomToken);
           toast('Login successful!', 'success');
-          location.href = '/dashboard';
+
+          // ✅ role-based redirect
+          routeAfterLogin(user);
         }else{
           toast('Invalid response from server.', 'error');
         }
@@ -273,6 +280,7 @@
       }
     }
 
+    // ---------- init ----------
     window.onload = ()=>{
       // default: Pet Owner tab with Google
       setRole('pet');
