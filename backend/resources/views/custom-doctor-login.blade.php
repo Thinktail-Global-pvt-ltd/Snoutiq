@@ -14,7 +14,6 @@
       --bg1:#eef4ff; --bg2:#e9eefe;
       --card:#ffffff; --text:#0f172a; --muted:#64748b;
       --blue:#2563eb; --blue-d:#1e40af; --border:#e5e7eb; --ring:rgba(37,99,235,.25);
-      --err:#dc2626; --ok:#16a34a; --hint:#6b7280;
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;color:var(--text);
@@ -29,27 +28,18 @@
     .seg button{flex:1;padding:10px;border:0;background:transparent;border-radius:8px;cursor:pointer;font-weight:600;color:#475569}
     .seg button.active{background:#fff;color:var(--blue);box-shadow:0 1px 0 rgba(0,0,0,.02)}
     label{display:block;font-size:13px;font-weight:600;color:#334155;margin:0 0 6px}
-    .input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#fff;
-      outline:none}
+    .input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#fff;outline:none}
     .input:focus{border-color:transparent;box-shadow:0 0 0 3px var(--ring)}
-    .err{color:var(--err);font-size:12px;margin-top:6px}
     .row{margin-bottom:14px}
     .btn{width:100%;padding:12px 14px;border-radius:10px;border:0;font-weight:700;cursor:pointer}
     .btn-primary{background:var(--blue);color:#fff}
     .btn-primary:hover{background:var(--blue-d)}
-    .muted{color:var(--muted)}
-    .foot{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:center}
     .link{color:var(--blue);text-decoration:none;font-weight:600}
     .right{float:right;font-size:12px}
-    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.7rem .9rem;border-radius:.6rem;
-      box-shadow:0 10px 24px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:.25s;z-index:50}
-    .toast.show{opacity:1;transform:translateY(0)}
-    .google-box{border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
-    .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;cursor:pointer}
-    /* user dump box */
-    .dump-wrap{margin-top:14px;display:none}
+    /* debug dump */
+    .dump-wrap{margin-top:16px;display:none}
     .dump-card{border:1px solid var(--border);background:#f8fafc;border-radius:12px;padding:12px}
-    pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:12px;color:#0b1220;max-height:260px;overflow:auto}
+    pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:12px;color:#0b1220;max-height:320px;overflow:auto}
   </style>
 </head>
 <body>
@@ -70,7 +60,6 @@
         <div class="row">
           <label for="email">Email Address</label>
           <input id="email" type="email" class="input" placeholder="Enter your email address" autocomplete="email"/>
-          <div id="emailErr" class="err" style="display:none"></div>
         </div>
 
         <div class="row" style="position:relative">
@@ -80,95 +69,62 @@
             </label>
           </div>
           <input id="password" type="password" class="input" placeholder="Enter your password" autocomplete="current-password"/>
-          <button id="pwBtn" class="pw-toggle" type="button" aria-label="Show password">👁️</button>
-          <div id="passErr" class="err" style="display:none"></div>
+          <button id="pwBtn" type="button" aria-label="Show password"
+                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;cursor:pointer">👁️</button>
         </div>
 
         <button id="loginBtn" class="btn btn-primary" type="submit">Login</button>
       </form>
 
       <!-- Pet Google login -->
-      <div id="petBox" class="google-box">
+      <div id="petBox" style="border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)">
         <div style="display:grid;place-items:center;min-height:42px">
           <div id="googleBtn"></div>
         </div>
-        <p id="googleMsg" class="err" style="display:none;margin:10px 0 0"></p>
       </div>
 
-      <!-- 🔎 User dump appears here after success -->
+      <!-- Full API dump -->
       <div id="dumpWrap" class="dump-wrap">
         <div class="dump-card">
-          <strong>User dump (debug):</strong>
-          <pre id="userDump">{}</pre>
+          <strong>Full API Response (debug):</strong>
+          <pre id="fullDump">{}</pre>
         </div>
-      </div>
-
-      <div class="foot">
-        <p class="muted">Don't have an account?
-          <a class="link" href="/register">Create an account</a>
-        </p>
       </div>
     </main>
   </div>
 
-  <div id="toast" class="toast"></div>
-
   <script>
-    // ---------- toast ----------
-    const toast = (msg, type="info")=>{
-      const el=document.getElementById('toast');
-      el.textContent=msg;
-      el.style.background = type==="error" ? "#dc2626" : (type==="success" ? "#16a34a" : "#111827");
-      el.classList.add('show');
-      clearTimeout(el._t);
-      el._t = setTimeout(()=>el.classList.remove('show'), 2200);
-    };
-
-    // ---------- small utils ----------
-    const maskToken = (t)=> typeof t === "string" && t.length > 16 ? (t.slice(0,6)+"…"+t.slice(-4)) : t || "";
-    const pick = (obj, keys)=> keys.reduce((a,k)=> (a[k]=obj?.[k], a), {});
-
-    // ---------- redirect helper (role → url) ----------
+    // ---- helpers ----
+    const maskToken = (t)=> typeof t === "string" && t.length > 16 ? (t.slice(0,6)+"…"+t.slice(-4)) : (t || "");
+    function saveSessionFrontend(user, token, chatRoomToken, raw){
+      try{
+        sessionStorage.setItem('token', token || '');
+        sessionStorage.setItem('user', JSON.stringify(user || {}));
+        if(chatRoomToken) sessionStorage.setItem('chatRoomToken', chatRoomToken);
+        if(raw) sessionStorage.setItem('loginResponse', JSON.stringify(raw));
+      }catch(_){}
+    }
+    function dumpFullResponse(data){
+      console.log("✅ Login Success — Full API response:", data);
+      if(data?.token) console.log("🔑 Token (masked):", maskToken(data.token));
+      const wrap = document.getElementById('dumpWrap');
+      const pre  = document.getElementById('fullDump');
+      if(wrap && pre){
+        pre.textContent = JSON.stringify(data || {}, null, 2);
+        wrap.style.display = 'block';
+      }
+    }
     function routeAfterLogin(user){
       const role = (user?.role || '').toString().toLowerCase();
-      const nextUrl = role === 'pet' ? 'backend/pet-dashboard' : 'backend/doctor';
+      const nextUrl = role === 'pet' ? '/pet-dashboard' : '/doctor';
       location.href = nextUrl;
     }
 
-    // ---------- dump helper (console + alert + on-page JSON) ----------
-    function dumpUser(user, token){
-      try{
-        // 1) Console logs
-        console.log("✅ Login Success — User:", user);
-        console.log("🔑 Token (masked):", maskToken(token));
-
-        // 2) Page dump
-        const wrap = document.getElementById('dumpWrap');
-        const pre  = document.getElementById('userDump');
-        if(pre && wrap){
-          pre.textContent = JSON.stringify(user, null, 2);
-          wrap.style.display = 'block';
-        }
-
-        // 3) Alert (concise)
-        const summary = pick(user, ["id","name","full_name","email","role","mobile","phone"]);
-        alert(
-          "Login Success ✅\\n" +
-          "Role: " + (user?.role ?? "") + "\\n" +
-          "Name: " + (user?.name || user?.full_name || "") + "\\n" +
-          "Email: " + (user?.email || "") + "\\n" +
-          "User ID: " + (user?.id || "")
-        );
-      }catch(e){
-        console.warn("Dump failed:", e);
-      }
-    }
-
-    // ---------- state ----------
-    let userType = "pet"; // default tab
+    // ---- state & els ----
+    let userType = "pet";
     let isLoading = false;
     const ADMIN_EMAIL = "admin@gmail.com";
-    const ADMIN_PASS  = "5f4dcc3b5d"; // super admin override (as per React)
+    const ADMIN_PASS  = "5f4dcc3b5d";
 
     const els = {
       tabPet: document.getElementById('tab-pet'),
@@ -176,18 +132,15 @@
       petBox: document.getElementById('petBox'),
       vetForm: document.getElementById('vetForm'),
       email: document.getElementById('email'),
-      emailErr: document.getElementById('emailErr'),
       password: document.getElementById('password'),
-      passErr: document.getElementById('passErr'),
       pwBtn: document.getElementById('pwBtn'),
       loginBtn: document.getElementById('loginBtn'),
       googleBtn: document.getElementById('googleBtn'),
-      googleMsg: document.getElementById('googleMsg'),
       dumpWrap: document.getElementById('dumpWrap'),
-      userDump: document.getElementById('userDump'),
+      fullDump: document.getElementById('fullDump'),
     };
 
-    // ---------- role switching ----------
+    // ---- role switch ----
     function setRole(type){
       userType = type;
       if(type === 'vet'){
@@ -205,133 +158,103 @@
     els.tabPet.onclick = ()=> setRole('pet');
     els.tabVet.onclick = ()=> setRole('vet');
 
-    // ---------- show/hide password ----------
+    // ---- show/hide password ----
     els.pwBtn.addEventListener('click', ()=>{
       const isText = els.password.type === 'text';
       els.password.type = isText ? 'password' : 'text';
       els.pwBtn.textContent = isText ? '👁️' : '🙈';
     });
 
-    // ---------- validation (like React) ----------
-    function validate(){
-      let ok = true;
-      els.emailErr.style.display = 'none';
-      els.passErr.style.display = 'none';
-
-      if(userType === 'vet'){
-        if(!els.email.value){
-          els.emailErr.textContent = 'Email is required';
-          els.emailErr.style.display='block';
-          ok = false;
-        }else if(!/\S+@\S+\.\S+/.test(els.email.value)){
-          els.emailErr.textContent = 'Please enter a valid email address';
-          els.emailErr.style.display='block';
-          ok = false;
-        }
-        if(!els.password.value){
-          els.passErr.textContent = 'Password is required';
-          els.passErr.style.display='block';
-          ok = false;
-        }
-      }
-      return ok;
-    }
-
-    // ---------- storage helpers (replace React AuthContext.login) ----------
-    function saveSession(user, token, chatRoomToken){
-      try{
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        if(chatRoomToken) localStorage.setItem('chatRoomToken', chatRoomToken);
-      }catch(_){}
-    }
-
-    // ---------- Vet Login submit — API unchanged ----------
+    // ---- Vet submit (no alerts/error toasts) ----
     els.vetForm.addEventListener('submit', async (e)=>{
       e.preventDefault();
       if(isLoading) return;
-      if(!validate()) return;
 
       isLoading = true;
       els.loginBtn.disabled = true;
       els.loginBtn.textContent = 'Logging in...';
+
       try{
         const payload = {
           login: els.email.value,
           password: els.password.value,
-          role: 'vet', // backend role for vet
+          role: 'vet',
         };
         const res = await axios.post('https://snoutiq.com/backend/api/auth/login', payload);
 
-        const chatRoomToken = (res.data?.chat_room && res.data.chat_room.token) ? res.data.chat_room.token : null;
-        let token = res.data?.token;
-        let user  = res.data?.user;
+        const data = res?.data || {};
+        const chatRoomToken = data?.chat_room?.token || null;
+        let   user  = data?.user || {};
+        const token = data?.token || '';
 
-        if(token && user){
-          // super admin override (same as React)
-          if(els.email.value === ADMIN_EMAIL && els.password.value === ADMIN_PASS){
-            user = { ...user, role: 'super_admin' };
-          }
-          saveSession(user, token, chatRoomToken);
-          toast('Login successful!', 'success');
-
-          // 🔎 Dump + alert + console, then redirect
-          dumpUser(user, token);
-          routeAfterLogin(user);
-        }else{
-          toast('Invalid response from server.', 'error');
+        // super_admin override (as in React)
+        if(els.email.value === ADMIN_EMAIL && els.password.value === ADMIN_PASS){
+          user = { ...user, role: 'super_admin' };
         }
-      }catch(error){
-        const msg = error?.response?.data?.message || error?.message || 'Login failed. Please check your credentials and try again.';
-        toast(msg, 'error');
-      }finally{
+
+        // store & dump
+        saveSessionFrontend(user, token, chatRoomToken, data);
+        dumpFullResponse({
+          success: true,
+          message: 'Login success',
+          role: user?.role || 'vet',
+          email: user?.email || '',
+          token: token,
+          token_type: 'Bearer',
+          chat_room: data?.chat_room || null,
+          user: user
+        });
+
+        // redirect
+        routeAfterLogin(user);
+
+      } finally {
         isLoading = false;
         els.loginBtn.disabled = false;
         els.loginBtn.textContent = 'Login';
       }
     });
 
-    // ---------- Google Sign-In (Pet) — API unchanged ----------
+    // ---- Google Sign-In (Pet) (no alerts/error toasts) ----
     async function onGoogleCredential(response){
-      try{
-        const base64Url = response.credential.split(".")[1];
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        const jsonPayload = decodeURIComponent(atob(base64).split("").map(c=>"%"+("00"+c.charCodeAt(0).toString(16)).slice(-2)).join(""));
-        const googleData = JSON.parse(jsonPayload);
+      const base64Url = response.credential.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(atob(base64).split("").map(c=>"%"+("00"+c.charCodeAt(0).toString(16)).slice(-2)).join(""));
+      const googleData = JSON.parse(jsonPayload);
 
-        const uniqueUserId = googleData.sub;
-        const email = googleData.email || "";
+      const uniqueUserId = googleData.sub;
+      const email = googleData.email || "";
 
-        const res = await axios.post('https://snoutiq.com/backend/api/google-login', {
-          email,
-          google_token: uniqueUserId,
-          role: 'pet',
-        });
+      const res = await axios.post('https://snoutiq.com/backend/api/google-login', {
+        email,
+        google_token: uniqueUserId,
+        role: 'pet',
+      });
 
-        const chatRoomToken = (res.data?.chat_room && res.data.chat_room.token) ? res.data.chat_room.token : null;
-        const token = res.data?.token;
-        const user  = res.data?.user;
+      const data = res?.data || {};
+      const chatRoomToken = data?.chat_room?.token || null;
+      const user  = data?.user || {};
+      const token = data?.token || '';
 
-        if(token && user){
-          saveSession(user, token, chatRoomToken);
-          toast('Login successful!', 'success');
+      // store & dump (include server fields as-is)
+      saveSessionFrontend(user, token, chatRoomToken, data);
+      dumpFullResponse({
+        success: true,
+        message: 'Login success',
+        role: data?.role || 'pet',
+        email: data?.email || '',
+        token: token,
+        token_type: 'Bearer',
+        chat_room: data?.chat_room || null,
+        user: user
+      });
 
-          // 🔎 Dump + alert + console, then redirect
-          dumpUser(user, token);
-          routeAfterLogin(user);
-        }else{
-          toast('Invalid response from server.', 'error');
-        }
-      }catch(error){
-        const msg = error?.response?.data?.message || 'Google login failed.';
-        const el = els.googleMsg; el.textContent = msg; el.style.display='block';
-        toast(msg, 'error');
-      }
+      // redirect
+      routeAfterLogin(user);
     }
 
-    // ---------- init ----------
+    // ---- init ----
     window.onload = ()=>{
-      // default: Pet Owner tab with Google
       setRole('pet');
 
       if(window.google && window.google.accounts){
@@ -342,7 +265,6 @@
         window.google.accounts.id.renderButton(els.googleBtn, {
           theme: "filled_blue", size: "large", text: "continue_with", shape: "rectangular"
         });
-        // One-tap (optional, mirrors React useOneTap)
         try{ window.google.accounts.id.prompt(); }catch(_){}
       }
     };
