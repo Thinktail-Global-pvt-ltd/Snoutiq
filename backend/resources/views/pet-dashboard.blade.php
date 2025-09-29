@@ -16,8 +16,8 @@
   $chatUrl = $pathPrefix . '/chat';
 
   // active states (nice highlight)
-  $dashPath = ltrim(($pathPrefix ? $pathPrefix.'/' : '').'pet-dashboard', '/');
-  $chatPath = ltrim(($pathPrefix ? $pathPrefix.'/' : '').'chat', '/');
+  $dashPath = ltrim(($pathPrefix ? $pathPrefix.'/' : '').'backend/pet-dashboard', '/');
+  $chatPath = ltrim(($pathPrefix ? $pathPrefix.'/' : '').'backend/chat', '/');
 
   $aiActive   = request()->is($dashPath);
   $vcActive   = request()->is($chatPath);
