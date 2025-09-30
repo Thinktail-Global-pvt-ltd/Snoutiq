@@ -65,37 +65,37 @@
       <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
     </div>
 
-<nav class="px-3 py-4 space-y-1">
-  <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
+    <nav class="px-3 py-4 space-y-1">
+      <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
 
-  <a href="{{ $aiChatUrl }}"
-     class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-    <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v7a2 2 0 01-2 2h-4l-5 4v-4z"/>
-    </svg>
-    <span class="text-sm font-medium">AI Chat</span>
-  </a>
+      <a href="{{ $aiChatUrl }}"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v7a2 2 0 01-2 2h-4l-5 4v-4z"/>
+        </svg>
+        <span class="text-sm font-medium">AI Chat</span>
+      </a>
 
-  <a href="{{ $thisPageUrl }}"
-     class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-    <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-    </svg>
-    <span class="text-sm font-medium">Video Consultation</span>
-  </a>
+      <a href="{{ $thisPageUrl }}"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        <span class="text-sm font-medium">Video Consultation</span>
+      </a>
 
-  {{-- NEW: Services (hardcoded URL) --}}
-  <a href="http://snoutiq.com/backend/dashboard/services"
-     class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-    <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6h-6v-6z"/>
-    </svg>
-    <span class="text-sm font-medium">Services</span>
-  </a>
-</nav>
+      {{-- NEW: Services (hardcoded URL) --}}
+      <a href="http://snoutiq.com/backend/dashboard/services"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6h-6v-6z"/>
+        </svg>
+        <span class="text-sm font-medium">Services</span>
+      </a>
+    </nav>
 
   </aside>
 
@@ -384,9 +384,6 @@
           timer: 2200
         }));
 
-        // Optional: small instant success toast here too
-        // Swal.fire({icon:'success', title:'Saving...', timer:700, showConfirmButton:false});
-
         // Redirect
         const to = (PATH_PREFIX || '') + '/backend/doctor';
         window.location.href = to;
@@ -431,6 +428,173 @@
       }
     }
   });
+</script>
+
+<!-- ========================= -->
+<!-- FRONTEND LOGGER (A to Z) -->
+<!-- ========================= -->
+<style>
+  #client-logger{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New",monospace}
+</style>
+<div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[380px] max-h-[65vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
+  <div class="flex items-center justify-between px-3 py-2 border-b">
+    <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
+    <div class="flex items-center gap-2">
+      <button id="log-download" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Download</button>
+      <button id="log-clear" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Clear</button>
+      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">✕</button>
+    </div>
+  </div>
+  <div id="log-body" class="text-[11px] leading-4 text-gray-800 px-3 py-2 overflow-y-auto whitespace-pre-wrap"></div>
+</div>
+<button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">🪵 Logs (<span id="log-count">0</span>)</button>
+
+<script>
+(function(){
+  const ui = {
+    panel:  document.getElementById('client-logger'),
+    body:   document.getElementById('log-body'),
+    toggle: document.getElementById('log-toggle'),
+    count:  document.getElementById('log-count'),
+    close:  document.getElementById('log-close'),
+    clear:  document.getElementById('log-clear'),
+    dl:     document.getElementById('log-download'),
+  };
+
+  const MAX = 500;
+  const buf = [];
+
+  function trunc(s, n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}
+    return s.length>n ? s.slice(0,n)+'…' : s;
+  }
+  function previewBody(body){
+    if(!body) return null;
+    if(body instanceof FormData){
+      const o={}; body.forEach((v,k)=>{ o[k] = (typeof v==='string')? trunc(v,200) : (v?.name?`<file:${v.name}>`:'<blob>'); });
+      return o;
+    }
+    if(typeof body === 'string') return trunc(body, 1000);
+    return '<body>';
+  }
+  function safeJson(x){ try{ return JSON.parse(JSON.stringify(x)); }catch(_){ return String(x); } }
+  function stamp(){ const d=new Date(); return d.toISOString(); }
+
+  function push(level, msg, meta){
+    const row = { t: stamp(), level, msg, meta };
+    buf.push(row); if(buf.length>MAX) buf.shift();
+    renderRow(row);
+    ui.count.textContent = String(buf.length);
+  }
+
+  function renderRow(e){
+    const div = document.createElement('div');
+    const meta = (e.meta==null) ? '' : ' ' + trunc(typeof e.meta==='string' ? e.meta : JSON.stringify(e.meta), 2000);
+    div.textContent = `[${e.t}] ${e.level.toUpperCase()} ${e.msg}${meta}`;
+    ui.body.appendChild(div);
+    ui.body.scrollTop = ui.body.scrollHeight;
+  }
+
+  const ClientLog = {
+    info:(m,d)=>push('info', m, d),
+    warn:(m,d)=>push('warn', m, d),
+    error:(m,d)=>push('error', m, d),
+    net:(phase,summary,detail)=>push('net:'+phase, summary, detail),
+    open:()=>ui.panel.classList.remove('hidden'),
+    close:()=>ui.panel.classList.add('hidden'),
+    clear:()=>{ while(ui.body.firstChild) ui.body.removeChild(ui.body.firstChild); buf.length=0; ui.count.textContent='0'; },
+    dump:()=>({ env: {
+        PATH_PREFIX: (typeof PATH_PREFIX !== 'undefined') ? PATH_PREFIX : null,
+        SOCKET_URL:  (typeof SOCKET_URL  !== 'undefined') ? SOCKET_URL  : null,
+        DOCTOR_ID:   (typeof DOCTOR_ID   !== 'undefined') ? DOCTOR_ID   : null,
+        url: location.href,
+        ua: navigator.userAgent
+      }, logs: buf })
+  };
+  window.ClientLog = ClientLog;
+
+  // UI controls
+  ui.toggle.addEventListener('click', ClientLog.open);
+  ui.close.addEventListener('click', ClientLog.close);
+  ui.clear.addEventListener('click', ClientLog.clear);
+  ui.dl.addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(ClientLog.dump(), null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'frontend-logs.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  // Keyboard toggle  Ctrl + `
+  window.addEventListener('keydown', (e)=>{
+    if((e.ctrlKey || e.metaKey) && e.key === '`'){ e.preventDefault(); ui.panel.classList.toggle('hidden'); }
+  });
+
+  // Pipe window errors
+  window.addEventListener('error', (e)=>{
+    ClientLog.error('window.error', { message:e.message, file:e.filename, line:e.lineno, col:e.colno, stack: e.error && e.error.stack });
+  });
+  window.addEventListener('unhandledrejection', (e)=>{
+    ClientLog.error('unhandledrejection', { reason: e.reason && (e.reason.stack || e.reason) });
+  });
+
+  // Mirror console.* to logger (keep original)
+  ['log','info','warn','error'].forEach(k=>{
+    const orig = console[k];
+    console[k] = function(...args){
+      try{ ClientLog.info('console.'+k, args.map(safeJson)); }catch(_){}
+      return orig.apply(this, args);
+    };
+  });
+
+  // Fetch instrumentation
+  const origFetch = window.fetch.bind(window);
+  window.fetch = async function(input, init={}) {
+    const url = (typeof input==='string') ? input : input.url;
+    const method = (init?.method || (typeof input==='object' && input.method) || 'GET').toUpperCase();
+    const start  = performance.now();
+
+    ClientLog.net('request', `${method} ${url}`, {
+      headers: init?.headers || {},
+      body: previewBody(init?.body)
+    });
+
+    try{
+      const res = await origFetch(input, init);
+      const ms = Math.round(performance.now() - start);
+      let bodyPreview = '';
+      try{
+        const clone = res.clone();
+        const ct = clone.headers.get('content-type') || '';
+        if(ct.includes('application/json')) bodyPreview = await clone.text();
+        else bodyPreview = `<${ct}>`;
+      }catch(_){}
+      ClientLog.net('response', `${method} ${url} → ${res.status} (${ms}ms)`, {
+        ok: res.ok, status: res.status, duration_ms: ms, body: bodyPreview && bodyPreview.length>1500 ? bodyPreview.slice(0,1500)+'…' : bodyPreview
+      });
+      return res;
+    }catch(err){
+      const ms = Math.round(performance.now() - start);
+      ClientLog.error('fetch.failed', { url, method, duration_ms: ms, error: err?.message || String(err) });
+      throw err;
+    }
+  };
+
+  // Seed environment snapshot
+  ClientLog.info('env', {
+    PATH_PREFIX: (typeof PATH_PREFIX !== 'undefined') ? PATH_PREFIX : null,
+    SOCKET_URL:  (typeof SOCKET_URL  !== 'undefined') ? SOCKET_URL  : null,
+    DOCTOR_ID:   (typeof DOCTOR_ID   !== 'undefined') ? DOCTOR_ID   : null,
+    token_present: !!(localStorage.getItem('token') || sessionStorage.getItem('token'))
+  });
+
+  // Pipe your existing addLog into ClientLog as well
+  const origAddLog = window.addLog;
+  window.addLog = function(m){
+    try { ClientLog.info(m); } catch(_){}
+    if (typeof origAddLog === 'function') return origAddLog(m);
+  };
+})();
 </script>
 
 </body>
