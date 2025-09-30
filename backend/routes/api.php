@@ -161,6 +161,7 @@ Route::get('/users-db', function () {
     $users = DB::table('users')->get();
     return response()->json($users);
 });
+ Route::post('groomer/service', [GroomerServiceController::class, 'store']);
 
 // using Eloquent Model
 Route::get('/users', function () {
@@ -192,7 +193,7 @@ Route::post('/service_categroy/{id}/delete', [GroomerServiceCategoryController::
     
 
  Route::get('/services', [GroomerServiceController::class, 'get']);
- Route::post('/service', [GroomerServiceController::class, 'store']);
+
     Route::get('/service/{id}', [GroomerServiceController::class, 'view']);
     Route::get('/service/{id}/edit', [GroomerServiceController::class, 'edit']);
     Route::post('/service/{id}/update', [GroomerServiceController::class, 'update']);

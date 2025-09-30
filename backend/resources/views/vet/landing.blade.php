@@ -168,7 +168,7 @@
       @if(!is_null($vet->open_now)) • {{ $vet->open_now ? 'Open now' : 'Closed now' }} @endif
     </p>
     <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:.5rem">
-      <a class="btn btn-primary" href="#book"><i class="fa-solid fa-calendar-check"></i> Book Appointment</a>
+      <!-- <a class="btn btn-primary" href="/backend/appointments/create?vet_slug={{ $vet->slug }}">$1</a> -->
       @php $clinicPhone = $vet->mobile ?? null; @endphp
       <a class="btn btn-outline" href="{{ $clinicPhone ? 'tel:'.$clinicPhone : 'javascript:void(0)' }}"><i class="fa-solid fa-phone"></i> Call Clinic</a>
       <a class="btn btn-outline" id="video-consult-btn" href="/video?vet_slug={{ $vet->slug }}"><i class="fa-solid fa-video"></i> Start Video Consult</a>
@@ -192,12 +192,12 @@
     <div class="reviews-card">
       <div class="bar"><span>⚡</span> <span>Quick Services</span></div>
       <div class="qsvc-grid">
-        <a class="qsvc-btn" href="#book">Checkup ₹499</a>
-        <a class="qsvc-btn" href="#book">Vaccination ₹299</a>
-        <a class="qsvc-btn" href="#book">Grooming ₹599</a>
-        <a class="qsvc-btn" href="#book">Dental ₹799</a>
-        <a class="qsvc-btn" href="#book">Surgery ₹1299</a>
-        <a class="qsvc-btn" href="#book">Home Visit ₹1099</a>
+        <a class="qsvc-btn" href="/backend/appointments/create?vet_slug={{ $vet->slug }}&type=Clinic&issue=Checkup">Checkup ₹499</a>
+        <a class="qsvc-btn" href="/backend/appointments/create?vet_slug={{ $vet->slug }}&type=Clinic&issue=Vaccination">Vaccination ₹299</a>
+        <a class="qsvc-btn" href="/backend/appointments/create?vet_slug={{ $vet->slug }}&type=Clinic&issue=Grooming">Grooming ₹599</a>
+        <a class="qsvc-btn" href="/backend/appointments/create?vet_slug={{ $vet->slug }}&type=Clinic&issue=Dental">Dental ₹799</a>
+        <a class="qsvc-btn" href="/backend/appointments/create?vet_slug={{ $vet->slug }}&type=Clinic&issue=Surgery">Surgery ₹1299</a>
+        <a class="qsvc-btn" href="/backend/appointments/create?vet_slug={{ $vet->slug }}&type=Clinic&issue=Home%20Visit">Home Visit ₹1099</a>
       </div>
     </div>
   </section>
@@ -294,52 +294,7 @@
   </section>
 
   <!-- Booking --><!-- Booking -->
-  <section class="container section" id="book">
-    <h2 class="heading">Book Appointment</h2>
-    <div class="card" style="padding:1rem;margin-top:1rem">
-      <form action="/backend/appointments/create" method="GET" class="grid grid-2">
-        <div>
-          <label for="owner_name">Your Name</label>
-          <input id="owner_name" name="name" class="input" placeholder="Pet parent name" required>
-        </div>
-        <div>
-          <label for="phone">Phone</label>
-          <input id="phone" name="phone" class="input" placeholder="+91…" required>
-        </div>
-        <div>
-          <label for="pet">Pet Name</label>
-          <input id="pet" name="pet" class="input" placeholder="Sheru / Momo" required>
-        </div>
-        <div>
-          <label for="type">Visit Type</label>
-          <select id="type" name="type" class="select">
-            <option>Clinic</option>
-            <option>Video</option>
-          </select>
-        </div>
-        <div>
-          <label for="doctor_id">Choose Doctor</label>
-          <select id="doctor_id" name="doctor_id" class="select">
-            @php $doctors = $vet->doctors()->orderBy('doctor_name')->get(); @endphp
-            @foreach($doctors as $doc)
-              <option value="{{ $doc->id }}">{{ $doc->doctor_name }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div style="grid-column:1/-1">
-          <label for="issue">Concern</label>
-          <textarea id="issue" name="issue" rows="3" class="input" placeholder="Briefly describe what's going on…"></textarea>
-        </div>
-        <input type="hidden" name="vet_slug" value="{{ $vet->slug }}"/>
-        <div style="grid-column:1/-1;display:flex;gap:.75rem;flex-wrap:wrap">
-          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-arrow-right"></i> Continue</button>
-          @php $digits = $vet->mobile ? preg_replace('/[^0-9]+/', '', $vet->mobile) : null; @endphp
-          <a class="btn btn-outline" href="{{ $digits ? ('https://wa.me/'.$digits.'?text='.urlencode('Hi, I want to book at '.$vet->name)) : 'javascript:void(0)' }}"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>
-        </div>
-      </form>
-      <p class="muted" style="margin-top:.75rem">Already a user? <a href="https://snoutiq.com/login" style="color:var(--accent)">Login</a> for faster booking.</p>
-    </div>
-  </section>
+  
 
   <!-- Location -->
   @php
