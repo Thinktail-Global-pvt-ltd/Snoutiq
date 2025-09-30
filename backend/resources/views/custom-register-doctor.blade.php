@@ -22,7 +22,7 @@
 
   <!-- UI -->
   <main style="max-width:400px;margin:40px auto;background:#fff;padding:24px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.1)">
-    <h1 style="text-align:center;margin-bottom:10px">Welcome to SnoutIQ!</h1>
+    <h1 style="text-align:center;margin-bottom:10px">Welcome to Test Clinic!</h1>
     <p style="text-align:center;color:#64748b">Let's start by getting to know you</p>
 
     <!-- Tabs -->
