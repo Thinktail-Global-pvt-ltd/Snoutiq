@@ -48,7 +48,6 @@
   --sky2:#d7e6ff;
 }
 
-
     *{margin:0;padding:0;box-sizing:border-box}
     body{
       background:radial-gradient(1000px 500px at 20% -20%, var(--sky1), transparent 60%),
@@ -78,47 +77,39 @@
     .nav-wrap{height:70px;display:flex;align-items:center;justify-content:space-between}
     .logo{display:flex;align-items:center;gap:.5rem;font-weight:800;color:var(--accent);cursor:pointer}
     .logo img{height:20px}
-    .input,.select,textarea{width:100%;padding:.85rem 1rem;border-radius:.75rem;border:1px solid var(--border);background:#fbfdff;color:var(--text)}
+    .input,.select,textarea{width:100%;padding:.85rem 1rem;border-radius:.75rem;border:1px solid var(--border);background:#fbfdff;color:#0f172a}
     .input:focus,.select:focus,textarea:focus{outline:2px solid var(--ring);border-color:transparent}
     label{font-size:.9rem;color:#334155}
     .doc-img{width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid var(--border)}
 
-    /* ===== HERO — like screenshot ===== */
-    .ai-hero{padding:42px 0 18px;text-align:center}
-    .ai-hero .ai-pill{display:inline-flex;gap:.5rem;align-items:center;background:#e9f2ff;border:1px solid var(--border);color:#1d4ed8;padding:.4rem .9rem;border-radius:999px;font-weight:700}
-    .ai-hero h1{font-size:clamp(28px,5vw,56px);line-height:1.1;margin:.65rem auto .4rem;max-width:980px;font-weight:800}
+    /* ===== HERO — compact to surface clinic info ===== */
+    .ai-hero{padding:18px 0 8px;text-align:center}
+    .ai-hero .ai-pill{display:inline-flex;gap:.5rem;align-items:center;background:#e9f2ff;border:1px solid var(--border);color:#1d4ed8;padding:.35rem .8rem;border-radius:999px;font-weight:700}
+    .ai-hero h1{font-size:clamp(22px,4.5vw,40px);line-height:1.15;margin:.4rem auto .2rem;max-width:980px;font-weight:800}
     .ai-hero .accent{background:linear-gradient(90deg,#2563eb,#06b6d4);-webkit-background-clip:text;background-clip:text;color:transparent}
-    .ai-hero p.sub{max-width:880px;margin:0 auto 18px;color:#6b7280;font-size:clamp(14px,2.1vw,20px)}
-    .askbar{max-width:720px;margin:14px auto 8px;padding:10px 10px;border:1px solid var(--border);border-radius:16px;background:#fff;display:flex;align-items:center;gap:10px;box-shadow:0 8px 30px -12px rgba(37,99,235,.18)}
-    .askbar i{font-size:18px;opacity:.8}
-    .askbar input{flex:1;border:none;outline:none;font-size:16px;padding:.6rem}
-    .askbar .send{width:42px;height:42px;border-radius:12px;border:1px solid var(--border);background:#f5f9ff;display:grid;place-items:center;cursor:pointer}
+    .ai-hero p.sub{max-width:880px;margin:0 auto 10px;color:#6b7280;font-size:clamp(14px,2vw,18px)}
+    .askbar{max-width:680px;margin:8px auto 6px;padding:6px 8px;border:1px solid var(--border);border-radius:12px;background:#fff;display:flex;align-items:center;gap:8px;box-shadow:0 8px 30px -12px rgba(37,99,235,.18)}
+    .askbar i{font-size:16px;opacity:.85}
+    .askbar input{flex:1;border:none;outline:none;font-size:14px;padding:.5rem}
+    .askbar .send{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:#f5f9ff;display:grid;place-items:center;cursor:pointer}
     .askbar .send:hover{background:#eef6ff}
-    .ai-hint{font-size:.92rem;color:#6b7280}
+    .ai-hint{font-size:.85rem;color:#6b7280}
 
-    /* --- Chat UI (reveals after first send) --- */
-    .chat-wrap{display:grid;gap:1rem}
-    @media(min-width:1024px){.chat-wrap{grid-template-columns:280px 1fr 280px}}
-    .chat-card{background:#fff;border:1px solid var(--border);border-radius:1rem;box-shadow:0 8px 28px -14px rgba(37,99,235,.18);overflow:hidden}
-    .rooms{height:540px;overflow:auto}
-    .room-item{padding:.7rem .9rem;border-bottom:1px solid #eef5ff;cursor:pointer}
-    .room-item.active{background:#eef6ff}
-    .msgs{height:540px;overflow:auto;background:#f8fbff}
-    .msg{max-width:78%;margin:.35rem 0;padding:.7rem .9rem;border-radius:.8rem;border:1px solid #e8f0ff;background:#fff}
-    .msg.user{margin-left:auto;background:#e8f3ff;border-color:#d6e8ff}
-    .msg.ai{margin-right:auto}
-    .msg .time{font-size:.75rem;color:#64748b;margin-top:.25rem}
-    .typing{display:inline-block;min-width:38px}
-    .typing span{display:inline-block;width:6px;height:6px;margin:0 1px;background:#94a3b8;border-radius:50%;animation:bounce 1s infinite}
-    .typing span:nth-child(2){animation-delay:.15s}
-    .typing span:nth-child(3){animation-delay:.3s}
-    @keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
-    .chat-input-wrap{display:flex;gap:.5rem;padding:.75rem;border-top:1px solid #e5efff;background:#fff}
-    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:.65rem .85rem;border-radius:.6rem;box-shadow:0 10px 24px rgba(0,0,0,.25);opacity:0;transform:translateY(10px);transition:.2s}
-    .toast.show{opacity:1;transform:translateY(0)}
-    .badge-blue{display:inline-flex;align-items:center;background:#e9f2ff;border:1px solid var(--border);color:#2563eb;border-radius:999px;font-size:.75rem;padding:.15rem .5rem;font-weight:700}
-    .right-col{height:540px;overflow:auto}
-    .doctor-mini{display:flex;gap:.7rem;align-items:center;padding:.6rem;border:1px solid var(--border);border-radius:.8rem;background:#fff}
+    /* ===== Emergency bar (from demo) ===== */
+    .emergency-bar{background:linear-gradient(135deg,#f44336,#e57373);color:#fff;padding:12px;border-radius:10px;text-align:center;cursor:pointer;box-shadow:0 10px 24px rgba(244,67,54,.25)}
+    .emergency-bar:hover{transform:translateY(-1px)}
+
+    /* ===== Quick Actions (from demo) ===== */
+    .qa-grid{display:grid;gap:10px;grid-template-columns:repeat(4,1fr);max-width:720px;margin:8px auto 0}
+    .qa-btn{background:#f8fbff;border:1px solid var(--border);border-radius:12px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+    .qa-btn:hover{background:#eef6ff}
+    .qa-icon{font-size:22px}
+    .qa-sub{font-size:.72rem;color:#64748b}
+    @media(max-width:640px){.qa-grid{grid-template-columns:repeat(4,1fr)}}
+
+    /* ===== Floating AI button (from demo) ===== */
+    .ai-fab{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff;box-shadow:0 8px 24px rgba(59,130,246,.35);cursor:pointer;z-index:80}
+
   </style>
 </head>
 <body>
@@ -130,17 +121,21 @@
         <img src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/> {{ $vet->name }}
       </div>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
- <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/backend/custom-doctor-register'">Login</button>
-      <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/backend/custom-doctor-register'">Register</button>
+        <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/backend/custom-doctor-register'">Login</button>
+        <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/backend/custom-doctor-register'">Register</button>
       </div>
     </div>
   </nav>
 
-  <!-- ===== HERO (Screenshot-like) ===== -->
+  <!-- Emergency CTA -->
+  <section class="container" style="padding:10px 0 0">
+    <div class="emergency-bar" onclick="emergency()">🚨 EMERGENCY - TAP FOR INSTANT CONNECT</div>
+  </section>
+
+  <!-- ===== HERO (compact) ===== -->
   <section class="container ai-hero">
     <div class="ai-pill">🩺 AI-Powered Pet Care Assistant</div>
     <h1>{{ $vet->name }} – Your AI Pet Companion for <span class="accent">Smart Pet Care</span></h1>
-
     <p class="sub">Intelligent pet care guidance, health advice, and training tips powered by advanced AI technology</p>
 
     <!-- Search-like Ask Bar -->
@@ -152,30 +147,38 @@
       </button>
     </div>
     <div class="ai-hint">Ask anything about your pet's health, behavior, or training</div>
+
+    <!-- Demo buttons ported: Analyze + Quick Actions -->
+    <div style="max-width:720px;margin:8px auto 0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="checkSymptoms()">🤖 Analyze Symptoms</button>
+    </div>
+    <div class="qa-grid">
+      <button class="qa-btn" onclick="videoCall()"><div class="qa-icon">📹</div><div>Video Call</div><div class="qa-sub">₹299</div></button>
+      <button class="qa-btn" onclick="bookClinic()"><div class="qa-icon">🏥</div><div>Book Visit</div><div class="qa-sub">Available</div></button>
+      <button class="qa-btn" onclick="getRecords()"><div class="qa-icon">📋</div><div>Records</div><div class="qa-sub">Access</div></button>
+      <button class="qa-btn" onclick="refillMeds()"><div class="qa-icon">💊</div><div>Refill</div><div class="qa-sub">Order</div></button>
+    </div>
   </section>
 
-  <!-- Hero (Clinic profile) -->
-  <header class="container section" style="text-align:center">
+  <!-- Clinic profile CTA row -->
+  <header class="container" style="text-align:center;padding:12px 0 8px">
     <span class="tag">🏥 Clinic Profile • {{ $vet->business_status === 'OPERATIONAL' ? 'Open' : 'Status Unknown' }}</span>
-    <h1 class="heading" style="font-size:2.25rem;margin:.9rem 0">{{ $vet->name }}</h1>
-    <p class="muted" style="max-width:820px;margin:0 auto 1.25rem">
+    <h1 class="heading" style="font-size:2rem;margin:.7rem 0">{{ $vet->name }}</h1>
+    <p class="muted" style="max-width:820px;margin:0 auto 1rem">
       {{ $vet->formatted_address ?? $vet->address ?? ($vet->city ?? '') }}
       @if($vet->pincode) • {{ $vet->pincode }} @endif
       @if(!is_null($vet->open_now)) • {{ $vet->open_now ? 'Open now' : 'Closed now' }} @endif
     </p>
-    <div style="display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;margin-top:1rem">
+    <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:.5rem">
       <a class="btn btn-primary" href="#book"><i class="fa-solid fa-calendar-check"></i> Book Appointment</a>
-      @if($vet->mobile)
-        <a class="btn btn-outline" href="tel:{{ $vet->mobile }}"><i class="fa-solid fa-phone"></i> Call Clinic</a>
-      @endif
-      <a class="btn btn-outline" id="video-consult-btn" href="/video?vet_slug={{ $vet->slug }}">
-        <i class="fa-solid fa-video"></i> Start Video Consult
-      </a>
+      @php $clinicPhone = $vet->mobile ?? null; @endphp
+      <a class="btn btn-outline" href="{{ $clinicPhone ? 'tel:'.$clinicPhone : 'javascript:void(0)' }}"><i class="fa-solid fa-phone"></i> Call Clinic</a>
+      <a class="btn btn-outline" id="video-consult-btn" href="/video?vet_slug={{ $vet->slug }}"><i class="fa-solid fa-video"></i> Start Video Consult</a>
     </div>
   </header>
 
   <!-- Quick stats -->
-  <section class="container" style="margin-top:-.25rem">
+  <section class="container" style="margin-top:-.1rem">
     <div class="grid grid-3">
       <div class="card" style="padding:1.1rem;text-align:center">
         <div style="font-size:1.4rem;font-weight:800;color:var(--success)">{{ number_format((float)($vet->rating ?? 4.7), 1) }}★</div>
@@ -210,9 +213,7 @@
                 @if($doc->doctor_email) <a href="mailto:{{ $doc->doctor_email }}" style="color:var(--accent)">Email</a>@endif
               </div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
-                @if($doc->doctor_mobile)
-                  <a class="pill" href="tel:{{ $doc->doctor_mobile }}"><i class="fa-solid fa-phone"></i>&nbsp;Call</a>
-                @endif
+                <a class="pill" href="{{ $doc->doctor_mobile ? 'tel:'.$doc->doctor_mobile : 'javascript:void(0)' }}"><i class="fa-solid fa-phone"></i>&nbsp;Call</a>
                 <a class="pill" href="/video?vet_slug={{ $vet->slug }}"><i class="fa-solid fa-video"></i>&nbsp;Video Consult</a>
               </div>
             </div>
@@ -261,10 +262,8 @@
         <input type="hidden" name="vet_slug" value="{{ $vet->slug }}"/>
         <div style="grid-column:1/-1;display:flex;gap:.75rem;flex-wrap:wrap">
           <button class="btn btn-primary" type="submit"><i class="fa-solid fa-arrow-right"></i> Continue</button>
-          @php $digits = $vet->mobile ? preg_replace('/\D+/', '', $vet->mobile) : null; @endphp
-          @if($digits)
-            <a class="btn btn-outline" href="https://wa.me/{{ $digits }}?text={{ urlencode('Hi, I want to book at '.$vet->name) }}"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>
-          @endif
+          @php $digits = $vet->mobile ? preg_replace('/[^0-9]+/', '', $vet->mobile) : null; @endphp
+          <a class="btn btn-outline" href="{{ $digits ? ('https://wa.me/'.$digits.'?text='.urlencode('Hi, I want to book at '.$vet->name)) : 'javascript:void(0)' }}"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>
         </div>
       </form>
       <p class="muted" style="margin-top:.75rem">Already a user? <a href="https://snoutiq.com/login" style="color:var(--accent)">Login</a> for faster booking.</p>
@@ -347,238 +346,69 @@
   <!-- Axios CDN -->
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
-  <!-- Chat Logic -->
+  <!-- Buttons logic from demo (alerts) + askbar redirect hook -->
   <script>
   (function() {
-    const API_BASE = 'https://snoutiq.com/backend/api';
     const vetSlug = @json($vet->slug);
-    const clinicId = @json($vet->id);
-    const userFromBlade = (window.SNOUTIQ && window.SNOUTIQ.user) ? window.SNOUTIQ.user : null;
-    const bearerToken = (window.SNOUTIQ && window.SNOUTIQ.token) || localStorage.getItem('token') || null;
 
-    // toast
-    const toast = {
-      el: null,
-      show(msg) {
-        if(!this.el) {
-          this.el = document.createElement('div');
-          this.el.className = 'toast';
-          document.body.appendChild(this.el);
-        }
-        this.el.textContent = msg;
-        this.el.classList.add('show');
-        setTimeout(()=> this.el.classList.remove('show'), 1800);
-      }
-    };
-
-    // state
-    let user = userFromBlade;
-    let token = bearerToken;
-    let currentRoom = localStorage.getItem('lastChatRoomToken') || '';
-    let contextToken = localStorage.getItem('contextToken') || '';
-    let messages = [];
-    let typingTimer = null;
-    let isSending = false;
-
-    const els = {
-      rooms: document.getElementById('rooms'),
-      msgs: document.getElementById('msgs'),
-      empty: document.getElementById('empty-state'),
-      input: document.getElementById('chat-input'),
-      send: document.getElementById('btn-send'),
-      clear: document.getElementById('btn-clear'),
-      newChat: document.getElementById('btn-new-chat'),
-      roomSubtitle: document.getElementById('room-subtitle'),
-      nearby: document.getElementById('nearby'),
-      heroInput: document.getElementById('top-ask'),
-      heroSend: document.getElementById('top-ask-send'),
-      chatSection: document.getElementById('ai-chat'),
-    };
-
-    const genId = () => Date.now() + Math.random();
-    const storageKey = (token) => token ? `chatMessages_${token}` : 'chatMessages';
-    const scrollToBottom = (smooth = true) => {
-      setTimeout(() => {
-        if (els.msgs) els.msgs.scrollTo({ top: els.msgs.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
-      }, 50);
-    };
-    function getToken(){ if (token) return token; token = localStorage.getItem('token'); return token; }
-    function getUser(){
-      if (user) return user;
-      try { const u = localStorage.getItem('user'); user = u ? JSON.parse(u) : null; } catch(e){}
-      return user;
-    }
-
-    function revealChat(){
-      if (els.chatSection && els.chatSection.style.display === 'none') {
-        els.chatSection.style.display = 'block';
-        location.hash = '#ai-chat';
-      }
-    }
-
-    // rooms
-    async function loadRooms() {
-      const u = getUser(); const t = getToken();
-      if (!u || !t) return;
-      try {
-        const res = await axios.get(`${API_BASE}/chat/listRooms?user_id=${u.id}`, { headers: { Authorization: `Bearer ${t}` }});
-        const data = Array.isArray(res.data) ? res.data : (res.data.rooms || res.data.data || []);
-        renderRooms(data);
-      } catch(e){ console.error(e); }
-    }
-    function renderRooms(rooms){
-      if (!els.rooms) return;
-      els.rooms.innerHTML = '';
-      if (!rooms || rooms.length === 0) { els.rooms.innerHTML = `<div class="room-item muted">No rooms</div>`; return; }
-      rooms.forEach(r => {
-        const token = r.chat_room_token || r.token || r.room_token || r.id || '';
-        const title = r.title || r.last_question || ('Room ' + String(token).slice(-6));
-        const el = document.createElement('div');
-        el.className = 'room-item' + (token === currentRoom ? ' active' : '');
-        el.innerHTML = `<div style="font-weight:700">${title}</div>
-                        <div class="muted" style="font-size:.8rem">${(r.updated_at || r.created_at || '').toString().slice(0,19)}</div>`;
-        el.onclick = () => openRoom(token);
-        els.rooms.appendChild(el);
-      });
-    }
-
-    async function openRoom(roomToken){
-      const u = getUser(); const t = getToken();
-      if (!u || !t) { toast.show('Login required'); return; }
-      currentRoom = roomToken || '';
-      localStorage.setItem('lastChatRoomToken', currentRoom);
-
-      const saved = localStorage.getItem(storageKey(currentRoom));
-      messages = saved ? JSON.parse(saved) : [];
-      renderMessages();
-
-      try {
-        const url = currentRoom
-          ? `${API_BASE}/chat-rooms/${currentRoom}/chats?user_id=${u.id}`
-          : `${API_BASE}/chat/listRooms?user_id=${u.id}`;
-        const res = await axios.get(url, { headers: { Authorization: `Bearer ${t}` } });
-        let msgs = [];
-        if (res.data && res.data.chats) {
-          msgs = res.data.chats.flatMap(chat => {
-            const baseId = Number(new Date(chat.created_at)) + Math.random();
-            return [
-              { id: baseId + 1, sender:'user', text: chat.question, displayedText: chat.question, ts: chat.created_at },
-              { id: baseId + 2, sender:'ai', text: chat.answer,  displayedText: chat.answer,  ts: chat.created_at }
-            ];
-          });
-        }
-        if (msgs.length) { messages = msgs; persistMessages(); renderMessages(); }
-      } catch(e){ console.error(e); }
-    }
-
-    function renderMessages(){
-      if (!els.msgs || !els.empty) return;
-      els.msgs.innerHTML = '';
-      if (!messages.length) {
-        els.msgs.appendChild(els.empty);
-        els.empty.style.display = 'flex';
-        if (els.roomSubtitle) els.roomSubtitle.textContent = currentRoom ? `Room: ${currentRoom}` : '';
-        return;
-      }
-      els.empty.style.display = 'none';
-      messages.forEach(m => {
-        const div = document.createElement('div');
-        div.className = 'msg ' + (m.sender === 'user' ? 'user' : 'ai');
-        div.innerHTML = `<div>${(m.displayedText ?? m.text ?? '').replace(/\n/g,'<br>')}</div>
-                         <div class="time">${new Date(m.timestamp || m.ts || Date.now()).toLocaleString()}</div>`;
-        els.msgs.appendChild(div);
-      });
-      const end = document.createElement('div'); end.style.height = '1px'; els.msgs.appendChild(end);
-      if (els.roomSubtitle) els.roomSubtitle.textContent = currentRoom ? `Room: ${currentRoom}` : '';
-      scrollToBottom();
-    }
-    function persistMessages(){ localStorage.setItem(storageKey(currentRoom), JSON.stringify(messages)); }
-
-    function typeAI(fullText, id){
-      let idx = 0; const batch = 3, speed = 25;
-      if (typingTimer) clearTimeout(typingTimer);
-      const step = () => {
-        const target = messages.find(m => m.id === id); if (!target) return;
-        target.displayedText = fullText.slice(0, Math.min(idx + batch, fullText.length));
-        renderMessages(); idx += batch;
-        if (idx < fullText.length) typingTimer = setTimeout(step, speed);
-      };
-      setTimeout(step, 250);
-    }
-
-    // ✅ ALWAYS redirect to custom-doctor-register (with prefill + next + vet_slug)
     function loginRedirect(prefill = "") {
-      try {
-        if (prefill) localStorage.setItem("pendingChatQuestion", prefill);
-      } catch(_) {}
-      const params = new URLSearchParams({
-        next: location.href,
-        source: "chat",
-        vet_slug: (typeof vetSlug !== "undefined" ? vetSlug : "")
-      });
+      try { if (prefill) localStorage.setItem("pendingChatQuestion", prefill); } catch(_) {}
+      const params = new URLSearchParams({ next: location.href, source: "chat", vet_slug: (typeof vetSlug !== "undefined" ? vetSlug : "") });
       if (prefill) params.set("prefill", prefill);
       location.href = `backend/custom-doctor-register?${params.toString()}`;
     }
 
-    // ✅ Hero ask bar → redirect
-    function sendFromHero(){
-      const text = (els.heroInput?.value || '').trim();
-      if (!text) return;
-      loginRedirect(text);
-    }
+    // Ask bar → redirect
+    document.getElementById('top-ask-send')?.addEventListener('click', ()=> {
+      const v = (document.getElementById('top-ask')?.value || '').trim(); if (!v) return; loginRedirect(v);
+    });
+    document.getElementById('top-ask')?.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); const v=e.target.value.trim(); if (v) loginRedirect(v); }});
 
-    // ✅ Chat send → redirect
-    async function sendMessage(){
-      const text = (els.input?.value || '').trim();
-      if (!text || isSending) return;
-      loginRedirect(text);
-      return;
-    }
+    // === Demo button handlers ===
+    window.emergency = function(){
+      alert('🚨 EMERGENCY ACTIVATED
 
-    function clearChat(){ if (!confirm('Clear this chat?')) return; messages = []; persistMessages(); renderMessages(); toast.show('Chat cleared'); }
-    function newChat(){ currentRoom = ''; localStorage.removeItem('lastChatRoomToken'); messages = []; renderMessages(); toast.show('New chat'); }
+Connecting to emergency vet...
+Dr. on-call responding shortly.');
+    };
+    window.checkSymptoms = function(){
+      const v = (document.getElementById('top-ask')?.value || '').trim();
+      if(!v) return alert('Please describe symptoms in the ask bar first.');
+      alert(`🤖 AI ANALYSIS
 
-    async function loadNearbyDoctors(){
-      const u = getUser(); const t = getToken(); if (!u || !t || !els.nearby) return;
-      try{
-        const res = await axios.get(`${API_BASE}/nearby-vets?user_id=${u.id}`, { headers: { Authorization: `Bearer ${t}` }});
-        const docs = res.data?.data || [];
-        els.nearby.innerHTML = '';
-        docs.slice(0,8).forEach(d => {
-          const card = document.createElement('div'); card.className='doctor-mini';
-          card.innerHTML = `
-            <img src="${d.image || 'https://placehold.co/56x56?text=Dr'}" style="width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid var(--border)" />
-            <div style="flex:1">
-              <div style="font-weight:700">${d.name || d.clinic_name || 'Doctor'}</div>
-              <div class="muted" style="font-size:.85rem">${d.city || ''}</div>
-              <div style="margin-top:.35rem;display:flex;gap:.4rem;flex-wrap:wrap">
-                ${d.mobile ? `<a class="pill" href="tel:${d.mobile}"><i class="fa-solid fa-phone"></i>&nbsp;Call</a>`:''}
-                <a class="pill" href="/video?vet_slug=${encodeURIComponent(d.slug || vetSlug)}"><i class="fa-solid fa-video"></i>&nbsp;Video</a>
-              </div>
-            </div>`;
-          els.nearby.appendChild(card);
-        });
-      } catch(e){ console.log('nearby doctors error', e); }
-    }
+"${v}"
 
-    // listeners (safe with optional chaining)
-    els.send?.addEventListener('click', sendMessage);
-    els.input?.addEventListener('keydown', (e)=> { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }});
-    els.clear?.addEventListener('click', clearChat);
-    els.newChat?.addEventListener('click', newChat);
-    els.heroSend?.addEventListener('click', sendFromHero);
-    els.heroInput?.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') { e.preventDefault(); sendFromHero(); }});
+Recommendation: Video consultation
+Urgency: Medium
+Doctor available now.`);
+    };
+    window.videoCall = function(){ alert('📹 VIDEO CONSULTATION
 
-    // init
-    (function init(){
-      if (!getToken()) console.warn('No token found. Redirect will still work on send.');
-      loadRooms();
-      loadNearbyDoctors();
-      if (currentRoom) { revealChat(); openRoom(currentRoom); }
-      setInterval(loadNearbyDoctors, 5*60*1000);
-    })();
+Doctor available: NOW
+Cost: ₹299
+Duration: 15–20 mins'); };
+    window.bookClinic = function(){ alert('🏥 IN-CLINIC BOOKING
+
+Next available:
+Today 4:30 PM
+Tomorrow 10:00 AM'); };
+    window.getRecords = function(){ alert('📋 MEDICAL RECORDS
+
+Last visit: Dec 15, 2024
+Vaccinations: Up to date
+Next checkup: Mar 15, 2025'); };
+    window.refillMeds = function(){ alert('💊 MEDICINE REFILL
+
+Delivery: Tomorrow
+Cost: ₹450'); };
+    window.openChat = function(){ alert('🎩 VETCARE AI CONCIERGE
+
+How can I help you today?'); };
   })();
   </script>
+
+  <!-- Floating AI button -->
+  <button class="ai-fab" onclick="openChat()" aria-label="Open AI Assistant">🎩</button>
 
   <noscript>
     <img height="1" width="1" style="display:none"
