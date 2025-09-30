@@ -310,7 +310,7 @@
   // ===== Add Service form logic =====
   (function(){
     const $ = s => document.querySelector(s);
-    const API_POST_SVC = 'backend/api/groomer/service'; // API prefix used
+    const API_POST_SVC = '/api/groomer/service'; // API prefix used
 
     const els = {
       openBtn: $('#btn-add-service'),

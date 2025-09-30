@@ -298,11 +298,11 @@
 
   // ===== Services LICRUD (your existing script, unchanged) =====
   const API = {
-    list:   'backend/api/groomer/services',
-    create: 'backend/api/groomer/service',
-    show:   id => `backend/api/groomer/service/${id}`,
-    update: id => `backend/api/groomer/service/${id}/update`,
-    delete: id => `backend/api/groomer/service/${id}`
+    list:   '/api/groomer/services',
+    create: '/api/groomer/service',
+    show:   id => `/api/groomer/service/${id}`,
+    update: id => `/api/groomer/service/${id}/update`,
+    delete: id => `/api/groomer/service/${id}`
   };
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const authHeaders = token ? { 'Authorization': 'Bearer ' + token } : {};
