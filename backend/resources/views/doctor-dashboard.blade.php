@@ -373,7 +373,7 @@
         // Swal.fire({icon:'success', title:'Saving...', timer:700, showConfirmButton:false});
 
         // Redirect
-        const to = (PATH_PREFIX || '') + '/doctor';
+        const to = (PATH_PREFIX || '') + '/backend/doctor';
         window.location.href = to;
 
       }catch(err){
