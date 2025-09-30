@@ -12,7 +12,8 @@ class ServiceController extends Controller
 {
     public function get(Request $request){
        try {
-            $services = GroomerService::where('user_id', $request->user()->id)
+        $uid=session('user_id') ??'1';
+            $services = GroomerService::where('user_id', $uid)
                 ->with('category')
                 ->get();
 
@@ -250,6 +251,35 @@ class ServiceController extends Controller
                 'status' => false,
                 'message' => 'Failed to update service',
                 'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+        public function destroy(Request $request, $id)
+    {
+        try {
+            $service = GroomerService::where('id', $id)
+                        ->where('user_id', $request->user()->id) // apne hi service delete
+                        ->firstOrFail();
+
+            $service->delete();
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Service deleted successfully'
+            ], 200);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Service not found'
+            ], 404);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Failed to delete service',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }

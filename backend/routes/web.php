@@ -124,3 +124,8 @@ Route::get('/clinic-dashboard', fn () => view('clinic-dashboard'))
 
 
 
+    Route::view('/dashboard/services', 'groomer.services.index')->name('groomer.services.index');
+
+
+
+
