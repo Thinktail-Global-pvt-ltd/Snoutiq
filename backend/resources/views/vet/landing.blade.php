@@ -110,6 +110,33 @@
     /* ===== Floating AI button (from demo) ===== */
     .ai-fab{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff;box-shadow:0 8px 24px rgba(59,130,246,.35);cursor:pointer;z-index:80}
 
+      /* ===== Reels, Reviews, Offers (new) ===== */
+    .reel-grid{display:grid;gap:14px;grid-template-columns:repeat(2,1fr)}
+    @media(min-width:768px){.reel-grid{grid-template-columns:repeat(4,1fr)}}
+    .reel-card{position:relative;height:160px;border-radius:14px;border:1px solid var(--border);background:linear-gradient(180deg,#e8eefc,#cbd8ff 65%,#b4c4ff);box-shadow:0 8px 22px -12px rgba(37,99,235,.25);overflow:hidden;display:flex;align-items:flex-end}
+    .reel-card .reel-play{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:999px;background:#5aa3ff;display:grid;place-items:center;color:#fff;font-size:20px;box-shadow:0 8px 18px rgba(59,130,246,.35)}
+    .reel-title{width:100%;padding:10px 12px;background:linear-gradient(180deg,rgba(15,23,42,0),rgba(15,23,42,.05));color:#0f172a;font-weight:700}
+
+    .reviews-card{padding:10px;border-radius:12px;background:#eaf3ff;color:var(--text);border:1px solid var(--border)}
+    .reviews-card .bar{display:flex;align-items:center;gap:.5rem;font-weight:800;background:#e1edff;border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:.6rem .8rem;margin-bottom:.75rem}
+    .rev-item{background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:.7rem .9rem;color:var(--text)}
+    .rev-item + .rev-item{margin-top:.6rem}
+
+    .offers-grid{display:grid;gap:14px;grid-template-columns:repeat(1,1fr)}
+    @media(min-width:768px){.offers-grid{grid-template-columns:repeat(3,1fr)}}
+    .offer-card{position:relative;background:#eaf3ff;border:1px solid var(--border);border-radius:14px;padding:14px;color:var(--text);box-shadow:0 10px 28px rgba(37,99,235,.12)}
+    .offer-title{font-weight:800;margin-bottom:.15rem}
+    .offer-sub{color:#a6b6d6;font-size:.9rem;margin-bottom:.5rem}
+    .price-old{text-decoration:line-through;color:#8296bf;margin-right:.5rem}
+    .price-new{color:#60a5fa;font-weight:800}
+    .badge{position:absolute;right:10px;top:10px;border-radius:999px;font-size:.72rem;padding:.2rem .5rem;font-weight:800}
+    .badge-pink{background:#f472b6;color:#fff}
+    .badge-purple{background:#a78bfa;color:#fff}
+    .badge-blue{background:#60a5fa;color:#0b1220}
+      /* ===== Quick Services (chips) ===== */
+    .qsvc-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+    .qsvc-btn{background:#ecf3ff;border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:10px 12px;text-align:center;font-weight:800}
+    .qsvc-btn:hover{background:#e6f0ff}
   </style>
 </head>
 <body>
@@ -127,38 +154,9 @@
     </div>
   </nav>
 
-  <!-- Emergency CTA -->
-  <section class="container" style="padding:10px 0 0">
-    <div class="emergency-bar" onclick="emergency()">🚨 EMERGENCY - TAP FOR INSTANT CONNECT</div>
-  </section>
+  
 
-  <!-- ===== HERO (compact) ===== -->
-  <section class="container ai-hero">
-    <div class="ai-pill">🩺 AI-Powered Pet Care Assistant</div>
-    <h1>{{ $vet->name }} – Your AI Pet Companion for <span class="accent">Smart Pet Care</span></h1>
-    <p class="sub">Intelligent pet care guidance, health advice, and training tips powered by advanced AI technology</p>
-
-    <!-- Search-like Ask Bar -->
-    <div class="askbar">
-      <i class="fa-solid fa-microphone-lines"></i>
-      <input id="top-ask" placeholder="Ask anything about your pet"/>
-      <button id="top-ask-send" class="send" aria-label="Send">
-        <i class="fa-solid fa-paper-plane"></i>
-      </button>
-    </div>
-    <div class="ai-hint">Ask anything about your pet's health, behavior, or training</div>
-
-    <!-- Demo buttons ported: Analyze + Quick Actions -->
-    <div style="max-width:720px;margin:8px auto 0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-      <button class="btn btn-outline" onclick="checkSymptoms()">🤖 Analyze Symptoms</button>
-    </div>
-    <div class="qa-grid">
-      <button class="qa-btn" onclick="videoCall()"><div class="qa-icon">📹</div><div>Video Call</div><div class="qa-sub">₹299</div></button>
-      <button class="qa-btn" onclick="bookClinic()"><div class="qa-icon">🏥</div><div>Book Visit</div><div class="qa-sub">Available</div></button>
-      <button class="qa-btn" onclick="getRecords()"><div class="qa-icon">📋</div><div>Records</div><div class="qa-sub">Access</div></button>
-      <button class="qa-btn" onclick="refillMeds()"><div class="qa-icon">💊</div><div>Refill</div><div class="qa-sub">Order</div></button>
-    </div>
-  </section>
+  
 
   <!-- Clinic profile CTA row -->
   <header class="container" style="text-align:center;padding:12px 0 8px">
@@ -176,6 +174,78 @@
       <a class="btn btn-outline" id="video-consult-btn" href="/video?vet_slug={{ $vet->slug }}"><i class="fa-solid fa-video"></i> Start Video Consult</a>
     </div>
   </header>
+
+  <!-- Inline ask box just below clinic title -->
+  <div class="container" id="clinic-ask-wrap" style="text-align:center;padding:6px 0 10px">
+    <div class="askbar" style="max-width:720px;margin:0 auto">
+      <i class="fa-solid fa-microphone-lines"></i>
+      <input id="clinic-ask-input" placeholder="Ask anything about your pet"/>
+      <button id="clinic-ask-send" class="send" aria-label="Send">
+        <i class="fa-solid fa-paper-plane"></i>
+      </button>
+    </div>
+    <div class="ai-hint">AI-generated advice. Consult a licensed veterinarian.</div>
+  </div>
+
+  <!-- Quick Services -->
+  <section class="container" id="quick-services" style="padding:0 1rem 1.25rem">
+    <div class="reviews-card">
+      <div class="bar"><span>⚡</span> <span>Quick Services</span></div>
+      <div class="qsvc-grid">
+        <a class="qsvc-btn" href="#book">Checkup ₹499</a>
+        <a class="qsvc-btn" href="#book">Vaccination ₹299</a>
+        <a class="qsvc-btn" href="#book">Grooming ₹599</a>
+        <a class="qsvc-btn" href="#book">Dental ₹799</a>
+        <a class="qsvc-btn" href="#book">Surgery ₹1299</a>
+        <a class="qsvc-btn" href="#book">Home Visit ₹1099</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Clinic Reels -->
+  <section class="container section" id="reels">
+    <h2 class="heading">Clinic Reels</h2>
+    <div class="reel-grid" style="margin-top:.8rem">
+      <a class="reel-card" href="#"><div class="reel-play">▶</div><div class="reel-title">Meet Dr. Sarah</div></a>
+      <a class="reel-card" href="#"><div class="reel-play">▶</div><div class="reel-title">Clinic Tour</div></a>
+      <a class="reel-card" href="#"><div class="reel-play">▶</div><div class="reel-title">Success Story</div></a>
+      <a class="reel-card" href="#"><div class="reel-play">▶</div><div class="reel-title">Our Services</div></a>
+    </div>
+  </section>
+
+  <!-- Reviews -->
+  <section class="container" id="reviews" style="padding:0 1rem 2rem">
+    <div class="reviews-card">
+      <div class="bar"><span>⭐</span> <span>Reviews (4.9/5)</span></div>
+      <div class="rev-item"><div style="font-weight:800;margin-bottom:.2rem">Priya S.</div><div>"AI diagnosis was perfect! Quick video call saved my cat."</div></div>
+      <div class="rev-item"><div style="font-weight:800;margin-bottom:.2rem">Rakesh M.</div><div>"Emergency service at 2 AM. Excellent response time."</div></div>
+    </div>
+  </section>
+
+  <!-- Current Offers -->
+  <section class="container section" id="offers">
+    <h2 class="heading">Current Offers</h2>
+    <div class="offers-grid" style="margin-top:1rem">
+      <div class="offer-card">
+        <div class="badge badge-pink">50% OFF</div>
+        <div class="offer-title">New Pet Package</div>
+        <div class="offer-sub">Complete checkup + vaccines</div>
+        <div><span class="price-old">₹1,998</span><span class="price-new">₹999</span></div>
+      </div>
+      <div class="offer-card">
+        <div class="badge badge-purple">LIMITED</div>
+        <div class="offer-title">Emergency Plan</div>
+        <div class="offer-sub">24/7 support for 1 year</div>
+        <div><span class="price-new">₹1,999/year</span></div>
+      </div>
+      <div class="offer-card">
+        <div class="badge badge-blue">NEW</div>
+        <div class="offer-title">AI Health Monitor</div>
+        <div class="offer-sub">Wearable + monthly reports</div>
+        <div><span class="price-new">₹899/month</span></div>
+      </div>
+    </div>
+  </section>
 
   <!-- Quick stats -->
   <section class="container" style="margin-top:-.1rem">
@@ -223,7 +293,7 @@
     @endif
   </section>
 
-  <!-- Booking -->
+  <!-- Booking --><!-- Booking -->
   <section class="container section" id="book">
     <h2 class="heading">Book Appointment</h2>
     <div class="card" style="padding:1rem;margin-top:1rem">
@@ -250,6 +320,7 @@
         <div>
           <label for="doctor_id">Choose Doctor</label>
           <select id="doctor_id" name="doctor_id" class="select">
+            @php $doctors = $vet->doctors()->orderBy('doctor_name')->get(); @endphp
             @foreach($doctors as $doc)
               <option value="{{ $doc->id }}">{{ $doc->doctor_name }}</option>
             @endforeach
@@ -358,11 +429,16 @@
       location.href = `backend/custom-doctor-register?${params.toString()}`;
     }
 
-    // Ask bar → redirect
-    document.getElementById('top-ask-send')?.addEventListener('click', ()=> {
-      const v = (document.getElementById('top-ask')?.value || '').trim(); if (!v) return; loginRedirect(v);
-    });
-    document.getElementById('top-ask')?.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); const v=e.target.value.trim(); if (v) loginRedirect(v); }});
+    // Ask bar → redirect (header inline + legacy)
+    const sendAsk = (id) => {
+      const v = (document.getElementById(id)?.value || '').trim();
+      if (!v) return; loginRedirect(v);
+    };
+    document.getElementById('clinic-ask-send')?.addEventListener('click', ()=> sendAsk('clinic-ask-input'));
+    document.getElementById('clinic-ask-input')?.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); sendAsk('clinic-ask-input'); }});
+    // legacy hero ids (safe no-ops if not present)
+    document.getElementById('top-ask-send')?.addEventListener('click', ()=> sendAsk('top-ask'));
+    document.getElementById('top-ask')?.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); sendAsk('top-ask'); }});
 
     // === Demo button handlers ===
     window.emergency = function(){
