@@ -161,7 +161,7 @@ Route::get('/users-db', function () {
     $users = DB::table('users')->get();
     return response()->json($users);
 });
- Route::post('groomer/service', [GroomerServiceController::class, 'store']);
+ 
 
 // using Eloquent Model
 Route::get('/users', function () {
@@ -358,9 +358,11 @@ Route::post('/chat/unified/reset', [GeminiChatController::class, 'unifiedReset']
 
 Route::prefix('groomer')->group(function () {
     Route::get('/services', [GroomerServiceController::class, 'get']);            // list
-    Route::post('/service', [GroomerServiceController::class, 'store']);          // create
+  //  Route::post('/service', [GroomerServiceController::class, 'store']);          // create
     Route::get('/service/{id}', [GroomerServiceController::class, 'view']);       // view single
     Route::post('/service/{id}/update', [GroomerServiceController::class, 'update']); // update
     Route::delete('/service/{id}', [GroomerServiceController::class, 'destroy']); // <-- NEW: delete
 });
+
+Route::post('groomer/service', [GroomerServiceController::class, 'store']);
 
