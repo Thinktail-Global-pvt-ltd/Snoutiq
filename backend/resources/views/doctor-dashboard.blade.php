@@ -317,7 +317,8 @@
 (function(){
   const $ = s => document.querySelector(s);
 
-  const API_POST_SVC = API_BASE + '/groomer/service';
+ // const API_POST_SVC = API_BASE + '/groomer/service';
+    const API_POST_SVC = 'https://snoutiq.com/backend/api/groomer/service';
   const els = {
     openBtn: $('#btn-add-service'),
     modal:   $('#add-service-modal'),
