@@ -576,7 +576,42 @@ class GeminiChatController extends Controller
             'rooms'  => $rooms,
         ]);
     }
+    
+    public function deleteRoom(Request $request, string $chat_room_token)
+{
+    // ✅ Validate
+    $data = $request->validate([
+        'user_id' => 'required|integer',
+    ]);
 
+    // ✅ Room must belong to this user
+    $room = ChatRoom::where('chat_room_token', $chat_room_token)
+        ->where('user_id', $data['user_id'])
+        ->first();
+
+    if (!$room) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => 'Room not found for this user',
+        ], 404);
+    }
+
+    // ✅ Delete with transaction (delete chats first, then room)
+    \DB::transaction(function () use ($room, &$deletedChats) {
+        $deletedChats = Chat::where('chat_room_id', $room->id)->delete();
+        $room->delete();
+    });
+
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Chat room deleted successfully',
+        'deleted' => [
+            'chat_room_id' => $room->id,
+            'chat_room_token' => $room->chat_room_token,
+            'chats_deleted' => $deletedChats ?? 0,
+        ],
+    ]);
+}
     public function history(Request $request, string $chat_room_token = null)
     {
         $data = $request->validate([
