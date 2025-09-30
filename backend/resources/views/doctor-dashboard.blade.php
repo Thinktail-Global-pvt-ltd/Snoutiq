@@ -5,33 +5,42 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Doctor Dashboard</title>
+
+  <!-- UI libs -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
   <style>
     @keyframes ring{0%{transform:rotate(0)}10%{transform:rotate(15deg)}20%{transform:rotate(-15deg)}30%{transform:rotate(10deg)}40%{transform:rotate(-10deg)}50%{transform:rotate(5deg)}60%{transform:rotate(-5deg)}100%{transform:rotate(0)}}
     .ringing{animation:ring 1s infinite}
+    #client-logger{font-family:ui-monospace,Menlo,Consolas,monospace}
   </style>
 </head>
 <body class="h-screen bg-gray-50">
 
 @php
-  $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
+  // ===== Server-side config =====
+  $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/'); // e.g. "/backend" on prod
   $socketUrl  = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
+
+  // Resolve doctor id if available
   $serverCandidate = session('user_id')
         ?? data_get(session('user'), 'id')
         ?? optional(auth()->user())->id
         ?? request('doctorId');
   $serverDoctorId = $serverCandidate ? (int)$serverCandidate : null;
 
+  // Links
   $aiChatUrl   = ($pathPrefix ? "/$pathPrefix" : '') . '/pet-dashboard';
   $thisPageUrl = ($pathPrefix ? "/$pathPrefix" : '') . '/doctor' . ($serverDoctorId ? ('?doctorId=' . urlencode($serverDoctorId)) : '');
 @endphp
 
 <script>
-  const PATH_PREFIX = @json($pathPrefix ? "/$pathPrefix" : "");
-  const SOCKET_URL = @json($socketUrl);
-  const fromServer   = Number(@json($serverDoctorId ?? null)) || null;
+  // ===== Client globals from PHP =====
+  const PATH_PREFIX = @json($pathPrefix ? "/$pathPrefix" : ""); // "" on local, "/backend" on prod
+  const SOCKET_URL  = @json($socketUrl);
+  const fromServer  = Number(@json($serverDoctorId ?? null)) || null;
 
   const fromQuery = (()=> {
     const u = new URL(location.href);
@@ -49,14 +58,19 @@
   const af = readAuthFull();
   const fromStorage = (()=> {
     if(!af) return null;
-    const id1 = af.user_id;
-    const id2 = af.user && af.user.id;
+    const id1 = af?.user_id;
+    const id2 = af?.user?.id;
     return Number(id1 || id2) || null;
   })();
+
   const DOCTOR_ID = fromServer || fromQuery || fromStorage || 501;
+
+  // ✅ API base always correct ("/backend/api" on prod, "/api" on local)
+  const API_BASE = (PATH_PREFIX || '') + '/api';
 </script>
 
 <div class="flex h-full">
+  {{-- Sidebar --}}
   <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white">
     <div class="h-16 flex items-center px-6 border-b border-white/10">
       <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
@@ -83,7 +97,7 @@
         <span class="text-sm font-medium">Video Consultation</span>
       </a>
 
-      {{-- Services menu (hardcoded) --}}
+      {{-- Hardcoded Services link --}}
       <a href="http://snoutiq.com/backend/dashboard/services"
          class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -95,6 +109,7 @@
     </nav>
   </aside>
 
+  {{-- Main --}}
   <main class="flex-1 flex flex-col">
     <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
       <div class="flex items-center gap-3">
@@ -188,9 +203,12 @@
   </div>
 </div>
 
+{{-- Toast container (optional) --}}
 <div id="toast-wrap" class="fixed top-4 right-4 z-[80] space-y-2 pointer-events-none"></div>
 
-<!-- Add Service Modal -->
+<!-- ============================= -->
+<!-- Add Service Modal (opens on load; NO category field) -->
+<!-- ============================= -->
 <div id="add-service-modal" class="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-4xl p-6 relative">
     <button type="button" id="svc-close"
@@ -208,19 +226,22 @@
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Service Name</label>
-            <input id="svc-name" type="text" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
+            <input id="svc-name" type="text" placeholder="Enter Service Name, eg. Premium Grooming"
+                   class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
           </div>
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Duration (mins)</label>
-            <input id="svc-duration" type="number" min="1" step="1" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
+            <input id="svc-duration" type="number" min="1" step="1" placeholder="Enter Duration (In Mins)"
+                   class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
           </div>
         </div>
 
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Price (₹)</label>
-            <input id="svc-price" type="number" min="0" step="0.01" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
+            <input id="svc-price" type="number" min="0" step="0.01" placeholder="Enter Service price in ₹"
+                   class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
           </div>
 
           <div>
@@ -254,7 +275,8 @@
         <label class="block text-sm font-semibold text-gray-700 mb-1">
           Additional Notes <span class="font-normal text-gray-500">(Optional)</span>
         </label>
-        <textarea id="svc-notes" rows="4" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2"></textarea>
+        <textarea id="svc-notes" rows="4" placeholder="Add more details about the service"
+                  class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2"></textarea>
       </div>
 
       <div class="flex items-center justify-end gap-2 pt-2">
@@ -265,123 +287,13 @@
   </div>
 </div>
 
-<script>
-  // minimal socket ui helpers
-  let incomingCalls=[]; let activeModalCall=null; let isOnline=false; let connectionStatus='connecting'; let debugLogs=[];
-  const elLogs=document.getElementById('logs');
-  function addLog(m){ const ts=new Date().toLocaleTimeString(); const line=`${ts}: ${m}`; console.log(line); debugLogs=[...debugLogs.slice(-99),line]; if(elLogs){ elLogs.innerHTML=debugLogs.map(l=>`<div>${l}</div>`).join(''); elLogs.parentElement.scrollTop=elLogs.parentElement.scrollHeight; } }
-
-  // ===== Add Service (NO RELOAD/REDIRECT) =====
-  (function(){
-    const $ = s => document.querySelector(s);
-    const API_POST_SVC = '/api/groomer/service';
-
-    const els = {
-      openBtn: $('#btn-add-service'),
-      modal:   $('#add-service-modal'),
-      close:   $('#svc-close'),
-      cancel:  $('#svc-cancel'),
-      form:    $('#svc-form'),
-      submit:  $('#svc-submit'),
-      name:    $('#svc-name'),
-      duration:$('#svc-duration'),
-      price:   $('#svc-price'),
-      petType: $('#svc-pet-type'),
-      main:    $('#svc-main'),
-      notes:   $('#svc-notes'),
-    };
-
-    function show(el){ el.classList.remove('hidden'); }
-    function hide(el){ el.classList.add('hidden'); }
-    function loading(btn, on){
-      if(!btn) return;
-      btn.disabled = !!on;
-      btn.classList.toggle('opacity-60', !!on);
-      if(on){ btn.dataset.oldText = btn.textContent; btn.textContent = 'Saving...'; }
-      else if(btn.dataset.oldText){ btn.textContent = btn.dataset.oldText; delete btn.dataset.oldText; }
-    }
-    function bearer(){
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      return token ? { 'Authorization': 'Bearer ' + token } : {};
-    }
-    async function fetchJSON(url, opts={}){
-      const res = await fetch(url, opts);
-      const ct = res.headers.get('content-type') || '';
-      const body = ct.includes('application/json') ? await res.json() : await res.text();
-      if(!res.ok) throw {status: res.status, body};
-      return body;
-    }
-    function resetForm(){
-      els.form.reset();
-      // if browser doesn't clear selects by reset
-      els.petType.value = '';
-      els.main.value = '';
-    }
-
-    async function createService(e){
-      e.preventDefault(); // <- prevents page reload
-      const name     = els.name.value.trim();
-      const duration = Number(els.duration.value);
-      const price    = Number(els.price.value);
-      const petType  = els.petType.value;
-      const main     = els.main.value;
-      const notes    = els.notes.value.trim();
-
-      if(!name || !duration || !price || !petType || !main){
-        Swal.fire({icon:'warning', title:'Missing fields', text:'Please fill all required fields.'});
-        return;
-      }
-
-      loading(els.submit, true);
-      try{
-        const fd = new FormData();
-        fd.append('serviceName', name);
-        fd.append('description', notes);
-        fd.append('petType', petType);
-        fd.append('price', price);
-        fd.append('duration', duration);
-        fd.append('main_service', main);
-        fd.append('status', 'Active');
-
-        const data = await fetchJSON(API_POST_SVC, { method:'POST', headers:{ ...bearer() }, body: fd });
-
-        // success: DON'T redirect/reload
-        Swal.fire({icon:'success', title:'Service Created', text:'Your service has been created successfully.'});
-        resetForm();
-        // keep modal open so you can see result; close if you want:
-        // hide(els.modal);
-
-        if(window.ClientLog){ ClientLog.info('service.create.success', data); }
-      }catch(err){
-        const msg = (err && err.body && err.body.message) ? err.body.message
-                  : (err && err.body) ? (typeof err.body === 'string' ? err.body : JSON.stringify(err.body))
-                  : 'Error creating service';
-        Swal.fire({icon:'error', title:'Create failed', text: msg});
-        if(window.ClientLog){
-          ClientLog.error('service.create.failed', { status: err.status, body: err.body });
-          ClientLog.open(); // auto-open logger on error
-        }
-      }finally{
-        loading(els.submit, false);
-      }
-    }
-
-    // open on load so you can test instantly
-    document.addEventListener('DOMContentLoaded', ()=> { show(els.modal); });
-
-    els.form.addEventListener('submit', createService);
-    els.close.addEventListener('click', ()=>hide(els.modal));
-    els.cancel.addEventListener('click', ()=>hide(els.modal));
-    els.openBtn && els.openBtn.addEventListener('click', ()=>show(els.modal));
-  })();
-</script>
-
-<!-- ===== Frontend Logger ===== -->
-<style>#client-logger{font-family:ui-monospace,Menlo,Consolas,monospace}</style>
-<div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[380px] max-h-[65vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
+<!-- ===== Frontend Logger (toggle: Ctrl + `) ===== -->
+<div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[420px] max-h-[70vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
   <div class="flex items-center justify-between px-3 py-2 border-b">
     <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
     <div class="flex items-center gap-2">
+      <input id="log-token" placeholder="paste Bearer token…" class="px-2 py-1 rounded bg-gray-100 text-xs w-40">
+      <button id="log-token-save" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs">Save</button>
       <button id="log-download" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Download</button>
       <button id="log-clear" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Clear</button>
       <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">✕</button>
@@ -389,9 +301,22 @@
   </div>
   <div id="log-body" class="text-[11px] leading-4 text-gray-800 px-3 py-2 overflow-y-auto whitespace-pre-wrap"></div>
 </div>
-<button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">🪵 Logs (<span id="log-count">0</span>)</button>
+<button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">
+  🪵 Logs (<span id="log-count">0</span>)
+</button>
 
 <script>
+/* =========================
+   Minimal Diagnostics Setup
+========================= */
+document.getElementById('doctor-id').textContent = String(DOCTOR_ID);
+document.getElementById('toggle-diag').addEventListener('click', () => {
+  document.getElementById('diagnostics').classList.toggle('hidden');
+});
+
+/* =========================
+   Frontend Logger
+========================= */
 (function(){
   const ui = {
     panel:  document.getElementById('client-logger'),
@@ -401,22 +326,191 @@
     close:  document.getElementById('log-close'),
     clear:  document.getElementById('log-clear'),
     dl:     document.getElementById('log-download'),
+    tokenI: document.getElementById('log-token'),
+    tokenS: document.getElementById('log-token-save'),
   };
   const MAX=500, buf=[];
   function trunc(s,n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}; return s.length>n?s.slice(0,n)+'…':s; }
   function previewBody(b){ if(!b) return null; if(b instanceof FormData){const o={}; b.forEach((v,k)=>o[k]=typeof v==='string'?trunc(v,200):(v?.name?`<file:${v.name}>`:'<blob>')); return o;} if(typeof b==='string') return trunc(b,1000); return '<body>'; }
   function stamp(){return new Date().toISOString()}
-  function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); const m=meta==null?'':' '+trunc(typeof meta==='string'?meta:JSON.stringify(meta),2000); div.textContent=`[${row.t}] ${row.level.toUpperCase()} ${row.msg}${m}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
-  const Log={info:(m,d)=>push('info',m,d),warn:(m,d)=>push('warn',m,d),error:(m,d)=>push('error',m,d),net:(p,s,d)=>push('net:'+p,s,d),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{PATH_PREFIX:(typeof PATH_PREFIX!=='undefined')?PATH_PREFIX:null,SOCKET_URL:(typeof SOCKET_URL!=='undefined')?SOCKET_URL:null,DOCTOR_ID:(typeof DOCTOR_ID!=='undefined')?DOCTOR_ID:null,url:location.href,ua:navigator.userAgent},logs:buf})};
+  function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); const m=meta==null?'':' '+trunc(typeof meta==='string'?meta:JSON.stringify(meta),2000); div.textContent=`[${row.t}] ${level.toUpperCase()} ${msg}${m}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
+  const Log={info:(m,d)=>push('info',m,d),warn:(m,d)=>push('warn',m,d),error:(m,d)=>push('error',m,d),net:(t,s,d)=>push('net:'+t,s,d),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{PATH_PREFIX,API_BASE,SOCKET_URL,DOCTOR_ID,url:location.href,ua:navigator.userAgent,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token'))},logs:buf})};
   window.ClientLog=Log;
-  ui.toggle.addEventListener('click',Log.open); ui.close.addEventListener('click',Log.close); ui.clear.addEventListener('click',Log.clear);
+
+  // UI bindings
+  ui.toggle.addEventListener('click',Log.open);
+  ui.close.addEventListener('click',Log.close);
+  ui.clear.addEventListener('click',Log.clear);
   ui.dl.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(Log.dump(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='frontend-logs.json'; a.click(); URL.revokeObjectURL(a.href); });
+  ui.tokenS.addEventListener('click',()=>{ const t=ui.tokenI.value.trim(); if(!t) return; localStorage.setItem('token', t); sessionStorage.setItem('token', t); Swal.fire({icon:'success',title:'Token saved',timer:1200,showConfirmButton:false}); });
+
+  // keyboard toggle
   window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='`'){ e.preventDefault(); ui.panel.classList.toggle('hidden'); }});
+
+  // error hooks
   window.addEventListener('error',e=>Log.error('window.error',{message:e.message,file:e.filename,line:e.lineno,col:e.colno,stack:e.error&&e.error.stack}));
   window.addEventListener('unhandledrejection',e=>Log.error('unhandledrejection',{reason:e.reason&&(e.reason.stack||e.reason)}));
+
+  // fetch instrumentation
   const origFetch=window.fetch.bind(window);
-  window.fetch=async function(input,init={}){ const url=(typeof input==='string')?input:input.url; const method=(init?.method||(typeof input==='object'&&input.method)||'GET').toUpperCase(); const start=performance.now(); Log.net('request',`${method} ${url}`,{headers:init?.headers||{},body:previewBody(init?.body)}); try{ const res=await origFetch(input,init); const ms=Math.round(performance.now()-start); let bodyPreview=''; try{ const c=res.clone(); const ct=c.headers.get('content-type')||''; bodyPreview=ct.includes('application/json')?await c.text():`<${ct}>`; }catch(_){ } Log.net('response',`${method} ${url} → ${res.status} (${ms}ms)`,{ok:res.ok,status:res.status,duration_ms:ms,body:bodyPreview && bodyPreview.length>1500?bodyPreview.slice(0,1500)+'…':bodyPreview}); return res; }catch(err){ const ms=Math.round(performance.now()-start); Log.error('fetch.failed',{url,method,duration_ms:ms,error:err?.message||String(err)}); throw err; } };
-  Log.info('env',{PATH_PREFIX:(typeof PATH_PREFIX!=='undefined')?PATH_PREFIX:null,SOCKET_URL:(typeof SOCKET_URL!=='undefined')?SOCKET_URL:null,DOCTOR_ID:(typeof DOCTOR_ID!=='undefined')?DOCTOR_ID:null,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token'))});
+  window.fetch=async function(input,init={}){
+    const url=(typeof input==='string')?input:input.url;
+    const method=(init?.method||(typeof input==='object'&&input.method)||'GET').toUpperCase();
+    const start=performance.now();
+    Log.net('request',`${method} ${url}`,{headers:init?.headers||{},body:previewBody(init?.body)});
+    try{
+      const res=await origFetch(input,init);
+      const ms=Math.round(performance.now()-start);
+      let bodyPreview='';
+      try{
+        const c=res.clone(); const ct=c.headers.get('content-type')||'';
+        bodyPreview=ct.includes('application/json')?await c.text():`<${ct||'unknown'}>`;
+      }catch(_){}
+      Log.net('response',`${method} ${url} → ${res.status} (${ms}ms)`,{ok:res.ok,status:res.status,duration_ms:ms,body:bodyPreview && bodyPreview.length>1500?bodyPreview.slice(0,1500)+'…':bodyPreview});
+      return res;
+    }catch(err){
+      const ms=Math.round(performance.now()-start);
+      Log.error('fetch.failed',{url,method,duration_ms:ms,error:err?.message||String(err)});
+      throw err;
+    }
+  };
+
+  Log.info('env', { PATH_PREFIX, API_BASE, SOCKET_URL, DOCTOR_ID, token_present: !!(localStorage.getItem('token')||sessionStorage.getItem('token')) });
+})();
+</script>
+
+<script>
+/* =========================
+   Add Service (No reload)
+========================= */
+(function(){
+  const $ = s => document.querySelector(s);
+
+  // Endpoints
+  const API_POST_SVC = API_BASE + '/groomer/service';
+
+  // Elements
+  const els = {
+    openBtn: $('#btn-add-service'),
+    modal:   $('#add-service-modal'),
+    close:   $('#svc-close'),
+    cancel:  $('#svc-cancel'),
+    form:    $('#svc-form'),
+    submit:  $('#svc-submit'),
+    name:    $('#svc-name'),
+    duration:$('#svc-duration'),
+    price:   $('#svc-price'),
+    petType: $('#svc-pet-type'),
+    main:    $('#svc-main'),
+    notes:   $('#svc-notes'),
+  };
+
+  // Helpers
+  function show(el){ el.classList.remove('hidden'); }
+  function hide(el){ el.classList.add('hidden'); }
+  function loading(btn, on){
+    if(!btn) return;
+    btn.disabled = !!on;
+    btn.classList.toggle('opacity-60', !!on);
+    if(on){ btn.dataset.oldText = btn.textContent; btn.textContent = 'Saving...'; }
+    else if(btn.dataset.oldText){ btn.textContent = btn.dataset.oldText; delete btn.dataset.oldText; }
+  }
+  function authHeaders(){
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const h = { 'Accept': 'application/json' };
+    if (token) h['Authorization'] = 'Bearer ' + token;
+    return h;
+  }
+  function ensureAuthOrWarn(){
+    const hasToken = !!(localStorage.getItem('token') || sessionStorage.getItem('token'));
+    if (!hasToken) {
+      if (window.ClientLog) ClientLog.warn('no-token', { message: 'No Bearer token in storage' });
+      Swal.fire({ icon:'warning', title:'Not authenticated', text:'No login token found. Paste token in logger and save.' });
+      // open logger to paste token
+      if (window.ClientLog) ClientLog.open();
+      return false;
+    }
+    return true;
+  }
+  async function fetchJSON(url, opts={}){
+    const res = await fetch(url, { credentials: 'include', ...opts });
+    const ct = res.headers.get('content-type') || '';
+    const body = ct.includes('application/json') ? await res.json() : await res.text();
+    if(!res.ok) throw { status: res.status, body };
+    return body;
+  }
+  function resetForm(){
+    els.form.reset();
+    els.petType.value = '';
+    els.main.value = '';
+  }
+
+  // Submit handler
+  async function createService(e){
+    e.preventDefault(); // 🚫 no reload
+    const name     = els.name.value.trim();
+    const duration = Number(els.duration.value);
+    const price    = Number(els.price.value);
+    const petType  = els.petType.value;
+    const main     = els.main.value;
+    const notes    = els.notes.value.trim();
+
+    if(!name || !duration || !price || !petType || !main){
+      Swal.fire({icon:'warning', title:'Missing fields', text:'Please fill all required fields.'});
+      return;
+    }
+    if(!ensureAuthOrWarn()) return;
+
+    loading(els.submit, true);
+    try{
+      const fd = new FormData();
+      fd.append('serviceName', name);
+      fd.append('description', notes);
+      fd.append('petType', petType);
+      fd.append('price', price);
+      fd.append('duration', duration);
+      fd.append('main_service', main);
+      fd.append('status', 'Active');
+
+      if (window.ClientLog) ClientLog.net('request', `POST ${API_POST_SVC}`, {
+        headers: authHeaders(),
+        body: { serviceName:name, description:notes, petType, price, duration, main_service:main, status:'Active' }
+      });
+
+      const data = await fetchJSON(API_POST_SVC, {
+        method:'POST',
+        headers: authHeaders(),
+        body: fd,
+      });
+
+      Swal.fire({icon:'success', title:'Service Created', text:'Your service has been created successfully.'});
+      resetForm();
+
+      if (window.ClientLog) ClientLog.info('service.create.success', data);
+
+    }catch(err){
+      const msg = (err && err.body && err.body.message) ? err.body.message
+                : (err && err.body) ? (typeof err.body === 'string' ? err.body : JSON.stringify(err.body))
+                : 'Error creating service';
+      Swal.fire({icon:'error', title:'Create failed', text: msg});
+
+      if (window.ClientLog) {
+        ClientLog.error('service.create.failed', { status: err.status, body: err.body });
+        ClientLog.open(); // auto open logs on error
+      }
+    }finally{
+      loading(els.submit, false);
+    }
+  }
+
+  // Open on load for quick testing
+  document.addEventListener('DOMContentLoaded', ()=> { show(els.modal); });
+
+  // Bindings
+  els.form.addEventListener('submit', createService);
+  els.close.addEventListener('click', ()=>hide(els.modal));
+  els.cancel.addEventListener('click', ()=>hide(els.modal));
+  els.openBtn && els.openBtn.addEventListener('click', ()=>show(els.modal));
 })();
 </script>
 
