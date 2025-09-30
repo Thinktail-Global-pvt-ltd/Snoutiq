@@ -7,7 +7,6 @@
   <title>Doctor Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
-  {{-- SweetAlert2 --}}
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     @keyframes ring{0%{transform:rotate(0)}10%{transform:rotate(15deg)}20%{transform:rotate(-15deg)}30%{transform:rotate(10deg)}40%{transform:rotate(-10deg)}50%{transform:rotate(5deg)}60%{transform:rotate(-5deg)}100%{transform:rotate(0)}}
@@ -19,7 +18,6 @@
 @php
   $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
   $socketUrl  = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
-
   $serverCandidate = session('user_id')
         ?? data_get(session('user'), 'id')
         ?? optional(auth()->user())->id
@@ -59,7 +57,6 @@
 </script>
 
 <div class="flex h-full">
-  {{-- Sidebar --}}
   <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white">
     <div class="h-16 flex items-center px-6 border-b border-white/10">
       <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
@@ -86,7 +83,7 @@
         <span class="text-sm font-medium">Video Consultation</span>
       </a>
 
-      {{-- NEW: Services (hardcoded URL) --}}
+      {{-- Services menu (hardcoded) --}}
       <a href="http://snoutiq.com/backend/dashboard/services"
          class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,10 +93,8 @@
         <span class="text-sm font-medium">Services</span>
       </a>
     </nav>
-
   </aside>
 
-  {{-- Main --}}
   <main class="flex-1 flex flex-col">
     <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
       <div class="flex items-center gap-3">
@@ -193,12 +188,9 @@
   </div>
 </div>
 
-{{-- Simple toast container (optional) --}}
 <div id="toast-wrap" class="fixed top-4 right-4 z-[80] space-y-2 pointer-events-none"></div>
 
-<!-- ============================= -->
-<!-- Add Service Modal (Category removed) -->
-<!-- ============================= -->
+<!-- Add Service Modal -->
 <div id="add-service-modal" class="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-4xl p-6 relative">
     <button type="button" id="svc-close"
@@ -216,22 +208,19 @@
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Service Name</label>
-            <input id="svc-name" type="text" placeholder="Enter Service Name, eg. Premium Grooming"
-                   class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
+            <input id="svc-name" type="text" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
           </div>
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Duration (mins)</label>
-            <input id="svc-duration" type="number" min="1" step="1" placeholder="Enter Duration (In Mins)"
-                   class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
+            <input id="svc-duration" type="number" min="1" step="1" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
           </div>
         </div>
 
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Price (₹)</label>
-            <input id="svc-price" type="number" min="0" step="0.01" placeholder="Enter Service price in ₹"
-                   class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
+            <input id="svc-price" type="number" min="0" step="0.01" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
           </div>
 
           <div>
@@ -265,8 +254,7 @@
         <label class="block text-sm font-semibold text-gray-700 mb-1">
           Additional Notes <span class="font-normal text-gray-500">(Optional)</span>
         </label>
-        <textarea id="svc-notes" rows="4" placeholder="Add more details about the service"
-                  class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2"></textarea>
+        <textarea id="svc-notes" rows="4" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2"></textarea>
       </div>
 
       <div class="flex items-center justify-end gap-2 pt-2">
@@ -278,39 +266,15 @@
 </div>
 
 <script>
-  // ===== Socket small UI (unchanged essentials) =====
+  // minimal socket ui helpers
   let incomingCalls=[]; let activeModalCall=null; let isOnline=false; let connectionStatus='connecting'; let debugLogs=[];
-  const elSocketId=document.getElementById('socket-id');
-  const elConnStatus=document.getElementById('conn-status');
-  const elSockConnected=document.getElementById('socket-connected');
-  const elIsOnline=document.getElementById('is-online');
-  const elStatusPill=document.getElementById('status-pill');
-  const elStatusDot=document.getElementById('status-dot');
-  const elCallsWrap=document.getElementById('calls');
-  const elCallsCount=document.getElementById('calls-count');
-  const elNoCalls=document.getElementById('no-calls');
-  const elNoCallsSub=document.getElementById('no-calls-sub');
   const elLogs=document.getElementById('logs');
-  const btnRejoin=document.getElementById('btn-rejoin');
-  const btnTest=document.getElementById('btn-test');
-  const btnClear=document.getElementById('btn-clear');
-  const btnToggleDiag=document.getElementById('toggle-diag');
-  const diagPanel=document.getElementById('diagnostics');
-  const modal=document.getElementById('incoming-modal');
-  const mPatient=document.getElementById('m-patient');
-  const mChannel=document.getElementById('m-channel');
-  const mTime=document.getElementById('m-time');
-  const mAccept=document.getElementById('m-accept');
-  const mReject=document.getElementById('m-reject');
-  document.getElementById('doctor-id').textContent = String(DOCTOR_ID);
-
-  btnToggleDiag.addEventListener('click',()=>diagPanel.classList.toggle('hidden'));
   function addLog(m){ const ts=new Date().toLocaleTimeString(); const line=`${ts}: ${m}`; console.log(line); debugLogs=[...debugLogs.slice(-99),line]; if(elLogs){ elLogs.innerHTML=debugLogs.map(l=>`<div>${l}</div>`).join(''); elLogs.parentElement.scrollTop=elLogs.parentElement.scrollHeight; } }
 
-  // ===== Add Service form logic =====
+  // ===== Add Service (NO RELOAD/REDIRECT) =====
   (function(){
     const $ = s => document.querySelector(s);
-    const API_POST_SVC = '/api/groomer/service'; // API prefix used
+    const API_POST_SVC = '/api/groomer/service';
 
     const els = {
       openBtn: $('#btn-add-service'),
@@ -325,7 +289,6 @@
       petType: $('#svc-pet-type'),
       main:    $('#svc-main'),
       notes:   $('#svc-notes'),
-      toastWrap: $('#toast-wrap'),
     };
 
     function show(el){ el.classList.remove('hidden'); }
@@ -348,9 +311,15 @@
       if(!res.ok) throw {status: res.status, body};
       return body;
     }
+    function resetForm(){
+      els.form.reset();
+      // if browser doesn't clear selects by reset
+      els.petType.value = '';
+      els.main.value = '';
+    }
 
     async function createService(e){
-      e.preventDefault();
+      e.preventDefault(); // <- prevents page reload
       const name     = els.name.value.trim();
       const duration = Number(els.duration.value);
       const price    = Number(els.price.value);
@@ -374,68 +343,41 @@
         fd.append('main_service', main);
         fd.append('status', 'Active');
 
-        await fetchJSON(API_POST_SVC, { method:'POST', headers:{ ...bearer() }, body: fd });
+        const data = await fetchJSON(API_POST_SVC, { method:'POST', headers:{ ...bearer() }, body: fd });
 
-        // Put SweetAlert payload for the NEXT page
-        sessionStorage.setItem('swalAfterRedirect', JSON.stringify({
-          icon: 'success',
-          title: 'Service Created',
-          text: 'Your service has been created successfully.',
-          timer: 2200
-        }));
+        // success: DON'T redirect/reload
+        Swal.fire({icon:'success', title:'Service Created', text:'Your service has been created successfully.'});
+        resetForm();
+        // keep modal open so you can see result; close if you want:
+        // hide(els.modal);
 
-        // Redirect
-        const to = (PATH_PREFIX || '') + '/backend/doctor';
-        window.location.href = to;
-
+        if(window.ClientLog){ ClientLog.info('service.create.success', data); }
       }catch(err){
         const msg = (err && err.body && err.body.message) ? err.body.message
                   : (err && err.body) ? (typeof err.body === 'string' ? err.body : JSON.stringify(err.body))
                   : 'Error creating service';
-        Swal.fire({icon:'error', title:'Failed to create', text: msg});
+        Swal.fire({icon:'error', title:'Create failed', text: msg});
+        if(window.ClientLog){
+          ClientLog.error('service.create.failed', { status: err.status, body: err.body });
+          ClientLog.open(); // auto-open logger on error
+        }
       }finally{
         loading(els.submit, false);
       }
     }
 
-    // Open on load
+    // open on load so you can test instantly
     document.addEventListener('DOMContentLoaded', ()=> { show(els.modal); });
 
-    // Bindings
     els.form.addEventListener('submit', createService);
     els.close.addEventListener('click', ()=>hide(els.modal));
     els.cancel.addEventListener('click', ()=>hide(els.modal));
     els.openBtn && els.openBtn.addEventListener('click', ()=>show(els.modal));
   })();
-
-  // ===== Optional: show SweetAlert if something is stored for this page too (global) =====
-  document.addEventListener('DOMContentLoaded', () => {
-    const key = 'swalAfterRedirect';
-    const raw = sessionStorage.getItem(key);
-    if(raw){
-      try{
-        const data = JSON.parse(raw);
-        Swal.fire({
-          icon: data.icon || 'success',
-          title: data.title || 'Success',
-          text: data.text || '',
-          timer: data.timer || 0,
-          showConfirmButton: !(data.timer>0)
-        });
-      }catch(_){}
-      finally{
-        sessionStorage.removeItem(key);
-      }
-    }
-  });
 </script>
 
-<!-- ========================= -->
-<!-- FRONTEND LOGGER (A to Z) -->
-<!-- ========================= -->
-<style>
-  #client-logger{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New",monospace}
-</style>
+<!-- ===== Frontend Logger ===== -->
+<style>#client-logger{font-family:ui-monospace,Menlo,Consolas,monospace}</style>
 <div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[380px] max-h-[65vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
   <div class="flex items-center justify-between px-3 py-2 border-b">
     <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
@@ -460,140 +402,21 @@
     clear:  document.getElementById('log-clear'),
     dl:     document.getElementById('log-download'),
   };
-
-  const MAX = 500;
-  const buf = [];
-
-  function trunc(s, n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}
-    return s.length>n ? s.slice(0,n)+'…' : s;
-  }
-  function previewBody(body){
-    if(!body) return null;
-    if(body instanceof FormData){
-      const o={}; body.forEach((v,k)=>{ o[k] = (typeof v==='string')? trunc(v,200) : (v?.name?`<file:${v.name}>`:'<blob>'); });
-      return o;
-    }
-    if(typeof body === 'string') return trunc(body, 1000);
-    return '<body>';
-  }
-  function safeJson(x){ try{ return JSON.parse(JSON.stringify(x)); }catch(_){ return String(x); } }
-  function stamp(){ const d=new Date(); return d.toISOString(); }
-
-  function push(level, msg, meta){
-    const row = { t: stamp(), level, msg, meta };
-    buf.push(row); if(buf.length>MAX) buf.shift();
-    renderRow(row);
-    ui.count.textContent = String(buf.length);
-  }
-
-  function renderRow(e){
-    const div = document.createElement('div');
-    const meta = (e.meta==null) ? '' : ' ' + trunc(typeof e.meta==='string' ? e.meta : JSON.stringify(e.meta), 2000);
-    div.textContent = `[${e.t}] ${e.level.toUpperCase()} ${e.msg}${meta}`;
-    ui.body.appendChild(div);
-    ui.body.scrollTop = ui.body.scrollHeight;
-  }
-
-  const ClientLog = {
-    info:(m,d)=>push('info', m, d),
-    warn:(m,d)=>push('warn', m, d),
-    error:(m,d)=>push('error', m, d),
-    net:(phase,summary,detail)=>push('net:'+phase, summary, detail),
-    open:()=>ui.panel.classList.remove('hidden'),
-    close:()=>ui.panel.classList.add('hidden'),
-    clear:()=>{ while(ui.body.firstChild) ui.body.removeChild(ui.body.firstChild); buf.length=0; ui.count.textContent='0'; },
-    dump:()=>({ env: {
-        PATH_PREFIX: (typeof PATH_PREFIX !== 'undefined') ? PATH_PREFIX : null,
-        SOCKET_URL:  (typeof SOCKET_URL  !== 'undefined') ? SOCKET_URL  : null,
-        DOCTOR_ID:   (typeof DOCTOR_ID   !== 'undefined') ? DOCTOR_ID   : null,
-        url: location.href,
-        ua: navigator.userAgent
-      }, logs: buf })
-  };
-  window.ClientLog = ClientLog;
-
-  // UI controls
-  ui.toggle.addEventListener('click', ClientLog.open);
-  ui.close.addEventListener('click', ClientLog.close);
-  ui.clear.addEventListener('click', ClientLog.clear);
-  ui.dl.addEventListener('click', ()=>{
-    const blob = new Blob([JSON.stringify(ClientLog.dump(), null, 2)], {type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'frontend-logs.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-
-  // Keyboard toggle  Ctrl + `
-  window.addEventListener('keydown', (e)=>{
-    if((e.ctrlKey || e.metaKey) && e.key === '`'){ e.preventDefault(); ui.panel.classList.toggle('hidden'); }
-  });
-
-  // Pipe window errors
-  window.addEventListener('error', (e)=>{
-    ClientLog.error('window.error', { message:e.message, file:e.filename, line:e.lineno, col:e.colno, stack: e.error && e.error.stack });
-  });
-  window.addEventListener('unhandledrejection', (e)=>{
-    ClientLog.error('unhandledrejection', { reason: e.reason && (e.reason.stack || e.reason) });
-  });
-
-  // Mirror console.* to logger (keep original)
-  ['log','info','warn','error'].forEach(k=>{
-    const orig = console[k];
-    console[k] = function(...args){
-      try{ ClientLog.info('console.'+k, args.map(safeJson)); }catch(_){}
-      return orig.apply(this, args);
-    };
-  });
-
-  // Fetch instrumentation
-  const origFetch = window.fetch.bind(window);
-  window.fetch = async function(input, init={}) {
-    const url = (typeof input==='string') ? input : input.url;
-    const method = (init?.method || (typeof input==='object' && input.method) || 'GET').toUpperCase();
-    const start  = performance.now();
-
-    ClientLog.net('request', `${method} ${url}`, {
-      headers: init?.headers || {},
-      body: previewBody(init?.body)
-    });
-
-    try{
-      const res = await origFetch(input, init);
-      const ms = Math.round(performance.now() - start);
-      let bodyPreview = '';
-      try{
-        const clone = res.clone();
-        const ct = clone.headers.get('content-type') || '';
-        if(ct.includes('application/json')) bodyPreview = await clone.text();
-        else bodyPreview = `<${ct}>`;
-      }catch(_){}
-      ClientLog.net('response', `${method} ${url} → ${res.status} (${ms}ms)`, {
-        ok: res.ok, status: res.status, duration_ms: ms, body: bodyPreview && bodyPreview.length>1500 ? bodyPreview.slice(0,1500)+'…' : bodyPreview
-      });
-      return res;
-    }catch(err){
-      const ms = Math.round(performance.now() - start);
-      ClientLog.error('fetch.failed', { url, method, duration_ms: ms, error: err?.message || String(err) });
-      throw err;
-    }
-  };
-
-  // Seed environment snapshot
-  ClientLog.info('env', {
-    PATH_PREFIX: (typeof PATH_PREFIX !== 'undefined') ? PATH_PREFIX : null,
-    SOCKET_URL:  (typeof SOCKET_URL  !== 'undefined') ? SOCKET_URL  : null,
-    DOCTOR_ID:   (typeof DOCTOR_ID   !== 'undefined') ? DOCTOR_ID   : null,
-    token_present: !!(localStorage.getItem('token') || sessionStorage.getItem('token'))
-  });
-
-  // Pipe your existing addLog into ClientLog as well
-  const origAddLog = window.addLog;
-  window.addLog = function(m){
-    try { ClientLog.info(m); } catch(_){}
-    if (typeof origAddLog === 'function') return origAddLog(m);
-  };
+  const MAX=500, buf=[];
+  function trunc(s,n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}; return s.length>n?s.slice(0,n)+'…':s; }
+  function previewBody(b){ if(!b) return null; if(b instanceof FormData){const o={}; b.forEach((v,k)=>o[k]=typeof v==='string'?trunc(v,200):(v?.name?`<file:${v.name}>`:'<blob>')); return o;} if(typeof b==='string') return trunc(b,1000); return '<body>'; }
+  function stamp(){return new Date().toISOString()}
+  function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); const m=meta==null?'':' '+trunc(typeof meta==='string'?meta:JSON.stringify(meta),2000); div.textContent=`[${row.t}] ${row.level.toUpperCase()} ${row.msg}${m}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
+  const Log={info:(m,d)=>push('info',m,d),warn:(m,d)=>push('warn',m,d),error:(m,d)=>push('error',m,d),net:(p,s,d)=>push('net:'+p,s,d),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{PATH_PREFIX:(typeof PATH_PREFIX!=='undefined')?PATH_PREFIX:null,SOCKET_URL:(typeof SOCKET_URL!=='undefined')?SOCKET_URL:null,DOCTOR_ID:(typeof DOCTOR_ID!=='undefined')?DOCTOR_ID:null,url:location.href,ua:navigator.userAgent},logs:buf})};
+  window.ClientLog=Log;
+  ui.toggle.addEventListener('click',Log.open); ui.close.addEventListener('click',Log.close); ui.clear.addEventListener('click',Log.clear);
+  ui.dl.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(Log.dump(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='frontend-logs.json'; a.click(); URL.revokeObjectURL(a.href); });
+  window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='`'){ e.preventDefault(); ui.panel.classList.toggle('hidden'); }});
+  window.addEventListener('error',e=>Log.error('window.error',{message:e.message,file:e.filename,line:e.lineno,col:e.colno,stack:e.error&&e.error.stack}));
+  window.addEventListener('unhandledrejection',e=>Log.error('unhandledrejection',{reason:e.reason&&(e.reason.stack||e.reason)}));
+  const origFetch=window.fetch.bind(window);
+  window.fetch=async function(input,init={}){ const url=(typeof input==='string')?input:input.url; const method=(init?.method||(typeof input==='object'&&input.method)||'GET').toUpperCase(); const start=performance.now(); Log.net('request',`${method} ${url}`,{headers:init?.headers||{},body:previewBody(init?.body)}); try{ const res=await origFetch(input,init); const ms=Math.round(performance.now()-start); let bodyPreview=''; try{ const c=res.clone(); const ct=c.headers.get('content-type')||''; bodyPreview=ct.includes('application/json')?await c.text():`<${ct}>`; }catch(_){ } Log.net('response',`${method} ${url} → ${res.status} (${ms}ms)`,{ok:res.ok,status:res.status,duration_ms:ms,body:bodyPreview && bodyPreview.length>1500?bodyPreview.slice(0,1500)+'…':bodyPreview}); return res; }catch(err){ const ms=Math.round(performance.now()-start); Log.error('fetch.failed',{url,method,duration_ms:ms,error:err?.message||String(err)}); throw err; } };
+  Log.info('env',{PATH_PREFIX:(typeof PATH_PREFIX!=='undefined')?PATH_PREFIX:null,SOCKET_URL:(typeof SOCKET_URL!=='undefined')?SOCKET_URL:null,DOCTOR_ID:(typeof DOCTOR_ID!=='undefined')?DOCTOR_ID:null,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token'))});
 })();
 </script>
 
