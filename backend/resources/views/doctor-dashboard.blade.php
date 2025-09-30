@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Doctor Dashboard</title>
 
-  <!-- UI libs -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -20,53 +19,32 @@
 <body class="h-screen bg-gray-50">
 
 @php
-  // ===== Server-side config =====
-  $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/'); // e.g. "/backend" on prod
+  $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/'); // e.g. "backend"
   $socketUrl  = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
 
-  // Resolve doctor id if available
   $serverCandidate = session('user_id')
         ?? data_get(session('user'), 'id')
         ?? optional(auth()->user())->id
         ?? request('doctorId');
   $serverDoctorId = $serverCandidate ? (int)$serverCandidate : null;
 
-  // Links
   $aiChatUrl   = ($pathPrefix ? "/$pathPrefix" : '') . '/pet-dashboard';
   $thisPageUrl = ($pathPrefix ? "/$pathPrefix" : '') . '/doctor' . ($serverDoctorId ? ('?doctorId=' . urlencode($serverDoctorId)) : '');
 @endphp
 
 <script>
-  // ===== Client globals from PHP =====
-  const PATH_PREFIX = @json($pathPrefix ? "/$pathPrefix" : ""); // "" on local, "/backend" on prod
+  // ========= runtime env from server =========
+  const PATH_PREFIX = @json($pathPrefix ? "/$pathPrefix" : ""); // "" locally, "/backend" in prod
   const SOCKET_URL  = @json($socketUrl);
   const fromServer  = Number(@json($serverDoctorId ?? null)) || null;
 
-  const fromQuery = (()=> {
-    const u = new URL(location.href);
-    const v = u.searchParams.get('doctorId');
-    return v ? Number(v) : null;
-  })();
-
-  function readAuthFull(){
-    try{
-      const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
-      if(!raw) return null;
-      return JSON.parse(raw);
-    }catch(_){ return null; }
-  }
+  const fromQuery = (()=>{ const u=new URL(location.href); const v=u.searchParams.get('doctorId'); return v?Number(v):null; })();
+  function readAuthFull(){ try{ const raw=sessionStorage.getItem('auth_full')||localStorage.getItem('auth_full'); return raw?JSON.parse(raw):null; }catch(_){ return null; } }
   const af = readAuthFull();
-  const fromStorage = (()=> {
-    if(!af) return null;
-    const id1 = af?.user_id;
-    const id2 = af?.user?.id;
-    return Number(id1 || id2) || null;
-  })();
+  const fromStorage = (()=>{ if(!af) return null; const id1=af.user_id; const id2=af.user && af.user.id; return Number(id1||id2)||null; })();
 
   const DOCTOR_ID = fromServer || fromQuery || fromStorage || 501;
-
-  // ✅ API base always correct ("/backend/api" on prod, "/api" on local)
-  const API_BASE = (PATH_PREFIX || '') + '/api';
+  const API_BASE  = (PATH_PREFIX || '') + '/api';
 </script>
 
 <div class="flex h-full">
@@ -79,30 +57,24 @@
     <nav class="px-3 py-4 space-y-1">
       <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
 
-      <a href="{{ $aiChatUrl }}"
-         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+      <a href="{{ $aiChatUrl }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v7a2 2 0 01-2 2h-4l-5 4v-4z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v7a2 2 0 01-2 2h-4l-5 4v-4z"/>
         </svg>
         <span class="text-sm font-medium">AI Chat</span>
       </a>
 
-      <a href="{{ $thisPageUrl }}"
-         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+      <a href="{{ $thisPageUrl }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
         </svg>
         <span class="text-sm font-medium">Video Consultation</span>
       </a>
 
       {{-- Hardcoded Services link --}}
-      <a href="http://snoutiq.com/backend/dashboard/services"
-         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+      <a href="http://snoutiq.com/backend/dashboard/services" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6h-6v-6z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6h-6v-6z"/>
         </svg>
         <span class="text-sm font-medium">Services</span>
       </a>
@@ -119,14 +91,8 @@
       </div>
 
       <div class="flex items-center gap-3">
-        <button id="toggle-diag" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800">
-          Diagnostics
-        </button>
-
-        <button id="btn-add-service" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white">
-          + Add Service
-        </button>
-
+        <button id="toggle-diag" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800">Diagnostics</button>
+        <button id="btn-add-service" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white">+ Add Service</button>
         <div class="text-right">
           <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? 'Doctor' }}</div>
           <div class="text-xs text-gray-500">{{ auth()->user()->role ?? 'doctor' }}</div>
@@ -203,8 +169,23 @@
   </div>
 </div>
 
-{{-- Toast container (optional) --}}
-<div id="toast-wrap" class="fixed top-4 right-4 z-[80] space-y-2 pointer-events-none"></div>
+{{-- Logger panel (toggle with button or Ctrl+`) --}}
+<div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[420px] max-h-[70vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
+  <div class="flex items-center justify-between px-3 py-2 border-b">
+    <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
+    <div class="flex items-center gap-2">
+      <input id="log-token" placeholder="paste Bearer token…" class="px-2 py-1 rounded bg-gray-100 text-xs w-40">
+      <button id="log-token-save" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs">Save</button>
+      <button id="log-download" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Download</button>
+      <button id="log-clear" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Clear</button>
+      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">✕</button>
+    </div>
+  </div>
+  <div id="log-body" class="text-[11px] leading-4 text-gray-800 px-3 py-2 overflow-y-auto whitespace-pre-wrap"></div>
+</div>
+<button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">
+  🪵 Logs (<span id="log-count">0</span>)
+</button>
 
 <!-- ============================= -->
 <!-- Add Service Modal (opens on load; NO category field) -->
@@ -212,9 +193,7 @@
 <div id="add-service-modal" class="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-4xl p-6 relative">
     <button type="button" id="svc-close"
-            class="absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">
-      ✕
-    </button>
+            class="absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">✕</button>
 
     <div class="mb-2">
       <h3 class="text-xl font-semibold text-gray-800">Add New Service</h3>
@@ -287,90 +266,42 @@
   </div>
 </div>
 
-<!-- ===== Frontend Logger (toggle: Ctrl + `) ===== -->
-<div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[420px] max-h-[70vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
-  <div class="flex items-center justify-between px-3 py-2 border-b">
-    <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
-    <div class="flex items-center gap-2">
-      <input id="log-token" placeholder="paste Bearer token…" class="px-2 py-1 rounded bg-gray-100 text-xs w-40">
-      <button id="log-token-save" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs">Save</button>
-      <button id="log-download" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Download</button>
-      <button id="log-clear" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Clear</button>
-      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">✕</button>
-    </div>
-  </div>
-  <div id="log-body" class="text-[11px] leading-4 text-gray-800 px-3 py-2 overflow-y-auto whitespace-pre-wrap"></div>
-</div>
-<button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">
-  🪵 Logs (<span id="log-count">0</span>)
-</button>
-
 <script>
 /* =========================
-   Minimal Diagnostics Setup
-========================= */
-document.getElementById('doctor-id').textContent = String(DOCTOR_ID);
-document.getElementById('toggle-diag').addEventListener('click', () => {
-  document.getElementById('diagnostics').classList.toggle('hidden');
-});
-
-/* =========================
-   Frontend Logger
+   Logger (Ctrl+` to toggle)
 ========================= */
 (function(){
-  const ui = {
-    panel:  document.getElementById('client-logger'),
-    body:   document.getElementById('log-body'),
-    toggle: document.getElementById('log-toggle'),
-    count:  document.getElementById('log-count'),
-    close:  document.getElementById('log-close'),
-    clear:  document.getElementById('log-clear'),
-    dl:     document.getElementById('log-download'),
-    tokenI: document.getElementById('log-token'),
-    tokenS: document.getElementById('log-token-save'),
-  };
-  const MAX=500, buf=[];
+  const ui={panel:document.getElementById('client-logger'),body:document.getElementById('log-body'),toggle:document.getElementById('log-toggle'),count:document.getElementById('log-count'),close:document.getElementById('log-close'),clear:document.getElementById('log-clear'),dl:document.getElementById('log-download'),tokenI:document.getElementById('log-token'),tokenS:document.getElementById('log-token-save'),};
+  const MAX=500,buf=[];
   function trunc(s,n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}; return s.length>n?s.slice(0,n)+'…':s; }
-  function previewBody(b){ if(!b) return null; if(b instanceof FormData){const o={}; b.forEach((v,k)=>o[k]=typeof v==='string'?trunc(v,200):(v?.name?`<file:${v.name}>`:'<blob>')); return o;} if(typeof b==='string') return trunc(b,1000); return '<body>'; }
   function stamp(){return new Date().toISOString()}
-  function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); const m=meta==null?'':' '+trunc(typeof meta==='string'?meta:JSON.stringify(meta),2000); div.textContent=`[${row.t}] ${level.toUpperCase()} ${msg}${m}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
-  const Log={info:(m,d)=>push('info',m,d),warn:(m,d)=>push('warn',m,d),error:(m,d)=>push('error',m,d),net:(t,s,d)=>push('net:'+t,s,d),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{PATH_PREFIX,API_BASE,SOCKET_URL,DOCTOR_ID,url:location.href,ua:navigator.userAgent,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token'))},logs:buf})};
+  function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); div.textContent=`[${row.t}] ${level.toUpperCase()} ${msg}${meta?' '+trunc(typeof meta==='string'?meta:JSON.stringify(meta),2000):''}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
+  const Log={info:(m,d)=>push('info',m,d),warn:(m,d)=>push('warn',m,d),error:(m,d)=>push('error',m,d),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{PATH_PREFIX,API_BASE,SOCKET_URL,DOCTOR_ID,url:location.href,ua:navigator.userAgent,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token')),auth_mode:window.__authMode||'unknown'},logs:buf})};
   window.ClientLog=Log;
 
-  // UI bindings
   ui.toggle.addEventListener('click',Log.open);
   ui.close.addEventListener('click',Log.close);
   ui.clear.addEventListener('click',Log.clear);
   ui.dl.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(Log.dump(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='frontend-logs.json'; a.click(); URL.revokeObjectURL(a.href); });
-  ui.tokenS.addEventListener('click',()=>{ const t=ui.tokenI.value.trim(); if(!t) return; localStorage.setItem('token', t); sessionStorage.setItem('token', t); Swal.fire({icon:'success',title:'Token saved',timer:1200,showConfirmButton:false}); });
+  ui.tokenS.addEventListener('click',()=>{ const t=ui.tokenI.value.trim(); if(!t) return; localStorage.setItem('token',t); sessionStorage.setItem('token',t); Swal.fire({icon:'success',title:'Token saved',timer:1200,showConfirmButton:false}); });
 
-  // keyboard toggle
   window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='`'){ e.preventDefault(); ui.panel.classList.toggle('hidden'); }});
 
-  // error hooks
-  window.addEventListener('error',e=>Log.error('window.error',{message:e.message,file:e.filename,line:e.lineno,col:e.colno,stack:e.error&&e.error.stack}));
-  window.addEventListener('unhandledrejection',e=>Log.error('unhandledrejection',{reason:e.reason&&(e.reason.stack||e.reason)}));
-
-  // fetch instrumentation
+  // instrument fetch
   const origFetch=window.fetch.bind(window);
   window.fetch=async function(input,init={}){
     const url=(typeof input==='string')?input:input.url;
     const method=(init?.method||(typeof input==='object'&&input.method)||'GET').toUpperCase();
     const start=performance.now();
-    Log.net('request',`${method} ${url}`,{headers:init?.headers||{},body:previewBody(init?.body)});
+    Log.info('NET:REQUEST', {method,url,headers:init?.headers||{},cred:init?.credentials||'default'});
     try{
       const res=await origFetch(input,init);
+      const ct=res.headers.get('content-type')||'';
       const ms=Math.round(performance.now()-start);
-      let bodyPreview='';
-      try{
-        const c=res.clone(); const ct=c.headers.get('content-type')||'';
-        bodyPreview=ct.includes('application/json')?await c.text():`<${ct||'unknown'}>`;
-      }catch(_){}
-      Log.net('response',`${method} ${url} → ${res.status} (${ms}ms)`,{ok:res.ok,status:res.status,duration_ms:ms,body:bodyPreview && bodyPreview.length>1500?bodyPreview.slice(0,1500)+'…':bodyPreview});
+      Log.info('NET:RESPONSE', {method,url,status:res.status,ok:res.ok,duration_ms:ms,content_type:ct});
       return res;
     }catch(err){
-      const ms=Math.round(performance.now()-start);
-      Log.error('fetch.failed',{url,method,duration_ms:ms,error:err?.message||String(err)});
+      Log.error('NET:FAILED',{method,url,error:err?.message||String(err)});
       throw err;
     }
   };
@@ -381,15 +312,12 @@ document.getElementById('toggle-diag').addEventListener('click', () => {
 
 <script>
 /* =========================
-   Add Service (No reload)
+   Add Service (supports Bearer or Sanctum cookie)
 ========================= */
 (function(){
   const $ = s => document.querySelector(s);
 
-  // Endpoints
   const API_POST_SVC = API_BASE + '/groomer/service';
-
-  // Elements
   const els = {
     openBtn: $('#btn-add-service'),
     modal:   $('#add-service-modal'),
@@ -405,49 +333,67 @@ document.getElementById('toggle-diag').addEventListener('click', () => {
     notes:   $('#svc-notes'),
   };
 
-  // Helpers
   function show(el){ el.classList.remove('hidden'); }
   function hide(el){ el.classList.add('hidden'); }
-  function loading(btn, on){
-    if(!btn) return;
-    btn.disabled = !!on;
-    btn.classList.toggle('opacity-60', !!on);
-    if(on){ btn.dataset.oldText = btn.textContent; btn.textContent = 'Saving...'; }
-    else if(btn.dataset.oldText){ btn.textContent = btn.dataset.oldText; delete btn.dataset.oldText; }
-  }
-  function authHeaders(){
+  function loading(btn,on){ if(!btn) return; btn.disabled=!!on; btn.classList.toggle('opacity-60',!!on); if(on){btn.dataset.oldText=btn.textContent; btn.textContent='Saving...';} else if(btn.dataset.oldText){ btn.textContent=btn.dataset.oldText; delete btn.dataset.oldText; } }
+
+  // ==== Sanctum helpers ====
+  const CSRF_URL = (PATH_PREFIX || '') + '/sanctum/csrf-cookie';
+  function getCookie(name){ return document.cookie.split('; ').find(r=>r.startsWith(name+'='))?.split('=')[1] || ''; }
+  function xsrfHeader(){ const raw=getCookie('XSRF-TOKEN'); return raw ? decodeURIComponent(raw) : ''; }
+
+  async function bootstrapAuth(){
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const h = { 'Accept': 'application/json' };
-    if (token) h['Authorization'] = 'Bearer ' + token;
-    return h;
-  }
-  function ensureAuthOrWarn(){
-    const hasToken = !!(localStorage.getItem('token') || sessionStorage.getItem('token'));
-    if (!hasToken) {
-      if (window.ClientLog) ClientLog.warn('no-token', { message: 'No Bearer token in storage' });
-      Swal.fire({ icon:'warning', title:'Not authenticated', text:'No login token found. Paste token in logger and save.' });
-      // open logger to paste token
-      if (window.ClientLog) ClientLog.open();
-      return false;
+    if (token) { window.__authMode='bearer'; if (window.ClientLog) ClientLog.info('auth.mode','bearer'); return { mode:'bearer' }; }
+    // try Sanctum cookie mode
+    try{
+      await fetch(CSRF_URL, { credentials:'include' });
+      const xsrf = xsrfHeader();
+      if (xsrf) { window.__authMode='cookie'; if (window.ClientLog) ClientLog.info('auth.mode','cookie'); return { mode:'cookie', xsrf }; }
+      window.__authMode='none';
+      if (window.ClientLog) ClientLog.warn('auth.cookie.missing-xsrf');
+      return { mode:'none' };
+    }catch(err){
+      window.__authMode='none';
+      if (window.ClientLog) ClientLog.error('auth.cookie.failed',err);
+      return { mode:'none' };
     }
-    return true;
-  }
-  async function fetchJSON(url, opts={}){
-    const res = await fetch(url, { credentials: 'include', ...opts });
-    const ct = res.headers.get('content-type') || '';
-    const body = ct.includes('application/json') ? await res.json() : await res.text();
-    if(!res.ok) throw { status: res.status, body };
-    return body;
-  }
-  function resetForm(){
-    els.form.reset();
-    els.petType.value = '';
-    els.main.value = '';
   }
 
-  // Submit handler
+  function buildHeaders(auth){
+    const h = { 'Accept':'application/json' };
+    if (auth.mode === 'bearer') {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      h['Authorization'] = 'Bearer ' + token;
+    } else if (auth.mode === 'cookie') {
+      h['X-Requested-With'] = 'XMLHttpRequest';
+      const xsrf = xsrfHeader();
+      if (xsrf) h['X-XSRF-TOKEN'] = xsrf;
+    }
+    return h;
+  }
+
+  async function fetchJSON(url, opts={}){
+    const res = await fetch(url, { credentials:'include', ...opts });
+    const ct  = res.headers.get('content-type') || '';
+    const isJSON = ct.includes('application/json');
+    if (!isJSON) {
+      // Useful hint when HTML comes back instead of JSON
+      throw { status: res.status, body: `<${ct}>`, hint: 'Non-JSON response (likely HTML redirect/login). Check auth + PATH_PREFIX.' };
+    }
+    const data = await res.json();
+    if (!res.ok) throw { status: res.status, body: data };
+    return data;
+  }
+
+  function resetForm(){
+    els.form.reset();
+    els.petType.value='';
+    els.main.value='';
+  }
+
   async function createService(e){
-    e.preventDefault(); // 🚫 no reload
+    e.preventDefault(); // no reload
     const name     = els.name.value.trim();
     const duration = Number(els.duration.value);
     const price    = Number(els.price.value);
@@ -459,10 +405,17 @@ document.getElementById('toggle-diag').addEventListener('click', () => {
       Swal.fire({icon:'warning', title:'Missing fields', text:'Please fill all required fields.'});
       return;
     }
-    if(!ensureAuthOrWarn()) return;
 
-    loading(els.submit, true);
+    loading(els.submit,true);
     try{
+      const auth = await bootstrapAuth();
+      if (auth.mode === 'none') {
+        if (window.ClientLog) ClientLog.warn('no-token', { message:'No Bearer token and Sanctum cookie not ready' });
+        Swal.fire({icon:'warning', title:'Not authenticated', text:'Paste a Bearer token in the logger OR configure Sanctum cookies.'});
+        loading(els.submit,false);
+        return;
+      }
+
       const fd = new FormData();
       fd.append('serviceName', name);
       fd.append('description', notes);
@@ -472,41 +425,29 @@ document.getElementById('toggle-diag').addEventListener('click', () => {
       fd.append('main_service', main);
       fd.append('status', 'Active');
 
-      if (window.ClientLog) ClientLog.net('request', `POST ${API_POST_SVC}`, {
-        headers: authHeaders(),
-        body: { serviceName:name, description:notes, petType, price, duration, main_service:main, status:'Active' }
-      });
-
-      const data = await fetchJSON(API_POST_SVC, {
-        method:'POST',
-        headers: authHeaders(),
-        body: fd,
-      });
+      const headers = buildHeaders(auth);
+      const data = await fetchJSON(API_POST_SVC, { method:'POST', headers, body: fd });
 
       Swal.fire({icon:'success', title:'Service Created', text:'Your service has been created successfully.'});
       resetForm();
-
       if (window.ClientLog) ClientLog.info('service.create.success', data);
 
     }catch(err){
-      const msg = (err && err.body && err.body.message) ? err.body.message
-                : (err && err.body) ? (typeof err.body === 'string' ? err.body : JSON.stringify(err.body))
-                : 'Error creating service';
+      const msg = err?.body?.message
+        || (typeof err?.body==='string' ? err.body : JSON.stringify(err?.body||err))
+        || err?.hint
+        || 'Error creating service';
       Swal.fire({icon:'error', title:'Create failed', text: msg});
-
-      if (window.ClientLog) {
-        ClientLog.error('service.create.failed', { status: err.status, body: err.body });
-        ClientLog.open(); // auto open logs on error
-      }
+      if (window.ClientLog) { ClientLog.error('service.create.failed', err); ClientLog.open(); }
     }finally{
-      loading(els.submit, false);
+      loading(els.submit,false);
     }
   }
 
-  // Open on load for quick testing
-  document.addEventListener('DOMContentLoaded', ()=> { show(els.modal); });
+  // open form on load
+  document.addEventListener('DOMContentLoaded', ()=> { show(els.modal); document.getElementById('doctor-id').textContent=String(DOCTOR_ID); });
 
-  // Bindings
+  // bindings
   els.form.addEventListener('submit', createService);
   els.close.addEventListener('click', ()=>hide(els.modal));
   els.cancel.addEventListener('click', ()=>hide(els.modal));
