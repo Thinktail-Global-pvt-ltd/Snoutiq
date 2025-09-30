@@ -148,7 +148,7 @@
         <img src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/> {{ $vet->name }}
       </div>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/backend/custom-doctor-register'">Login</button>
+        <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/backend/custom-doctor-login'">Login</button>
         <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/backend/custom-doctor-register'">Register</button>
       </div>
     </div>
