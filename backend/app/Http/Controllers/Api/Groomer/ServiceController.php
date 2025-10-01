@@ -56,7 +56,7 @@ class ServiceController extends Controller
     {
         try {
             $uid = $this->resolveUserId($request);
-            dd($uid);
+           // dd($uid);
             if (!$uid) {
                 return response()->json([
                     'status'  => false,
@@ -67,6 +67,7 @@ class ServiceController extends Controller
             $services = GroomerService::where('user_id', $uid)
                 ->with('category')
                 ->get();
+                dd($services);
 
             return response()->json([
                 'status'  => true,
