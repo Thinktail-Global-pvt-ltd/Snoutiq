@@ -7,99 +7,51 @@
   <title>Services</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  {{-- Doctor dashboard had socket.io too; keeping it for identical header layout (status pill/dot) --}}
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
 </head>
 <body class="h-screen bg-gray-50">
 
-@php
-  // ===== Same server vars used in doctor dashboard for nav links =====
-  $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
-  $socketUrl  = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
-
-  $serverCandidate = session('user_id')
-        ?? data_get(session('user'), 'id')
-        ?? optional(auth()->user())->id
-        ?? request('doctorId');
-  $serverDoctorId = $serverCandidate ? (int)$serverCandidate : null;
-
-  $aiChatUrl   = ($pathPrefix ? "/$pathPrefix" : '') . '/pet-dashboard';
-  $thisPageUrl = ($pathPrefix ? "/$pathPrefix" : '') . '/doctor' . ($serverDoctorId ? ('?doctorId=' . urlencode($serverDoctorId)) : '');
-
-  // current services page (for "You are here" if needed later)
-  $servicesPageUrl = ($pathPrefix ? "/$pathPrefix" : '') . '/dashboard/services';
-@endphp
-
-<script>
-  // ===== Keep same globals as doctor dashboard =====
-  const PATH_PREFIX = @json($pathPrefix ? "/$pathPrefix" : "");
-  const SOCKET_URL = @json($socketUrl);
-
-  const fromServer   = Number(@json($serverDoctorId ?? null)) || null;
-  const fromQuery = (()=> {
-    const u = new URL(location.href);
-    const v = u.searchParams.get('doctorId');
-    return v ? Number(v) : null;
-  })();
-  function readAuthFull(){
-    try{
-      const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
-      if(!raw) return null;
-      return JSON.parse(raw);
-    }catch(_){ return null; }
-  }
-  const af = readAuthFull();
-  const fromStorage = (()=> {
-    if(!af) return null;
-    const id1 = af.user_id;
-    const id2 = af.user && af.user.id;
-    return Number(id1 || id2) || null;
-  })();
-  const DOCTOR_ID = fromServer || fromQuery || fromStorage || 501;
-</script>
-
 <div class="flex h-full">
-  {{-- ===== Sidebar (exactly like doctor dashboard) ===== --}}
+  <!-- Sidebar (exact style as doctor dashboard) -->
   <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white">
     <div class="h-16 flex items-center px-6 border-b border-white/10">
       <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
     </div>
 
-  <nav class="px-3 py-4 space-y-1">
-  <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
+    <nav class="px-3 py-4 space-y-1">
+      <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
 
-  <a href="{{ $aiChatUrl }}"
-     class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-    <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v7a2 2 0 01-2 2h-4l-5 4v-4z"/>
-    </svg>
-    <span class="text-sm font-medium">AI Chat</span>
-  </a>
+      <a href="https://snoutiq.com/backend/pet-dashboard"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v7a2 2 0 01-2 2h-4l-5 4v-4z"/>
+        </svg>
+        <span class="text-sm font-medium">AI Chat</span>
+      </a>
 
-  <a href="{{ $thisPageUrl }}"
-     class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-    <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-    </svg>
-    <span class="text-sm font-medium">Video Consultation</span>
-  </a>
+      <a href="https://snoutiq.com/backend/doctor"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        <span class="text-sm font-medium">Video Consultation</span>
+      </a>
 
-  {{-- NEW: Services (hardcoded URL) --}}
-  <a href="http://snoutiq.com/backend/dashboard/services"
-     class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-    <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6h-6v-6z"/>
-    </svg>
-    <span class="text-sm font-medium">Services</span>
-  </a>
-</nav>
-
+      <!-- Hardcoded Services link (as requested) -->
+      <a href="http://snoutiq.com/backend/dashboard/services"
+         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6h-6v-6z"/>
+        </svg>
+        <span class="text-sm font-medium">Services</span>
+      </a>
+    </nav>
   </aside>
 
-  {{-- ===== Main (header same structure as doctor dashboard) ===== --}}
+  <!-- Main -->
   <main class="flex-1 flex flex-col">
     <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
       <div class="flex items-center gap-3">
@@ -114,7 +66,8 @@
           Diagnostics
         </button>
 
-        <button id="btn-open-create" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white">
+        <button id="btn-open-create"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white">
           + Add Service
         </button>
 
@@ -128,7 +81,7 @@
       </div>
     </header>
 
-    {{-- ===== Page Content (YOUR LISTING UI) ===== --}}
+    <!-- Page Content -->
     <section class="flex-1 p-6">
       <div class="max-w-6xl mx-auto">
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -159,7 +112,7 @@
   </main>
 </div>
 
-{{-- ===== Create Modal ===== --}}
+<!-- Create Modal -->
 <div id="create-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-3xl p-6 relative">
     <button type="button" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">✕</button>
@@ -224,7 +177,7 @@
   </div>
 </div>
 
-{{-- ===== Edit Modal ===== --}}
+<!-- Edit Modal -->
 <div id="edit-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-3xl p-6 relative">
     <button type="button" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">✕</button>
@@ -290,22 +243,18 @@
 </div>
 
 <script>
-  // ===== Tiny header init (keep IDs consistent with doctor header) =====
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const el = document.getElementById('doctor-id');
-    if(el) el.textContent = String(DOCTOR_ID);
-  });
-
-  // ===== Services LICRUD (your existing script, unchanged) =====
+  // ===== Hardcoded API endpoints (PROD) =====
   const API = {
-    list:   '/api/groomer/services',
-    create: '/api/groomer/service',
-    show:   id => `/api/groomer/service/${id}`,
-    update: id => `/api/groomer/service/${id}/update`,
-    delete: id => `/api/groomer/service/${id}`
+    list:   'https://snoutiq.com/backend/api/groomer/services',
+    create: 'https://snoutiq.com/backend/api/groomer/service',
+    show:   id => `https://snoutiq.com/backend/api/groomer/service/${id}`,
+    update: id => `https://snoutiq.com/backend/api/groomer/service/${id}/update`,
+    delete: id => `https://snoutiq.com/backend/api/groomer/service/${id}`
   };
+
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  const authHeaders = token ? { 'Authorization': 'Bearer ' + token } : {};
+  const authHeaders = token ? { 'Authorization': 'Bearer ' + token } : { };
+
   const $ = (s, r=document)=> r.querySelector(s);
   const $$ = (s, r=document)=> Array.from(r.querySelectorAll(s));
   const rows = $('#rows');
@@ -395,12 +344,9 @@
       const res = await fetch(API.create, { method:'POST', headers:{ ...authHeaders }, body: payload });
       const data = await res.json();
       if(!res.ok) throw new Error(data?.message || 'Failed');
-      sessionStorage.setItem('swalAfterRedirect', JSON.stringify({
-        icon:'success', title:'Service Created', text:'Service was created successfully', timer:2000
-      }));
+      Swal.fire({icon:'success', title:'Service Created', text:'Service was created successfully', timer:1500, showConfirmButton:false});
       close(createModal);
       await fetchServices();
-      showSwalFromSession();
     }catch(err){
       Swal.fire({icon:'error', title:'Create failed', text: err.message || 'Error'});
     }
@@ -486,29 +432,9 @@
     }
   });
 
-  // ===== SweetAlert after redirect helper =====
-  function showSwalFromSession(){
-    const key = 'swalAfterRedirect';
-    const raw = sessionStorage.getItem(key);
-    if(raw){
-      try{
-        const d = JSON.parse(raw);
-        Swal.fire({
-          icon: d.icon || 'success',
-          title: d.title || 'Success',
-          text: d.text || '',
-          timer: d.timer || 0,
-          showConfirmButton: !(d.timer>0)
-        });
-      }catch(_){}
-      sessionStorage.removeItem(key);
-    }
-  }
-
-  // init
+  // Init
   document.addEventListener('DOMContentLoaded', ()=>{
     fetchServices();
-    showSwalFromSession();
   });
 </script>
 
