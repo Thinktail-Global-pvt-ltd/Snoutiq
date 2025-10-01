@@ -16,6 +16,24 @@ class ServiceController extends Controller
      */
     protected function resolveUserId(Request $request): ?int
     {
+        $vetSlug = $request->input('vet_slug')
+            ?? $request->query('vet_slug')
+            ?? $request->header('X-Vet-Slug');
+
+        if ($vetSlug) {
+            // slug OR vet_slug column—use whichever exists in your table
+            $uid = DB::table('vet_registerations_temp')
+                ->where(function ($q) use ($vetSlug) {
+                    $q->where('slug', $vetSlug)
+                      ->orWhere('vet_slug', $vetSlug);
+                })
+                ->value('user_id');
+
+            if ($uid) {
+                return (int) $uid;
+            }
+        }
+
         $id = $request->input('user_id')
             ?? $request->query('user_id')
             ?? $request->header('X-User-Id')
@@ -53,6 +71,8 @@ class ServiceController extends Controller
             ], 500);
         }
     }
+
+
 
     public function store(Request $request)
     {

@@ -1,3 +1,4 @@
+{{-- resources/views/vet/landing.blade.php --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27,9 +28,9 @@
     },7000);
   </script>
 
-  <!-- SweetAlert2 (for service modal) -->
+  <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <!-- Axios (already okay to keep; we use fetch below but axios is fine to keep on page) -->
+  <!-- Axios (optional, we use fetch below) -->
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
   <style>
@@ -88,11 +89,25 @@ label{font-size:.9rem;color:#334155}
 .qsvc-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .qsvc-btn{background:#ecf3ff;border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:10px 12px;text-align:center;font-weight:800;cursor:pointer}
 .qsvc-btn:hover{background:#e6f0ff}
-.reviews-card{padding:10px;border-radius:12px;background:#eaf3ff;color:var(--text);border:1px solid var(--border)}
-.reviews-card .bar{display:flex;align-items:center;gap:.5rem;font-weight:800;background:#e1edff;border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:.6rem .8rem;margin-bottom:.75rem}
-.rev-item{background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:.7rem .9rem;color:var(--text)}
-.rev-item + .rev-item{margin-top:.6rem}
-/* reels/offers omitted (same as before) */
+/* reels */
+.reel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.reel-card{position:relative;background:#eef4ff;border:1px solid var(--border);border-radius:12px;padding:18px 16px;min-height:120px;display:flex;align-items:flex-end;overflow:hidden}
+.reel-play{position:absolute;top:10px;right:10px;background:#00000012;border:1px solid #0000001a;color:#111;padding:.35rem .55rem;border-radius:8px;font-weight:800}
+.reel-title{font-weight:800;color:#0f172a}
+/* offers */
+.offers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.offer-card{position:relative;background:#ffffff;border:1px solid var(--border);border-radius:12px;padding:14px}
+.badge{position:absolute;top:10px;right:10px;border-radius:999px;padding:.25rem .6rem;font-weight:800;font-size:.8rem}
+.badge-pink{background:#ffe4f1;color:#be185d;border:1px solid #fbcfe8}
+.badge-purple{background:#efe9ff;color:#6d28d9;border:1px solid #ddd6fe}
+.badge-blue{background:#e6f5ff;color:#0369a1;border:1px solid #bae6fd}
+.offer-title{font-weight:800;margin-bottom:.1rem}
+.offer-sub{color:#55607a;margin-bottom:.4rem}
+.price-old{text-decoration:line-through;color:#64748b;margin-right:.5rem}
+.price-new{font-weight:900;color:#0ea5e9}
+/* floating AI btn */
+.ai-fab{position:fixed;right:16px;bottom:16px;border:none;border-radius:999px;width:54px;height:54px;display:grid;place-items:center;font-size:22px;background:linear-gradient(90deg,#3b82f6,#06b6d4);color:#fff;box-shadow:0 14px 30px -10px rgba(59,130,246,.45);cursor:pointer}
+.ai-fab:focus{outline:2px solid var(--ring);outline-offset:2px}
   </style>
 </head>
 <body>
@@ -126,7 +141,7 @@ label{font-size:.9rem;color:#334155}
     </div>
   </header>
 
-  <!-- Inline ask box just below clinic title -->
+  <!-- Inline ask box -->
   <div class="container" id="clinic-ask-wrap" style="text-align:center;padding:6px 0 10px">
     <div class="askbar" style="max-width:720px;margin:0 auto">
       <i class="fa-solid fa-microphone-lines"></i>
@@ -140,8 +155,10 @@ label{font-size:.9rem;color:#334155}
 
   <!-- Quick Services (DYNAMIC) -->
   <section class="container" id="quick-services" style="padding:0 1rem 1.25rem">
-    <div class="reviews-card">
-      <div class="bar"><span>⚡</span> <span>Quick Services</span></div>
+    <div class="reviews-card" style="padding:10px;border-radius:12px;background:#eaf3ff;color:var(--text);border:1px solid var(--border)">
+      <div class="bar" style="display:flex;align-items:center;gap:.5rem;font-weight:800;background:#e1edff;border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:.6rem .8rem;margin-bottom:.75rem">
+        <span>⚡</span> <span>Quick Services</span>
+      </div>
       <div id="qsvc-loading" class="muted" style="padding:.5rem 0">Loading services…</div>
       <div id="qsvc-grid" class="qsvc-grid" style="display:none"></div>
       <div id="qsvc-empty" class="muted" style="text-align:center;margin-top:.6rem;display:none">No services available right now.</div>
@@ -161,10 +178,12 @@ label{font-size:.9rem;color:#334155}
 
   <!-- Reviews -->
   <section class="container" id="reviews" style="padding:0 1rem 2rem">
-    <div class="reviews-card">
-      <div class="bar"><span>⭐</span> <span>Reviews (4.9/5)</span></div>
-      <div class="rev-item"><div style="font-weight:800;margin-bottom:.2rem">Priya S.</div><div>"AI diagnosis was perfect! Quick video call saved my cat."</div></div>
-      <div class="rev-item"><div style="font-weight:800;margin-bottom:.2rem">Rakesh M.</div><div>"Emergency service at 2 AM. Excellent response time."</div></div>
+    <div class="reviews-card" style="padding:10px;border-radius:12px;background:#eaf3ff;color:var(--text);border:1px solid var(--border)">
+      <div class="bar" style="display:flex;align-items:center;gap:.5rem;font-weight:800;background:#e1edff;border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:.6rem .8rem;margin-bottom:.75rem">
+        <span>⭐</span> <span>Reviews (4.9/5)</span>
+      </div>
+      <div class="rev-item" style="background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:.7rem .9rem;color:var(--text)"><div style="font-weight:800;margin-bottom:.2rem">Priya S.</div><div>"AI diagnosis was perfect! Quick video call saved my cat."</div></div>
+      <div class="rev-item" style="background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:.7rem .9rem;color:var(--text);margin-top:.6rem"><div style="font-weight:800;margin-bottom:.2rem">Rakesh M.</div><div>"Emergency service at 2 AM. Excellent response time."</div></div>
     </div>
   </section>
 
@@ -324,6 +343,12 @@ label{font-size:.9rem;color:#334155}
       location.href = `backend/custom-doctor-register?${params.toString()}`;
     }
 
+    function openChat(){
+      const params = new URLSearchParams({ vet_slug: (vetSlug || '') });
+      location.href = `/backend/pet-dashboard?${params.toString()}`;
+    }
+    window.openChat = openChat;
+
     const sendAsk = (id) => {
       const v = (document.getElementById(id)?.value || '').trim();
       if (!v) return; loginRedirect(v);
@@ -336,13 +361,13 @@ label{font-size:.9rem;color:#334155}
   <!-- Dynamic Quick Services + SweetAlert request -->
   <script>
   (function(){
-    const vetSlug   = @json($vet->slug);
-    const API_SERVICES = 'https://snoutiq.com/backend/api/groomer/services';
-    const API_REQUEST  = 'https://snoutiq.com/backend/api/service-requests'; // <-- change if your endpoint differs
+    const vetSlug     = @json($vet->slug);
+    const API_SERVICES= 'https://snoutiq.com/backend/api/groomer/services';
+    const API_REQUEST = 'https://snoutiq.com/backend/api/service-requests'; // change if different
 
-    const grid   = document.getElementById('qsvc-grid');
-    const empty  = document.getElementById('qsvc-empty');
-    const loading= document.getElementById('qsvc-loading');
+    const grid    = document.getElementById('qsvc-grid');
+    const empty   = document.getElementById('qsvc-empty');
+    const loading = document.getElementById('qsvc-loading');
 
     const authToken = (window.SNOUTIQ && window.SNOUTIQ.token) || localStorage.getItem('token') || sessionStorage.getItem('token');
 
@@ -356,7 +381,7 @@ label{font-size:.9rem;color:#334155}
       }catch(_){ return null; }
     }
     const USER_ID = resolveUserId();
-    console.log('[vet page] user_id resolved:', USER_ID);
+    console.log('[vet page] user_id resolved:', USER_ID, 'vet_slug:', vetSlug);
 
     function inr(n){ const x=Number(n); return Number.isFinite(x)? x.toFixed(0) : '—'; }
 
@@ -375,7 +400,18 @@ label{font-size:.9rem;color:#334155}
       empty.style.display = 'none';
 
       try{
-        const res = await fetch(API_SERVICES, { headers: { 'Accept':'application/json' }});
+        // build URL with vet_slug + optional user_id
+        const url = new URL(API_SERVICES);
+        if (vetSlug) url.searchParams.set('vet_slug', vetSlug);
+        if (USER_ID) url.searchParams.set('user_id', String(USER_ID));
+
+        const res = await fetch(url.toString(), {
+          headers: {
+            'Accept':'application/json',
+            ...(vetSlug ? {'X-Vet-Slug': vetSlug} : {})
+          }
+        });
+
         const data = await res.json();
         const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
         renderServices(list);
@@ -390,8 +426,7 @@ label{font-size:.9rem;color:#334155}
 
     function renderServices(items){
       grid.innerHTML = '';
-      // Optional filter for this page (e.g., only vet-related):
-      const filtered = items.filter(s => (s.status||'').toLowerCase() !== 'inactive');
+      const filtered = (items || []).filter(s => (s.status||'').toLowerCase() !== 'inactive');
       if (!filtered.length){
         empty.textContent = 'No services available right now.';
         empty.style.display = '';
@@ -473,7 +508,6 @@ label{font-size:.9rem;color:#334155}
         const msg = (body && body.message) ? body.message : ('HTTP ' + resp.status);
         throw new Error(msg);
       }
-      // success -> body can be shown in toast/log if needed
       console.log('[service.request.success]', body);
     }
 
