@@ -55,6 +55,7 @@ class ServiceController extends Controller
  public function get(Request $request)
 {
     try {
+     
         $uid = null;
 
         // if vet_slug passed
@@ -64,6 +65,7 @@ class ServiceController extends Controller
             $vet = \DB::table('vet_registerations_temp')
                 ->whereRaw('LOWER(slug) = ?', [$slug])
                 ->first();
+                   
 
             if ($vet) {
                 $uid = $vet->id; // 👈 yahan user_id ki jagah vet ka id use karna hoga
@@ -83,6 +85,7 @@ class ServiceController extends Controller
         }
 
         $services = GroomerService::where('user_id', $uid)->get();
+        dd($vet);
 
         return response()->json([
             'status' => true,
