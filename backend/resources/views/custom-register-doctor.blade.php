@@ -23,13 +23,7 @@
   <!-- UI -->
   <main style="max-width:400px;margin:40px auto;background:#fff;padding:24px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.1)">
     <h1 style="text-align:center;margin-bottom:10px">Welcome to Test Clinic!</h1>
-    <p style="text-align:center;color:#64748b">Let's start by getting to know you</p>
-
-    <!-- Tabs -->
-    <div style="display:flex;gap:8px;margin:16px 0">
-      <button id="tab-pet" class="tab active" style="flex:1;padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:#2563eb;color:#fff">Pet Owner</button>
-      <button id="tab-vet" class="tab" style="flex:1;padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb">Veterinarian</button>
-    </div>
+    <p style="text-align:center;color:#64748b">Sign up as a pet owner to continue</p>
 
     <!-- Location Badge -->
     <div id="locBadge" style="padding:10px;border-radius:8px;text-align:center;border:1px solid #e5e7eb;background:#f3f4f6;margin-bottom:16px">
@@ -39,13 +33,6 @@
     <!-- Google login -->
     <div id="googleBtn" style="margin:12px auto;text-align:center;min-height:44px"></div>
     <p id="googleMsg" style="text-align:center;font-size:14px;margin-top:8px;color:#dc2626"></p>
-
-    <!-- Vet email -->
-    <div id="vetPanel" style="display:none;margin-top:16px">
-      <input id="vetEmail" placeholder="Work email" style="width:100%;padding:10px;margin-bottom:8px;border:1px solid #e5e7eb;border-radius:8px"/>
-      <input id="vetPass" type="password" placeholder="Password" style="width:100%;padding:10px;margin-bottom:8px;border:1px solid #e5e7eb;border-radius:8px"/>
-      <button id="vetCta" style="width:100%;padding:10px;background:#2563eb;color:#fff;border:none;border-radius:8px">Continue</button>
-    </div>
   </main>
 
   <div id="toast" class="toast"></div>
@@ -60,18 +47,6 @@
       el.style.background = type==="error" ? "#dc2626" : (type==="success"?"#16a34a":"#111827");
       el.classList.add("show");
       setTimeout(()=>el.classList.remove("show"),2500);
-    };
-
-    // Tab switching
-    document.getElementById("tab-pet").onclick=()=>{
-      document.getElementById("vetPanel").style.display="none";
-      document.getElementById("tab-pet").classList.add("active");
-      document.getElementById("tab-vet").classList.remove("active");
-    };
-    document.getElementById("tab-vet").onclick=()=>{
-      document.getElementById("vetPanel").style.display="block";
-      document.getElementById("tab-vet").classList.add("active");
-      document.getElementById("tab-pet").classList.remove("active");
     };
 
     // Location
@@ -94,7 +69,7 @@
     }
     if(navigator.geolocation){ requestLocation(); } else { setBadge("denied","Not supported","#fee2e2"); }
 
-    // Google login
+    // Google login -> pet flow only
     window.onGoogleCredential = async (response)=>{
       if(locationStatus!=="granted"){ 
         document.getElementById("googleMsg").textContent="❌ Please allow location access first";
@@ -107,25 +82,31 @@
       const email=googleData.email; const googleToken=googleData.sub;
 
       try{
-        // 1. Try login with role pet
+        // 1) Try login (role: pet)
         let loginRes=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
-        if(loginRes.data.status==="success"){
+        if(loginRes.data.status==="success" || loginRes.data.token){
           toast("Login successful!","success");
-          location.href="/dashboard"; return;
+          location.href="https://snoutiq.com/backend/dashboard";
+          return;
         }
       }catch(e){ console.warn("Login failed, will register"); }
 
-      // 2. Register
+      // 2) Register (initial)
       let reg=await fetch("https://snoutiq.com/backend/api/auth/initial-register",{
         method:"POST",headers:{ "Content-Type":"application/json" },
         body:JSON.stringify({ fullName:googleData.name,email,google_token:googleToken,latitude:coords.lat,longitude:coords.lng })
       });
       let regData=await reg.json();
-      if(regData.status==="error"){ document.getElementById("googleMsg").textContent=regData.message; return; }
+      if(regData.status==="error"){ document.getElementById("googleMsg").textContent=regData.message || "Registration error"; return; }
 
-      // 3. Login again with role pet
+      // 3) Login again (role: pet)
       let finalLogin=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
-      if(finalLogin.data.token){ toast("Registered & logged in!","success"); location.href="https://snoutiq.com/backend/dashboard"; }
+      if(finalLogin.data.token || finalLogin.data.status==="success"){
+        toast("Registered & logged in!","success");
+        location.href="https://snoutiq.com/backend/dashboard";
+      }else{
+        document.getElementById("googleMsg").textContent="Could not log you in. Please try again.";
+      }
     };
 
     window.onload=()=>{
@@ -136,15 +117,6 @@
         });
         google.accounts.id.renderButton(document.getElementById("googleBtn"),{ theme:"filled_blue", size:"large" });
       }
-    };
-
-    // Vet CTA
-    document.getElementById("vetCta").onclick=()=>{
-      const email=document.getElementById("vetEmail").value;
-      const pass=document.getElementById("vetPass").value;
-      if(!email||!pass){ toast("Email & password required","error"); return; }
-      toast("Vet register flow started","info");
-      // TODO: call your API
     };
   </script>
 </body>
