@@ -24,6 +24,7 @@ class ServiceController extends Controller
 
         // 2) vet_slug => take the row id from vet_registerations_temp (slug column exists)
         $slug = $request->query('vet_slug') ?? $request->query('clinic_slug');
+        dd($slug); 
         if ($slug) {
             $row = DB::table('vet_registerations_temp')
                 ->select('id')
