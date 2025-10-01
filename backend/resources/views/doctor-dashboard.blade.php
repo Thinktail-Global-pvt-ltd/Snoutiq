@@ -414,6 +414,15 @@
 
   function resetForm(){ els.form.reset(); els.petType.value=''; els.main.value=''; }
 
+  // helper: FormData -> object (for clean console logs)
+  function fdToObject(fd){
+    const obj = {};
+    for(const [k,v] of fd.entries()){
+      obj[k] = (v instanceof File) ? `[File:${v.name}, size:${v.size}]` : v;
+    }
+    return obj;
+  }
+
   // guard open modal (login first)
   function handleOpen(){
     if (!SESSION_USER_ID) {
@@ -474,15 +483,29 @@
       fd.append('status',      'Active');
 
       // send both — body + headers (for audits); server still uses session()
-      fd.append('user_id',      String(SESSION_USER_ID));  // most accurate with your store()
-      fd.append('client_user',  String(CURRENT_USER_ID || '')); // extra hint
+      fd.append('user_id',      String(SESSION_USER_ID));     // aligns with your store()
+      fd.append('client_user',  String(CURRENT_USER_ID||'')); // extra hint
 
       const headers = buildHeaders(auth);
+
+      // 🔵 DEBUG: submit se pehle payload + headers console pe dikhado
+      const debugBody = fdToObject(fd);
+      console.log('%c[createService] About to POST','color:#2563eb;font-weight:700', {
+        endpoint: API_POST_SVC,
+        authMode: window.__authMode,
+        SESSION_USER_ID,
+        CURRENT_USER_ID,
+        headers,
+        body: debugBody
+      });
+      // logger me bhi daal do
+      (window.ClientLog?.info) && window.ClientLog.info('service.create.payload', { endpoint: API_POST_SVC, headers, body: debugBody });
+
       const data = await fetchJSON(API_POST_SVC, { method:'POST', headers, body: fd });
 
       Swal.fire({icon:'success', title:'Service Created', text:'Your service has been created successfully.'});
       resetForm();
-      ClientLog?.info('service.create.success', data);
+      window.ClientLog?.info && window.ClientLog.info('service.create.success', data);
 
     }catch(err){
       const msg = err?.body?.message
@@ -490,8 +513,8 @@
         || err?.hint
         || 'Error creating service';
       Swal.fire({icon:'error', title:'Create failed', text: msg});
-      ClientLog?.error('service.create.failed', { err, CURRENT_USER_ID, SESSION_USER_ID });
-      ClientLog?.open();
+      window.ClientLog?.error && window.ClientLog.error('service.create.failed', { err, CURRENT_USER_ID, SESSION_USER_ID });
+      window.ClientLog?.open && window.ClientLog.open();
     }finally{
       loading(els.submit,false);
     }
