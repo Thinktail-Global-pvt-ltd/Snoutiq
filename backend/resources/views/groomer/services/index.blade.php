@@ -268,18 +268,31 @@
 </button>
 
 <script>
+  // ===== CURRENT_USER_ID strictly from frontend =====
+  const CURRENT_USER_ID = (() => {
+    try {
+      const url = new URL(location.href);
+      const qid = Number(url.searchParams.get('userId') || url.searchParams.get('doctorId'));
+      const authFull = JSON.parse(localStorage.getItem('auth_full') || sessionStorage.getItem('auth_full') || 'null');
+      const stg = Number(localStorage.getItem('user_id') || sessionStorage.getItem('user_id'));
+      const fromAuth = Number(authFull?.user?.id ?? authFull?.user_id);
+      return qid || fromAuth || stg || null;
+    } catch (_) { return null; }
+  })();
+  console.log('[services] CURRENT_USER_ID:', CURRENT_USER_ID);
+
   // ===== CONFIG (hardcoded prod endpoints) =====
   const CONFIG = {
     API_BASE: 'https://snoutiq.com/backend/api',
     CSRF_URL: 'https://snoutiq.com/backend/sanctum/csrf-cookie',
-    LOGIN_API: 'https://snoutiq.com/backend/api/login', // change if different
+    LOGIN_API: 'https://snoutiq.com/backend/api/login',
   };
   const API = {
-    list:   `${CONFIG.API_BASE}/groomer/services`,
+    list:   (uid) => `${CONFIG.API_BASE}/groomer/services?user_id=${encodeURIComponent(uid ?? '')}`,
     create: `${CONFIG.API_BASE}/groomer/service`,
-    show:   id => `${CONFIG.API_BASE}/groomer/service/${id}`,
-    update: id => `${CONFIG.API_BASE}/groomer/service/${id}/update`, // backend uses POST update
-    delete: id => `${CONFIG.API_BASE}/groomer/service/${id}`
+    show:   (id,uid) => `${CONFIG.API_BASE}/groomer/service/${id}?user_id=${encodeURIComponent(uid ?? '')}`,
+    update: (id,uid) => `${CONFIG.API_BASE}/groomer/service/${id}/update?user_id=${encodeURIComponent(uid ?? '')}`,
+    delete: (id,uid) => `${CONFIG.API_BASE}/groomer/service/${id}?user_id=${encodeURIComponent(uid ?? '')}`,
   };
 
   // ===== Logger =====
@@ -323,19 +336,16 @@
     mode: 'unknown', // 'bearer' | 'cookie' | 'none'
     async bootstrap(){
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (token){ this.mode='bearer'; ClientLog.info('auth.mode','bearer'); return {mode:'bearer'}; }
-      // try sanctum cookie
+      if (token){ this.mode='bearer'; return {mode:'bearer'}; }
       try{
         await fetch(CONFIG.CSRF_URL, {credentials:'include'});
         const xsrf = getCookie('XSRF-TOKEN');
-        if (xsrf){ this.mode='cookie'; ClientLog.info('auth.mode','cookie'); return {mode:'cookie', xsrf}; }
-        this.mode='none'; ClientLog.warn('auth.cookie.missing-xsrf'); return {mode:'none'};
-      }catch(err){
-        this.mode='none'; ClientLog.error('auth.cookie.failed',err?.message||String(err)); return {mode:'none'};
-      }
+        if (xsrf){ this.mode='cookie'; return {mode:'cookie', xsrf}; }
+        this.mode='none'; return {mode:'none'};
+      }catch{ this.mode='none'; return {mode:'none'}; }
     },
     headers(base={}){
-      const h={ 'Accept':'application/json', ...base };
+      const h={ 'Accept':'application/json', ...base, 'X-User-Id': String(CURRENT_USER_ID || '') };
       if (this.mode==='bearer'){
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (token) h['Authorization']='Bearer '+token;
@@ -346,10 +356,6 @@
       }
       return h;
     },
-    logout(){
-      localStorage.removeItem('token'); sessionStorage.removeItem('token'); this.mode='none';
-      Swal.fire({icon:'success',title:'Logged out',timer:1000,showConfirmButton:false});
-    }
   };
 
   function getCookie(name){
@@ -357,7 +363,6 @@
   }
 
   async function apiFetch(url, opts={}, expectJSON=true){
-    // always include credentials for cookie mode
     const res = await fetch(url, { credentials:'include', ...opts });
     const ct  = res.headers.get('content-type')||'';
     const body = (expectJSON && ct.includes('application/json')) ? await res.json() : await res.text();
@@ -380,82 +385,17 @@
   const close = el => el.classList.add('hidden');
   function esc(s){ return (''+(s??'')).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 
-  // ===== Auth button (SweetAlert mini panel) =====
-  document.getElementById('btn-auth').addEventListener('click', async ()=>{
-    const result = await Swal.fire({
-      title: 'Authentication',
-      html: `
-        <div class="text-left space-y-3">
-          <div>
-            <div class="text-xs mb-1">Paste Bearer token</div>
-            <input id="auth-token" class="swal2-input" placeholder="eyJ..."/>
-          </div>
-          <div class="text-xs">OR use Cookie mode (Sanctum). Click "Enable Cookie Mode" to load CSRF.</div>
-          <hr/>
-          <div>
-            <div class="text-xs mb-1">Email (optional)</div>
-            <input id="auth-email" class="swal2-input" placeholder="email@example.com"/>
-          </div>
-          <div>
-            <div class="text-xs mb-1">Password (optional)</div>
-            <input id="auth-pass" type="password" class="swal2-input" placeholder="••••••••"/>
-          </div>
-          <div class="text-[11px] text-gray-500">Login endpoint: ${CONFIG.LOGIN_API}</div>
-        </div>
-      `,
-      showDenyButton: true,
-      showCancelButton: true,
-      confirmButtonText: 'Save Token',
-      denyButtonText: 'Enable Cookie Mode',
-      cancelButtonText: 'Login (get token)',
-      focusConfirm: false,
-      preConfirm: ()=>{
-        const t = document.getElementById('auth-token').value.trim();
-        if (!t){ Swal.showValidationMessage('Paste a token or use other options'); return false; }
-        localStorage.setItem('token', t); sessionStorage.setItem('token', t);
-        return true;
-      }
-    });
-
-    if (result.isDenied){
-      try{
-        await fetch(CONFIG.CSRF_URL, {credentials:'include'});
-        Auth.mode='cookie';
-        Swal.fire({icon:'success',title:'Cookie mode enabled',timer:1200,showConfirmButton:false});
-      }catch(e){
-        Swal.fire({icon:'error',title:'Cookie setup failed',text:e?.message||'CSRF error'});
-      }
-      return;
-    }
-
-    if (result.dismiss === Swal.DismissReason.cancel){
-      // attempt credential login to get token
-      const email = document.getElementById('auth-email').value.trim();
-      const pass  = document.getElementById('auth-pass').value;
-      if (!email || !pass) { Swal.fire({icon:'warning',title:'Enter email & password'}); return; }
-      try{
-        const data = await apiFetch(CONFIG.LOGIN_API, {
-          method:'POST',
-          headers:{ 'Accept':'application/json', 'Content-Type':'application/json' },
-          body: JSON.stringify({ email, password: pass })
-        });
-        const token = data?.token || data?.access_token;
-        if (!token) throw new Error('No token in response');
-        localStorage.setItem('token', token); sessionStorage.setItem('token', token);
-        Swal.fire({icon:'success',title:'Logged in',timer:1200,showConfirmButton:false});
-      }catch(err){
-        Swal.fire({icon:'error',title:'Login failed',text:err.message||'Error'});
-      }
-    }
-  });
-
   // ===== List + Render =====
   let ALL = [];
   async function fetchServices(){
+    if (!CURRENT_USER_ID){
+      rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">user_id missing (add ?userId=... in URL or set auth_full)</td></tr>`;
+      return;
+    }
     rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-gray-500" colspan="7">Loading…</td></tr>`;
     try{
       await Auth.bootstrap();
-      const res = await apiFetch(API.list, {
+      const res = await apiFetch(API.list(CURRENT_USER_ID), {
         headers: Auth.headers()
       });
       const items = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
@@ -463,8 +403,8 @@
       render(ALL);
     }catch(e){
       rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">Failed to load (${esc(e.message||e)})</td></tr>`;
-      ClientLog.error('services.load.failed', e.message||String(e));
-      ClientLog.open();
+      ClientLog?.error('services.load.failed', e.message||String(e));
+      ClientLog?.open();
     }
   }
 
@@ -509,6 +449,8 @@
 
   document.getElementById('create-form').addEventListener('submit', async (e)=>{
     e.preventDefault();
+    if (!CURRENT_USER_ID){ Swal.fire({icon:'warning',title:'user_id missing'}); return; }
+
     const fd = new FormData(e.target);
     const payload = new FormData();
     payload.append('serviceName',  fd.get('serviceName'));
@@ -518,6 +460,8 @@
     payload.append('duration',     fd.get('duration'));
     payload.append('main_service', fd.get('main_service'));
     payload.append('status',       fd.get('status'));
+    // ⭐ send user_id from frontend
+    payload.append('user_id',      String(CURRENT_USER_ID));
 
     try{
       await Auth.bootstrap();
@@ -529,11 +473,11 @@
       Swal.fire({icon:'success', title:'Service Created', text:'Service was created successfully', timer:1500, showConfirmButton:false});
       close(createModal);
       await fetchServices();
-      ClientLog.info('service.create.success', JSON.stringify(res).slice(0,800));
+      ClientLog?.info('service.create.success', JSON.stringify(res).slice(0,800));
     }catch(err){
       Swal.fire({icon:'error', title:'Create failed', text: err.message || 'Error'});
-      ClientLog.error('service.create.failed', err.message||String(err));
-      ClientLog.open();
+      ClientLog?.error('service.create.failed', err.message||String(err));
+      ClientLog?.open();
     }
   });
 
@@ -546,13 +490,13 @@
     if(act==='edit'){
       try{
         await Auth.bootstrap();
-        const data = await apiFetch(API.show(id), { headers: Auth.headers() });
+        const data = await apiFetch(API.show(id, CURRENT_USER_ID), { headers: Auth.headers() });
         const s = data?.data || data;
         fillEdit(s);
         open(editModal);
       }catch(err){
         Swal.fire({icon:'error', title:'Failed to load service', text: err.message||'Error'});
-        ClientLog.error('service.show.failed', err.message||String(err));
+        ClientLog?.error('service.show.failed', err.message||String(err));
       }
     }
 
@@ -569,33 +513,29 @@
 
       try{
         await Auth.bootstrap();
-        // First try DELETE (Bearer or Cookie with XSRF)
-        await apiFetch(API.delete(id), {
+        // DELETE with header + query ?user_id=
+        await apiFetch(API.delete(id, CURRENT_USER_ID), {
           method:'DELETE',
           headers: Auth.headers()
         }, true);
         Swal.fire({icon:'success', title:'Deleted', timer:1200, showConfirmButton:false});
         await fetchServices();
       }catch(err){
-        // Fallback: POST override if server blocks DELETE (419/401/405)
-        if ([401,403,405,419].includes(err.status|0)){
-          try{
-            await apiFetch(API.delete(id), {
-              method:'POST',
-              headers: Auth.headers({'X-HTTP-Method-Override':'DELETE'}),
-            }, true);
-            Swal.fire({icon:'success', title:'Deleted', timer:1200, showConfirmButton:false});
-            await fetchServices();
-            return;
-          }catch(err2){
-            Swal.fire({icon:'error', title:'Delete failed', text: err2.message || 'Error'});
-            ClientLog.error('service.delete.failed(fallback)', err2.message||String(err2));
-            ClientLog.open();
-          }
-        }else{
-          Swal.fire({icon:'error', title:'Delete failed', text: err.message || 'Error'});
-          ClientLog.error('service.delete.failed', err.message||String(err));
-          ClientLog.open();
+        // Fallback: POST override if server blocks DELETE
+        try{
+          const payload = new FormData();
+          payload.append('user_id', String(CURRENT_USER_ID));
+          await apiFetch(API.delete(id, CURRENT_USER_ID), {
+            method:'POST',
+            headers: Auth.headers({'X-HTTP-Method-Override':'DELETE'}),
+            body: payload
+          }, true);
+          Swal.fire({icon:'success', title:'Deleted', timer:1200, showConfirmButton:false});
+          await fetchServices();
+        }catch(err2){
+          Swal.fire({icon:'error', title:'Delete failed', text: err2.message || 'Error'});
+          ClientLog?.error('service.delete.failed', err2.message||String(err2));
+          ClientLog?.open();
         }
       }
     }
@@ -617,6 +557,8 @@
 
   document.getElementById('edit-form').addEventListener('submit', async (e)=>{
     e.preventDefault();
+    if (!CURRENT_USER_ID){ Swal.fire({icon:'warning',title:'user_id missing'}); return; }
+
     const f = e.target;
     const id = f.elements['id'].value;
     const payload = new FormData();
@@ -627,11 +569,12 @@
     payload.append('duration',     f.elements['duration'].value);
     payload.append('main_service', f.elements['main_service'].value);
     payload.append('status',       f.elements['status'].value);
+    // ⭐ send user_id from frontend
+    payload.append('user_id',      String(CURRENT_USER_ID));
 
     try{
       await Auth.bootstrap();
-      // Backend expects POST {id}/update. If you move to REST, switch to PUT.
-      const res = await apiFetch(API.update(id), {
+      const res = await apiFetch(API.update(id, CURRENT_USER_ID), {
         method:'POST',
         headers: Auth.headers(),
         body: payload
@@ -639,11 +582,11 @@
       Swal.fire({icon:'success', title:'Updated', timer:1200, showConfirmButton:false});
       close(editModal);
       await fetchServices();
-      ClientLog.info('service.update.success', JSON.stringify(res).slice(0,800));
+      ClientLog?.info('service.update.success', JSON.stringify(res).slice(0,800));
     }catch(err){
-      // Fallback: PUT /groomer/services/{id} with X-HTTP-Method-Override
+      // Fallback: PUT w/ override
       try{
-        const res2 = await apiFetch(`${CONFIG.API_BASE}/groomer/services/${id}`, {
+        const res2 = await apiFetch(`${CONFIG.API_BASE}/groomer/services/${id}?user_id=${encodeURIComponent(CURRENT_USER_ID)}`, {
           method:'POST',
           headers: Auth.headers({'X-HTTP-Method-Override':'PUT'}),
           body: payload
@@ -651,21 +594,17 @@
         Swal.fire({icon:'success', title:'Updated', timer:1200, showConfirmButton:false});
         close(editModal);
         await fetchServices();
-        ClientLog.info('service.update.success(fallback)', JSON.stringify(res2).slice(0,800));
+        ClientLog?.info('service.update.success(fallback)', JSON.stringify(res2).slice(0,800));
       }catch(err2){
         Swal.fire({icon:'error', title:'Update failed', text: err2.message || err.message || 'Error'});
-        ClientLog.error('service.update.failed', err2.message||String(err2));
-        ClientLog.open();
+        ClientLog?.error('service.update.failed', err2.message||String(err2));
+        ClientLog?.open();
       }
     }
   });
 
   // ===== Init =====
   document.addEventListener('DOMContentLoaded', async ()=>{
-    ClientLog.info('env', JSON.stringify({
-      API, LOGIN_API: CONFIG.LOGIN_API,
-      token_present: !!(localStorage.getItem('token')||sessionStorage.getItem('token'))
-    }));
     await fetchServices();
   });
 
