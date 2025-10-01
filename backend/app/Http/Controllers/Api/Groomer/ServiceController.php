@@ -67,7 +67,7 @@ class ServiceController extends Controller
             $services = GroomerService::where('user_id', $uid)
                 ->with('category')
                 ->get();
-                dd($services);
+               // dd($services);
 
             return response()->json([
                 'status'  => true,
