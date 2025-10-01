@@ -21,15 +21,16 @@ class ServiceController extends Controller
         if ($uid !== null && $uid !== '') {
             return (int) $uid;
         }
-
+                     
         // 2) vet_slug => take the row id from vet_registerations_temp (slug column exists)
         $slug = $request->query('vet_slug') ?? $request->query('clinic_slug');
-        dd($slug); 
+                                      
         if ($slug) {
             $row = DB::table('vet_registerations_temp')
                 ->select('id')
                 ->whereRaw('LOWER(slug) = ?', [strtolower($slug)])
                 ->first();
+                  dd($row);   
 
             if ($row) {
                 return (int) $row->id;   // <-- this id will be used as user_id
