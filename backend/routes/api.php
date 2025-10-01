@@ -365,4 +365,5 @@ Route::prefix('groomer')->group(function () {
 });
 
 Route::post('groomer/service', [GroomerServiceController::class, 'store']);
+    Route::delete('groomer/service/{id}', [GroomerServiceController::class, 'destroy']);
 

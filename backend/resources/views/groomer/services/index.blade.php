@@ -8,11 +8,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
+  <style>
+    #client-logger{font-family:ui-monospace,Menlo,Consolas,monospace}
+  </style>
 </head>
 <body class="h-screen bg-gray-50">
 
 <div class="flex h-full">
-  <!-- Sidebar (exact style as doctor dashboard) -->
+  <!-- Sidebar -->
   <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white">
     <div class="h-16 flex items-center px-6 border-b border-white/10">
       <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
@@ -39,7 +42,6 @@
         <span class="text-sm font-medium">Video Consultation</span>
       </a>
 
-      <!-- Hardcoded Services link (as requested) -->
       <a href="http://snoutiq.com/backend/dashboard/services"
          class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -61,6 +63,11 @@
       </div>
 
       <div class="flex items-center gap-3">
+        <button id="btn-auth"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">
+          🔐 Auth
+        </button>
+
         <button id="toggle-diag"
                 class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800">
           Diagnostics
@@ -242,54 +249,228 @@
   </div>
 </div>
 
+<!-- ===== Frontend Logger + Auth Panel ===== -->
+<div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[460px] max-h-[72vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
+  <div class="flex items-center justify-between px-3 py-2 border-b">
+    <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
+    <div class="flex items-center gap-2">
+      <input id="log-token" placeholder="paste Bearer token…" class="px-2 py-1 rounded bg-gray-100 text-xs w-44">
+      <button id="log-token-save" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs">Save</button>
+      <button id="log-dump" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Download</button>
+      <button id="log-clear" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Clear</button>
+      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">✕</button>
+    </div>
+  </div>
+  <div id="log-body" class="text-[11px] leading-4 text-gray-800 px-3 py-2 overflow-y-auto whitespace-pre-wrap"></div>
+</div>
+<button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">
+  🪵 Logs (<span id="log-count">0</span>)
+</button>
+
 <script>
-  // ===== Hardcoded API endpoints (PROD) =====
+  // ===== CONFIG (hardcoded prod endpoints) =====
+  const CONFIG = {
+    API_BASE: 'https://snoutiq.com/backend/api',
+    CSRF_URL: 'https://snoutiq.com/backend/sanctum/csrf-cookie',
+    LOGIN_API: 'https://snoutiq.com/backend/api/login', // change if different
+  };
   const API = {
-    list:   'https://snoutiq.com/backend/api/groomer/services',
-    create: 'https://snoutiq.com/backend/api/groomer/service',
-    show:   id => `https://snoutiq.com/backend/api/groomer/service/${id}`,
-    update: id => `https://snoutiq.com/backend/api/groomer/service/${id}/update`,
-    delete: id => `https://snoutiq.com/backend/api/groomer/service/${id}`
+    list:   `${CONFIG.API_BASE}/groomer/services`,
+    create: `${CONFIG.API_BASE}/groomer/service`,
+    show:   id => `${CONFIG.API_BASE}/groomer/service/${id}`,
+    update: id => `${CONFIG.API_BASE}/groomer/service/${id}/update`, // backend uses POST update
+    delete: id => `${CONFIG.API_BASE}/groomer/service/${id}`
   };
 
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  const authHeaders = token ? { 'Authorization': 'Bearer ' + token } : { };
+  // ===== Logger =====
+  (function(){
+    const ui={panel:document.getElementById('client-logger'),body:document.getElementById('log-body'),toggle:document.getElementById('log-toggle'),count:document.getElementById('log-count'),close:document.getElementById('log-close'),clear:document.getElementById('log-clear'),dump:document.getElementById('log-dump'),tokenI:document.getElementById('log-token'),tokenS:document.getElementById('log-token-save')};
+    const MAX=600,buf=[];
+    const trunc=(s,n)=>{ if(typeof s!=='string'){ try{s=JSON.stringify(s)}catch(_){s=String(s)} } return s.length>n?s.slice(0,n)+'…':s; };
+    const stamp=()=>new Date().toISOString();
+    function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); div.textContent=`[${row.t}] ${level.toUpperCase()} ${msg}${meta?' '+trunc(meta,1800):''}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
+    const Log={info:(m,d)=>push('info',m,d? (typeof d==='string'?d:JSON.stringify(d)):''),warn:(m,d)=>push('warn',m,d? (typeof d==='string'?d:JSON.stringify(d)):''),error:(m,d)=>push('error',m,d? (typeof d==='string'?d:JSON.stringify(d)):''),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{api:API,login_api:CONFIG.LOGIN_API,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token'))},logs:buf})};
+    window.ClientLog=Log;
 
+    ui.toggle.addEventListener('click',Log.open);
+    ui.close.addEventListener('click',Log.close);
+    ui.clear.addEventListener('click',Log.clear);
+    ui.dump.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(Log.dump(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='frontend-logs.json'; a.click(); URL.revokeObjectURL(a.href); });
+    ui.tokenS.addEventListener('click',()=>{ const t=ui.tokenI.value.trim(); if(!t) return; localStorage.setItem('token',t); sessionStorage.setItem('token',t); Swal.fire({icon:'success',title:'Token saved',timer:1200,showConfirmButton:false}); });
+
+    // instrument fetch
+    const origFetch=window.fetch.bind(window);
+    window.fetch=async function(input,init={}){
+      const url=(typeof input==='string')?input:input.url;
+      const method=(init?.method||(typeof input==='object'&&input.method)||'GET').toUpperCase();
+      const start=performance.now();
+      Log.info('NET:REQUEST', JSON.stringify({method,url,headers:init?.headers||{},cred:init?.credentials||'default'}));
+      try{
+        const res=await origFetch(input,init);
+        const ct=res.headers.get('content-type')||'';
+        const ms=Math.round(performance.now()-start);
+        Log.info('NET:RESPONSE', JSON.stringify({method,url,status:res.status,ok:res.ok,duration_ms:ms,content_type:ct}));
+        return res;
+      }catch(err){
+        Log.error('NET:FAILED', JSON.stringify({method,url,error:err?.message||String(err)}));
+        throw err;
+      }
+    };
+  })();
+
+  // ===== Auth helper (Bearer OR Sanctum cookie) =====
+  const Auth = {
+    mode: 'unknown', // 'bearer' | 'cookie' | 'none'
+    async bootstrap(){
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (token){ this.mode='bearer'; ClientLog.info('auth.mode','bearer'); return {mode:'bearer'}; }
+      // try sanctum cookie
+      try{
+        await fetch(CONFIG.CSRF_URL, {credentials:'include'});
+        const xsrf = getCookie('XSRF-TOKEN');
+        if (xsrf){ this.mode='cookie'; ClientLog.info('auth.mode','cookie'); return {mode:'cookie', xsrf}; }
+        this.mode='none'; ClientLog.warn('auth.cookie.missing-xsrf'); return {mode:'none'};
+      }catch(err){
+        this.mode='none'; ClientLog.error('auth.cookie.failed',err?.message||String(err)); return {mode:'none'};
+      }
+    },
+    headers(base={}){
+      const h={ 'Accept':'application/json', ...base };
+      if (this.mode==='bearer'){
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (token) h['Authorization']='Bearer '+token;
+      } else if (this.mode==='cookie'){
+        h['X-Requested-With']='XMLHttpRequest';
+        const xsrf = decodeURIComponent(getCookie('XSRF-TOKEN')||'');
+        if (xsrf) h['X-XSRF-TOKEN']=xsrf;
+      }
+      return h;
+    },
+    logout(){
+      localStorage.removeItem('token'); sessionStorage.removeItem('token'); this.mode='none';
+      Swal.fire({icon:'success',title:'Logged out',timer:1000,showConfirmButton:false});
+    }
+  };
+
+  function getCookie(name){
+    return document.cookie.split('; ').find(r=>r.startsWith(name+'='))?.split('=')[1] || '';
+  }
+
+  async function apiFetch(url, opts={}, expectJSON=true){
+    // always include credentials for cookie mode
+    const res = await fetch(url, { credentials:'include', ...opts });
+    const ct  = res.headers.get('content-type')||'';
+    const body = (expectJSON && ct.includes('application/json')) ? await res.json() : await res.text();
+    if (!res.ok){
+      const msg = (body && body.message) ? body.message : `HTTP ${res.status}`;
+      const err = new Error(msg); err.status=res.status; err.body=body; throw err;
+    }
+    return body;
+  }
+
+  // ===== UI helpers =====
   const $ = (s, r=document)=> r.querySelector(s);
   const $$ = (s, r=document)=> Array.from(r.querySelectorAll(s));
   const rows = $('#rows');
   const empty = $('#empty');
   const search = $('#search');
-
   const createModal = $('#create-modal');
   const editModal   = $('#edit-modal');
-
   const open = el => el.classList.remove('hidden');
   const close = el => el.classList.add('hidden');
+  function esc(s){ return (''+(s??'')).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+  // ===== Auth button (SweetAlert mini panel) =====
+  document.getElementById('btn-auth').addEventListener('click', async ()=>{
+    const result = await Swal.fire({
+      title: 'Authentication',
+      html: `
+        <div class="text-left space-y-3">
+          <div>
+            <div class="text-xs mb-1">Paste Bearer token</div>
+            <input id="auth-token" class="swal2-input" placeholder="eyJ..."/>
+          </div>
+          <div class="text-xs">OR use Cookie mode (Sanctum). Click "Enable Cookie Mode" to load CSRF.</div>
+          <hr/>
+          <div>
+            <div class="text-xs mb-1">Email (optional)</div>
+            <input id="auth-email" class="swal2-input" placeholder="email@example.com"/>
+          </div>
+          <div>
+            <div class="text-xs mb-1">Password (optional)</div>
+            <input id="auth-pass" type="password" class="swal2-input" placeholder="••••••••"/>
+          </div>
+          <div class="text-[11px] text-gray-500">Login endpoint: ${CONFIG.LOGIN_API}</div>
+        </div>
+      `,
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: 'Save Token',
+      denyButtonText: 'Enable Cookie Mode',
+      cancelButtonText: 'Login (get token)',
+      focusConfirm: false,
+      preConfirm: ()=>{
+        const t = document.getElementById('auth-token').value.trim();
+        if (!t){ Swal.showValidationMessage('Paste a token or use other options'); return false; }
+        localStorage.setItem('token', t); sessionStorage.setItem('token', t);
+        return true;
+      }
+    });
+
+    if (result.isDenied){
+      try{
+        await fetch(CONFIG.CSRF_URL, {credentials:'include'});
+        Auth.mode='cookie';
+        Swal.fire({icon:'success',title:'Cookie mode enabled',timer:1200,showConfirmButton:false});
+      }catch(e){
+        Swal.fire({icon:'error',title:'Cookie setup failed',text:e?.message||'CSRF error'});
+      }
+      return;
+    }
+
+    if (result.dismiss === Swal.DismissReason.cancel){
+      // attempt credential login to get token
+      const email = document.getElementById('auth-email').value.trim();
+      const pass  = document.getElementById('auth-pass').value;
+      if (!email || !pass) { Swal.fire({icon:'warning',title:'Enter email & password'}); return; }
+      try{
+        const data = await apiFetch(CONFIG.LOGIN_API, {
+          method:'POST',
+          headers:{ 'Accept':'application/json', 'Content-Type':'application/json' },
+          body: JSON.stringify({ email, password: pass })
+        });
+        const token = data?.token || data?.access_token;
+        if (!token) throw new Error('No token in response');
+        localStorage.setItem('token', token); sessionStorage.setItem('token', token);
+        Swal.fire({icon:'success',title:'Logged in',timer:1200,showConfirmButton:false});
+      }catch(err){
+        Swal.fire({icon:'error',title:'Login failed',text:err.message||'Error'});
+      }
+    }
+  });
 
   // ===== List + Render =====
   let ALL = [];
   async function fetchServices(){
     rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-gray-500" colspan="7">Loading…</td></tr>`;
     try{
-      const res = await fetch(API.list, { headers: { ...authHeaders, 'Accept':'application/json' }});
-      const data = await res.json();
-      const items = Array.isArray(data) ? data
-                  : Array.isArray(data?.data) ? data.data
-                  : [];
+      await Auth.bootstrap();
+      const res = await apiFetch(API.list, {
+        headers: Auth.headers()
+      });
+      const items = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
       ALL = items;
       render(ALL);
     }catch(e){
-      rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">Failed to load</td></tr>`;
+      rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">Failed to load (${esc(e.message||e)})</td></tr>`;
+      ClientLog.error('services.load.failed', e.message||String(e));
+      ClientLog.open();
     }
   }
 
   function render(list){
     rows.innerHTML = '';
-    if(!list.length){
-      empty.classList.remove('hidden');
-      return;
-    }
+    if(!list.length){ empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
 
     for(const it of list){
@@ -315,9 +496,7 @@
     }
   }
 
-  function esc(s){ return (''+ (s ?? '')).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
-
-  // ===== Search =====
+  // Search
   search.addEventListener('input', e=>{
     const q = e.target.value.toLowerCase().trim();
     const filtered = !q ? ALL : ALL.filter(x => (x.name||'').toLowerCase().includes(q));
@@ -341,18 +520,24 @@
     payload.append('status',       fd.get('status'));
 
     try{
-      const res = await fetch(API.create, { method:'POST', headers:{ ...authHeaders }, body: payload });
-      const data = await res.json();
-      if(!res.ok) throw new Error(data?.message || 'Failed');
+      await Auth.bootstrap();
+      const res = await apiFetch(API.create, {
+        method:'POST',
+        headers: Auth.headers(),
+        body: payload
+      });
       Swal.fire({icon:'success', title:'Service Created', text:'Service was created successfully', timer:1500, showConfirmButton:false});
       close(createModal);
       await fetchServices();
+      ClientLog.info('service.create.success', JSON.stringify(res).slice(0,800));
     }catch(err){
       Swal.fire({icon:'error', title:'Create failed', text: err.message || 'Error'});
+      ClientLog.error('service.create.failed', err.message||String(err));
+      ClientLog.open();
     }
   });
 
-  // ===== Edit/Delete =====
+  // ===== Edit/Delete actions =====
   rows.addEventListener('click', async (e)=>{
     const btn = e.target.closest('button[data-act]');
     if(!btn) return;
@@ -360,13 +545,14 @@
 
     if(act==='edit'){
       try{
-        const res = await fetch(API.show(id), { headers:{ ...authHeaders, 'Accept':'application/json' }});
-        const data = await res.json();
+        await Auth.bootstrap();
+        const data = await apiFetch(API.show(id), { headers: Auth.headers() });
         const s = data?.data || data;
         fillEdit(s);
         open(editModal);
-      }catch(_){
-        Swal.fire({icon:'error', title:'Failed to load service'});
+      }catch(err){
+        Swal.fire({icon:'error', title:'Failed to load service', text: err.message||'Error'});
+        ClientLog.error('service.show.failed', err.message||String(err));
       }
     }
 
@@ -382,13 +568,35 @@
       if(!ok.isConfirmed) return;
 
       try{
-        const res = await fetch(API.delete(id), { method:'DELETE', headers:{ ...authHeaders }});
-        const data = await res.json();
-        if(!res.ok) throw new Error(data?.message || 'Delete failed');
+        await Auth.bootstrap();
+        // First try DELETE (Bearer or Cookie with XSRF)
+        await apiFetch(API.delete(id), {
+          method:'DELETE',
+          headers: Auth.headers()
+        }, true);
         Swal.fire({icon:'success', title:'Deleted', timer:1200, showConfirmButton:false});
         await fetchServices();
       }catch(err){
-        Swal.fire({icon:'error', title:'Delete failed', text: err.message || 'Error'});
+        // Fallback: POST override if server blocks DELETE (419/401/405)
+        if ([401,403,405,419].includes(err.status|0)){
+          try{
+            await apiFetch(API.delete(id), {
+              method:'POST',
+              headers: Auth.headers({'X-HTTP-Method-Override':'DELETE'}),
+            }, true);
+            Swal.fire({icon:'success', title:'Deleted', timer:1200, showConfirmButton:false});
+            await fetchServices();
+            return;
+          }catch(err2){
+            Swal.fire({icon:'error', title:'Delete failed', text: err2.message || 'Error'});
+            ClientLog.error('service.delete.failed(fallback)', err2.message||String(err2));
+            ClientLog.open();
+          }
+        }else{
+          Swal.fire({icon:'error', title:'Delete failed', text: err.message || 'Error'});
+          ClientLog.error('service.delete.failed', err.message||String(err));
+          ClientLog.open();
+        }
       }
     }
   });
@@ -421,21 +629,55 @@
     payload.append('status',       f.elements['status'].value);
 
     try{
-      const res = await fetch(API.update(id), { method:'POST', headers:{ ...authHeaders }, body: payload });
-      const data = await res.json();
-      if(!res.ok) throw new Error(data?.message || 'Update failed');
+      await Auth.bootstrap();
+      // Backend expects POST {id}/update. If you move to REST, switch to PUT.
+      const res = await apiFetch(API.update(id), {
+        method:'POST',
+        headers: Auth.headers(),
+        body: payload
+      });
       Swal.fire({icon:'success', title:'Updated', timer:1200, showConfirmButton:false});
       close(editModal);
       await fetchServices();
+      ClientLog.info('service.update.success', JSON.stringify(res).slice(0,800));
     }catch(err){
-      Swal.fire({icon:'error', title:'Update failed', text: err.message || 'Error'});
+      // Fallback: PUT /groomer/services/{id} with X-HTTP-Method-Override
+      try{
+        const res2 = await apiFetch(`${CONFIG.API_BASE}/groomer/services/${id}`, {
+          method:'POST',
+          headers: Auth.headers({'X-HTTP-Method-Override':'PUT'}),
+          body: payload
+        });
+        Swal.fire({icon:'success', title:'Updated', timer:1200, showConfirmButton:false});
+        close(editModal);
+        await fetchServices();
+        ClientLog.info('service.update.success(fallback)', JSON.stringify(res2).slice(0,800));
+      }catch(err2){
+        Swal.fire({icon:'error', title:'Update failed', text: err2.message || err.message || 'Error'});
+        ClientLog.error('service.update.failed', err2.message||String(err2));
+        ClientLog.open();
+      }
     }
   });
 
-  // Init
-  document.addEventListener('DOMContentLoaded', ()=>{
-    fetchServices();
+  // ===== Init =====
+  document.addEventListener('DOMContentLoaded', async ()=>{
+    ClientLog.info('env', JSON.stringify({
+      API, LOGIN_API: CONFIG.LOGIN_API,
+      token_present: !!(localStorage.getItem('token')||sessionStorage.getItem('token'))
+    }));
+    await fetchServices();
   });
+
+  // ===== Logger hotkey =====
+  (function(){
+    const uiToggle=document.getElementById('log-toggle');
+    const uiPanel=document.getElementById('client-logger');
+    const uiClose=document.getElementById('log-close');
+    uiToggle.addEventListener('click', ()=> uiPanel.classList.remove('hidden'));
+    uiClose.addEventListener('click', ()=> uiPanel.classList.add('hidden'));
+    window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='`'){ e.preventDefault(); uiPanel.classList.toggle('hidden'); }});
+  })();
 </script>
 
 </body>
