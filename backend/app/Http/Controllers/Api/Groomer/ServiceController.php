@@ -30,7 +30,7 @@ class ServiceController extends Controller
                 ->select('id')
                 ->whereRaw('LOWER(slug) = ?', [strtolower($slug)])
                 ->first();
-                  dd($row);   
+                  //dd($row);   
 
             if ($row) {
                 return (int) $row->id;   // <-- this id will be used as user_id
@@ -56,7 +56,7 @@ class ServiceController extends Controller
     {
         try {
             $uid = $this->resolveUserId($request);
-           // dd($uid);
+            dd($uid);
             if (!$uid) {
                 return response()->json([
                     'status'  => false,
