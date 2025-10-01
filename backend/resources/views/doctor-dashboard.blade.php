@@ -31,36 +31,39 @@
 
   $serverDoctorId = $serverCandidate ? (int)$serverCandidate : null;
 
+  // Auth id for fallback/enabling button
+  $authId = optional(auth()->user())->id;
+
   // ===== Sidebar links =====
   $aiChatUrl   = ($pathPrefix ? "/$pathPrefix" : '') . '/pet-dashboard';
   $thisPageUrl = ($pathPrefix ? "/$pathPrefix" : '') . '/doctor' . ($serverDoctorId ? ('?doctorId=' . urlencode($serverDoctorId)) : '');
 @endphp
 
 <script>
-  // ========= Runtime env from server =========
+  /* ========= runtime env from server ========= */
   const PATH_PREFIX = @json($pathPrefix ? "/$pathPrefix" : ""); // "" locally, "/backend" in prod
   const SOCKET_URL  = @json($socketUrl);
 
-  // server session user (what your backend will actually use)
+  // server-backed ids (what backend can truly see)
   const SESSION_USER_ID = Number(@json(session('user_id') ?? data_get(session('user'),'id') ?? null)) || null;
+  const AUTH_USER_ID    = Number(@json($authId ?? null)) || null;   // Laravel auth()->id()
 
-  // other fallbacks (for display only)
+  // other fallbacks (url + localStorage)
   const fromServer  = Number(@json($serverDoctorId ?? null)) || null;
   const fromQuery   = (()=>{ const u=new URL(location.href); const v=u.searchParams.get('doctorId'); return v?Number(v):null; })();
   function readAuthFull(){ try{ const raw=sessionStorage.getItem('auth_full')||localStorage.getItem('auth_full'); return raw?JSON.parse(raw):null; }catch(_){ return null; } }
   const af          = readAuthFull();
   const fromStorage = (()=>{ if(!af) return null; const id1=af?.user_id; const id2=af?.user?.id; return Number(id1||id2)||null; })();
 
-  // ⭐ FINAL effective ID used by frontend:
-  //    prefer SESSION_USER_ID so it matches server-side store() behaviour.
-  let CURRENT_USER_ID = SESSION_USER_ID || fromServer || fromQuery || fromStorage || null;
+  // ⭐ FINAL effective ID used in frontend (prefer server-backed)
+  let CURRENT_USER_ID = SESSION_USER_ID || AUTH_USER_ID || fromServer || fromQuery || fromStorage || null;
 
-  // For logger context
+  // utils for logger/debug
   const API_BASE  = (PATH_PREFIX || '') + '/api';
-  const LOGIN_URL = 'https://snoutiq.com/backend/custom-doctor-login';
+  const LOGIN_URL = (PATH_PREFIX || '') + '/custom-doctor-login';
 
   console.log('[doctor-dashboard] RESOLVED user_id:', CURRENT_USER_ID, {
-    SESSION_USER_ID, fromServer, fromQuery, fromStorage, PATH_PREFIX, API_BASE
+    SESSION_USER_ID, AUTH_USER_ID, fromServer, fromQuery, fromStorage, PATH_PREFIX, API_BASE
   });
 </script>
 
@@ -108,18 +111,21 @@
       </div>
 
       <div class="flex items-center gap-3">
-        <button id="toggle-diag" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800">Diagnostics</button>
+        <button id="toggle-diag" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800">
+          Diagnostics
+        </button>
 
-        <!-- Create button shows login guard if no session -->
-        <button id="btn-add-service" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-white
-                {{ session('user_id') ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed' }}">
+        {{-- Enable if session or auth() is present --}}
+        <button
+          id="btn-add-service"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold text-white {{ (session('user_id') || auth()->check()) ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed' }}">
           + Add Service
         </button>
 
         <div class="text-right">
           <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? 'Doctor' }}</div>
           <div class="text-xs text-gray-500">
-            {{ session('user_id') ? 'logged in (session)' : 'not logged in' }}
+            {{ session('user_id') || auth()->check() ? 'logged in' : 'not logged in' }}
           </div>
         </div>
         <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
@@ -296,7 +302,7 @@
    Logger (Ctrl+` to toggle)
 ========================= */
 (function(){
-  const ui={panel:document.getElementById('client-logger'),body:document.getElementById('log-body'),toggle:document.getElementById('log-toggle'),count:document.getElementById('log-count'),close:document.getElementById('log-close'),clear:document.getElementById('log-clear'),dl:document.getElementById('log-download'),tokenI:document.getElementById('log-token'),tokenS:document.getElementById('log-token-save'),};
+  const ui={panel:document.getElementById('client-logger'),body:document.getElementById('log-body'),toggle:document.getElementById('log-toggle'),count:document.getElementById('log-count'),close:document.getElementById('log-close'),clear:document.getElementById('log-clear'),dl:document.getElementById('log-download'),tokenI:document.getElementById('log-token'),tokenS:document.getElementById('log-token-save')};
   const MAX=500,buf=[];
   function trunc(s,n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}; return s.length>n?s.slice(0,n)+'…':s; }
   function stamp(){return new Date().toISOString()}
@@ -312,7 +318,6 @@
 
   window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='`'){ e.preventDefault(); ui.panel.classList.toggle('hidden'); }});
 
-  // instrument fetch
   const origFetch=window.fetch.bind(window);
   window.fetch=async function(input,init={}){
     const url=(typeof input==='string')?input:input.url;
@@ -331,20 +336,22 @@
     }
   };
 
-  Log.info('env', { PATH_PREFIX, API_BASE, SOCKET_URL, DOCTOR_ID: CURRENT_USER_ID, token_present: !!(localStorage.getItem('token')||sessionStorage.getItem('token')) });
+  ClientLog?.info('env', { PATH_PREFIX, API_BASE, SOCKET_URL, DOCTOR_ID: CURRENT_USER_ID, token_present: !!(localStorage.getItem('token')||sessionStorage.getItem('token')) });
 })();
 </script>
 
 <script>
 /* =========================
    Add Service (Bearer or Sanctum)
-   Uses SESSION user for correctness with backend store().
+   Uses SESSION/AUTH user for correctness with backend store().
 ========================= */
 (function(){
   const $ = s => document.querySelector(s);
 
-  // ENDPOINT
+  // ENDPOINT (prod)
   const API_POST_SVC = 'https://snoutiq.com/backend/api/groomer/service';
+  // For local testing:
+  // const API_POST_SVC = (PATH_PREFIX || '') + '/api/groomer/service';
 
   const els = {
     openBtn: $('#btn-add-service'),
@@ -389,7 +396,7 @@
     const h = {
       'Accept':'application/json',
       'X-Acting-User': String(CURRENT_USER_ID || ''),
-      'X-Session-User': String(SESSION_USER_ID || '')
+      'X-Session-User': String(SESSION_USER_ID || AUTH_USER_ID || '')
     };
     if (auth.mode === 'bearer') {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -414,22 +421,13 @@
 
   function resetForm(){ els.form.reset(); els.petType.value=''; els.main.value=''; }
 
-  // helper: FormData -> object (for clean console logs)
-  function fdToObject(fd){
-    const obj = {};
-    for(const [k,v] of fd.entries()){
-      obj[k] = (v instanceof File) ? `[File:${v.name}, size:${v.size}]` : v;
-    }
-    return obj;
-  }
-
   // guard open modal (login first)
   function handleOpen(){
-    if (!SESSION_USER_ID) {
+    if (!(SESSION_USER_ID || AUTH_USER_ID)) {
       Swal.fire({
         icon:'warning',
         title:'Please login',
-        text:'A server session is required so your service is saved against your account.',
+        text:'A server session/account is required so your service is saved against your profile.',
         confirmButtonText:'Go to Login'
       }).then(x=>{ if(x.isConfirmed){ window.location.href = LOGIN_URL; } });
       return;
@@ -440,8 +438,8 @@
   async function createService(e){
     e.preventDefault();
 
-    // hard guard — block if no session user (prevents user_id = 1 on server)
-    if (!SESSION_USER_ID) {
+    // block if both null → prevents user_id=1 fallback on server
+    if (!(SESSION_USER_ID || AUTH_USER_ID)) {
       Swal.fire({
         icon:'warning',
         title:'Not logged in',
@@ -482,30 +480,29 @@
       fd.append('main_service', main);
       fd.append('status',      'Active');
 
-      // send both — body + headers (for audits); server still uses session()
-      fd.append('user_id',      String(SESSION_USER_ID));     // aligns with your store()
+      // send both — body + headers (server still uses session()/auth()->id())
+      const EFFECTIVE_USER = (SESSION_USER_ID || AUTH_USER_ID || CURRENT_USER_ID);
+      fd.append('user_id',      String(EFFECTIVE_USER));      // body (for auditing/fallback)
       fd.append('client_user',  String(CURRENT_USER_ID||'')); // extra hint
 
       const headers = buildHeaders(auth);
 
-      // 🔵 DEBUG: submit se pehle payload + headers console pe dikhado
-      const debugBody = fdToObject(fd);
-      console.log('%c[createService] About to POST','color:#2563eb;font-weight:700', {
+      // 🔵 DEBUG: log payload BEFORE submit
+      const debugBody = Object.fromEntries([...fd.entries()]);
+      console.log('[createService] POST', {
         endpoint: API_POST_SVC,
-        authMode: window.__authMode,
-        SESSION_USER_ID,
-        CURRENT_USER_ID,
         headers,
+        SESSION_USER_ID,
+        AUTH_USER_ID,
+        CURRENT_USER_ID,
         body: debugBody
       });
-      // logger me bhi daal do
-      (window.ClientLog?.info) && window.ClientLog.info('service.create.payload', { endpoint: API_POST_SVC, headers, body: debugBody });
 
       const data = await fetchJSON(API_POST_SVC, { method:'POST', headers, body: fd });
 
       Swal.fire({icon:'success', title:'Service Created', text:'Your service has been created successfully.'});
       resetForm();
-      window.ClientLog?.info && window.ClientLog.info('service.create.success', data);
+      ClientLog?.info('service.create.success', data);
 
     }catch(err){
       const msg = err?.body?.message
@@ -513,8 +510,8 @@
         || err?.hint
         || 'Error creating service';
       Swal.fire({icon:'error', title:'Create failed', text: msg});
-      window.ClientLog?.error && window.ClientLog.error('service.create.failed', { err, CURRENT_USER_ID, SESSION_USER_ID });
-      window.ClientLog?.open && window.ClientLog.open();
+      ClientLog?.error('service.create.failed', { err, CURRENT_USER_ID, SESSION_USER_ID, AUTH_USER_ID });
+      ClientLog?.open();
     }finally{
       loading(els.submit,false);
     }
@@ -527,7 +524,7 @@
     // wire up modal button with guard
     els.openBtn?.addEventListener('click', handleOpen);
 
-    // also keyboard shortcut to open (if logged in)
+    // keyboard shortcut to open (if logged in)
     window.addEventListener('keydown', e=>{
       if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='n'){
         e.preventDefault(); handleOpen();
