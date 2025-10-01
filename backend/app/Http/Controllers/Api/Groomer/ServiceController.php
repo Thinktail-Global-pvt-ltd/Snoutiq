@@ -8,13 +8,57 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
+use Illuminate\Support\Facades\DB;
+
+
 class ServiceController extends Controller
 {
     /**
      * Resolve user id strictly from the request (frontend),
      * with very last fallback to auth/session if present.
      */
-    protected function resolveUserId(Request $request): ?int
+
+    private function resolveUserId(Request $request): ?int
+{
+    // 1) direct param
+    if ($uid = $request->query('user_id') ?? $request->input('user_id')) {
+        return (int) $uid;
+    }
+
+    // 2) via slug (accepts vet_slug / slug)
+    $slug = $request->query('vet_slug')
+         ?? $request->query('slug')
+         ?? $request->input('vet_slug')
+         ?? $request->input('slug');
+
+    if ($slug) {
+        $needle = Str::lower(trim($slug));
+
+        // Try vet_registerations_temp (check whichever column actually has the slug)
+        $row = DB::table('vet_registerations_temp')
+            ->select('user_id','slug','vet_slug','clinic_slug')
+            ->whereRaw('LOWER(slug) = ?',        [$needle])
+            ->orWhereRaw('LOWER(vet_slug) = ?',  [$needle])
+            ->orWhereRaw('LOWER(clinic_slug) = ?',[$needle])
+            ->first();
+
+        if ($row && !empty($row->user_id)) {
+            return (int) $row->user_id;
+        }
+
+        // Fallback: if your main vets table also carries slug→user_id
+        $fallback = DB::table('vets')
+            ->whereRaw('LOWER(slug) = ?', [$needle])
+            ->value('user_id');
+        if ($fallback) return (int) $fallback;
+    }
+
+    // 3) last resort
+    $session = $request->session()->get('user_id');
+    return $session ? (int) $session : null;
+}
+
+    protected function resolveUserId__old(Request $request): ?int
     {
         $vetSlug = $request->input('vet_slug')
             ?? $request->query('vet_slug')
@@ -42,8 +86,39 @@ class ServiceController extends Controller
 
         return $id ? (int) $id : null;
     }
-
     public function get(Request $request)
+{
+    try {
+        $uid = $this->resolveUserId($request);
+
+        if (!$uid) {
+            \Log::warning('[groomer.services] user_id missing', [
+                'q' => $request->query(), 'session_user' => $request->session()->get('user_id')
+            ]);
+            return response()->json(['status'=>false,'message'=>'user_id missing'], 422);
+        }
+
+        $services = GroomerService::where('user_id', $uid)
+            ->with('category')
+            ->get();
+
+        return response()->json([
+            'status'=>true,
+            'message'=>'Services retrieved successfully',
+            'data'=>$services
+        ], 200);
+    } catch (\Throwable $e) {
+        \Log::error('[groomer.services] get failed', ['e'=>$e->getMessage()]);
+        return response()->json([
+            'status'=>false,
+            'message'=>'Failed to retrieve services',
+            'error'=>$e->getMessage(),
+        ], 500);
+    }
+}
+
+
+    public function get__old(Request $request)
     {
         try {
             $uid = $this->resolveUserId($request);
