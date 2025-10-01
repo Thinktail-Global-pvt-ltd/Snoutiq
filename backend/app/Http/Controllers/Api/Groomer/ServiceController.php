@@ -85,12 +85,80 @@ class ServiceController extends Controller
     //     }
     // }
 
-    public function store(Request $request)
+//     public function store(Request $request)
+// {
+//     try {
+
+//        // dd(session('user_id'));
+//         // Basic validation only (easy version)
+//         $request->validate([
+//             'serviceName'   => 'required|string',
+//             'petType'       => 'required|string',
+//             'price'         => 'required|numeric',
+//             'duration'      => 'required|integer',
+//             'main_service'  => 'required|string',
+//             'status'        => 'required|string',
+//             // serviceCategory optional kar diya
+//             'serviceCategory' => 'nullable|integer',
+//             'description'   => 'nullable|string',
+//             'servicePic'    => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+//         ]);
+
+//         // Prepare data
+//         $data = [
+//             'user_id'   => session('user_id') ?? "1",
+//            // 'groomer_service_category_id' => $request->serviceCategory ?? null,
+//             'name'      => $request->serviceName,
+//             'description' => $request->description,
+//             'pet_type'  => $request->petType,
+//             'price'     => $request->price,
+//             'duration'  => $request->duration,
+//             'main_service' => $request->main_service,
+//             'status'    => $request->status,
+//         ];
+
+//         // Handle file upload
+//         if ($request->hasFile('servicePic')) {
+//             $directory = public_path('service_pics');
+//             if (!File::exists($directory)) {
+//                 File::makeDirectory($directory, 0755, true);
+//             }
+//             $file = $request->file('servicePic');
+//             $uniqueName = time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
+//             $file->move($directory, $uniqueName);
+//             $data['service_pic'] = 'service_pics/' . $uniqueName;
+//         }
+
+//         // Create service
+//         $service = GroomerService::create($data);
+
+//         return response()->json([
+//             'status'  => true,
+//             'message' => 'Service created successfully',
+//             'data'    => $service,
+//         ], 201);
+
+//     } catch (\Illuminate\Validation\ValidationException $e) {
+//         // Agar validation fail hoti hai
+//         return response()->json([
+//             'status'  => false,
+//             'message' => 'Validation error',
+//             'errors'  => $e->errors(),
+//         ], 422);
+
+//     } catch (\Exception $e) {
+//         // Other errors
+//         return response()->json([
+//             'status'  => false,
+//             'message' => 'Failed to create service',
+//             'error'   => $e->getMessage(),
+//         ], 500);
+//     }
+// }
+
+public function store(Request $request)
 {
     try {
-
-       // dd(session('user_id'));
-        // Basic validation only (easy version)
         $request->validate([
             'serviceName'   => 'required|string',
             'petType'       => 'required|string',
@@ -98,16 +166,16 @@ class ServiceController extends Controller
             'duration'      => 'required|integer',
             'main_service'  => 'required|string',
             'status'        => 'required|string',
-            // serviceCategory optional kar diya
             'serviceCategory' => 'nullable|integer',
             'description'   => 'nullable|string',
             'servicePic'    => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'user_id'       => 'nullable|integer', // 👈 (optional) validate incoming user_id
         ]);
 
-        // Prepare data
         $data = [
-            'user_id'   => session('user_id') ?? "1",
-           // 'groomer_service_category_id' => $request->serviceCategory ?? null,
+            // 👇 prefer user_id sent from frontend (came from session), else fallback to session, else "1"
+            'user_id'   => $request->input('user_id') ?? session('user_id') ?? "1",
+
             'name'      => $request->serviceName,
             'description' => $request->description,
             'pet_type'  => $request->petType,
@@ -117,7 +185,6 @@ class ServiceController extends Controller
             'status'    => $request->status,
         ];
 
-        // Handle file upload
         if ($request->hasFile('servicePic')) {
             $directory = public_path('service_pics');
             if (!File::exists($directory)) {
@@ -129,7 +196,6 @@ class ServiceController extends Controller
             $data['service_pic'] = 'service_pics/' . $uniqueName;
         }
 
-        // Create service
         $service = GroomerService::create($data);
 
         return response()->json([
@@ -139,7 +205,6 @@ class ServiceController extends Controller
         ], 201);
 
     } catch (\Illuminate\Validation\ValidationException $e) {
-        // Agar validation fail hoti hai
         return response()->json([
             'status'  => false,
             'message' => 'Validation error',
@@ -147,7 +212,6 @@ class ServiceController extends Controller
         ], 422);
 
     } catch (\Exception $e) {
-        // Other errors
         return response()->json([
             'status'  => false,
             'message' => 'Failed to create service',
@@ -155,6 +219,7 @@ class ServiceController extends Controller
         ], 500);
     }
 }
+
 
 
     public function view(Request $request, $id)
