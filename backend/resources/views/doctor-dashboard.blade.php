@@ -19,15 +19,18 @@
 <body class="h-screen bg-gray-50">
 
 @php
+  // ===== Env / paths =====
   $pathPrefix = rtrim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/'); // e.g. "backend"
   $socketUrl  = $socketUrl ?? (config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000'));
 
+  // ===== Doctor identity (server-side first) =====
   $serverCandidate = session('user_id')
         ?? data_get(session('user'), 'id')
         ?? optional(auth()->user())->id
         ?? request('doctorId');
   $serverDoctorId = $serverCandidate ? (int)$serverCandidate : null;
 
+  // ===== Sidebar links =====
   $aiChatUrl   = ($pathPrefix ? "/$pathPrefix" : '') . '/pet-dashboard';
   $thisPageUrl = ($pathPrefix ? "/$pathPrefix" : '') . '/doctor' . ($serverDoctorId ? ('?doctorId=' . urlencode($serverDoctorId)) : '');
 @endphp
@@ -43,7 +46,10 @@
   const af = readAuthFull();
   const fromStorage = (()=>{ if(!af) return null; const id1=af.user_id; const id2=af.user && af.user.id; return Number(id1||id2)||null; })();
 
-  const DOCTOR_ID = fromServer || fromQuery || fromStorage || 501;
+  // Final doctor/user id resolution (same pattern as your chat view)
+  let CURRENT_USER_ID = fromServer || fromQuery || fromStorage || 501;
+
+  // Expose a minimal API base if ever needed (kept for logger)
   const API_BASE  = (PATH_PREFIX || '') + '/api';
 </script>
 
@@ -169,7 +175,7 @@
   </div>
 </div>
 
-{{-- Logger panel (toggle with button or Ctrl+`) --}}
+{{-- Frontend Logger (toggle with button or Ctrl+`) --}}
 <div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[420px] max-h-[70vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
   <div class="flex items-center justify-between px-3 py-2 border-b">
     <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
@@ -276,7 +282,7 @@
   function trunc(s,n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}; return s.length>n?s.slice(0,n)+'…':s; }
   function stamp(){return new Date().toISOString()}
   function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); div.textContent=`[${row.t}] ${level.toUpperCase()} ${msg}${meta?' '+trunc(typeof meta==='string'?meta:JSON.stringify(meta),2000):''}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
-  const Log={info:(m,d)=>push('info',m,d),warn:(m,d)=>push('warn',m,d),error:(m,d)=>push('error',m,d),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{PATH_PREFIX,API_BASE,SOCKET_URL,DOCTOR_ID,url:location.href,ua:navigator.userAgent,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token')),auth_mode:window.__authMode||'unknown'},logs:buf})};
+  const Log={info:(m,d)=>push('info',m,d),warn:(m,d)=>push('warn',m,d),error:(m,d)=>push('error',m,d),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{PATH_PREFIX,API_BASE,SOCKET_URL,USER_ID:CURRENT_USER_ID,url:location.href,ua:navigator.userAgent,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token')),auth_mode:window.__authMode||'unknown'},logs:buf})};
   window.ClientLog=Log;
 
   ui.toggle.addEventListener('click',Log.open);
@@ -293,7 +299,7 @@
     const url=(typeof input==='string')?input:input.url;
     const method=(init?.method||(typeof input==='object'&&input.method)||'GET').toUpperCase();
     const start=performance.now();
-    Log.info('NET:REQUEST', {method,url,headers:init?.headers||{},cred:init?.credentials||'default'});
+    Log.info('NET:REQUEST', {method,url,headers:init?.headers||{},cred:init?.credentials||'default',body: (init?.body instanceof FormData ? '[FormData]' : undefined)});
     try{
       const res=await origFetch(input,init);
       const ct=res.headers.get('content-type')||'';
@@ -306,19 +312,21 @@
     }
   };
 
-  Log.info('env', { PATH_PREFIX, API_BASE, SOCKET_URL, DOCTOR_ID, token_present: !!(localStorage.getItem('token')||sessionStorage.getItem('token')) });
+  Log.info('env', { PATH_PREFIX, API_BASE, SOCKET_URL, DOCTOR_ID: CURRENT_USER_ID, token_present: !!(localStorage.getItem('token')||sessionStorage.getItem('token')) });
 })();
 </script>
 
 <script>
 /* =========================
-   Add Service (supports Bearer or Sanctum cookie)
+   Add Service (Bearer or Sanctum). Sends user_id like chat view.
 ========================= */
 (function(){
   const $ = s => document.querySelector(s);
 
- // const API_POST_SVC = API_BASE + '/groomer/service';
-    const API_POST_SVC = 'https://snoutiq.com/backend/api/groomer/service';
+  // HARD-CODED PROD ENDPOINT (change if needed):
+  const API_POST_SVC = 'https://snoutiq.com/backend/api/groomer/service';
+  // For local: const API_POST_SVC = 'http://localhost:8000/api/groomer/service';
+
   const els = {
     openBtn: $('#btn-add-service'),
     modal:   $('#add-service-modal'),
@@ -345,24 +353,21 @@
 
   async function bootstrapAuth(){
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (token) { window.__authMode='bearer'; if (window.ClientLog) ClientLog.info('auth.mode','bearer'); return { mode:'bearer' }; }
-    // try Sanctum cookie mode
+    if (token) { window.__authMode='bearer'; ClientLog?.info('auth.mode','bearer'); return { mode:'bearer' }; }
     try{
       await fetch(CSRF_URL, { credentials:'include' });
       const xsrf = xsrfHeader();
-      if (xsrf) { window.__authMode='cookie'; if (window.ClientLog) ClientLog.info('auth.mode','cookie'); return { mode:'cookie', xsrf }; }
-      window.__authMode='none';
-      if (window.ClientLog) ClientLog.warn('auth.cookie.missing-xsrf');
+      if (xsrf) { window.__authMode='cookie'; ClientLog?.info('auth.mode','cookie'); return { mode:'cookie', xsrf }; }
+      window.__authMode='none'; ClientLog?.warn('auth.cookie.missing-xsrf');
       return { mode:'none' };
     }catch(err){
-      window.__authMode='none';
-      if (window.ClientLog) ClientLog.error('auth.cookie.failed',err);
+      window.__authMode='none'; ClientLog?.error('auth.cookie.failed',err);
       return { mode:'none' };
     }
   }
 
   function buildHeaders(auth){
-    const h = { 'Accept':'application/json' };
+    const h = { 'Accept':'application/json', 'X-Acting-User': String(CURRENT_USER_ID||'') }; // helpful for backend logs
     if (auth.mode === 'bearer') {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       h['Authorization'] = 'Bearer ' + token;
@@ -378,13 +383,13 @@
     const res = await fetch(url, { credentials:'include', ...opts });
     const ct  = res.headers.get('content-type') || '';
     const isJSON = ct.includes('application/json');
+    const body = isJSON ? await res.json() : await res.text();
     if (!isJSON) {
-      // Useful hint when HTML comes back instead of JSON
-      throw { status: res.status, body: `<${ct}>`, hint: 'Non-JSON response (likely HTML redirect/login). Check auth + PATH_PREFIX.' };
+      // HTML returned (likely login page / redirect)
+      throw { status: res.status, body, hint: 'Non-JSON response (HTML). Check auth/cookies / CORS / base URL.' };
     }
-    const data = await res.json();
-    if (!res.ok) throw { status: res.status, body: data };
-    return data;
+    if (!res.ok) throw { status: res.status, body };
+    return body;
   }
 
   function resetForm(){
@@ -395,6 +400,17 @@
 
   async function createService(e){
     e.preventDefault(); // no reload
+
+    // Resolve CURRENT_USER_ID like chat (already computed above), but try storage override again for safety:
+    try{
+      const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
+      if (raw) {
+        const obj = JSON.parse(raw);
+        const fromStorage = Number(obj?.user?.id ?? obj?.user_id ?? NaN);
+        if (!Number.isNaN(fromStorage) && fromStorage) CURRENT_USER_ID = fromStorage;
+      }
+    }catch(_){}
+
     const name     = els.name.value.trim();
     const duration = Number(els.duration.value);
     const price    = Number(els.price.value);
@@ -411,12 +427,13 @@
     try{
       const auth = await bootstrapAuth();
       if (auth.mode === 'none') {
-        if (window.ClientLog) ClientLog.warn('no-token', { message:'No Bearer token and Sanctum cookie not ready' });
+        ClientLog?.warn('no-auth', { message:'No Bearer token and Sanctum cookie not ready' });
         Swal.fire({icon:'warning', title:'Not authenticated', text:'Paste a Bearer token in the logger OR configure Sanctum cookies.'});
         loading(els.submit,false);
         return;
       }
 
+      // Build form data (API expects these)
       const fd = new FormData();
       fd.append('serviceName', name);
       fd.append('description', notes);
@@ -426,12 +443,16 @@
       fd.append('main_service', main);
       fd.append('status', 'Active');
 
+      // ALSO send user id (for debugging on prod; server may ignore, but harmless)
+      fd.append('user_id', String(CURRENT_USER_ID||''));     // body param
+      // And we already add 'X-Acting-User' header in buildHeaders()
+
       const headers = buildHeaders(auth);
       const data = await fetchJSON(API_POST_SVC, { method:'POST', headers, body: fd });
 
       Swal.fire({icon:'success', title:'Service Created', text:'Your service has been created successfully.'});
       resetForm();
-      if (window.ClientLog) ClientLog.info('service.create.success', data);
+      ClientLog?.info('service.create.success', data);
 
     }catch(err){
       const msg = err?.body?.message
@@ -439,14 +460,20 @@
         || err?.hint
         || 'Error creating service';
       Swal.fire({icon:'error', title:'Create failed', text: msg});
-      if (window.ClientLog) { ClientLog.error('service.create.failed', err); ClientLog.open(); }
+      ClientLog?.error('service.create.failed', { err, CURRENT_USER_ID });
+      ClientLog?.open();
     }finally{
       loading(els.submit,false);
     }
   }
 
-  // open form on load
-  document.addEventListener('DOMContentLoaded', ()=> { show(els.modal); document.getElementById('doctor-id').textContent=String(DOCTOR_ID); });
+  // Open form on load + set doctor id label
+  document.addEventListener('DOMContentLoaded', ()=> {
+    document.getElementById('doctor-id').textContent=String(CURRENT_USER_ID);
+    // Auto-open the create modal so you can test quickly
+    const modal = document.getElementById('add-service-modal');
+    modal && modal.classList.remove('hidden');
+  });
 
   // bindings
   els.form.addEventListener('submit', createService);
