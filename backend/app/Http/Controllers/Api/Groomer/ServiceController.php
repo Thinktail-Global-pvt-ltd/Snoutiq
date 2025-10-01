@@ -52,36 +52,53 @@ class ServiceController extends Controller
         return $sid ? (int) $sid : null;
     }
 
-    public function get(Request $request)
-    {
-        try {
-            $uid = $this->resolveUserId($request);
-           // dd($uid);
-            if (!$uid) {
-                return response()->json([
-                    'status'  => false,
-                    'message' => 'user_id missing',
-                ], 422);
+ public function get(Request $request)
+{
+    try {
+        $uid = null;
+
+        // if vet_slug passed
+        if ($request->has('vet_slug')) {
+            $slug = strtolower($request->get('vet_slug'));
+
+            $vet = \DB::table('vet_registerations_temp')
+                ->whereRaw('LOWER(slug) = ?', [$slug])
+                ->first();
+
+            if ($vet) {
+                $uid = $vet->id; // 👈 yahan user_id ki jagah vet ka id use karna hoga
             }
-
-            $services = GroomerService::where('user_id', $uid)
-                ->with('category')
-                ->get();
-               // dd($services);
-
-            return response()->json([
-                'status'  => true,
-                'message' => 'Services retrieved successfully',
-                'data'    => $services,
-            ], 200);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Failed to retrieve services',
-                'error'   => $e->getMessage(),
-            ], 500);
         }
+
+        // fallback: user_id param
+        if (!$uid && $request->has('user_id')) {
+            $uid = $request->get('user_id');
+        }
+
+        if (!$uid) {
+            return response()->json([
+                'status' => false,
+                'message' => 'user_id missing (slug not found)'
+            ], 422);
+        }
+
+        $services = GroomerService::where('user_id', $uid)->get();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Services retrieved successfully',
+            'data' => $services,
+        ], 200);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Failed to retrieve services',
+            'error'   => $e->getMessage(),
+        ], 500);
     }
+}
+
     /**
      * Resolve user id strictly from the request (frontend),
      * with very last fallback to auth/session if present.
