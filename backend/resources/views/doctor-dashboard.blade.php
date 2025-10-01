@@ -51,6 +51,11 @@
 
   // Expose a minimal API base if ever needed (kept for logger)
   const API_BASE  = (PATH_PREFIX || '') + '/api';
+
+  // 🔵 Console log user_id on boot
+  console.log('[doctor-dashboard] RESOLVED user_id:', CURRENT_USER_ID, {
+    fromServer, fromQuery, fromStorage, PATH_PREFIX, API_BASE
+  });
 </script>
 
 <div class="flex h-full">
@@ -401,7 +406,7 @@
   async function createService(e){
     e.preventDefault(); // no reload
 
-    // Resolve CURRENT_USER_ID like chat (already computed above), but try storage override again for safety:
+    // Re-resolve from storage in case it changed
     try{
       const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
       if (raw) {
@@ -410,6 +415,9 @@
         if (!Number.isNaN(fromStorage) && fromStorage) CURRENT_USER_ID = fromStorage;
       }
     }catch(_){}
+
+    // 🔵 Console log user_id at submit time
+    console.log('[doctor-dashboard] SUBMIT user_id:', CURRENT_USER_ID);
 
     const name     = els.name.value.trim();
     const duration = Number(els.duration.value);
@@ -445,7 +453,6 @@
 
       // ALSO send user id (for debugging on prod; server may ignore, but harmless)
       fd.append('user_id', String(CURRENT_USER_ID||''));     // body param
-      // And we already add 'X-Acting-User' header in buildHeaders()
 
       const headers = buildHeaders(auth);
       const data = await fetchJSON(API_POST_SVC, { method:'POST', headers, body: fd });
@@ -470,7 +477,6 @@
   // Open form on load + set doctor id label
   document.addEventListener('DOMContentLoaded', ()=> {
     document.getElementById('doctor-id').textContent=String(CURRENT_USER_ID);
-    // Auto-open the create modal so you can test quickly
     const modal = document.getElementById('add-service-modal');
     modal && modal.classList.remove('hidden');
   });
