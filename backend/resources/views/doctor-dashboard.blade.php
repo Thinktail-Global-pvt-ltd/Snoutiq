@@ -37,7 +37,7 @@
         ?? null;
 
   // ===== Sidebar links =====
-  $aiChatUrl   = ($pathPrefix ? "/$pathPrefix" : '') . '/pet-dashboard';
+  $aiChatUrl   = ($pathPrefix ? "/$pathPrefix" : '') . '/backend/pet-dashboard';
   $thisPageUrl = ($pathPrefix ? "/$pathPrefix" : '') . '/doctor' . ($serverDoctorId ? ('?doctorId=' . urlencode($serverDoctorId)) : '');
 @endphp
 
