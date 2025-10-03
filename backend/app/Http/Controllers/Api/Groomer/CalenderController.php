@@ -8,6 +8,9 @@ use App\Models\GroomerBooking;
 use Illuminate\Http\Request;
 use App\Models\GroomerClient;
 use App\Models\GroomerClientPet;
+use App\Models\DoctorBooking;
+
+use App\Models\VetRegisterationTemp;
 use App\Models\GroomerService;
 use App\Models\UserPet;
 use App\Models\UserProfile;
@@ -15,33 +18,115 @@ use App\Models\GroomerEmployee;
 
 class CalenderController extends Controller
 {
- public function store_blockTime(Request $request){
+ public function store_doctor_booking(Request $request)
+{
     $request->validate([
-        'title'=>'string|required',
-        'date'=>'required',
-        'start_time'=>'string|required',
-        'end_time'=>'string|required',
-        'groomer_employees_id'=>'required',
+        'customer_id' => 'required|integer',
+        'date' => 'required|date',
+        'start_time' => 'required',
+        'end_time' => 'required',
+        'services' => 'required|array',
+        'vet_id' => 'required|integer',
+        'user_id' => 'required|integer'
     ]);
-    $data = $request->only([
-         'title',
-        'date',
-        'start_time',
-        'end_time',
-        'groomer_employees_id'
-    ]);
-    $data['user_id']= $request->user()->id;
-    $blockedTime = self::blockedTime($data['user_id'],$request->date);
-    if(!self::isSlotAvailable($request->start_time, $request->end_time, $request->groomer_employees_id, $blockedTime)){
- return response()->json([
-        'message'=>'Time slot not available! It\'s confliting with other'
-    ],500);
+
+    $total = 0;
+    foreach ($request->services as $srv) {
+        $total += $srv['price'];
     }
-    GroomerBlockTime::create($data);
-    return response()->json([
-        'message'=>'Block time added successfull!'
+
+    $old_booking = DoctorBooking::where('user_id', $request->user_id)
+        ->orderBy('serial_number', 'desc')
+        ->first();
+
+    DoctorBooking::create([
+        'serial_number' => $old_booking ? $old_booking->serial_number + 1 : 1,
+        'customer_id'   => $request->customer_id,
+        'date'          => $request->date,
+        'start_time'    => $request->start_time,
+        'end_time'      => $request->end_time,
+        'services'      => json_encode($request->services),
+        'total'         => $total,
+        'paid'          => 0,
+        'user_id'       => $request->user_id,
+        'vet_id'        => $request->vet_id,
+        'status'        => 'Pending'
     ]);
- }
+
+    return response()->json(['message' => 'Doctor booking created successfully!']);
+}
+
+// public function doctor_bookings(Request $request)
+// {
+//     $request->validate([
+//         'user_id' => 'required|integer'
+//     ]);
+//     $uid = $request->user_id;
+
+//     $bookings = DoctorBooking::where('user_id', $uid)
+//         ->with('vet')
+//         ->orderBy('id', 'desc')
+//         ->get()
+//         ->map(function ($data) {
+//             $services = [];
+//             foreach (json_decode($data->services) as $srv) {
+//                 $services[] = [
+//                     'service_id' => $srv->service_id,
+//                     'price'      => $srv->price
+//                 ];
+//             }
+
+//             return array_merge($data->toArray(), [
+//                 'vet_data' => $data->vet,
+//                 'services_list' => $services
+//             ]);
+//         });
+
+//     return response()->json(['data' => $bookings]);
+// }
+
+public function doctor_bookings(Request $request)
+{
+    try {
+        $bookings = \DB::table('doctor_bookings as db')
+            ->join('vet_registerations_temp as v', 'db.vet_id', '=', 'v.id')
+            ->select(
+                'db.id',
+                'db.serial_number',
+                'db.customer_id',
+                'db.date',
+                'db.start_time',
+                'db.end_time',
+                'db.total',
+                'db.paid',
+                'db.status',
+                'db.services',
+                'v.id as vet_id',
+                'v.name as vet_name',
+                'v.email as vet_email',
+             
+                'v.address as vet_address'
+            )
+            ->where('db.user_id', $request->user_id)
+            ->orderBy('db.id', 'desc')
+            ->get();
+
+        return response()->json([
+            'data' => $bookings
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error'   => true,
+            'message' => 'Something went wrong while fetching doctor bookings',
+            'details' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
+
+
 public function store_booking(Request $request)
 {
     try {
@@ -123,56 +208,58 @@ public function store_booking(Request $request)
     }
 }
 
- public function bookings(Request $request){
-    $uid = $request->user()->id;
-    $GroomerBooking = GroomerBooking::where('user_id',$uid)->with("groomerEmployee");
-    if(filled($request->date)){
-$GroomerBooking->where('date',$request->date);
+public function bookings(Request $request)
+{
+    $request->validate([
+        'user_id' => 'required|integer'
+    ]);
+    $uid = $request->user_id;
+
+    $GroomerBooking = GroomerBooking::where('user_id', $uid)
+        ->with("groomerEmployee");
+
+    if (filled($request->date)) {
+        $GroomerBooking->where('date', $request->date);
     }
-    if(filled($request->customer_id)){
-$GroomerBooking->where('customer_id',$request->customer_id);
+    if (filled($request->customer_id)) {
+        $GroomerBooking->where('customer_id', $request->customer_id);
     }
-    $GroomerBooking = $GroomerBooking->orderBy('id','desc')->get()->map(function($data) use($uid){
-        if($data->customer_type=="walkin"){
-            $customer_data = ['name'=>'Walkin'];
-        }elseif($data->customer_type=="Groomer" || $data->customer_type=="groomer"){
-            $cust = GroomerClient::where('id',$data->customer_id)->where('user_id',$uid)->first();
-            if($cust){
-                $customer_data = $cust;
-            }
-        }else{
-             $cust = UserProfile::where('user_id',$data->customer_id)->first();
-            if($cust){
-                $customer_data = $cust;
-            }
-        }
-        if($data->customer_type=="walkin"){
-            $pet_data = ['name'=>'Not added'];
-        }elseif($data->customer_type=="Groomer" || $data->customer_type=="groomer"){
-         $GroomerClientPet= GroomerClientPet::where('user_id',$uid)->where('id',$data->customer_pet_id)->first();
-         $pet_data = $GroomerClientPet;
-        }else{
-             $pett= UserPet::where('user_id',$data->customer_id)->where('id',$data->customer_pet_id)->first();
-         $pet_data = $pett;
-        }
+
+    $GroomerBooking = $GroomerBooking->orderBy('id', 'desc')->get()->map(function ($data) use ($uid) {
+        // doctor data
+        $doctor = GroomerEmployee::find($data->groomer_employees_id);
+        $customer_data = $doctor ? [
+            'id' => $doctor->id,
+            'name' => $doctor->name,
+            'email' => $doctor->email,
+            'phone' => $doctor->phone,
+            'job_title' => $doctor->job_title
+        ] : null;
+
+        // services
         $services = [];
-        // return ['s'=>$data->services];
-        foreach(json_decode($data->services) as $ddd){
-            // return $ddd;
-            $service = GroomerService::where('user_id',$uid)->where('id',$ddd->service_id)->first();
-$services[]=['name'=>$service->name,'price'=>$ddd->price];
+        foreach (json_decode($data->services) as $ddd) {
+            $service = GroomerService::where('user_id', $uid)
+                ->where('id', $ddd->service_id)->first();
+
+            if ($service) {
+                $services[] = [
+                    'name'  => $service->name,
+                    'price' => $ddd->price
+                ];
+            }
         }
 
-        return array_merge($data->toArray(),[
-'customer_data'=>$customer_data,
-'service_withnames'=>$services
+        return array_merge($data->toArray(), [
+            'customer_data'    => $customer_data, // doctor info
+            'pet_data'         => null,           // no pets for doctors
+            'service_withnames'=> $services
         ]);
     });
-    
-    return response()->json([
-'data'=>$GroomerBooking
-    ]);
- }
+
+    return response()->json(['data' => $GroomerBooking], 200);
+}
+
  public function bookingsV2(Request $request){
         $uid = $request->user()->id;
 $GroomerBooking = GroomerBooking::where('user_id',$uid)->with("groomerEmployee")

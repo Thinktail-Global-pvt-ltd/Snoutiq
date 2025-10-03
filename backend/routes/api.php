@@ -203,7 +203,6 @@ Route::post('/service_categroy/{id}/delete', [GroomerServiceCategoryController::
       Route::get('/employees/{id}', [GroomerEmployeeController::class, 'show']);
     Route::put('/employees/{id}', [GroomerEmployeeController::class, 'update']);
 
-          Route::post('/block_time', [GroomerCalenderController::class, 'store_blockTime']);
           Route::post('/booked_times', [GroomerCalenderController::class, 'booked_times']);
           Route::get('/clients', [GroomerClientController::class, 'get']);
           Route::get('/clients/{id}', [GroomerClientController::class, 'single']);
@@ -367,3 +366,21 @@ Route::prefix('groomer')->group(function () {
 Route::post('groomer/service', [GroomerServiceController::class, 'store']);
     Route::delete('groomer/service/{id}', [GroomerServiceController::class, 'destroy']);
 
+
+   // Clinic Reels CRUD routes (for admin panel)
+Route::get('/backend/groomer/reels',            [ClinicReelController::class, 'get']);            // list reels ?user_id= or ?vet_slug=
+Route::get('/backend/groomer/reel/{id}',        [ClinicReelController::class, 'show']);           // view single
+Route::post('/backend/groomer/reel',            [ClinicReelController::class, 'store']);          // create
+Route::post('/backend/groomer/reel/{id}/update',[ClinicReelController::class, 'update']);         // update
+Route::delete('/backend/groomer/reel/{id}',     [ClinicReelController::class, 'destroy']);        // delete
+
+
+
+          Route::post('/block_time', [GroomerCalenderController::class, 'store_blockTime']);
+
+
+
+          Route::prefix('doctor')->group(function () {
+    Route::post('/bookings', [GroomerCalenderController::class, 'store_doctor_booking']);
+    Route::get('/bookings', [GroomerCalenderController::class, 'doctor_bookings']);
+});
