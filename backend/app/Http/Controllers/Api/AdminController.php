@@ -26,8 +26,54 @@ class AdminController extends Controller
         return response()->json(['status'=>'success','data'=>$row[0]]);
     }
 
-    // update user (dynamic SET)
     public function updateUser(Request $request, $id)
+{
+    try {
+        $allowed = ['name','phone','role','summary','latitude','longitude','password'];
+        $sets = [];
+        $params = [];
+
+        foreach ($allowed as $col) {
+            if ($request->has($col)) {
+                $val = $request->input($col);
+                if ($col === 'password' && !empty($val)) {
+                    $val = Hash::make($val);
+                }
+                $sets[] = "`$col` = ?";
+                $params[] = $val;
+            }
+        }
+
+        if (empty($sets)) {
+            return response()->json(['status'=>'error','message'=>'No fields to update'], 422);
+        }
+
+        $sql = 'UPDATE users SET '.implode(',', $sets).', updated_at = NOW() WHERE id = ?';
+        $params[] = $id;
+
+        $affected = DB::update($sql, $params);
+
+        if ($affected === 0) {
+            return response()->json(['status'=>'error','message'=>'Nothing updated or user not found'], 404);
+        }
+
+        $row = DB::select('SELECT * FROM users WHERE id = ? LIMIT 1', [$id]);
+        return response()->json(['status'=>'success','data'=>$row[0]]);
+
+    } catch (\Throwable $e) {
+        // Debug: Return the actual error in response
+        return response()->json([
+            'status'  => 'error',
+            'message' => $e->getMessage(),
+            'file'    => $e->getFile(),
+            'line'    => $e->getLine()
+        ], 500);
+    }
+}
+
+
+    // update user (dynamic SET)
+    public function updateUser_old(Request $request, $id)
     {
         $allowed = ['name','phone','role','summary','latitude','longitude','password'];
         $sets = [];
