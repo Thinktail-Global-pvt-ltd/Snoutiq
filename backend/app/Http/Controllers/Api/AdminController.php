@@ -6,10 +6,169 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
+use Illuminate\Support\Facades\Hash;
+
 class AdminController extends Controller
 {
-    // Fetch all users
+
+    // list all users
     public function getUsers(Request $request)
+    {
+        $rows = DB::select('SELECT * FROM users ORDER BY id DESC');
+        return response()->json(['status'=>'success','data'=>$rows]);
+    }
+
+    // get one user
+    public function getUser(Request $request, $id)
+    {
+        $row = DB::select('SELECT * FROM users WHERE id = ? LIMIT 1', [$id]);
+        if (!$row) return response()->json(['status'=>'error','message'=>'User not found'], 404);
+        return response()->json(['status'=>'success','data'=>$row[0]]);
+    }
+
+    // update user (dynamic SET)
+    public function updateUser(Request $request, $id)
+    {
+        $allowed = ['name','phone','role','summary','latitude','longitude','password'];
+        $sets = [];
+        $params = [];
+
+        foreach ($allowed as $col) {
+            if ($request->has($col)) {
+                $val = $request->input($col);
+                if ($col === 'password') {
+                    if ($val === null || $val === '') continue;
+                    $val = Hash::make($val);
+                }
+                $sets[] = "`$col` = ?";
+                $params[] = $val;
+            }
+        }
+        if (empty($sets)) {
+            return response()->json(['status'=>'error','message'=>'No fields to update'], 422);
+        }
+
+        $sql = 'UPDATE users SET '.implode(',', $sets).', updated_at = NOW() WHERE id = ?';
+        $params[] = $id;
+
+        $affected = DB::update($sql, $params);
+        if ($affected === 0) return response()->json(['status'=>'error','message'=>'Nothing updated or user not found'], 404);
+
+        $row = DB::select('SELECT * FROM users WHERE id = ? LIMIT 1', [$id]);
+        return response()->json(['status'=>'success','data'=>$row[0]]);
+    }
+
+    // delete user (pets cascade by FK)
+    public function deleteUser(Request $request, $id)
+    {
+        $deleted = DB::delete('DELETE FROM users WHERE id = ?', [$id]);
+        if (!$deleted) return response()->json(['status'=>'error','message'=>'User not found'], 404);
+        return response()->json(['status'=>'success','message'=>'User deleted']);
+    }
+
+    /* ============== VETS (raw SQL) ============== */
+
+    public function getVets(Request $request)
+    {
+        $vets = DB::select('SELECT * FROM vet_registerations_temp ORDER BY id DESC');
+        return response()->json(['status'=>'success','data'=>$vets]);
+    }
+
+    /* ============== PETS (raw SQL) ============== */
+
+    // list pets for a user
+    public function listPets(Request $request, $userId)
+    {
+        $pets = DB::select('SELECT * FROM pets WHERE user_id = ? ORDER BY id DESC', [$userId]);
+        return response()->json(['status'=>'success','data'=>$pets]);
+    }
+
+    /**
+     * ADD PET:
+     * 1) migrate legacy pet fields from users → pets ONCE (idempotent via UNIQUE key)
+     * 2) insert requested pet with ON DUPLICATE KEY UPDATE (no duplicates)
+     * Body: { name, breed, pet_age, pet_gender, pet_doc1?, pet_doc2? }
+     */
+    public function addPet(Request $request, $userId)
+    {
+        // minimal required checks
+        foreach (['name','breed','pet_gender','pet_age'] as $f) {
+            if (!$request->filled($f)) {
+                return response()->json(['status'=>'error','message'=>"$f is required"], 422);
+            }
+        }
+        $name       = $request->input('name');
+        $breed      = $request->input('breed');
+        $pet_age    = (int)$request->input('pet_age');
+        $pet_gender = $request->input('pet_gender');
+        $pet_doc1   = $request->input('pet_doc1');
+        $pet_doc2   = $request->input('pet_doc2');
+
+        return DB::transaction(function () use ($userId, $name, $breed, $pet_age, $pet_gender, $pet_doc1, $pet_doc2) {
+
+            // (1) migrate legacy user->pets once
+            DB::statement(
+                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, pet_doc1, pet_doc2, created_at, updated_at)
+                 SELECT u.id, u.pet_name, u.breed, u.pet_age, u.pet_gender, u.pet_doc1, u.pet_doc2, NOW(), NOW()
+                 FROM users u
+                 WHERE u.id = ?
+                   AND (u.pet_name IS NOT NULL OR u.breed IS NOT NULL OR u.pet_age IS NOT NULL
+                        OR u.pet_gender IS NOT NULL OR u.pet_doc1 IS NOT NULL OR u.pet_doc2 IS NOT NULL)
+                 ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP',
+                [$userId]
+            );
+
+            // (2) insert the new pet (idempotent)
+            DB::statement(
+                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, pet_doc1, pet_doc2, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE
+                   pet_doc1 = COALESCE(VALUES(pet_doc1), pet_doc1),
+                   pet_doc2 = COALESCE(VALUES(pet_doc2), pet_doc2),
+                   updated_at = CURRENT_TIMESTAMP',
+                [$userId, $name, $breed, $pet_age, $pet_gender, $pet_doc1, $pet_doc2]
+            );
+
+            // return the row
+            $pet = DB::select(
+                'SELECT * FROM pets WHERE user_id = ? AND name = ? AND breed = ? AND pet_age = ? AND pet_gender = ? LIMIT 1',
+                [$userId, $name, $breed, $pet_age, $pet_gender]
+            );
+
+            return response()->json(['status'=>'success','data'=>$pet ? $pet[0] : null]);
+        });
+    }
+
+    // update pet
+    public function updatePet(Request $request, $petId)
+    {
+        $cols = ['name','breed','pet_age','pet_gender','pet_doc1','pet_doc2'];
+        $sets = [];
+        $params = [];
+        foreach ($cols as $c) {
+            if ($request->has($c)) { $sets[] = "`$c` = ?"; $params[] = $request->input($c); }
+        }
+        if (!$sets) return response()->json(['status'=>'error','message'=>'No fields to update'], 422);
+
+        $sql = 'UPDATE pets SET '.implode(',', $sets).', updated_at = NOW() WHERE id = ?';
+        $params[] = $petId;
+
+        $n = DB::update($sql, $params);
+        if (!$n) return response()->json(['status'=>'error','message'=>'Pet not found or unchanged'], 404);
+
+        $row = DB::select('SELECT * FROM pets WHERE id = ? LIMIT 1', [$petId]);
+        return response()->json(['status'=>'success','data'=>$row[0]]);
+    }
+
+    // delete pet
+    public function deletePet(Request $request, $petId)
+    {
+        $deleted = DB::delete('DELETE FROM pets WHERE id = ?', [$petId]);
+        if (!$deleted) return response()->json(['status'=>'error','message'=>'Pet not found'], 404);
+        return response()->json(['status'=>'success','message'=>'Pet deleted']);
+    }
+    // Fetch all users
+    public function getUsers_old(Request $request)
     {
         if ($request->email !== 'adminsnoutiq@gmail.com') {
             return response()->json(['status' => 'error', 'message' => 'Invalid user'], 403);
@@ -20,7 +179,7 @@ class AdminController extends Controller
     }
 
     // Fetch all vets
-    public function getVets(Request $request)
+    public function getVets_old(Request $request)
     {
         if ($request->email !== 'adminsnoutiq@gmail.com') {
             return response()->json(['status' => 'error', 'message' => 'Invalid user'], 403);
