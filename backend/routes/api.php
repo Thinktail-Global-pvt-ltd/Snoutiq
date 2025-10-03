@@ -384,3 +384,16 @@ Route::delete('/backend/groomer/reel/{id}',     [ClinicReelController::class, 'd
     Route::post('/bookings', [GroomerCalenderController::class, 'store_doctor_booking']);
     Route::get('/bookings', [GroomerCalenderController::class, 'doctor_bookings']);
 });
+
+
+Route::get('/users',            [AdminController::class, 'getUsers']);
+Route::get('/users/{id}',       [AdminController::class, 'getUser']);
+Route::put('/users/{id}',       [AdminController::class, 'updateUser']);
+Route::delete('/users/{id}',    [AdminController::class, 'deleteUser']);
+
+Route::get('/vets',             [AdminController::class, 'getVets']);
+
+Route::get('/users/{userId}/pets',  [AdminController::class, 'listPets']);
+Route::post('/users/{userId}/pets', [AdminController::class, 'addPet']);
+Route::put('/pets/{petId}',         [AdminController::class, 'updatePet']);
+Route::delete('/pets/{petId}',      [AdminController::class, 'deletePet']);
