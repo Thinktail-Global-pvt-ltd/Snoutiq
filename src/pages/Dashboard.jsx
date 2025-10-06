@@ -213,7 +213,9 @@ const Dashboard = () => {
         let messagesFromAPI = [];
 
         if (res.data && Array.isArray(res.data)) {
-          const emergencyStatus = res.data.emergency_status || null;
+          const decision = res.data.decision || null;
+          console.log(decision,"ankit217");
+          
 
           messagesFromAPI =
             res.data.chats
@@ -233,7 +235,7 @@ const Dashboard = () => {
                     text: chat.answer,
                     displayedText: chat.answer,
                     timestamp: new Date(chat.created_at),
-                    emergency_status: emergencyStatus,
+                    decision: decision,
                   },
                 ];
               })

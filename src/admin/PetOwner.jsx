@@ -26,7 +26,7 @@ const AdminPetsDashboard = () => {
           "https://snoutiq.com/backend/api/users?email=admin@gmail.com"
         );
         const data = await res.json();
-        setVets(data || []);
+        setVets(data.data || []);
       } catch (err) {
         console.error(err);
       } finally {

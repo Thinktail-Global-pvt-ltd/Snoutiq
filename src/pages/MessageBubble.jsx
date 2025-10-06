@@ -643,12 +643,12 @@ const StartCallButton = ({ nearbyDoctors }) => {
   );
 };
 
-const EmergencyStatusBox = ({ emergencyStatus, nearbyDoctors }) => {
+const EmergencyStatusBox = ({ decision, nearbyDoctors }) => {
   const navigate = useNavigate();
 
-  if (!emergencyStatus) return null;
+  if (!decision) return null;
 
-  if (emergencyStatus.includes("EMERGENCY")) {
+  if (decision.includes("EMERGENCY")) {
     return (
       <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 rounded-r-xl shadow-sm">
         <div className="flex items-center mb-3">
@@ -696,7 +696,7 @@ const EmergencyStatusBox = ({ emergencyStatus, nearbyDoctors }) => {
         </button>
       </div>
     );
-  } else if (emergencyStatus.includes("ROUTINE")) {
+  } else if (decision.includes("VIDEO_CONSULT")) {
     return (
       <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-r-xl shadow-sm">
         <div className="flex items-center mb-3">
@@ -912,9 +912,9 @@ const MessageBubble = memo(
             </div>
 
             {/* Emergency Status Box */}
-            {msg.sender === "ai" && msg.emergency_status && (
+            {msg.sender === "ai" && msg.decision && (
               <EmergencyStatusBox
-                emergencyStatus={msg.emergency_status.trim()}
+                decision={msg.decision.trim()}
                 nearbyDoctors={nearbyDoctors}
               />
             )}
