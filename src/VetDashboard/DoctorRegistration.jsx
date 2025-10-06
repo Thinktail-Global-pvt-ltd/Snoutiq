@@ -66,7 +66,7 @@ const DoctorRegistration = () => {
   ]);
 
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: "AIzaSyDEFWG5jYxYTXBouOr43vjV4Aj6WEOXBps",
+    googleMapsApiKey: "AIzaSyDyLEw7zvazCUhpEK8wASOYeFOuHbaHx1E",
     libraries: LIBRARIES,
   });
 
@@ -197,7 +197,7 @@ const DoctorRegistration = () => {
   const reverseGeocode = async (lat, lng) => {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${"AIzaSyDEFWG5jYxYTXBouOr43vjV4Aj6WEOXBps"}`
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${"AIzaSyDyLEw7zvazCUhpEK8wASOYeFOuHbaHx1E"}`
       );
       const data = await response.json();
 
