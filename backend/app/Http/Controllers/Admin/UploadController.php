@@ -16,6 +16,9 @@ class UploadController extends Controller
             'file' => ['required','image','mimes:jpg,jpeg,png,gif,webp','max:5120'],
         ]);
         $path = $request->file('file')->store('uploads','public');
-        return response()->json(['success'=>true,'url'=>Storage::url($path)]);
+        // Because the 'public' disk in this app points to public_path(),
+        // return a URL based on the current host to avoid APP_URL mismatches.
+        $url = asset($path);
+        return response()->json(['success'=>true,'url'=>$url, 'path'=>$path]);
     }
 }

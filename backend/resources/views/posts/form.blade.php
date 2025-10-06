@@ -85,7 +85,7 @@
     if(!input.files.length) return;
     const data = new FormData();
     data.append('file', input.files[0]);
-    fetch('{{ url("admin/upload") }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}'}, body:data})
+    fetch('{{ route('admin.upload.store') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}'}, body:data})
       .then(r=>r.json()).then(j=>{
         if(j.success){ document.querySelector('[name="featured_image"]').value = j.url; }
         else alert('Upload failed');
@@ -94,4 +94,3 @@
   </script>
 </div>
 @endsection
-
