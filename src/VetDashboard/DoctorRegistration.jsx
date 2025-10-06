@@ -582,7 +582,7 @@ const DoctorRegistration = () => {
     setIsProfileSaving(true);
     try {
       const formData = new FormData();
-      formData.append("clinic_name", name);
+      formData.append("name", name);
       formData.append("city", city);
       formData.append("pincode", pinCode);
       formData.append("mobile", mobileNumber);
