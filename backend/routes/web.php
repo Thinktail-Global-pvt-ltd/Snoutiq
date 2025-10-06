@@ -126,6 +126,43 @@ Route::get('/clinic-dashboard', fn () => view('clinic-dashboard'))
 
     Route::view('/dashboard/services', 'groomer.services.index')->name('groomer.services.index');
 
+     use App\Http\Controllers\Api\Groomer\ClinicReelController;
+
+
+Route::get('/backend/groomer/reels',            [ClinicReelController::class, 'get']);            // list reels ?user_id= or ?vet_slug=
+Route::get('/backend/groomer/reel/{id}',        [ClinicReelController::class, 'show']);           // view single
+Route::post('/backend/groomer/reel',            [ClinicReelController::class, 'store']);          // create
+Route::post('/backend/groomer/reel/{id}/update',[ClinicReelController::class, 'update']);         // update
+Route::delete('/backend/groomer/reel/{id}',     [ClinicReelController::class, 'destroy']);        // delete
+
+
+use App\Http\Controllers\BlogController;
+use App\Http\Controllers\Admin\PostController as AdminPost;
+use App\Http\Controllers\Admin\CategoryController as AdminCategory;
+use App\Http\Controllers\Admin\TagController as AdminTag;
+use App\Http\Controllers\Admin\UploadController;
+
+// Everything under /blogs — ALL PUBLIC
+Route::prefix('blogs')->group(function () {
+    // Frontend
+    Route::get('/', [BlogController::class,'index'])->name('blog.index');
+    Route::get('/post/{post:slug}', [BlogController::class,'show'])->name('blog.post');
+    Route::get('/category/{category:slug}', [BlogController::class,'category'])->name('blog.category');
+    Route::get('/tag/{tag:slug}', [BlogController::class,'tag'])->name('blog.tag');
+    Route::get('/sitemap.xml', [BlogController::class,'sitemap']);
+    Route::get('/feed', [BlogController::class,'feed']);
+
+    // “Admin” CRUD — now PUBLIC
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::resource('posts', AdminPost::class);
+        Route::resource('categories', AdminCategory::class)->except('show');
+        Route::resource('tags', AdminTag::class)->except('show');
+        Route::post('upload', [UploadController::class,'store'])->name('upload.store');
+    });
+});
+
+// Optional: redirect root to /blogs
+Route::redirect('/', '/blogs');
 
 
 
