@@ -64,7 +64,7 @@ const DoctorRegistration = () => {
         "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiNFMkUyRTIiIHJ4PSI2MCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzk5OSIgZm9udC1zaXplPSIxNCI+RG9jdG9yPC90ZXh0Pjwvc3ZnPg==",
     },
   ]);
-const apiKey = "AIzaSyDSiWYPatUTt_CCokGa9ZW1rsQhP5THCpA"; 
+  const apiKey = "AIzaSyDSiWYPatUTt_CCokGa9ZW1rsQhP5THCpA";
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey,
     libraries: LIBRARIES,
@@ -195,7 +195,6 @@ const apiKey = "AIzaSyDSiWYPatUTt_CCokGa9ZW1rsQhP5THCpA";
   };
 
   const reverseGeocode = async (lat, lng) => {
-    
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`
@@ -511,7 +510,6 @@ const apiKey = "AIzaSyDSiWYPatUTt_CCokGa9ZW1rsQhP5THCpA";
       },
     ]);
   };
-  
 
   const handleRemoveDoctor = (index) => {
     if (doctors.length <= 1) {
@@ -716,10 +714,20 @@ const apiKey = "AIzaSyDSiWYPatUTt_CCokGa9ZW1rsQhP5THCpA";
       );
 
       if (res.status === 200 || res.status === 201) {
-        toast.success(res.data.message || "Profile saved successfully!");
-        alert("Form submitted successfully ✅");
-        window.location.reload();
-        // navigate("/login");
+        console.log(res, "ankit");
+
+        // Extract slug from backend response
+        const slug = res?.data?.data?.slug;
+
+        if (slug) {
+          // Show success message
+          toast.success(res.data.message || "Profile saved successfully!");
+
+          // Redirect to the vet profile page
+          window.location.href = `https://snoutiq.com/backend/vet/${slug}`;
+        } else {
+          toast.error("Something went wrong: slug not found");
+        }
       }
     } catch (error) {
       const errorMessage =
