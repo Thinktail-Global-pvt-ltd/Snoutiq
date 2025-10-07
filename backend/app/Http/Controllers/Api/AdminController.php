@@ -125,8 +125,34 @@ class AdminController extends Controller
     // list pets for a user
     public function listPets(Request $request, $userId)
     {
-        $pets = DB::select('SELECT * FROM pets WHERE user_id = ? ORDER BY id DESC', [$userId]);
-        return response()->json(['status'=>'success','data'=>$pets]);
+        try {
+            // Basic sanity check
+            if (!is_numeric($userId)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Invalid user id'
+                ], 422);
+            }
+
+            // Ensure user exists
+            $user = DB::select('SELECT id FROM users WHERE id = ? LIMIT 1', [$userId]);
+            if (!$user) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            // Fetch pets safely
+            $pets = DB::select('SELECT * FROM pets WHERE user_id = ? ORDER BY id DESC', [$userId]);
+            return response()->json(['status' => 'success', 'data' => $pets]);
+        } catch (\Throwable $e) {
+            // Centralized failure response without leaking sensitive info
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Unable to fetch pets right now',
+            ], 500);
+        }
     }
 
     /**
@@ -183,6 +209,14 @@ class AdminController extends Controller
 
             return response()->json(['status'=>'success','data'=>$pet ? $pet[0] : null]);
         });
+    }
+
+    // get one pet (for edit)
+    public function getPet(Request $request, $petId)
+    {
+        $row = DB::select('SELECT * FROM pets WHERE id = ? LIMIT 1', [$petId]);
+        if (!$row) return response()->json(['status'=>'error','message'=>'Pet not found'], 404);
+        return response()->json(['status'=>'success','data'=>$row[0]]);
     }
 
     // update pet

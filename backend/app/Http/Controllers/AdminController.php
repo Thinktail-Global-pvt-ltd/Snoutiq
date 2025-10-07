@@ -129,6 +129,14 @@ class AdminController extends Controller
         return response()->json(['status'=>'success','data'=>$pets]);
     }
 
+    // get one pet (for edit)
+    public function getPet(Request $request, $petId)
+    {
+        $row = DB::select('SELECT * FROM pets WHERE id = ? LIMIT 1', [$petId]);
+        if (!$row) return response()->json(['status'=>'error','message'=>'Pet not found'], 404);
+        return response()->json(['status'=>'success','data'=>$row[0]]);
+    }
+
     /**
      * ADD PET:
      * 1) migrate legacy pet fields from users → pets ONCE (idempotent via UNIQUE key)

@@ -395,10 +395,10 @@ Route::get('/vets',             [AdminController::class, 'getVets']);
 
 Route::get('/users/{userId}/pets',  [AdminController::class, 'listPets']);
 Route::post('/users/{userId}/pets', [AdminController::class, 'addPet']);
+Route::get('/pets/{petId}',         [AdminController::class, 'getPet']);
 Route::put('/pets/{petId}',         [AdminController::class, 'updatePet']);
 Route::delete('/pets/{petId}',      [AdminController::class, 'deletePet']);
 
 
 Route::post('/doctor/availability', [GroomerCalenderController::class,'doctor_availability_store']);
 Route::get('/doctor/availability/suggestions', [GroomerCalenderController::class,'doctor_availability_suggestions']);
-
