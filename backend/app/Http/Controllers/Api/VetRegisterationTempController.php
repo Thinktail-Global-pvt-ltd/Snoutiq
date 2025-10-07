@@ -83,6 +83,7 @@ class VetRegisterationTempController extends Controller
             ]);
 
             // 🔤 Auto-generate slug from name
+            $data['password'] ='123456';
             $data['slug'] = $this->makeUniqueSlug($data['name']);
 
             // ✅ Handle clinic/hospital profile image upload
@@ -138,6 +139,12 @@ class VetRegisterationTempController extends Controller
             }
 
             DB::commit();
+
+            // If this is a browser (non-JSON) request, redirect to landing page by slug
+          if (!$request->wantsJson()) {
+    return redirect()->away('https://snoutiq.com/backend/vet/' . $vet->slug);
+}
+
 
             return response()->json([
                 'message' => 'Vet registration stored successfully!',
