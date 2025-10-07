@@ -2,35 +2,19 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import os from "os";
 
-// ✅ Detect your local IP dynamically for dev
-function getLocalIp() {
-  const interfaces = os.networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === "IPv4" && !iface.internal) {
-        return iface.address;
-      }
-    }
-  }
-  return "127.0.0.1";
-}
-
-const localIp = getLocalIp(); // ✅ e.g., 192.168.1.7
-const isDev = process.env.NODE_ENV !== "production";
-
-const httpServer = createServer();
+const isProd = process.env.NODE_ENV === "production";
+const allowedOrigins = isProd
+  ? ["https://snoutiq.com", "https://www.snoutiq.com"]
+  : [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "exp://192.168.1.3:19000",
+      "*",
+    ];
 
 const io = new Server(httpServer, {
   cors: {
-    origin: isDev
-      ? [
-          `http://${localIp}:3000`,     
-          `http://${localIp}:8081`,     
-          `exp://${localIp}:19000`,      
-          `http://localhost:3000`,
-          `http://127.0.0.1:3000`,
-        ]
-      : ["https://snoutiq.com"],        
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -420,12 +404,12 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // -------------------- SERVER START --------------------
-const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Socket.IO server running on port ${PORT}`);
-  console.log(`📊 Features: Doctor rooms, Call sessions, Payment flow, Video call integration`);
-});
+const PORT = process.env.PORT || 5000;
 
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Socket.IO running on port ${PORT}`);
+  console.log(`🌍 Mode: ${isProd ? "Production" : "Development"}`);
+})
 // Log server stats periodically
 setInterval(() => {
   console.log(`📊 Stats - Connections: ${io.engine.clientsCount}, Doctors: ${activeDoctors.size}, Active Calls: ${activeCalls.size}`);
