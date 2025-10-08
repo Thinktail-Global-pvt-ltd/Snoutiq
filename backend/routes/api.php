@@ -115,6 +115,12 @@ Route::get('/chat/listRooms', [GeminiChatController::class, 'listRooms']);
 // routes/api.php
 Route::get('/chat-rooms/{chat_room_token}/chats', [\App\Http\Controllers\Api\GeminiChatController::class, 'history']);
 
+// Summarize a chat room and save to chat_rooms.summary
+Route::post('/chat-rooms/{chat_room_token}/summarize', [GeminiChatController::class, 'summarizeRoom']);
+
+// Shortcut endpoint: POST /api/summary { user_id, chat_room_token }
+Route::post('/summary', [GeminiChatController::class, 'summary']);
+
 Route::delete('/chat-rooms/{chat_room_token}', [GeminiChatController::class, 'deleteRoom']);
 Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
 

@@ -31,8 +31,14 @@ class GeminiChatController extends Controller
             'pet_location'   => 'nullable|string',
         ]);
 
-        // session / room identity
-        $sessionId = $data['chat_room_token'] ?? $data['context_token'] ?? ('user:' . $data['user_id']);
+        // session / room identity (chat_room_token no longer required in request)
+        $sessionId = $data['chat_room_token'] ?? $data['context_token'] ?? null;
+        if (!$sessionId) {
+            $latestRoom = ChatRoom::where('user_id', $data['user_id'])
+                ->orderBy('updated_at', 'desc')
+                ->first();
+            $sessionId = $latestRoom ? $latestRoom->chat_room_token : ('room_' . Str::uuid()->toString());
+        }
         $cacheKey  = "unified:{$sessionId}";
         $state     = Cache::get($cacheKey, $this->defaultState());
 
@@ -114,6 +120,7 @@ class GeminiChatController extends Controller
             'context_token'    => $sessionId,
             'session_id'       => $sessionId,
             'chat'             => $chat,
+            'chat_room_token'  => $room->chat_room_token,
             'emergency_status' => $emergencyStatus,
             'decision'         => $decision,
             'score'            => $state['evidence_score'],
@@ -139,7 +146,13 @@ class GeminiChatController extends Controller
             'pet_location'   => 'nullable|string',
         ]);
 
-        $sessionId = $data['context_token'] ?? ('user:' . $data['user_id']);
+        $sessionId = $data['chat_room_token'] ?? $data['context_token'] ?? null;
+        if (!$sessionId) {
+            $latestRoom = ChatRoom::where('user_id', $data['user_id'])
+                ->orderBy('updated_at', 'desc')
+                ->first();
+            $sessionId = $latestRoom ? $latestRoom->chat_room_token : ('room_' . Str::uuid()->toString());
+        }
         $cacheKey  = "unified:{$sessionId}";
         $state     = Cache::get($cacheKey, $this->defaultState());
 
@@ -688,6 +701,101 @@ class GeminiChatController extends Controller
             'context_token'    => $room->chat_room_token,
             'name'             => $room->name,
             'note'             => 'Use this chat_room_token as context_token in /api/chat/send for this room.',
+        ]);
+    }
+
+    // Simple wrapper to support POST /api/summary with { user_id }
+    public function summary(Request $request)
+    {
+        $data = $request->validate([
+            'user_id'         => 'required|integer',
+            // chat_room_token no longer required; optional for backward compatibility
+            'chat_room_token' => 'sometimes|string',
+        ]);
+
+        $token = $data['chat_room_token'] ?? null;
+        if (!$token) {
+            // Resolve user's latest room; fail if none
+            $room = ChatRoom::where('user_id', $data['user_id'])
+                ->orderBy('updated_at', 'desc')
+                ->first();
+
+            if (!$room) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No chat room found for this user',
+                ], 404);
+            }
+            $token = $room->chat_room_token;
+        }
+
+        // Delegate to summarizeRoom which also validates room ownership
+        return $this->summarizeRoom($request, $token);
+    }
+
+    /**
+     * Summarize a chat room with Gemini and save to chat_rooms.summary.
+     * Request: user_id (int), path: chat_room_token (string)
+     */
+    public function summarizeRoom(Request $request, string $chat_room_token)
+    {
+        $data = $request->validate([
+            'user_id' => 'required|integer',
+        ]);
+
+        // Room must belong to the user
+        $room = ChatRoom::where('chat_room_token', $chat_room_token)
+            ->where('user_id', $data['user_id'])
+            ->first();
+
+        if (!$room) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Room not found for this user',
+            ], 404);
+        }
+
+        $chats = Chat::where('chat_room_id', $room->id)
+            ->orderBy('created_at', 'asc')
+            ->get(['question', 'answer', 'created_at']);
+
+        if ($chats->isEmpty()) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No chats to summarize',
+            ], 422);
+        }
+
+        // Build a concise prompt
+        $lines = [];
+        foreach ($chats as $c) {
+            $q = trim((string)($c->question ?? ''));
+            $a = trim((string)($c->answer   ?? ''));
+            if ($q !== '') $lines[] = 'User: ' . $q;
+            if ($a !== '') $lines[] = 'AI: '   . $a;
+        }
+        // Limit prompt size if very long
+        $joined = implode("\n", $lines);
+        if (strlen($joined) > 16000) {
+            $joined = substr($joined, -16000); // last ~16KB of conversation
+        }
+
+        $prompt = "You are a veterinary assistant. Read the following conversation between a pet owner and AI and produce a concise, clinically useful summary for a vet.\n\n" .
+                  "Keep it factual, avoid duplication, and include: presenting complaint, relevant history, key symptoms, any advice already given, and suggested next steps.\n\n" .
+                  "Conversation:\n" . $joined . "\n\n" .
+                  "Return only the summary in clear paragraphs (no markdown).";
+
+        $summary = $this->callGeminiApi_curl($prompt);
+
+        $room->summary = $summary;
+        $room->save();
+
+        return response()->json([
+            'status'        => 'success',
+            'chat_room_id'  => $room->id,
+            'chat_room_token'=> $room->chat_room_token,
+            'summary'       => $summary,
+            'saved'         => true,
         ]);
     }
 }
