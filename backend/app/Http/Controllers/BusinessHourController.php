@@ -11,90 +11,148 @@ class BusinessHourController extends Controller
 {
     public function save(Request $request)
     {
-        $data = $request->validate([
-            'vet_id'             => 'nullable|integer',
-            'clinic_slug'        => 'nullable|string',
-            'open_time'          => 'required|array',
-            'open_time.*'        => 'nullable|date_format:H:i',
-            'close_time'         => 'required|array',
-            'close_time.*'       => 'nullable|date_format:H:i',
-            'closed'             => 'nullable|array',
-            'closed.*'           => 'nullable|boolean',
-        ]);
+        try {
+            $data = $request->validate([
+                'vet_id'             => 'nullable|integer',
+                'clinic_slug'        => 'nullable|string',
+                'open_time'          => 'required|array',
+                'open_time.*'        => 'nullable|date_format:H:i',
+                'close_time'         => 'required|array',
+                'close_time.*'       => 'nullable|date_format:H:i',
+                'closed'             => 'nullable|array',
+                'closed.*'           => 'nullable|boolean',
+                'user_id'            => 'nullable|integer',
+            ]);
 
-        // Resolve clinic: prefer explicit vet_id, then slug, then request/SESSION user -> doctor/clinic
-        $clinic = null;
-        $requestUserId = $data['vet_id'] ? null : ($request->input('user_id') ?: null);
-        if (!empty($data['vet_id'])) {
-            $clinic = VetRegisterationTemp::find($data['vet_id']);
-        }
-        if (!$clinic && !empty($data['clinic_slug'])) {
-            $clinic = VetRegisterationTemp::where('slug', $data['clinic_slug'])->first();
-        }
-        // From request user_id (like Services flow)
-        if (!$clinic && $requestUserId) {
-            $doctor = Doctor::where('user_id', $requestUserId)->orWhere('id', $requestUserId)->first();
-            if ($doctor && $doctor->vet_registeration_id) {
-                $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+            // Resolve clinic: prefer explicit vet_id, then slug, then request/SESSION user -> doctor/clinic
+            $clinic = null;
+            $requestUserId = $data['vet_id'] ? null : ($data['user_id'] ?? null);
+            if (!empty($data['vet_id'])) {
+                $clinic = VetRegisterationTemp::find($data['vet_id']);
+            }
+            if (!$clinic && !empty($data['clinic_slug'])) {
+                $clinic = VetRegisterationTemp::where('slug', $data['clinic_slug'])->first();
+            }
+            // From request user_id (like Services flow)
+            if (!$clinic && $requestUserId) {
+                $doctor = Doctor::where('user_id', $requestUserId)->orWhere('id', $requestUserId)->first();
+                if ($doctor && $doctor->vet_registeration_id) {
+                    $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+                }
+                if (!$clinic) {
+                    $clinic = VetRegisterationTemp::where('employee_id', (string)$requestUserId)->first();
+                }
             }
             if (!$clinic) {
-                $clinic = VetRegisterationTemp::where('employee_id', (string)$requestUserId)->first();
-            }
-        }
-        if (!$clinic) {
-            // Try session user_id -> Doctor primary key mapping
-            $sessionUserId = session('user_id');
-            if ($sessionUserId) {
-                $doctor = Doctor::where('user_id', $sessionUserId)->orWhere('id', $sessionUserId)->first();
-                if ($doctor && $doctor->vet_registeration_id) {
-                    $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
-                }
-                // Fallback: clinic where employee_id equals session user id
-                if (!$clinic) {
-                    $clinic = VetRegisterationTemp::where('employee_id', (string)$sessionUserId)->first();
+                // Try session user_id -> Doctor primary key mapping
+                $sessionUserId = session('user_id');
+                if ($sessionUserId) {
+                    $doctor = Doctor::where('user_id', $sessionUserId)->orWhere('id', $sessionUserId)->first();
+                    if ($doctor && $doctor->vet_registeration_id) {
+                        $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+                    }
+                    // Fallback: clinic where employee_id equals session user id
+                    if (!$clinic) {
+                        $clinic = VetRegisterationTemp::where('employee_id', (string)$sessionUserId)->first();
+                    }
                 }
             }
-        }
-        if (!$clinic) {
-            // Try Laravel auth user -> match by email/phone/employee_id
-            $user = auth()->user();
-            if ($user) {
-                // Doctor by email/phone
-                $doctor = Doctor::where('doctor_email', $user->email)
-                                ->orWhere('doctor_mobile', $user->phone ?? null)
-                                ->first();
-                if ($doctor && $doctor->vet_registeration_id) {
-                    $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
-                }
-                // Clinic by email/phone/employee_id
-                if (!$clinic) {
-                    $clinic = VetRegisterationTemp::where('email', $user->email)
-                                ->orWhere('mobile', $user->phone ?? null)
-                                ->orWhere('employee_id', (string)$user->id)
-                                ->first();
+            if (!$clinic) {
+                // Try Laravel auth user -> match by email/phone/employee_id
+                $user = auth()->user();
+                if ($user) {
+                    // Doctor by email/phone
+                    $doctor = Doctor::where('doctor_email', $user->email)
+                                    ->orWhere('doctor_mobile', $user->phone ?? null)
+                                    ->first();
+                    if ($doctor && $doctor->vet_registeration_id) {
+                        $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+                    }
+                    // Clinic by email/phone/employee_id
+                    if (!$clinic) {
+                        $clinic = VetRegisterationTemp::where('email', $user->email)
+                                    ->orWhere('mobile', $user->phone ?? null)
+                                    ->orWhere('employee_id', (string)$user->id)
+                                    ->first();
+                    }
                 }
             }
-        }
-        if (!$clinic) {
-            return back()->withInput()->with('error', 'Unable to resolve clinic. Provide vet_id or login as a doctor.');
-        }
 
-        // Save 1..7 (Mon..Sun)
-        for ($day = 1; $day <= 7; $day++) {
-            $isClosed = isset($data['closed'][$day]) && (int)$data['closed'][$day] === 1;
-            BusinessHour::updateOrCreate(
-                [
-                    'vet_registeration_id' => $clinic->id,
-                    'day_of_week'          => $day,
-                ],
-                [
-                    'open_time' => $isClosed ? null : ($data['open_time'][$day] ?? null),
-                    'close_time'=> $isClosed ? null : ($data['close_time'][$day] ?? null),
-                    'closed'    => $isClosed,
-                ]
-            );
-        }
+            if (!$clinic) {
+                $context = $this->dbgContext($request, $data, $clinic);
+                if ($request->wantsJson() || (string)$request->query('debug') === '1') {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'Unable to resolve clinic',
+                        'context' => $context,
+                    ], 422);
+                }
+                return back()->withInput()->with('error', 'Unable to resolve clinic. Provide vet_id or login as a doctor.');
+            }
 
-        return back()->with('success', 'Business hours saved');
+            \DB::transaction(function () use ($data, $clinic) {
+                for ($day = 1; $day <= 7; $day++) {
+                    $isClosed = isset($data['closed'][$day]) && (int)$data['closed'][$day] === 1;
+                    $open = $data['open_time'][$day] ?? null; if ($open === '') $open = null;
+                    $close= $data['close_time'][$day] ?? null; if ($close === '') $close = null;
+                    BusinessHour::updateOrCreate(
+                        [
+                            'vet_registeration_id' => $clinic->id,
+                            'day_of_week'          => $day,
+                        ],
+                        [
+                            'open_time' => $isClosed ? null : $open,
+                            'close_time'=> $isClosed ? null : $close,
+                            'closed'    => $isClosed,
+                        ]
+                    );
+                }
+            });
+
+            if ($request->wantsJson()) {
+                return response()->json(['status'=>'success','message'=>'Business hours saved','clinic_id'=>$clinic->id]);
+            }
+            return back()->with('success', 'Business hours saved');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            if ($request->wantsJson() || (string)$request->query('debug') === '1') {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Validation failed',
+                    'errors'  => $e->errors(),
+                ], 422);
+            }
+            return back()->withErrors($e->errors())->withInput();
+        } catch (\Throwable $e) {
+            $context = $this->dbgContext($request, $request->all(), isset($clinic)?$clinic:null);
+            \Log::error('clinic.hours.save.failed', array_merge($context, [
+                'exception' => $e->getMessage(),
+                'file'      => $e->getFile(),
+                'line'      => $e->getLine(),
+            ]));
+            if ($request->wantsJson() || (string)$request->query('debug') === '1') {
+                return response()->json([
+                    'status'    => 'error',
+                    'message'   => 'Save failed',
+                    'exception' => $e->getMessage(),
+                    'context'   => $context,
+                ], 500);
+            }
+            return back()->withInput()->with('error', 'Could not save business hours. '.(config('app.debug') ? $e->getMessage() : ''));
+        }
+    }
+
+    private function dbgContext(Request $request, $data, $clinic)
+    {
+        return [
+            'vet_id'            => $data['vet_id'] ?? null,
+            'clinic_slug'       => $data['clinic_slug'] ?? null,
+            'resolved_clinic_id'=> optional($clinic)->id,
+            'request_user_id'   => $data['user_id'] ?? null,
+            'session_user_id'   => session('user_id'),
+            'auth_user_id'      => optional(auth()->user())->id,
+            'has_open_time'     => isset($data['open_time']) ? array_keys((array)$data['open_time']) : [],
+            'has_close_time'    => isset($data['close_time'])? array_keys((array)$data['close_time']) : [],
+            'has_closed'        => isset($data['closed']) ? array_keys((array)$data['closed']) : [],
+        ];
     }
 }
