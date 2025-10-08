@@ -13,6 +13,6 @@ class Prescription extends Model
         'doctor_id',
         'user_id',
         'content_html',
+        'image_path',
     ];
 }
-

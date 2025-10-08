@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Prescription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 
 class PrescriptionController extends Controller
 {
@@ -40,10 +41,11 @@ class PrescriptionController extends Controller
     {
         $data = $request->only(['doctor_id', 'user_id', 'content_html']);
 
-        $validator = Validator::make($data, [
+        $validator = Validator::make(array_merge($data, ['image' => $request->file('image')]), [
             'doctor_id'    => 'required|integer|min:1',
             'user_id'      => 'required|integer|min:1',
             'content_html' => 'required|string',
+            'image'        => 'sometimes|file|image|mimes:jpeg,jpg,png,webp,gif|max:5120',
         ]);
 
         if ($validator->fails()) {
@@ -53,12 +55,21 @@ class PrescriptionController extends Controller
             ], 422);
         }
 
+        // Handle file upload (optional)
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('prescriptions', 'public');
+            $data['image_path'] = $path;
+        }
+
         $prescription = Prescription::create($data);
 
         return response()->json([
             'message' => 'Prescription created',
-            'data'    => $prescription,
+            'data'    => array_merge($prescription->toArray(), [
+                'image_url' => ($prescription->image_path ?? null)
+                    ? Storage::disk('public')->url($prescription->image_path)
+                    : null,
+            ]),
         ], 201);
     }
 }
-

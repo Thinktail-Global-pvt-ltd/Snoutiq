@@ -204,3 +204,13 @@ Route::get('/vet/{slug}', [VetLandingController::class, 'show'])
 
 // Optional: redirect root to /blogs
 Route::redirect('/', '/blogs');
+
+// Fallback static file server for storage if symlink is missing (dev convenience)
+// Access: /storage/{path} -> storage/app/public/{path}
+Route::get('/storage/{path}', function ($path) {
+    $full = storage_path('app/public/' . $path);
+    if (!file_exists($full)) {
+        abort(404);
+    }
+    return response()->file($full);
+})->where('path', '.*');
