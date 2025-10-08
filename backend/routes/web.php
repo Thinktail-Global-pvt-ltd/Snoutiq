@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Http\Controllers\TestControlelr;
 use App\Http\Controllers\VetLandingController;
+use App\Http\Controllers\AppointmentController;
+use App\Http\Controllers\BusinessHourController;
 Route::get('/import-vets', [TestControlelr::class, 'importPdfData']);
 
 
@@ -42,8 +44,43 @@ Route::get('/admin/supports', [App\Http\Controllers\HomeController::class, 'supp
 
 
 
-Route::get('/vet/{slug}', [VetLandingController::class, 'show'])
-     ->name('vet.landing');
+// placeholder: dynamic vet landing route moved below test-store
+
+// Static services & pricing JSON (served via Blade view)
+Route::get('/vet/services-pricing/static', function () {
+    $data = [
+        'chat_price' => 399,
+        'video_consultation_price' => 499,
+        'business_hours' => [
+            'Monday'    => ['open' => '09:00', 'close' => '18:00', 'closed' => false],
+            'Tuesday'   => ['open' => '09:00', 'close' => '18:00', 'closed' => false],
+            'Wednesday' => ['open' => '09:00', 'close' => '18:00', 'closed' => false],
+            'Thursday'  => ['open' => '09:00', 'close' => '18:00', 'closed' => false],
+            'Friday'    => ['open' => '09:00', 'close' => '18:00', 'closed' => false],
+            'Saturday'  => ['open' => '10:00', 'close' => '16:00', 'closed' => false],
+            'Sunday'    => ['open' => '00:00', 'close' => '00:00', 'closed' => true],
+        ],
+    ];
+
+    return response()
+        ->view('vet.services-pricing-static', ['data' => $data])
+        ->header('Content-Type', 'application/json');
+})->name('vet.services_pricing.static');
+
+// Static clinic hours view (UI only)
+Route::view('/clinic/hours', 'clinic.business-hours')->name('clinic.hours');
+Route::post('/clinic/hours/save', [BusinessHourController::class, 'save'])->name('clinic.hours.save');
+
+// Appointment booking (view + submit)
+Route::view('/appointments/book', 'appointments.book')->name('appointments.book');
+Route::post('/appointments/book', [AppointmentController::class, 'store'])->name('appointments.store');
+
+// Quick test page to create a vet and follow redirect to its slug
+Route::get('/vet/test-store', function () {
+    return view('vet.test-store');
+})->name('vet.test-store');
+Route::post('/vet/test-store', [\App\Http\Controllers\Api\VetRegisterationTempController::class, 'store'])
+    ->name('vet.test-store.submit');
 
 
 
@@ -161,8 +198,9 @@ Route::prefix('blogs')->group(function () {
     });
 });
 
+// Dynamic vet landing route (kept near end to avoid conflicts with specific routes)
+Route::get('/vet/{slug}', [VetLandingController::class, 'show'])
+     ->name('vet.landing');
+
 // Optional: redirect root to /blogs
 Route::redirect('/', '/blogs');
-
-
-
