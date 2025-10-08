@@ -16,6 +16,7 @@ class Doctor extends Model
         'doctor_mobile',
         'doctor_license',
         'doctor_image',
+        'toggle_availability',
     ];
 
     /**

@@ -79,6 +79,7 @@ use App\Http\Controllers\Api\VideoCallingController;
 use App\Http\Controllers\Api\WeatherController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\DoctorStatusController;
 
 
 Route::get('/weather/latest', [WeatherLogController::class, 'latest']);
@@ -125,6 +126,9 @@ Route::post('/summary', [GeminiChatController::class, 'summary']);
 // ---- Reviews ----
 Route::get('/reviews', [ReviewController::class, 'index']);
 Route::post('/reviews', [ReviewController::class, 'store']);
+
+// ---- Doctor status/availability updates by vet_registerations_temp.id ----
+Route::post('/doctor/update-status', [DoctorStatusController::class, 'updateByVet']);
 
 Route::delete('/chat-rooms/{chat_room_token}', [GeminiChatController::class, 'deleteRoom']);
 Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
