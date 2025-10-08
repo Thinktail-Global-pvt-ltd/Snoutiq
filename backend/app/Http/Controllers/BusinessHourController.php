@@ -31,11 +31,32 @@ class BusinessHourController extends Controller
             $clinic = VetRegisterationTemp::where('slug', $data['clinic_slug'])->first();
         }
         if (!$clinic) {
+            // Try session user_id -> Doctor primary key mapping
             $sessionUserId = session('user_id');
             if ($sessionUserId) {
                 $doctor = Doctor::find($sessionUserId);
-                if ($doctor) {
+                if ($doctor && $doctor->vet_registeration_id) {
                     $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+                }
+            }
+        }
+        if (!$clinic) {
+            // Try Laravel auth user -> match by email/phone/employee_id
+            $user = auth()->user();
+            if ($user) {
+                // Doctor by email/phone
+                $doctor = Doctor::where('doctor_email', $user->email)
+                                ->orWhere('doctor_mobile', $user->phone ?? null)
+                                ->first();
+                if ($doctor && $doctor->vet_registeration_id) {
+                    $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+                }
+                // Clinic by email/phone/employee_id
+                if (!$clinic) {
+                    $clinic = VetRegisterationTemp::where('email', $user->email)
+                                ->orWhere('mobile', $user->phone ?? null)
+                                ->orWhere('employee_id', (string)$user->id)
+                                ->first();
                 }
             }
         }

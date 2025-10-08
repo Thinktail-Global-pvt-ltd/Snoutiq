@@ -40,12 +40,29 @@
   <main class="flex-1 flex flex-col">
     <!-- Top Bar -->
     @php
-      // Try to resolve clinic automatically from session user (doctor)
+      // Try to resolve clinic automatically from session/auth similar to services page
       $resolvedClinic = null;
       $sessionUserId = session('user_id');
       if ($sessionUserId) {
           $doc = \App\Models\Doctor::find($sessionUserId);
-          if ($doc) { $resolvedClinic = \App\Models\VetRegisterationTemp::find($doc->vet_registeration_id); }
+          if ($doc && $doc->vet_registeration_id) {
+              $resolvedClinic = \App\Models\VetRegisterationTemp::find($doc->vet_registeration_id);
+          }
+      }
+      if (!$resolvedClinic && auth()->check()) {
+          $u = auth()->user();
+          $doc = \App\Models\Doctor::where('doctor_email', $u->email)
+                  ->orWhere('doctor_mobile', $u->phone ?? null)
+                  ->first();
+          if ($doc && $doc->vet_registeration_id) {
+              $resolvedClinic = \App\Models\VetRegisterationTemp::find($doc->vet_registeration_id);
+          }
+          if (!$resolvedClinic) {
+              $resolvedClinic = \App\Models\VetRegisterationTemp::where('email', $u->email)
+                    ->orWhere('mobile', $u->phone ?? null)
+                    ->orWhere('employee_id', (string)$u->id)
+                    ->first();
+          }
       }
     @endphp
     <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
