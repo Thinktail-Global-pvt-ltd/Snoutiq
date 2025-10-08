@@ -11,6 +11,20 @@ class BusinessHourController extends Controller
 {
     public function save(Request $request)
     {
+        // On-demand hard dump for debugging from the browser:
+        // POST to /clinic/hours/save?dd=1 (or add dd=1 to the form action) to see the exact payload
+        if ((string)$request->query('dd') === '1') {
+            dd([
+                'url'               => $request->fullUrl(),
+                'method'            => $request->method(),
+                'request_all'       => $request->all(),
+                'headers'           => $request->headers->all(),
+                'cookies'           => $request->cookies->all(),
+                'has_csrf_token'    => $request->has('_token'),
+                'session_user_id'   => session('user_id'),
+                'auth_user_id'      => optional(auth()->user())->id,
+            ]);
+        }
         try {
             $data = $request->validate([
                 'vet_id'             => 'nullable|integer',

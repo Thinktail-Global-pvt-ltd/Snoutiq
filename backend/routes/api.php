@@ -77,6 +77,7 @@ use App\Http\Controllers\Api\GeminiChatController;
 use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\VideoCallingController;
 use App\Http\Controllers\Api\WeatherController;
+use App\Http\Controllers\Api\PrescriptionController;
 
 
 Route::get('/weather/latest', [WeatherLogController::class, 'latest']);
@@ -90,6 +91,11 @@ Route::get('/weather/hourly-schedule', [WeatherController::class, 'hourlySchedul
 
 // routes/api.php
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
+
+// ---- Prescriptions ----
+Route::get('/prescriptions', [PrescriptionController::class, 'index']);
+Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show']);
+Route::post('/prescriptions', [PrescriptionController::class, 'store']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
 Route::get('/test-dd', function () {
     dd("highest in the room ~travis scott g g g g");
