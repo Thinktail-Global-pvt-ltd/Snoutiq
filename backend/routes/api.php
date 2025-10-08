@@ -78,6 +78,7 @@ use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\VideoCallingController;
 use App\Http\Controllers\Api\WeatherController;
 use App\Http\Controllers\Api\PrescriptionController;
+use App\Http\Controllers\Api\ReviewController;
 
 
 Route::get('/weather/latest', [WeatherLogController::class, 'latest']);
@@ -120,6 +121,10 @@ Route::post('/chat-rooms/{chat_room_token}/summarize', [GeminiChatController::cl
 
 // Shortcut endpoint: POST /api/summary { user_id, chat_room_token }
 Route::post('/summary', [GeminiChatController::class, 'summary']);
+
+// ---- Reviews ----
+Route::get('/reviews', [ReviewController::class, 'index']);
+Route::post('/reviews', [ReviewController::class, 'store']);
 
 Route::delete('/chat-rooms/{chat_room_token}', [GeminiChatController::class, 'deleteRoom']);
 Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
