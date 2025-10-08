@@ -87,7 +87,10 @@ class BusinessHourController extends Controller
                         'context' => $context,
                     ], 422);
                 }
-                return back()->withInput()->with('error', 'Unable to resolve clinic. Provide vet_id or login as a doctor.');
+                return back()
+                    ->withInput()
+                    ->with('error', 'Unable to resolve clinic. Provide vet_id or login as a doctor.')
+                    ->with('error_context', $context);
             }
 
             \DB::transaction(function () use ($data, $clinic) {
@@ -112,7 +115,12 @@ class BusinessHourController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['status'=>'success','message'=>'Business hours saved','clinic_id'=>$clinic->id]);
             }
-            return back()->with('success', 'Business hours saved');
+            return back()->with('success', 'Business hours saved')
+                         ->with('debug_context', [
+                             'clinic_id' => $clinic->id,
+                             'user_id'   => $data['user_id'] ?? session('user_id') ?? optional(auth()->user())->id,
+                             'vet_id'    => $data['vet_id'] ?? null,
+                         ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             if ($request->wantsJson() || (string)$request->query('debug') === '1') {
                 return response()->json([
@@ -121,7 +129,9 @@ class BusinessHourController extends Controller
                     'errors'  => $e->errors(),
                 ], 422);
             }
-            return back()->withErrors($e->errors())->withInput();
+            return back()->withErrors($e->errors())->withInput()
+                        ->with('error', 'Validation failed')
+                        ->with('error_context', ['errors' => $e->errors()]);
         } catch (\Throwable $e) {
             $context = $this->dbgContext($request, $request->all(), isset($clinic)?$clinic:null);
             \Log::error('clinic.hours.save.failed', array_merge($context, [
@@ -137,7 +147,13 @@ class BusinessHourController extends Controller
                     'context'   => $context,
                 ], 500);
             }
-            return back()->withInput()->with('error', 'Could not save business hours. '.(config('app.debug') ? $e->getMessage() : ''));
+            return back()->withInput()
+                         ->with('error', 'Could not save business hours.')
+                         ->with('error_context', array_merge($context, [
+                             'exception' => $e->getMessage(),
+                             'file'      => $e->getFile(),
+                             'line'      => $e->getLine(),
+                         ]));
         }
     }
 
