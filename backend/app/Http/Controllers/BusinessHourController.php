@@ -22,21 +22,36 @@ class BusinessHourController extends Controller
             'closed.*'           => 'nullable|boolean',
         ]);
 
-        // Resolve clinic: prefer explicit vet_id, then slug, then session user -> doctor -> clinic
+        // Resolve clinic: prefer explicit vet_id, then slug, then request/SESSION user -> doctor/clinic
         $clinic = null;
+        $requestUserId = $data['vet_id'] ? null : ($request->input('user_id') ?: null);
         if (!empty($data['vet_id'])) {
             $clinic = VetRegisterationTemp::find($data['vet_id']);
         }
         if (!$clinic && !empty($data['clinic_slug'])) {
             $clinic = VetRegisterationTemp::where('slug', $data['clinic_slug'])->first();
         }
+        // From request user_id (like Services flow)
+        if (!$clinic && $requestUserId) {
+            $doctor = Doctor::where('user_id', $requestUserId)->orWhere('id', $requestUserId)->first();
+            if ($doctor && $doctor->vet_registeration_id) {
+                $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+            }
+            if (!$clinic) {
+                $clinic = VetRegisterationTemp::where('employee_id', (string)$requestUserId)->first();
+            }
+        }
         if (!$clinic) {
             // Try session user_id -> Doctor primary key mapping
             $sessionUserId = session('user_id');
             if ($sessionUserId) {
-                $doctor = Doctor::find($sessionUserId);
+                $doctor = Doctor::where('user_id', $sessionUserId)->orWhere('id', $sessionUserId)->first();
                 if ($doctor && $doctor->vet_registeration_id) {
                     $clinic = VetRegisterationTemp::find($doctor->vet_registeration_id);
+                }
+                // Fallback: clinic where employee_id equals session user id
+                if (!$clinic) {
+                    $clinic = VetRegisterationTemp::where('employee_id', (string)$sessionUserId)->first();
                 }
             }
         }

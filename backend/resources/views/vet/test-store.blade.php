@@ -73,6 +73,7 @@
           <input form="hoursForm" type="hidden" name="vet_id" value="{{ $resolvedClinic->id }}" />
         @else
           <input form="hoursForm" type="text" name="clinic_slug" value="{{ request('clinic_slug') }}" placeholder="clinic slug" class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-800 text-sm" />
+          <span class="text-xs text-gray-500">session user_id: {{ session('user_id') ?? 'null' }}</span>
         @endif
         <button type="submit" form="hoursForm" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">Save Hours</button>
       </div>
@@ -94,6 +95,7 @@
 
         <form id="hoursForm" action="{{ route('clinic.hours.save') }}" method="POST" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           @csrf
+          <input type="hidden" name="user_id" id="hours_user_id" value="">
           @if(session('success'))
             <div class="mb-4 p-3 rounded bg-green-100 text-green-800">{{ session('success') }}</div>
           @endif
@@ -128,9 +130,32 @@
             @endfor
           </div>
         </form>
-      </div>
-    </section>
+</div>
+</section>
   </main>
 </div>
+<script>
+(function(){
+  function readAuthFull(){
+    try{ const raw=sessionStorage.getItem('auth_full')||localStorage.getItem('auth_full'); return raw?JSON.parse(raw):null; }catch(_){ return null; }
+  }
+  const sid = {{ json_encode(session('user_id')) }};
+  const au  = {{ json_encode(optional(auth()->user())->id ?? null) }};
+  const af  = readAuthFull();
+  const fromStorage = af?.user_id || (af?.user && af.user.id) || null;
+  const resolved = sid || fromStorage || au || null;
+  const el = document.getElementById('hours_user_id');
+  if(el && resolved){ el.value = String(resolved); }
+  // Debug logs for user_id source and final value
+  console.log('[hours] session user_id =', sid);
+  console.log('[hours] auth()->user()->id =', au);
+  console.log('[hours] storage auth_full =', af);
+  console.log('[hours] fromStorage user_id =', fromStorage);
+  console.log('[hours] resolved user_id =', resolved);
+  console.log('[hours] hidden input set =', !!(el && el.value));
+  // Expose for quick inspection
+  window.__snqHoursUserId = { sid, au, fromStorage, resolved };
+})();
+</script>
 </body>
 </html>
