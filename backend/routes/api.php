@@ -470,7 +470,7 @@ Route::get('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorSchedu
 Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class, 'byUser']);
 
 // AI Summary from chats
-Route::middleware('web')->get('/ai/summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'summary']);
+Route::get('/ai/summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'summary']);
 Route::post('/ai/send-summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'sendToDoctor']);
 
 // Frontend session helpers (attach web middleware to enable session store)
