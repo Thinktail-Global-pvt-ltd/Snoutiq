@@ -1,4 +1,4 @@
-<?php 
+﻿<?php 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 // use App
@@ -80,6 +80,7 @@ use App\Http\Controllers\Api\WeatherController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\DoctorStatusController;
+use App\Http\Controllers\Api\DoctorController;
 
 
 Route::get('/weather/latest', [WeatherLogController::class, 'latest']);
@@ -264,7 +265,7 @@ Route::prefix('user')->middleware('auth:sanctum')->group(function () {
 
     
     Route::get('/profile', [UserController::class, 'profile']);
-    Route::get('/my_bookings', [UserController::class, 'my_bookings']);
+  Route::get('/my_bookings', [UserController::class, 'my_bookings']);
     Route::get('/my_booking/{id}', [UserController::class, 'my_booking']);
      Route::post('/profile', [UserController::class, 'profile_update']);
      Route::post('/add_pet', [UserController::class, 'add_pet']);
@@ -319,7 +320,7 @@ Route::prefix('public')->group(function(){
 use Illuminate\Support\Facades\Log;
 
 Route::post('/webhook/deploy', function () {
-    Log::info('🚀 Webhook received at ' . now());
+    Log::info('ðŸš€ Webhook received at ' . now());
 
     exec('bash /var/www/deploy.sh 2>&1', $output, $returnCode);
 
@@ -423,3 +424,74 @@ Route::delete('/pets/{petId}',      [AdminController::class, 'deletePet']);
 
 Route::post('/doctor/availability', [GroomerCalenderController::class,'doctor_availability_store']);
 Route::get('/doctor/availability/suggestions', [GroomerCalenderController::class,'doctor_availability_suggestions']);
+
+// --- Snoutiq Healthcare API (scaffold) ---
+
+// Provider endpoints
+Route::post('/providers/register', [\App\Http\Controllers\Api\ProvidersController::class, 'register']);
+Route::post('/providers/complete-profile', [\App\Http\Controllers\Api\ProvidersController::class, 'completeProfile']);
+Route::get('/providers/{id}/status', [\App\Http\Controllers\Api\ProvidersController::class, 'status']);
+Route::put('/providers/{id}/availability', [\App\Http\Controllers\Api\ProvidersController::class, 'updateAvailability']);
+
+// Booking endpoints
+Route::post('/bookings/create', [\App\Http\Controllers\Api\BookingsController::class, 'create']);
+Route::get('/bookings/details/{id}', [\App\Http\Controllers\Api\BookingsController::class, 'details']);
+Route::put('/bookings/{id}/status', [\App\Http\Controllers\Api\BookingsController::class, 'updateStatus']);
+Route::post('/bookings/{id}/rate', [\App\Http\Controllers\Api\BookingsController::class, 'rate']);
+Route::get('/doctors', [DoctorController::class, 'index']);
+Route::get('/doctors/{id}/bookings', [\App\Http\Controllers\Api\BookingsController::class, 'doctorBookings']);
+
+// Coverage endpoints
+Route::get('/coverage/dashboard', [\App\Http\Controllers\Api\CoverageController::class, 'dashboard']);
+Route::get('/coverage/zone/{id}', [\App\Http\Controllers\Api\CoverageController::class, 'zone']);
+
+// Admin endpoints
+Route::get('/admin/tasks', [\App\Http\Controllers\Api\AdminController::class, 'tasks']);
+Route::get('/admin/alerts', [\App\Http\Controllers\Api\AdminController::class, 'alerts']);
+Route::post('/admin/resolve-alert/{id}', [\App\Http\Controllers\Api\AdminController::class, 'resolveAlert']);
+Route::get('/admin/providers-queue', [\App\Http\Controllers\Api\AdminController::class, 'providersQueue']);
+Route::get('/admin/analytics', [\App\Http\Controllers\Api\AdminController::class, 'analytics']);
+
+// ML endpoints
+Route::post('/ml/train', [\App\Http\Controllers\Api\MLController::class, 'train']);
+Route::get('/ml/provider-performance/{id}', [\App\Http\Controllers\Api\MLController::class, 'providerPerformance']);
+Route::get('/ml/demand-prediction', [\App\Http\Controllers\Api\MLController::class, 'demandPrediction']);
+
+// Doctor availability (schedule)
+Route::put('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updateAvailability']);
+Route::get('/doctors/{id}/free-slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'freeSlots']);
+
+// Clinics
+Route::get('/clinics', [\App\Http\Controllers\Api\ClinicsController::class, 'index']);
+Route::get('/clinics/{id}/doctors', [\App\Http\Controllers\Api\ClinicsController::class, 'doctors']);
+Route::get('/clinics/{id}/availability', [\App\Http\Controllers\Api\ClinicsController::class, 'availability']);
+Route::get('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'getAvailability']);
+// Pets
+Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class, 'byUser']);
+
+// AI Summary from chats
+Route::middleware('web')->get('/ai/summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'summary']);
+Route::post('/ai/send-summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'sendToDoctor']);
+
+// Frontend session helpers (attach web middleware to enable session store)
+Route::middleware('web')->group(function () {
+    Route::get('/session/get', [\App\Http\Controllers\Api\SessionController::class, 'get']);
+    Route::get('/session/login', [\App\Http\Controllers\Api\SessionController::class, 'loginWithUserIdGet']);
+    // Allow POST without CSRF for programmatic use
+    Route::post('/session/login', [\App\Http\Controllers\Api\SessionController::class, 'loginWithUserId'])
+        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/session/save', [\App\Http\Controllers\Api\SessionController::class, 'save'])
+        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/session/clear', [\App\Http\Controllers\Api\SessionController::class, 'clear'])
+        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    // User bookings via session (no Sanctum token required)
+    Route::get('/my_bookings', [\App\Http\Controllers\Api\UserController::class, 'my_bookings']);
+    Route::get('/my_booking/{id}', [\App\Http\Controllers\Api\UserController::class, 'my_booking']);
+});
+
+use App\Http\Controllers\Api\UserOrdersController;
+
+Route::get('/users/{id}/orders', [UserOrdersController::class, 'index']);
+
+
+ 
