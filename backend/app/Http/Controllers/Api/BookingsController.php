@@ -1,0 +1,123 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Services\Snoutiq\RoutingEngine;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class BookingsController extends Controller
+{
+    // POST /api/bookings/create
+    public function create(Request $request, RoutingEngine $routing)
+    {
+        $payload = $request->validate([
+            'user_id' => 'required|integer',
+            'pet_id' => 'required|integer',
+            'service_type' => 'required|string|in:video,in_clinic,home_visit',
+            'urgency' => 'required|string|in:low,medium,high,emergency',
+            'ai_summary' => 'nullable|string',
+            'ai_urgency_score' => 'nullable|numeric',
+            'symptoms' => 'nullable|array',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'address' => 'nullable|string',
+            // clinic + doctor centric fields
+            'clinic_id' => 'nullable|integer',
+            'doctor_id' => 'nullable|integer',
+            'scheduled_date' => 'nullable|date',
+            'scheduled_time' => 'nullable',
+        ]);
+
+        $scheduledFor = null;
+        if (!empty($payload['scheduled_date']) && !empty($payload['scheduled_time'])) {
+            $scheduledFor = $payload['scheduled_date'] . ' ' . $payload['scheduled_time'];
+        }
+
+        $id = DB::table('bookings')->insertGetId([
+            'user_id' => $payload['user_id'],
+            'pet_id' => $payload['pet_id'],
+            'service_type' => $payload['service_type'],
+            'urgency' => $payload['urgency'],
+            'ai_summary' => $payload['ai_summary'] ?? null,
+            'ai_urgency_score' => $payload['ai_urgency_score'] ?? null,
+            'symptoms' => isset($payload['symptoms']) ? json_encode($payload['symptoms']) : null,
+            'user_latitude' => $payload['latitude'] ?? null,
+            'user_longitude' => $payload['longitude'] ?? null,
+            'user_address' => $payload['address'] ?? null,
+            'status' => 'pending',
+            // new optional associations
+            'clinic_id' => $payload['clinic_id'] ?? null,
+            'assigned_doctor_id' => $payload['doctor_id'] ?? null,
+            'scheduled_for' => $scheduledFor,
+        ]);
+
+        // Kick off routing (minimal stub)
+        $routing->routeBooking($id);
+
+        return response()->json([
+            'success' => true,
+            'booking_id' => $id,
+            'message' => 'Booking created, finding doctor...',
+            'status' => 'routing',
+        ]);
+    }
+
+    // GET /api/bookings/details/{id}
+    public function details(string $id)
+    {
+        $booking = DB::table('bookings')->where('id', $id)->first();
+        if (!$booking) {
+            return response()->json(['error' => 'Not found', 'success' => false], 404);
+        }
+        return response()->json(['booking' => $booking]);
+    }
+
+    // GET /api/doctors/{id}/bookings?since=YYYY-MM-DD
+    public function doctorBookings(string $id, Request $request)
+    {
+        $since = $request->query('since');
+        $q = DB::table('bookings as b')
+            ->leftJoin('user_pets as p', 'b.pet_id', '=', 'p.id')
+            ->select(
+                'b.*',
+                DB::raw('COALESCE(p.name, "") as pet_name'),
+                DB::raw('COALESCE(p.breed, "") as pet_breed')
+            )
+            ->where('b.assigned_doctor_id', (int) $id);
+        if ($since) {
+            $q->where(function($sub) use ($since) {
+                $sub->whereDate('b.scheduled_for', '>=', $since)
+                    ->orWhereDate('b.booking_created_at', '>=', $since);
+            });
+        }
+        $rows = $q->orderByRaw('COALESCE(b.scheduled_for, b.booking_created_at) DESC')->limit(200)->get();
+
+        // Decode JSON symptoms to array for convenience
+        $rows = $rows->map(function($r){
+            if (isset($r->symptoms) && $r->symptoms) {
+                try { $r->symptoms = is_array($r->symptoms) ? $r->symptoms : json_decode($r->symptoms, true); } catch (\Throwable $e) { /* ignore */ }
+            }
+            return $r;
+        });
+
+        return response()->json(['bookings' => $rows]);
+    }
+
+    // PUT /api/bookings/{id}/status
+    public function updateStatus(Request $request, string $id)
+    {
+        $data = $request->validate(['status' => 'required|string']);
+        DB::table('bookings')->where('id', $id)->update(['status' => $data['status']]);
+        return response()->json(['message' => 'Status updated']);
+    }
+
+    // POST /api/bookings/{id}/rate
+    public function rate(Request $request, string $id)
+    {
+        $data = $request->validate(['rating' => 'required|integer|min:1|max:5', 'review' => 'nullable|string']);
+        DB::table('bookings')->where('id', $id)->update(['rating' => $data['rating'], 'review' => $data['review'] ?? null]);
+        return response()->json(['message' => 'Thanks for your feedback']);
+    }
+}

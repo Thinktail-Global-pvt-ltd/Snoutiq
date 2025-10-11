@@ -124,7 +124,7 @@
     e.preventDefault();
     els.loginBtn.disabled = true; els.loginBtn.textContent = 'Logging in...';
     try{
-      const res = await axios.post('https://snoutiq.com/backend/api/auth/login', {
+      const res = await axios.post('/api/auth/login', {
         login: els.email.value,
         password: els.password.value,
         role: 'vet',
@@ -144,11 +144,10 @@
       saveAuthFull(payload);
 
       const docId = payload.user_id;
-      const prefix = '/backend';
       if (docId) {
-        window.location.href = `${prefix}/doctor?doctorId=${encodeURIComponent(docId)}`;
+        window.location.href = `/doctor?doctorId=${encodeURIComponent(docId)}`;
       } else {
-        window.location.href = `${prefix}/doctor`;
+        window.location.href = `/doctor`;
       }
     }catch(err){
       console.error('Vet login failed:', err?.response?.data || err);
@@ -167,7 +166,7 @@
       const email = googleData.email || '';
       const uniqueUserId = googleData.sub;
 
-      const res = await axios.post('https://snoutiq.com/backend/api/google-login',{
+      const res = await axios.post('/api/google-login',{
         email,
         google_token: uniqueUserId,
         role: 'pet'
@@ -185,7 +184,7 @@
         user_id: res.data?.user?.id || null,
       };
       saveAuthFull(payload);
-      window.location.href = '/backend/pet-dashboard';
+      window.location.href = '/pet-dashboard';
     }catch(err){
       console.error('Google login failed:', err?.response?.data || err);
     }

@@ -38,6 +38,11 @@
   <div id="toast" class="toast"></div>
 
   <script>
+    // Dynamic base so it works on local and production
+    const PATH_PREFIX = "{{ trim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/') }}";
+    const BASE = PATH_PREFIX ? ('/' + PATH_PREFIX) : '';
+    const API  = BASE + '/api';
+
     let locationStatus = "checking";
     let coords = { lat:null, lng:null };
 
@@ -83,16 +88,16 @@
 
       try{
         // 1) Try login (role: pet)
-        let loginRes=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
+        let loginRes=await axios.post(`${API}/google-login`,{ email, google_token:googleToken, role:"pet" });
         if(loginRes.data.status==="success" || loginRes.data.token){
           toast("Login successful!","success");
-          location.href="https://snoutiq.com/backend/dashboard";
+          location.href = `${BASE}/dashboard`;
           return;
         }
       }catch(e){ console.warn("Login failed, will register"); }
 
       // 2) Register (initial)
-      let reg=await fetch("https://snoutiq.com/backend/api/auth/initial-register",{
+      let reg=await fetch(`${API}/auth/initial-register`,{
         method:"POST",headers:{ "Content-Type":"application/json" },
         body:JSON.stringify({ fullName:googleData.name,email,google_token:googleToken,latitude:coords.lat,longitude:coords.lng })
       });
@@ -100,10 +105,10 @@
       if(regData.status==="error"){ document.getElementById("googleMsg").textContent=regData.message || "Registration error"; return; }
 
       // 3) Login again (role: pet)
-      let finalLogin=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
+      let finalLogin=await axios.post(`${API}/google-login`,{ email, google_token:googleToken, role:"pet" });
       if(finalLogin.data.token || finalLogin.data.status==="success"){
         toast("Registered & logged in!","success");
-        location.href="https://snoutiq.com/backend/dashboard";
+        location.href = `${BASE}/dashboard`;
       }else{
         document.getElementById("googleMsg").textContent="Could not log you in. Please try again.";
       }

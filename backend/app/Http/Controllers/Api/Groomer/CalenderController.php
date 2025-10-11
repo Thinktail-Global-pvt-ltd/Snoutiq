@@ -15,10 +15,181 @@ use App\Models\GroomerService;
 use App\Models\UserPet;
 use App\Models\UserProfile;
 use App\Models\GroomerEmployee;
+use Illuminate\Support\Facades\DB;
+
+
+use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 
 class CalenderController extends Controller
 {
- public function store_doctor_booking(Request $request)
+    
+
+
+public function store_doctor_booking(Request $request)
+{
+    $request->validate([
+        'customer_id' => 'required|integer',
+        'date'        => 'required|date',
+        'start_time'  => 'required',     // 'HH:mm'
+        'end_time'    => 'required',     // 'HH:mm'
+        'services'    => 'required|array',
+        'user_id'     => 'required|integer',
+        // optional: if you send these, we'll respect them, else we auto-pick
+        'vet_id'      => 'nullable|integer',
+        'doctor_id'   => 'nullable|integer',
+        'radius_km'   => 'nullable|numeric',   // default 5km
+    ]);
+
+    // sum total
+    $total = 0;
+    foreach ($request->services as $s) { $total += (float) ($s['price'] ?? 0); }
+
+    return DB::transaction(function () use ($request, $total) {
+
+        $chosenVetId    = $request->vet_id;
+        $chosenDoctorId = $request->doctor_id;
+
+        // -------------------------------
+        // Auto-pick clinic & doctor if missing
+        // -------------------------------
+        if (!$chosenVetId || !$chosenDoctorId) {
+
+            // 1) get user lat/lng
+            $user = DB::table('users')
+                ->select('latitude','longitude')
+                ->where('id', $request->user_id)
+                ->first();
+
+            if (!$user || $user->latitude === null || $user->longitude === null || $user->latitude === '' || $user->longitude === '') {
+                return response()->json([
+                    'message' => 'User latitude/longitude missing—cannot find nearby clinics.'
+                ], 422);
+            }
+
+            $lat = (float) $user->latitude;
+            $lng = (float) $user->longitude;
+
+            // we’ll try 5km, then expand to 10km, then 25km
+            $radii = [(float)($request->radius_km ?? 5), 10.0, 25.0];
+
+            $found = false;
+
+            foreach ($radii as $radiusKm) {
+                // 2) nearest clinics within radius (your Haversine)
+                $clinics = DB::table('vet_registerations_temp as c')
+                    ->select('c.*')
+                    ->selectRaw("
+                        (6371 * acos(
+                            cos(radians(?)) * cos(radians(c.lat)) *
+                            cos(radians(c.lng) - radians(?)) +
+                            sin(radians(?)) * sin(radians(c.lat))
+                        )) AS distance
+                    ", [$lat, $lng, $lat])
+                    ->whereNotNull('c.lat')
+                    ->whereNotNull('c.lng')
+                    ->having('distance','<=',$radiusKm)
+                    ->orderBy('distance','asc')
+                    ->limit(50) // cap
+                    ->get();
+
+                // iterate clinics by proximity
+                foreach ($clinics as $clinic) {
+
+                    // 3) doctors of this clinic
+                    $doctors = DB::table('doctors')
+                        ->where('vet_registeration_id', $clinic->id)
+                        ->orderBy('id')
+                        ->lockForUpdate()   // prevent two threads picking same free doctor simultaneously
+                        ->get();
+
+                    if ($doctors->isEmpty()) {
+                        // no doctors at this clinic, try next clinic
+                        continue;
+                    }
+
+                    // 4) check each doctor for overlap (first free wins)
+                    foreach ($doctors as $doc) {
+                        $busy = DB::table('doctor_bookings')
+                            ->where('doctor_id', $doc->id)
+                            ->where('date', $request->date)
+                            ->where('start_time', '<', $request->end_time)
+                            ->where('end_time',   '>', $request->start_time)
+                            ->lockForUpdate()
+                            ->exists();
+
+                        if (!$busy) {
+                            $chosenVetId    = $clinic->id;
+                            $chosenDoctorId = $doc->id;
+                            $found = true;
+                            break 2; // break doctors + clinics
+                        }
+                    }
+                    // if all doctors busy at this clinic, continue to next clinic
+                }
+
+                if ($found) break; // booked doctor found in this radius
+            }
+
+            if (!$found) {
+                return response()->json([
+                    'message' => 'No doctors available in nearby clinics for the selected time.'
+                ], 422);
+            }
+        }
+
+        // -------------------------------
+        // serial number (per user)
+        // -------------------------------
+        $old = DB::table('doctor_bookings')
+            ->where('user_id', $request->user_id)
+            ->orderByDesc('serial_number')
+            ->first();
+        $serial = $old ? ($old->serial_number + 1) : 1;
+
+        // final safety: ensure selected doctor still free in this TX
+        $stillBusy = DB::table('doctor_bookings')
+            ->where('doctor_id', $chosenDoctorId)
+            ->where('date', $request->date)
+            ->where('start_time', '<', $request->end_time)
+            ->where('end_time',   '>', $request->start_time)
+            ->lockForUpdate()
+            ->exists();
+
+        if ($stillBusy) {
+            return response()->json([
+                'message' => 'Selected doctor just got booked. Please try again.'
+            ], 409);
+        }
+
+        // create booking
+        DB::table('doctor_bookings')->insert([
+            'serial_number' => $serial,
+            'customer_id'   => $request->customer_id,
+            'date'          => $request->date,
+            'start_time'    => $request->start_time,
+            'end_time'      => $request->end_time,
+            'services'      => json_encode($request->services),
+            'total'         => $total,
+            'paid'          => 0,
+            'user_id'       => $request->user_id,
+            'vet_id'        => $chosenVetId,
+            'doctor_id'     => $chosenDoctorId,
+            'status'        => 'Pending',
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
+
+        return response()->json([
+            'message'   => 'Doctor booking created successfully!',
+            'vet_id'    => $chosenVetId,
+            'doctor_id' => $chosenDoctorId
+        ], 200);
+    });
+}
+
+
+ public function store_doctor_booking_old(Request $request)
 {
     $request->validate([
         'customer_id' => 'required|integer',
@@ -86,6 +257,62 @@ class CalenderController extends Controller
 // }
 
 public function doctor_bookings(Request $request)
+{
+    $request->validate(['user_id' => 'required|integer']);
+
+    $rows = DB::table('doctor_bookings as db')
+        ->join('vet_registerations_temp as v', 'db.vet_id', '=', 'v.id')
+        ->join('doctors as d', 'db.doctor_id', '=', 'd.id')
+        ->select(
+            'db.id','db.serial_number','db.customer_id','db.date',
+            'db.start_time','db.end_time','db.total','db.paid','db.status','db.services',
+            'v.id as vet_id',
+            'v.name as vet_name',                // ✅ clinic_name -> name
+            'v.email as vet_email',
+     
+            'v.address as vet_address',
+            'd.id as doctor_id',
+            'd.doctor_name','d.doctor_email','d.doctor_mobile'
+        )
+        ->where('db.user_id', $request->user_id)
+        ->when($request->filled('date'), fn($q) => $q->where('db.date', $request->date))
+        ->orderByDesc('db.id')
+        ->get();
+
+    $rows = $rows->map(function ($r) {
+        return [
+            'id'            => $r->id,
+            'serial_number' => $r->serial_number,
+            'customer_id'   => $r->customer_id,
+            'date'          => $r->date,
+            'start_time'    => $r->start_time,
+            'end_time'      => $r->end_time,
+            'total'         => $r->total,
+            'paid'          => $r->paid,
+            'status'        => $r->status,
+            'clinic' => [
+                'id'      => $r->vet_id,
+                'name'    => $r->vet_name,       // ✅ correct
+                'email'   => $r->vet_email,
+                    // uses contact_number
+                'address' => $r->vet_address,
+            ],
+            'doctor' => [
+                'id'     => $r->doctor_id,
+                'name'   => $r->doctor_name,
+                'email'  => $r->doctor_email,
+                'mobile' => $r->doctor_mobile,
+            ],
+            'services_list' => json_decode($r->services, true) ?: [],
+        ];
+    });
+
+    return response()->json(['data' => $rows], 200);
+}
+
+
+
+public function doctor_bookings_old(Request $request)
 {
     try {
         $bookings = \DB::table('doctor_bookings as db')
@@ -559,4 +786,274 @@ public function booking_single_status($id,Request $request){
 
     return true; // No conflict, slot is available
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////
+// A) Save / update availability (single window)
+////////////////////////////////////////////////////////////////////////
+public function doctor_availability_store(Request $request)
+{
+    $request->validate([
+        'doctor_id'    => 'required|integer',
+        'vet_id'       => 'required|integer',
+        'type'         => 'required|in:recurring,one_off',
+        'weekday'      => 'nullable|integer|min:0|max:6',
+        'date'         => 'nullable|date',
+        'start_time'   => 'required',   // HH:mm
+        'end_time'     => 'required',
+        'slot_minutes' => 'nullable|integer|min:5|max:180'
+    ]);
+
+    $slot = $request->integer('slot_minutes', 30);
+
+    // sanity for recurring / one_off
+    if ($request->type === 'recurring' && $request->weekday === null) {
+        return response()->json(['message' => 'weekday is required for recurring'], 422);
+    }
+    if ($request->type === 'one_off' && !$request->date) {
+        return response()->json(['message' => 'date is required for one_off'], 422);
+    }
+
+    DB::table('doctor_availabilities')->insert([
+        'doctor_id'    => $request->doctor_id,
+        'vet_id'       => $request->vet_id,
+        'type'         => $request->type,
+        'weekday'      => $request->type === 'recurring' ? $request->weekday : null,
+        'date'         => $request->type === 'one_off'   ? $request->date    : null,
+        'start_time'   => $request->start_time,
+        'end_time'     => $request->end_time,
+        'slot_minutes' => $slot,
+        'created_at'   => now(),
+        'updated_at'   => now(),
+    ]);
+
+    return response()->json(['message' => 'Availability saved'], 200);
+}
+
+////////////////////////////////////////////////////////////////////////
+// B) Smart suggestions for a doctor on a given date
+////////////////////////////////////////////////////////////////////////
+public function doctor_availability_suggestions(Request $request)
+{
+    $request->validate([
+        'doctor_id'  => 'required|integer',
+        'date'       => 'required|date',
+        'radius_km'  => 'nullable|numeric',   // default 10
+        'slot'       => 'nullable|integer|min:5|max:180', // default 30
+        'day_start'  => 'nullable',  // HH:mm optional (default 08:00)
+        'day_end'    => 'nullable',  // HH:mm optional (default 22:00)
+    ]);
+
+    $date       = Carbon::parse($request->date)->toDateString();
+    $slotMin    = $request->integer('slot', 30);
+    $radiusKm   = (float)($request->radius_km ?? 10);
+    $dayStart   = $request->input('day_start', '08:00');
+    $dayEnd     = $request->input('day_end',   '22:00');
+
+    // doctor + clinic
+    $doctor = DB::table('doctors')->where('id', $request->doctor_id)->first();
+    if (!$doctor) return response()->json(['message' => 'Doctor not found'], 404);
+
+    $clinic = DB::table('vet_registerations_temp')->where('id', $doctor->vet_registeration_id)->first();
+    if (!$clinic || $clinic->lat === null || $clinic->lng === null) {
+        return response()->json(['message' => 'Doctor clinic lat/lng missing'], 422);
+    }
+
+    // 1) Nearby clinics within radius (Haversine)
+    $nearbyClinics = DB::table('vet_registerations_temp as c')
+        ->select('c.id','c.lat','c.lng','c.name')
+        ->selectRaw("
+            (6371 * acos(
+                cos(radians(?)) * cos(radians(c.lat)) *
+                cos(radians(c.lng) - radians(?)) +
+                sin(radians(?)) * sin(radians(c.lat))
+            )) AS distance
+        ", [$clinic->lat, $clinic->lng, $clinic->lat])
+        ->whereNotNull('c.lat')->whereNotNull('c.lng')
+        ->having('distance', '<=', $radiusKm)
+        ->orderBy('distance','asc')
+        ->get();
+
+    if ($nearbyClinics->isEmpty()) {
+        return response()->json(['message' => 'No clinics found in radius'], 422);
+    }
+
+    $clinicIds = $nearbyClinics->pluck('id')->all();
+
+    // 2) Doctors in those clinics
+    $doctorIds = DB::table('doctors')
+        ->whereIn('vet_registeration_id', $clinicIds)
+        ->pluck('id')
+        ->all();
+
+    // 3) Build a day grid (HH:mm) in slotMin steps
+    $grid = [];
+    $start = Carbon::parse("$date $dayStart");
+    $end   = Carbon::parse("$date $dayEnd");
+    foreach (CarbonPeriod::create($start, "{$slotMin} minutes", $end->copy()->subMinutes($slotMin)) as $t) {
+        $key = $t->format('H:i');
+        $grid[$key] = 0; // availability count
+    }
+
+    // 4) For each doctor in area, mark slots they are AVAILABLE on that date
+    $weekday = Carbon::parse($date)->dayOfWeek; // 0..6
+
+    foreach ($doctorIds as $docId) {
+        // availability intervals (recurring + one-off)
+        $avail = DB::table('doctor_availabilities')
+            ->where('doctor_id', $docId)
+            ->where(function($q) use ($date, $weekday){
+                $q->where(function($qq) use ($weekday){
+                    $qq->where('type','recurring')->where('weekday', $weekday);
+                })
+                ->orWhere(function($qq) use ($date){
+                    $qq->where('type','one_off')->where('date', $date);
+                });
+            })
+            ->get();
+
+        if ($avail->isEmpty()) continue;
+
+        // the doctor’s bookings (busy intervals) on that date
+        $busy = DB::table('doctor_bookings')
+            ->where('doctor_id', $docId)
+            ->where('date', $date)
+            ->select('start_time','end_time')
+            ->get();
+
+        // time-offs on that date
+        $offs = DB::table('doctor_time_offs')
+            ->where('doctor_id', $docId)
+            ->where('date', $date)
+            ->select('start_time','end_time')
+            ->get();
+
+        // mark slots covered by availability but not intersecting busy/off
+        foreach ($avail as $a) {
+            $aStart = Carbon::parse("$date {$a->start_time}");
+            $aEnd   = Carbon::parse("$date {$a->end_time}");
+
+            foreach ($grid as $hhmm => $count) {
+                $slotStart = Carbon::parse("$date $hhmm");
+                $slotEnd   = $slotStart->copy()->addMinutes($slotMin);
+
+                // slot within availability
+                $inAvail = $slotStart >= $aStart && $slotEnd <= $aEnd;
+
+                // slot overlaps any booking?
+                $overlapsBooking = false;
+                foreach ($busy as $b) {
+                    $bStart = Carbon::parse("$date {$b->start_time}");
+                    $bEnd   = Carbon::parse("$date {$b->end_time}");
+                    if ($slotStart < $bEnd && $slotEnd > $bStart) { $overlapsBooking = true; break; }
+                }
+
+                // slot overlaps any time-off?
+                $overlapsOff = false;
+                foreach ($offs as $o) {
+                    $oStart = Carbon::parse("$date {$o->start_time}");
+                    $oEnd   = Carbon::parse("$date {$o->end_time}");
+                    if ($slotStart < $oEnd && $slotEnd > $oStart) { $overlapsOff = true; break; }
+                }
+
+                if ($inAvail && !$overlapsBooking && !$overlapsOff) {
+                    $grid[$hhmm] = $grid[$hhmm] + 1; // one more doctor available here
+                }
+            }
+        }
+    }
+
+    // 5) Remove current doctor’s own busy/off slots from suggestions, and de-dupe times he already offers
+    $currBookings = DB::table('doctor_bookings')
+        ->where('doctor_id', $request->doctor_id)->where('date', $date)
+        ->select('start_time','end_time')->get();
+
+    $currAvail = DB::table('doctor_availabilities')
+        ->where('doctor_id', $request->doctor_id)
+        ->where(function($q) use ($date,$weekday){
+            $q->where(function($qq) use ($weekday){ $qq->where('type','recurring')->where('weekday',$weekday); })
+              ->orWhere(function($qq) use ($date){ $qq->where('type','one_off')->where('date',$date); });
+        })->get();
+
+    $currOffs = DB::table('doctor_time_offs')
+        ->where('doctor_id', $request->doctor_id)->where('date', $date)
+        ->select('start_time','end_time')->get();
+
+    // 6) Rank suggestions by LOWEST neighborhood availability
+    $suggestions = [];
+    foreach ($grid as $hhmm => $count) {
+        $slotStart = Carbon::parse("$date $hhmm");
+        $slotEnd   = $slotStart->copy()->addMinutes($slotMin);
+
+        // skip if current doctor already offers this slot
+        $alreadyOffered = false;
+        foreach ($currAvail as $a) {
+            $aStart = Carbon::parse("$date {$a->start_time}");
+            $aEnd   = Carbon::parse("$date {$a->end_time}");
+            if ($slotStart >= $aStart && $slotEnd <= $aEnd) { $alreadyOffered = true; break; }
+        }
+        if ($alreadyOffered) continue;
+
+        // skip if doctor booked or off
+        $conflict = false;
+        foreach ($currBookings as $b) {
+            $bStart = Carbon::parse("$date {$b->start_time}");
+            $bEnd   = Carbon::parse("$date {$b->end_time}");
+            if ($slotStart < $bEnd && $slotEnd > $bStart) { $conflict = true; break; }
+        }
+        if ($conflict) continue;
+
+        foreach ($currOffs as $o) {
+            $oStart = Carbon::parse("$date {$o->start_time}");
+            $oEnd   = Carbon::parse("$date {$o->end_time}");
+            if ($slotStart < $oEnd && $slotEnd > $oStart) { $conflict = true; break; }
+        }
+        if ($conflict) continue;
+
+        $suggestions[] = [
+            'start_time' => $hhmm,
+            'end_time'   => $slotEnd->format('H:i'),
+            'neighbor_available_doctors' => $count,     // lower is better
+        ];
+    }
+
+    // sort by ascending availability (valleys), then by time
+    usort($suggestions, function($a,$b){
+        if ($a['neighbor_available_doctors'] === $b['neighbor_available_doctors']) {
+            return strcmp($a['start_time'], $b['start_time']);
+        }
+        return $a['neighbor_available_doctors'] <=> $b['neighbor_available_doctors'];
+    });
+
+    // top N (e.g., 10)
+    $top = array_slice($suggestions, 0, 10);
+
+    return response()->json([
+        'date'        => $date,
+        'slot_minutes'=> $slotMin,
+        'clinic_ids_considered' => $clinicIds,
+        'suggestions' => $top
+    ], 200);
+}
+
 }

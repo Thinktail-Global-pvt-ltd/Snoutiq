@@ -7,6 +7,8 @@ use App\Models\Prescription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class PrescriptionController extends Controller
 {
@@ -55,20 +57,38 @@ class PrescriptionController extends Controller
             ], 422);
         }
 
-        // Handle file upload (optional)
+        // Handle file upload (optional) -> save directly under public/prescriptions
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('prescriptions', 'public');
-            $data['image_path'] = $path;
+            $file = $request->file('image');
+            $ext  = strtolower($file->getClientOriginalExtension() ?: 'png');
+            $name = Str::random(40) . '.' . $ext;
+            $dest = public_path('prescriptions');
+            File::ensureDirectoryExists($dest);
+            $file->move($dest, $name);
+            $data['image_path'] = 'prescriptions/' . $name; // web-accessible path
         }
 
         $prescription = Prescription::create($data);
 
+        // Build URL with optional backend prefix
+        $appUrl = rtrim(config('app.url') ?? env('APP_URL', ''), '/');
+        $prefix = trim((config('app.path_prefix') ?? env('APP_PATH_PREFIX', '')), '/');
+        $base   = $prefix ? ($appUrl . '/' . $prefix) : $appUrl;
+
+        $imageUrl = null;
+        if (!empty($prescription->image_path)) {
+            // If saved under public/, serve directly; else fall back to Storage public disk
+            if (str_starts_with($prescription->image_path, 'prescriptions/')) {
+                $imageUrl = rtrim($base, '/') . '/' . ltrim($prescription->image_path, '/');
+            } else {
+                $imageUrl = Storage::disk('public')->url($prescription->image_path);
+            }
+        }
+
         return response()->json([
             'message' => 'Prescription created',
             'data'    => array_merge($prescription->toArray(), [
-                'image_url' => ($prescription->image_path ?? null)
-                    ? Storage::disk('public')->url($prescription->image_path)
-                    : null,
+                'image_url' => $imageUrl,
             ]),
         ], 201);
     }
