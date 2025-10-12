@@ -389,7 +389,24 @@
   async function apiFetch(url, opts={}, expectJSON=true){
     const res = await fetch(url, { credentials:'include', ...opts });
     const ct  = res.headers.get('content-type')||'';
-    const body = (expectJSON && ct.includes('application/json')) ? await res.json() : await res.text();
+    let body;
+
+    if (expectJSON && ct.includes('application/json')){
+      const text = await res.text();
+      const cleaned = text.replace(/^\uFEFF/, '');
+      try {
+        body = JSON.parse(cleaned || 'null');
+      } catch (parseErr) {
+        const err = new Error(`Invalid JSON response: ${parseErr?.message || parseErr}`);
+        err.status = res.status;
+        err.body = cleaned;
+        err.cause = parseErr;
+        throw err;
+      }
+    } else {
+      body = await res.text();
+    }
+
     if (!res.ok){
       const msg = (body && body.message) ? body.message : `HTTP ${res.status}`;
       const err = new Error(msg); err.status=res.status; err.body=body; throw err;
