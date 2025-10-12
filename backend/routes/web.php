@@ -141,45 +141,7 @@ Route::get('/doctor', function (\Illuminate\Http\Request $request) {
     return view('doctor-dashboard', compact('socketUrl','doctorId'));
 })->name('doctor.dashboard');
 
-Route::get('/doctor/schedule', function () {
-    $view = view()->exists('snoutiq.provider-schedule')
-        ? 'snoutiq.provider-schedule'
-        : 'doctor.schedule';
-
-    return view($view);
-})->name('doctor.schedule');
-
-// Production booking entry: redirect to clinics list first
-Route::redirect('/booking', '/booking/clinics');
-
-// Multi-step booking flow
-Route::view('/booking/clinics', 'booking.clinics')->name('booking.clinics');
-Route::get('/booking/clinic/{id}/doctors', function (\Illuminate\Http\Request $request, int $id) {
-    return view('booking.clinic-doctors', ['clinicId' => $id]);
-})->name('booking.clinic.doctors');
-Route::get('/booking/clinic/{id}/book', function (\Illuminate\Http\Request $request, int $id) {
-    $doctorId = (int) $request->query('doctorId', 0);
-
-    return view('booking.schedule', [
-        'presetClinicId' => $id,
-        'presetDoctorId' => $doctorId,
-    ]);
-})->name('booking.clinic.book');
-
-// Doctor bookings list (production)
-Route::get('/doctor/bookings', function (\Illuminate\Http\Request $request) {
-    return view('doctor.bookings');
-})->name('doctor.bookings');
-
-// User bookings (order history)
-Route::get('/user/bookings', function () {
-    return view('user.bookings');
-})->name('user.bookings');
-
-// Doctor booking detail page (renders via API)
-Route::get('/doctor/booking/{id}', function ($id) {
-    return view('doctor.booking-detail', ['bookingId' => (int) $id]);
-})->name('doctor.booking.detail');
+Route::view('/doctor/schedule', 'doctor.schedule')->name('doctor.schedule');
 
 // --- Payment + Call page (shared) ---
 Route::get('/payment/{callId}', function (string $callId) {
