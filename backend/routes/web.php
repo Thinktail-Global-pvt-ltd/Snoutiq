@@ -140,6 +140,8 @@ Route::get('/doctor', function (\Illuminate\Http\Request $request) {
     return view('doctor-dashboard', compact('socketUrl','doctorId'));
 })->name('doctor.dashboard');
 
+Route::view('/doctor/schedule', 'doctor.schedule')->name('doctor.schedule');
+
 // --- Payment + Call page (shared) ---
 Route::get('/payment/{callId}', function (string $callId) {
     $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
