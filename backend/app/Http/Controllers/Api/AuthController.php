@@ -644,7 +644,7 @@ public function login(Request $request)
             unset($userData['password']);
             $userData['role'] = 'pet';
 
-            return response()->json([
+            $response = [
                 'message'    => 'Login successful',
                 'role'       => 'pet',
                 'email'      => $user->email,
@@ -656,7 +656,24 @@ public function login(Request $request)
                     'name'  => $room->name,
                 ],
                 'user'       => $userData,
-            ], 200);
+                'user_id'    => $user->id,
+                'vet_id'     => null,
+            ];
+
+            session([
+                'user_id'                     => $user->id,
+                'role'                        => 'pet',
+                'token'                       => $plainToken,
+                'token_type'                  => 'Bearer',
+                'chat_room'                   => $response['chat_room'],
+                'user'                        => $userData,
+                'auth_full'                   => $response,
+                'vet_id'                      => null,
+                'vet_registeration_id'        => null,
+                'vet_registerations_temp_id'  => null,
+            ]);
+
+            return response()->json($response, 200);
 
         } elseif ($role === 'vet') {
             $tempVet = DB::table('vet_registerations_temp')
@@ -687,7 +704,9 @@ public function login(Request $request)
             unset($vetData['password']);
             $vetData['role'] = 'vet';
 
-            return response()->json([
+            $vetId = (int) $tempVet->id;
+
+            $response = [
                 'message'    => 'Login successful',
                 'role'       => 'vet',
                 'email'      => $tempVet->email,
@@ -699,7 +718,26 @@ public function login(Request $request)
                     'name'  => $room->name,
                 ],
                 'user'        => $vetData,
-            ], 200);
+                'user_id'     => $vetId,
+                'vet_id'      => $vetId,
+                'vet_registeration_id'       => $vetId,
+                'vet_registerations_temp_id' => $vetId,
+            ];
+
+            session([
+                'user_id'                     => $vetId,
+                'role'                        => 'vet',
+                'token'                       => $plainToken,
+                'token_type'                  => 'Bearer',
+                'chat_room'                   => $response['chat_room'],
+                'user'                        => $vetData,
+                'auth_full'                   => $response,
+                'vet_id'                      => $vetId,
+                'vet_registeration_id'        => $vetId,
+                'vet_registerations_temp_id'  => $vetId,
+            ]);
+
+            return response()->json($response, 200);
         }
 
         return response()->json(['message' => 'Invalid role'], 400);
@@ -898,10 +936,23 @@ public function googleLogin(Request $request)
                     'name'  => $room->name,
                 ],
                 'user'       => $userData,
+                'user_id'    => $user->id,
+                'vet_id'     => null,
             ];
 
             // ✅ Save everything in session
-            session($response);
+            session([
+                'user_id'                     => $user->id,
+                'role'                        => 'pet',
+                'token'                       => $plainToken,
+                'token_type'                  => 'Bearer',
+                'chat_room'                   => $response['chat_room'],
+                'user'                        => $userData,
+                'auth_full'                   => $response,
+                'vet_id'                      => null,
+                'vet_registeration_id'        => null,
+                'vet_registerations_temp_id'  => null,
+            ]);
 
             return response()->json($response, 200);
 
@@ -937,6 +988,8 @@ public function googleLogin(Request $request)
             unset($vetData['password']);
             $vetData['role'] = 'vet';
 
+            $vetId = (int) $tempVet->id;
+
             $response = [
                 'success'    => true,
                 'message'    => 'Login success',
@@ -950,10 +1003,25 @@ public function googleLogin(Request $request)
                     'name'  => $room->name,
                 ],
                 'user'       => $vetData,
+                'user_id'    => $vetId,
+                'vet_id'     => $vetId,
+                'vet_registeration_id'       => $vetId,
+                'vet_registerations_temp_id' => $vetId,
             ];
 
             // ✅ Save everything in session
-            session($response);
+            session([
+                'user_id'                     => $vetId,
+                'role'                        => 'vet',
+                'token'                       => $plainToken,
+                'token_type'                  => 'Bearer',
+                'chat_room'                   => $response['chat_room'],
+                'user'                        => $vetData,
+                'auth_full'                   => $response,
+                'vet_id'                      => $vetId,
+                'vet_registeration_id'        => $vetId,
+                'vet_registerations_temp_id'  => $vetId,
+            ]);
 
             return response()->json($response, 200);
         }

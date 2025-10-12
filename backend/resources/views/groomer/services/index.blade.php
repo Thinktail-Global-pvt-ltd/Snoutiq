@@ -273,24 +273,40 @@
 </button>
 
 <script>
+  const SESSION_LOGIN_URL = @json(url('/api/session/login'));
+  const SERVER_USER_ID = (() => {
+    const raw = @json(auth()->id() ?? session('user_id'));
+    if (raw === null || raw === undefined) return null;
+    const num = Number(raw);
+    return Number.isFinite(num) && num > 0 ? num : null;
+  })();
+
   // ===== CURRENT_USER_ID strictly from frontend =====
   const CURRENT_USER_ID = (() => {
     try {
       const url = new URL(location.href);
-      const qid = Number(url.searchParams.get('userId') || url.searchParams.get('doctorId'));
+      const qRaw = url.searchParams.get('userId') ?? url.searchParams.get('doctorId');
+      const qid = Number(qRaw);
       const authFull = JSON.parse(localStorage.getItem('auth_full') || sessionStorage.getItem('auth_full') || 'null');
       const stg = Number(localStorage.getItem('user_id') || sessionStorage.getItem('user_id'));
       const fromAuth = Number(authFull?.user?.id ?? authFull?.user_id);
-      return qid || fromAuth || stg || null;
+      const candidates = [qid, SERVER_USER_ID, fromAuth, stg];
+      for (const value of candidates){
+        if (Number.isFinite(value) && value > 0){
+          return Number(value);
+        }
+      }
+      return null;
     } catch (_) { return null; }
   })();
   console.log('[services] CURRENT_USER_ID:', CURRENT_USER_ID);
 
-  // ===== CONFIG (hardcoded prod endpoints) =====
+  // ===== CONFIG (backend endpoints) =====
   const CONFIG = {
-    API_BASE: 'https://snoutiq.com/backend/api',
-    CSRF_URL: 'https://snoutiq.com/backend/sanctum/csrf-cookie',
-    LOGIN_API: 'https://snoutiq.com/backend/api/login',
+    API_BASE: @json(url('/api')),
+    CSRF_URL: @json(url('/sanctum/csrf-cookie')),
+    LOGIN_API: @json(url('/api/login')),
+    SESSION_LOGIN: SESSION_LOGIN_URL,
   };
   const API = {
     list:   (uid) => `${CONFIG.API_BASE}/groomer/services?user_id=${encodeURIComponent(uid ?? '')}`,
@@ -350,7 +366,10 @@
       }catch{ this.mode='none'; return {mode:'none'}; }
     },
     headers(base={}){
-      const h={ 'Accept':'application/json', ...base, 'X-User-Id': String(CURRENT_USER_ID || '') };
+      const h={ 'Accept':'application/json', ...base };
+      if (CURRENT_USER_ID){
+        h['X-User-Id'] = String(CURRENT_USER_ID);
+      }
       if (this.mode==='bearer'){
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (token) h['Authorization']='Bearer '+token;
@@ -370,7 +389,24 @@
   async function apiFetch(url, opts={}, expectJSON=true){
     const res = await fetch(url, { credentials:'include', ...opts });
     const ct  = res.headers.get('content-type')||'';
-    const body = (expectJSON && ct.includes('application/json')) ? await res.json() : await res.text();
+    let body;
+
+    if (expectJSON && ct.includes('application/json')){
+      const text = await res.text();
+      const cleaned = text.replace(/^\uFEFF/, '');
+      try {
+        body = JSON.parse(cleaned || 'null');
+      } catch (parseErr) {
+        const err = new Error(`Invalid JSON response: ${parseErr?.message || parseErr}`);
+        err.status = res.status;
+        err.body = cleaned;
+        err.cause = parseErr;
+        throw err;
+      }
+    } else {
+      body = await res.text();
+    }
+
     if (!res.ok){
       const msg = (body && body.message) ? body.message : `HTTP ${res.status}`;
       const err = new Error(msg); err.status=res.status; err.body=body; throw err;
@@ -394,7 +430,8 @@
   let ALL = [];
   async function fetchServices(){
     if (!CURRENT_USER_ID){
-      rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">user_id missing (add ?userId=... in URL or set auth_full)</td></tr>`;
+      const helpUrl = `${CONFIG.SESSION_LOGIN}?user_id=YOUR_ID`;
+      rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">user_id missing (add ?userId=... in URL or visit <a class="text-blue-600 underline" target="_blank" rel="noreferrer" href="${esc(helpUrl)}">${esc(CONFIG.SESSION_LOGIN)}?user_id=YOUR_ID</a> then reload)</td></tr>`;
       return;
     }
     rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-gray-500" colspan="7">Loading…</td></tr>`;
