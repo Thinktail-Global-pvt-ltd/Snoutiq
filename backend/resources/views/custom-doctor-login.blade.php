@@ -80,6 +80,16 @@
 </div>
 
 <script>
+  const ROUTES = {
+    login: @json(url('/api/auth/login')),
+    googleLogin: @json(url('/api/google-login')),
+    sessionLogin: @json(url('/api/session/login')),
+    doctorDashboard: @json(url('/doctor')),
+    petDashboard: @json(url('/pet-dashboard')),
+  };
+
+  axios.defaults.withCredentials = true;
+
   // ---------------- Role tabs ----------------
   let userType = 'pet';
   const els = {
@@ -119,16 +129,28 @@
     }catch(e){ console.warn('auth_full save failed', e); }
   }
 
+  async function syncSessionWithBackend(userId){
+    if(!userId) return;
+    try{
+      const endpoint = new URL(ROUTES.sessionLogin);
+      endpoint.searchParams.set('user_id', userId);
+      await axios.get(endpoint.toString(), { withCredentials: true });
+      console.log('[login] session synced with backend for user:', userId);
+    }catch(err){
+      console.warn('Failed to sync session with backend', err?.response?.data || err);
+    }
+  }
+
   // ---------------- Vet email/password login ----------------
   els.vetForm.addEventListener('submit', async (e)=>{
     e.preventDefault();
     els.loginBtn.disabled = true; els.loginBtn.textContent = 'Logging in...';
     try{
-      const res = await axios.post('/api/auth/login', {
+      const res = await axios.post(ROUTES.login, {
         login: els.email.value,
         password: els.password.value,
         role: 'vet',
-      });
+      }, { withCredentials: true });
 
       const payload = {
         success: true,
@@ -144,11 +166,12 @@
       saveAuthFull(payload);
 
       const docId = payload.user_id;
+      const doctorUrl = new URL(ROUTES.doctorDashboard);
       if (docId) {
-        window.location.href = `/doctor?doctorId=${encodeURIComponent(docId)}`;
-      } else {
-        window.location.href = `/doctor`;
+        doctorUrl.searchParams.set('doctorId', docId);
       }
+      await syncSessionWithBackend(docId);
+      window.location.href = doctorUrl.toString();
     }catch(err){
       console.error('Vet login failed:', err?.response?.data || err);
     }finally{
@@ -166,11 +189,11 @@
       const email = googleData.email || '';
       const uniqueUserId = googleData.sub;
 
-      const res = await axios.post('/api/google-login',{
+      const res = await axios.post(ROUTES.googleLogin,{
         email,
         google_token: uniqueUserId,
         role: 'pet'
-      });
+      }, { withCredentials: true });
 
       const payload = {
         success: true,
@@ -184,7 +207,8 @@
         user_id: res.data?.user?.id || null,
       };
       saveAuthFull(payload);
-      window.location.href = '/pet-dashboard';
+      await syncSessionWithBackend(payload.user_id);
+      window.location.href = ROUTES.petDashboard;
     }catch(err){
       console.error('Google login failed:', err?.response?.data || err);
     }

@@ -7,6 +7,13 @@ use App\Http\Controllers\TestControlelr;
 use App\Http\Controllers\VetLandingController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\BusinessHourController;
+use App\Http\Controllers\Api\Groomer\ClinicReelController;
+use App\Http\Controllers\BlogController;
+use App\Http\Controllers\Admin\PostController as AdminPost;
+use App\Http\Controllers\Admin\CategoryController as AdminCategory;
+use App\Http\Controllers\Admin\TagController as AdminTag;
+use App\Http\Controllers\Admin\UploadController;
+use App\Http\Controllers\ChatController;
 Route::get('/import-vets', [TestControlelr::class, 'importPdfData']);
 
 
@@ -22,11 +29,6 @@ Route::get('/users', function () {
 
     $users = User::all();
     return response()->json($users);
-});
-
-Route::get('/', function () {
- 
-    return view('welcome');
 });
 
 Auth::routes();
@@ -99,12 +101,11 @@ Route::get('/dashboard', function () {
 
 
 
+Route::view('/welcome', 'welcome')->name('welcome');
+
 Route::get('/vet/register', function () {
-    return view('register'); 
+    return view('register');
 })->name('register');
-
-
-use App\Http\Controllers\ChatController;
 
 
 
@@ -140,6 +141,8 @@ Route::get('/doctor', function (\Illuminate\Http\Request $request) {
     return view('doctor-dashboard', compact('socketUrl','doctorId'));
 })->name('doctor.dashboard');
 
+Route::view('/doctor/schedule', 'doctor.schedule')->name('doctor.schedule');
+
 // --- Payment + Call page (shared) ---
 Route::get('/payment/{callId}', function (string $callId) {
     $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
@@ -161,23 +164,13 @@ Route::get('/clinic-dashboard', fn () => view('clinic-dashboard'))
 
 
 
-    Route::view('/dashboard/services', 'groomer.services.index')->name('groomer.services.index');
-
-     use App\Http\Controllers\Api\Groomer\ClinicReelController;
-
-
 Route::get('/backend/groomer/reels',            [ClinicReelController::class, 'get']);            // list reels ?user_id= or ?vet_slug=
 Route::get('/backend/groomer/reel/{id}',        [ClinicReelController::class, 'show']);           // view single
 Route::post('/backend/groomer/reel',            [ClinicReelController::class, 'store']);          // create
 Route::post('/backend/groomer/reel/{id}/update',[ClinicReelController::class, 'update']);         // update
 Route::delete('/backend/groomer/reel/{id}',     [ClinicReelController::class, 'destroy']);        // delete
 
-
-use App\Http\Controllers\BlogController;
-use App\Http\Controllers\Admin\PostController as AdminPost;
-use App\Http\Controllers\Admin\CategoryController as AdminCategory;
-use App\Http\Controllers\Admin\TagController as AdminTag;
-use App\Http\Controllers\Admin\UploadController;
+Route::view('/dashboard/services', 'groomer.services.index')->name('groomer.services.index');
 
 // Everything under /blogs — ALL PUBLIC
 Route::prefix('blogs')->group(function () {
@@ -203,7 +196,9 @@ Route::get('/vet/{slug}', [VetLandingController::class, 'show'])
      ->name('vet.landing');
 
 // Optional: redirect root to /blogs
-Route::redirect('/', '/blogs');
+Route::get('/', function () {
+    return redirect()->to(url('/blogs'));
+});
 
 // Fallback static file server for storage if symlink is missing (dev convenience)
 // Access: /storage/{path} -> storage/app/public/{path}
