@@ -128,6 +128,18 @@
     }catch(e){ console.warn('auth_full save failed', e); }
   }
 
+  async function syncSessionWithBackend(userId){
+    if(!userId) return;
+    try{
+      const endpoint = new URL(ROUTES.sessionLogin);
+      endpoint.searchParams.set('user_id', userId);
+      await axios.get(endpoint.toString(), { withCredentials: true });
+      console.log('[login] session synced with backend for user:', userId);
+    }catch(err){
+      console.warn('Failed to sync session with backend', err?.response?.data || err);
+    }
+  }
+
   // ---------------- Vet email/password login ----------------
   els.vetForm.addEventListener('submit', async (e)=>{
     e.preventDefault();
