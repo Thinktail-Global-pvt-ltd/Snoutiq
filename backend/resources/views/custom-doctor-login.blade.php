@@ -83,7 +83,6 @@
   const ROUTES = {
     login: @json(url('/api/auth/login')),
     googleLogin: @json(url('/api/google-login')),
-    sessionLogin: @json(url('/api/session/login')),
     doctorDashboard: @json(url('/doctor')),
     petDashboard: @json(url('/pet-dashboard')),
   };
@@ -170,7 +169,6 @@
       if (docId) {
         doctorUrl.searchParams.set('doctorId', docId);
       }
-      await syncSessionWithBackend(docId);
       window.location.href = doctorUrl.toString();
     }catch(err){
       console.error('Vet login failed:', err?.response?.data || err);
@@ -207,7 +205,6 @@
         user_id: res.data?.user?.id || null,
       };
       saveAuthFull(payload);
-      await syncSessionWithBackend(payload.user_id);
       window.location.href = ROUTES.petDashboard;
     }catch(err){
       console.error('Google login failed:', err?.response?.data || err);
