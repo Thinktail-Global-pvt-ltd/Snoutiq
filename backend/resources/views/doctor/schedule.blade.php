@@ -5,39 +5,18 @@
 @section('page_title','Doctor Weekly Availability')
 
 @php
-  $sessionClinicId = $sessionClinicId ?? null;
-  $preloadedDoctors = collect($preloadedDoctors ?? []);
-  $resolvedClinicId = $sessionClinicId
-      ?? session('vet_registerations_temp_id')
+  $resolvedClinicId = session('vet_registerations_temp_id')
       ?? session('vet_registeration_id')
       ?? session('vet_id')
-      ?? data_get(session('auth_full'), 'vet_registerations_temp_id')
-      ?? data_get(session('auth_full'), 'vet_registeration_id')
-      ?? data_get(session('auth_full'), 'vet_id')
-      ?? data_get(session('user'), 'vet_registerations_temp_id')
-      ?? data_get(session('user'), 'vet_registeration_id')
-      ?? session('clinic_id')
       ?? session('user_id')
       ?? data_get(session('user'), 'id');
+  $resolvedClinic = $resolvedClinicId ? \App\Models\VetRegisterationTemp::find($resolvedClinicId) : null;
   $presetDoctorId = request()->query('doctor_id') ?? request()->query('doctorId');
   $presetDoctorId = $presetDoctorId !== null && $presetDoctorId !== '' ? (int) $presetDoctorId : null;
   $presetServiceType = request()->query('service_type');
   $explicitClinicId = request()->query('clinic_id');
-  $explicitClinicId = $explicitClinicId !== null && $explicitClinicId !== '' ? (int) $explicitClinicId : null;
-  $resolvedClinicId = $resolvedClinicId !== null ? (int) $resolvedClinicId : null;
-  if (!$resolvedClinicId && $explicitClinicId) {
-      $resolvedClinicId = $explicitClinicId;
-  }
-  $clinicIdForJs = $resolvedClinicId;
+  $clinicIdForJs = $resolvedClinicId ?: ($explicitClinicId !== null && $explicitClinicId !== '' ? (int) $explicitClinicId : null);
   $displayClinicId = $clinicIdForJs;
-  $resolvedClinic = $clinicIdForJs ? \App\Models\VetRegisterationTemp::find($clinicIdForJs) : null;
-  $preloadedDoctorsForJs = $preloadedDoctors
-      ->map(fn ($doc) => [
-          'id' => $doc->id,
-          'doctor_name' => $doc->doctor_name,
-          'vet_registeration_id' => $doc->vet_registeration_id,
-      ])
-      ->values();
 @endphp
 
 @section('head')
@@ -169,9 +148,8 @@
     return { ok: res.ok, status: res.status, json, raw: text };
   }
 
-  const SESSION_CLINIC_ID = @json($clinicIdForJs);
-  const PRELOADED_DOCTORS = @json($preloadedDoctorsForJs);
-  const PRESET_DOCTOR_ID = @json($presetDoctorId ? (string) $presetDoctorId : null);
+  const SESSION_CLINIC_ID = Number(@json($clinicIdForJs ?? null)) || null;
+  const PRESET_DOCTOR_ID = Number(@json($presetDoctorId ?? null)) || null;
   const PRESET_SERVICE_TYPE = @json($presetServiceType ?? null);
   const doctorSelect = document.getElementById('doctor_select');
   const doctorMeta = document.getElementById('doctor_meta');
@@ -184,8 +162,8 @@
   const saveResult = document.getElementById('save_result');
   const scheduleRows = Array.from(document.querySelectorAll('#schedule_rows tr[data-day]'));
 
-  if (clinicBadge) {
-    clinicBadge.textContent = SESSION_CLINIC_ID ? `#${SESSION_CLINIC_ID}` : '—';
+  if (clinicBadge && SESSION_CLINIC_ID) {
+    clinicBadge.textContent = `#${SESSION_CLINIC_ID}`;
   }
 
   if (serviceTypeSelect && PRESET_SERVICE_TYPE) {
@@ -193,11 +171,12 @@
   }
 
   function doctorApiUrl(){
-    if (!SESSION_CLINIC_ID) {
-      return `${apiBase}/doctors`;
+    const params = new URLSearchParams();
+    if (SESSION_CLINIC_ID) {
+      params.set('vet_id', SESSION_CLINIC_ID);
     }
-    const params = new URLSearchParams({ vet_id: SESSION_CLINIC_ID });
-    return `${apiBase}/doctors?${params.toString()}`;
+    const query = params.toString();
+    return `${apiBase}/doctors${query ? `?${query}` : ''}`;
   }
 
   function setRowEnabled(row, enabled){
@@ -225,14 +204,8 @@
     if (option && option.value) {
       const label = option.textContent.trim();
       doctorBadge.innerHTML = `<span class="text-gray-800 font-medium">${label}</span> <span class="text-xs text-gray-500">Doctor ID: <span class="font-mono text-gray-700">#${option.value}</span></span>`;
-      if (doctorMeta) {
-        doctorMeta.textContent = `Doctor ID: #${option.value}`;
-      }
     } else {
       doctorBadge.textContent = 'No doctor selected.';
-      if (doctorMeta && doctorSelect?.options?.length > 1) {
-        doctorMeta.textContent = 'Select a doctor to manage availability.';
-      }
     }
   }
 
@@ -270,79 +243,42 @@
     statusNote.textContent = 'Loaded availability from the server.';
   }
 
-  let cachedDoctors = Array.isArray(PRELOADED_DOCTORS) ? [...PRELOADED_DOCTORS] : [];
-
-  function populateDoctorOptions(doctors){
+  async function loadDoctors(){
     if (!doctorSelect) return;
-
-    if (!Array.isArray(doctors) || !doctors.length) {
+    doctorSelect.innerHTML = '<option value="">-- Loading doctors --</option>';
+    doctorSelect.disabled = true;
+    doctorMeta.textContent = SESSION_CLINIC_ID ? 'Loading doctors for this clinic…' : 'Loading doctors…';
+    const res = await api(doctorApiUrl());
+    if (!res.ok) {
+      doctorSelect.innerHTML = '<option value="">-- Unable to load doctors --</option>';
+      doctorMeta.textContent = 'Unable to fetch doctors. Check API logs.';
+      return;
+    }
+    const doctors = Array.isArray(res.json?.doctors) ? res.json.doctors : [];
+    if (!doctors.length) {
       doctorSelect.innerHTML = '<option value="">-- No doctors found --</option>';
-      doctorSelect.disabled = true;
-      if (doctorMeta) {
-        doctorMeta.textContent = SESSION_CLINIC_ID ? 'No doctors found for this clinic.' : 'Set the clinic session to load doctors.';
-      }
+      doctorMeta.textContent = SESSION_CLINIC_ID ? 'No doctors found for this clinic.' : 'No doctors found.';
+      doctorSelect.disabled = false;
       updateDoctorBadge();
       resetRows();
       return;
     }
-
     const options = doctors.map(d => ({
       id: String(d.id),
       label: d.doctor_name ? `${d.doctor_name} (#${d.id})` : `Doctor #${d.id}`
-    })).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
-
-    const preset = PRESET_DOCTOR_ID ? String(PRESET_DOCTOR_ID) : null;
+    })).sort((a,b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
     doctorSelect.innerHTML = '<option value="">-- Select Doctor --</option>' + options.map(opt => `<option value="${opt.id}">${opt.label}</option>`).join('');
     doctorSelect.disabled = false;
-
+    doctorMeta.textContent = 'Choose a doctor to edit availability.';
+    // Auto-select first doctor for convenience
+    const preset = PRESET_DOCTOR_ID ? String(PRESET_DOCTOR_ID) : null;
     if (preset && options.some(opt => opt.id === preset)) {
       doctorSelect.value = preset;
     } else {
       doctorSelect.value = options[0].id;
     }
-
-    if (doctorMeta) {
-      doctorMeta.textContent = `Choose a doctor to edit availability for clinic #${SESSION_CLINIC_ID}`;
-    }
-
     updateDoctorBadge();
-    loadAvailability();
-  }
-
-  async function loadDoctors(force = false){
-    if (!doctorSelect) return;
-
-    if (!SESSION_CLINIC_ID) {
-      doctorSelect.innerHTML = '<option value="">-- Clinic session required --</option>';
-      doctorSelect.disabled = true;
-      if (doctorMeta) {
-        doctorMeta.textContent = 'Clinic session not found. Set it via /api/session/login?user_id=…';
-      }
-      resetRows();
-      return;
-    }
-
-    if (!force && cachedDoctors.length) {
-      populateDoctorOptions(cachedDoctors);
-      return;
-    }
-
-    doctorSelect.innerHTML = '<option value="">-- Loading doctors --</option>';
-    doctorSelect.disabled = true;
-    if (doctorMeta) {
-      doctorMeta.textContent = `Loading doctors for clinic #${SESSION_CLINIC_ID}…`;
-    }
-
-    const res = await api(doctorApiUrl());
-    if (!res.ok) {
-      doctorSelect.innerHTML = '<option value="">-- Unable to load doctors --</option>';
-      doctorMeta.textContent = 'Unable to fetch doctors. Check API logs.';
-      resetRows();
-      return;
-    }
-
-    cachedDoctors = Array.isArray(res.json?.doctors) ? res.json.doctors : [];
-    populateDoctorOptions(cachedDoctors);
+    await loadAvailability();
   }
 
   async function loadAvailability(){
@@ -437,26 +373,16 @@
     loadAvailability();
   });
   serviceTypeSelect?.addEventListener('change', loadAvailability);
-  btnReload?.addEventListener('click', e => {
-    e.preventDefault();
-    cachedDoctors = [];
-    loadDoctors(true);
-  });
+  btnReload?.addEventListener('click', e => { e.preventDefault(); loadAvailability(); });
   btnSave?.addEventListener('click', e => { e.preventDefault(); saveAvailability(); });
 
   document.addEventListener('DOMContentLoaded', () => {
     updateDoctorBadge();
     if (SESSION_CLINIC_ID) {
       doctorMeta.textContent = `Loading doctors for clinic #${SESSION_CLINIC_ID}…`;
-    } else if (doctorMeta) {
-      doctorMeta.textContent = 'Clinic session not found. Set it via /api/session/login?user_id=…';
     }
     resetRows();
-    if (cachedDoctors.length) {
-      populateDoctorOptions(cachedDoctors);
-    } else {
-      loadDoctors();
-    }
+    loadDoctors();
   });
 </script>
 @endsection
