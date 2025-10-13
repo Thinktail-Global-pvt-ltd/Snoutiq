@@ -81,6 +81,7 @@
 
       <button id="btn-join" class="btn btn-primary">Join</button>
       <button id="btn-leave" class="btn btn-danger hidden">🚪 Leave</button>
+      <button id="btn-pip" class="btn btn-ghost hidden" title="Picture in Picture">📺 PiP</button>
 
       <div class="ml-auto text-xs text-gray-500">
         <span class="mr-2">CallId: <span id="hdr-callid">—</span></span>
@@ -142,6 +143,7 @@
   const btnPay          = document.getElementById('btn-pay');
   const btnJoin         = document.getElementById('btn-join');
   const btnLeave        = document.getElementById('btn-leave');
+  const btnPiP          = document.getElementById('btn-pip');
   const btnToggleMic    = document.getElementById('btn-toggle-mic');
   const btnToggleCam    = document.getElementById('btn-toggle-cam');
 
@@ -174,6 +176,13 @@
     el.style.borderRadius = '8px';
     el.className = 'overflow-hidden';
     wrap.appendChild(el);
+  }
+  // PiP helper: pick remote if present else local
+  function findBestVideoEl(){
+    const firstRemote = document.querySelector('#remote-container video');
+    if (firstRemote) return firstRemote;
+    const local = document.querySelector('#local-player video');
+    return local || null;
   }
   function removeRemoteVideoContainer(uid){
     const el = document.getElementById(getRemoteDivId(uid));
@@ -350,6 +359,7 @@
       // UI
       btnJoin.classList.add('hidden');
       btnLeave.classList.remove('hidden');
+      btnPiP?.classList.remove('hidden');
     }catch(e){
       log('Agora join error: ' + (e?.message || String(e)));
       setStatus('Join error', 'red');
@@ -377,11 +387,24 @@
       log('🚪 Left Agora');
 
       btnLeave.classList.add('hidden');
+      btnPiP?.classList.add('hidden');
       btnJoin.classList.remove('hidden');
     }catch(e){
       log('Leave error: ' + (e?.message || String(e)));
     }
   }
+
+  // ===== PiP actions =====
+  async function tryEnterPiP(){
+    const v = findBestVideoEl();
+    if (!v) { log('PiP: no video found'); return; }
+    try {
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      await v.requestPictureInPicture();
+      log('PiP: entered');
+    } catch(e) { log('PiP error: ' + (e?.message || e)); }
+  }
+  btnPiP?.addEventListener('click', tryEnterPiP);
 
   // ========= UI Events =========
   btnCreate.addEventListener('click', createCall);
