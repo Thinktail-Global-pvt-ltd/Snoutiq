@@ -33,11 +33,10 @@
 
       <div>
         <label class="block text-sm font-medium text-gray-700">Service Type</label>
-        <select id="service_type" class="mt-1 w-full rounded border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
-          <option value="video">video</option>
-          <option value="in_clinic">in_clinic</option>
-          <option value="home_visit">home_visit</option>
+        <select id="service_type" class="mt-1 w-full rounded border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 text-gray-700" disabled>
+          <option value="in_clinic" selected>in_clinic</option>
         </select>
+        <div class="mt-1 text-xs text-gray-500">Fixed to in_clinic for this page</div>
       </div>
 
       <div>
@@ -127,7 +126,7 @@
         const note = el('#metaNote'); if (note) note.textContent = 'Select a doctor to load availability.';
         return;
       }
-      const serviceType = el('#service_type')?.value || '';
+      const serviceType = el('#service_type')?.value || 'in_clinic';
 
       try {
         const url  = `${apiBase}/doctors/${doctorId}/availability` + (serviceType ? `?service_type=${encodeURIComponent(serviceType)}` : '');
@@ -183,7 +182,7 @@
 
     // ---------- collect rows ----------
     function collectAvailability() {
-      const serviceType = el('#service_type').value;
+      const serviceType = el('#service_type')?.value || 'in_clinic';
       const avgMins     = Number(el('#avg_consultation_mins').value || 20);
       const maxBph      = Number(el('#max_bph').value || 3);
 

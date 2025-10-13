@@ -103,8 +103,8 @@
 
   // 👇 Redirect target per environment
   const POST_LOGIN_REDIRECT = IS_LOCAL
-    ? `${ORIGIN}/dashboard/services`
-    : `${ORIGIN}/backend/doctor`;
+    ? `${ORIGIN}/dashboard/services?open=create`
+    : `${ORIGIN}/backend/dashboard/services?open=create`;
 
   const POST_LOGIN_REDIRECT_PET = IS_LOCAL
     ? `${ORIGIN}/user/bookings`
