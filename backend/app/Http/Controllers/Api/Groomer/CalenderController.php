@@ -814,8 +814,7 @@ public function booking_single_status($id,Request $request){
 public function doctor_availability_store(Request $request)
 {
     $request->validate([
-        'doctor_id'    => 'required|integer',
-        'vet_id'       => 'required|integer',
+        'doctor_id'    => 'nullable|integer',
         'type'         => 'required|in:recurring,one_off',
         'weekday'      => 'nullable|integer|min:0|max:6',
         'date'         => 'nullable|date',
@@ -823,6 +822,32 @@ public function doctor_availability_store(Request $request)
         'end_time'     => 'required',
         'slot_minutes' => 'nullable|integer|min:5|max:180'
     ]);
+
+    $sessionUserId = $request->session()->get('user_id');
+    if (!$sessionUserId) {
+        $sessionUserId = data_get($request->session()->get('user'), 'id');
+    }
+
+    if (!$sessionUserId) {
+        return response()->json([
+            'message' => 'No active session user found. Please log in again to manage availability.'
+        ], 401);
+    }
+
+    $doctorQuery = DB::table('doctors')
+        ->where('vet_registeration_id', $sessionUserId);
+
+    if ($request->filled('doctor_id')) {
+        $doctorQuery->where('id', (int) $request->doctor_id);
+    }
+
+    $doctor = $doctorQuery->first();
+
+    if (!$doctor) {
+        return response()->json([
+            'message' => 'No doctor found for the current session user.'
+        ], 404);
+    }
 
     $slot = $request->integer('slot_minutes', 30);
 
@@ -835,8 +860,8 @@ public function doctor_availability_store(Request $request)
     }
 
     DB::table('doctor_availabilities')->insert([
-        'doctor_id'    => $request->doctor_id,
-        'vet_id'       => $request->vet_id,
+        'doctor_id'    => $doctor->id,
+        'vet_id'       => $doctor->vet_registeration_id,
         'type'         => $request->type,
         'weekday'      => $request->type === 'recurring' ? $request->weekday : null,
         'date'         => $request->type === 'one_off'   ? $request->date    : null,
