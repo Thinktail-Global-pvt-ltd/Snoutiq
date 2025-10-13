@@ -83,4 +83,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     // Optional editor (write-enabled) using separate table; not linked in sidebar by default
     Route::get('/doctor/video-calling-schedule/manage', [VideoSchedulePageController::class, 'editor'])
         ->name('doctor.video.schedule.manage');
+
+    // Clinic order history (aggregates bookings across doctors of this clinic)
+    Route::view('/clinic/orders', 'clinic.order-history')->name('clinic.orders');
 });

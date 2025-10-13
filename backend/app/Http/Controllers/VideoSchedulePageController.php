@@ -19,10 +19,15 @@ class VideoSchedulePageController extends Controller
     // Optional: provider/editor view (write-enabled) – not used by pet sidebar
     public function editor(Request $request)
     {
-        $doctors = Doctor::orderBy('doctor_name')->get(['id','doctor_name']);
+        $vetId = $request->session()->get('user_id') ?? data_get($request->session()->get('user'), 'id');
+        $doctors = collect();
+        if ($vetId) {
+            $doctors = Doctor::where('vet_registeration_id', $vetId)
+                ->orderBy('doctor_name')
+                ->get(['id','doctor_name']);
+        }
         $readonly = false;
         $page_title = 'Manage Video Calling Schedule (Separate)';
         return view('snoutiq.video-calling-schedule', compact('doctors','readonly','page_title'));
     }
 }
-
