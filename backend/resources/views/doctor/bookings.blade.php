@@ -6,7 +6,11 @@
 @section('content')
   @php
     $debug = request()->query('debug') === '1';
-    $resolvedClinicId = session('vet_registerations_temp_id')
+    // Restrict doctors list to the logged-in vet (session user)
+    // Fall back to existing clinic session keys if needed
+    $resolvedClinicId = session('user_id')
+        ?? data_get(session('user'), 'id')
+        ?? session('vet_registerations_temp_id')
         ?? session('vet_registeration_id')
         ?? session('vet_id');
     $resolvedClinic = $resolvedClinicId ? \App\Models\VetRegisterationTemp::find($resolvedClinicId) : null;
@@ -89,7 +93,9 @@
     return { ok: res.ok, status: res.status, json: j, raw: text };
   }
 
+  // Session-derived IDs
   const SESSION_DOCTOR_ID = Number(@json(session('user_id') ?? data_get(session('user'), 'id') ?? null)) || null;
+  const SESSION_USER_ID   = Number(@json(session('user_id') ?? data_get(session('user'), 'id') ?? null)) || null;
   const SESSION_CLINIC_ID = Number(@json($resolvedClinicId ?? null)) || null;
   const calendarEl = document.getElementById('calendar');
   const calRows = document.getElementById('calRows');
@@ -112,10 +118,35 @@
     return String(value);
   };
 
+  // Final vet id resolver (prefer clinic id, fallback to session user id, then storage, then /api/session/get)
+  let FINAL_VET_ID = SESSION_CLINIC_ID || SESSION_USER_ID || null;
+
+  async function bootResolveVetId(){
+    if (FINAL_VET_ID) return FINAL_VET_ID;
+    try {
+      const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full') || localStorage.getItem('sn_session_v1');
+      if (raw) {
+        const obj = JSON.parse(raw);
+        const candidate = Number(obj?.user?.id ?? obj?.user_id ?? obj?.vet_id ?? obj?.clinic_id ?? NaN);
+        if (!Number.isNaN(candidate) && candidate) {
+          FINAL_VET_ID = candidate;
+        }
+      }
+    } catch(_){}
+    if (!FINAL_VET_ID) {
+      try {
+        const r = await api(`${apiBase}/session/get`);
+        const id = Number(r?.json?.user_id ?? r?.json?.user?.id ?? NaN);
+        if (!Number.isNaN(id) && id) FINAL_VET_ID = id;
+      } catch(_){}
+    }
+    return FINAL_VET_ID;
+  }
+
   function doctorApiUrl(){
     const params = new URLSearchParams();
-    if (SESSION_CLINIC_ID) {
-      params.set('vet_id', SESSION_CLINIC_ID);
+    if (FINAL_VET_ID) {
+      params.set('vet_id', FINAL_VET_ID);
     }
     const query = params.toString();
     return `${apiBase}/doctors${query ? `?${query}` : ''}`;
@@ -135,7 +166,7 @@
   async function loadDoctorDropdown(){
     try{
       if(doctorMeta){
-        doctorMeta.textContent = SESSION_CLINIC_ID
+        doctorMeta.textContent = FINAL_VET_ID
           ? 'Loading doctors for this clinic…'
           : 'Loading available doctors…';
       }
@@ -148,7 +179,7 @@
       const doctors = Array.isArray(res.json?.doctors) ? res.json.doctors : [];
       if(!doctors.length){
         if(doctorMeta){
-          doctorMeta.textContent = SESSION_CLINIC_ID
+          doctorMeta.textContent = FINAL_VET_ID
             ? 'No doctors found for this clinic.'
             : 'No doctors found.';
         }
@@ -244,9 +275,13 @@
     const d = new Date(since.value || new Date()); d.setMonth(d.getMonth()+1); d.setDate(1); since.value=d.toISOString().slice(0,10); load();
   });
 
-  document.addEventListener('DOMContentLoaded', ()=>{
+  document.addEventListener('DOMContentLoaded', async ()=>{
     // Prefill doctor from session if present (may not be a real doctor id)
     if(SESSION_DOCTOR_ID && doctorInput){ doctorInput.value = SESSION_DOCTOR_ID; }
+    // Resolve vet/clinic id and reflect in badge
+    await bootResolveVetId();
+    const clinicBadge = document.getElementById('clinic_badge');
+    if (clinicBadge) clinicBadge.textContent = FINAL_VET_ID ? `#${FINAL_VET_ID}` : '—';
     // Populate dropdown and auto-load a valid doctor selection
     loadDoctorDropdown();
     // Keep input/select in sync on user interaction
