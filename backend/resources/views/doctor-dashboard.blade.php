@@ -28,7 +28,8 @@
         ?? data_get(session('user'), 'id')
         ?? optional(auth()->user())->id
         ?? request('doctorId');
-  $serverDoctorId = $serverCandidate ? (int)$serverCandidate : null;
+  // Prefer explicit route-provided $doctorId when present
+  $serverDoctorId = $serverCandidate ? (int)$serverCandidate : (isset($doctorId) ? (int)$doctorId : null);
 
   // For JS (pure session value; helpful but not required)
   $sessionUserId = session('user_id')
@@ -46,6 +47,7 @@
   const PATH_PREFIX = @json($pathPrefix ? "/$pathPrefix" : ""); // "" locally, "/backend" in prod
   const SOCKET_URL  = @json($socketUrl);
   const API_BASE    = (PATH_PREFIX || '') + '/api';
+  const DEFAULT_DOCTOR_ID = Number(@json($serverDoctorId ?? ($doctorId ?? null))) || null;
 
   // Sources
   const SESSION_USER_ID = Number(@json($sessionUserId ?? null)) || null; // server truth (optional)
@@ -56,7 +58,7 @@
   const fromStorage     = (()=>{ if(!af) return null; const id1=af?.user_id; const id2=af?.user?.id; return Number(id1||id2)||null; })();
 
   // ⭐ FINAL id the frontend will use everywhere:
-  let CURRENT_USER_ID = SESSION_USER_ID || fromServer || fromQuery || fromStorage || null;
+  let CURRENT_USER_ID = SESSION_USER_ID || fromServer || fromQuery || fromStorage || DEFAULT_DOCTOR_ID || null;
 
   console.log('[doctor-dashboard] RESOLVED user_id →', {
     SESSION_USER_ID, fromServer, fromQuery, fromStorage, CURRENT_USER_ID, PATH_PREFIX, API_BASE
@@ -87,19 +89,25 @@
         <span class="text-sm font-medium">Services</span>
       </a>
 
-      <a href="{{ route('booking.clinics') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 19h14a2 2 0 002-2v-6H3v6a2 2 0 002 2z"/></svg>
-        <span class="text-sm font-medium">Book Appointment</span>
-      </a>
 
       <a href="{{ route('doctor.bookings') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2z"/></svg>
         <span class="text-sm font-medium">My Bookings</span>
       </a>
 
+      <a href="{{ route('doctor.video.schedule.manage') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="text-sm font-medium">Video Calling Schedule</span>
+      </a>
+
+      <a href="{{ route('clinic.orders') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
+        <span class="text-sm font-medium">Order History</span>
+      </a>
+
       <a href="{{ route('doctor.schedule') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="text-sm font-medium">Weekly Schedule</span>
+        <span class="text-sm font-medium">Clinic Schedule</span>
       </a>
     </nav>
   </aside>
@@ -504,6 +512,9 @@
   const elConn     = $('#conn-status');
   const elConnYes  = $('#socket-connected');
   const elIsOnline = $('#is-online');
+  const elLogs     = document.getElementById('logs');
+  const elDiagWrap = document.getElementById('diagnostics');
+  const elHeaderDot= document.getElementById('status-dot');
   const modal      = document.getElementById('incoming-modal');
   const elMPatient = document.getElementById('m-patient');
   const elMChannel = document.getElementById('m-channel');
@@ -512,7 +523,8 @@
   let joined = false;
   let lastCall = null;
   const url = new URL(window.location.href);
-  const doctorId = Number(window.CURRENT_USER_ID || url.searchParams.get('doctorId') || 0) || null;
+  const autoLive = (url.searchParams.get('live') === '1');
+  const doctorId = Number(url.searchParams.get('doctorId') || window.CURRENT_USER_ID || DEFAULT_DOCTOR_ID || 0) || null;
 
   const socket = io(SOCKET_URL, {
     transports: ['websocket','polling'],
@@ -520,27 +532,48 @@
     path: '/socket.io/'
   });
 
+  function addLog(msg){
+    try { if (elLogs){ const t=new Date().toLocaleTimeString(); elLogs.textContent += `[${t}] ${msg}\n`; elLogs.scrollTop = elLogs.scrollHeight; } } catch(_){}
+  }
+
   function setConn(state){
     if (elConn) elConn.textContent = state ? 'connected' : 'disconnected';
     if (elConnYes) elConnYes.textContent = state ? 'Yes' : 'No';
   }
 
+  function setHeaderStatus(status){
+    if (!elHeaderDot) return;
+    elHeaderDot.classList.remove('bg-yellow-400','bg-green-500','bg-red-500');
+    if (status==='online') elHeaderDot.classList.add('bg-green-500');
+    else if (status==='error' || status==='offline') elHeaderDot.classList.add('bg-red-500');
+    else elHeaderDot.classList.add('bg-yellow-400');
+  }
+
   socket.on('connect', ()=>{
     if (elSocketId) elSocketId.textContent = socket.id;
     setConn(true);
+    addLog('Socket connected: ' + socket.id);
+    setHeaderStatus('connecting');
+    console.log('[doctor] socket connected', { id: socket.id, url: SOCKET_URL });
     if (doctorId && !joined) {
       socket.emit('join-doctor', Number(doctorId));
+      addLog('emit join-doctor ' + doctorId);
+      console.log('[doctor] emit join-doctor', doctorId);
     }
   });
 
   socket.on('connect_error', (err)=>{
     setConn(false);
-    console.warn('[doctor] socket connect_error:', err && err.message);
+    addLog('connect_error: ' + (err && err.message));
+    setHeaderStatus('error');
+    console.warn('[doctor] socket connect_error:', err?.message||err);
   });
 
   socket.on('disconnect', ()=>{
     setConn(false);
     joined = false;
+    addLog('Socket disconnected');
+    setHeaderStatus('offline');
   });
 
   socket.on('doctor-online', (data)=>{
@@ -548,6 +581,9 @@
       if (Number(data?.doctorId) === Number(doctorId)) {
         joined = true;
         if (elIsOnline) elIsOnline.textContent = 'Yes';
+        addLog('Doctor online ack for ' + doctorId);
+        setHeaderStatus('online');
+        console.log('[doctor] online ack for', doctorId);
       }
     } catch {}
   });
@@ -560,6 +596,7 @@
       if (elMChannel) elMChannel.textContent = String(payload?.channel ?? '');
       if (elMTime)    elMTime.textContent    = new Date().toLocaleString();
       modal.classList.remove('hidden');
+      addLog('Incoming call for doctor ' + doctorId + ' ch=' + (payload?.channel||''));
     }catch(e){ console.warn('[doctor] call-requested render failed', e); }
   });
 
@@ -590,8 +627,28 @@
   });
 
   document.getElementById('btn-rejoin')?.addEventListener('click', ()=>{
-    if (socket?.connected && doctorId) socket.emit('join-doctor', Number(doctorId));
+    if (socket?.connected && doctorId){ socket.emit('join-doctor', Number(doctorId)); addLog('Manual rejoin ' + doctorId); }
   });
+  document.getElementById('btn-test')?.addEventListener('click', ()=>{ try{ socket.emit('get-server-status'); addLog('emit get-server-status'); }catch(_){} });
+  document.getElementById('btn-clear')?.addEventListener('click', ()=>{ try{ if(elLogs) elLogs.textContent=''; }catch(_){} });
+
+  socket.on('server-status', (s)=>{ addLog('server-status: ' + JSON.stringify(s)); });
+
+  // Auto-join like /doctor/live?doctorId=...&live=1
+  if (autoLive && doctorId) {
+    if (!socket.connected) try{ socket.connect(); }catch(_){ }
+    // If already connected, emit immediately
+    if (socket.connected) { socket.emit('join-doctor', Number(doctorId)); addLog('Auto join-doctor ' + doctorId); }
+  }
+
+  // Toggle diagnostics panel and optionally auto-open with ?diag=1
+  document.getElementById('toggle-diag')?.addEventListener('click', ()=>{
+    if (!elDiagWrap) return;
+    elDiagWrap.classList.toggle('hidden');
+  });
+  if (new URL(location.href).searchParams.get('diag') === '1') {
+    elDiagWrap?.classList.remove('hidden');
+  }
 })();
 </script>
 

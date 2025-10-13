@@ -15,7 +15,7 @@
   <p class="text-sm text-gray-600 mb-3">This view uses a separate storage and API. Existing flows remain unchanged.</p>
 
   <div class="bg-white rounded-xl shadow p-4 mb-4">
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
       <div class="md:col-span-2">
         <label class="block text-sm font-medium text-gray-700">Doctor</label>
         <select id="doctor_id" class="mt-1 w-full rounded border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
@@ -42,6 +42,13 @@
       <div>
         <label class="block text-sm font-medium text-gray-700">Max bookings / hour</label>
         <input type="number" id="max_bph" value="3" class="mt-1 w-full rounded border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" @if($readonly) disabled @endif>
+      </div>
+
+      <div class="flex items-end">
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+          <input type="checkbox" id="enable247" class="rounded border-gray-300" @if($readonly) disabled @endif>
+          <span>Enable 24/7</span>
+        </label>
       </div>
     </div>
   </div>
@@ -158,7 +165,52 @@
           }
         });
         const note = el('#metaNote'); if(note) note.textContent = `Loaded ${list.length} of 7 days from new table.`;
+
+        // Detect 24/7: all 7 days with 00:00 to >=23:59 and no breaks
+        try{
+          const byDowFull = new Map(list.map(r => [Number(r.day_of_week), r]));
+          let is247 = true;
+          for(let d=0; d<7; d++){
+            const r = byDowFull.get(d);
+            if(!r){ is247=false; break; }
+            const st = String(r.start_time||'');
+            const en = String(r.end_time||'');
+            const noBreak = (!r.break_start && !r.break_end);
+            if(!(st.startsWith('00:00') && (en >= '23:59:00')) && !(st.startsWith('00:00') && en.startsWith('00:00'))) { is247=false; break; }
+            if(!noBreak) { is247=false; break; }
+          }
+          const cb247 = el('#enable247');
+          if(cb247){ cb247.checked = !!is247; toggle247Inputs(!!is247); }
+        }catch(_){ /* ignore */ }
       }catch(e){ out('#saveOut', `Load error: ${e?.message||e}`, false); }
+    }
+
+    function toggle247Inputs(disabled){
+      els('tbody tr[data-dow] input[type="time"], tbody tr[data-dow] input[type="checkbox"]').forEach(inp => {
+        if(inp.classList.contains('active')){ inp.disabled = false; }
+        else { inp.disabled = !!disabled; }
+      });
+    }
+
+    function apply247(on){
+      const avgMins = Number(el('#avg_consultation_mins').value || 20);
+      const maxBph  = Number(el('#max_bph').value || 3);
+      els('tbody tr[data-dow]').forEach(tr=>{
+        const $active = tr.querySelector('.active');
+        const $start  = tr.querySelector('.start');
+        const $end    = tr.querySelector('.end');
+        const $bStart = tr.querySelector('.break_start');
+        const $bEnd   = tr.querySelector('.break_end');
+        if(on){
+          if($active) $active.checked = true;
+          if($start)  $start.value = '00:00';
+          if($end)    $end.value   = '23:59';
+          if($bStart) $bStart.value = '';
+          if($bEnd)   $bEnd.value   = '';
+        }
+      });
+      toggle247Inputs(on);
+      const note = el('#metaNote'); if(note && on){ note.textContent = '24/7 enabled — all days set to 00:00–23:59 with no breaks.'; }
     }
 
     function collect(){
@@ -211,8 +263,10 @@
       dd?.addEventListener('change', loadExisting);
       if(!READONLY) el('#btnSave')?.addEventListener('click', save);
       el('#btnLoadSlots')?.addEventListener('click', loadSlots);
+      if(!READONLY){
+        el('#enable247')?.addEventListener('change', (e)=> apply247(!!e.target.checked));
+      }
     });
   </script>
 </div>
 @endsection
-

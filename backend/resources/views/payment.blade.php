@@ -29,9 +29,23 @@
 
 <script>
   /** ===== Env from PHP ===== */
-  const SOCKET_URL   = @json($socketUrl);
-  const BACKEND_BASE = @json($backendBase);   // e.g. https://snoutiq.com/backend
-  const FRONTEND_BASE= @json($frontBase);     // e.g. https://snoutiq.com
+  const SOCKET_URL       = @json($socketUrl);
+  const RAW_BACKEND_BASE = @json($backendBase);   // e.g. https://snoutiq.com/backend (fallback)
+  const RAW_FRONTEND_BASE= @json($frontBase);     // e.g. https://snoutiq.com (fallback)
+
+  // Choose bases dynamically so local runs hit local API and prod hits /backend
+  const ORIGIN    = window.location.origin;                     // http://127.0.0.1:8000 or https://snoutiq.com
+  const IS_LOCAL  = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
+  const ON_BACKEND_PATH = window.location.pathname.startsWith('/backend');
+  const PATH_PREFIX = IS_LOCAL ? '' : '/backend';                // force /backend on prod
+
+  const BACKEND_BASE = IS_LOCAL
+    ? ORIGIN
+    : (RAW_BACKEND_BASE || (ORIGIN + PATH_PREFIX));
+
+  const FRONTEND_BASE = IS_LOCAL
+    ? ORIGIN
+    : (RAW_FRONTEND_BASE || ORIGIN);
 
   const CALL_ID      = @json($callId);
   const DOCTOR_ID    = Number(@json($doctorId));

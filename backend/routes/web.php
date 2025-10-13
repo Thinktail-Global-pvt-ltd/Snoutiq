@@ -30,6 +30,13 @@ Route::get('/call-page/{channel?}', function () {
     return view('call-page');
 })->name('video.call');
 
+// Payment page for video calls (public)
+// Example: /payment/{callId}?doctorId=2&channel=channel_xxx&patientId=4&amount=499
+Route::get('/payment/{callId}', function (string $callId) {
+    $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
+    return view('payment', compact('callId','socketUrl'));
+})->name('video.payment');
+
 // Protected application routes (requires session user)
 Route::middleware([EnsureSessionUser::class])->group(function(){
     // Dashboards
