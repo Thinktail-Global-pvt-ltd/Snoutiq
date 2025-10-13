@@ -104,7 +104,11 @@
   // 👇 Redirect target per environment
   const POST_LOGIN_REDIRECT = IS_LOCAL
     ? `${ORIGIN}/dashboard/services`
-    : `https://snoutiq.com/backend/doctor`;
+    : `${ORIGIN}/backend/doctor`;
+
+  const POST_LOGIN_REDIRECT_PET = IS_LOCAL
+    ? `${ORIGIN}/user/bookings`
+    : `${ORIGIN}/backend/user/bookings`;
 
   const ROUTES = {
     login:            `${API_BASE}/auth/login`,
@@ -160,14 +164,14 @@
       console.log('[login] auth_full saved:', obj);
     }catch(e){ console.warn('auth_full save failed', e); }
   }
-  async function syncSessionWithBackend(userId){
+  async function syncSessionWithBackend(userId, role){
     if(!userId){
       console.warn('[session] No user_id provided to session sync');
       return { ok:false, error:'missing user_id' };
     }
     try{
       const { data } = await axios.get(ROUTES.sessionLogin, {
-        params: { user_id: userId },
+        params: { user_id: userId, role: role || undefined },
         withCredentials: true
       });
       console.log('[session] requested_user_id:', userId);
@@ -246,7 +250,7 @@
       };
       saveAuthFull(payload);
 
-      const sessionSync = await syncSessionWithBackend(payload.user_id);
+      const sessionSync = await syncSessionWithBackend(payload.user_id, payload.role);
       dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Vet Login + Session');
 
       if (sessionSync.ok) {
@@ -298,8 +302,11 @@
       };
       saveAuthFull(payload);
 
-      const sessionSync = await syncSessionWithBackend(payload.user_id);
+      const sessionSync = await syncSessionWithBackend(payload.user_id, payload.role);
       dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Pet Login + Session');
+
+      // Redirect pet parent to their orders/bookings page
+      if (sessionSync.ok) setTimeout(()=> window.location.replace(POST_LOGIN_REDIRECT_PET), 150);
 
       // If you want pet to redirect too, uncomment:
       // if (sessionSync.ok) setTimeout(()=> window.location.replace(POST_LOGIN_REDIRECT), 150);
@@ -328,3 +335,5 @@
 
 </body>
 </html>
+
+

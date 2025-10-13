@@ -12,7 +12,6 @@
       <div class="flex items-center gap-2 text-sm">
         <button id="tabUpcoming"  class="px-3 py-1.5 rounded border border-gray-300 bg-gray-50">Upcoming</button>
         <button id="tabCompleted" class="px-3 py-1.5 rounded border border-gray-200">Completed</button>
-        <button id="tabCancelled" class="px-3 py-1.5 rounded border border-gray-200">Cancelled</button>
       </div>
     </div>
   </div>
@@ -82,7 +81,6 @@
   const tabBtns = {
     Upcoming:  document.getElementById('tabUpcoming'),
     Completed: document.getElementById('tabCompleted'),
-    Cancelled: document.getElementById('tabCancelled'),
   };
   let ALL=[]; let CURRENT='Upcoming';
 
@@ -98,7 +96,7 @@
 
   function statusPillCls(status){
     if (String(status).toLowerCase()==='completed') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-    if (['cancelled','failed','rejected'].includes(String(status).toLowerCase())) return 'text-red-700 bg-red-50 border-red-200';
+    if (['failed','rejected'].includes(String(status).toLowerCase())) return 'text-red-700 bg-red-50 border-red-200';
     return 'text-indigo-700 bg-indigo-50 border-indigo-200';
   }
 
@@ -135,8 +133,11 @@
   function mapOrder(row){
     const status = String(row.status||'pending').toLowerCase();
     let tab = 'Upcoming';
-    if (status === 'completed') tab = 'Completed';
-    if (['cancelled','failed'].includes(status)) tab = 'Cancelled';
+    // If scheduled time is in the past, show under Completed
+    const when = row.scheduled_for || row.booking_created_at || null;
+    let isPast = false;
+    try { if (when) isPast = new Date(when.replace(' ', 'T')) < new Date(); } catch(_){ }
+    if (status === 'completed' || isPast) tab = 'Completed';
     return {
       id: row.id,
       tab,

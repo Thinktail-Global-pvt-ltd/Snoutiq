@@ -64,7 +64,18 @@ class UserController extends Controller
                 $status = $b->status ?? 'pending';
                 $out['status'] = $status;
                 $sl = strtolower((string)$status);
-                $out['tab'] = $sl === 'completed' ? 'Completed' : (($sl === 'cancelled' || $status === 'Rejected') ? 'Cancelled' : 'Upcoming');
+                // Date classification: if scheduled time is past, treat as Completed
+                $when = $b->scheduled_for ?? $b->booking_created_at ?? null;
+                $isPast = false;
+                if ($when) {
+                    try { $isPast = \Carbon\Carbon::parse($when)->lt(\Carbon\Carbon::now()); } catch (\Throwable $e) {}
+                }
+                if ($sl === 'completed' || $isPast) {
+                    $out['tab'] = 'Completed';
+                } else {
+                    // Do not expose Cancelled tab; keep only Upcoming/Completed
+                    $out['tab'] = 'Upcoming';
+                }
                 $out['doctorName'] = isset($b->assigned_doctor_id) && $b->assigned_doctor_id
                     ? (DB::table('doctors')->where('id',$b->assigned_doctor_id)->value('doctor_name') ?? ('Doctor #'.$b->assigned_doctor_id))
                     : 'Doctor';
@@ -380,7 +391,6 @@ public function pet_update(Request $request, $id)
     ]);
 } 
 }
-
 
 
 

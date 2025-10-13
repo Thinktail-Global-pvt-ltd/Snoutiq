@@ -898,10 +898,20 @@ public function googleLogin(Request $request)
                         ->first();
 
             if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid pet credentials',
-                ], 401);
+                // Fallback: locate by email and attach token; if still not found, create a minimal user
+                $user = User::where('email', $request->email)->first();
+                if ($user) {
+                    $user->google_token = $request->google_token;
+                    $user->save();
+                } else {
+                    $name = explode('@', $request->email)[0] ?? 'Pet User';
+                    $user = User::create([
+                        'name'         => $name,
+                        'email'        => $request->email,
+                        'password'     => null,
+                        'google_token' => $request->google_token,
+                    ]);
+                }
             }
 
             // ✅ Laravel login

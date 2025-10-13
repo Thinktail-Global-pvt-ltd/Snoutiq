@@ -13,15 +13,23 @@ class SessionController extends Controller
     {
         $validated = $request->validate([
             'user_id' => 'required|integer|min:1',
+            'role'    => 'nullable|string', // 'pet' or 'vet'
         ]);
 
         $uid = (int) $validated['user_id'];
         session(['user_id' => $uid]);
+        // Normalize role if provided
+        if (isset($validated['role'])) {
+            $raw = strtolower(trim((string)$validated['role']));
+            $role = in_array($raw, ['vet','doctor','clinic']) ? 'vet' : 'pet';
+            session(['role' => $role]);
+        }
 
         return response()->json([
             'success'    => true,
             'message'    => 'User ID stored in session',
             'user_id'    => session('user_id'),
+            'role'       => session('role'),
             'session_id' => $request->session()->getId(),
         ]);
     }
@@ -37,10 +45,18 @@ class SessionController extends Controller
             ], 422);
         }
         session(['user_id' => $userId]);
+        $roleParam = $request->query('role');
+        if ($roleParam !== null) {
+            $raw = strtolower(trim((string)$roleParam));
+            $role = in_array($raw, ['vet','doctor','clinic']) ? 'vet' : 'pet';
+            session(['role' => $role]);
+        }
         return response()->json([
             'success'    => true,
             'message'    => 'User ID stored in session (GET)',
             'user_id'    => session('user_id'),
+            'role'       => session('role'),
+            'session_user_id' => session('user_id'),
             'session_id' => $request->session()->getId(),
         ]);
     }
@@ -79,7 +95,7 @@ class SessionController extends Controller
         }
 
         // Return a safe subset of the session
-        $whitelist = ['auth_full', 'user', 'role', 'token', 'chat_room'];
+        $whitelist = ['auth_full', 'user', 'user_id', 'role', 'token', 'chat_room'];
         $payload = [];
         foreach ($whitelist as $k) {
             if (session()->has($k)) {
