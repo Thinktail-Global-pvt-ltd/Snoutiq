@@ -13,6 +13,22 @@ Route::get('/logout', function (\Illuminate\Http\Request $request) {
 })->name('logout');
 Route::get('/vets/{slug}', [VetLandingController::class, 'show']);
 
+// Video consult entry points (public views)
+// Patient-facing lobby to pick a doctor and place a call
+Route::get('/chat', function () {
+    return view('chat');
+})->name('video.chat');
+
+// Friendly alias used from clinic landing: /video?vet_slug=...
+Route::get('/video', function () {
+    return view('chat');
+})->name('video.alias');
+
+// Actual call room (Agora join page). Channel param is optional to allow manual testing
+Route::get('/call-page/{channel?}', function () {
+    return view('call-page');
+})->name('video.call');
+
 // Protected application routes (requires session user)
 Route::middleware([EnsureSessionUser::class])->group(function(){
     // Dashboards
@@ -21,6 +37,8 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         $doctorId  = auth()->id() ?? 301;
         return view('doctor-dashboard', compact('socketUrl','doctorId'));
     })->name('doctor.dashboard');
+    // Clinic dashboard shell (links to doctor console)
+    Route::view('/clinic-dashboard', 'clinic-dashboard')->name('clinic.dashboard');
     Route::view('/dashboard/services', 'groomer.services.index')->name('groomer.services.index');
 
     // Booking flow

@@ -493,5 +493,107 @@
 })();
 </script>
 
+<script>
+// =========================
+// Socket.IO: come online and receive calls
+// =========================
+(function(){
+  if (typeof io === 'undefined') { console.warn('[doctor] Socket.IO not loaded'); return; }
+  const $ = s => document.querySelector(s);
+  const elSocketId = $('#socket-id');
+  const elConn     = $('#conn-status');
+  const elConnYes  = $('#socket-connected');
+  const elIsOnline = $('#is-online');
+  const modal      = document.getElementById('incoming-modal');
+  const elMPatient = document.getElementById('m-patient');
+  const elMChannel = document.getElementById('m-channel');
+  const elMTime    = document.getElementById('m-time');
+
+  let joined = false;
+  let lastCall = null;
+  const url = new URL(window.location.href);
+  const doctorId = Number(window.CURRENT_USER_ID || url.searchParams.get('doctorId') || 0) || null;
+
+  const socket = io(SOCKET_URL, {
+    transports: ['websocket','polling'],
+    withCredentials: false,
+    path: '/socket.io/'
+  });
+
+  function setConn(state){
+    if (elConn) elConn.textContent = state ? 'connected' : 'disconnected';
+    if (elConnYes) elConnYes.textContent = state ? 'Yes' : 'No';
+  }
+
+  socket.on('connect', ()=>{
+    if (elSocketId) elSocketId.textContent = socket.id;
+    setConn(true);
+    if (doctorId && !joined) {
+      socket.emit('join-doctor', Number(doctorId));
+    }
+  });
+
+  socket.on('connect_error', (err)=>{
+    setConn(false);
+    console.warn('[doctor] socket connect_error:', err && err.message);
+  });
+
+  socket.on('disconnect', ()=>{
+    setConn(false);
+    joined = false;
+  });
+
+  socket.on('doctor-online', (data)=>{
+    try {
+      if (Number(data?.doctorId) === Number(doctorId)) {
+        joined = true;
+        if (elIsOnline) elIsOnline.textContent = 'Yes';
+      }
+    } catch {}
+  });
+
+  socket.on('call-requested', (payload)=>{
+    lastCall = payload || null;
+    try{
+      if (!modal) return;
+      if (elMPatient) elMPatient.textContent = String(payload?.patientId ?? '');
+      if (elMChannel) elMChannel.textContent = String(payload?.channel ?? '');
+      if (elMTime)    elMTime.textContent    = new Date().toLocaleString();
+      modal.classList.remove('hidden');
+    }catch(e){ console.warn('[doctor] call-requested render failed', e); }
+  });
+
+  document.getElementById('m-accept')?.addEventListener('click', ()=>{
+    try{
+      modal?.classList.add('hidden');
+      const ch = (lastCall?.channel || elMChannel?.textContent || '').trim();
+      const callId = (lastCall?.callId || '').trim();
+      if (callId) {
+        socket.emit('call-accepted', {
+          callId,
+          doctorId: Number(doctorId||0),
+          patientId: Number(lastCall?.patientId||0),
+          channel: ch,
+        });
+      }
+      const callUrl = (PATH_PREFIX || '') + '/call-page/' + encodeURIComponent(ch) + '?uid=' + encodeURIComponent(doctorId||'') + '&role=host' + (callId ? ('&callId=' + encodeURIComponent(callId)) : '');
+      window.location.href = callUrl;
+    }catch(e){ console.warn('[doctor] accept failed', e); }
+  });
+
+  document.getElementById('m-reject')?.addEventListener('click', ()=>{
+    try{
+      modal?.classList.add('hidden');
+      const callId = (lastCall?.callId || '').trim();
+      if (callId) socket.emit('call-rejected', { callId, reason: 'rejected' });
+    }catch(e){ /* no-op */ }
+  });
+
+  document.getElementById('btn-rejoin')?.addEventListener('click', ()=>{
+    if (socket?.connected && doctorId) socket.emit('join-doctor', Number(doctorId));
+  });
+})();
+</script>
+
 </body>
 </html>

@@ -29,9 +29,10 @@ use App\Http\Controllers\AdminController;
 // routes/api.php
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AgoraController;
-use App\Http\Controllers\Api\CallController;
+use App\Http\Controllers\Api\CallController as ApiCallController; // handles lightweight requestCall
+use App\Http\Controllers\CallController as CoreCallController;    // handles sessions + token
 
-Route::post('/call/request', [CallController::class, 'requestCall']);
+Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 
 use App\Http\Controllers\Api\VetController;
 
@@ -45,7 +46,8 @@ Route::get('/agora/appid', function () {
         'appId' => trim(env('AGORA_APP_ID')),
     ]);
 });
-Route::get('/call/{id}', [CallController::class, 'show']);
+// Call session info (patient/doctor polling)
+Route::get('/call/{id}', [CoreCallController::class, 'show']);
 // routes/web.php (ya api.php)
 Route::get('/debug/pusher', function () {
     return [
@@ -59,9 +61,10 @@ Route::get('/debug/pusher', function () {
 
 
 
-Route::post('/call/create', [CallController::class, 'createSession']);
-Route::post('/call/{id}/accept', [CallController::class, 'acceptCall']);
-Route::post('/call/{id}/payment-success', [CallController::class, 'paymentSuccess']);
+// Create/accept/payment flow for video consult
+Route::post('/call/create', [CoreCallController::class, 'createSession']);
+Route::post('/call/{id}/accept', [CoreCallController::class, 'acceptCall']);
+Route::post('/call/{id}/payment-success', [CoreCallController::class, 'paymentSuccess']);
 
 Route::get('/users', [AdminController::class, 'getUsers']);
 // Route::get('/vets', [AdminController::class, 'getVets']);
@@ -330,8 +333,8 @@ Route::post('/webhook/deploy', function () {
     return response()->json(['status' => 'ok']);
 });
 
-// routes/api.php
-Route::post('/agora/token', [CallController::class, 'generateToken']);
+// Agora RTC token for joining the call
+Route::post('/agora/token', [CoreCallController::class, 'generateToken']);
 
 use App\Http\Controllers\Api\PetParentController;
 
@@ -498,7 +501,5 @@ Route::middleware('web')->group(function () {
 use App\Http\Controllers\Api\UserOrdersController;
 
 Route::get('/users/{id}/orders', [UserOrdersController::class, 'index']);
-
-
 
 
