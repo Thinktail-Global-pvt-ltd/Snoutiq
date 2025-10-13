@@ -44,11 +44,18 @@
         <input type="number" id="max_bph" value="3" class="mt-1 w-full rounded border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" @if($readonly) disabled @endif>
       </div>
 
-      <div class="flex items-end">
-        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-          <input type="checkbox" id="enable247" class="rounded border-gray-300" @if($readonly) disabled @endif>
-          <span>Enable 24/7</span>
-        </label>
+      {{-- Highlighted 24/7 toggle --}}
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Enable 24/7</label>
+        <div id="enable247Wrap"
+             class="flex items-center justify-between gap-3 rounded-lg border bg-white p-2 transition-all duration-200 @if($readonly) opacity-60 cursor-not-allowed @endif">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="enable247" class="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500" @if($readonly) disabled @endif>
+            <span class="text-sm font-medium">All-day, all-week availability</span>
+          </div>
+          <span id="enable247Badge" class="text-xs px-2 py-0.5 rounded-full border border-gray-300 text-gray-700">OFF</span>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">When enabled, all 7 days will be set to 00:00–23:59 with no breaks.</p>
       </div>
     </div>
   </div>
@@ -112,6 +119,9 @@
     <div id="slotOut" class="mt-3 text-sm"></div>
   </div>
 
+  {{-- SweetAlert2 (safe to include even if layout already has it) --}}
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
   <script>
     const ORIGIN   = window.location.origin;
     const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(location.hostname);
@@ -130,6 +140,22 @@
     function getDoctorId(){
       const v = Number(el('#doctor_id')?.value);
       return Number.isFinite(v) && v>0 ? v : null;
+    }
+
+    function highlight247(){
+      const wrap  = el('#enable247Wrap');
+      const badge = el('#enable247Badge');
+      const cb    = el('#enable247');
+      if(!wrap || !cb) return;
+      wrap.classList.remove('ring-2', 'ring-green-300', 'bg-green-50', 'border-green-400', 'shadow-sm');
+      wrap.classList.remove('bg-white', 'border-gray-200');
+      if(cb.checked){
+        wrap.classList.add('ring-2','ring-green-300','bg-green-50','border-green-400','shadow-sm');
+        if(badge){ badge.textContent = 'ON'; badge.className = 'text-xs px-2 py-0.5 rounded-full border border-green-500 text-green-700 bg-green-50'; }
+      }else{
+        wrap.classList.add('bg-white','border-gray-200');
+        if(badge){ badge.textContent = 'OFF'; badge.className = 'text-xs px-2 py-0.5 rounded-full border border-gray-300 text-gray-700'; }
+      }
     }
 
     async function loadExisting(){
@@ -166,7 +192,7 @@
         });
         const note = el('#metaNote'); if(note) note.textContent = `Loaded ${list.length} of 7 days from new table.`;
 
-        // Detect 24/7: all 7 days with 00:00 to >=23:59 and no breaks
+        // Detect 24/7 (00:00–23:59 no breaks on all 7 days)
         try{
           const byDowFull = new Map(list.map(r => [Number(r.day_of_week), r]));
           let is247 = true;
@@ -182,6 +208,8 @@
           const cb247 = el('#enable247');
           if(cb247){ cb247.checked = !!is247; toggle247Inputs(!!is247); }
         }catch(_){ /* ignore */ }
+
+        highlight247();
       }catch(e){ out('#saveOut', `Load error: ${e?.message||e}`, false); }
     }
 
@@ -211,6 +239,19 @@
       });
       toggle247Inputs(on);
       const note = el('#metaNote'); if(note && on){ note.textContent = '24/7 enabled — all days set to 00:00–23:59 with no breaks.'; }
+    }
+
+    function show247Alert(on){
+      if(typeof Swal === 'undefined') return;
+      Swal.fire({
+        toast: true,
+        position: 'top',
+        icon: on ? 'success' : 'info',
+        title: on ? '24/7 enabled' : '24/7 disabled',
+        text: on ? 'All 7 days set to 00:00–23:59 with no breaks.' : 'You can now set custom hours and breaks.',
+        showConfirmButton: false,
+        timer: 2200
+      });
     }
 
     function collect(){
@@ -263,8 +304,17 @@
       dd?.addEventListener('change', loadExisting);
       if(!READONLY) el('#btnSave')?.addEventListener('click', save);
       el('#btnLoadSlots')?.addEventListener('click', loadSlots);
-      if(!READONLY){
-        el('#enable247')?.addEventListener('change', (e)=> apply247(!!e.target.checked));
+
+      // 24/7 toggle behaviour: apply, highlight, and SweetAlert
+      const cb247 = el('#enable247');
+      highlight247();
+      if(!READONLY && cb247){
+        cb247.addEventListener('change', (e)=>{
+          const on = !!e.target.checked;
+          apply247(on);
+          highlight247();
+          show247Alert(on);
+        });
       }
     });
   </script>
