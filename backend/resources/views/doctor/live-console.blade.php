@@ -20,7 +20,11 @@
 
 <script>
   const PATH_PREFIX = @json($pathPrefix ? '/'.$pathPrefix : '');
-  const SOCKET_URL  = @json($socketUrl);
+  const RAW_SOCKET_URL = @json($socketUrl);
+  const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
+  const SOCKET_URL = (!IS_LOCAL && /localhost|127\.0\.0\.1/i.test(RAW_SOCKET_URL))
+    ? window.location.origin
+    : RAW_SOCKET_URL;
   const DEFAULT_DOCTOR_ID = Number(@json($defaultDoctor));
 </script>
 
@@ -191,4 +195,3 @@
 
 </body>
 </html>
-

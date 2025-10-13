@@ -36,7 +36,7 @@
 <script>
   // ===== Prefix utils =====
   const RAW_PATH_PREFIX = @json($pathPrefix);            // may be ""
-  const SOCKET_URL      = @json($socketUrl);
+  const RAW_SOCKET_URL  = @json($socketUrl);
 
   const resolvePrefix = () => {
     const given = (RAW_PATH_PREFIX || "").trim();
@@ -48,6 +48,10 @@
     return '';
   };
   const PATH_PREFIX = resolvePrefix();
+  const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
+  const SOCKET_URL = (!IS_LOCAL && /localhost|127\.0\.0\.1/i.test(RAW_SOCKET_URL))
+    ? window.location.origin
+    : RAW_SOCKET_URL;
 
   // ===== user_id logging + resolution =====
   const PHP_SESSION_USER_ID = @json($sessionUserId);

@@ -29,7 +29,7 @@
 
 <script>
   /** ===== Env from PHP ===== */
-  const SOCKET_URL       = @json($socketUrl);
+  const RAW_SOCKET_URL   = @json($socketUrl);
   const RAW_BACKEND_BASE = @json($backendBase);   // e.g. https://snoutiq.com/backend (fallback)
   const RAW_FRONTEND_BASE= @json($frontBase);     // e.g. https://snoutiq.com (fallback)
 
@@ -72,6 +72,9 @@
   const formatTime = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 
   /** ===== Socket (optional, for notifying doctor) ===== */
+  const SOCKET_URL = (!IS_LOCAL && /localhost|127\.0\.0\.1/i.test(RAW_SOCKET_URL))
+    ? ORIGIN
+    : RAW_SOCKET_URL;
   const socket = io(SOCKET_URL, { transports:['websocket','polling'], withCredentials:false, path:'/socket.io/' });
 
   /** ===== Razorpay loader ===== */

@@ -45,9 +45,13 @@
 <script>
   // ========= runtime env from server =========
   const PATH_PREFIX = @json($pathPrefix ? "/$pathPrefix" : ""); // "" locally, "/backend" in prod
-  const SOCKET_URL  = @json($socketUrl);
+  const RAW_SOCKET_URL = @json($socketUrl);
   const API_BASE    = (PATH_PREFIX || '') + '/api';
   const DEFAULT_DOCTOR_ID = Number(@json($serverDoctorId ?? ($doctorId ?? null))) || null;
+  const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
+  const SOCKET_URL = (!IS_LOCAL && /localhost|127\.0\.0\.1/i.test(RAW_SOCKET_URL))
+    ? window.location.origin
+    : RAW_SOCKET_URL;
 
   // Sources
   const SESSION_USER_ID = Number(@json($sessionUserId ?? null)) || null; // server truth (optional)
