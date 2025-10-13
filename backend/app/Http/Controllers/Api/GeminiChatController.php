@@ -529,6 +529,7 @@ class GeminiChatController extends Controller
 
     private function callGeminiApi_curl(string $prompt): string
     {
+        // Use hard-coded API key as requested (no .env)
         $apiKey = self::GEMINI_API_KEY;
 
         $payload = json_encode([

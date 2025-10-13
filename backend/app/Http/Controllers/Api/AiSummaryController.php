@@ -14,7 +14,10 @@ class AiSummaryController extends Controller
     public function summary(Request $request)
     {
         // Prefer user-based scope; optionally narrow to a specific chat_room_token if explicitly provided
-        $uid = (int) ($request->query('user_id') ?? ($request->session()->get('user_id') ?? 0));
+        $uid = (int) ($request->query('user_id') ?? 0);
+        if ($uid <= 0 && method_exists($request, 'hasSession') && $request->hasSession()) {
+            $uid = (int) ($request->session()->get('user_id') ?? 0);
+        }
         $chatRoomToken = (string) $request->query('chat_room_token', '');
 
         if ($uid <= 0 && !$chatRoomToken) {
@@ -24,7 +27,7 @@ class AiSummaryController extends Controller
             ], 422);
         }
 
-        $limit = (int) $request->query('limit', 50);
+        $limit = (int) $request->query('limit', 5);
         $q = DB::table('chats')->orderBy('id', 'desc')->limit($limit);
 
         // Always constrain by user when available to avoid cross-user leakage

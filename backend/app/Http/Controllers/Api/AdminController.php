@@ -1,271 +1,69 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
-
-use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
 {
-
-    // list all users
-    public function getUsers(Request $request)
+    // GET /api/admin/tasks?status=open
+    public function tasks(Request $request)
     {
-        $rows = DB::select('SELECT * FROM users ORDER BY id DESC');
-        return response()->json(['status'=>'success','data'=>$rows]);
+        $status = $request->query('status', 'open');
+        $tasks = DB::table('recruitment_tasks')
+            ->where('status', $status)
+            ->orderBy('priority', 'desc')
+            ->orderBy('due_date')
+            ->limit(100)
+            ->get();
+        return response()->json(['tasks' => $tasks]);
     }
 
-    // get one user
-    public function getUser(Request $request, $id)
+    // GET /api/admin/alerts?resolved=0
+    public function alerts(Request $request)
     {
-        $row = DB::select('SELECT * FROM users WHERE id = ? LIMIT 1', [$id]);
-        if (!$row) return response()->json(['status'=>'error','message'=>'User not found'], 404);
-        return response()->json(['status'=>'success','data'=>$row[0]]);
+        $resolved = $request->query('resolved', '0');
+        $alerts = DB::table('system_alerts')
+            ->where('resolved', (bool) $resolved)
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+        return response()->json(['alerts' => $alerts]);
     }
 
-    public function updateUser(Request $request, $id)
-{
-    try {
-        $allowed = ['name','phone','role','summary','latitude','longitude','password'];
-        $sets = [];
-        $params = [];
+    // POST /api/admin/resolve-alert/{id}
+    public function resolveAlert(string $id)
+    {
+        DB::table('system_alerts')->where('id', $id)->update([
+            'resolved' => true,
+            'resolved_at' => now(),
+        ]);
+        return response()->json(['message' => 'Alert resolved']);
+    }
 
-        foreach ($allowed as $col) {
-            if ($request->has($col)) {
-                $val = $request->input($col);
-                if ($col === 'password' && !empty($val)) {
-                    $val = Hash::make($val);
-                }
-                $sets[] = "`$col` = ?";
-                $params[] = $val;
-            }
-        }
+    // GET /api/admin/providers-queue
+    public function providersQueue()
+    {
+        $providers = DB::table('providers')->where('status', 'registered')->orderBy('created_at')->get();
+        return response()->json(['providers' => $providers]);
+    }
 
-        if (empty($sets)) {
-            return response()->json(['status'=>'error','message'=>'No fields to update'], 422);
-        }
-
-        $sql = 'UPDATE users SET '.implode(',', $sets).', updated_at = NOW() WHERE id = ?';
-        $params[] = $id;
-
-        $affected = DB::update($sql, $params);
-
-        if ($affected === 0) {
-            return response()->json(['status'=>'error','message'=>'Nothing updated or user not found'], 404);
-        }
-
-        $row = DB::select('SELECT * FROM users WHERE id = ? LIMIT 1', [$id]);
-        return response()->json(['status'=>'success','data'=>$row[0]]);
-
-    } catch (\Throwable $e) {
-        // Debug: Return the actual error in response
-        return response()->json([
-            'status'  => 'error',
-            'message' => $e->getMessage(),
-            'file'    => $e->getFile(),
-            'line'    => $e->getLine()
-        ], 500);
+    // GET /api/admin/analytics?period=30
+    public function analytics(Request $request)
+    {
+        $period = (int) $request->query('period', 30);
+        $from = now()->subDays($period);
+        $stats = DB::table('bookings')
+            ->selectRaw("COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_bookings,
+                          COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_bookings,
+                          AVG(rating) as avg_rating,
+                          SUM(final_price) as total_revenue")
+            ->where('booking_created_at', '>=', $from)
+            ->first();
+        $activeProviders = DB::table('bookings')->where('booking_created_at', '>=', $from)->whereNotNull('assigned_provider_id')->distinct('assigned_provider_id')->count('assigned_provider_id');
+        return response()->json(['analytics' => array_merge((array) $stats, ['active_providers' => $activeProviders])]);
     }
 }
 
-
-    // update user (dynamic SET)
-    public function updateUser_old(Request $request, $id)
-    {
-        $allowed = ['name','phone','role','summary','latitude','longitude','password'];
-        $sets = [];
-        $params = [];
-
-        foreach ($allowed as $col) {
-            if ($request->has($col)) {
-                $val = $request->input($col);
-                if ($col === 'password') {
-                    if ($val === null || $val === '') continue;
-                    $val = Hash::make($val);
-                }
-                $sets[] = "`$col` = ?";
-                $params[] = $val;
-            }
-        }
-        if (empty($sets)) {
-            return response()->json(['status'=>'error','message'=>'No fields to update'], 422);
-        }
-
-        $sql = 'UPDATE users SET '.implode(',', $sets).', updated_at = NOW() WHERE id = ?';
-        $params[] = $id;
-
-        $affected = DB::update($sql, $params);
-        if ($affected === 0) return response()->json(['status'=>'error','message'=>'Nothing updated or user not found'], 404);
-
-        $row = DB::select('SELECT * FROM users WHERE id = ? LIMIT 1', [$id]);
-        return response()->json(['status'=>'success','data'=>$row[0]]);
-    }
-
-    // delete user (pets cascade by FK)
-    public function deleteUser(Request $request, $id)
-    {
-        $deleted = DB::delete('DELETE FROM users WHERE id = ?', [$id]);
-        if (!$deleted) return response()->json(['status'=>'error','message'=>'User not found'], 404);
-        return response()->json(['status'=>'success','message'=>'User deleted']);
-    }
-
-    /* ============== VETS (raw SQL) ============== */
-
-    public function getVets(Request $request)
-    {
-        $vets = DB::select('SELECT * FROM vet_registerations_temp ORDER BY id DESC');
-        return response()->json(['status'=>'success','data'=>$vets]);
-    }
-
-    /* ============== PETS (raw SQL) ============== */
-
-    // list pets for a user
-    public function listPets(Request $request, $userId)
-    {
-        try {
-            // Basic sanity check
-            if (!is_numeric($userId)) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Invalid user id'
-                ], 422);
-            }
-
-            // Ensure user exists
-            $user = DB::select('SELECT id FROM users WHERE id = ? LIMIT 1', [$userId]);
-            if (!$user) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'User not found'
-                ], 404);
-            }
-
-            // Fetch pets safely
-            $pets = DB::select('SELECT * FROM pets WHERE user_id = ? ORDER BY id DESC', [$userId]);
-            return response()->json(['status' => 'success', 'data' => $pets]);
-        } catch (\Throwable $e) {
-            // Centralized failure response without leaking sensitive info
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Unable to fetch pets right now',
-            ], 500);
-        }
-    }
-
-    /**
-     * ADD PET:
-     * 1) migrate legacy pet fields from users → pets ONCE (idempotent via UNIQUE key)
-     * 2) insert requested pet with ON DUPLICATE KEY UPDATE (no duplicates)
-     * Body: { name, breed, pet_age, pet_gender, pet_doc1?, pet_doc2? }
-     */
-    public function addPet(Request $request, $userId)
-    {
-        // minimal required checks
-        foreach (['name','breed','pet_gender','pet_age'] as $f) {
-            if (!$request->filled($f)) {
-                return response()->json(['status'=>'error','message'=>"$f is required"], 422);
-            }
-        }
-        $name       = $request->input('name');
-        $breed      = $request->input('breed');
-        $pet_age    = (int)$request->input('pet_age');
-        $pet_gender = $request->input('pet_gender');
-        $pet_doc1   = $request->input('pet_doc1');
-        $pet_doc2   = $request->input('pet_doc2');
-
-        return DB::transaction(function () use ($userId, $name, $breed, $pet_age, $pet_gender, $pet_doc1, $pet_doc2) {
-
-            // (1) migrate legacy user->pets once
-            DB::statement(
-                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, pet_doc1, pet_doc2, created_at, updated_at)
-                 SELECT u.id, u.pet_name, u.breed, u.pet_age, u.pet_gender, u.pet_doc1, u.pet_doc2, NOW(), NOW()
-                 FROM users u
-                 WHERE u.id = ?
-                   AND (u.pet_name IS NOT NULL OR u.breed IS NOT NULL OR u.pet_age IS NOT NULL
-                        OR u.pet_gender IS NOT NULL OR u.pet_doc1 IS NOT NULL OR u.pet_doc2 IS NOT NULL)
-                 ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP',
-                [$userId]
-            );
-
-            // (2) insert the new pet (idempotent)
-            DB::statement(
-                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, pet_doc1, pet_doc2, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-                 ON DUPLICATE KEY UPDATE
-                   pet_doc1 = COALESCE(VALUES(pet_doc1), pet_doc1),
-                   pet_doc2 = COALESCE(VALUES(pet_doc2), pet_doc2),
-                   updated_at = CURRENT_TIMESTAMP',
-                [$userId, $name, $breed, $pet_age, $pet_gender, $pet_doc1, $pet_doc2]
-            );
-
-            // return the row
-            $pet = DB::select(
-                'SELECT * FROM pets WHERE user_id = ? AND name = ? AND breed = ? AND pet_age = ? AND pet_gender = ? LIMIT 1',
-                [$userId, $name, $breed, $pet_age, $pet_gender]
-            );
-
-            return response()->json(['status'=>'success','data'=>$pet ? $pet[0] : null]);
-        });
-    }
-
-    // get one pet (for edit)
-    public function getPet(Request $request, $petId)
-    {
-        $row = DB::select('SELECT * FROM pets WHERE id = ? LIMIT 1', [$petId]);
-        if (!$row) return response()->json(['status'=>'error','message'=>'Pet not found'], 404);
-        return response()->json(['status'=>'success','data'=>$row[0]]);
-    }
-
-    // update pet
-    public function updatePet(Request $request, $petId)
-    {
-        $cols = ['name','breed','pet_age','pet_gender','pet_doc1','pet_doc2'];
-        $sets = [];
-        $params = [];
-        foreach ($cols as $c) {
-            if ($request->has($c)) { $sets[] = "`$c` = ?"; $params[] = $request->input($c); }
-        }
-        if (!$sets) return response()->json(['status'=>'error','message'=>'No fields to update'], 422);
-
-        $sql = 'UPDATE pets SET '.implode(',', $sets).', updated_at = NOW() WHERE id = ?';
-        $params[] = $petId;
-
-        $n = DB::update($sql, $params);
-        if (!$n) return response()->json(['status'=>'error','message'=>'Pet not found or unchanged'], 404);
-
-        $row = DB::select('SELECT * FROM pets WHERE id = ? LIMIT 1', [$petId]);
-        return response()->json(['status'=>'success','data'=>$row[0]]);
-    }
-
-    // delete pet
-    public function deletePet(Request $request, $petId)
-    {
-        $deleted = DB::delete('DELETE FROM pets WHERE id = ?', [$petId]);
-        if (!$deleted) return response()->json(['status'=>'error','message'=>'Pet not found'], 404);
-        return response()->json(['status'=>'success','message'=>'Pet deleted']);
-    }
-    // Fetch all users
-    public function getUsers_old(Request $request)
-    {
-        if ($request->email !== 'adminsnoutiq@gmail.com') {
-            return response()->json(['status' => 'error', 'message' => 'Invalid user'], 403);
-        }
-
-        $users = User::all();
-        return response()->json(['status' => 'success', 'data' => $users]);
-    }
-
-    // Fetch all vets
-    public function getVets_old(Request $request)
-    {
-        if ($request->email !== 'adminsnoutiq@gmail.com') {
-            return response()->json(['status' => 'error', 'message' => 'Invalid user'], 403);
-        }
-
-        $vets = DB::table('vet_registerations_temp')->get();
-        return response()->json(['status' => 'success', 'data' => $vets]);
-    }
-}

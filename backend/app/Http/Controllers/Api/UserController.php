@@ -15,8 +15,10 @@ use App\Models\GroomerService;
 use App\Models\UserRating;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+
 use Illuminate\Support\Facades\Hash;
-  
+
+use Illuminate\Support\Facades\DB;
 class UserController extends Controller
 {
     //
@@ -44,69 +46,63 @@ class UserController extends Controller
     ]);
 }
     public function my_bookings(Request $request){
-        $limit = 1000000;
-        if(filled($request->limit)){
-        $limit = $request->limit;
+        $limit = filled($request->limit) ? (int)$request->limit : 1000;
 
-        }
-        return response()->json([
-            'data'=>GroomerBooking::where('customer_type','online')->where('customer_id',$request->user()->id)->limit($limit)->get()->map(function($data) {
-$request['doctorName']=$data->groomer_employees_id==0?'Not Assigned': GroomerEmployee::where('id',$data->groomer_employees_id)->first()?->name;
-$request['clinic']=GroomerProfile::where('user_id',$data->user_id)->first()->name;
-$request['date']=$data->date;
-$request['prescription']=$data->prescription;
-$request['time']=$data->start_time.'-'.$data->end_time;
-// $request['petName']=$data->petName;
-$request['rating']=UserRating::where('servicer_id', $data->user_id)->avg('rating');
-  if($data->customer_type=="Groomer" || $data->customer_type=="groomer"){
-         $GroomerClientPet= GroomerClientPet::where('id',$data->customer_pet_id)->first();
-    $cust = GroomerClient::where('id',$data->customer_id)->first();
-$request['ownerName'] = $cust?->name;
-$request['ownerMobile'] = $cust?->phone;
+        // Resolve user id from auth, session, header or query
+        $uid = optional($request->user())->id ?? (int) ($request->session()->get('user_id') ?? 0);
+        if (!$uid) { $uid = (int) ($request->header('X-Session-User') ?? $request->query('user_id', 0)); }
+        if (!$uid) { return response()->json(['message' => 'Not authenticated'], 401); }
 
-         $request['petName']=$GroomerClientPet->name;
-         $request['petBreed']=$GroomerClientPet->type .' - '. $GroomerClientPet->breed;
-        }else{
-                         $cust = UserProfile::where('user_id',$data->customer_id)->first();
+        $rows = DB::table('bookings')
+            ->where('user_id', $uid)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(function($b){
+                $out = [];
+                $out['id'] = $b->id;
+                $status = $b->status ?? 'pending';
+                $out['status'] = $status;
+                $sl = strtolower((string)$status);
+                $out['tab'] = $sl === 'completed' ? 'Completed' : (($sl === 'cancelled' || $status === 'Rejected') ? 'Cancelled' : 'Upcoming');
+                $out['doctorName'] = isset($b->assigned_doctor_id) && $b->assigned_doctor_id
+                    ? (DB::table('doctors')->where('id',$b->assigned_doctor_id)->value('doctor_name') ?? ('Doctor #'.$b->assigned_doctor_id))
+                    : 'Doctor';
+                if (isset($b->clinic_id) && $b->clinic_id) {
+                    $clinicName = DB::table('vet_registerations_temp')->where('id',$b->clinic_id)->value('name');
+                    if (!$clinicName) {
+                        $clinicSlug = DB::table('vet_registerations_temp')->where('id',$b->clinic_id)->value('slug');
+                        $clinicName = $clinicSlug ?: ('Clinic #'.$b->clinic_id);
+                    }
+                    $out['clinic'] = $clinicName;
+                } else {
+                    $out['clinic'] = 'Clinic';
+                }
+                $dt = $b->scheduled_for ?? $b->booking_created_at ?? null;
+                $out['date'] = $dt ? substr($dt,0,10) : '';
+                $out['time'] = $dt ? substr($dt,11,5) : '';
+                if (isset($b->pet_id) && $b->pet_id) {
+                    $pet = DB::table('user_pets')->where('id',$b->pet_id)->first();
+                    $out['petName'] = $pet->name ?? '—';
+                    $out['petBreed'] = ($pet->type ?? '').($pet->breed ? (' - '.$pet->breed) : '');
+                }
+                return $out;
+            });
 
-             $pett= UserPet::where('user_id',$data->customer_id)->where('id',$data->customer_pet_id)->first();
-           $request['petName']=$pett?->name??'---';
-         $request['petBreed']=$pett?->type .' - '. $pett?->breed;
-$request['ownerName'] = $cust?->name??'---';
-    $request['ownerMobile'] = $cust?->user?->mobile;
-
-        }
-        $request['status']=$data->status;
-        switch ($data->status) {
-            case 'completed':
-                $request['tab'] = 'Completed';
-                break;
-            case 'Rejected':
-                $request['tab'] = 'Cancelled';
-                break;
-            default:
-                $request['tab'] = 'Upcoming';
-                break;
-        }
-                $is_videoCall = false;
-        foreach(json_decode($data->services) as $ddd){
-            // return $ddd;
-            $service = GroomerService::where('id',$ddd->service_id)->first();
- if($service->main_service == "video_call"){
-         $is_videoCall = true;
-   
-}
-        }
-        $request['is_videoCall']=$is_videoCall;
-        $request['id']=$data->id;
-        return $request;
-            })
-        ]);
+        return response()->json(['data' => $rows]);
     }
    public function my_booking($id, Request $request)
 {
+    // Resolve user id similarly as above
+    $uid = optional($request->user())->id
+        ?? (int) ($request->session()->get('user_id') ?? 0)
+        ?? 0;
+    if (!$uid) {
+        $uid = (int) ($request->header('X-Session-User') ?? $request->query('user_id', 0));
+    }
+
     $booking = GroomerBooking::where('customer_type', 'online')
-        ->where('customer_id', $request->user()->id)
+        ->where('customer_id', $uid)
         ->where('id', $id)
         ->first();
 
@@ -384,3 +380,7 @@ public function pet_update(Request $request, $id)
     ]);
 } 
 }
+
+
+
+

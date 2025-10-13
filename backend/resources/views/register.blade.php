@@ -51,6 +51,11 @@
   <div id="toast" class="toast"></div>
 
   <script>
+    // Dynamic base so it works on local and production
+    const PATH_PREFIX = "{{ trim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/') }}";
+    const BASE = PATH_PREFIX ? ('/' + PATH_PREFIX) : '';
+    const API  = BASE + '/api';
+
     let locationStatus = "checking";
     let coords = { lat:null, lng:null };
 
@@ -108,7 +113,7 @@
 
       try{
         // 1. Try login with role pet
-        let loginRes=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
+        let loginRes=await axios.post(`${API}/google-login`,{ email, google_token:googleToken, role:"pet" });
         if(loginRes.data.status==="success"){
           toast("Login successful!","success");
           location.href="/dashboard"; return;
@@ -116,7 +121,7 @@
       }catch(e){ console.warn("Login failed, will register"); }
 
       // 2. Register
-      let reg=await fetch("https://snoutiq.com/backend/api/auth/initial-register",{
+      let reg=await fetch(`${API}/auth/initial-register`,{
         method:"POST",headers:{ "Content-Type":"application/json" },
         body:JSON.stringify({ fullName:googleData.name,email,google_token:googleToken,latitude:coords.lat,longitude:coords.lng })
       });
@@ -124,9 +129,9 @@
       if(regData.status==="error"){ document.getElementById("googleMsg").textContent=regData.message; return; }
 
       // 3. Login again with role pet
-      let finalLogin=await axios.post("https://snoutiq.com/backend/api/google-login",{ email, google_token:googleToken, role:"pet" });
-      if(finalLogin.data.token){ toast("Registered & logged in!","success"); location.href="/dashboard"; }
-    };
+      let finalLogin=await axios.post(`${API}/google-login`,{ email, google_token:googleToken, role:"pet" });
+      if(finalLogin.data.token){ toast("Registered & logged in!","success"); location.href = `${BASE}/dashboard`; }
+  };
 
     window.onload=()=>{
       if(window.google && google.accounts){

@@ -14,7 +14,7 @@
     *{box-sizing:border-box}
     body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text)}
     .wrap{min-height:100dvh;display:grid;place-items:center;padding:32px}
-    .card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.08);padding:24px 22px}
+    .card{width:100%;max-width:480px;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.08);padding:24px 22px}
     .logo{height:22px;margin:0 auto 14px;display:block}
     h1{font-size:24px;margin:0 0 6px;text-align:center}
     .sub{color:var(--muted);text-align:center;margin:0 0 16px}
@@ -30,6 +30,9 @@
     .btn-primary:hover{background:var(--blue-d)}
     .google-box{border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
     .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;cursor:pointer}
+    .debug{margin-top:18px;border-top:1px solid var(--border);padding-top:14px}
+    .debug h3{margin:0 0 8px;font-size:14px}
+    .debug pre{max-height:360px;overflow:auto;background:#0b1020;color:#d1e7ff;padding:12px;border-radius:10px;font-size:12px;line-height:1.45}
   </style>
 </head>
 <body>
@@ -71,7 +74,13 @@
       </div>
     </div>
 
-    <div class="foot" style="margin-top:16px;padding-top:14px;border-top:1px solid #e5e7eb;text-align:center">
+    <!-- On-page dump -->
+    <div class="debug">
+      <h3>Debug dump (user + session)</h3>
+      <pre id="dump">Waiting for login…</pre>
+    </div>
+
+    <div class="foot" style="margin-top:16px;text-align:center">
       <p style="color:#64748b">Don't have an account?
         <a class="link" style="color:#2563eb;text-decoration:none;font-weight:600" href="/register">Create an account</a>
       </p>
@@ -80,17 +89,100 @@
 </div>
 
 <script>
+  // -------- Smart bases: local vs production --------
+  const ORIGIN   = window.location.origin; // http://127.0.0.1:8000 or https://snoutiq.com
+  const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
+  const API_BASE = IS_LOCAL ? `${ORIGIN}/api`        : `${ORIGIN}/backend/api`;
+  const WEB_BASE = IS_LOCAL ? `${ORIGIN}`           : `${ORIGIN}/backend`;
+
+  // EXACT local session endpoint; prod uses /backend/api/session/login
+  function getSessionLoginBase(){
+    if (IS_LOCAL) return 'http://127.0.0.1:8000/api/session/login';
+    return `${ORIGIN}/backend/api/session/login`;
+  }
+
+  // 👇 Redirect target per environment
+  const POST_LOGIN_REDIRECT = IS_LOCAL
+    ? `${ORIGIN}/dashboard/services`
+    : `https://snoutiq.com/backend/doctor`;
+
   const ROUTES = {
-    login: @json(url('/api/auth/login')),
-    googleLogin: @json(url('/api/google-login')),
-    doctorDashboard: @json(url('/doctor')),
-    petDashboard: @json(url('/pet-dashboard')),
+    login:            `${API_BASE}/auth/login`,
+    googleLogin:      `${API_BASE}/google-login`,
+    sessionLogin:     getSessionLoginBase(),
   };
 
   axios.defaults.withCredentials = true;
 
-  // ---------------- Role tabs ----------------
-  let userType = 'pet';
+  // ---------- helpers ----------
+  function stripBOM(s){ return typeof s === 'string' ? s.replace(/^\uFEFF/, '').trim() : s; }
+  function parseDeepJSON(x) {
+    let v = stripBOM(x);
+    if (typeof v !== 'string') return v;
+    try { v = JSON.parse(v); } catch { return x; }
+    if (typeof v === 'string') { try { v = JSON.parse(v); } catch {} }
+    return v;
+  }
+  function extractUserId(obj, isVet) {
+    const cands = isVet
+      ? [obj?.user?.id, obj?.user_id, obj?.vet_registerations_temp_id, obj?.vet_registration_temp_id, obj?.vet_registeration_id, obj?.vet_id]
+      : [obj?.user?.id, obj?.user_id];
+    for (const c of cands) {
+      if (c === null || c === undefined || String(c).trim() === '') continue;
+      const n = Number(c);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  }
+  function dump(obj, title='Dump'){
+    try{
+      const meta = {
+        title,
+        is_local: IS_LOCAL,
+        page_origin: ORIGIN,
+        login_endpoint: ROUTES.login,
+        session_endpoint: ROUTES.sessionLogin,
+        post_login_redirect: POST_LOGIN_REDIRECT
+      };
+      const pretty = JSON.stringify({ meta, ...obj }, null, 2);
+      console.log(`[debug] ${title}:`, obj);
+      document.getElementById('dump').textContent = pretty;
+    }catch(e){
+      console.warn('dump failed', e);
+      document.getElementById('dump').textContent = String(obj);
+    }
+  }
+  function saveAuthFull(obj){
+    try{
+      const json = JSON.stringify(obj);
+      sessionStorage.setItem('auth_full', json);
+      localStorage.setItem('auth_full', json);
+      console.log('[login] auth_full saved:', obj);
+    }catch(e){ console.warn('auth_full save failed', e); }
+  }
+  async function syncSessionWithBackend(userId){
+    if(!userId){
+      console.warn('[session] No user_id provided to session sync');
+      return { ok:false, error:'missing user_id' };
+    }
+    try{
+      const { data } = await axios.get(ROUTES.sessionLogin, {
+        params: { user_id: userId },
+        withCredentials: true
+      });
+      console.log('[session] requested_user_id:', userId);
+      console.log('[session] server.session_user_id:', data?.session_user_id ?? null);
+      console.log('[session] full response:', data);
+      return { ok:true, response:data };
+    }catch(err){
+      const payload = err?.response?.data || { message: String(err) };
+      console.warn('Failed to sync session with backend', payload);
+      return { ok:false, error:payload };
+    }
+  }
+
+  // ---------- UI ----------
+  let userType = 'vet'; // start on vet while testing; change if needed
   const els = {
     tabPet: document.getElementById('tab-pet'),
     tabVet: document.getElementById('tab-vet'),
@@ -101,46 +193,29 @@
     pwBtn: document.getElementById('pwBtn'),
     loginBtn: document.getElementById('loginBtn'),
     googleBtn: document.getElementById('googleBtn'),
+    dump: document.getElementById('dump'),
   };
   function setRole(type){
     userType = type;
-    if(type==='vet'){ els.tabVet.classList.add('active'); els.tabPet.classList.remove('active'); els.vetForm.style.display='block'; els.petBox.style.display='none'; }
-    else{ els.tabPet.classList.add('active'); els.tabVet.classList.remove('active'); els.vetForm.style.display='none'; els.petBox.style.display='block'; }
+    if(type==='vet'){
+      els.tabVet?.classList.add('active'); els.tabPet?.classList.remove('active');
+      els.vetForm.style.display='block'; els.petBox.style.display='none';
+    } else {
+      els.tabPet?.classList.add('active'); els.tabVet?.classList.remove('active');
+      els.vetForm.style.display='none'; els.petBox.style.display='block';
+    }
   }
-  els.tabPet.onclick = ()=> setRole('pet');
-  els.tabVet.onclick = ()=> setRole('vet');
-  setRole('pet');
+  els.tabPet?.addEventListener('click', ()=> setRole('pet'));
+  els.tabVet?.addEventListener('click', ()=> setRole('vet'));
+  setRole('vet');
 
-  // ---------------- show/hide password ----------------
   els.pwBtn.addEventListener('click', ()=>{
     const isText = els.password.type === 'text';
     els.password.type = isText ? 'password' : 'text';
     els.pwBtn.textContent = isText ? '👁️' : '🙈';
   });
 
-  // ---------------- helpers ----------------
-  function saveAuthFull(obj){
-    try{
-      const json = JSON.stringify(obj);
-      sessionStorage.setItem('auth_full', json);
-      localStorage.setItem('auth_full', json); // optional
-      console.log('[login] auth_full saved:', obj);
-    }catch(e){ console.warn('auth_full save failed', e); }
-  }
-
-  async function syncSessionWithBackend(userId){
-    if(!userId) return;
-    try{
-      const endpoint = new URL(ROUTES.sessionLogin);
-      endpoint.searchParams.set('user_id', userId);
-      await axios.get(endpoint.toString(), { withCredentials: true });
-      console.log('[login] session synced with backend for user:', userId);
-    }catch(err){
-      console.warn('Failed to sync session with backend', err?.response?.data || err);
-    }
-  }
-
-  // ---------------- Vet email/password login ----------------
+  // ---------- Vet login (redirect after session OK) ----------
   els.vetForm.addEventListener('submit', async (e)=>{
     e.preventDefault();
     els.loginBtn.disabled = true; els.loginBtn.textContent = 'Logging in...';
@@ -151,38 +226,51 @@
         role: 'vet',
       }, { withCredentials: true });
 
+      const loginDataRaw    = res?.data;
+      const loginDataParsed = parseDeepJSON(loginDataRaw);
+
+      console.log('[auth][vet] parsed:', loginDataParsed);
+      const computedUserId = extractUserId(loginDataParsed, true);
+      console.log('[auth][vet] computedUserId:', computedUserId);
+
       const payload = {
         success: true,
-        message: res.data?.message || 'Login success',
+        message: loginDataParsed?.message || 'Login success',
         role: 'vet',
-        email: res.data?.user?.email,
-        token: res.data?.token,
-        token_type: res.data?.token_type || 'Bearer',
-        chat_room: res.data?.chat_room || null,
-        user: res.data?.user || null,
-        user_id: res.data?.user?.id || null,
+        email:  loginDataParsed?.email ?? loginDataParsed?.user?.email ?? null,
+        token:  loginDataParsed?.token,
+        token_type: loginDataParsed?.token_type || 'Bearer',
+        chat_room: loginDataParsed?.chat_room || null,
+        user: loginDataParsed?.user || null,
+        user_id: computedUserId,
       };
       saveAuthFull(payload);
 
-      const docId = payload.user_id;
-      const doctorUrl = new URL(ROUTES.doctorDashboard);
-      if (docId) {
-        doctorUrl.searchParams.set('doctorId', docId);
+      const sessionSync = await syncSessionWithBackend(payload.user_id);
+      dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Vet Login + Session');
+
+      if (sessionSync.ok) {
+        console.log('[redirect] ->', POST_LOGIN_REDIRECT);
+        // Small delay helps ensure cookie is set before nav
+        setTimeout(()=> window.location.replace(POST_LOGIN_REDIRECT), 150);
       }
-      window.location.href = doctorUrl.toString();
     }catch(err){
-      console.error('Vet login failed:', err?.response?.data || err);
+      const data = err?.response?.data || { error:String(err) };
+      console.error('Vet login failed:', data);
+      dump({ error:'Vet login failed', detail:data }, 'Vet Login Error');
     }finally{
       els.loginBtn.disabled = false; els.loginBtn.textContent = 'Login';
     }
   });
 
-  // ---------------- Pet Google login ----------------
+  // ---------- (Optional) Pet Google: keep no-redirect while testing ----------
   window.onGoogleCredential = async (response)=>{
     try{
       const base64Url = response.credential.split(".")[1];
       const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(atob(base64).split("").map(c=>"%"+("00"+c.charCodeAt(0).toString(16)).slice(-2)).join(""));
+      const jsonPayload = decodeURIComponent(atob(base64).split("").map(
+        c=>"%"+("00"+c.charCodeAt(0).toString(16)).slice(-2)
+      ).join(""));
       const googleData = JSON.parse(jsonPayload);
       const email = googleData.email || '';
       const uniqueUserId = googleData.sub;
@@ -193,34 +281,50 @@
         role: 'pet'
       }, { withCredentials: true });
 
+      const loginDataRaw    = res?.data;
+      const loginDataParsed = parseDeepJSON(loginDataRaw);
+      const computedUserId  = extractUserId(loginDataParsed, false);
+
       const payload = {
         success: true,
-        message: res.data?.message || 'Login success',
+        message: loginDataParsed?.message || 'Login success',
         role: 'pet',
-        email: res.data?.user?.email,
-        token: res.data?.token,
-        token_type: res.data?.token_type || 'Bearer',
-        chat_room: res.data?.chat_room || null,
-        user: res.data?.user || null,
-        user_id: res.data?.user?.id || null,
+        email: loginDataParsed?.user?.email ?? email ?? null,
+        token: loginDataParsed?.token,
+        token_type: loginDataParsed?.token_type || 'Bearer',
+        chat_room: loginDataParsed?.chat_room || null,
+        user: loginDataParsed?.user || null,
+        user_id: computedUserId,
       };
       saveAuthFull(payload);
-      window.location.href = ROUTES.petDashboard;
+
+      const sessionSync = await syncSessionWithBackend(payload.user_id);
+      dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Pet Login + Session');
+
+      // If you want pet to redirect too, uncomment:
+      // if (sessionSync.ok) setTimeout(()=> window.location.replace(POST_LOGIN_REDIRECT), 150);
     }catch(err){
-      console.error('Google login failed:', err?.response?.data || err);
+      const data = err?.response?.data || { error:String(err) };
+      console.error('Google login failed:', data);
+      dump({ error:'Google login failed', detail:data }, 'Pet Login Error');
     }
   };
 
+  // Google button render
   window.onload=()=>{
     if(window.google && window.google.accounts){
       window.google.accounts.id.initialize({
         client_id:"325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com",
         callback:onGoogleCredential
       });
-      window.google.accounts.id.renderButton(els.googleBtn,{ theme:"filled_blue", size:"large", text:"continue_with", shape:"rectangular" });
+      window.google.accounts.id.renderButton(
+        document.getElementById('googleBtn'),
+        { theme:"filled_blue", size:"large", text:"continue_with", shape:"rectangular" }
+      );
       try{ window.google.accounts.id.prompt(); }catch(_){}
     }
   };
 </script>
+
 </body>
 </html>

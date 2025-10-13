@@ -208,8 +208,8 @@
           ${prefer? '<span class="text-xs text-indigo-600 font-medium">Preferred</span>' : ''}
         </div>
         <label class="block text-sm text-gray-600 mb-1">Time Slot</label>
-        <div class="text-[11px] text-gray-400 mb-2 block group-hover:hidden">Hover to view today's available times</div>
-        <div class="slot-grid hidden group-hover:grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+        <div class="text-[11px] text-gray-400 mb-2 hidden group-hover:hidden hover-hint">Hover to view today's available times</div>
+        <div class="slot-grid grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
         <select class="slot-select hidden" data-doctor-id="${doc.id}">
           <option value=""></option>
         </select>
@@ -225,9 +225,11 @@
           const slots = r.json.free_slots || [];
           sel.innerHTML = '<option value=""></option>' + slots.map(s=>`<option value="${s}">${s.slice(0,5)}</option>`).join('');
           if (gridEl){
-            gridEl.innerHTML = slots.map(s => `
-              <button type="button" class="slot-btn px-2 py-1.5 text-sm rounded border border-gray-300 hover:bg-indigo-50" data-time="${s}" data-doctor-id="${doc.id}">${s.slice(0,5)}</button>
-            `).join('');
+            gridEl.innerHTML = slots.length
+              ? slots.map(s => `
+                  <button type="button" class="slot-btn px-2 py-1.5 text-sm rounded border border-gray-300 hover:bg-indigo-50" data-time="${s}" data-doctor-id="${doc.id}">${s.slice(0,5)}</button>
+                `).join('')
+              : '<div class="text-xs text-gray-500">No slots</div>';
             // Preselect first for preferred doctor
             if (prefer && slots.length){
               sel.value = slots[0];
