@@ -37,6 +37,8 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         $doctorId  = auth()->id() ?? 301;
         return view('doctor-dashboard', compact('socketUrl','doctorId'));
     })->name('doctor.dashboard');
+    // Lightweight live console (single view) for receiving calls
+    Route::view('/doctor/live', 'doctor.live-console')->name('doctor.live');
     // Clinic dashboard shell (links to doctor console)
     Route::view('/clinic-dashboard', 'clinic-dashboard')->name('clinic.dashboard');
     Route::view('/dashboard/services', 'groomer.services.index')->name('groomer.services.index');
