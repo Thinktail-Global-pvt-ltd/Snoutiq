@@ -67,11 +67,53 @@ class BookingsController extends Controller
     // GET /api/bookings/details/{id}
     public function details(string $id)
     {
-        $booking = DB::table('bookings')->where('id', $id)->first();
+        $booking = DB::table('bookings as b')
+            ->leftJoin('doctors as d', 'b.assigned_doctor_id', '=', 'd.id')
+            ->select('b.*', DB::raw('COALESCE(d.doctor_name, "") as doctor_name'))
+            ->where('b.id', $id)
+            ->first();
         if (!$booking) {
             return response()->json(['error' => 'Not found', 'success' => false], 404);
         }
-        return response()->json(['booking' => $booking]);
+
+        // Fetch selected pet + all pets for the user (prefer `pets`, fallback to `user_pets`)
+        $pet = null; $pets = collect(); $user = null; $petParentName = null;
+        try {
+            // User (pet parent)
+            if (Schema::hasTable('users')) {
+                $user = DB::table('users')
+                    ->where('id', $booking->user_id)
+                    ->select('id','name','email')
+                    ->first();
+                if ($user) { $petParentName = $user->name ?? null; }
+            }
+
+            if (Schema::hasTable('pets')) {
+                if (!empty($booking->pet_id)) {
+                    $pet = DB::table('pets')->where('id', $booking->pet_id)->first();
+                }
+                $petsQ = DB::table('pets');
+                if (Schema::hasColumn('pets', 'user_id')) {
+                    $petsQ->where('user_id', $booking->user_id);
+                } elseif (Schema::hasColumn('pets', 'owner_id')) {
+                    $petsQ->where('owner_id', $booking->user_id);
+                }
+                $pets = $petsQ->orderByDesc('id')->get();
+            } elseif (Schema::hasTable('user_pets')) {
+                if (!empty($booking->pet_id)) {
+                    $pet = DB::table('user_pets')->where('id', $booking->pet_id)->first();
+                }
+                $pets = DB::table('user_pets')->where('user_id', $booking->user_id)->orderByDesc('id')->get();
+            }
+        } catch (\Throwable $e) { /* ignore */ }
+
+        return response()->json([
+            'booking' => $booking,
+            'user'    => $user,
+            'pet_parent_name' => $petParentName,
+            'pet'     => $pet,
+            'pets'    => $pets,
+        ]);
     }
 
     // GET /api/doctors/{id}/bookings?since=YYYY-MM-DD
