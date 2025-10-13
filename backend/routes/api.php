@@ -469,14 +469,20 @@ Route::get('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorSchedu
 // Pets
 Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class, 'byUser']);
 
-// AI Summary from chats
-Route::get('/ai/summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'summary']);
-Route::post('/ai/send-summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'sendToDoctor']);
+  // AI Summary from chats
+  // Apply 'web' middleware to enable session access from browser-based calls
+  Route::middleware('web')->get('/ai/summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'summary']);
+  // POST keeps session (web) but skips CSRF so it can be called via fetch()
+  Route::middleware('web')
+      ->post('/ai/send-summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'sendToDoctor'])
+      ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
 // Frontend session helpers (attach web middleware to enable session store)
 Route::middleware('web')->group(function () {
     Route::get('/session/get', [\App\Http\Controllers\Api\SessionController::class, 'get']);
     Route::get('/session/login', [\App\Http\Controllers\Api\SessionController::class, 'loginWithUserIdGet']);
+
+    
     // Allow POST without CSRF for programmatic use
     Route::post('/session/login', [\App\Http\Controllers\Api\SessionController::class, 'loginWithUserId'])
         ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
