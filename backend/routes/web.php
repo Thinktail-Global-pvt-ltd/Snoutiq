@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VetLandingController;
 use App\Models\Doctor;
 use App\Http\Middleware\EnsureSessionUser;
+use App\Http\Controllers\VideoSchedulePageController;
 
 // Public routes
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');
@@ -64,7 +65,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         return view('doctor.booking-detail', ['bookingId' => $id]);
     })->name('doctor.booking.detail');
 
-    // Weekly schedule (secure)
+    // Weekly schedule (existing, secure)
     Route::get('/doctor/schedule', function () {
         $vetId = session('user_id') ?? data_get(session('user'), 'id');
         $doctors = collect();
@@ -75,4 +76,11 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         }
         return view('snoutiq.provider-schedule', compact('doctors', 'vetId'));
     })->name('doctor.schedule');
+
+    // New: Pet parent page using separate table & API (read-only)
+    Route::get('/pet/video-calling-schedule', [VideoSchedulePageController::class, 'petIndex'])
+        ->name('pet.video.schedule');
+    // Optional editor (write-enabled) using separate table; not linked in sidebar by default
+    Route::get('/doctor/video-calling-schedule/manage', [VideoSchedulePageController::class, 'editor'])
+        ->name('doctor.video.schedule.manage');
 });

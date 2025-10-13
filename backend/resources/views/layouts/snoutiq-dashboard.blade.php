@@ -30,6 +30,7 @@
           <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 19h14a2 2 0 002-2v-6H3v6a2 2 0 002 2z"/></svg>
           <span>Book Appointment</span>
         </a>
+    
       @else
         {{-- Vet/Doctor sidebar --}}
         <a href="{{ route('doctor.dashboard') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
@@ -48,9 +49,13 @@
           <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2z"/></svg>
           <span>My Bookings</span>
         </a>
+        <a href="{{ route('doctor.video.schedule.manage') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Video Calling Schedule</span>
+        </a>
         <a href="{{ route('doctor.schedule') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
           <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <span>Weekly Schedule</span>
+          <span>Clinic Schedule</span>
         </a>
       @endif
     </nav>

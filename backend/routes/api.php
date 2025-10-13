@@ -469,6 +469,10 @@ Route::get('/clinics', [\App\Http\Controllers\Api\ClinicsController::class, 'ind
 Route::get('/clinics/{id}/doctors', [\App\Http\Controllers\Api\ClinicsController::class, 'doctors']);
 Route::get('/clinics/{id}/availability', [\App\Http\Controllers\Api\ClinicsController::class, 'availability']);
 Route::get('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'getAvailability']);
+// --- Separate video-only scheduling API (new table) ---
+Route::put('/video-schedule/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorVideoScheduleController::class, 'updateAvailability']);
+Route::get('/video-schedule/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorVideoScheduleController::class, 'getAvailability']);
+Route::get('/video-schedule/doctors/{id}/free-slots', [\App\Http\Controllers\Api\DoctorVideoScheduleController::class, 'freeSlots']);
 // Pets
 Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class, 'byUser']);
 
@@ -501,5 +505,4 @@ Route::middleware('web')->group(function () {
 use App\Http\Controllers\Api\UserOrdersController;
 
 Route::get('/users/{id}/orders', [UserOrdersController::class, 'index']);
-
 
