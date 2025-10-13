@@ -30,6 +30,10 @@
 @section('scripts')
 <script>
   const BOOKING_ID = Number(@json($bookingId));
+  // Smart base detection for API (handles /backend prefix in production)
+  const ORIGIN          = window.location.origin;
+  const IS_LOCAL        = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
+  const apiBase         = IS_LOCAL ? `${ORIGIN}/api` : `${ORIGIN}/backend/api`;
   async function api(url){
     const res = await fetch(url, { headers: { 'Accept': 'application/json' }});
     const t = await res.text();
@@ -40,7 +44,7 @@
   function pretty(v){ if(v==null) return ''; if(typeof v==='string'){ try{ const j=JSON.parse(v); return JSON.stringify(j,null,2) }catch{} return v } return JSON.stringify(v,null,2); }
 
   async function load(){
-    const res = await api(`/api/bookings/details/${BOOKING_ID}`);
+    const res = await api(`${apiBase}/bookings/details/${BOOKING_ID}`);
     console.log('[booking-detail] GET /api/bookings/details/'+BOOKING_ID+' response:', res);
     if(!res.ok || !res.json?.booking){
       document.getElementById('subtitle').textContent = 'Failed to load booking';
