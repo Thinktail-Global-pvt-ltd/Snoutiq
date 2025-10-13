@@ -500,4 +500,5 @@ use App\Http\Controllers\Api\UserOrdersController;
 Route::get('/users/{id}/orders', [UserOrdersController::class, 'index']);
 
 
- 
+
+
