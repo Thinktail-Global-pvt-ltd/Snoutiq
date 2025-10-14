@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 export default function PrescriptionPage() {
     const [file, setFile] = useState(null);
@@ -28,34 +28,53 @@ export default function PrescriptionPage() {
         }
     };
 
-    const handleSubmit = async (paymentType) => {
-        setIsSending(true);
-        setPaymentMethod(paymentType);
+ const { doctorId, patientId} = useParams(); // get from route
+ console.log( doctorId, patientId );
+ 
 
-        // Simulate API call
-        try {
-            // In a real application, you would:
-            // 1. Process payment through a payment gateway (Stripe, Razorpay, etc.)
-            // 2. Save prescription to backend
-            // 3. Send notification to patient
+const handleSubmit = async (paymentType) => {
+    if (!text && !file) {
+        alert("Please add prescription details or upload an image");
+        return;
+    }
 
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
+    setIsSending(true);
+    setPaymentMethod(paymentType);
 
-            setSendSuccess(true);
-            navigate('/chat')
+    try {
+        const formData = new FormData();
+        formData.append("doctor_id", doctorId);
+        formData.append("user_id", patientId);
+        formData.append("content_html", text);
 
-            // Reset after success
-            setTimeout(() => {
-                setSendSuccess(false);
-                setText("");
-                setFile(null);
-                setIsSending(false);
-            }, 3000);
-        } catch (error) {
-            console.error("Error submitting prescription:", error);
-            setIsSending(false);
+        if (file) {
+            formData.append("image", file, file.name);
         }
-    };
+
+        const response = await fetch("https://snoutiq.com/backend/api/prescriptions", {
+            method: "POST",
+            body: formData,
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            setSendSuccess(true);
+            // Navigate 2 pages back in history
+            navigate(-2);
+        } else {
+            console.error("Error submitting prescription:", data);
+            alert(data.message || "Failed to submit prescription");
+        }
+    } catch (error) {
+        console.error("Error submitting prescription:", error);
+        alert("Something went wrong");
+    } finally {
+        setIsSending(false);
+        setText("");
+        setFile(null);
+    }
+};
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 py-8 px-4">

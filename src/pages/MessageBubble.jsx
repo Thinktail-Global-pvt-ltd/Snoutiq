@@ -7,6 +7,7 @@ const StartCallButton = ({ nearbyDoctors }) => {
   const [loading, setLoading] = useState(false);
   const [callStatus, setCallStatus] = useState(null);
   const [activeDoctors, setActiveDoctors] = useState([]);
+  
   // const [selectedDoctor, setSelectedDoctor] = useState(501);
   const [selectedDoctors, setSelectedDoctors] = useState(
     nearbyDoctors ? nearbyDoctors.map((doc) => doc.id) : []
@@ -14,9 +15,8 @@ const StartCallButton = ({ nearbyDoctors }) => {
   const [callDataMap, setCallDataMap] = useState({}); 
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
-  console.log(nearbyDoctors, "cdfgdfgs");
 
-  const patientId = 101;
+  const patientId = 146;
 
   useEffect(() => {
     // Get list of active doctors

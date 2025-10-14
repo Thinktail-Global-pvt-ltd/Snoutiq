@@ -442,6 +442,8 @@ import NotificationSocket from "./components/NotificationSocket";
 import SuperAdminLogin from "./admin/SuperAdminLogin";
 import AuthenticatedUserRedirect from "./auth/AuthenticatedUserRedirect";
 import DoctorWaitingRoom from "./VetDashboard/DoctorWaitingRoom";
+import PrescriptionPage from "./VetDashboard/PrescriptionPage";
+
 
 
 function App() {
@@ -774,6 +776,23 @@ function App() {
             />
 
             <Route path="/call" element={<CallPage />} />
+
+               <Route
+              path="/prescription/:doctorId/:patientId"
+              element={
+                <ProtectedRoute>
+                  <PrescriptionPage />
+                </ProtectedRoute>
+              }
+            />
+              <Route
+              path="/ratings/:doctorId/:patientId"
+              element={
+                <ProtectedRoute>
+                  <Ratings />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </Suspense>
       </div>

@@ -353,11 +353,12 @@ const httpServer = createServer();
 
 const io = new Server(httpServer, {
   cors: {
-    origin: [
-      "http://localhost:3000",
-      "http://127.0.0.1:3000", 
-      "https://snoutiq.com"
-    ],
+    // origin: [
+    //   "http://localhost:3000",
+    //   "http://127.0.0.1:3000", 
+    //   "https://snoutiq.com"
+    // ],
+     origin: "*", 
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -407,6 +408,7 @@ io.on("connection", (socket) => {
     if (!activeDoctors.has(doctorId)) {
       socket.emit("call-failed", {
         error: "Doctor not available",
+        
         doctorId,
         patientId,
       });
@@ -746,11 +748,17 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // -------------------- SERVER START --------------------
+// const PORT = process.env.PORT || 4000;
+// httpServer.listen(PORT, () => {
+//   console.log(`🚀 Socket.IO server running on port ${PORT}`);
+//   console.log(`📊 Features: Doctor rooms, Call sessions, Payment flow, Video call integration`);
+// });
+
 const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Socket.IO server running on port ${PORT}`);
-  console.log(`📊 Features: Doctor rooms, Call sessions, Payment flow, Video call integration`);
 });
+
 
 // Log server stats periodically
 setInterval(() => {
