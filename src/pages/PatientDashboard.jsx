@@ -169,7 +169,7 @@ export default function PatientDashboard() {
   const navigate = useNavigate();
 
   // Patient ID - in real app, this would come from auth
-  const patientId = 101;
+  const patientId = 146;
 
   useEffect(() => {
     // Get list of active doctors

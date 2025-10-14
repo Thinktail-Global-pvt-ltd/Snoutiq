@@ -911,10 +911,12 @@
 //     </div>
 //   );
 // }
+
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate,useLocation } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
 import { socket } from "./socket";
+import logo from '../assets/images/logo.webp';
 
 const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
 
@@ -922,6 +924,20 @@ export default function CallPage() {
   const { channelName } = useParams();
   const [qs] = useSearchParams();
   const navigate = useNavigate();
+    const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // From navigation state
+  const { doctorId: stateDoctorId, patientId: statePatientId, channel, callId } = location.state || {};
+
+  // From query params (fallback)
+  const doctorId = stateDoctorId || searchParams.get("doctorId");
+  const patientId = statePatientId || searchParams.get("patientId");
+
+  console.log("Doctor ID:", doctorId);
+  console.log("Patient ID:", patientId);
+  console.log("Channel:", channel);
+  console.log("Call ID:", callId);
 
   const safeChannel = useMemo(() => {
     return (channelName || "default_channel")
@@ -1089,11 +1105,28 @@ setCallStatus("connected"); // Ensure status connected even if video fails
     }
   };
 
+  // const handleEndCall = async () => {
+  //   await cleanup();
+  //   socket.emit("call-ended", { channel: safeChannel });
+  //   navigate(isHost ? "/prescriptionPage" : "/ratings");
+  // };
   const handleEndCall = async () => {
-    await cleanup();
-    socket.emit("call-ended", { channel: safeChannel });
-    navigate(isHost ? "/doctor-dashboard" : "/patient-dashboard");
-  };
+  await cleanup();
+
+  // Emit call-ended with doctorId and patientId
+  socket.emit("call-ended", { 
+    channel: safeChannel,
+    doctorId: doctorId,     // make sure these variables are defined in your component
+    patientId: patientId
+  });
+
+  // Navigate
+  navigate(isHost 
+    ? `/prescription/${doctorId}/${patientId}`  // pass params in route
+    : `/ratings/${doctorId}/${patientId}`
+  );
+};
+
 
   const getStatusColor = () => {
     switch (callStatus) {
@@ -1104,61 +1137,240 @@ setCallStatus("connected"); // Ensure status connected even if video fails
     }
   };
 
+  // return (
+  //   <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
+  //     <div style={{ marginBottom: 20 }}>
+  //       <h2>Video Call</h2>
+  //       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+  //         <span>UID: <strong>{uid}</strong></span>
+  //         <span>Channel: <strong>{safeChannel}</strong></span>
+  //         <span>Role: <strong>{role}</strong></span>
+  //         <span style={{
+  //           padding: "4px 8px",
+  //           borderRadius: 12,
+  //           fontSize: 12,
+  //           fontWeight: "bold",
+  //           background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
+  //           color: getStatusColor()
+  //         }}>
+  //           {callStatus.toUpperCase()}
+  //         </span>
+  //       </div>
+  //     </div>
+
+  //     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+  //       <div style={{ position: "relative" }}>
+  //         <div ref={localVideoRef} style={{ width: "100%", height: 300, background: "#000", borderRadius: 12, overflow: "hidden" }} />
+  //         <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
+  //           You ({isHost ? "Doctor" : "Patient"})
+  //         </div>
+  //         {isCameraOff && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", fontSize: 18 }}>📷 Camera Off</div>}
+  //       </div>
+
+  //       <div style={{ position: "relative" }}>
+  //         <div ref={remoteVideoRef} style={{ width: "100%", height: 300, background: "#000", borderRadius: 12, overflow: "hidden" }} />
+  //         <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
+  //           {remoteUsers.length > 0 ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})` : "Waiting for other participant..."}
+  //         </div>
+  //         {remoteUsers.length === 0 && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", textAlign: "center" }}>
+  //           <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
+  //           <div>Waiting for {isHost ? "patient" : "doctor"}...</div>
+  //         </div>}
+  //       </div>
+  //     </div>
+
+  //     {joined && (
+  //       <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: 16, background: "#f9fafb", borderRadius: 12 }}>
+  //         <button onClick={toggleMute} style={{ padding: "12px 16px", borderRadius: 8, background: isMuted ? "#dc2626" : "#6b7280", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
+  //           {isMuted ? "🔇 Unmute" : "🎤 Mute"}
+  //         </button>
+  //         <button onClick={toggleCamera} style={{ padding: "12px 16px", borderRadius: 8, background: isCameraOff ? "#dc2626" : "#6b7280", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
+  //           {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
+  //         </button>
+  //         <button onClick={handleEndCall} style={{ padding: "12px 16px", borderRadius: 8, background: "#dc2626", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
+  //           📞 End Call
+  //         </button>
+  //       </div>
+  //     )}
+  //   </div>
+  // );
+
   return (
-    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2>Video Call</h2>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span>UID: <strong>{uid}</strong></span>
-          <span>Channel: <strong>{safeChannel}</strong></span>
-          <span>Role: <strong>{role}</strong></span>
-          <span style={{
-            padding: "4px 8px",
-            borderRadius: 12,
-            fontSize: 12,
-            fontWeight: "bold",
-            background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
-            color: getStatusColor()
-          }}>
-            {callStatus.toUpperCase()}
-          </span>
-        </div>
+  <div style={{
+    position: "relative",
+    width: "100vw",
+    height: "100vh",
+    backgroundColor: "#0b0f19",
+    overflow: "hidden",
+    color: "white",
+    fontFamily: "Inter, sans-serif"
+  }}>
+    
+    {/* --- Snoutiq Logo --- */}
+    <div style={{
+      position: "absolute",
+      top: 16,
+      left: 20,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      zIndex: 10
+    }}>
+      <img
+        src={logo}
+        alt="Snoutiq"
+      />
+    </div>
+
+    {/* --- Remote (Patient) Video --- */}
+    <div ref={remoteVideoRef} style={{
+      position: "absolute",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      background: "#000",
+      borderRadius: 0,
+      objectFit: "cover",
+      overflow: "hidden"
+    }} />
+
+    {/* Waiting state */}
+    {remoteUsers.length === 0 && (
+      <div style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        textAlign: "center",
+        color: "white",
+        opacity: 0.8
+      }}>
+        <div style={{ fontSize: 56, marginBottom: 8 }}>⏳</div>
+        <div style={{ fontSize: 18 }}>Waiting for {isHost ? "Patient" : "Doctor"} to join...</div>
       </div>
+    )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-        <div style={{ position: "relative" }}>
-          <div ref={localVideoRef} style={{ width: "100%", height: 300, background: "#000", borderRadius: 12, overflow: "hidden" }} />
-          <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
-            You ({isHost ? "Doctor" : "Patient"})
-          </div>
-          {isCameraOff && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", fontSize: 18 }}>📷 Camera Off</div>}
-        </div>
-
-        <div style={{ position: "relative" }}>
-          <div ref={remoteVideoRef} style={{ width: "100%", height: 300, background: "#000", borderRadius: 12, overflow: "hidden" }} />
-          <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
-            {remoteUsers.length > 0 ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})` : "Waiting for other participant..."}
-          </div>
-          {remoteUsers.length === 0 && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", textAlign: "center" }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
-            <div>Waiting for {isHost ? "patient" : "doctor"}...</div>
-          </div>}
-        </div>
-      </div>
-
-      {joined && (
-        <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: 16, background: "#f9fafb", borderRadius: 12 }}>
-          <button onClick={toggleMute} style={{ padding: "12px 16px", borderRadius: 8, background: isMuted ? "#dc2626" : "#6b7280", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
-            {isMuted ? "🔇 Unmute" : "🎤 Mute"}
-          </button>
-          <button onClick={toggleCamera} style={{ padding: "12px 16px", borderRadius: 8, background: isCameraOff ? "#dc2626" : "#6b7280", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
-            {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
-          </button>
-          <button onClick={handleEndCall} style={{ padding: "12px 16px", borderRadius: 8, background: "#dc2626", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
-            📞 End Call
-          </button>
+    {/* --- Local (Doctor) Preview --- */}
+    <div style={{
+      position: "absolute",
+      bottom: 100,
+      right: 30,
+      width: 220,
+      height: 150,
+      borderRadius: 12,
+      overflow: "hidden",
+      border: "2px solid rgba(255,255,255,0.3)",
+      boxShadow: "0 0 20px rgba(0,0,0,0.4)",
+      background: "#000",
+      zIndex: 5
+    }}>
+      <div ref={localVideoRef} style={{ width: "100%", height: "100%" }} />
+      {isCameraOff && (
+        <div style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          color: "white"
+        }}>
+          📷 Camera Off
         </div>
       )}
+      <div style={{
+        position: "absolute",
+        bottom: 4,
+        left: 4,
+        background: "rgba(0,0,0,0.6)",
+        padding: "2px 8px",
+        borderRadius: 6,
+        fontSize: 12
+      }}>
+        You ({isHost ? "Doctor" : "Patient"})
+      </div>
     </div>
-  );
+
+    {/* --- Top Status Bar --- */}
+    <div style={{
+      position: "absolute",
+      top: 16,
+      right: 20,
+      background: "rgba(255,255,255,0.1)",
+      padding: "8px 16px",
+      borderRadius: 12,
+      fontSize: 13,
+      fontWeight: 500,
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }}>
+      <span>Channel: {safeChannel}</span>
+      <span style={{
+        width: 10,
+        height: 10,
+        borderRadius: "50%",
+        background: getStatusColor()
+      }}></span>
+      <span>{callStatus}</span>
+    </div>
+
+    {/* --- Controls --- */}
+    {joined && (
+      <div style={{
+        position: "absolute",
+        bottom: 20,
+        left: "50%",
+        transform: "translateX(-50%)",
+        display: "flex",
+        gap: 20,
+        justifyContent: "center",
+        background: "rgba(0,0,0,0.5)",
+        padding: "12px 24px",
+        borderRadius: 50,
+        backdropFilter: "blur(6px)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.3)"
+      }}>
+        <button onClick={toggleMute} style={{
+          width: 60,
+          height: 60,
+          borderRadius: "50%",
+          border: "none",
+          background: isMuted ? "#dc2626" : "#4b5563",
+          color: "white",
+          fontSize: 20,
+          cursor: "pointer"
+        }}>
+          {isMuted ? "🔇" : "🎤"}
+        </button>
+
+        <button onClick={toggleCamera} style={{
+          width: 60,
+          height: 60,
+          borderRadius: "50%",
+          border: "none",
+          background: isCameraOff ? "#dc2626" : "#4b5563",
+          color: "white",
+          fontSize: 20,
+          cursor: "pointer"
+        }}>
+          {isCameraOff ? "📷" : "📹"}
+        </button>
+
+        <button onClick={handleEndCall} style={{
+          width: 60,
+          height: 60,
+          borderRadius: "50%",
+          border: "none",
+          background: "#dc2626",
+          color: "white",
+          fontSize: 22,
+          cursor: "pointer"
+        }}>
+          📞
+        </button>
+      </div>
+    )}
+  </div>
+);
+
 }

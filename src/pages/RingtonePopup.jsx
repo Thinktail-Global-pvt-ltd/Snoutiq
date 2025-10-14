@@ -400,7 +400,6 @@
 //   );
 // }
 
-
 // import React, { useEffect, useRef } from "react";
 // import { socket } from "./socket";
 // import { useNavigate } from "react-router-dom";
@@ -437,16 +436,16 @@
 //     }
 
 //     // Send call accepted with payment required flag
-//     socket.emit("call-accepted", { 
-//       callId: call.id, 
-//       doctorId, 
-//       patientId: call.patientId, 
+//     socket.emit("call-accepted", {
+//       callId: call.id,
+//       doctorId,
+//       patientId: call.patientId,
 //       channel: call.channel,
 //       requiresPayment: true // New flag
 //     });
 
 //     onClose();
-    
+
 //     // Doctor goes to a waiting room instead of direct video call
 //     navigate(`/doctor-waiting/${call.channel}?callId=${call.id}&patientId=${call.patientId}`);
 //   };
@@ -456,10 +455,10 @@
 //       audioRef.current.pause();
 //       audioRef.current.currentTime = 0;
 //     }
-//     socket.emit("call-rejected", { 
-//       callId: call.id, 
-//       doctorId, 
-//       patientId: call.patientId 
+//     socket.emit("call-rejected", {
+//       callId: call.id,
+//       doctorId,
+//       patientId: call.patientId
 //     });
 //     onClose();
 //   };
@@ -483,33 +482,33 @@
 //       <p style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
 //         Patient will be redirected to payment before video call starts
 //       </p>
-      
+
 //       <audio ref={audioRef} src="/ringtone.mp3" loop preload="auto" />
-      
+
 //       <div style={{ marginTop: 12 }}>
-//         <button 
-//           onClick={handleAccept} 
-//           style={{ 
-//             padding: "8px 16px", 
-//             marginRight: 8, 
-//             borderRadius: 6, 
-//             background: "green", 
-//             color: "white", 
-//             border: "none", 
-//             fontWeight: "bold" 
+//         <button
+//           onClick={handleAccept}
+//           style={{
+//             padding: "8px 16px",
+//             marginRight: 8,
+//             borderRadius: 6,
+//             background: "green",
+//             color: "white",
+//             border: "none",
+//             fontWeight: "bold"
 //           }}
 //         >
 //           ✅ Accept & Request Payment
 //         </button>
-//         <button 
-//           onClick={handleReject} 
-//           style={{ 
-//             padding: "8px 16px", 
-//             borderRadius: 6, 
-//             background: "red", 
-//             color: "white", 
-//             border: "none", 
-//             fontWeight: "bold" 
+//         <button
+//           onClick={handleReject}
+//           style={{
+//             padding: "8px 16px",
+//             borderRadius: 6,
+//             background: "red",
+//             color: "white",
+//             border: "none",
+//             fontWeight: "bold"
 //           }}
 //         >
 //           ❌ Reject
@@ -620,7 +619,6 @@
 //   );
 // }
 
-
 // import React, { useEffect, useRef, useState } from "react";
 
 // export default function RingtonePopup({ call, doctorId, onClose }) {
@@ -691,7 +689,7 @@
 
 //   const handleAccept = () => {
 //     setIsProcessing(true);
-    
+
 //     if (audioRef.current) {
 //       audioRef.current.pause();
 //     }
@@ -709,13 +707,13 @@
 //     // Navigate to doctor waiting room
 //     navigate(`/doctor-waiting-room/${call.channel}?callId=${call.id}&patientId=${call.patientId}`);
 //       //  navigate(`/call-page/${call.channel}?uid=${doctorId}&role=host`);
-    
+
 //     onClose?.();
 //   };
 
 //   const handleReject = (reason = "rejected") => {
 //     setIsProcessing(true);
-    
+
 //     if (audioRef.current) {
 //       audioRef.current.pause();
 //     }
@@ -726,8 +724,8 @@
 //       doctorId: doctorId,
 //       patientId: call.patientId,
 //       reason: reason,
-//       message: reason === "timeout" 
-//         ? "Doctor did not respond within 30 seconds" 
+//       message: reason === "timeout"
+//         ? "Doctor did not respond within 30 seconds"
 //         : "Doctor is currently unavailable"
 //     });
 
@@ -756,7 +754,7 @@
 //         <h2 className="text-2xl font-bold text-gray-800 mb-2">Incoming Video Call</h2>
 //         <p className="text-gray-600 mb-2">Patient ID: {call.patientId}</p>
 //         <p className="text-sm text-gray-500 mb-4">Call ID: {call.id}</p>
-        
+
 //         {/* Call Duration */}
 //         <div className="bg-gray-100 rounded-lg p-2 mb-6">
 //           <p className="text-sm text-gray-600">Ringing: {formatTime(callDuration)}</p>
@@ -793,7 +791,7 @@
 //               </>
 //             )}
 //           </button>
-          
+
 //           <button
 //             onClick={() => handleReject("rejected")}
 //             disabled={isProcessing}
@@ -830,9 +828,9 @@
 //         </div>
 
 //         {/* Hidden ringtone element */}
-//         <audio 
-//           ref={audioRef} 
-//           loop 
+//         <audio
+//           ref={audioRef}
+//           loop
 //           preload="auto"
 //         >
 //           <source src="/ringtone.mp3" type="audio/mpeg" />
@@ -857,15 +855,44 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { socket } from './socket'; // Import real socket
+import { socket } from "./socket";
+import axios from "axios";
 
-export default function RingtonePopup({ call, doctorId, onClose }) {
+export default function RingtonePopup({
+  call,
+  doctorId,
+  onClose,
+  patientId,
+}) {
   const audioRef = useRef(null);
   const [requiresInteraction, setRequiresInteraction] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [waitingStatus, setWaitingStatus] = useState("");
   const navigate = useNavigate();
+  const [summary, setSummary] = useState(null);
+  console.log(patientId, "paads");
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        const response = await axios.post(
+          "https://snoutiq.com/backend/api/summary",
+          {
+            user_id: patientId,
+          }
+        );
+        console.log(response, "ankit");
+
+        setSummary(response.data);
+      } catch (error) {
+        console.error("Error fetching summary:", error);
+      }
+    };
+
+    fetchSummary();
+  }, [patientId]);
+  console.log(summary, "ankit2");
 
   useEffect(() => {
     const playRingtone = async () => {
@@ -884,7 +911,7 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
 
     // Start call duration timer
     const timer = setInterval(() => {
-      setCallDuration(prev => prev + 1);
+      setCallDuration((prev) => prev + 1);
     }, 1000);
 
     // Auto-reject after 30 seconds (only if not processing)
@@ -907,9 +934,9 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
   // Cleanup socket listeners on unmount
   useEffect(() => {
     return () => {
-      socket.off('patient-paid');
-      socket.off('payment-cancelled');
-      socket.off('payment-verified');
+      socket.off("patient-paid");
+      socket.off("payment-cancelled");
+      socket.off("payment-verified");
     };
   }, []);
 
@@ -927,7 +954,7 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
   const handleAccept = () => {
     setIsProcessing(true);
     setWaitingStatus("Accepting call...");
-    
+
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -941,7 +968,7 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
       patientId: call.patientId,
       channel: call.channel,
       requiresPayment: true,
-      message: "Doctor accepted your call. Please complete payment to proceed."
+      message: "Doctor accepted your call. Please complete payment to proceed.",
     });
 
     setWaitingStatus("Waiting for patient payment...");
@@ -951,44 +978,66 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
       if (data.callId === call.id) {
         console.log("Patient payment confirmed, navigating to video call");
         setWaitingStatus("Payment confirmed! Joining video call...");
-        
+
         // Small delay to show confirmation message
+        // setTimeout(() => {
+        //   navigate(
+        //     `/call-page/${data.channel}?uid=${doctorId}&role=host&callId=${data.callId}`
+        //   );
         setTimeout(() => {
-          navigate(`/call-page/${data.channel}?uid=${doctorId}&role=host&callId=${data.callId}`);
-          socket.off('patient-paid', handlePatientPaid);
-          socket.off('payment-cancelled', handlePaymentCancelled);
-          onClose?.();
-        }, 1500);
+  navigate(
+    `/call-page/${data.channel}?uid=${doctorId}&role=host&callId=${data.callId}&doctorId=${doctorId}&patientId=${data.patientId}`,
+    {
+      state: {
+        doctorId,
+        patientId: data.patientId,
+        channel: data.channel,
+        callId: data.callId
+      }
+    }
+  );
+
+  // Cleanup listeners
+  socket.off("patient-paid", handlePatientPaid);
+  socket.off("payment-cancelled", handlePaymentCancelled);
+  onClose?.();
+}, 1500);
+
+        //   socket.off("patient-paid", handlePatientPaid);
+        //   socket.off("payment-cancelled", handlePaymentCancelled);
+        //   onClose?.();
+        // }, 1500);
       }
     };
 
     const handlePaymentCancelled = (data) => {
       if (data.callId === call.id) {
         console.log("Patient cancelled payment:", data.reason);
-        
-        const message = data.reason === 'timeout' 
-          ? 'Payment timed out. Call ended.' 
-          : 'Patient cancelled payment. Call ended.';
-          
+
+        const message =
+          data.reason === "timeout"
+            ? "Payment timed out. Call ended."
+            : "Patient cancelled payment. Call ended.";
+
         setWaitingStatus(message);
-        
+
         // Close after showing message
         setTimeout(() => {
-          socket.off('payment-cancelled', handlePaymentCancelled);
-          socket.off('patient-paid', handlePatientPaid);
+          socket.off("payment-cancelled", handlePaymentCancelled);
+          socket.off("patient-paid", handlePatientPaid);
           onClose?.();
         }, 3000);
       }
     };
 
     // Set up listeners for payment events
-    socket.on('patient-paid', handlePatientPaid);
-    socket.on('payment-cancelled', handlePaymentCancelled);
+    socket.on("patient-paid", handlePatientPaid);
+    socket.on("payment-cancelled", handlePaymentCancelled);
   };
 
   const handleReject = (reason = "rejected") => {
     setIsProcessing(true);
-    
+
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -1001,9 +1050,10 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
       doctorId: doctorId,
       patientId: call.patientId,
       reason: reason,
-      message: reason === "timeout" 
-        ? "Doctor did not respond within 30 seconds" 
-        : "Doctor is currently unavailable"
+      message:
+        reason === "timeout"
+          ? "Doctor did not respond within 30 seconds"
+          : "Doctor is currently unavailable",
     });
 
     // Close popup immediately
@@ -1011,7 +1061,9 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
   };
 
   const formatTime = (seconds) => {
-    return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
+    return `${Math.floor(seconds / 60)}:${(seconds % 60)
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   if (!call) return null;
@@ -1021,9 +1073,21 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-96 text-center transform animate-pulse-ring">
         {/* Call Animation */}
         <div className="relative mb-6">
-          <div className={`w-24 h-24 bg-gradient-to-r ${isProcessing ? 'from-blue-500 to-green-500' : 'from-blue-500 to-purple-500'} rounded-full flex items-center justify-center mx-auto mb-4 ${isProcessing ? 'animate-pulse' : 'animate-bounce'}`}>
-            <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+          <div
+            className={`w-24 h-24 bg-gradient-to-r ${
+              isProcessing
+                ? "from-blue-500 to-green-500"
+                : "from-blue-500 to-purple-500"
+            } rounded-full flex items-center justify-center mx-auto mb-4 ${
+              isProcessing ? "animate-pulse" : "animate-bounce"
+            }`}
+          >
+            <svg
+              className="w-12 h-12 text-white"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
             </svg>
           </div>
           <div className="absolute -inset-4 rounded-full border-4 border-blue-200 animate-ping opacity-30"></div>
@@ -1034,23 +1098,30 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
         </h2>
         <p className="text-gray-600 mb-2">Patient ID: {call.patientId}</p>
         <p className="text-sm text-gray-500 mb-4">Call ID: {call.id}</p>
-        
+
         {/* Call Duration or Status */}
         <div className="bg-gray-100 rounded-lg p-2 mb-6">
           {isProcessing ? (
             <p className="text-sm text-blue-600 font-medium">{waitingStatus}</p>
           ) : (
-            <p className="text-sm text-gray-600">Ringing: {formatTime(callDuration)}</p>
+            <p className="text-sm text-gray-600">
+              Ringing: {formatTime(callDuration)}
+            </p>
           )}
         </div>
 
         {/* Patient Info Card */}
         <div className="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200">
-          <h3 className="font-semibold text-blue-800 mb-2">Consultation Request</h3>
+          <h3 className="font-semibold text-blue-800 mb-2">
+            Consultation Request
+          </h3>
           <div className="text-sm text-blue-700 space-y-1">
-            <p>• 30-minute video consultation</p>
+            {/* <p>• 30-minute video consultation</p>
             <p>• Payment: ₹499 (after acceptance)</p>
-            <p>• Emergency veterinary care</p>
+            <p>• Emergency veterinary care</p> */}
+            <p className="text-sm text-blue-700 whitespace-pre-line">
+              {/* {summary ? summary.summary : "Loading summary..."} */}
+            </p>
           </div>
         </div>
 
@@ -1060,18 +1131,21 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
             <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-4">
               <div className="flex items-center justify-center mb-3">
                 <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mr-3"></div>
-                <h3 className="text-lg font-semibold text-green-800">Processing...</h3>
+                <h3 className="text-lg font-semibold text-green-800">
+                  Processing...
+                </h3>
               </div>
               <p className="text-green-700 text-center text-sm">
                 {waitingStatus}
               </p>
               {waitingStatus.includes("Waiting for payment") && (
                 <div className="mt-3 text-xs text-green-600 text-center">
-                  You will be automatically redirected to the video call once payment is confirmed.
+                  You will be automatically redirected to the video call once
+                  payment is confirmed.
                 </div>
               )}
             </div>
-            
+
             {waitingStatus.includes("Waiting for payment") && (
               <button
                 onClick={() => handleReject("doctor-cancelled")}
@@ -1087,18 +1161,34 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
               onClick={handleAccept}
               className="flex items-center px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all duration-200 shadow-lg hover:shadow-xl"
             >
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
               </svg>
               Accept Call
             </button>
-            
+
             <button
               onClick={() => handleReject("rejected")}
               className="flex items-center px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 shadow-lg hover:shadow-xl"
             >
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
               </svg>
               Decline
             </button>
@@ -1112,8 +1202,16 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
               onClick={enableAudio}
               className="flex items-center justify-center w-full px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
             >
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.785L4.382 14H2a1 1 0 01-1-1V7a1 1 0 011-1h2.382l4.001-2.785zm5.834 1.92a1 1 0 011.414 0 11.952 11.952 0 010 16.908 1 1 0 01-1.414-1.414A9.952 9.952 0 0019.07 12a9.952 9.952 0 00-2.853-7.072 1 1 0 010-1.414zm-2.1 2.828a1 1 0 011.414 0 7.956 7.956 0 010 11.314 1 1 0 01-1.414-1.414 5.956 5.956 0 000-8.486 1 1 0 010-1.414z" clipRule="evenodd"/>
+              <svg
+                className="w-4 h-4 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.785L4.382 14H2a1 1 0 01-1-1V7a1 1 0 011-1h2.382l4.001-2.785zm5.834 1.92a1 1 0 011.414 0 11.952 11.952 0 010 16.908 1 1 0 01-1.414-1.414A9.952 9.952 0 0019.07 12a9.952 9.952 0 00-2.853-7.072 1 1 0 010-1.414zm-2.1 2.828a1 1 0 011.414 0 7.956 7.956 0 010 11.314 1 1 0 01-1.414-1.414 5.956 5.956 0 000-8.486 1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
               </svg>
               Enable Ringtone
             </button>
@@ -1131,11 +1229,7 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
         )}
 
         {/* Hidden ringtone element */}
-        <audio 
-          ref={audioRef} 
-          loop 
-          preload="auto"
-        >
+        <audio ref={audioRef} loop preload="auto">
           <source src="/ringtone.mp3" type="audio/mpeg" />
           <source src="/ringtone.ogg" type="audio/ogg" />
           <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DwwG4gBTV2y/LQeisFJHfH8N2QQAoUXrTp66hVFAo=" />
@@ -1143,9 +1237,15 @@ export default function RingtonePopup({ call, doctorId, onClose }) {
 
         <style jsx>{`
           @keyframes pulse-ring {
-            0% { transform: scale(0.9) }
-            50% { transform: scale(1.05) }
-            100% { transform: scale(0.9) }
+            0% {
+              transform: scale(0.9);
+            }
+            50% {
+              transform: scale(1.05);
+            }
+            100% {
+              transform: scale(0.9);
+            }
           }
           .animate-pulse-ring {
             animation: pulse-ring 2s ease-in-out infinite;

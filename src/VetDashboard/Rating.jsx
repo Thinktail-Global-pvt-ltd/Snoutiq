@@ -9,7 +9,7 @@ const Ratings = () => {
   useEffect(() => {
     const fetchRatings = async () => {
       try {
-        const res = await axios.get("/api/doctors/ratings"); // API jo doctor ratings return kare
+        const res = await axios.get("https://snoutiq.com/backend/api/reviews"); // API jo doctor ratings return kare
         setDoctors(res.data);
       } catch (err) {
         console.error("Failed to fetch ratings:", err);
