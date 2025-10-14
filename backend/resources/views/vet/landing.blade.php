@@ -510,6 +510,8 @@ label{font-size:.9rem;color:#334155}
                 razorpay_order_id: resp.razorpay_order_id,
                 razorpay_payment_id: resp.razorpay_payment_id,
                 razorpay_signature: resp.razorpay_signature,
+                vet_slug: String(vetSlug || ''),
+                service_id: String(svc.id || ''),
               };
               const vres = await fetch(VERIFY_URL, {
                 method: 'POST',

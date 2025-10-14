@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VetLandingController;
 use App\Models\Doctor;
+use App\Models\VetRegisterationTemp;
+use App\Models\Payment;
 use App\Http\Middleware\EnsureSessionUser;
 use App\Http\Controllers\VideoSchedulePageController;
 
@@ -94,4 +96,23 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
 
     // Clinic order history (aggregates bookings across doctors of this clinic)
     Route::view('/clinic/orders', 'clinic.order-history')->name('clinic.orders');
+    // Clinic payments view (lists Razorpay payments linked via vet_slug in notes)
+    Route::get('/clinic/payments', function () {
+        $vetId = session('user_id') ?? data_get(session('user'), 'id');
+        $vet   = null; $slug = null;
+        if ($vetId) {
+            $vet = VetRegisterationTemp::find($vetId);
+            $slug = $vet?->slug;
+        }
+
+        $payments = Payment::query()
+            ->when($slug, function ($q) use ($slug) {
+                $q->where('notes->vet_slug', $slug);
+            })
+            ->orderByDesc('created_at')
+            ->limit(300)
+            ->get();
+
+        return view('clinic.payments', compact('payments','vet','slug','vetId'));
+    })->name('clinic.payments');
 });

@@ -90,7 +90,7 @@ class PaymentController extends Controller
             $method   = null;
             $email    = null;
             $contact  = null;
-            $notes    = null;
+            $notes    = [];
 
             try {
                 $p = $api->payment->fetch($data['razorpay_payment_id']);
@@ -101,9 +101,18 @@ class PaymentController extends Controller
                 $method   = $paymentArr['method']   ?? null;
                 $email    = $paymentArr['email']    ?? null;
                 $contact  = $paymentArr['contact']  ?? null;
-                $notes    = $paymentArr['notes']    ?? null;
+                $fetchedNotes = $paymentArr['notes'] ?? [];
+                if (is_array($fetchedNotes)) { $notes = $fetchedNotes; }
             } catch (\Throwable $e) {
                 // ignore network failure
+            }
+
+            // Merge client-provided tags to ensure clinic linkage even if fetch fails
+            if ($request->filled('vet_slug')) {
+                $notes['vet_slug'] = (string) $request->input('vet_slug');
+            }
+            if ($request->filled('service_id')) {
+                $notes['service_id'] = (string) $request->input('service_id');
             }
 
             // Upsert into DB (idempotent on payment_id)
@@ -118,7 +127,7 @@ class PaymentController extends Controller
                     'method'             => $method,
                     'email'              => $email,
                     'contact'            => $contact,
-                    'notes'              => $notes,
+                    'notes'              => $notes ?: null,
                     'raw_response'       => $paymentArr,
                 ]
             );
@@ -149,4 +158,3 @@ class PaymentController extends Controller
         }
     }
 }
-
