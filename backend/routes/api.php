@@ -84,6 +84,7 @@ use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\DoctorStatusController;
 use App\Http\Controllers\Api\DoctorController;
+use App\Http\Controllers\Api\ClinicsController;
 
 
 Route::get('/weather/latest', [WeatherLogController::class, 'latest']);
@@ -466,7 +467,8 @@ Route::get('/doctors/{id}/free-slots', [\App\Http\Controllers\Api\DoctorSchedule
 
 // Clinics
 Route::get('/clinics', [\App\Http\Controllers\Api\ClinicsController::class, 'index']);
-Route::get('/clinics/{id}/doctors', [\App\Http\Controllers\Api\ClinicsController::class, 'doctors']);
+Route::get('/clinics/{id}/doctors', [ClinicsController::class, 'doctors']);
+Route::post('/clinics/{id}/doctors', [ClinicsController::class, 'storeDoctor']);
 Route::get('/clinics/{id}/availability', [\App\Http\Controllers\Api\ClinicsController::class, 'availability']);
 Route::get('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'getAvailability']);
 // --- Separate video-only scheduling API (new table) ---
@@ -505,4 +507,3 @@ Route::middleware('web')->group(function () {
 use App\Http\Controllers\Api\UserOrdersController;
 
 Route::get('/users/{id}/orders', [UserOrdersController::class, 'index']);
-

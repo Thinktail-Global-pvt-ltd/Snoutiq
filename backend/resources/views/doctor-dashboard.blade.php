@@ -1,4 +1,4 @@
-{{-- resources/views/doctor-dashboard.blade.php --}}
+﻿{{-- resources/views/doctor-dashboard.blade.php --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -65,68 +65,25 @@
   const af              = readAuthFull();
   const fromStorage     = (()=>{ if(!af) return null; const id1=af?.user_id; const id2=af?.user?.id; return Number(id1||id2)||null; })();
 
-  // ⭐ FINAL id the frontend will use everywhere:
+  // â­ FINAL id the frontend will use everywhere:
   let CURRENT_USER_ID = SESSION_USER_ID || fromServer || fromQuery || fromStorage || DEFAULT_DOCTOR_ID || null;
 
-  console.log('[doctor-dashboard] RESOLVED user_id →', {
+  console.log('[doctor-dashboard] RESOLVED user_id â†’', {
     SESSION_USER_ID, fromServer, fromQuery, fromStorage, CURRENT_USER_ID, PATH_PREFIX, API_BASE
   });
 </script>
 
 <div class="flex h-full">
   {{-- Sidebar --}}
-  <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white">
-    <div class="h-16 flex items-center px-6 border-b border-white/10">
-      <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
-    </div>
-
-    <nav class="px-3 py-4 space-y-1">
-      <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
-
-      <a href="{{ route('doctor.dashboard') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-        </svg>
-        <span class="text-sm font-medium">Video Consultation</span>
-      </a>
-
-      <a href="{{ route('groomer.services.index') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6h-6v-6z"/>
-        </svg>
-        <span class="text-sm font-medium">Services</span>
-      </a>
-
-
-      <a href="{{ route('doctor.bookings') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2z"/></svg>
-        <span class="text-sm font-medium">My Bookings</span>
-      </a>
-
-      <a href="{{ route('doctor.video.schedule.manage') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="text-sm font-medium">Video Calling Schedule</span>
-      </a>
-
-      <a href="{{ route('clinic.orders') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
-        <span class="text-sm font-medium">Order History</span>
-      </a>
-
-      <a href="{{ route('doctor.schedule') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="text-sm font-medium">Clinic Schedule</span>
-      </a>
-    </nav>
-  </aside>
-
+  {{-- Shared sidebar --}}
+  @include('layouts.partials.sidebar')
   {{-- Main --}}
   <main class="flex-1 flex flex-col">
     <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
       <div class="flex items-center gap-3">
         <h1 class="text-lg font-semibold text-gray-800">Doctor Dashboard</h1>
-        <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Connecting…"></span>
-        <span id="status-pill" class="hidden px-3 py-1 rounded-full text-xs font-bold">…</span>
+        <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Connectingâ€¦"></span>
+        <span id="status-pill" class="hidden px-3 py-1 rounded-full text-xs font-bold">â€¦</span>
       </div>
 
       <div class="flex items-center gap-3">
@@ -162,7 +119,7 @@
         <div class="lg:col-span-1 order-2">
           <div id="diagnostics" class="hidden space-y-6">
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <div class="text-sm text-gray-700 mb-2">Doctor ID: <strong id="doctor-id">…</strong></div>
+              <div class="text-sm text-gray-700 mb-2">Doctor ID: <strong id="doctor-id">â€¦</strong></div>
               <div class="text-sm space-y-1">
                 <div>Socket ID: <code id="socket-id" class="text-gray-600">Not connected</code></div>
                 <div>Connection Status: <strong id="conn-status" class="text-gray-800">connecting</strong></div>
@@ -170,9 +127,9 @@
                 <div>Is Online: <strong id="is-online" class="text-gray-800">No</strong></div>
               </div>
               <div class="mt-4 grid grid-cols-3 gap-2">
-                <button id="btn-rejoin" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">🔄 Rejoin</button>
-                <button id="btn-test" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm font-medium hover:bg-black">🧪 Test</button>
-                <button id="btn-clear" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm font-medium hover:bg-gray-300">🗑️ Clear</button>
+                <button id="btn-rejoin" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">ðŸ”„ Rejoin</button>
+                <button id="btn-test" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm font-medium hover:bg-black">ðŸ§ª Test</button>
+                <button id="btn-clear" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm font-medium hover:bg-gray-300">ðŸ—‘ï¸ Clear</button>
               </div>
             </div>
 
@@ -202,8 +159,8 @@
       <div class="text-xs text-gray-500"><span class="font-semibold">Time:</span> <span id="m-time"></span></div>
     </div>
     <div class="mt-6 grid grid-cols-2 gap-3">
-      <button id="m-accept" class="py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow">✅ Accept</button>
-      <button id="m-reject" class="py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow">❌ Reject</button>
+      <button id="m-accept" class="py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow">âœ… Accept</button>
+      <button id="m-reject" class="py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow">âŒ Reject</button>
     </div>
   </div>
 </div>
@@ -213,17 +170,17 @@
   <div class="flex items-center justify-between px-3 py-2 border-b">
     <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
     <div class="flex items-center gap-2">
-      <input id="log-token" placeholder="paste Bearer token…" class="px-2 py-1 rounded bg-gray-100 text-xs w-40">
+      <input id="log-token" placeholder="paste Bearer tokenâ€¦" class="px-2 py-1 rounded bg-gray-100 text-xs w-40">
       <button id="log-token-save" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs">Save</button>
       <button id="log-download" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Download</button>
       <button id="log-clear" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Clear</button>
-      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">✕</button>
+      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">âœ•</button>
     </div>
   </div>
   <div id="log-body" class="text-[11px] leading-4 text-gray-800 px-3 py-2 overflow-y-auto whitespace-pre-wrap"></div>
 </div>
 <button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">
-  🪵 Logs (<span id="log-count">0</span>)
+  ðŸªµ Logs (<span id="log-count">0</span>)
 </button>
 
 <!-- =============================
@@ -232,7 +189,7 @@
 <div id="add-service-modal" class="hidden fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-4xl p-6 relative">
     <button type="button" id="svc-close"
-            class="absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">✕</button>
+            class="absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">âœ•</button>
 
     <div class="mb-2">
       <h3 class="text-xl font-semibold text-gray-800">Add New Service</h3>
@@ -257,8 +214,8 @@
 
         <div class="space-y-4">
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Price (₹)</label>
-            <input id="svc-price" type="number" min="0" step="0.01" placeholder="Enter Service price in ₹"
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Price (â‚¹)</label>
+            <input id="svc-price" type="number" min="0" step="0.01" placeholder="Enter Service price in â‚¹"
                    class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
           </div>
 
@@ -312,7 +269,7 @@
 (function(){
   const ui={panel:document.getElementById('client-logger'),body:document.getElementById('log-body'),toggle:document.getElementById('log-toggle'),count:document.getElementById('log-count'),close:document.getElementById('log-close'),clear:document.getElementById('log-clear'),dl:document.getElementById('log-download'),tokenI:document.getElementById('log-token'),tokenS:document.getElementById('log-token-save'),};
   const MAX=500,buf=[];
-  function trunc(s,n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}; return s.length>n?s.slice(0,n)+'…':s; }
+  function trunc(s,n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}; return s.length>n?s.slice(0,n)+'â€¦':s; }
   function stamp(){return new Date().toISOString()}
   function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); div.textContent=`[${row.t}] ${level.toUpperCase()} ${msg}${meta?' '+trunc(typeof meta==='string'?meta:JSON.stringify(meta),2000):''}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
   const Log={info:(m,d)=>push('info',m,d),warn:(m,d)=>push('warn',m,d),error:(m,d)=>push('error',m,d),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{PATH_PREFIX,API_BASE,SOCKET_URL,USER_ID:CURRENT_USER_ID,url:location.href,ua:navigator.userAgent,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token')),auth_mode:window.__authMode||'unknown'},logs:buf})};
@@ -351,7 +308,7 @@
 
 <script>
 /* =========================
-   Add Service — sends user_id = CURRENT_USER_ID
+   Add Service â€” sends user_id = CURRENT_USER_ID
 ========================= */
 (function(){
   const $ = s => document.querySelector(s);
@@ -461,13 +418,13 @@
       fd.append('main_service', main);
       fd.append('status',       'Active');
 
-      // ⭐ IMPORTANT: send CURRENT_USER_ID
+      // â­ IMPORTANT: send CURRENT_USER_ID
       fd.append('user_id', String(CURRENT_USER_ID ?? ''));
 
       const headers = buildHeaders(auth);
 
       // Debug: see exactly what is going
-      console.log('[createService] POST →', {
+      console.log('[createService] POST â†’', {
         endpoint: API_POST_SVC,
         CURRENT_USER_ID,
         SESSION_USER_ID,
@@ -497,7 +454,7 @@
   // init
   document.addEventListener('DOMContentLoaded', ()=>{
     const label=document.getElementById('doctor-id');
-    if(label) label.textContent=String(CURRENT_USER_ID ?? '—');
+    if(label) label.textContent=String(CURRENT_USER_ID ?? 'â€”');
 
     // open modal via button
     document.getElementById('btn-add-service')?.addEventListener('click', ()=>show(els.modal));

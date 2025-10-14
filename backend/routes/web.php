@@ -49,6 +49,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     Route::view('/doctor/live', 'doctor.live-console')->name('doctor.live');
     // Clinic dashboard shell (links to doctor console)
     Route::view('/clinic-dashboard', 'clinic-dashboard')->name('clinic.dashboard');
+    Route::view('/clinic/doctors', 'clinic.doctors')->name('clinic.doctors');
     Route::view('/dashboard/services', 'groomer.services.index')->name('groomer.services.index');
 
     // Booking flow

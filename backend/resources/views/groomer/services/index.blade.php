@@ -1,4 +1,4 @@
-{{-- resources/views/groomer/services/index.blade.php --}}
+﻿{{-- resources/views/groomer/services/index.blade.php --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,68 +20,21 @@
 <body class="h-screen bg-gray-50">
 
 <div class="flex h-full">
-  <!-- Sidebar -->
-  <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white">
-    <div class="h-16 flex items-center px-6 border-b border-white/10">
-      <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
-    </div>
-
-    <nav class="px-3 py-4 space-y-1">
-      <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
-
-      <a href="{{ route('doctor.dashboard') }}"
-         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-        </svg>
-        <span class="text-sm font-medium">Video Consultation</span>
-      </a>
-      <a href="{{ route('groomer.services.index') }}"
-         class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6h-6v-6z"/>
-        </svg>
-        <span class="text-sm font-medium">Services</span>
-      </a>
-
-
-      <a href="{{ route('doctor.bookings') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2z"/></svg>
-        <span class="text-sm font-medium">My Bookings</span>
-      </a>
-
-      <a href="{{ route('doctor.video.schedule.manage') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="text-sm font-medium">Video Calling Schedule</span>
-      </a>
-
-      <a href="{{ route('clinic.orders') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
-        <span class="text-sm font-medium">Order History</span>
-      </a>
-
-      <a href="{{ route('doctor.schedule') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="text-sm font-medium">Clinic Schedule</span>
-      </a>
-    </nav>
-  </aside>
-
+  {{-- Shared sidebar --}}
+  @include('layouts.partials.sidebar')
   <!-- Main -->
   <main class="flex-1 flex flex-col">
     <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
       <div class="flex items-center gap-3">
         <h1 class="text-lg font-semibold text-gray-800">Services</h1>
-        <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Connecting…"></span>
-        <span id="status-pill" class="hidden px-3 py-1 rounded-full text-xs font-bold">…</span>
+        <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Connectingâ€¦"></span>
+        <span id="status-pill" class="hidden px-3 py-1 rounded-full text-xs font-bold">â€¦</span>
       </div>
 
       <div class="flex items-center gap-3">
         <button id="btn-auth"
                 class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">
-          🔐 Auth
+          ðŸ” Auth
         </button>
 
         <button id="toggle-diag"
@@ -125,7 +78,7 @@
                 <tr>
                   <th class="text-left px-4 py-3">Name</th>
                   <th class="text-left px-4 py-3">Pet</th>
-                  <th class="text-left px-4 py-3">Price (₹)</th>
+                  <th class="text-left px-4 py-3">Price (â‚¹)</th>
                   <th class="text-left px-4 py-3">Duration (m)</th>
                   <th class="text-left px-4 py-3">Category</th>
                   <th class="text-left px-4 py-3">Status</th>
@@ -145,7 +98,7 @@
 <!-- Create Modal -->
 <div id="create-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-3xl p-6 relative">
-    <button type="button" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">✕</button>
+    <button type="button" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">âœ•</button>
     <h3 class="text-xl font-semibold text-gray-800 mb-1">Add New Service</h3>
     <p class="text-sm text-gray-500 mb-4">Fill details to create service</p>
 
@@ -156,7 +109,7 @@
           <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
-          <label class="block text-sm font-semibold mb-1">Price (₹)</label>
+          <label class="block text-sm font-semibold mb-1">Price (â‚¹)</label>
           <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
@@ -210,7 +163,7 @@
 <!-- Edit Modal -->
 <div id="edit-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-3xl p-6 relative">
-    <button type="button" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">✕</button>
+    <button type="button" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">âœ•</button>
     <h3 class="text-xl font-semibold text-gray-800 mb-1">Edit Service</h3>
     <p class="text-sm text-gray-500 mb-4">Update details</p>
 
@@ -222,7 +175,7 @@
           <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
-          <label class="block text-sm font-semibold mb-1">Price (₹)</label>
+          <label class="block text-sm font-semibold mb-1">Price (â‚¹)</label>
           <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
@@ -277,17 +230,17 @@
   <div class="flex items-center justify-between px-3 py-2 border-b">
     <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
     <div class="flex items-center gap-2">
-      <input id="log-token" placeholder="paste Bearer token…" class="px-2 py-1 rounded bg-gray-100 text-xs w-44">
+      <input id="log-token" placeholder="paste Bearer tokenâ€¦" class="px-2 py-1 rounded bg-gray-100 text-xs w-44">
       <button id="log-token-save" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs">Save</button>
       <button id="log-dump" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Download</button>
       <button id="log-clear" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Clear</button>
-      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">✕</button>
+      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">âœ•</button>
     </div>
   </div>
   <div id="log-body" class="text-[11px] leading-4 text-gray-800 px-3 py-2 overflow-y-auto whitespace-pre-wrap"></div>
 </div>
 <button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">
-  🪵 Logs (<span id="log-count">0</span>)
+  ðŸªµ Logs (<span id="log-count">0</span>)
 </button>
 
 <script>
@@ -338,7 +291,7 @@
   (function(){
     const ui={panel:document.getElementById('client-logger'),body:document.getElementById('log-body'),toggle:document.getElementById('log-toggle'),count:document.getElementById('log-count'),close:document.getElementById('log-close'),clear:document.getElementById('log-clear'),dump:document.getElementById('log-dump'),tokenI:document.getElementById('log-token'),tokenS:document.getElementById('log-token-save')};
     const MAX=600,buf=[];
-    const trunc=(s,n)=>{ if(typeof s!=='string'){ try{s=JSON.stringify(s)}catch(_){s=String(s)} } return s.length>n?s.slice(0,n)+'…':s; };
+    const trunc=(s,n)=>{ if(typeof s!=='string'){ try{s=JSON.stringify(s)}catch(_){s=String(s)} } return s.length>n?s.slice(0,n)+'â€¦':s; };
     const stamp=()=>new Date().toISOString();
     function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); div.textContent=`[${row.t}] ${level.toUpperCase()} ${msg}${meta?' '+trunc(meta,1800):''}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
     const Log={info:(m,d)=>push('info',m,d? (typeof d==='string'?d:JSON.stringify(d)):''),warn:(m,d)=>push('warn',m,d? (typeof d==='string'?d:JSON.stringify(d)):''),error:(m,d)=>push('error',m,d? (typeof d==='string'?d:JSON.stringify(d)):''),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{api:API,login_api:CONFIG.LOGIN_API,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token'))},logs:buf})};
@@ -452,7 +405,7 @@
       rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">user_id missing (add ?userId=... in URL or visit <a class="text-blue-600 underline" target="_blank" rel="noreferrer" href="${esc(helpUrl)}">${esc(CONFIG.SESSION_LOGIN)}?user_id=YOUR_ID</a> then reload)</td></tr>`;
       return;
     }
-    rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-gray-500" colspan="7">Loading…</td></tr>`;
+    rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-gray-500" colspan="7">Loadingâ€¦</td></tr>`;
     try{
       await Auth.bootstrap();
       const res = await apiFetch(API.list(CURRENT_USER_ID), {
@@ -520,7 +473,7 @@
     payload.append('duration',     fd.get('duration'));
     payload.append('main_service', fd.get('main_service'));
     payload.append('status',       fd.get('status'));
-    // ⭐ send user_id from frontend
+    // â­ send user_id from frontend
     payload.append('user_id',      String(CURRENT_USER_ID));
 
     try{
@@ -639,7 +592,7 @@
     payload.append('duration',     f.elements['duration'].value);
     payload.append('main_service', f.elements['main_service'].value);
     payload.append('status',       f.elements['status'].value);
-    // ⭐ send user_id from frontend
+    // â­ send user_id from frontend
     payload.append('user_id',      String(CURRENT_USER_ID));
 
     try{

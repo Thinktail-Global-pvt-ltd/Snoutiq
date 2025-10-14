@@ -72,4 +72,37 @@ class ClinicsController extends Controller
             'availability' => $availability,
         ]);
     }
+
+    // POST /api/clinics/{id}/doctors
+    public function storeDoctor(string $id)
+    {
+        $clinicId = (int)$id;
+        $clinic = DB::table('vet_registerations_temp')->where('id', $clinicId)->first();
+        if (!$clinic) {
+            return response()->json(['success' => false, 'error' => 'Clinic not found'], 404);
+        }
+
+        $name    = trim(request('doctor_name') ?? request('name') ?? '');
+        $email   = trim(request('doctor_email') ?? request('email') ?? '');
+        $mobile  = trim(request('doctor_mobile') ?? request('phone') ?? '');
+        $license = trim(request('doctor_license') ?? request('license') ?? '');
+
+        if ($name === '') {
+            return response()->json(['success' => false, 'error' => 'doctor_name is required'], 422);
+        }
+
+        $idNew = DB::table('doctors')->insertGetId([
+            'vet_registeration_id' => $clinicId,
+            'doctor_name'          => $name,
+            'doctor_email'         => $email ?: null,
+            'doctor_mobile'        => $mobile ?: null,
+            'doctor_license'       => $license ?: null,
+            'toggle_availability'  => 1,
+            'created_at'           => now(),
+            'updated_at'           => now(),
+        ]);
+
+        $row = DB::table('doctors')->select('id','doctor_name','doctor_email','doctor_mobile','doctor_license','vet_registeration_id')->where('id',$idNew)->first();
+        return response()->json(['success'=>true,'doctor'=>$row], 201);
+    }
 }
