@@ -1,5 +1,5 @@
 <?php
-// app/Http/Controllers/RazorpayTestController.php
+// app/Http/Controllers/PaymentController.php
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -9,25 +9,29 @@ use App\Models\Payment;
 
 class PaymentController extends Controller
 {
-    // ⚠️ TEST ONLY — keys hardcoded as requested
-    private string $key    = 'rzp_test_1nhE9190sR3rkP';
-    private string $secret = 'L6CPZlUwrKQpdC9N3TRX8gIh';
-    // app/Http/Controllers/RazorpayTestController.php
+    // Prefer env/config keys; fallback to test keys in dev
+    private string $key;
+    private string $secret;
 
-public function testView()
-{
-    return view('rzp-test'); // resources/views/rzp-test.blade.php
-}
+    public function __construct()
+    {
+        $this->key    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_test_1nhE9190sR3rkP';
+        $this->secret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'L6CPZlUwrKQpdC9N3TRX8gIh';
+    }
 
+    public function testView()
+    {
+        return view('rzp-test'); // resources/views/rzp-test.blade.php
+    }
 
-    // POST /api/rzp/order  { "amount": 999 }
+    // POST /api/create-order  { "amount": 999 }
     public function createOrder(Request $request)
     {
         $request->validate([
             'amount' => 'nullable|integer|min:1',
         ]);
 
-        $amountInInr = (int) ($request->input('amount', 500)); // default ₹500
+        $amountInInr = (int) ($request->input('amount', 500));
 
         try {
             $api = new Api($this->key, $this->secret);
@@ -36,19 +40,19 @@ public function testView()
                 'receipt'  => 'rcpt_' . bin2hex(random_bytes(6)),
                 'amount'   => $amountInInr * 100, // paisa
                 'currency' => 'INR',
-                'notes'    => ['via' => 'laravel-test'],
+                'notes'    => ['via' => 'snoutiq'],
             ]);
 
             return response()->json([
                 'success'  => true,
-                'key'      => $this->key,           // front-end (checkout) ke liye public key
-                'order'    => $order->toArray(),    // entity -> array
+                'key'      => $this->key,
+                'order'    => $order->toArray(),
                 'order_id' => $order['id'],
             ]);
         } catch (RazorpayError $e) {
             return response()->json([
                 'success' => false,
-                'error'   => 'Razorpay: '.$e->getMessage(),
+                'error'   => 'Razorpay: ' . $e->getMessage(),
             ], 400);
         } catch (\Throwable $e) {
             return response()->json([
@@ -59,13 +63,8 @@ public function testView()
     }
 
     // POST /api/rzp/verify
-    // {
-    //   "razorpay_order_id": "...",
-    //   "razorpay_payment_id": "...",
-    //   "razorpay_signature": "...",
-    //   "capture": true
-    // }
- public function verifyPayment(Request $request)
+    // { razorpay_order_id, razorpay_payment_id, razorpay_signature }
+    public function verifyPayment(Request $request)
     {
         $data = $request->validate([
             'razorpay_order_id'   => 'required|string',
@@ -76,38 +75,38 @@ public function testView()
         try {
             $api = new Api($this->key, $this->secret);
 
-            // 1) Signature verify (local HMAC) — NO capture
+            // Signature verify (local HMAC)
             $api->utility->verifyPaymentSignature([
                 'razorpay_order_id'   => $data['razorpay_order_id'],
                 'razorpay_payment_id' => $data['razorpay_payment_id'],
                 'razorpay_signature'  => $data['razorpay_signature'],
             ]);
 
-            // 2) Try to fetch payment for details (optional; safe to skip if network blocks)
+            // Try to fetch payment details (optional)
             $paymentArr = null;
-            $status     = 'verified';   // default if fetch fails
-            $amount     = null;
-            $currency   = 'INR';
-            $method     = null;
-            $email      = null;
-            $contact    = null;
-            $notes      = null;
+            $status   = 'verified';
+            $amount   = null;
+            $currency = 'INR';
+            $method   = null;
+            $email    = null;
+            $contact  = null;
+            $notes    = null;
 
             try {
                 $p = $api->payment->fetch($data['razorpay_payment_id']);
                 $paymentArr = $p->toArray();
                 $status   = $paymentArr['status']   ?? $status;
-                $amount   = $paymentArr['amount']   ?? null;     // paisa
+                $amount   = $paymentArr['amount']   ?? null;
                 $currency = $paymentArr['currency'] ?? 'INR';
                 $method   = $paymentArr['method']   ?? null;
                 $email    = $paymentArr['email']    ?? null;
                 $contact  = $paymentArr['contact']  ?? null;
                 $notes    = $paymentArr['notes']    ?? null;
             } catch (\Throwable $e) {
-                // ignore fetch failure; we still store minimal verified record
+                // ignore network failure
             }
 
-            // 3) Upsert into DB (idempotent on razorpay_payment_id)
+            // Upsert into DB (idempotent on payment_id)
             $record = Payment::updateOrCreate(
                 ['razorpay_payment_id' => $data['razorpay_payment_id']],
                 [
@@ -132,7 +131,7 @@ public function testView()
                     'id'       => $record->id,
                     'rzp_pid'  => $record->razorpay_payment_id,
                     'status'   => $record->status,
-                    'amount'   => $record->amount,   // paisa
+                    'amount'   => $record->amount,
                     'currency' => $record->currency,
                 ],
             ]);
@@ -140,7 +139,7 @@ public function testView()
         } catch (RazorpayError $e) {
             return response()->json([
                 'success' => false,
-                'error'   => 'Razorpay: '.$e->getMessage(),
+                'error'   => 'Razorpay: ' . $e->getMessage(),
             ], 400);
         } catch (\Throwable $e) {
             return response()->json([
@@ -149,5 +148,5 @@ public function testView()
             ], 500);
         }
     }
-
 }
+

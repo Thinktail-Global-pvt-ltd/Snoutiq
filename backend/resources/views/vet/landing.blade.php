@@ -30,6 +30,8 @@
 
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- Razorpay Checkout -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
   <style>
 /* ======== Light Theme ======== */
@@ -353,12 +355,14 @@ label{font-size:.9rem;color:#334155}
   })();
   </script>
 
-  <!-- Dynamic Quick Services (fetch by slug) + Request modal -->
+  <!-- Dynamic Quick Services (fetch by slug) + Request modal + Payment -->
   <script>
   (function(){
     const vetSlug      = @json($vet->slug);
     const API_SERVICES = 'https://snoutiq.com/backend/api/groomer/services';
-    const API_REQUEST  = 'https://snoutiq.com/backend/api/service-requests'; // adjust if different
+    // Payment endpoints (served from this Laravel app)
+    const ORDER_URL    = @json(url('/api/create-order'));
+    const VERIFY_URL   = @json(url('/api/rzp/verify'));
 
     const grid    = document.getElementById('qsvc-grid');
     const empty   = document.getElementById('qsvc-empty');
@@ -462,21 +466,70 @@ label{font-size:.9rem;color:#334155}
         }
       }).then((res)=>{
         if (res.isConfirmed){
-          Swal.fire({icon:'success', title:'Request sent', text:'We will contact you shortly.', timer:1600, showConfirmButton:false});
+          Swal.fire({icon:'success', title:'Payment successful', text:'Your request has been recorded.', timer:1800, showConfirmButton:false});
         }
       });
     }
 
+    // Launch Razorpay checkout; resolve when payment verified and saved to DB
     async function requestService(svc, notes){
-      const payload = { service_id: svc.id, vet_slug: vetSlug || '', notes: notes || '' };
-      const headers = { 'Accept':'application/json', 'Content-Type':'application/json' };
-      if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+      if (typeof Razorpay === 'undefined') throw new Error('Payment library not loaded');
 
-      const resp = await fetch(API_REQUEST, { method:'POST', headers, body: JSON.stringify(payload), credentials:'include' });
-      const ct   = resp.headers.get('content-type') || '';
-      const body = ct.includes('application/json') ? await resp.json() : await resp.text();
-      if (!resp.ok) throw new Error((body && body.message) ? body.message : ('HTTP ' + resp.status));
-      console.log('[service.request.success]', body);
+      // 1) Create order on server (amount in INR)
+      const amountInInr = parseInt(String(svc.price || '0'), 10);
+      if (!Number.isInteger(amountInInr) || amountInInr < 1) throw new Error('Invalid service price');
+
+      const makeOrder = async () => {
+        const res = await fetch(ORDER_URL, {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: amountInInr })
+        });
+        if (!res.ok) throw new Error('Order create failed: ' + res.status);
+        return res.json();
+      };
+
+      const orderRes = await makeOrder();
+      if (!orderRes?.success || !orderRes?.order_id || !orderRes?.key) throw new Error('Invalid order response');
+
+      // 2) Open Razorpay checkout and verify
+      return new Promise((resolve, reject) => {
+        const rzp = new Razorpay({
+          key: orderRes.key,
+          order_id: orderRes.order_id,
+          name: 'SnoutIQ',
+          description: (svc.name ? ('Service: ' + svc.name) : 'Clinic Service'),
+          notes: {
+            service_id: String(svc.id || ''),
+            vet_slug: String(vetSlug || ''),
+          },
+          theme: { color: '#3b82f6' },
+          handler: async function (resp) {
+            try {
+              const payload = {
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+              };
+              const vres = await fetch(VERIFY_URL, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              if (!vres.ok) throw new Error('Verify API failed: ' + vres.status);
+              const vjson = await vres.json();
+              if (!(vjson?.success || vjson?.verified)) throw new Error('Payment not verified');
+              resolve(vjson);
+            } catch (e) {
+              reject(e);
+            }
+          }
+        });
+        rzp.on('payment.failed', function (resp) {
+          reject(new Error(resp?.error?.description || 'Payment failed'));
+        });
+        rzp.open();
+      });
     }
 
     document.addEventListener('DOMContentLoaded', fetchServices);
