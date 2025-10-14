@@ -11,6 +11,9 @@
 
 @section('content')
 <div class="max-w-5xl mx-auto">
+  @if(request()->get('onboarding')==='1')
+    @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 2))])
+  @endif
   <h2 class="text-lg font-semibold">Doctor Weekly Availability (Video)</h2>
   <p class="text-sm text-gray-600 mb-3">This view uses a separate storage and API. Existing flows remain unchanged.</p>
 

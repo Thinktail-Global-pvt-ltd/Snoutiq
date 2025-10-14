@@ -6,6 +6,9 @@
 
 @section('content')
 <div class="max-w-5xl mx-auto">
+  @if(request()->get('onboarding')==='1')
+    @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 3))])
+  @endif
   <h2 class="text-lg font-semibold">Doctor Weekly Availability</h2>
   <p class="text-sm text-gray-600 mb-3">
     Select a doctor below. Availability will load for the chosen doctor & service type.

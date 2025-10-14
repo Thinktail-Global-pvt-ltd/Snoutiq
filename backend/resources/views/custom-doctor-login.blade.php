@@ -263,16 +263,9 @@
       dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Vet Login + Session');
 
       if (sessionSync.ok) {
-        // Compute redirect: if onboarding already done, take to dashboard, else start onboarding at Services
-        let target = POST_LOGIN_REDIRECT;
-        try{
-          if (localStorage.getItem('onboarding_v1_done') === '1'){
-            const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
-            target = `${window.location.origin}${PATH_PREFIX}/doctor`;
-          }
-        }catch(_){ }
+        // Always start onboarding (Step 1) after fresh login
+        const target = POST_LOGIN_REDIRECT;
         console.log('[redirect] ->', target);
-        // Small delay helps ensure cookie is set before nav
         setTimeout(()=> window.location.replace(target), 150);
       }
     }catch(err){

@@ -104,6 +104,13 @@
       </div>
     </header>
 
+    <!-- Onboarding steps ribbon -->
+    @if(request()->get('onboarding')==='1')
+      <div class="px-6 pt-4">
+        @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 1))])
+      </div>
+    @endif
+
     <!-- Page Content -->
     <section class="flex-1 p-6">
       <div class="max-w-6xl mx-auto">
