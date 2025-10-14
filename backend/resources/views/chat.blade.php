@@ -304,7 +304,7 @@
       const callUrl =
         `${PATH_PREFIX}/call-page/${encodeURIComponent(data.channel)}`
         + `?uid=${encodeURIComponent(PATIENT_ID)}&role=audience`
-        + `&callId=${encodeURIComponent(data.callId)}`;
+        + `&callId=${encodeURIComponent(data.callId)}&pip=1`;
       window.location.href = callUrl;
     }
     showModal(false);
@@ -321,7 +321,7 @@
       const url =
         `${PATH_PREFIX}/call-page/${encodeURIComponent(data.channel)}`
         + `?uid=${encodeURIComponent(PATIENT_ID)}&role=audience`
-        + `&callId=${encodeURIComponent(data.callId)}`;
+        + `&callId=${encodeURIComponent(data.callId)}&pip=1`;
       window.location.href = url;
     }
   });

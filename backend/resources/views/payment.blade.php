@@ -348,7 +348,7 @@
 
             // 5) ABSOLUTE REDIRECT (role=host) — as requested
             window.location.href =
-              `${FRONTEND_BASE}/call-page/${encodeURIComponent(CHANNEL)}?uid=${encodeURIComponent(PATIENT_ID)}&role=host`;
+              `${FRONTEND_BASE}/call-page/${encodeURIComponent(CHANNEL)}?uid=${encodeURIComponent(PATIENT_ID)}&role=host&pip=1`;
           } catch (e) {
             paymentStatus = 'verification-failed';
             showStatus('bg-red-50 border border-red-200 text-red-800', 'Payment verification failed. Please contact support.');

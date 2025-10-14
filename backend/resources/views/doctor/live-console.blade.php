@@ -179,7 +179,7 @@
       const ch = (lastCall?.channel || elMC?.textContent || '').trim();
       const callId = (lastCall?.callId || lastCall?.id || '').trim();
       if (callId) socket.emit('call-accepted', { callId, doctorId: DOCTOR_ID, patientId: lastCall?.patientId, channel: ch });
-      const next = (PATH_PREFIX||'') + '/call-page/' + encodeURIComponent(ch) + '?uid=' + encodeURIComponent(DOCTOR_ID) + '&role=host' + (callId ? ('&callId='+encodeURIComponent(callId)) : '');
+      const next = (PATH_PREFIX||'') + '/call-page/' + encodeURIComponent(ch) + '?uid=' + encodeURIComponent(DOCTOR_ID) + '&role=host' + (callId ? ('&callId='+encodeURIComponent(callId)) : '') + '&pip=1';
       location.href = next;
     } catch (e) { addLog('accept failed: '+ e?.message); }
   });
