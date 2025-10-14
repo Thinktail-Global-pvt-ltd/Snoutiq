@@ -47,6 +47,10 @@
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-4.418 0-8 1.79-8 4s3.582 4 8 4 8-1.79 8-4-3.582-4-8-4zm0-6v4m0 12v4"/></svg>
         <span>Payments</span>
       </a>
+      <a href="{{ route('clinic.booking.payments') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l2 2 4-4m-7 6h8a2 2 0 002-2V8a2 2 0 00-2-2H9l-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2h2z"/></svg>
+        <span>Booking Payments</span>
+      </a>
       <a href="{{ route('clinic.doctors') }}" class="group flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/10">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-4a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
         <span>Clinic Doctors</span>

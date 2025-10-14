@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Services\Snoutiq\RoutingEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Razorpay\Api\Api;
+use Razorpay\Api\Errors\Error as RazorpayError;
 
 class BookingsController extends Controller
 {
@@ -35,6 +38,9 @@ class BookingsController extends Controller
             $scheduledFor = $payload['scheduled_date'] . ' ' . $payload['scheduled_time'];
         }
 
+        // Fixed price for now
+        $amountInInr = 800;
+
         $id = DB::table('bookings')->insertGetId([
             'user_id' => $payload['user_id'],
             'pet_id' => $payload['pet_id'],
@@ -51,7 +57,31 @@ class BookingsController extends Controller
             'clinic_id' => $payload['clinic_id'] ?? null,
             'assigned_doctor_id' => $payload['doctor_id'] ?? null,
             'scheduled_for' => $scheduledFor,
+            // price & payment fields
+            'quoted_price'  => $amountInInr,
+            'final_price'   => $amountInInr,
+            'payment_status'=> 'pending',
         ]);
+
+        // Create Razorpay order for payment
+        $rzKey    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_test_1nhE9190sR3rkP';
+        $rzSecret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'L6CPZlUwrKQpdC9N3TRX8gIh';
+        $orderId = null; $orderArr = null; $currency = 'INR';
+        try {
+            $api = new Api($rzKey, $rzSecret);
+            $order = $api->order->create([
+                'receipt'  => 'booking_'.$id,
+                'amount'   => $amountInInr * 100, // paisa
+                'currency' => $currency,
+                'notes'    => ['booking_id' => (string) $id, 'service_type' => $payload['service_type']],
+            ]);
+            $orderArr = $order->toArray();
+            $orderId  = $order['id'] ?? null;
+        } catch (RazorpayError $e) {
+            Log::warning('Razorpay order create failed: '.$e->getMessage());
+        } catch (\Throwable $e) {
+            Log::warning('Razorpay order create exception: '.$e->getMessage());
+        }
 
         // Kick off routing (minimal stub)
         $routing->routeBooking($id);
@@ -59,11 +89,78 @@ class BookingsController extends Controller
         return response()->json([
             'success' => true,
             'booking_id' => $id,
-            'message' => 'Booking created, finding doctor...',
+            'message' => 'Booking created, proceed to payment.',
             'status' => 'routing',
+            'payment' => [
+                'provider' => 'razorpay',
+                'key'      => $rzKey,
+                'order_id' => $orderId,
+                'order'    => $orderArr,
+                'amount'   => $amountInInr,
+                'currency' => $currency,
+            ],
         ]);
     }
 
+    // POST /api/bookings/{id}/verify-payment
+    public function verifyPayment(Request $request, string $id)
+    {
+        $data = $request->validate([
+            'razorpay_order_id'   => 'required|string',
+            'razorpay_payment_id' => 'required|string',
+            'razorpay_signature'  => 'required|string',
+        ]);
+
+        $booking = DB::table('bookings')->where('id', $id)->first();
+        if (!$booking) {
+            return response()->json(['success' => false, 'error' => 'Booking not found'], 404);
+        }
+
+        $rzKey    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_test_1nhE9190sR3rkP';
+        $rzSecret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'L6CPZlUwrKQpdC9N3TRX8gIh';
+
+        try {
+            $api = new Api($rzKey, $rzSecret);
+
+            $api->utility->verifyPaymentSignature([
+                'razorpay_order_id'   => $data['razorpay_order_id'],
+                'razorpay_payment_id' => $data['razorpay_payment_id'],
+                'razorpay_signature'  => $data['razorpay_signature'],
+            ]);
+
+            $paymentArr = null; $method = null; $email = null; $contact = null; $currency = 'INR'; $status = 'verified';
+            try {
+                $p = $api->payment->fetch($data['razorpay_payment_id']);
+                $paymentArr = $p->toArray();
+                $method   = $paymentArr['method']   ?? null;
+                $email    = $paymentArr['email']    ?? null;
+                $contact  = $paymentArr['contact']  ?? null;
+                $currency = $paymentArr['currency'] ?? 'INR';
+                $status   = $paymentArr['status']   ?? $status;
+            } catch (\Throwable $e) { /* ignore */ }
+
+            DB::table('bookings')->where('id', $id)->update([
+                'payment_provider'    => 'razorpay',
+                'payment_order_id'    => $data['razorpay_order_id'],
+                'payment_id'          => $data['razorpay_payment_id'],
+                'payment_signature'   => $data['razorpay_signature'],
+                'payment_method'      => $method,
+                'payment_email'       => $email,
+                'payment_contact'     => $contact,
+                'payment_currency'    => $currency,
+                'payment_raw'         => $paymentArr ? json_encode($paymentArr) : null,
+                'payment_status'      => 'paid',
+                'payment_verified_at' => now(),
+                'updated_at'          => now(),
+            ]);
+
+            return response()->json(['success' => true, 'verified' => true]);
+        } catch (RazorpayError $e) {
+            return response()->json(['success' => false, 'error' => 'Razorpay: '.$e->getMessage()], 400);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
     // GET /api/bookings/details/{id}
     public function details(string $id)
     {

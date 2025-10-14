@@ -442,6 +442,7 @@ Route::post('/bookings/create', [\App\Http\Controllers\Api\BookingsController::c
 Route::get('/bookings/details/{id}', [\App\Http\Controllers\Api\BookingsController::class, 'details']);
 Route::put('/bookings/{id}/status', [\App\Http\Controllers\Api\BookingsController::class, 'updateStatus']);
 Route::post('/bookings/{id}/rate', [\App\Http\Controllers\Api\BookingsController::class, 'rate']);
+Route::post('/bookings/{id}/verify-payment', [\App\Http\Controllers\Api\BookingsController::class, 'verifyPayment']);
 Route::get('/doctors', [DoctorController::class, 'index']);
 Route::get('/doctors/{id}/bookings', [\App\Http\Controllers\Api\BookingsController::class, 'doctorBookings']);
 

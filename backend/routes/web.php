@@ -64,6 +64,8 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         return view('booking.schedule', [
             'presetClinicId' => $id,
             'presetDoctorId' => $doctorId,
+            // Default service for clinic booking flow
+            'presetServiceType' => 'in_clinic',
         ]);
     })->name('booking.clinic.book');
 
@@ -115,4 +117,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
 
         return view('clinic.payments', compact('payments','vet','slug','vetId'));
     })->name('clinic.payments');
+
+    // Booking payments from bookings table (filtered by this clinic)
+    Route::view('/clinic/booking-payments', 'clinic.booking-payments')->name('clinic.booking.payments');
 });

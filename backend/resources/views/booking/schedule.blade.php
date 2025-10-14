@@ -45,6 +45,7 @@
       } finally { __dec(); }
     }
   </script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 @endsection
 
 @section('content')
@@ -176,6 +177,7 @@
   const SESSION_USER_ID = Number(@json(session('user_id') ?? data_get(session('user'), 'id') ?? null)) || null;
   const PRESET_CLINIC = Number(@json($presetClinicId ?? null)) || null;
   const PRESET_DOCTOR = Number(@json($presetDoctorId ?? null)) || null;
+  const PRESET_SERVICE = @json($presetServiceType ?? null);
 
   const el = s => document.querySelector(s);
   const panel = document.getElementById('availabilityPanel');
@@ -298,6 +300,11 @@
       loadPets(FINAL_UID);
       // Load AI summary (server resolves session user)
       loadAiSummary();
+      // If preset service type provided (e.g., in_clinic for clinic booking flow), set once
+      if (PRESET_SERVICE){
+        const svc = document.querySelector('[name="service_type"]');
+        if (svc) svc.value = PRESET_SERVICE;
+      }
     } else {
       const badge = document.getElementById('userBadge');
       if (badge) badge.textContent = `User: not set (use ${apiBase}/session/login?user_id=...)`;
@@ -405,12 +412,41 @@
     };
 
     if(res.ok && res.json?.booking_id){
-      setMsg(`Booking #${res.json.booking_id} created`, 'text-sm text-green-700');
-      // Kick off AI summary generation and attach to booking for doctor
-      const gen = await api('POST', `${apiBase}/ai/send-summary`, { booking_id: res.json.booking_id });
-      if(gen.ok){
-        const ta = el('[name="ai_summary"]'); if(ta){ ta.value = gen.json?.ai_summary || ta.value; }
+      const bookingId = res.json.booking_id;
+      setMsg(`Booking #${bookingId} created. Opening payment...`, 'text-sm text-indigo-700');
+
+      // If server provided payment (Razorpay) details, open checkout
+      const pay = res.json.payment || {};
+      if (pay && pay.key && pay.order_id && typeof Razorpay !== 'undefined'){
+        const rzp = new Razorpay({
+          key: pay.key,
+          order_id: pay.order_id,
+          name: 'SnoutIQ',
+          description: 'Consultation Payment',
+          theme: { color: '#4f46e5' },
+          handler: async function (resp) {
+            // Verify and save on server (into bookings table)
+            const v = await api('POST', `${apiBase}/bookings/${bookingId}/verify-payment`, {
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+            });
+            if (v.ok){
+              setMsg(`Payment successful for Booking #${bookingId}`, 'text-sm text-green-700');
+            } else {
+              setMsg(`Payment verification failed for Booking #${bookingId}`, 'text-sm text-red-700');
+            }
+          }
+        });
+        rzp.on('payment.failed', function(){ setMsg('Payment failed or cancelled', 'text-sm text-red-700'); });
+        rzp.open();
+      } else {
+        setMsg(`Booking #${bookingId} created. Payment pending.`, 'text-sm text-yellow-700');
       }
+
+      // Kick off AI summary generation and attach to booking for doctor
+      const gen = await api('POST', `${apiBase}/ai/send-summary`, { booking_id: bookingId });
+      if(gen.ok){ const ta = el('[name="ai_summary"]'); if(ta){ ta.value = gen.json?.ai_summary || ta.value; } }
       return;
     }
     setMsg('', 'text-sm ' + (res.ok ? 'text-green-700' : 'text-red-700'));
