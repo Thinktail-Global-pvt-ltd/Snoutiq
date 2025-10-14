@@ -10,6 +10,11 @@
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
   <style>
     #client-logger{font-family:ui-monospace,Menlo,Consolas,monospace}
+    /* Hide debug/auth controls in header */
+    #btn-auth, #toggle-diag { display: none !important; }
+    /* Hide role label and avatar so only clinic/name remains */
+    header .text-right .text-xs { display: none !important; }
+    header .w-9.h-9.rounded-full.bg-gradient-to-br.from-indigo-500.to-purple-500 { display: none !important; }
   </style>
 </head>
 <body class="h-screen bg-gray-50">
@@ -522,6 +527,16 @@
       close(createModal);
       await fetchServices();
       ClientLog?.info('service.create.success', JSON.stringify(res).slice(0,800));
+      // If onboarding is active, move to Step 2 (Video Calling Schedule)
+      try{
+        const url = new URL(location.href);
+        if ((url.searchParams.get('onboarding')||'') === '1'){
+          const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+          setTimeout(()=>{
+            window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor/video-calling-schedule/manage?onboarding=1&step=2`;
+          }, 600);
+        }
+      }catch(_){ }
     }catch(err){
       Swal.fire({icon:'error', title:'Create failed', text: err.message || 'Error'});
       ClientLog?.error('service.create.failed', err.message||String(err));
@@ -661,6 +676,26 @@
       if (openParam === 'create' || addParam === '1') {
         open(createModal);
       }
+      // Onboarding Step 1 helper
+      if ((url.searchParams.get('onboarding')||'') === '1' && (url.searchParams.get('step')||'1') === '1'){
+        if (localStorage.getItem('onboarding_v1_done') !== '1'){
+          // Professional guide modal
+          if (window.Swal){
+            const res = await Swal.fire({
+              icon:'info',
+              title:'Step 1 of 3: Add a Service',
+              html:'Create at least one service your clinic offers. This helps patients find and book you easily.',
+              showCancelButton:true,
+              confirmButtonText:'Next Step',
+              cancelButtonText:"I'll add a service first"
+            });
+            if (res.isConfirmed){
+              const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+              window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor/video-calling-schedule/manage?onboarding=1&step=2`;
+            }
+          }
+        }
+      }
     } catch(_){}
   });
 
@@ -672,6 +707,31 @@
     uiToggle.addEventListener('click', ()=> uiPanel.classList.remove('hidden'));
     uiClose.addEventListener('click', ()=> uiPanel.classList.add('hidden'));
     window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='`'){ e.preventDefault(); uiPanel.classList.toggle('hidden'); }});
+  })();
+</script>
+
+<!-- Inject Logout link next to "+ Add Service" and ensure Auth/Diagnostics stay hidden -->
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    try{
+      var rightGroup = document.querySelector('header .flex.items-center.gap-3:last-child');
+      if (rightGroup) {
+        // Add logout link if not present
+        if (!rightGroup.querySelector('a[data-role="logout-link"]')) {
+          var a = document.createElement('a');
+          a.href = '{{ route('logout') }}';
+          a.setAttribute('data-role','logout-link');
+          a.className = 'px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50 text-gray-700';
+          a.textContent = 'Logout';
+          rightGroup.appendChild(a);
+        }
+      }
+    }catch(_){ /* noop */ }
+  });
+  // Safety: hide auth/diag via JS as well
+  (function(){
+    var a=document.getElementById('btn-auth'); if(a) a.style.display='none';
+    var d=document.getElementById('toggle-diag'); if(d) d.style.display='none';
   })();
 </script>
 

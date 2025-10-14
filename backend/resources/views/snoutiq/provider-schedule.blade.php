@@ -95,6 +95,10 @@
   </fieldset>
 
   <script>
+    // Load SweetAlert2 for onboarding prompts
+    (function(){
+      var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/sweetalert2@11'; document.head.appendChild(s);
+    })();
     // ---------- env ----------
     const ORIGIN   = window.location.origin; // http://127.0.0.1:8000 or https://snoutiq.com
     const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(location.hostname);
@@ -118,6 +122,36 @@
 
     // Simple in-page validation
     function timeLt(a, b) { return a && b && a < b; }
+
+    // ----- Onboarding Step 3: Clinic Schedule -----
+    document.addEventListener('DOMContentLoaded', function(){
+      try{
+        const u = new URL(location.href);
+        const isOnb = (u.searchParams.get('onboarding')||'') === '1';
+        const step  = u.searchParams.get('step')||'';
+        const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+        if (isOnb && step==='3' && localStorage.getItem('onboarding_v1_done') !== '1'){
+          const show = ()=>{
+            if (!window.Swal) { setTimeout(show, 150); return; }
+            Swal.fire({
+              icon:'info',
+              title:'Step 3 of 3: Set Clinic Schedule',
+              html:'Configure your in-clinic hours. Patients can book in-person visits during these times.',
+              showCancelButton:true,
+              confirmButtonText:'Finish Setup',
+              cancelButtonText:'I will update this first'
+            }).then(r=>{
+              if (r.isConfirmed){
+                localStorage.setItem('onboarding_v1_done','1');
+                Swal.fire({icon:'success', title:'All set!', timer:1200, showConfirmButton:false});
+                setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor`; }, 900);
+              }
+            });
+          };
+          show();
+        }
+      }catch(_){ }
+    });
 
     // ---------- load existing availability for selected doctor ----------
     async function loadExistingAvailability() {
@@ -245,6 +279,16 @@
         if (res.ok) {
           out('#saveOut', json ?? text ?? 'Saved', true);
           await loadExistingAvailability(); // refresh UI with server truth
+          // Onboarding: finish after saving clinic schedule
+          try{
+            const u = new URL(location.href);
+            const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+            if ((u.searchParams.get('onboarding')||'') === '1'){
+              localStorage.setItem('onboarding_v1_done','1');
+              if (window.Swal){ Swal.fire({icon:'success', title:'Clinic schedule saved', timer:900, showConfirmButton:false}); }
+              setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor`; }, 600);
+            }
+          }catch(_){ }
         } else {
           out('#saveOut', json ?? text ?? 'Failed to save', false);
         }

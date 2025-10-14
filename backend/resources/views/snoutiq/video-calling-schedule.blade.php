@@ -283,7 +283,23 @@
       try{
         const res = await fetch(`${apiBase}/video-schedule/doctors/${id}/availability`, { method:'PUT', headers:{'Content-Type':'application/json','Accept':'application/json'}, body: JSON.stringify({availability})});
         const text = await res.text(); let json=null; try{ json = JSON.parse(text);}catch{}
-        if(res.ok){ out('#saveOut', json ?? text ?? 'Saved', true); await loadExisting(); }
+        if(res.ok){
+          out('#saveOut', json ?? text ?? 'Saved', true);
+          await loadExisting();
+          // If onboarding, advance to Step 3 after save
+          try{
+            const u = new URL(location.href);
+            if ((u.searchParams.get('onboarding')||'') === '1'){
+              const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+              if (window.Swal){
+                Swal.fire({icon:'success', title:'Video schedule saved', timer:900, showConfirmButton:false});
+              }
+              setTimeout(()=>{
+                window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor/schedule?onboarding=1&step=3`;
+              }, 500);
+            }
+          }catch(_){ }
+        }
         else { out('#saveOut', json ?? text ?? 'Failed to save', false); }
       }catch(e){ out('#saveOut', `Network error: ${e?.message||e}`, false);} finally { if(btn){ btn.disabled=false; btn.textContent='Save Weekly Availability'; } }
     }
@@ -316,6 +332,30 @@
           show247Alert(on);
         });
       }
+
+      // Onboarding Step 2: Video Calling Schedule
+      try{
+        const u = new URL(location.href);
+        const isOnb = (u.searchParams.get('onboarding')||'') === '1';
+        const step  = u.searchParams.get('step')||'';
+        const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+        if (isOnb && step === '2' && localStorage.getItem('onboarding_v1_done') !== '1'){
+          if (window.Swal){
+            Swal.fire({
+              icon:'info',
+              title:'Step 2 of 3: Set Video Calling Schedule',
+              html:'Define your video consultation hours so patients can see your live availability.',
+              showCancelButton:true,
+              confirmButtonText:'Next: Clinic Schedule',
+              cancelButtonText:'I will update this first'
+            }).then(r=>{
+              if (r.isConfirmed){
+                window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor/schedule?onboarding=1&step=3`;
+              }
+            });
+          }
+        }
+      }catch(_){ }
     });
   </script>
 </div>

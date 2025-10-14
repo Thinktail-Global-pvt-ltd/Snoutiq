@@ -30,7 +30,7 @@
     .btn-primary:hover{background:var(--blue-d)}
     .google-box{border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
     .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;cursor:pointer}
-    .debug{margin-top:18px;border-top:1px solid var(--border);padding-top:14px}
+    .debug{display:none!important}
     .debug h3{margin:0 0 8px;font-size:14px}
     .debug pre{max-height:360px;overflow:auto;background:#0b1020;color:#d1e7ff;padding:12px;border-radius:10px;font-size:12px;line-height:1.45}
   </style>
@@ -89,6 +89,15 @@
 </div>
 
 <script>
+  // Silence all console output on the login page
+  (function(){
+    try{
+      const noop=function(){};
+      if (window.console) {
+        ['log','warn','error','info','debug','trace'].forEach(k=>{ try{ console[k]=noop; }catch(_){ /* ignore */ } });
+      }
+    }catch(_){ /* ignore */ }
+  })();
   // -------- Smart bases: local vs production --------
   const ORIGIN   = window.location.origin; // http://127.0.0.1:8000 or https://snoutiq.com
   const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
@@ -103,8 +112,8 @@
 
   // 👇 Redirect target per environment
   const POST_LOGIN_REDIRECT = IS_LOCAL
-    ? `${ORIGIN}/dashboard/services?open=create`
-    : `${ORIGIN}/backend/dashboard/services?open=create`;
+    ? `${ORIGIN}/dashboard/services?open=create&onboarding=1&step=1`
+    : `${ORIGIN}/backend/dashboard/services?open=create&onboarding=1&step=1`;
 
   const POST_LOGIN_REDIRECT_PET = IS_LOCAL
     ? `${ORIGIN}/user/bookings`
@@ -254,9 +263,17 @@
       dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Vet Login + Session');
 
       if (sessionSync.ok) {
-        console.log('[redirect] ->', POST_LOGIN_REDIRECT);
+        // Compute redirect: if onboarding already done, take to dashboard, else start onboarding at Services
+        let target = POST_LOGIN_REDIRECT;
+        try{
+          if (localStorage.getItem('onboarding_v1_done') === '1'){
+            const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+            target = `${window.location.origin}${PATH_PREFIX}/doctor`;
+          }
+        }catch(_){ }
+        console.log('[redirect] ->', target);
         // Small delay helps ensure cookie is set before nav
-        setTimeout(()=> window.location.replace(POST_LOGIN_REDIRECT), 150);
+        setTimeout(()=> window.location.replace(target), 150);
       }
     }catch(err){
       const data = err?.response?.data || { error:String(err) };

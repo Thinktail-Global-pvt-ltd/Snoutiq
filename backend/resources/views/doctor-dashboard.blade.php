@@ -14,6 +14,10 @@
     @keyframes ring{0%{transform:rotate(0)}10%{transform:rotate(15deg)}20%{transform:rotate(-15deg)}30%{transform:rotate(10deg)}40%{transform:rotate(-10deg)}50%{transform:rotate(5deg)}60%{transform:rotate(-5deg)}100%{transform:rotate(0)}}
     .ringing{animation:ring 1s infinite}
     #client-logger{font-family:ui-monospace,Menlo,Consolas,monospace}
+    /* Hide diagnostics button and extra header bits */
+    #toggle-diag{ display:none !important; }
+    header .text-right .text-xs{ display:none !important; }
+    header .w-9.h-9.rounded-full.bg-gradient-to-br.from-indigo-500.to-purple-500{ display:none !important; }
   </style>
 </head>
 <body class="h-screen bg-gray-50">
@@ -505,6 +509,25 @@
 })();
 </script>
 
+<!-- Inject Logout link next to "+ Add Service" on header -->
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    try{
+      var rightGroup = document.querySelector('header .flex.items-center.gap-3:last-child');
+      if (rightGroup) {
+        if (!rightGroup.querySelector('a[data-role="logout-link"]')) {
+          var a = document.createElement('a');
+          a.href = '{{ route('logout') }}';
+          a.setAttribute('data-role','logout-link');
+          a.className = 'px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50 text-gray-700';
+          a.textContent = 'Logout';
+          rightGroup.appendChild(a);
+        }
+      }
+    }catch(_){ /* noop */ }
+  });
+</script>
+
 <script>
 // =========================
 // Socket.IO: come online and receive calls
@@ -519,6 +542,7 @@
   const elLogs     = document.getElementById('logs');
   const elDiagWrap = document.getElementById('diagnostics');
   const elHeaderDot= document.getElementById('status-dot');
+  const elNoCallsSub = document.getElementById('no-calls-sub');
   const modal      = document.getElementById('incoming-modal');
   const elMPatient = document.getElementById('m-patient');
   const elMChannel = document.getElementById('m-channel');
@@ -530,10 +554,45 @@
   const autoLive = (url.searchParams.get('live') === '1');
   const doctorId = Number(url.searchParams.get('doctorId') || window.CURRENT_USER_ID || DEFAULT_DOCTOR_ID || 0) || null;
 
+  // ===== Visibility state (persisted) =====
+  function isVisible(){ return (localStorage.getItem('clinic_visible') ?? 'on') !== 'off'; }
+  function setVisible(v){ localStorage.setItem('clinic_visible', v ? 'on' : 'off'); }
+  function updateNoCalls(on){ if (elNoCallsSub) elNoCallsSub.textContent = on ? 'Connect to receive calls' : 'You will not be receiving calls'; }
+  function ensureToggle(){
+    try{
+      const groups = document.querySelectorAll('header .flex.items-center.gap-3');
+      const left = groups && groups.length ? groups[0] : null;
+      if (!left) return null;
+      if (document.getElementById('visibility-toggle')) return document.getElementById('visibility-toggle');
+      const label = document.createElement('label');
+      label.className = 'inline-flex items-center gap-2 cursor-pointer select-none';
+      label.title = 'Clinic Visibility';
+      label.innerHTML = `
+        <input id="visibility-toggle" type="checkbox" class="sr-only peer">
+        <span class="relative w-10 h-5 bg-gray-300 rounded-full transition peer-checked:bg-green-500">
+          <span class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200 peer-checked:translate-x-5"></span>
+        </span>
+        <span id="visibility-label" class="text-sm text-gray-700">Visible</span>
+      `;
+      left.appendChild(label);
+      return label.querySelector('#visibility-toggle');
+    }catch(_){ return null; }
+  }
+  const toggle = ensureToggle();
+  const toggleLabel = document.getElementById('visibility-label');
+  const initialVisible = isVisible();
+  if (toggle) {
+    toggle.checked = initialVisible;
+    if (toggleLabel) toggleLabel.textContent = initialVisible ? 'Visible' : 'Hidden';
+  }
+  updateNoCalls(initialVisible);
+
   const socket = io(SOCKET_URL, {
     transports: ['websocket','polling'],
     withCredentials: false,
-    path: '/socket.io/'
+    path: '/socket.io/',
+    autoConnect: initialVisible,
+    reconnection: true
   });
 
   function addLog(msg){
@@ -552,6 +611,17 @@
     else if (status==='error' || status==='offline') elHeaderDot.classList.add('bg-red-500');
     else elHeaderDot.classList.add('bg-yellow-400');
   }
+
+  // Initial alert on load based on visibility
+  try{
+    if (initialVisible) {
+      setHeaderStatus('connecting');
+      if (window.Swal) Swal.fire({icon:'success', title:'Online', text:'Your clinic is currently visible to patients within 10 km.'});
+    } else {
+      setHeaderStatus('offline');
+      if (window.Swal) Swal.fire({icon:'info', title:'Offline', text:'You will not be receiving calls. Turn on this button to receive video consultation calls.'});
+    }
+  }catch(_){ }
 
   socket.on('connect', ()=>{
     if (elSocketId) elSocketId.textContent = socket.id;
@@ -639,7 +709,7 @@
   socket.on('server-status', (s)=>{ addLog('server-status: ' + JSON.stringify(s)); });
 
   // Auto-join like /doctor/live?doctorId=...&live=1
-  if (autoLive && doctorId) {
+  if (autoLive && doctorId && isVisible()) {
     if (!socket.connected) try{ socket.connect(); }catch(_){ }
     // If already connected, emit immediately
     if (socket.connected) { socket.emit('join-doctor', Number(doctorId)); addLog('Auto join-doctor ' + doctorId); }
@@ -652,6 +722,25 @@
   });
   if (new URL(location.href).searchParams.get('diag') === '1') {
     elDiagWrap?.classList.remove('hidden');
+  }
+
+  // Toggle behaviour: connect/disconnect and SweetAlerts
+  if (toggle) {
+    toggle.addEventListener('change', ()=>{
+      const on = !!toggle.checked;
+      setVisible(on);
+      if (toggleLabel) toggleLabel.textContent = on ? 'Visible' : 'Hidden';
+      updateNoCalls(on);
+      if (on) {
+        setHeaderStatus('connecting');
+        try{ socket.io.opts.reconnection = true; socket.connect(); }catch(_){ }
+        if (window.Swal) Swal.fire({icon:'success', title:'Online', text:'Your clinic is currently visible to patients within 10 km.'});
+      } else {
+        try{ socket.io.opts.reconnection = false; socket.disconnect(); }catch(_){ }
+        setHeaderStatus('offline');
+        if (window.Swal) Swal.fire({icon:'info', title:'Offline', text:'You will not be receiving calls. Turn on this button to receive video consultation calls.'});
+      }
+    });
   }
 })();
 </script>
