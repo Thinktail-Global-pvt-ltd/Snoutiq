@@ -78,7 +78,7 @@
                 <tr>
                   <th class="text-left px-4 py-3">Name</th>
                   <th class="text-left px-4 py-3">Pet</th>
-                  <th class="text-left px-4 py-3">Price (â‚¹)</th>
+                  <th class="text-left px-4 py-3">Price (&#8377;)</th>
                   <th class="text-left px-4 py-3">Duration (m)</th>
                   <th class="text-left px-4 py-3">Category</th>
                   <th class="text-left px-4 py-3">Status</th>
@@ -98,7 +98,7 @@
 <!-- Create Modal -->
 <div id="create-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-3xl p-6 relative">
-    <button type="button" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">âœ•</button>
+    <button type="button" aria-label="Close" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd"/></svg></button>
     <h3 class="text-xl font-semibold text-gray-800 mb-1">Add New Service</h3>
     <p class="text-sm text-gray-500 mb-4">Fill details to create service</p>
 
@@ -109,7 +109,7 @@
           <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
-          <label class="block text-sm font-semibold mb-1">Price (â‚¹)</label>
+          <label class="block text-sm font-semibold mb-1">Price (&#8377;)</label>
           <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
@@ -163,7 +163,7 @@
 <!-- Edit Modal -->
 <div id="edit-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-3xl p-6 relative">
-    <button type="button" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">âœ•</button>
+    <button type="button" aria-label="Close" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd"/></svg></button>
     <h3 class="text-xl font-semibold text-gray-800 mb-1">Edit Service</h3>
     <p class="text-sm text-gray-500 mb-4">Update details</p>
 
@@ -175,7 +175,7 @@
           <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
-          <label class="block text-sm font-semibold mb-1">Price (â‚¹)</label>
+          <label class="block text-sm font-semibold mb-1">Price (&#8377;)</label>
           <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
@@ -697,3 +697,8 @@
 
 </body>
 </html>
+
+
+
+
+
