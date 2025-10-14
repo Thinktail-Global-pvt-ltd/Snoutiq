@@ -133,7 +133,7 @@ label{font-size:.9rem;color:#334155}
     </p>
     <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:.5rem">
       @php $clinicPhone = $vet->mobile ?? null; @endphp
-      <a class="btn btn-outline" href="{{ $clinicPhone ? 'tel:'.$clinicPhone : 'javascript:void(0)' }}"><i class="fa-solid fa-phone"></i> Call Clinic</a>
+      <a class="btn btn-outline" href="{{ $clinicPhone ? 'tel:'.$clinicPhone : 'https://snoutiq.com/backend/custom-doctor-login' }}"><i class="fa-solid fa-phone"></i> Call Clinic</a>
       <a class="btn btn-outline" id="video-consult-btn" href="/video?vet_slug={{ $vet->slug }}"><i class="fa-solid fa-video"></i> Start Video Consult</a>
     </div>
   </header>
@@ -166,10 +166,10 @@ label{font-size:.9rem;color:#334155}
   <section class="container section" id="reels">
     <h2 class="heading">Clinic Reels</h2>
     <div class="reel-grid" style="margin-top:.8rem">
-      <a class="reel-card" href="#"><div class="reel-play">▶</div><div class="reel-title">Meet Dr. Sarah</div></a>
-      <a class="reel-card" href="#"><div class="reel-play">▶</div><div class="reel-title">Clinic Tour</div></a>
-      <a class="reel-card" href="#"><div class="reel-play">▶</div><div class="reel-title">Success Story</div></a>
-      <a class="reel-card" href="#"><div class="reel-play">▶</div><div class="reel-title">Our Services</div></a>
+      <a class="reel-card" href="https://snoutiq.com/backend/custom-doctor-login"><div class="reel-play">▶</div><div class="reel-title">Meet Dr. Sarah</div></a>
+      <a class="reel-card" href="https://snoutiq.com/backend/custom-doctor-login"><div class="reel-play">▶</div><div class="reel-title">Clinic Tour</div></a>
+      <a class="reel-card" href="https://snoutiq.com/backend/custom-doctor-login"><div class="reel-play">▶</div><div class="reel-title">Success Story</div></a>
+      <a class="reel-card" href="https://snoutiq.com/backend/custom-doctor-login"><div class="reel-play">▶</div><div class="reel-title">Our Services</div></a>
     </div>
   </section>
 
@@ -245,7 +245,7 @@ label{font-size:.9rem;color:#334155}
                 @if($doc->doctor_email) <a href="mailto:{{ $doc->doctor_email }}" style="color:var(--accent)">Email</a>@endif
               </div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
-                <a class="pill" href="{{ $doc->doctor_mobile ? 'tel:'.$doc->doctor_mobile : 'javascript:void(0)' }}"><i class="fa-solid fa-phone"></i>&nbsp;Call</a>
+                <a class="pill" href="{{ $doc->doctor_mobile ? 'tel:'.$doc->doctor_mobile : 'https://snoutiq.com/backend/custom-doctor-login' }}"><i class="fa-solid fa-phone"></i>&nbsp;Call</a>
                 <a class="pill" href="/video?vet_slug={{ $vet->slug }}"><i class="fa-solid fa-video"></i>&nbsp;Video Consult</a>
               </div>
             </div>
