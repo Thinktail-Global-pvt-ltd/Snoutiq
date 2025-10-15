@@ -3,21 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SnoutIQ - Your AI Pet Companion</title>
   <meta name="description" content="AI pet care with 24/7 support, vet video consultations, and health checks.">
+
+  <!-- Content Security Policy for security -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.googletagmanager.com https://connect.facebook.net https://polyfill.io; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://www.facebook.com data:; connect-src 'self' https://www.googletagmanager.com https://*.facebook.com;">
 
   <!-- Preconnect & preload fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-  <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 
-  <!-- Favicon -->
-  <link rel="icon" href="/favicon.webp" sizes="32x32" type="image/webp">
-  <link rel="icon" sizes="192x192" href="/favicon-192.webp">
-  <link rel="icon" sizes="512x512" href="/favicon-512.webp">
-  <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.webp">
+  <!-- Favicon for cross-browser and device compatibility -->
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="icon" href="/favicon.webp" type="image/webp">
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png">
+  <link rel="icon" sizes="192x192" href="/favicon-192.png">
+  <link rel="icon" sizes="512x512" href="/favicon-512.png">
+
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="/assets/index.css">
 
   <!-- Critical CSS -->
   <style>
@@ -26,59 +35,83 @@
       padding: 0;
       height: 100%;
       width: 100%;
-      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
       background-color: #fff;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
     #root {
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
+    .fallback-message {
+      display: none;
+      text-align: center;
+      padding: 20px;
+      color: #ff0000;
+      font-size: 18px;
+    }
   </style>
 
-  <!-- Main CSS (deferred with preload) -->
-  <link rel="preload" href="/assets/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="/assets/index.css"></noscript>
-
-  <!-- Google Tag Manager (lazy load after 10s) -->
+  <!-- Polyfill for older browsers -->
   <script>
-    window.addEventListener("load", () => {
+    if (!('fetch' in window) || !('Promise' in window) || !('Object.assign' in window)) {
+      var script = document.createElement('script');
+      script.src = 'https://polyfill.io/v3/polyfill.min.js?features=Promise,fetch,IntersectionObserver,Object.assign,Array.includes';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  </script>
+
+  <!-- Debug Script Loading -->
+  <script>
+    window.addEventListener('load', () => {
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.src = '/src/main.jsx';
+      script.onerror = () => {
+        console.error('Failed to load /src/main.jsx. Check file path or server configuration.');
+        const root = document.querySelector('#root');
+        if (root) {
+          root.innerHTML = '<p class="fallback-message" role="alert">Error: Failed to load the application. Please try again later or contact support.</p>';
+        }
+      };
+      // Timeout to detect prolonged loading
       setTimeout(() => {
-        (function(w,d,s,l,i){
-          w[l]=w[l]||[];
-          w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});
-          var f=d.getElementsByTagName(s)[0], j=d.createElement(s), dl=l!='dataLayer'?'&l='+l:'';
-          j.async=true;
-          j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
-          f.parentNode.insertBefore(j,f);
-        })(window,document,'script','dataLayer','GTM-5D756BMW');
-      },10000);
+        if (!document.querySelector('script[src="/src/main.jsx"]')) {
+          const root = document.querySelector('#root');
+          if (root) {
+            root.innerHTML = '<p class="fallback-message" role="alert">Error: Application loading timed out. Please check your connection or contact support.</p>';
+          }
+        }
+      }, 10000); // 10-second timeout
+      document.head.appendChild(script);
     });
   </script>
 
-  <!-- Meta Pixel (7s delay) -->
+  <!-- Google Tag Manager -->
+  <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-5D756BMW"></script>
   <script>
-    setTimeout(function() {
-      !function(f,b,e,v,n,t,s){
-        if(f.fbq)return;
-        n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-        if(!f._fbq) f._fbq=n;
-        n.push=n;
-        n.loaded=!0;
-        n.version='2.0';
-        n.queue=[];
-        t=b.createElement(e); t.async=!0;
-        t.src=v;
-        s=b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t,s);
-      }(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', '1909812439872823');
-      fbq('track', 'PageView');
-    },7000);
+    (function(w,d,s,l,i){
+      w[l]=w[l]||[];
+      w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});
+    })(window,document,'script','dataLayer','GTM-5D756BMW');
   </script>
 
+  <!-- Meta Pixel -->
+  <script async src="https://connect.facebook.net/en_US/fbevents.js"></script>
+  <script>
+    (function(f,b,e,v,n,t,s){
+      if(f.fbq)return;
+      n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq) f._fbq=n;
+      n.push=n;
+      n.loaded=!0;
+      n.version='2.0';
+      n.queue=[];
+      fbq('init', '1909812439872823');
+      fbq('track', 'PageView');
+    })(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  </script>
 </head>
 <body>
   <!-- GTM Noscript Fallback -->
@@ -93,12 +126,12 @@
          src="https://www.facebook.com/tr?id=1909812439872823&ev=PageView&noscript=1"/>
   </noscript>
 
-  <!-- Root for React/Vue/Svelte -->
-  <div id="root"></div>
+  <!-- Root with fallback content -->
+  <div id="root">
+    <p class="fallback-message" role="alert">Loading SnoutIQ... If this message persists, JavaScript may be disabled or the app failed to load.</p>
+  </div>
 
-  <!-- JS -->
-  <script type="module" src="/src/main.jsx" defer></script>
-  <!-- Optional legacy JS for older browsers -->
-  <!-- <script nomodule src="/src/main.legacy.js" defer></script> -->
+  <!-- Legacy JS for older browsers -->
+  <script nomodule src="/src/main.legacy.js" defer></script>
 </body>
 </html>
