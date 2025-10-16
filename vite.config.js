@@ -2,17 +2,22 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  base: '/',                // base URL for your app
+  base: '/',  // base URL
   plugins: [react()],
   build: {
     target: 'esnext',
     modulePreload: { polyfill: false },
     rollupOptions: {
       output: {
-        // Fixed filenames to avoid hashed names (Safari/MIME safe)
         entryFileNames: 'assets/index.js',      
         chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]',
+        assetFileNames: (assetInfo) => {
+          // Fixed filename for main CSS
+          if (assetInfo.name && assetInfo.name.endsWith('.css')) {
+            return 'assets/index.css';
+          }
+          return 'assets/[name].[ext]';
+        },
         manualChunks: {
           react: ['react', 'react-dom'],
           vendor: ['react-router-dom'],
