@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  base: '/',                // base URL for your app
   plugins: [react()],
   build: {
     target: 'esnext',
@@ -9,17 +10,17 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Fixed filenames to avoid hashed names (Safari/MIME safe)
-        entryFileNames: 'assets/index.js',      // <-- index.html me use hoga
+        entryFileNames: 'assets/index.js',      
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]',
         manualChunks: {
           react: ['react', 'react-dom'],
-          vendor: ['react-router-dom']
+          vendor: ['react-router-dom'],
         },
-      }
-    }
+      },
+    },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom']
-  }
+    include: ['react', 'react-dom'],
+  },
 });
