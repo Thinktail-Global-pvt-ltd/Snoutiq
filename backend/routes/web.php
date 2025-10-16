@@ -121,3 +121,104 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     // Booking payments from bookings table (filtered by this clinic)
     Route::view('/clinic/booking-payments', 'clinic.booking-payments')->name('clinic.booking.payments');
 });
+
+use Illuminate\Support\Facades\DB;
+
+
+// Route::get('/debug/user-location', function () {
+//     // Get session user_id
+//     $userId = session('user_id');
+//     if (!$userId) {
+//         return response()->json(['error' => 'No session user_id found'], 401);
+//     }
+
+//     // Fetch coordinates from vet_registerations_temp
+//     $row = DB::table('vet_registerations_temp')
+//         ->where('id', $userId)
+//         ->select('lat', 'lng')
+//         ->first();
+
+//     if (!$row) {
+//         return response()->json(['error' => 'User not found in vet_registerations_temp'], 404);
+//     }
+
+//     // Optional: find nearest pincode
+//     $nearest = DB::selectOne("
+//         SELECT pincode AS code, label AS name, lat, lon,
+//         (6371 * ACOS(
+//            LEAST(1, COS(RADIANS(?)) * COS(RADIANS(lat)) * COS(RADIANS(lon - ?))
+//                    + SIN(RADIANS(?)) * SIN(RADIANS(lat)))
+//         )) AS km
+//         FROM geo_pincodes
+//         WHERE active = 1 AND city = 'Gurugram'
+//         ORDER BY km ASC
+//         LIMIT 1
+//     ", [$row->lat, $row->lng, $row->lat]);
+
+//     // Dump in JSON
+//     return response()->json([
+//         'user_id' => $userId,
+//         'lat'     => $row->lat,
+//         'lng'     => $row->lng,
+//         'nearest_pincode' => $nearest,
+//         'timestamp' => now()->toDateTimeString(),
+//     ]);
+// });
+
+  Route::middleware(['web'])->get('/api/geo/nearest-pincode', function (\Illuminate\Http\Request $request) {
+    // Prefer frontend-provided user_id (query/header), fallback to PHP session
+    $userId = $request->query('user_id')
+        ?: $request->header('X-User-Id')
+        ?: $request->session()->get('user_id');
+    if (!$userId) {
+        return response()->json(['error' => 'No session user_id found'], 401);
+    }
+
+    $row = DB::table('vet_registerations_temp')
+        ->where('id', $userId)
+        ->select('lat', 'lng')
+        ->first();
+
+    if (!$row) {
+        return response()->json(['error' => 'User not found in vet_registerations_temp'], 404);
+    }
+
+    // nearest pincode in Gurugram
+    $nearest = DB::selectOne("
+        SELECT pincode AS code, label AS name, lat, lon,
+        (6371 * ACOS(
+          LEAST(1, COS(RADIANS(?)) * COS(RADIANS(lat)) * COS(RADIANS(lon - ?))
+                 + SIN(RADIANS(?)) * SIN(RADIANS(lat)))
+        )) AS km
+        FROM geo_pincodes
+        WHERE active = 1 AND city = 'Gurugram'
+        ORDER BY km ASC
+        LIMIT 1
+    ", [$row->lat, $row->lng, $row->lat]);
+
+    return response()->json([
+        'coords'  => ['lat' => $row->lat, 'lon' => $row->lng],
+        'pincode' => $nearest,
+    ]);
+});
+
+// Simple UI to test /api/video/slots/doctor
+Route::middleware('web')->get('/dev/api-test/doctor-slots', function () {
+    $doctors = DB::table('doctors')->select('id','doctor_name')->orderBy('doctor_name')->get();
+    return view('snoutiq.api-test-doctor-slots', compact('doctors'));
+})->name('dev.api.test.doctor_slots');
+
+Route::middleware('web')->get('/video/app/night-coverage', function () {
+    // Pull a lightweight list of doctors. Adjust the source if your table/model differs.
+    $doctors = DB::table('doctors')
+        ->select('id', 'doctor_name')
+        ->orderBy('doctor_name')
+        ->get();
+
+    // Readonly UI; we just need the doctor select visible.
+    return view('snoutiq.app-video-night-coverage', [
+        'doctors'  => $doctors,
+        'readonly' => true,
+        'page_title' => 'Night Video Coverage',
+    ]);
+});
