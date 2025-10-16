@@ -8,7 +8,7 @@ const isDevelopment =
 
 const SOCKET_URLS = {
   development: "http://localhost:4000",
-  production: window.location.origin, // https://snoutiq.com (Apache proxy karega)
+  production: window.location.origin, // Apache/Nginx proxy karega
 };
 
 const socketUrl = isDevelopment ? SOCKET_URLS.development : SOCKET_URLS.production;
@@ -16,6 +16,7 @@ const socketUrl = isDevelopment ? SOCKET_URLS.development : SOCKET_URLS.producti
 export const socket = io(socketUrl, {
   path: "/socket.io/",
   transports: ["websocket", "polling"],
+  withCredentials: true,
   reconnection: true,
   reconnectionDelay: 1000,
   reconnectionAttempts: 10,
@@ -35,8 +36,6 @@ socket.on("disconnect", (reason) => {
 
 socket.on("connect_error", (error) => {
   console.error("❌ Connection error:", error.message);
-  console.error("🔍 Trying to connect to:", socketUrl);
-  console.error("🛠️ Environment:", isDevelopment ? "Development" : "Production");
 });
 
 socket.on("reconnect", (attemptNumber) => {
@@ -55,6 +54,22 @@ socket.on("reconnect_failed", () => {
   console.error("❌ Failed to reconnect after maximum attempts");
 });
 
+// Notification listener
+socket.on("receive_notification", (data) => {
+  if (typeof window !== "undefined" && "Notification" in window) {
+    if (Notification.permission === "granted") {
+      new Notification(data.title, { body: data.message });
+    } else {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification(data.title, { body: data.message });
+        }
+      });
+    }
+  }
+});
+
+// Helper to get connection info
 export const getConnectionInfo = () => ({
   url: socketUrl,
   environment: isDevelopment ? "development" : "production",

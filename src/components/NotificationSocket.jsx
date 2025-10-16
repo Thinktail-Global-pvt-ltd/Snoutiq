@@ -1,10 +1,16 @@
 import { useEffect } from "react";
-import { io } from "socket.io-client";
+import { socket } from "../pages/socket";
 
 export default function NotificationSocket() {
   useEffect(() => {
-    // Socket server connect
-    const socket = io("http://localhost:4000");
+    // Request browser notification permission on mount
+    if (typeof window !== "undefined" && "Notification" in window) {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          console.log("Notification permission granted");
+        }
+      });
+    }
 
     // Request browser notification permission
     Notification.requestPermission().then((permission) => {
