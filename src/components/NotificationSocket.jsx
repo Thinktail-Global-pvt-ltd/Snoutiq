@@ -3,37 +3,28 @@ import { io } from "socket.io-client";
 
 export default function NotificationSocket() {
   useEffect(() => {
-    // -------------------- SOCKET.IO --------------------
-    const socket = io("http://localhost:4000", {
-      withCredentials: true, // important for credentials
-    });
+    // Socket server connect
+    const socket = io("http://localhost:4000");
 
-    socket.on("connect", () => {
-      console.log("✅ Connected to socket server:", socket.id);
-    });
-
-    socket.on("receive_notification", (data) => {
-      // Safely show notification
-      if ("Notification" in window) {
-        if (Notification.permission === "granted") {
-          new Notification(data.title, { body: data.message });
-        } else if (Notification.permission !== "denied") {
-          Notification.requestPermission().then((permission) => {
-            if (permission === "granted") {
-              new Notification(data.title, { body: data.message });
-            }
-          });
-        }
-      } else {
-        console.warn("⚠️ Notifications not supported in this browser.");
+    // Request browser notification permission
+    Notification.requestPermission().then((permission) => {
+      if (permission === "granted") {
+        console.log("Notification permission granted");
       }
     });
 
-    // Cleanup on unmount
+    socket.on("connect", () => {
+      console.log("Connected to socket server");
+    });
+
+    socket.on("receive_notification", (data) => {
+      new Notification(data.title, { body: data.message });
+    });
+
     return () => {
       socket.disconnect();
     };
   }, []);
 
-  return null;
+  return null; 
 }
