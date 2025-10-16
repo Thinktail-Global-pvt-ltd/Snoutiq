@@ -351,16 +351,24 @@ import { Server } from "socket.io";
 
 const httpServer = createServer();
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "https://snoutiq.com" // production domain
+];
+
 const io = new Server(httpServer, {
   cors: {
-    // origin: [
-    //   "http://localhost:3000",
-    //   "http://127.0.0.1:3000", 
-    //   "https://snoutiq.com"
-    // ],
-     origin: "*", 
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      }
+    },
     methods: ["GET", "POST"],
-    credentials: true,
+    credentials: true
   },
   path: "/socket.io/",
 });
