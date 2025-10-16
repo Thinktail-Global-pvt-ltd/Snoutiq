@@ -9,7 +9,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Fixed filenames to avoid hashed names (Safari/MIME safe)
-        entryFileNames: 'assets/index.js',
+        entryFileNames: 'assets/index.js',      // <-- index.html me use hoga
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]',
         manualChunks: {

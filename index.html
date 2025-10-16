@@ -36,7 +36,7 @@
   <link rel="preload" href="/assets/index-B5H-QuNv.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="/assets/index-B5H-QuNv.css"></noscript>
 
-  <!-- Deferred GTM -->
+  <!-- GTM & FB Pixel deferred (same as before) -->
   <script>
     window.addEventListener("load", () => {
       setTimeout(() => {
@@ -50,11 +50,9 @@
           j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
           f.parentNode.insertBefore(j,f);
         })(window,document,'script','dataLayer','GTM-5D756BMW');
-      }, 10000); // 10 seconds delay
+      }, 10000);
     });
   </script>
-
-  <!-- Deferred Facebook Pixel -->
   <script>
     setTimeout(function() {
       !function(f,b,e,v,n,t,s) {
@@ -73,17 +71,20 @@
       }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '1909812439872823');
       fbq('track', 'PageView');
-    }, 7000); // 7 seconds delay
+    }, 7000);
   </script>
+
+  <!-- Production JS -->
+<!-- Dev version -->
+<script type="module" src="/src/main.jsx"></script>
+
 </head>
 
 <body>
-  <!-- GTM noscript fallback -->
   <noscript>
     <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW" height="0" width="0" style="display:none;visibility:hidden"></iframe>
   </noscript>
 
-  <!-- Facebook Pixel noscript -->
   <noscript>
     <img height="1" width="1" style="display:none"
       src="https://www.facebook.com/tr?id=1909812439872823&ev=PageView&noscript=1"
@@ -91,10 +92,6 @@
   </noscript>
 
   <div id="root"></div>
-
-  <!-- Production JS -->
-  <script type="module" src="/src/main.jsx"></script>
-
 
   <!-- Safe Notification API Example -->
   <script>
