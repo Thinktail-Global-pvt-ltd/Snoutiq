@@ -1,51 +1,28 @@
+
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    />
-    <title>SnoutIQ - Your AI Pet Companion</title>
-    <meta
-      name="description"
-      content="AI pet care with 24/7 support, vet video consultations, and health checks."
-    />
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SnoutIQ - Your AI Pet Companion</title>
+  <meta name="description" content="AI pet care with 24/7 support, vet video consultations, and health checks.">
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- Preconnect & preload fonts -->
 
-    <!-- Favicon -->
-    <link rel="icon" href="/favicon.webp" sizes="32x32" type="image/webp" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.webp" />
+  <!-- Critical CSS -->
+  <style>
+    body { margin:0; font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+    #root { min-height:100vh; display:flex; flex-direction:column;}
+  </style>
 
-    <!-- Critical CSS -->
-    <style>
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        width: 100%;
-        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
-          "Segoe UI", Roboto, sans-serif;
-        background-color: #fff;
-      }
+  <!-- Deferred main CSS -->
+  <noscript><link rel="stylesheet" href="/assets/index.css"></noscript>
 
-      #root {
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-      }
-    </style>
-  </head>
+</head>
 
-  <body>
-    <div id="root"></div>
+<body>
 
-    <!-- ✅ Correct entry for Vite dev mode -->
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx" defer></script>
+</body>
 </html>
