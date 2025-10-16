@@ -13,33 +13,13 @@
       content="AI pet care with 24/7 support, vet video consultations, and health checks."
     />
 
-    <!-- Preconnect & Preload Fonts -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="preload"
-      href="/fonts/inter-400.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin="anonymous"
-    />
-    <link
-      rel="preload"
-      href="/fonts/inter-700.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin="anonymous"
-    />
 
     <!-- Favicon -->
     <link rel="icon" href="/favicon.webp" sizes="32x32" type="image/webp" />
-    <link rel="icon" sizes="192x192" href="/favicon-192.webp" />
-    <link rel="icon" sizes="512x512" href="/favicon-512.webp" />
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="/favicon-512.webp"
-    />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.webp" />
 
     <!-- Critical CSS -->
     <style>
@@ -52,8 +32,6 @@
         font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
           "Segoe UI", Roboto, sans-serif;
         background-color: #fff;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
       }
 
       #root {
@@ -62,96 +40,12 @@
         flex-direction: column;
       }
     </style>
-
-    <!-- Main CSS (preloaded for performance) -->
-    <link
-      rel="preload"
-      href="/assets/index.css"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript><link rel="stylesheet" href="/assets/index.css" /></noscript>
-
-    <!-- Google Tag Manager (delayed load) -->
-    <script>
-      window.addEventListener("load", () => {
-        setTimeout(() => {
-          (function (w, d, s, l, i) {
-            w[l] = w[l] || [];
-            w[l].push({
-              "gtm.start": new Date().getTime(),
-              event: "gtm.js",
-            });
-            var f = d.getElementsByTagName(s)[0],
-              j = d.createElement(s),
-              dl = l != "dataLayer" ? "&l=" + l : "";
-            j.async = true;
-            j.src =
-              "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
-            f.parentNode.insertBefore(j, f);
-          })(window, document, "script", "dataLayer", "GTM-5D756BMW");
-        }, 10000);
-      });
-    </script>
-
-    <!-- Meta Pixel (delayed load) -->
-    <script>
-      setTimeout(function () {
-        !(function (f, b, e, v, n, t, s) {
-          if (f.fbq) return;
-          n = f.fbq = function () {
-            n.callMethod
-              ? n.callMethod.apply(n, arguments)
-              : n.queue.push(arguments);
-          };
-          if (!f._fbq) f._fbq = n;
-          n.push = n;
-          n.loaded = !0;
-          n.version = "2.0";
-          n.queue = [];
-          t = b.createElement(e);
-          t.async = !0;
-          t.src = v;
-          s = b.getElementsByTagName(e)[0];
-          s.parentNode.insertBefore(t, s);
-        })(
-          window,
-          document,
-          "script",
-          "https://connect.facebook.net/en_US/fbevents.js"
-        );
-        fbq("init", "1909812439872823");
-        fbq("track", "PageView");
-      }, 7000);
-    </script>
   </head>
 
   <body>
-    <!-- GTM Noscript -->
-    <noscript>
-      <iframe
-        src="https://www.googletagmanager.com/ns.html?id=GTM-5D756BMW"
-        height="0"
-        width="0"
-        style="display: none; visibility: hidden"
-      ></iframe>
-    </noscript>
-
-    <!-- Meta Pixel Noscript -->
-    <noscript>
-      <img
-        height="1"
-        width="1"
-        style="display: none"
-        src="https://www.facebook.com/tr?id=1909812439872823&ev=PageView&noscript=1"
-      />
-    </noscript>
-
-    <!-- App Root -->
     <div id="root"></div>
 
-    <!-- ✅ Correct JavaScript path (for production build) -->
-    <!-- This file will be generated inside /dist/assets/ after build -->
-    <script type="module" src="/assets/index-xxxxx.js"></script>
+    <!-- ✅ Correct entry for Vite dev mode -->
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
