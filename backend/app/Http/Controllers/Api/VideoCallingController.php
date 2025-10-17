@@ -12,6 +12,7 @@ class VideoCallingController extends Controller
     public function nearbyVets(Request $request)
     {
         $userId = $request->query('user_id');
+        $date   = (string) $request->query('date', now('Asia/Kolkata')->toDateString());
 
         if (!$userId) {
             return response()->json([
@@ -55,9 +56,102 @@ class VideoCallingController extends Controller
             ->orderBy('distance', 'asc')
             ->get();
 
+        if ($vets->isEmpty()) {
+            return response()->json([
+                'status' => 'success',
+                'date'   => $date,
+                'data'   => $vets,
+                'available_doctors_by_vet' => new \stdClass(),
+            ]);
+        }
+
+        $vetIds = $vets->pluck('id')->all();
+
+        $doctors = DB::table('doctors')
+            ->select('id', 'vet_registeration_id')
+            ->whereIn('vet_registeration_id', $vetIds)
+            ->get();
+
+        if ($doctors->isEmpty()) {
+            return response()->json([
+                'status' => 'success',
+                'date'   => $date,
+                'data'   => [],
+                'available_doctors_by_vet' => new \stdClass(),
+            ]);
+        }
+
+        $doctorIds = $doctors->pluck('id')->all();
+
+        $activeDoctorIds = DB::table('doctor_video_availability')
+            ->whereIn('doctor_id', $doctorIds)
+            ->where('is_active', 1)
+            ->distinct()
+            ->pluck('doctor_id');
+
+        if ($activeDoctorIds->isEmpty()) {
+            return response()->json([
+                'status' => 'success',
+                'date'   => $date,
+                'data'   => [],
+                'available_doctors_by_vet' => new \stdClass(),
+            ]);
+        }
+
+        $utcNightHours = array_merge(range(13, 23), range(0, 6));
+
+        $busyDoctorIds = DB::table('video_slots')
+            ->whereIn('committed_doctor_id', $activeDoctorIds->all())
+            ->where('slot_date', $date)
+            ->whereIn('hour_24', $utcNightHours)
+            ->whereIn('status', ['committed', 'in_progress', 'done'])
+            ->distinct()
+            ->pluck('committed_doctor_id')
+            ->all();
+
+        $activeDoctorSet = array_fill_keys($activeDoctorIds->all(), true);
+        $busyDoctorSet   = array_fill_keys($busyDoctorIds, true);
+
+        $doctorsByVet = $doctors->groupBy('vet_registeration_id');
+        $availableDoctorsByVet = [];
+
+        $filteredVets = $vets->filter(function ($vet) use ($doctorsByVet, $activeDoctorSet, $busyDoctorSet, &$availableDoctorsByVet) {
+            $doctorsForVet = $doctorsByVet->get($vet->id);
+
+            if (!$doctorsForVet) {
+                return false;
+            }
+
+            $qualified = collect($doctorsForVet)
+                ->pluck('id')
+                ->filter(function ($doctorId) use ($activeDoctorSet, $busyDoctorSet) {
+                    if (!isset($activeDoctorSet[$doctorId])) {
+                        return false;
+                    }
+
+                    if (isset($busyDoctorSet[$doctorId])) {
+                        return false;
+                    }
+
+                    return true;
+                })
+                ->values()
+                ->all();
+
+            if (empty($qualified)) {
+                return false;
+            }
+
+            $availableDoctorsByVet[$vet->id] = $qualified;
+
+            return true;
+        });
+
         return response()->json([
             'status' => 'success',
-            'data'   => $vets,
+            'date'   => $date,
+            'data'   => $filteredVets->values(),
+            'available_doctors_by_vet' => (object) $availableDoctorsByVet,
         ]);
     }
 }
