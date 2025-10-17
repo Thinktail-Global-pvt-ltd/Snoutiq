@@ -385,3 +385,599 @@
     animation: none;
   }
 }
+
+
+
+
+
+
+
+/* Diwali Header Animations */
+.diwali-header {
+  background: linear-gradient(135deg, #ffffff 0%, #fff8e1 50%, #ffedd5 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Diwali Lights Animation */
+.diwali-lights-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #1a1a1a, #2d1b00, #1a1a1a);
+  z-index: 51;
+  overflow: hidden;
+}
+
+.diwali-light {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  top: -4px;
+  animation: light-flicker 2s infinite;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.light-0 { background: #ff0000; animation-delay: 0s; }
+.light-1 { background: #ff9900; animation-delay: 0.2s; }
+.light-2 { background: #ffff00; animation-delay: 0.4s; }
+.light-3 { background: #00ff00; animation-delay: 0.6s; }
+.light-4 { background: #ff00ff; animation-delay: 0.8s; }
+
+@keyframes light-flicker {
+  0%, 100% { 
+    opacity: 0.3; 
+    transform: scale(0.8);
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.2);
+    box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+}
+
+/* Floating Diyas in Header */
+.header-diyas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 49;
+}
+
+.header-diya {
+  position: absolute;
+  font-size: 1rem;
+  opacity: 0.7;
+  animation: header-float 8s ease-in-out infinite;
+}
+
+.h-diya-1 { top: 10px; left: 10%; animation-delay: 0s; }
+.h-diya-2 { top: 15px; left: 30%; animation-delay: 1s; }
+.h-diya-3 { top: 8px; left: 50%; animation-delay: 2s; }
+.h-diya-4 { top: 12px; left: 70%; animation-delay: 3s; }
+.h-diya-5 { top: 5px; left: 85%; animation-delay: 4s; }
+.h-diya-6 { top: 18px; left: 25%; animation-delay: 5s; }
+
+@keyframes header-float {
+  0%, 100% { 
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.3;
+  }
+  50% { 
+    transform: translateY(-8px) rotate(5deg);
+    opacity: 0.8;
+  }
+}
+
+/* Logo Glow Effect */
+.logo-container {
+  position: relative;
+  display: inline-block;
+}
+
+.logo-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 30px;
+  background: radial-gradient(circle, rgba(255,107,0,0.4) 0%, rgba(255,107,0,0) 70%);
+  border-radius: 50%;
+  animation: logo-pulse 2s ease-in-out infinite;
+  z-index: 1;
+}
+
+.diya-sparkle {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 0.6rem;
+  animation: sparkle-spin 3s linear infinite;
+}
+
+@keyframes logo-pulse {
+  0%, 100% { 
+    opacity: 0.5;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  50% { 
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+@keyframes sparkle-spin {
+  from { transform: rotate(0deg) scale(1); }
+  to { transform: rotate(360deg) scale(1.2); }
+}
+
+/* Diwali Badge */
+.diwali-badge {
+  background: linear-gradient(45deg, #ff6b00, #ffa500, #ffd700, #ffa500, #ff6b00);
+  background-size: 200% 200%;
+  animation: badge-shimmer 2s ease infinite;
+  box-shadow: 0 2px 10px rgba(255, 107, 0, 0.3);
+}
+
+@keyframes badge-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Diwali Buttons */
+.diwali-btn {
+  background: linear-gradient(45deg, #ff6b00, #ffa500, #ffd700);
+  background-size: 200% 200%;
+  animation: button-glow 3s ease infinite;
+  box-shadow: 0 4px 15px rgba(255, 107, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.diwali-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.diwali-btn:hover::before {
+  left: 100%;
+}
+
+.diwali-btn-secondary {
+  box-shadow: 0 2px 10px rgba(255, 107, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.diwali-btn-secondary:hover {
+  box-shadow: 0 4px 15px rgba(255, 107, 0, 0.3);
+}
+
+@keyframes button-glow {
+  0%, 100% { 
+    box-shadow: 0 4px 15px rgba(255, 107, 0, 0.4);
+  }
+  50% { 
+    box-shadow: 0 6px 20px rgba(255, 107, 0, 0.6), 0 0 30px rgba(255, 107, 0, 0.3);
+  }
+}
+
+/* User Card Effects */
+.diwali-user-card {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.diwali-user-card:hover {
+  box-shadow: 0 8px 25px rgba(255, 107, 0, 0.15) !important;
+}
+
+.user-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  background: radial-gradient(circle, rgba(255,107,0,0.3) 0%, rgba(255,107,0,0) 70%);
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.diwali-user-card:hover .user-glow {
+  opacity: 1;
+}
+
+/* Dropdown Styles */
+.diwali-dropdown {
+  position: relative;
+  overflow: hidden;
+}
+
+.dropdown-sparkle {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  font-size: 0.8rem;
+  animation: sparkle-bounce 2s ease-in-out infinite;
+}
+
+@keyframes sparkle-bounce {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-3px) scale(1.1); }
+}
+
+/* Mobile Menu Button */
+.diwali-menu-btn {
+  box-shadow: 0 2px 8px rgba(255, 107, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.diwali-menu-btn:hover {
+  box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
+  transform: scale(1.05);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .diwali-light {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .header-diya {
+    font-size: 0.8rem;
+  }
+  
+  .logo-glow {
+    width: 50px;
+    height: 25px;
+  }
+  
+  .diwali-badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+  }
+}
+
+/* Enhanced hover effects */
+.diwali-dropdown button {
+  position: relative;
+  overflow: hidden;
+}
+
+.diwali-dropdown button::before {
+  content: '';
+  position: absolute;
+  left: -100%;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,165,0,0.1), transparent);
+  transition: left 0.3s ease;
+}
+
+.diwali-dropdown button:hover::before {
+  left: 100%;
+}
+
+
+
+
+
+/* Diwali Footer Styles */
+.diwali-footer {
+  background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 25%, #fdba74 50%, #fb923c 75%, #ea580c 100%);
+  position: relative;
+}
+
+.diwali-footer-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Rangoli Pattern */
+.rangoli-pattern {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  height: 200px;
+  opacity: 0.1;
+  background: conic-gradient(from 0deg, #ff0000, #ff9900, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+  border-radius: 50%;
+  animation: rotate-rangoli 20s linear infinite;
+}
+
+@keyframes rotate-rangoli {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Floating Sparkles */
+.floating-sparkles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sparkle {
+  position: absolute;
+  font-size: 0.8rem;
+  opacity: 0;
+  animation: sparkle-float 6s ease-in-out infinite;
+}
+
+.s-0 { top: 10%; left: 10%; animation-delay: 0s; }
+.s-1 { top: 20%; left: 80%; animation-delay: 1s; }
+.s-2 { top: 60%; left: 15%; animation-delay: 2s; }
+.s-0:nth-child(4) { top: 30%; left: 70%; animation-delay: 3s; }
+.s-1:nth-child(5) { top: 70%; left: 85%; animation-delay: 4s; }
+.s-2:nth-child(6) { top: 40%; left: 90%; animation-delay: 5s; }
+
+@keyframes sparkle-float {
+  0%, 100% { 
+    opacity: 0;
+    transform: translateY(0px) scale(0.5);
+  }
+  50% { 
+    opacity: 1;
+    transform: translateY(-20px) scale(1.2);
+  }
+}
+
+/* Logo Glow Effect */
+.logo-container {
+  position: relative;
+  display: inline-block;
+}
+
+.logo-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 30px;
+  background: radial-gradient(circle, rgba(255,107,0,0.4) 0%, rgba(255,107,0,0) 70%);
+  border-radius: 50%;
+  animation: logo-pulse 2s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes logo-pulse {
+  0%, 100% { 
+    opacity: 0.5;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  50% { 
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+/* Diwali Badge */
+.diwali-badge {
+  background: linear-gradient(45deg, #ff6b00, #ffa500, #ffd700, #ffa500, #ff6b00);
+  background-size: 200% 200%;
+  animation: badge-shimmer 2s ease infinite;
+  box-shadow: 0 2px 10px rgba(255, 107, 0, 0.3);
+}
+
+@keyframes badge-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Social Media Buttons */
+.diwali-social-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.diwali-social-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.diwali-social-btn:hover::before {
+  left: 100%;
+}
+
+/* Newsletter Section */
+.diwali-newsletter {
+  border-image: linear-gradient(45deg, #ff6b00, #ffa500, #ffd700, #ffa500, #ff6b00) 1;
+  position: relative;
+}
+
+.diwali-newsletter::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #ff6b00, #ffa500, #ffd700, #ffa500, #ff6b00);
+  border-radius: 16px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.diwali-newsletter:hover::before {
+  opacity: 1;
+}
+
+/* Subscribe Button */
+.diwali-subscribe-btn {
+  position: relative;
+  overflow: hidden;
+  background-size: 200% 200%;
+  animation: button-glow 3s ease infinite;
+}
+
+.diwali-subscribe-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  transition: left 0.5s;
+}
+
+.diwali-subscribe-btn:hover::before {
+  left: 100%;
+}
+
+@keyframes button-glow {
+  0%, 100% { 
+    box-shadow: 0 4px 15px rgba(255, 107, 0, 0.4);
+  }
+  50% { 
+    box-shadow: 0 6px 20px rgba(255, 107, 0, 0.6), 0 0 30px rgba(255, 107, 0, 0.3);
+  }
+}
+
+/* Section Titles */
+.diwali-section-title {
+  position: relative;
+}
+
+.diwali-section-title::after {
+  content: '🪔';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  animation: diya-flicker 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes diya-flicker {
+  0% { opacity: 0.7; transform: translateY(-50%) scale(1); }
+  100% { opacity: 1; transform: translateY(-50%) scale(1.1); }
+}
+
+/* Footer Links */
+.diwali-footer-link {
+  position: relative;
+  padding-left: 8px;
+  transition: all 0.3s ease;
+}
+
+.diwali-footer-link::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  background: #ff6b00;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.diwali-footer-link:hover::before {
+  opacity: 1;
+}
+
+/* Contact Links */
+.diwali-contact-link {
+  position: relative;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.diwali-contact-link:hover {
+  background: rgba(255, 107, 0, 0.1);
+}
+
+/* Diya Border for Bottom Bar */
+.diya-border {
+  position: absolute;
+  top: -10px;
+  left: 0;
+  width: 100%;
+  height: 20px;
+  background-image: 
+    radial-gradient(circle at 10% 50%, #ff6b00 3px, transparent 4px),
+    radial-gradient(circle at 30% 50%, #ffa500 3px, transparent 4px),
+    radial-gradient(circle at 50% 50%, #ffd700 3px, transparent 4px),
+    radial-gradient(circle at 70% 50%, #ffa500 3px, transparent 4px),
+    radial-gradient(circle at 90% 50%, #ff6b00 3px, transparent 4px);
+  background-size: 20% 100%;
+  opacity: 0.6;
+}
+
+/* Festive Emoji */
+.festive-emoji {
+  animation: festive-bounce 2s ease-in-out infinite;
+}
+
+@keyframes festive-bounce {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.2) rotate(10deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .rangoli-pattern {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .sparkle {
+    font-size: 0.6rem;
+  }
+  
+  .diwali-badge {
+    font-size: 0.6rem;
+    padding: 2px 8px;
+  }
+  
+  .diya-border {
+    height: 15px;
+    background-size: 25% 100%;
+  }
+}
+
+/* Enhanced hover effects */
+.diwali-newsletter input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.1);
+  border-color: #ff6b00;
+}
