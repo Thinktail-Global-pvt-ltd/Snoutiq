@@ -1,0 +1,216 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Api\Video;
+
+use App\Http\Controllers\Controller;
+use App\Models\VideoSlot;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Carbon\CarbonImmutable;
+
+class VideoSlotController extends Controller
+{
+    // GET /api/video/slots/open?date=YYYY-MM-DD&strip_id=
+    public function openSlots(Request $request): JsonResponse
+    {
+        $date = (string) $request->query('date');
+        if (!$date) {
+            return response()->json(['error' => 'date is required (YYYY-MM-DD)'], 422);
+        }
+
+        $stripId = $request->query('strip_id');
+        $q = VideoSlot::query()
+            ->openForMarketplace($date, $stripId ? (int) $stripId : null)
+            ->orderBy('slot_date')
+            ->orderBy('hour_24')
+            ->orderBy('strip_id');
+
+        return response()->json([
+            'date'     => $date,
+            'strip_id' => $stripId ? (int) $stripId : null,
+            'slots'    => $q->get(),
+        ]);
+    }
+
+    // POST /api/video/slots/{slot}/commit
+    public function commit(Request $request, int $slot): JsonResponse
+    {
+        $slotModel = VideoSlot::query()->find($slot);
+        if (!$slotModel) {
+            return response()->json(['error' => 'Slot not found'], 404);
+        }
+
+        $data = $request->validate([
+            'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
+        ]);
+
+        try {
+            $updated = DB::transaction(function () use ($slotModel, $data) {
+                // lock the row to avoid double-commit
+                /** @var VideoSlot $row */
+                $row = VideoSlot::query()->whereKey($slotModel->id)->lockForUpdate()->firstOrFail();
+
+                if (!in_array($row->status, ['open', 'held'], true)) {
+                    throw new \RuntimeException('Slot is not open for commit');
+                }
+
+                $row->status = 'committed';
+                $row->committed_doctor_id = (int) $data['doctor_id'];
+                // (optional) set due/check-in times here if you want
+                $row->save();
+
+                return $row->fresh();
+            });
+
+            return response()->json(['slot' => $updated], 200);
+        } catch (\Throwable $e) {
+            // conflict or validation-like business error
+            return response()->json(['error' => $e->getMessage()], 409);
+        }
+    }
+
+    // POST /api/video/slots/{slot}/checkin
+    public function checkin(Request $request, int $slot): JsonResponse
+    {
+        $slotModel = VideoSlot::query()->find($slot);
+        if (!$slotModel) {
+            return response()->json(['error' => 'Slot not found'], 404);
+        }
+
+        $data = $request->validate([
+            'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
+        ]);
+
+        try {
+            $updated = DB::transaction(function () use ($slotModel, $data) {
+                /** @var VideoSlot $row */
+                $row = VideoSlot::query()->whereKey($slotModel->id)->lockForUpdate()->firstOrFail();
+
+                // Dev-safety: ensure same doctor is checking in
+                if ((int) $row->committed_doctor_id !== (int) $data['doctor_id']) {
+                    throw new \RuntimeException('Not your committed slot');
+                }
+
+                // mark checked-in and move to in_progress (simple dev logic)
+                $row->checked_in_at = now()->toImmutable(); // UTC timestamps
+                if (in_array($row->status, ['committed', 'held'], true)) {
+                    $row->status = 'in_progress';
+                }
+                $row->save();
+
+                return $row->fresh();
+            });
+
+            return response()->json(['status' => 'ok', 'slot' => $updated], 200);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 409);
+        }
+    }
+
+    // GET /api/video/slots/doctor?doctor_id=ID&date=YYYY-MM-DD&tz=IST
+    // public function doctorSlots(Request $request): JsonResponse
+    // {
+    //     $doctorId = (int) $request->query('doctor_id');
+    //     $date     = (string) $request->query('date');
+    //     $tz       = strtoupper((string) $request->query('tz', 'IST'));
+
+    //     if (!$doctorId || !$date) {
+    //         return response()->json(['error' => 'doctor_id and date are required'], 422);
+    //     }
+
+    //     // Allowed IST night hours 19..06
+    //     $hoursIst = [19,20,21,22,23,0,1,2,3,4,5,6];
+
+    //     // Build (slot_date UTC, hour_24 UTC) pairs for the requested IST date
+    //     $pairs = [];
+    //     if ($tz === 'IST') {
+    //         foreach ($hoursIst as $hIst) {
+    //             $hm  = str_pad((string)$hIst, 2, '0', STR_PAD_LEFT) . ':00:00';
+    //             $ist = CarbonImmutable::createFromFormat('Y-m-d H:i:s', $date . ' ' . $hm, 'Asia/Kolkata');
+    //             $utc = $ist->setTimezone('UTC');
+    //             $pairs[] = [$utc->toDateString(), (int) $utc->format('G')];
+    //         }
+    //     } else {
+    //         // Treat given date as UTC calendar day; include hours 19..06 as provided
+    //         foreach ($hoursIst as $h) {
+    //             $pairs[] = [$date, (int) $h];
+    //         }
+    //     }
+
+    //     $query = VideoSlot::query()
+    //         ->where('committed_doctor_id', $doctorId)
+    //         ->whereIn('status', ['committed','in_progress','done'])
+    //         ->where(function ($q) use ($pairs) {
+    //             foreach ($pairs as [$d, $h]) {
+    //                 $q->orWhere(function ($qq) use ($d, $h) {
+    //                     $qq->where('slot_date', $d)->where('hour_24', $h);
+    //                 });
+    //             }
+    //         })
+    //         ->orderBy('slot_date')
+    //         ->orderBy('hour_24');
+
+    //     return response()->json([
+    //         'doctor_id' => $doctorId,
+    //         'date'      => $date,
+    //         'slots'     => $query->get(),
+    //     ]);
+    // }
+
+    public function doctorSlots(Request $request): JsonResponse
+    {
+         $doctorId = (int) $request->query('doctor_id');
+    $date     = (string) $request->query('date', now('Asia/Kolkata')->toDateString());
+    $tz       = strtoupper((string) $request->query('tz', 'IST'));
+
+    if (!$doctorId || !$date) {
+        return response()->json(['error' => 'doctor_id and date are required'], 422);
+    }
+
+    // IST night hours → UTC 13..23 + 0..6
+    $utcNightHours = array_merge(range(13, 23), range(0, 6));
+
+    $rows = VideoSlot::query()
+        ->where('committed_doctor_id', $doctorId)
+        ->where('slot_date', $date)
+        ->whereIn('hour_24', $utcNightHours)
+        ->whereIn('status', ['committed','in_progress','done'])
+        ->orderBy('hour_24')
+        ->orderBy('strip_id')
+        ->orderByRaw("FIELD(role,'primary','bench')")
+        ->get();
+
+    $mapped = $rows->map(function ($r) {
+        $istHour = ($r->hour_24 + 6) % 24;
+        // ✅ safe parse (handles 'YYYY-MM-DD' or full timestamps)
+        $istDate = CarbonImmutable::parse($r->slot_date, 'Asia/Kolkata');
+        if ($istHour <= 6) {
+            $istDate = $istDate->addDay();
+        }
+
+        return [
+            'id' => $r->id,
+            'strip_id' => $r->strip_id,
+            'slot_date' => $r->slot_date,
+            'hour_24' => $r->hour_24,
+            'role' => $r->role,
+            'status' => $r->status,
+            'committed_doctor_id' => $r->committed_doctor_id,
+            'ist_hour' => $istHour,
+            'ist_datetime' => $istDate->setTime($istHour, 0)->format('Y-m-d H:i:s'),
+        ];
+    });
+
+    return response()->json([
+        'doctor_id' => $doctorId,
+        'date'      => $date,
+        'tz'        => $tz,
+        'count'     => $mapped->count(),
+        'slots'     => $mapped,
+    ]);
+    }
+
+}

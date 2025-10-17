@@ -508,3 +508,115 @@ Route::middleware('web')->group(function () {
 use App\Http\Controllers\Api\UserOrdersController;
 
 Route::get('/users/{id}/orders', [UserOrdersController::class, 'index']);
+
+// Night Video Coverage APIs
+use App\Http\Controllers\Api\Video\DoctorVideoScheduleController as VDoctorVideoScheduleController;
+use App\Http\Controllers\Api\Video\VideoSlotController as VVideoSlotController;
+use App\Http\Controllers\Api\Video\CoverageController as VCoverageController;
+use App\Http\Controllers\Api\Video\PincodeCoverageController as VPincodeCoverageController;
+use App\Http\Controllers\Api\Video\RoutingController as VRoutingController;
+use App\Http\Controllers\Api\Video\AdminController as VAdminController;
+
+// routes/api.php
+Route::get('/geo/pincodes', [\App\Http\Controllers\Api\GeoController::class, 'pincodes']);
+use App\Http\Controllers\Api\LocationSlotsController;
+use App\Http\Controllers\Api\GeoController;
+
+Route::get('/geo/pincodes',        [GeoController::class, 'pincodes']);
+// These rely on session (user_id), so attach 'web' middleware to enable session cookies
+Route::middleware('web')->group(function(){
+    Route::get('/geo/nearest-pincode', [LocationSlotsController::class, 'nearestPincode']);
+    Route::get('/video/slots/nearby',  [LocationSlotsController::class, 'openSlotsNear']);
+    // New: pincode-based open slots (does not use geo_strips table)
+    Route::get('/video/slots/nearby/pincode',  [LocationSlotsController::class, 'openSlotsByPincode']);
+    Route::get('/debug/user-location', [LocationSlotsController::class, 'dumpUserLocation']);
+    Route::get('/video/strip-for-pincode', [LocationSlotsController::class, 'stripForPincode']);
+    Route::get('/video/nearest-strip', [LocationSlotsController::class, 'nearestStrip']);
+});
+
+// Public read-only endpoints for admin dashboard integration
+Route::prefix('video')->group(function () {
+    Route::get('/slots/open', [VVideoSlotController::class, 'openSlots']);
+    Route::get('/slots/doctor', [VVideoSlotController::class, 'doctorSlots']);
+    Route::get('/coverage', [VCoverageController::class, 'matrix']);
+    Route::get('/pincode-coverage', [VPincodeCoverageController::class, 'matrix']);
+    Route::post('/route', [VRoutingController::class, 'assign']);
+});
+
+// Protected write endpoints
+Route::prefix('video')->group(function () {
+    Route::get('/schedule/{doctor}', [VDoctorVideoScheduleController::class, 'show']);
+    Route::post('/schedule/{doctor}', [VDoctorVideoScheduleController::class, 'storeOrUpdate']);
+    Route::post('/schedule/{doctor}/toggle-247', [VDoctorVideoScheduleController::class, 'toggle247']);
+
+    Route::post('/slots/{slot}/commit', [VVideoSlotController::class, 'commit']);
+    Route::post('/slots/{slot}/checkin', [VVideoSlotController::class, 'checkin']);
+
+    // Admin helper to publish tonight's slots
+    Route::post('/admin/publish', [VAdminController::class, 'publish']);
+    // Admin helper to reset video slot data
+    Route::post('/admin/reset', [VAdminController::class, 'reset']);
+});
+
+Route::middleware('web')->get('/geo/strips', [\App\Http\Controllers\Api\GeoController::class, 'strips']);
+
+Route::middleware('web')->get('/app/video/heatmap', function () {
+    $doctors = \App\Models\Doctor::select('id','doctor_name')->orderBy('doctor_name')->get();
+    return view('snoutiq.app-video-heatmap', compact('doctors'));
+});
+
+use App\Models\VideoSlot;
+use Carbon\CarbonImmutable;
+
+Route::get('/video/slots/doctor-test', function (\Illuminate\Http\Request $request) {
+    $doctorId = (int) $request->query('doctor_id');
+    $date     = (string) $request->query('date', now('Asia/Kolkata')->toDateString());
+    $tz       = strtoupper((string) $request->query('tz', 'IST'));
+
+    if (!$doctorId || !$date) {
+        return response()->json(['error' => 'doctor_id and date are required'], 422);
+    }
+
+    // IST night hours → UTC 13..23 + 0..6
+    $utcNightHours = array_merge(range(13, 23), range(0, 6));
+
+    $rows = VideoSlot::query()
+        ->where('committed_doctor_id', $doctorId)
+        ->where('slot_date', $date)
+        ->whereIn('hour_24', $utcNightHours)
+        ->whereIn('status', ['committed','in_progress','done'])
+        ->orderBy('hour_24')
+        ->orderBy('strip_id')
+        ->orderByRaw("FIELD(role,'primary','bench')")
+        ->get();
+
+    $mapped = $rows->map(function ($r) {
+        $istHour = ($r->hour_24 + 6) % 24;
+        // ✅ safe parse (handles 'YYYY-MM-DD' or full timestamps)
+        $istDate = CarbonImmutable::parse($r->slot_date, 'Asia/Kolkata');
+        if ($istHour <= 6) {
+            $istDate = $istDate->addDay();
+        }
+
+        return [
+            'id' => $r->id,
+            'strip_id' => $r->strip_id,
+            'slot_date' => $r->slot_date,
+            'hour_24' => $r->hour_24,
+            'role' => $r->role,
+            'status' => $r->status,
+            'committed_doctor_id' => $r->committed_doctor_id,
+            'ist_hour' => $istHour,
+            'ist_datetime' => $istDate->setTime($istHour, 0)->format('Y-m-d H:i:s'),
+        ];
+    });
+
+    return response()->json([
+        'doctor_id' => $doctorId,
+        'date'      => $date,
+        'tz'        => $tz,
+        'count'     => $mapped->count(),
+        'slots'     => $mapped,
+    ]);
+});
+
