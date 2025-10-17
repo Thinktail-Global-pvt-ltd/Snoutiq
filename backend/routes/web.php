@@ -222,3 +222,12 @@ Route::middleware('web')->get('/video/app/night-coverage', function () {
         'page_title' => 'Night Video Coverage',
     ]);
 });
+// routes/web.php
+Route::get('/backend/video/night/edit', function (\Illuminate\Http\Request $req) {
+    return view('snoutiq.video-calling-night-edit', [
+        'doctorId' => (int) $req->query('doctor_id', auth()->id() ?? 0),
+        'userId'   => (int) $req->query('user_id',   auth()->id() ?? 0),
+        'date'     => $req->query('date'),
+        // 'doctors' => \App\Models\Doctor::select('id','name')->get(), // optional
+    ]);
+})->name('video.night.edit');
