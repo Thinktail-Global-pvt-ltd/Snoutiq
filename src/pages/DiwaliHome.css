@@ -1,0 +1,387 @@
+/* Diwali Home Page Animations */
+.diwali-home {
+  position: relative;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 25%, #fed7aa 75%, #fdba74 100%);
+}
+
+/* Hero Chat Spotlight - Main Focus */
+.hero-chat-spotlight {
+  position: relative;
+  animation: spotlight-pulse 3s ease-in-out infinite;
+}
+
+@keyframes spotlight-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 20px rgba(251, 146, 60, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 40px rgba(251, 146, 60, 0.6));
+  }
+}
+
+/* Sparkle Effects on Chat Input */
+.sparkle {
+  position: absolute;
+  font-size: 1.2rem;
+  animation: sparkle-float 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.sparkle-1 {
+  top: 10%;
+  right: 15%;
+  animation-delay: 0s;
+}
+
+.sparkle-2 {
+  top: 60%;
+  left: 10%;
+  animation-delay: 1s;
+}
+
+.sparkle-3 {
+  bottom: 20%;
+  right: 20%;
+  animation-delay: 2s;
+}
+
+@keyframes sparkle-float {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-15px) scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Fireworks Animation - Subtle */
+.fireworks-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.6;
+}
+
+.firework {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  animation: firework-animation 3s infinite ease-out;
+}
+
+.firework-0 { background: #fb923c; top: 15%; left: 10%; animation-delay: 0s; }
+.firework-1 { background: #f97316; top: 25%; left: 85%; animation-delay: 0.8s; }
+.firework-2 { background: #fbbf24; top: 70%; left: 15%; animation-delay: 1.6s; }
+.firework-3 { background: #ec4899; top: 80%; left: 80%; animation-delay: 2.4s; }
+.firework-4 { background: #f43f5e; top: 45%; left: 50%; animation-delay: 3.2s; }
+
+@keyframes firework-animation {
+  0% {
+    transform: translateY(150vh) scale(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-50px) scale(2);
+    opacity: 0;
+  }
+}
+
+/* Floating Diyas - More Subtle */
+.floating-diyas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.4;
+}
+
+.diya {
+  position: absolute;
+  font-size: 1.5rem;
+  animation: float-diya 8s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(251, 146, 60, 0.6));
+}
+
+.diya-1 { top: 8%; left: 5%; animation-delay: 0s; }
+.diya-2 { top: 12%; right: 8%; animation-delay: 1.2s; }
+.diya-3 { top: 88%; left: 6%; animation-delay: 2.4s; }
+.diya-4 { top: 85%; right: 10%; animation-delay: 3.6s; }
+.diya-5 { top: 45%; right: 5%; animation-delay: 4.8s; }
+.diya-6 { top: 92%; left: 50%; animation-delay: 6s; }
+.diya-7 { top: 35%; left: 8%; animation-delay: 7.2s; }
+.diya-8 { top: 55%; right: 12%; animation-delay: 8.4s; }
+
+@keyframes float-diya {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-25px) rotate(8deg);
+    opacity: 0.7;
+  }
+}
+
+/* Rangoli Background - Subtle */
+.rangoli-bg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  opacity: 0.05;
+  background: conic-gradient(
+    from 0deg,
+    #fb923c,
+    #f97316,
+    #fbbf24,
+    #34d399,
+    #60a5fa,
+    #a78bfa,
+    #ec4899,
+    #fb923c
+  );
+  border-radius: 50%;
+  animation: rotate-rangoli 30s linear infinite;
+  filter: blur(40px);
+}
+
+@keyframes rotate-rangoli {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Diwali Gradient Text */
+.diwali-gradient-text {
+  background: linear-gradient(
+    120deg,
+    #fb923c 0%,
+    #f97316 20%,
+    #fbbf24 40%,
+    #f97316 60%,
+    #fb923c 80%,
+    #fb923c 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 4s ease infinite;
+  font-weight: 800;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+  100% { background-position: 0% center; }
+}
+
+/* Fade In Up Animation */
+.fade-in-up {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fade-in-up.animate-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Diya Loader */
+.diya-loader {
+  animation: diya-flicker 1.2s ease-in-out infinite;
+}
+
+@keyframes diya-flicker {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+    filter: drop-shadow(0 0 10px rgba(251, 146, 60, 0.8));
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 20px rgba(251, 146, 60, 1));
+  }
+}
+
+/* Feature Card Animations */
+.diwali-feature-card {
+  opacity: 0;
+  animation: card-enter 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  position: relative;
+  overflow: hidden;
+}
+
+.diwali-feature-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transform: rotate(45deg);
+  animation: card-shine 3s ease-in-out infinite;
+}
+
+@keyframes card-shine {
+  0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+  100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(60px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Sparkle Overlay for CTA */
+.sparkle-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 15% 25%, rgba(255,255,255,0.8) 2px, transparent 3px),
+    radial-gradient(circle at 85% 75%, rgba(255,255,255,0.8) 2px, transparent 3px),
+    radial-gradient(circle at 35% 85%, rgba(255,255,255,0.8) 2px, transparent 3px),
+    radial-gradient(circle at 65% 15%, rgba(255,255,255,0.8) 2px, transparent 3px),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8) 2px, transparent 3px);
+  background-size: 250px 250px;
+  animation: sparkle-twinkle 2.5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+@keyframes sparkle-twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+/* Diwali CTA Button */
+.diwali-cta-btn {
+  position: relative;
+  overflow: hidden;
+  background: white;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 10px 30px rgba(251, 146, 60, 0.3);
+}
+
+.diwali-cta-btn::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #fb923c, #fbbf24, #ec4899, #fb923c);
+  background-size: 300% 300%;
+  border-radius: inherit;
+  z-index: -1;
+  animation: border-glow 3s ease infinite;
+}
+
+@keyframes border-glow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.diwali-cta-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  transition: left 0.6s;
+}
+
+.diwali-cta-btn:hover::before {
+  left: 100%;
+}
+
+/* Loading Animation */
+.diwali-loading {
+  position: relative;
+  display: inline-block;
+}
+
+.diwali-loading::after {
+  content: '✨';
+  margin-left: 0.5rem;
+  animation: loading-dots 1.2s steps(3, end) infinite;
+}
+
+@keyframes loading-dots {
+  0% { content: '✨'; }
+  33% { content: '✨✨'; }
+  66% { content: '✨✨✨'; }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .floating-diyas .diya {
+    font-size: 1.2rem;
+  }
+  
+  .rangoli-bg {
+    width: 250px;
+    height: 250px;
+  }
+  
+  .firework {
+    width: 2px;
+    height: 2px;
+  }
+  
+  .sparkle {
+    font-size: 1rem;
+  }
+  
+  .hero-chat-spotlight {
+    animation: none;
+  }
+}
+
+/* Additional Modern Effects */
+@media (prefers-reduced-motion: reduce) {
+  .fireworks-container,
+  .floating-diyas,
+  .rangoli-bg,
+  .sparkle,
+  .hero-chat-spotlight {
+    animation: none;
+  }
+}

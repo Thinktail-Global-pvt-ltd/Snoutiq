@@ -3,23 +3,11 @@ import { Server } from "socket.io";
 
 const httpServer = createServer();
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "https://snoutiq.com"
-];
-
 const io = new Server(httpServer, {
   cors: {
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`));
-      }
-    },
+    origin: "*", // ✅ sabhi origins allowed
     methods: ["GET", "POST"],
-    credentials: true,
+    credentials: false, // ❌ credentials true ke saath "*" allowed nahi hota
   },
   path: "/socket.io/",
 });
