@@ -431,7 +431,7 @@ export default function Footer() {
           <div className="max-w-7xl mx-auto px-6 py-6">
             <div className="flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0">
               <div className="flex items-center space-x-2 text-orange-700 text-sm font-medium">
-                <span>© 2024 SnoutIQ. All rights reserved.</span>
+                <span>© 2025 SnoutIQ. All rights reserved.</span>
               </div>
 
               <div className="flex items-center space-x-2 text-orange-700 text-sm font-medium">

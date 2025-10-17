@@ -247,7 +247,7 @@ const Home = () => {
               </p>
               <button
                 onClick={() => navigate("/register")}
-                className="diwali-cta-btn bg-white text-orange-600 font-bold py-4 px-8 md:px-12 rounded-full hover:bg-gray-50 transition-all duration-300 shadow-2xl transform hover:scale-110 text-base md:text-lg"
+                className="diwali-cta-btn bg-white text-white font-bold py-4 px-8 md:px-12 rounded-full hover:bg-gray-50 transition-all duration-300 shadow-2xl transform hover:scale-110 text-base md:text-lg"
               >
                 🪔 Start Your Free Consultation
               </button>

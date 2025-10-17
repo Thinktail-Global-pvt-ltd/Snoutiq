@@ -661,7 +661,7 @@ const Dashboard = () => {
           <div className="max-w-4xl mx-auto px-4">
 
             {/* ===== Editable Pet Profile Bar (restricted to admins) ===== */}
-            {canEditPetProfile && (
+            {/* {canEditPetProfile && (
               <div className="bg-gray-900 text-white px-4 py-3 rounded-xl mb-3">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -670,7 +670,6 @@ const Dashboard = () => {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* NEW: Decision & Score chips */}
                     <span className="text-[11px] px-2 py-1 rounded-md bg-blue-600/90">
                       Decision: {lastDecision ?? "—"}
                     </span>
@@ -722,7 +721,7 @@ const Dashboard = () => {
                   />
                 </div>
               </div>
-            )}
+            )} */}
             {/* ========================================= */}
 
             <ChatInput onSendMessage={handleSendMessage} isLoading={sending} />

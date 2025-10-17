@@ -724,7 +724,7 @@ const DoctorRegistration = () => {
           toast.success(res.data.message || "Profile saved successfully!");
 
           // Redirect to the vet profile page
-          window.location.href = `https://snoutiq.com/backend/vet/${slug}`;
+          window.location.href = `https://snoutiq.com/backend/vets/${slug}`;
         } else {
           toast.error("Something went wrong: slug not found");
         }
