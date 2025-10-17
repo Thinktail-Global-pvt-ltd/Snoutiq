@@ -1,629 +1,1019 @@
-import React, { useState, useEffect, memo } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import axios from "axios";
+import { AuthContext } from "../auth/AuthContext";
 import { socket } from "./socket";
-import LoadingModal from "./LoadingModal";
+import DoctorAppointmentModal from "./DoctorAppointmentModal";
+import LiveDoctorSelectionModal from "./LiveDoctorSelectionModal";
 
-const StartCallButton = ({ nearbyDoctors }) => {
-  const [loading, setLoading] = useState(false);
-  const [callStatus, setCallStatus] = useState(null);
-  const [activeDoctors, setActiveDoctors] = useState([]);
-  
-  // const [selectedDoctor, setSelectedDoctor] = useState(501);
-  const [selectedDoctors, setSelectedDoctors] = useState(
-    nearbyDoctors ? nearbyDoctors.map((doc) => doc.id) : []
-  );
-  const [callDataMap, setCallDataMap] = useState({}); 
-  const navigate = useNavigate();
-  const [showModal, setShowModal] = useState(false);
-
-  const patientId = 146;
+// ------------------- DoctorSearchModal -------------------
+const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 30000 }) => {
+  const [dots, setDots] = useState("");
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timeRef = useRef(null);
 
   useEffect(() => {
-    // Get list of active doctors
+    if (visible) {
+      setElapsedTime(0);
+
+      // Start timer
+      timeRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+
+      const interval = setInterval(() => {
+        setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+      }, 500);
+
+      return () => {
+        clearInterval(interval);
+        if (timeRef.current) {
+          clearInterval(timeRef.current);
+        }
+      };
+    } else {
+      setDots("");
+      setElapsedTime(0);
+    }
+  }, [visible, searchTime]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative overflow-hidden">
+        {/* Ripple Effects */}
+        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-36 h-36 bg-purple-600 rounded-full animate-ping opacity-20"></div>
+        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-36 h-36 bg-pink-500 rounded-full animate-ping opacity-20 animation-delay-1000"></div>
+
+        {/* Search Icon */}
+        <div className="relative z-10 mb-5 flex justify-center">
+          <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 animate-pulse">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <div className="absolute -inset-2 border-2 border-purple-300 rounded-full animate-pulse"></div>
+        </div>
+
+        {/* Title */}
+        <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+          Searching for Veterinarians{dots}
+        </h2>
+        <p className="text-gray-600 text-center mb-6">
+          Finding the best available doctors near you
+        </p>
+
+        {/* Time Indicator */}
+        <div className="flex items-center justify-center gap-2 mb-4 px-4 py-2 bg-purple-50 rounded-lg border border-purple-200">
+          <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-sm font-semibold text-purple-600">
+            {formatTime(elapsedTime)}
+          </span>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full h-2 bg-gray-200 rounded-full mb-8 overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-purple-500 to-purple-700 rounded-full transition-all duration-300"
+            style={{ 
+              width: `${Math.min((elapsedTime / (searchTime / 1000)) * 100, 100)}%` 
+            }}
+          ></div>
+        </div>
+
+        {/* Search Indicators */}
+        <div className="space-y-3 mb-6 max-h-40 overflow-y-auto">
+          <div className="flex items-center p-3 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-900">Location Services</p>
+              <p className="text-xs text-gray-600">Scanning nearby clinics</p>
+            </div>
+            <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+
+          <div className="flex items-center p-3 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-900">Network Status</p>
+              <p className="text-xs text-gray-600">Connected to servers</p>
+            </div>
+            <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          </div>
+
+          <div className="flex items-center p-3 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-900">Doctor Availability</p>
+              <p className="text-xs text-gray-600">
+                {elapsedTime > 10 ? "Expanding search radius" : "Checking schedules"}
+              </p>
+            </div>
+            <span className="text-yellow-600 font-semibold animate-pulse">...</span>
+          </div>
+
+          {elapsedTime > 15 && (
+            <div className="flex items-center p-3 bg-purple-50 rounded-xl border border-purple-200">
+              <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center mr-3">
+                <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Extended Search</p>
+                <p className="text-xs text-gray-600">
+                  Looking for available veterinarians in wider area
+                </p>
+              </div>
+              <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
+        </div>
+
+        {/* Info Text */}
+        <div className="flex items-center justify-center gap-2 mb-6 px-4 py-2 bg-yellow-50 rounded-lg">
+          <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-xs font-medium text-yellow-800">
+            Typically connects within 15-30 seconds
+          </span>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              onClose();
+              setElapsedTime(0);
+            }}
+            className="flex-1 py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              onClose();
+              setElapsedTime(0);
+              onFailure?.();
+            }}
+            className="flex-1 py-3 px-6 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
+          >
+            Try Alternative
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Enhanced StartCallButton with better error handling and UX
+const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
+  const [loading, setLoading] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [callStatus, setCallStatus] = useState(null);
+  const { user, token, updateNearbyDoctors, liveDoctors } = useContext(AuthContext);
+  const patientId = user?.id || "101";
+  const timeoutRef = useRef(null);
+  const { updateUser } = useContext(AuthContext);
+  const [nearbyDoctors, setNearbyDoctors] = useState([]);
+  const [showLiveDoctorsModal, setShowLiveDoctorsModal] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('idle');
+  const [showVideoPaymentModal, setShowVideoPaymentModal] = useState(false);
+  const [selectedDoctorForPayment, setSelectedDoctorForPayment] = useState(null);
+
+  // Enhanced doctor fetching with error handling
+  const fetchNearbyDoctors = useCallback(async () => {
+    if (!token || !user?.id) {
+      console.warn("No token or user ID available");
+      return;
+    }
+
+    try {
+      setConnectionStatus('connecting');
+      const response = await axios.get(
+        `https://snoutiq.com/backend/api/nearby-vets?user_id=${user.id}`,
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data && Array.isArray(response.data.data)) {
+        updateNearbyDoctors(response.data.data);
+        setNearbyDoctors(response.data.data);
+        setConnectionStatus(response.data.data.length > 0 ? 'connected' : 'no_doctors');
+      } else {
+        setConnectionStatus('no_doctors');
+      }
+    } catch (error) {
+      console.error("Failed to fetch nearby doctors:", error);
+      setConnectionStatus('failed');
+      
+      // Show user-friendly error
+      if (error.code === 'NETWORK_ERROR') {
+        alert(
+          "Connection Error",
+          "Unable to connect to the server. Please check your internet connection."
+        );
+      }
+    }
+  }, [token, user?.id, updateNearbyDoctors]);
+
+  useEffect(() => {
+    if (!token || !user?.id) return;
+
+    const fetchData = async () => {
+      await fetchNearbyDoctors();
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 2 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [token, user?.id, fetchNearbyDoctors]);
+
+  const handleNoResponse = useCallback(() => {
+    setLoading(false);
+    setShowSearchModal(false);
+    setConnectionStatus('failed');
+    setCallStatus(null);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    if (window.confirm(
+      "No Immediate Response\nAll veterinarians are currently busy. You can try again or book a clinic appointment for guaranteed care.\n\nClick OK to see available doctors, or Cancel to try other options."
+    )) {
+      setConnectionStatus('idle');
+      setShowLiveDoctorsModal(true);
+    }
+  }, []);
+
+  // Enhanced socket listeners with better error handling
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+
     socket.emit("get-active-doctors");
 
-    // Listen for call responses
-    socket.on("call-sent", (data) => {
+    const handleCallSent = (data) => {
       setCallStatus({ type: "sent", ...data });
-      setLoading(false);
-    });
+      setConnectionStatus('connecting');
+    };
 
-    socket.on("call-accepted", (data) => {
-      setCallStatus({ type: "accepted", ...data });
-      setShowModal(false);
-
-      const doctor = nearbyDoctors.find((d) => d.id === data.doctorId);
-
-      // Check if payment is required
-      if (data.requiresPayment) {
-           const callData = callDataMap[data.doctorId];
-        // Redirect to payment page with call details
-        setTimeout(() => {
-          navigate(`/payment/${data.callId}`, {
-            state: {
-              doctor, // full doctor object
-              channel: data.channel,
-              patientId,
-               callId: data.callId, 
-            },
-          });
-          // navigate(`/payment/${data.callId}?doctorId=${data.doctorId}&channel=${data.channel}&patientId=${patientId}`);
-        }, 2000);
-      } else {
-        // Direct video call (fallback)
-        setTimeout(() => {
-          // navigate(`/call-page/${data.channel}?uid=${patientId}&role=audience`);
-            navigate(`/call-page/${data.channel}?uid=${patientId}&role=audience&callId=${data.callId}`);
-        }, 2000);
+    const handleCallAccepted = (data) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
-    });
 
-    socket.on("call-rejected", (data) => {
+      setCallStatus({ type: "accepted", ...data });
+      setLoading(false);
+      setShowSearchModal(false);
+      setConnectionStatus('connected');
+
+      const doctor = (nearbyDoctors || []).find((d) => d.id == data.doctorId) ||
+        (liveDoctors || []).find((d) => d.id == data.doctorId);
+
+      const patientIdLocal = user?.id || "101";
+
+      // Small delay for smooth UI transition
+      setTimeout(() => {
+        if (data.requiresPayment) {
+          // Handle payment navigation
+          console.log("Payment required for call");
+        } else {
+          // Handle video call navigation
+          console.log("Starting video call with:", doctor);
+        }
+        setCallStatus(null);
+      }, 600);
+    };
+
+    const handleCallRejected = (data) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
       setCallStatus({ type: "rejected", ...data });
       setLoading(false);
-      setShowModal(false);
-    });
+      setShowSearchModal(false);
+      setConnectionStatus('failed');
 
-    socket.on("active-doctors", (doctors) => {
-      setActiveDoctors(doctors);
-      setShowModal(false);
-    });
-
-    // Listen for payment completion
-    socket.on("payment-completed", (data) => {
-      if (data.patientId === patientId) {
-        setCallStatus({ type: "payment-completed", ...data });
-        setTimeout(() => {
-          navigate(
-            `/call-page/${data.channel}?uid=${patientId}&role=audience&callId=${data.callId}`
-          );
-        }, 1000);
+      if (window.confirm(
+        "Call Not Available\nThe veterinarian is currently unavailable. Would you like to try another doctor?"
+      )) {
+        setCallStatus(null);
+        setConnectionStatus('idle');
+        setShowLiveDoctorsModal(true);
       }
+    };
+
+    const handleCallEnded = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
+      setLoading(false);
+      setShowSearchModal(false);
+      setConnectionStatus('idle');
+      setCallStatus(null);
+    };
+
+    const handleSocketError = (error) => {
+      console.error("Socket error:", error);
+      setConnectionStatus('failed');
+      setLoading(false);
+      setShowSearchModal(false);
+      setCallStatus(null);
+      
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+
+    socket.on("call-sent", handleCallSent);
+    socket.on("call-accepted", handleCallAccepted);
+    socket.on("call-rejected", handleCallRejected);
+    socket.on("call-ended", handleCallEnded);
+    socket.on("call-cancelled", handleCallEnded);
+    socket.on("error", handleSocketError);
+    socket.on("connect_error", handleSocketError);
+    socket.on("disconnect", () => {
+      setConnectionStatus('failed');
+      setLoading(false);
+      setShowSearchModal(false);
     });
 
     return () => {
-      socket.off("call-sent");
-      socket.off("call-accepted");
-      socket.off("call-rejected");
-      socket.off("active-doctors");
-      socket.off("payment-completed");
+      socket.off("call-sent", handleCallSent);
+      socket.off("call-accepted", handleCallAccepted);
+      socket.off("call-rejected", handleCallRejected);
+      socket.off("call-ended", handleCallEnded);
+      socket.off("call-cancelled", handleCallEnded);
+      socket.off("error", handleSocketError);
+      socket.off("connect_error", handleSocketError);
+      socket.off("disconnect");
+      
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
-  }, [navigate, patientId]);
+  }, [nearbyDoctors, liveDoctors, user]);
 
-  // const startCall = () => {
-  //   console.log(selectedDoctor,"anselectedDoctor");
+  const startCallWithDoctor = useCallback((doctor) => {
+    const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const channel = `channel_${callId}`;
+    const patientIdLocal = user?.id || "101";
 
-  //   if (!selectedDoctor) {
-  //     alert("Please select a doctor");
-  //     return;
-  //   }
+    setCallStatus(null);
+    setLoading(true);
+    setShowLiveDoctorsModal(false);
+    setShowSearchModal(true);
+    setConnectionStatus('connecting');
 
-  //   setLoading(true);
-  //     setShowModal(true);
-  //   setCallStatus(null);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
-  //   const callData = {
-  //     doctorId: selectedDoctor,
-  //     patientId: patientId,
-  //     channel: `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-  //   };
+    socket.emit("call-requested", {
+      doctorId: doctor.id,
+      patientId: patientIdLocal,
+      channel,
+      callId,
+      timestamp: new Date().toISOString(),
+      requiresPayment: false,
+    });
 
-  //   socket.emit("call-requested", callData);
-  // };
-  // const startCall = () => {
-  //   if (!selectedDoctors.length) {
-  //     alert("Please select at least one doctor");
-  //     return;
-  //   }
+    timeoutRef.current = setTimeout(() => {
+      if (loading || showSearchModal) {
+        handleNoResponse();
+      }
+    }, 30000);
+  }, [user?.id, loading, showSearchModal, handleNoResponse]);
 
-  //   setLoading(true);
-  //   setShowModal(true);
-  //   setCallStatus(null);
+  const handleCallDoctor = useCallback((doctor) => {
+    setSelectedDoctorForPayment(doctor);
+    setShowLiveDoctorsModal(false);
+    setShowVideoPaymentModal(true);
+  }, []);
 
-  //   selectedDoctors.forEach((doctorId) => {
-  //     const callData = {
-  //       doctorId,
-  //       patientId,
-  //       channel: `call_${Date.now()}_${Math.random()
-  //         .toString(36)
-  //         .substring(2, 8)}`,
-  //     };
+  const startCall = useCallback(() => {
+    const doctorsToCall = nearbyDoctors && nearbyDoctors.length ? nearbyDoctors : [];
 
-  //     socket.emit("call-requested", callData);
-  //   });
-  // };
-
-  
-  const startCall = () => {
-    if (!selectedDoctors.length) {
-      alert("Please select at least one doctor");
+    if (!doctorsToCall.length) {
+      alert(
+        "No Doctors Available",
+        "There are no nearby veterinarians available at the moment. Please try again later or book a clinic appointment."
+      );
       return;
     }
 
     setLoading(true);
-    setShowModal(true);
-    setCallStatus(null);
+    setShowSearchModal(true);
+    setConnectionStatus('connecting');
 
-    const newCallDataMap = {};
+    const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const channel = `channel_${callId}`;
 
-    selectedDoctors.forEach((doctorId) => {
-      const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-      const channel = `channel_${callId}`;
-      
-      const callData = {
-        doctorId,
-        patientId,
-        channel,
-        callId, // Include callId in the request
-      };
+    try {
+      doctorsToCall.forEach((doc) => {
+        socket.emit("call-requested", {
+          doctorId: doc.id,
+          patientId,
+          channel,
+          callId,
+          timestamp: new Date().toISOString(),
+        });
+      });
+    } catch (error) {
+      console.error("Error sending call requests:", error);
+      handleNoResponse();
+      return;
+    }
 
-      newCallDataMap[doctorId] = callData;
-      
-      socket.emit("call-requested", callData);
-    });
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      if (loading && !callStatus) {
+        handleNoResponse();
+      }
+    }, 30000);
+  }, [nearbyDoctors, patientId, loading, callStatus, handleNoResponse]);
 
-    setCallDataMap(newCallDataMap);
+  const getButtonState = () => {
+    if (loading) return 'loading';
+    if (connectionStatus === 'no_doctors' || connectionStatus === 'failed') return 'unavailable';
+    if (!nearbyDoctors?.length && !liveDoctors?.length) return 'unavailable';
+    return 'available';
   };
 
-  const getStatusMessage = () => {
-    if (!callStatus) return null;
+  const buttonState = getButtonState();
+  const buttonDisabled = buttonState === 'unavailable' || buttonState === 'loading';
 
-    switch (callStatus.type) {
-      case "sent":
-        return "📤 Call request sent to doctor. Waiting for response...";
-      case "accepted":
-        return callStatus.requiresPayment
-          ? "✅ Doctor accepted your call! Redirecting to payment..."
-          : "✅ Doctor accepted your call! Connecting...";
-      case "rejected":
-        return "❌ Doctor is currently unavailable. Please try again later.";
-      case "payment-completed":
-        return "💳 Payment successful! Connecting to video call...";
+  const getButtonText = () => {
+    switch (buttonState) {
+      case 'loading':
+        return 'Searching for Doctors...';
+      case 'unavailable':
+        return 'No Doctors Available';
       default:
-        return null;
+        return 'Start Video Consultation';
+    }
+  };
+
+  const getButtonIcon = () => {
+    switch (buttonState) {
+      case 'loading':
+        return (
+          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        );
+      case 'unavailable':
+        return (
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        );
+      default:
+        return (
+          <div className="w-7 h-7 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+        );
     }
   };
 
   return (
     <>
-      {/* <button
-        onClick={startCall}
-        disabled={loading || !selectedDoctor}
-        style={{
-          padding: "12px 24px",
-          borderRadius: 8,
-          background: loading ? "#ccc" : "#2563eb",
-          color: "#fff",
-          border: "none",
-          cursor: loading ? "not-allowed" : "pointer",
-          fontSize: 16,
-          fontWeight: "bold"
-        }}
-      >
-        {loading ? "📞 Requesting Call..." : "📞 Request Video Call"}
-      </button> */}
-      <p className="text-blue-700 text-sm mb-4 font-medium">
-        Schedule a convenient video consultation with a veterinary professional.
-      </p>
-      <button
-        //  style={{ cursor: loading ? "not-allowed" : "pointer",}}
-        style={{
-          cursor:
-            loading || selectedDoctors.length === 0 ? "not-allowed" : "pointer",
-        }}
-        onClick={startCall}
-        // disabled={loading || !selectedDoctor}
-        disabled={loading || selectedDoctors.length === 0}
-        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      <div className="mb-4">
+        <button
+          className={`
+            w-full relative overflow-hidden rounded-2xl transition-all duration-300 transform hover:scale-105
+            ${buttonDisabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-xl'}
+            ${buttonState === 'loading' ? 'opacity-80' : ''}
+          `}
+          onClick={() => {
+            setShowLiveDoctorsModal(true);
+          }}
+          disabled={buttonDisabled}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-          />
-        </svg>
-        {loading ? "📞 Requesting Call..." : "📞 Start Video Consultation"}
-      </button>
-      <LoadingModal open={showModal} onClose={() => setShowModal(false)} />
-      {callStatus && (
-        <div style={{ marginTop: "10px" }}>{getStatusMessage()}</div>
+          {!buttonDisabled && buttonState !== 'loading' && (
+            <div className="absolute inset-0 bg-purple-600 rounded-2xl shadow-lg shadow-purple-500/50 animate-pulse"></div>
+          )}
+
+          <div className={`
+            relative w-full py-4 px-6 rounded-2xl bg-gradient-to-r transition-all duration-300
+            ${buttonState === 'loading' ? 'from-gray-500 to-gray-600' :
+              buttonState === 'unavailable' ? 'from-gray-500 to-gray-600' : 
+              'from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600'}
+          `}>
+            <div className="flex items-center justify-center gap-4">
+              {getButtonIcon()}
+              <span className="text-white font-bold text-lg tracking-wide">
+                {getButtonText()}
+              </span>
+              {buttonState === 'available' && (
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              )}
+            </div>
+          </div>
+        </button>
+
+        {buttonState === 'available' && (
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            <span className="text-xs font-semibold text-green-600">
+              Licensed veterinarians • Instant connection • Secure call
+            </span>
+          </div>
+        )}
+
+        {buttonState === 'unavailable' && connectionStatus !== 'failed' && (
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span className="text-xs font-semibold text-yellow-600">
+              Check back soon or book a clinic appointment
+            </span>
+          </div>
+        )}
+
+        {connectionStatus === 'failed' && (
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-xs font-semibold text-red-600">
+              Connection issue • Click to retry
+            </span>
+          </div>
+        )}
+      </div>
+
+      <LiveDoctorSelectionModal
+        visible={showLiveDoctorsModal}
+        onClose={() => setShowLiveDoctorsModal(false)}
+        liveDoctors={liveDoctors}
+        onCallDoctor={handleCallDoctor}
+        loading={loading}
+      />
+
+      {/* Payment step before initiating the call */}
+      {showVideoPaymentModal && selectedDoctorForPayment && (
+        <VideoCallPaymentModal
+          visible={showVideoPaymentModal}
+          doctor={selectedDoctorForPayment}
+          onClose={() => {
+            setShowVideoPaymentModal(false);
+            setSelectedDoctorForPayment(null);
+          }}
+          onSuccess={() => {
+            setShowVideoPaymentModal(false);
+            const doc = selectedDoctorForPayment;
+            setSelectedDoctorForPayment(null);
+            // After successful payment, initiate the call (Agora prep happens in call handlers)
+            startCallWithDoctor(doc);
+          }}
+        />
+      )}
+
+      <DoctorSearchModal
+        visible={showSearchModal}
+        onClose={() => {
+          setShowSearchModal(false);
+          setLoading(false);
+          setConnectionStatus('idle');
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+        }}
+        onFailure={handleNoResponse}
+      />
+    </>
+  );
+};
+
+// ------------------- EmergencyStatusBox -------------------
+const EmergencyStatusBox = ({ 
+  decision, 
+  nearbyDoctors, 
+  navigation, 
+  messageId, 
+  isTypingComplete 
+}) => {
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (decision && isTypingComplete) {
+      const timer = setTimeout(() => {
+        setIsVisible(true);
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }
+  }, [decision, isTypingComplete]);
+
+  if (!decision || !isTypingComplete || !isVisible) return null;
+
+  if (decision.includes("EMERGENCY")) {
+    return (
+      <>
+        <div className="my-4 mx-6 max-w-[90%] animate-fade-in-up">
+          <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-2xl overflow-hidden border border-red-200">
+            <div className="p-6">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
+                    <span className="text-xs font-black text-red-600 tracking-wider uppercase">
+                      URGENT
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-red-900 mb-1">
+                    Emergency Care Required
+                  </h3>
+                  <p className="text-red-700 font-medium">
+                    Immediate attention needed
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-4 bg-white bg-opacity-70 rounded-xl border border-red-200 mb-5">
+                <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <p className="text-red-800 font-medium">
+                  Your pet's symptoms require emergency care. Please contact a veterinarian immediately.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowAppointmentModal(true)}
+                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all transform hover:scale-105 shadow-lg shadow-red-500/30"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Find Emergency Clinic
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <DoctorAppointmentModal
+          visible={showAppointmentModal}
+          onClose={() => setShowAppointmentModal(false)}
+          nearbyDoctors={nearbyDoctors}
+          onBook={(appointment) => {
+            console.log("Appointment booked:", appointment);
+            alert(
+              "Success",
+              `Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`
+            );
+            setShowAppointmentModal(false);
+          }}
+        />
+      </>
+    );
+  }
+
+  if (decision.includes("VIDEO_CONSULT")) {
+    return (
+      <div className="my-4 mx-6 max-w-[90%] animate-fade-in-up">
+        <div className="bg-gradient-to-r from-purple-50 to-indigo-100 rounded-2xl overflow-hidden border border-purple-200">
+          <div className="p-6">
+            <div className="flex items-start gap-4 mb-5">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  <span className="text-xs font-black text-purple-600 tracking-wider uppercase">
+                    RECOMMENDED
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-purple-900 mb-1">
+                  Video Consultation
+                </h3>
+                <p className="text-purple-700 font-medium">
+                  Connect with a vet instantly
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 p-4 bg-white bg-opacity-70 rounded-xl border border-purple-200 mb-5">
+              <div className="flex items-center gap-3">
+                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="text-purple-800 font-medium">Instant consultation</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="text-purple-800 font-medium">Professional advice</span>
+              </div>
+            </div>
+
+            <StartCallButton
+              nearbyDoctors={nearbyDoctors}
+              navigation={navigation}
+              onShowLiveDoctors={() => setShowLiveDoctorsModal(true)}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (decision.includes("IN_CLINIC")) {
+    return (
+      <>
+        <div className="my-4 mx-6 max-w-[90%] animate-fade-in-up">
+          <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl overflow-hidden border border-gray-200">
+            <div className="p-6">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-900 mb-1">
+                    Consultation Options
+                  </h3>
+                  <p className="text-gray-600 font-medium">
+                    Choose video call or clinic visit
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <StartCallButton
+                  nearbyDoctors={nearbyDoctors}
+                  navigation={navigation}
+                  onShowLiveDoctors={() => setShowLiveDoctorsModal(true)}
+                />
+
+                <div className="flex items-center my-4">
+                  <div className="flex-1 h-px bg-gray-300"></div>
+                  <span className="mx-4 text-xs font-semibold text-gray-500 uppercase">OR</span>
+                  <div className="flex-1 h-px bg-gray-300"></div>
+                </div>
+
+                <button
+                  onClick={() => setShowAppointmentModal(true)}
+                  className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-4 rounded-xl font-semibold flex items-center justify-center gap-3 transition-all border border-purple-200 hover:border-purple-300"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  Book Clinic Visit
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DoctorAppointmentModal
+          visible={showAppointmentModal}
+          onClose={() => setShowAppointmentModal(false)}
+          nearbyDoctors={nearbyDoctors}
+          onBook={(appointment) => {
+            console.log("Appointment booked:", appointment);
+            alert(
+              "Success",
+              `Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`
+            );
+            setShowAppointmentModal(false);
+          }}
+        />
+      </>
+    );
+  }
+
+  return null;
+};
+
+// ------------------- MessageBubble -------------------
+const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
+  const [isTypingComplete, setIsTypingComplete] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
+
+  // Check if typing is complete
+  useEffect(() => {
+    if (msg.sender === "ai" && msg.text && msg.displayedText) {
+      if (msg.displayedText.length >= msg.text.length) {
+        setIsTypingComplete(true);
+      }
+    }
+  }, [msg.displayedText, msg.text, msg.sender]);
+
+  if (msg.type === "loading") {
+    return (
+      <div className={`my-2 max-w-[85%] animate-fade-in-up ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+
+          <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-3 border border-gray-200 shadow-sm">
+            <div className="mb-2">
+              <span className="text-xs font-semibold text-purple-600">AI analyzing</span>
+            </div>
+            <div className="flex gap-1.5">
+              <div className="w-2 h-2 bg-purple-600 rounded-full opacity-60 animate-bounce"></div>
+              <div className="w-2 h-2 bg-purple-600 rounded-full opacity-80 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const isUser = msg.sender === "user";
+
+  return (
+    <>
+      <div className={`my-2 max-w-[85%] animate-fade-in-up ${isVisible ? 'opacity-100' : 'opacity-0'} ${isUser ? 'ml-auto' : ''}`}>
+        <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+          {!isUser && (
+            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+          )}
+
+          <div className={`
+            rounded-2xl px-5 py-3 shadow-sm max-w-full
+            ${isUser 
+              ? 'bg-purple-600 text-white rounded-br-sm' 
+              : 'bg-white border border-gray-200 rounded-bl-sm'
+            }
+          `}>
+            <p className={`break-words ${isUser ? 'text-white' : 'text-gray-900'}`}>
+              {msg.displayedText || msg.text}
+            </p>
+          </div>
+        </div>
+
+        {!isUser && (
+          <div className="text-xs text-gray-500 mt-1 ml-11">
+            {new Date(msg.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+        )}
+      </div>
+
+      {!isUser && msg.decision && (
+        <EmergencyStatusBox
+          decision={msg.decision}
+          nearbyDoctors={nearbyDoctors}
+          navigation={navigation}
+          messageId={msg.id}
+          isTypingComplete={isTypingComplete}
+        />
       )}
     </>
   );
 };
 
-const EmergencyStatusBox = ({ decision, nearbyDoctors }) => {
-  const navigate = useNavigate();
+export { EmergencyStatusBox, MessageBubble, StartCallButton };
 
-  if (!decision) return null;
+// ------------------- VideoCallPaymentModal -------------------
+const VideoCallPaymentModal = ({ visible, doctor, onClose, onSuccess }) => {
+  const [processing, setProcessing] = useState(false);
 
-  if (decision.includes("EMERGENCY")) {
-    return (
-      <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 rounded-r-xl shadow-sm">
-        <div className="flex items-center mb-3">
-          <div className="flex-shrink-0 w-6 h-6 bg-red-100 rounded-full flex items-center justify-center mr-3">
-            <svg
-              className="w-4 h-4 text-red-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-          </div>
-          <span className="text-sm font-bold text-red-800 uppercase tracking-wide">
-            🚨 Emergency Care Required
-          </span>
-        </div>
-        <p className="text-red-700 text-sm mb-4 font-medium">
-          Your pet needs immediate veterinary attention. Please seek emergency
-          care right away.
-        </p>
-        <button
-          onClick={() => navigate("/book-clinic-visit")}
-          className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-            />
-          </svg>
-          <span>Book Emergency Visit Now</span>
-        </button>
-      </div>
-    );
-  } else if (decision.includes("VIDEO_CONSULT")) {
-    return (
-      <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-r-xl shadow-sm">
-        <div className="flex items-center mb-3">
-          <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-            <svg
-              className="w-4 h-4 text-blue-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <span className="text-sm font-bold text-blue-800 uppercase tracking-wide">
-            📅 Routine Consultation
-          </span>
-        </div>
-        <StartCallButton nearbyDoctors={nearbyDoctors} />
-      </div>
-    );
-  } else {
-    return (
-      <div className="mt-4 p-4 bg-gradient-to-r from-gray-50 to-slate-50 border-l-4 border-gray-400 rounded-r-xl shadow-sm">
-        <div className="flex items-center mb-3">
-          <div className="flex-shrink-0 w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center mr-3">
-            <svg
-              className="w-4 h-4 text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-              />
-            </svg>
-          </div>
-          <span className="text-sm font-bold text-gray-800 uppercase tracking-wide">
-            💬 Consultation Options
-          </span>
-        </div>
-        <p className="text-gray-700 text-sm mb-4 font-medium">
-          Choose your preferred consultation method based on your pet's needs.
-        </p>
-        <div className="space-y-3">
-          <StartCallButton nearbyDoctors={nearbyDoctors} />
+  if (!visible) return null;
 
-          <button
-            onClick={() => navigate("/book-clinic-visit")}
-            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-sm font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
+  const price = doctor?.chat_price || 500;
+
+  const handlePay = async () => {
+    try {
+      setProcessing(true);
+      // TODO: Integrate real payment SDK/API here
+      await new Promise((r) => setTimeout(r, 1200));
+      onSuccess?.();
+    } catch (e) {
+      console.error("Payment error", e);
+      onClose?.();
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-gray-900">Confirm Video Call</h3>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-            <span>In-Person Clinic Visit</span>
           </button>
         </div>
+
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold">
+            {(doctor?.business_status || doctor?.name || 'DR').substring(0,2).toUpperCase()}
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">Dr. {doctor?.business_status || doctor?.name || 'Veterinarian'}</p>
+            <p className="text-sm text-gray-600">Video consultation</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-600">Consultation Fee</span>
+            <span className="text-lg font-bold text-green-600">₹{price}</span>
+          </div>
+        </div>
+
+        <button
+          onClick={handlePay}
+          disabled={processing}
+          className={`w-full py-3 rounded-xl text-white font-bold transition-all ${processing ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'}`}
+        >
+          {processing ? 'Processing...' : 'Pay & Connect'}
+        </button>
+
+        <button
+          onClick={onClose}
+          disabled={processing}
+          className="w-full mt-2 py-3 rounded-xl text-gray-700 font-semibold hover:bg-gray-100"
+        >
+          Cancel
+        </button>
       </div>
-    );
-  }
+    </div>
+  );
 };
-
-const MessageBubble = memo(
-  ({ msg, index, onFeedback, nearbyDoctors }) => {
-    if (msg.type === "loading") {
-      return (
-        <div key={`loader-${index}`} className="flex justify-start mb-2">
-          <div className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-2xl px-6 py-4 shadow-lg flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-white animate-pulse"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                />
-              </svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-gray-700">
-                AI is thinking...
-              </span>
-              <div className="flex space-x-1 mt-1">
-                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></span>
-                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-150"></span>
-                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-300"></span>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div
-        key={msg.id || `msg-${index}`}
-        className={`flex ${
-          msg.sender === "user" ? "justify-end" : "justify-start"
-        } mb-6`}
-      >
-        <div className="flex max-w-[85%] lg:max-w-[75%]">
-          {/* AI Avatar */}
-          {msg.sender === "ai" && (
-            <div className="flex-shrink-0 mr-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                  />
-                </svg>
-              </div>
-            </div>
-          )}
-
-          {/* Message Content */}
-          <div
-            className={`rounded-2xl px-4 py-3 shadow-lg relative ${
-              msg.sender === "user"
-                ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white ml-auto"
-                : msg.isError
-                ? "bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 text-red-800"
-                : "bg-white/90 backdrop-blur-sm border border-gray-200 text-gray-800"
-            }`}
-          >
-            {/* Message Header for AI */}
-            {msg.sender === "ai" && !msg.isError && (
-              <div className="flex items-center mb-2 pb-2 border-b border-gray-100">
-                <svg
-                  className="w-4 h-4 text-green-600 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                  />
-                </svg>
-                <span className="text-sm font-semibold text-gray-700">
-                  Snoutiq AI Veterinary Assistant
-                </span>
-                <div className="ml-auto">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                </div>
-              </div>
-            )}
-
-            {/* Error Header */}
-            {msg.isError && (
-              <div className="flex items-center mb-2 pb-2 border-b border-red-200">
-                <svg
-                  className="w-4 h-4 text-red-600 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span className="text-sm font-semibold text-red-700">
-                  Connection Error
-                </span>
-              </div>
-            )}
-
-            {/* Message Text */}
-            <div className="whitespace-pre-line leading-relaxed text-sm lg:text-base break-words">
-              <div
-                className="prose prose-sm max-w-full"
-                dangerouslySetInnerHTML={{
-                  __html:
-                    msg.displayedText !== undefined
-                      ? msg.displayedText
-                      : msg.text,
-                }}
-              />
-            </div>
-
-            {/* Emergency Status Box */}
-            {msg.sender === "ai" && msg.decision && (
-              <EmergencyStatusBox
-                decision={msg.decision.trim()}
-                nearbyDoctors={nearbyDoctors}
-              />
-            )}
-
-            {/* Message Footer */}
-            <div className="flex items-center justify-between mt-3 pt-2">
-              <div
-                className={`text-xs ${
-                  msg.sender === "user"
-                    ? "text-blue-200"
-                    : msg.isError
-                    ? "text-red-500"
-                    : "text-gray-500"
-                }`}
-              >
-                {msg.timestamp
-                  ? new Date(msg.timestamp).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : ""}
-              </div>
-
-              {/* Feedback Buttons for AI messages */}
-              {msg.sender === "ai" && !msg.isError && (
-                <div className="flex items-center gap-2">
-                  <button
-                    className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 hover:bg-green-200 text-green-600 hover:text-green-800 transition-all duration-200 transform hover:scale-110"
-                    onClick={() => onFeedback(1, msg.timestamp)}
-                    aria-label="Helpful response"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    className="flex items-center justify-center w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 transition-all duration-200 transform hover:scale-110"
-                    onClick={() => onFeedback(-1, msg.timestamp)}
-                    aria-label="Not helpful response"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2M17 4h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Message Tail */}
-            <div
-              className={`absolute ${
-                msg.sender === "user"
-                  ? "right-0 top-4 w-0 h-0 border-l-8 border-l-blue-600 border-t-8 border-t-transparent border-b-8 border-b-transparent transform translate-x-2"
-                  : "left-0 top-4 w-0 h-0 border-r-8 border-r-white border-t-8 border-t-transparent border-b-8 border-b-transparent transform -translate-x-2"
-              }`}
-            ></div>
-          </div>
-
-          {/* User Avatar */}
-          {msg.sender === "user" && (
-            <div className="flex-shrink-0 ml-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  },
-  (prevProps, nextProps) => {
-    const prevMsg = prevProps.msg;
-    const nextMsg = nextProps.msg;
-
-    return (
-      prevMsg.id === nextMsg.id &&
-      prevMsg.displayedText === nextMsg.displayedText &&
-      prevMsg.text === nextMsg.text &&
-      prevMsg.type === nextMsg.type
-    );
-  }
-);
-
-export default MessageBubble;

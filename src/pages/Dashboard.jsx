@@ -15,7 +15,7 @@ import Sidebar from "../components/Sidebar";
 import { AuthContext } from "../auth/AuthContext";
 import Navbar from "../components/Navbar";
 import { useParams } from "react-router-dom";
-import MessageBubble from "./MessageBubble";
+import {MessageBubble} from "./MessageBubble"
 import DetailedWeatherWidget from "./DetailedWeatherWidget";
 import PetDetailsModal from "./RegisterPetOwner";
 

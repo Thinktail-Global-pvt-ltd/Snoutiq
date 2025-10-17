@@ -120,7 +120,7 @@ io.on("connection", (socket) => {
       io.to(targetSocketId).emit("call-ended", { callId, endedBy: userId, message: 'Call ended' });
     }
 
-    setTimeout(() => activeCalls.delete(callId), 100000);
+    setTimeout(() => activeCalls.delete(callId), 10000);
   });
 
   // Doctor leaves
