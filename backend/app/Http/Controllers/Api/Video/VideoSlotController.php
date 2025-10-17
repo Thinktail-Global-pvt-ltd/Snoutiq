@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\Video;
 
 use App\Http\Controllers\Controller;
 use App\Models\VideoSlot;
+use App\Services\CommitmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,10 @@ use Carbon\CarbonImmutable;
 
 class VideoSlotController extends Controller
 {
+    public function __construct(private readonly CommitmentService $commitments)
+    {
+    }
+
     // GET /api/video/slots/open?date=YYYY-MM-DD&strip_id=
     public function openSlots(Request $request): JsonResponse
     {
@@ -68,6 +73,27 @@ class VideoSlotController extends Controller
             return response()->json(['slot' => $updated], 200);
         } catch (\Throwable $e) {
             // conflict or validation-like business error
+            return response()->json(['error' => $e->getMessage()], 409);
+        }
+    }
+
+    // DELETE /api/video/slots/{slot}/release
+    public function release(Request $request, int $slot): JsonResponse
+    {
+        $slotModel = VideoSlot::query()->find($slot);
+        if (!$slotModel) {
+            return response()->json(['error' => 'Slot not found'], 404);
+        }
+
+        $data = $request->validate([
+            'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $released = $this->commitments->releaseSlot($slotModel, (int) $data['doctor_id'], $data['reason'] ?? null);
+            return response()->json(['slot' => $released], 200);
+        } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 409);
         }
     }

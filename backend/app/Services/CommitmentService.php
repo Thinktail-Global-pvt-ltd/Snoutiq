@@ -61,6 +61,46 @@ class CommitmentService
         });
     }
 
+    public function releaseSlot(VideoSlot $slot, int $doctorId, ?string $reason = null): VideoSlot
+    {
+        return DB::transaction(function () use ($slot, $doctorId, $reason) {
+            $lock = VideoSlot::query()->whereKey($slot->id)->lockForUpdate()->firstOrFail();
+
+            if ((int) $lock->committed_doctor_id !== $doctorId) {
+                throw new RuntimeException('Not your slot');
+            }
+            if (!in_array($lock->status, ['committed'], true)) {
+                throw new RuntimeException('Slot cannot be released in its current state');
+            }
+
+            $lock->status = 'open';
+            $lock->committed_doctor_id = null;
+            $lock->checkin_due_at = null;
+            $lock->checked_in_at = null;
+            $lock->in_progress_at = null;
+            $lock->finished_at = null;
+
+            $meta = $lock->meta ?? [];
+            $meta['released_at'] = now('UTC')->toIso8601String();
+            $meta['released_by_doctor'] = $doctorId;
+            if ($reason) {
+                $meta['release_reason'] = $reason;
+            }
+            $lock->meta = $meta;
+            $lock->save();
+
+            DoctorCommitment::query()
+                ->where('slot_id', $lock->id)
+                ->where('doctor_id', $doctorId)
+                ->update([
+                    'released_at' => now('UTC'),
+                    'cancel_reason' => $reason,
+                ]);
+
+            return $lock->fresh();
+        });
+    }
+
     public function confirmCheckin(VideoSlot $slot, int $doctorId): void
     {
         DB::transaction(function () use ($slot, $doctorId) {
@@ -119,4 +159,3 @@ class CommitmentService
         });
     }
 }
-

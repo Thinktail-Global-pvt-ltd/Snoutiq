@@ -1,4 +1,4 @@
-﻿<?php 
+<?php 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 // use App
@@ -324,7 +324,7 @@ Route::prefix('public')->group(function(){
 use Illuminate\Support\Facades\Log;
 
 Route::post('/webhook/deploy', function () {
-    Log::info('ðŸš€ Webhook received at ' . now());
+    Log::info('🚀 Webhook received at ' . now());
 
     exec('bash /var/www/deploy.sh 2>&1', $output, $returnCode);
 
@@ -550,6 +550,7 @@ Route::prefix('video')->group(function () {
     Route::post('/schedule/{doctor}/toggle-247', [VDoctorVideoScheduleController::class, 'toggle247']);
 
     Route::post('/slots/{slot}/commit', [VVideoSlotController::class, 'commit']);
+    Route::delete('/slots/{slot}/release', [VVideoSlotController::class, 'release']);
     Route::post('/slots/{slot}/checkin', [VVideoSlotController::class, 'checkin']);
 
     // Admin helper to publish tonight's slots
@@ -577,7 +578,7 @@ Route::get('/video/slots/doctor-test', function (\Illuminate\Http\Request $reque
         return response()->json(['error' => 'doctor_id and date are required'], 422);
     }
 
-    // IST night hours → UTC 13..23 + 0..6
+    // IST night hours ? UTC 13..23 + 0..6
     $utcNightHours = array_merge(range(13, 23), range(0, 6));
 
     $rows = VideoSlot::query()
@@ -592,7 +593,7 @@ Route::get('/video/slots/doctor-test', function (\Illuminate\Http\Request $reque
 
     $mapped = $rows->map(function ($r) {
         $istHour = ($r->hour_24 + 6) % 24;
-        // ✅ safe parse (handles 'YYYY-MM-DD' or full timestamps)
+        // ? safe parse (handles 'YYYY-MM-DD' or full timestamps)
         $istDate = CarbonImmutable::parse($r->slot_date, 'Asia/Kolkata');
         if ($istHour <= 6) {
             $istDate = $istDate->addDay();
