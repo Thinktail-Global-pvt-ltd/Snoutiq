@@ -7,6 +7,7 @@ use App\Models\VetRegisterationTemp;
 use App\Models\Payment;
 use App\Http\Middleware\EnsureSessionUser;
 use App\Http\Controllers\VideoSchedulePageController;
+use App\Http\Controllers\VideoScheduleTestPageController;
 
 // Public routes
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');
@@ -92,9 +93,15 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     // New: Pet parent page using separate table & API (read-only)
     Route::get('/pet/video-calling-schedule', [VideoSchedulePageController::class, 'petIndex'])
         ->name('pet.video.schedule');
+    // Test flow (read-only)
+    Route::get('/pet/video-calling-test', [VideoScheduleTestPageController::class, 'petIndex'])
+        ->name('pet.video.schedule.test');
     // Optional editor (write-enabled) using separate table; not linked in sidebar by default
     Route::get('/doctor/video-calling-schedule/manage', [VideoSchedulePageController::class, 'editor'])
         ->name('doctor.video.schedule.manage');
+    // Test flow editor (write-enabled)
+    Route::get('/doctor/video-calling-test/manage', [VideoScheduleTestPageController::class, 'editor'])
+        ->name('doctor.video.schedule.test.manage');
 
     // Clinic order history (aggregates bookings across doctors of this clinic)
     Route::view('/clinic/orders', 'clinic.order-history')->name('clinic.orders');
