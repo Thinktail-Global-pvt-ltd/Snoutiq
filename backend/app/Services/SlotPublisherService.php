@@ -26,6 +26,7 @@ class SlotPublisherService
         $strips = GeoStrip::active()->get();
 
         DB::transaction(function () use ($hoursIST, $strips, $targetDateIST) {
+            $nightDayOfWeek = strtolower($targetDateIST->format('l'));
             foreach ($strips as $strip) {
                 foreach ($hoursIST as $hIst) {
                     // Convert IST date+hour to UTC date+hour
@@ -53,6 +54,7 @@ class SlotPublisherService
                                 'status' => 'open',
                                 'payout_offer' => $payout,
                                 'demand_score' => 1.00,
+                                'slot_day_of_week' => $nightDayOfWeek,
                             ]
                         );
                     }

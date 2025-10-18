@@ -21,20 +21,35 @@ class VideoSlotController extends Controller
     // GET /api/video/slots/open?date=YYYY-MM-DD&strip_id=
     public function openSlots(Request $request): JsonResponse
     {
-        $date = (string) $request->query('date');
-        if (!$date) {
-            return response()->json(['error' => 'date is required (YYYY-MM-DD)'], 422);
+        $date = $request->query('date');
+        $dayInput = $request->query('day');
+        $stripId = $request->query('strip_id');
+
+        $normalizedDay = null;
+        if ($dayInput !== null && $dayInput !== '') {
+            $normalizedDay = $this->normalizeDayOfWeek((string) $dayInput);
+            if ($normalizedDay === null) {
+                return response()->json(['error' => 'day must be a valid weekday name'], 422);
+            }
         }
 
-        $stripId = $request->query('strip_id');
+        if (($date === null || $date === '') && $normalizedDay === null) {
+            return response()->json(['error' => 'either date (YYYY-MM-DD) or day is required'], 422);
+        }
+
         $q = VideoSlot::query()
-            ->openForMarketplace($date, $stripId ? (int) $stripId : null)
+            ->openForMarketplace(
+                $date !== null && $date !== '' ? (string) $date : null,
+                $stripId ? (int) $stripId : null,
+                $normalizedDay
+            )
             ->orderBy('slot_date')
             ->orderBy('hour_24')
             ->orderBy('strip_id');
 
         return response()->json([
-            'date'     => $date,
+            'date'     => $date !== null && $date !== '' ? (string) $date : null,
+            'day'      => $normalizedDay,
             'strip_id' => $stripId ? (int) $stripId : null,
             'slots'    => $q->get(),
         ]);
@@ -188,55 +203,89 @@ class VideoSlotController extends Controller
 
     public function doctorSlots(Request $request): JsonResponse
     {
-         $doctorId = (int) $request->query('doctor_id');
-    $date     = (string) $request->query('date', now('Asia/Kolkata')->toDateString());
-    $tz       = strtoupper((string) $request->query('tz', 'IST'));
+        $doctorId = (int) $request->query('doctor_id');
+        $tz       = strtoupper((string) $request->query('tz', 'IST'));
+        $dayInput = $request->query('day');
 
-    if (!$doctorId || !$date) {
-        return response()->json(['error' => 'doctor_id and date are required'], 422);
-    }
+        $dateParam = $request->query('date');
+        $date = $dateParam !== null && $dateParam !== ''
+            ? (string) $dateParam
+            : now('Asia/Kolkata')->toDateString();
 
-    // IST night hours → UTC 13..23 + 0..6
-    $utcNightHours = array_merge(range(13, 23), range(0, 6));
-
-    $rows = VideoSlot::query()
-        ->where('committed_doctor_id', $doctorId)
-        ->where('slot_date', $date)
-        ->whereIn('hour_24', $utcNightHours)
-        ->whereIn('status', ['committed','in_progress','done'])
-        ->orderBy('hour_24')
-        ->orderBy('strip_id')
-        ->orderByRaw("FIELD(role,'primary','bench')")
-        ->get();
-
-    $mapped = $rows->map(function ($r) {
-        $istHour = ($r->hour_24 + 6) % 24;
-        // ✅ safe parse (handles 'YYYY-MM-DD' or full timestamps)
-        $istDate = CarbonImmutable::parse($r->slot_date, 'Asia/Kolkata');
-        if ($istHour <= 6) {
-            $istDate = $istDate->addDay();
+        if (!$doctorId) {
+            return response()->json(['error' => 'doctor_id is required'], 422);
         }
 
-        return [
-            'id' => $r->id,
-            'strip_id' => $r->strip_id,
-            'slot_date' => $r->slot_date,
-            'hour_24' => $r->hour_24,
-            'role' => $r->role,
-            'status' => $r->status,
-            'committed_doctor_id' => $r->committed_doctor_id,
-            'ist_hour' => $istHour,
-            'ist_datetime' => $istDate->setTime($istHour, 0)->format('Y-m-d H:i:s'),
-        ];
-    });
+        $normalizedDay = null;
+        if ($dayInput !== null && $dayInput !== '') {
+            $normalizedDay = $this->normalizeDayOfWeek((string) $dayInput);
+            if ($normalizedDay === null) {
+                return response()->json(['error' => 'day must be a valid weekday name'], 422);
+            }
+        }
 
-    return response()->json([
-        'doctor_id' => $doctorId,
-        'date'      => $date,
-        'tz'        => $tz,
-        'count'     => $mapped->count(),
-        'slots'     => $mapped,
-    ]);
+        if ($date === '' && $normalizedDay === null) {
+            return response()->json(['error' => 'either date (YYYY-MM-DD) or day is required'], 422);
+        }
+
+        // IST night hours → UTC 13..23 + 0..6
+        $utcNightHours = array_merge(range(13, 23), range(0, 6));
+
+        $rows = VideoSlot::query()
+            ->where('committed_doctor_id', $doctorId)
+            ->whereIn('hour_24', $utcNightHours)
+            ->whereIn('status', ['committed','in_progress','done']);
+
+        if ($normalizedDay !== null) {
+            $rows->where('slot_day_of_week', $normalizedDay);
+        } else {
+            $rows->where('slot_date', $date);
+        }
+
+        $rows = $rows
+            ->orderBy('hour_24')
+            ->orderBy('strip_id')
+            ->orderByRaw("FIELD(role,'primary','bench')")
+            ->get();
+
+        $mapped = $rows->map(function ($r) {
+            $istHour = ($r->hour_24 + 6) % 24;
+            // ✅ safe parse (handles 'YYYY-MM-DD' or full timestamps)
+            $istDate = CarbonImmutable::parse($r->slot_date, 'Asia/Kolkata');
+            if ($istHour <= 6) {
+                $istDate = $istDate->addDay();
+            }
+
+            return [
+                'id' => $r->id,
+                'strip_id' => $r->strip_id,
+                'slot_date' => $r->slot_date,
+                'hour_24' => $r->hour_24,
+                'role' => $r->role,
+                'status' => $r->status,
+                'committed_doctor_id' => $r->committed_doctor_id,
+                'ist_hour' => $istHour,
+                'ist_datetime' => $istDate->setTime($istHour, 0)->format('Y-m-d H:i:s'),
+            ];
+        });
+
+        return response()->json([
+            'doctor_id' => $doctorId,
+            'date'      => $date,
+            'day'       => $normalizedDay,
+            'tz'        => $tz,
+            'count'     => $mapped->count(),
+            'slots'     => $mapped,
+        ]);
     }
 
+    private function normalizeDayOfWeek(string $day): ?string
+    {
+        $normalized = strtolower(trim($day));
+        $valid = [
+            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+        ];
+
+        return in_array($normalized, $valid, true) ? $normalized : null;
+    }
 }

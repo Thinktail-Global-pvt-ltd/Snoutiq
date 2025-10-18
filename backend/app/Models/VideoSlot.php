@@ -15,13 +15,14 @@ class VideoSlot extends Model
     use HasFactory;
 
     protected $fillable = [
-        'strip_id', 'slot_date', 'hour_24', 'role', 'status', 'payout_offer', 'demand_score',
+        'strip_id', 'slot_date', 'slot_day_of_week', 'hour_24', 'role', 'status', 'payout_offer', 'demand_score',
         'committed_doctor_id', 'checkin_due_at', 'checked_in_at', 'in_progress_at', 'finished_at', 'meta',
     ];
 
     protected $casts = [
         'meta' => 'array',
         'slot_date' => 'date:Y-m-d',
+        'slot_day_of_week' => 'string',
         'checkin_due_at' => 'datetime',
         'checked_in_at' => 'datetime',
         'in_progress_at' => 'datetime',
@@ -39,15 +40,25 @@ class VideoSlot extends Model
         return $this->belongsTo(GeoStrip::class, 'strip_id');
     }
 
-    public function scopeOpenForMarketplace(Builder $q, string $date, ?int $stripId = null): Builder
+    public function scopeOpenForMarketplace(Builder $q, ?string $date = null, ?int $stripId = null, ?string $slotDayOfWeek = null): Builder
     {
-        $q->where('slot_date', $date)
-          ->whereIn('status', ['open', 'held']) // held may expire soon
+        if ($slotDayOfWeek !== null) {
+            $q->where('slot_day_of_week', strtolower($slotDayOfWeek));
+        } elseif ($date !== null) {
+            $q->where('slot_date', $date);
+        }
+
+        $q->whereIn('status', ['open', 'held']) // held may expire soon
           ->whereIn('role', ['primary','bench']);
         if ($stripId) {
             $q->where('strip_id', $stripId);
         }
         return $q;
+    }
+
+    public function scopeForNightDay(Builder $q, string $slotDayOfWeek): Builder
+    {
+        return $q->where('slot_day_of_week', strtolower($slotDayOfWeek));
     }
 
     public function scopeForWindow(Builder $q, int $stripId, string $slotDate, int $hour, array $roles = ['primary','bench']): Builder
