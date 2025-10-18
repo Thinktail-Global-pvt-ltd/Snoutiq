@@ -101,6 +101,21 @@ class LocationSlotsController extends Controller
         return $this->mapLonToStrip($lon, $count);
     }
 
+    private function nightUtcHours(): array
+    {
+        return array_merge(range(13, 23), range(0, 6));
+    }
+
+    private function normalizeDayOfWeek(string $day): ?string
+    {
+        $normalized = strtolower(trim($day));
+        $valid = [
+            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+        ];
+
+        return in_array($normalized, $valid, true) ? $normalized : null;
+    }
+
     // GET /api/geo/nearest-pincode (uses session user_id -> vet_registerations_temp.lat/lng)
     public function nearestPincode(Request $r): JsonResponse
     {
@@ -119,35 +134,50 @@ class LocationSlotsController extends Controller
     public function openSlotsNear(Request $r): JsonResponse
     {
         $dateIst = (string) $r->query('date');
-        if ($dateIst === '') {
-            return response()->json(['error' => 'date is required (YYYY-MM-DD, IST)'], 422);
+        $dayInput = $r->query('day');
+
+        $normalizedDay = null;
+        if ($dayInput !== null && $dayInput !== '') {
+            $normalizedDay = $this->normalizeDayOfWeek((string) $dayInput);
+            if ($normalizedDay === null) {
+                return response()->json(['error' => 'day must be a valid weekday name'], 422);
+            }
+        }
+
+        if ($dateIst === '' && $normalizedDay === null) {
+            return response()->json(['error' => 'either date (YYYY-MM-DD, IST) or day is required'], 422);
         }
 
         // Locate user and map to nearest geo_strips row (by longitude center)
         [, $lon] = $this->getSessionUserCoords($r);
-        $stripId = $this->nearestStripIdByLon((float) $lon, $dateIst);
-
-        // Night window 19:00..07:00 IST spans two UTC dates. Build list of (utcDate, utcHour) pairs.
-        $hoursIst = [19,20,21,22,23,0,1,2,3,4,5,6];
-        $pairs = [];
-        foreach ($hoursIst as $hIst) {
-            $ist = CarbonImmutable::createFromFormat('Y-m-d H:i:s', $dateIst . ' ' . str_pad((string) $hIst, 2, '0', STR_PAD_LEFT) . ':00:00', 'Asia/Kolkata');
-            if (in_array($hIst, [0,1,2,3,4,5,6], true)) {
-                // 00-06 are technically next day for the same IST night
-                $ist = $ist->addDay();
-            }
-            $utc   = $ist->setTimezone('UTC');
-            $pairs[] = [
-                'date' => $utc->toDateString(),
-                'hour' => (int) $utc->format('G'),
-            ];
-        }
+        $stripId = $this->nearestStripIdByLon((float) $lon, $dateIst ?: date('Y-m-d'));
 
         $q = VideoSlot::query()
             ->where('strip_id', $stripId)
             ->whereIn('status', ['open','held'])
-            ->whereIn('role', ['primary','bench'])
-            ->where(function ($w) use ($pairs) {
+            ->whereIn('role', ['primary','bench']);
+
+        if ($normalizedDay !== null) {
+            $q->where('slot_day_of_week', $normalizedDay)
+              ->whereIn('hour_24', $this->nightUtcHours())
+              ->orderBy('hour_24');
+        } else {
+            // Night window 19:00..07:00 IST spans two UTC dates. Build list of (utcDate, utcHour) pairs.
+            $pairs = [];
+            foreach ([19,20,21,22,23,0,1,2,3,4,5,6] as $hIst) {
+                $ist = CarbonImmutable::createFromFormat('Y-m-d H:i:s', $dateIst . ' ' . str_pad((string) $hIst, 2, '0', STR_PAD_LEFT) . ':00:00', 'Asia/Kolkata');
+                if (in_array($hIst, [0,1,2,3,4,5,6], true)) {
+                    // 00-06 are technically next day for the same IST night
+                    $ist = $ist->addDay();
+                }
+                $utc   = $ist->setTimezone('UTC');
+                $pairs[] = [
+                    'date' => $utc->toDateString(),
+                    'hour' => (int) $utc->format('G'),
+                ];
+            }
+
+            $q->where(function ($w) use ($pairs) {
                 foreach ($pairs as $p) {
                     $w->orWhere(function ($q) use ($p) {
                         $q->where('slot_date', $p['date'])
@@ -156,14 +186,17 @@ class LocationSlotsController extends Controller
                 }
             })
             ->orderBy('slot_date')
-            ->orderBy('hour_24')
-            ->orderBy('role');
+            ->orderBy('hour_24');
+        }
+
+        $q->orderBy('role');
 
         $stripRow = null;
         try { $stripRow = DB::table('geo_strips')->where('id', $stripId)->first(['id','name','min_lon','max_lon']); } catch (\Throwable $e) {}
 
         return response()->json([
-            'date'      => $dateIst,
+            'date'      => $dateIst !== '' ? $dateIst : null,
+            'day'       => $normalizedDay,
             'strip_id'  => $stripId,
             'strip'     => $stripRow,
             'slots'     => $q->get(),
@@ -175,8 +208,18 @@ class LocationSlotsController extends Controller
     public function openSlotsByPincode(Request $r): JsonResponse
     {
         $dateIst = (string) $r->query('date');
-        if ($dateIst === '') {
-            return response()->json(['error' => 'date is required (YYYY-MM-DD, IST)'], 422);
+        $dayInput = $r->query('day');
+
+        $normalizedDay = null;
+        if ($dayInput !== null && $dayInput !== '') {
+            $normalizedDay = $this->normalizeDayOfWeek((string) $dayInput);
+            if ($normalizedDay === null) {
+                return response()->json(['error' => 'day must be a valid weekday name'], 422);
+            }
+        }
+
+        if ($dateIst === '' && $normalizedDay === null) {
+            return response()->json(['error' => 'either date (YYYY-MM-DD, IST) or day is required'], 422);
         }
 
         $code = (string) $r->query('code', '');
@@ -200,26 +243,31 @@ class LocationSlotsController extends Controller
         $stripsCount = (int) env('VIDEO_NIGHT_STRIPS', 15);
         $stripId = $this->mapLonToStrip((float) $pinRow->lon, $stripsCount);
 
-        // Build IST night hours window
-        $hoursIst = [19,20,21,22,23,0,1,2,3,4,5,6];
-        $pairs = [];
-        foreach ($hoursIst as $hIst) {
-            $ist = CarbonImmutable::createFromFormat('Y-m-d H:i:s', $dateIst . ' ' . str_pad((string) $hIst, 2, '0', STR_PAD_LEFT) . ':00:00', 'Asia/Kolkata');
-            if (in_array($hIst, [0,1,2,3,4,5,6], true)) {
-                $ist = $ist->addDay();
-            }
-            $utc   = $ist->setTimezone('UTC');
-            $pairs[] = [
-                'date' => $utc->toDateString(),
-                'hour' => (int) $utc->format('G'),
-            ];
-        }
-
         $q = VideoSlot::query()
             ->where('strip_id', $stripId)
             ->whereIn('status', ['open','held'])
-            ->whereIn('role', ['primary','bench'])
-            ->where(function ($w) use ($pairs) {
+            ->whereIn('role', ['primary','bench']);
+
+        if ($normalizedDay !== null) {
+            $q->where('slot_day_of_week', $normalizedDay)
+              ->whereIn('hour_24', $this->nightUtcHours())
+              ->orderBy('hour_24');
+        } else {
+            // Build IST night hours window
+            $pairs = [];
+            foreach ([19,20,21,22,23,0,1,2,3,4,5,6] as $hIst) {
+                $ist = CarbonImmutable::createFromFormat('Y-m-d H:i:s', $dateIst . ' ' . str_pad((string) $hIst, 2, '0', STR_PAD_LEFT) . ':00:00', 'Asia/Kolkata');
+                if (in_array($hIst, [0,1,2,3,4,5,6], true)) {
+                    $ist = $ist->addDay();
+                }
+                $utc   = $ist->setTimezone('UTC');
+                $pairs[] = [
+                    'date' => $utc->toDateString(),
+                    'hour' => (int) $utc->format('G'),
+                ];
+            }
+
+            $q->where(function ($w) use ($pairs) {
                 foreach ($pairs as $p) {
                     $w->orWhere(function ($q) use ($p) {
                         $q->where('slot_date', $p['date'])
@@ -228,8 +276,10 @@ class LocationSlotsController extends Controller
                 }
             })
             ->orderBy('slot_date')
-            ->orderBy('hour_24')
-            ->orderBy('role');
+            ->orderBy('hour_24');
+        }
+
+        $q->orderBy('role');
 
         // No DB dependency for strip meta; provide a synthetic label
         $stripMeta = (object) [
@@ -238,7 +288,8 @@ class LocationSlotsController extends Controller
         ];
 
         return response()->json([
-            'date'      => $dateIst,
+            'date'      => $dateIst !== '' ? $dateIst : null,
+            'day'       => $normalizedDay,
             'using'     => 'pincode_band',
             'strip_id'  => (int) $stripId,
             'strip'     => $stripMeta,

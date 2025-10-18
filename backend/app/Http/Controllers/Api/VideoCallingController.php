@@ -12,13 +12,34 @@ class VideoCallingController extends Controller
     public function nearbyVets(Request $request)
     {
         $userId = $request->query('user_id');
-        $date   = (string) $request->query('date', now('Asia/Kolkata')->toDateString());
+        $dateParam = $request->query('date');
+        $dayInput = $request->query('day');
+
+        $date = $dateParam !== null ? (string) $dateParam : now('Asia/Kolkata')->toDateString();
+
+        $normalizedDay = null;
+        if ($dayInput !== null && $dayInput !== '') {
+            $normalizedDay = $this->normalizeDayOfWeek((string) $dayInput);
+            if ($normalizedDay === null) {
+                return response()->json(['status' => 'error', 'error' => 'day must be a valid weekday name'], 422);
+            }
+        }
 
         if (!$userId) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'user_id is required'
             ], 422);
+        }
+
+        if ($date === '' && $normalizedDay === null) {
+            return response()->json([
+                'status' => 'success',
+                'date'   => null,
+                'day'    => null,
+                'data'   => collect(),
+                'available_doctors_by_vet' => new \stdClass(),
+            ]);
         }
 
         // 1) User lat/lng lao
@@ -59,7 +80,8 @@ class VideoCallingController extends Controller
         if ($vets->isEmpty()) {
             return response()->json([
                 'status' => 'success',
-                'date'   => $date,
+                'date'   => $date === '' ? null : $date,
+                'day'    => $normalizedDay,
                 'data'   => $vets,
                 'available_doctors_by_vet' => new \stdClass(),
             ]);
@@ -75,7 +97,8 @@ class VideoCallingController extends Controller
         if ($doctors->isEmpty()) {
             return response()->json([
                 'status' => 'success',
-                'date'   => $date,
+                'date'   => $date === '' ? null : $date,
+                'day'    => $normalizedDay,
                 'data'   => [],
                 'available_doctors_by_vet' => new \stdClass(),
             ]);
@@ -92,7 +115,8 @@ class VideoCallingController extends Controller
         if ($activeDoctorIds->isEmpty()) {
             return response()->json([
                 'status' => 'success',
-                'date'   => $date,
+                'date'   => $date === '' ? null : $date,
+                'day'    => $normalizedDay,
                 'data'   => [],
                 'available_doctors_by_vet' => new \stdClass(),
             ]);
@@ -100,11 +124,18 @@ class VideoCallingController extends Controller
 
         $utcNightHours = array_merge(range(13, 23), range(0, 6));
 
-        $busyDoctorIds = DB::table('video_slots')
+        $busyQuery = DB::table('video_slots')
             ->whereIn('committed_doctor_id', $activeDoctorIds->all())
-            ->where('slot_date', $date)
             ->whereIn('hour_24', $utcNightHours)
-            ->whereIn('status', ['committed', 'in_progress', 'done'])
+            ->whereIn('status', ['committed', 'in_progress', 'done']);
+
+        if ($normalizedDay !== null) {
+            $busyQuery->where('slot_day_of_week', $normalizedDay);
+        } else {
+            $busyQuery->where('slot_date', $date);
+        }
+
+        $busyDoctorIds = $busyQuery
             ->distinct()
             ->pluck('committed_doctor_id')
             ->all();
@@ -149,10 +180,21 @@ class VideoCallingController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'date'   => $date,
+            'date'   => $date === '' ? null : $date,
+            'day'    => $normalizedDay,
             'data'   => $filteredVets->values(),
             'available_doctors_by_vet' => (object) $availableDoctorsByVet,
         ]);
+    }
+
+    private function normalizeDayOfWeek(string $day): ?string
+    {
+        $normalized = strtolower(trim($day));
+        $valid = [
+            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+        ];
+
+        return in_array($normalized, $valid, true) ? $normalized : null;
     }
 }
 
