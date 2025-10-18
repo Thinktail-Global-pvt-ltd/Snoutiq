@@ -249,7 +249,7 @@
         cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
         default: 'bg-gray-50 text-gray-600 border-gray-200',
       };
-      const NIGHT_STATE = { editMode: false, aggregated: [], slotsByDow: {}, errors: [], total: 0 };
+      const NIGHT_STATE = { editMode: false, aggregated: [], slotsByDow: {}, errors: [], total: 0, byDate: [] };
       const pad2 = (n)=>String(n).padStart(2,'0');
 
       function updateEditButtonLabel(){
@@ -301,12 +301,26 @@
             html += '</div>';
             cell.innerHTML = html;
           } else {
-            if(!NIGHT_STATE.aggregated.length){
+            const dates = NIGHT_STATE.byDate || [];
+            if(!dates.length){
               cell.innerHTML = '<span class="text-xs text-gray-400">No night slots configured</span>';
               return;
             }
-            const chipsHtml = NIGHT_STATE.aggregated.join('');
-            cell.innerHTML = `<div class="text-[11px] font-medium text-gray-700 mb-1">Repeats daily</div><div class="flex flex-wrap">${chipsHtml}</div>`;
+            let html = '<div class="space-y-1">';
+            dates.forEach(entry => {
+              const chips = (entry.chips && entry.chips.length)
+                ? `<div class="flex flex-wrap">${entry.chips.join('')}</div>`
+                : '<div class="text-[11px] text-gray-400">No slots</div>';
+              const errs = (entry.errors || []).map(msg => `<div class="text-[11px] text-red-600 mt-0.5">${msg}</div>`).join('');
+              const label = entry.label || entry.date || '';
+              html += `<div>
+                <div class="text-[11px] font-medium text-gray-700">${label}</div>
+                ${chips}
+                ${errs}
+              </div>`;
+            });
+            html += '</div>';
+            cell.innerHTML = html;
           }
         });
       }
@@ -428,6 +442,8 @@
         if(!doctorId){
           NIGHT_STATE.errors = ['Select a doctor to view night slots'];
           NIGHT_STATE.aggregated = [];
+          NIGHT_STATE.byDate = [];
+          NIGHT_STATE.total = 0;
           NIGHT_STATE.slotsByDow = {};
           renderNightSlotsCells();
           return;
@@ -435,6 +451,8 @@
         if(!baseDate){
           NIGHT_STATE.errors = ['Pick a date to view night slots'];
           NIGHT_STATE.aggregated = [];
+          NIGHT_STATE.byDate = [];
+          NIGHT_STATE.total = 0;
           NIGHT_STATE.slotsByDow = {};
           renderNightSlotsCells();
           return;
@@ -502,22 +520,13 @@
         });
 
         const aggregatedErrors = [];
-        const uniqueChipMap = new Map();
         mapByDow.forEach(entries => {
           entries.forEach(entry => {
             if(entry.errors && entry.errors.length){
               entry.errors.forEach(msg => aggregatedErrors.push(`${entry.label}: ${msg || 'Failed to load'}`));
             }
-            (entry.items || []).forEach(item => {
-              if(!uniqueChipMap.has(item.key)){
-                uniqueChipMap.set(item.key, item);
-              }
-            });
           });
         });
-
-        const uniqueChips = Array.from(uniqueChipMap.values()).sort((a,b)=> a.hour - b.hour || a.key.localeCompare(b.key));
-        const aggregatedChips = uniqueChips.map(item => item.chip);
 
         const slotsByDow = {};
         mapByDow.forEach((entries, dow) => {
@@ -547,9 +556,27 @@
         });
         Array.from({length:7}).forEach((_,idx)=>{ if(!slotsByDow[idx]) slotsByDow[idx] = []; });
 
+        const dateSummaries = Array.from(bucket.entries()).map(([dateStr, entry]) => {
+          const seen = new Set();
+          const chips = [];
+          (entry.items || []).forEach(item => {
+            const uniqKey = item.id ? `id:${item.id}` : `${item.key}|${dateStr}`;
+            if(seen.has(uniqKey)) return;
+            seen.add(uniqKey);
+            chips.push(item.chip);
+          });
+          return {
+            date: dateStr,
+            label: entry.label,
+            chips,
+            errors: Array.from(new Set(entry.errors || [])),
+          };
+        }).sort((a,b)=> a.date.localeCompare(b.date));
+
         NIGHT_STATE.errors = Array.from(new Set(aggregatedErrors));
-        NIGHT_STATE.aggregated = aggregatedChips;
-        NIGHT_STATE.total = aggregatedChips.length;
+        NIGHT_STATE.byDate = dateSummaries;
+        NIGHT_STATE.aggregated = dateSummaries.flatMap(entry => entry.chips);
+        NIGHT_STATE.total = dateSummaries.reduce((sum, entry) => sum + entry.chips.length, 0);
         NIGHT_STATE.slotsByDow = slotsByDow;
         renderNightSlotsCells();
         updateEditButtonLabel();
