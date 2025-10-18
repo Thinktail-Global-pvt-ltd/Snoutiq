@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { Search, X, Upload, Info, CheckCircle2 } from "lucide-react";
+import React, { useState, useEffect, useContext } from "react";
+import { toast } from "react-hot-toast";
+import { AuthContext } from "../auth/AuthContext";
+import axios from "../axios";
 
 const PetDetailsModal = ({ onComplete, updateUser, token, user }) => {
   const [formData, setFormData] = useState({
@@ -18,9 +20,6 @@ const PetDetailsModal = ({ onComplete, updateUser, token, user }) => {
   const [touched, setTouched] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [breedOptions, setBreedOptions] = useState([]);
-  const [filteredBreeds, setFilteredBreeds] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showBreedDropdown, setShowBreedDropdown] = useState(false);
   const [breedImage, setBreedImage] = useState(null);
   const [loadingBreeds, setLoadingBreeds] = useState(false);
   const [isLoadingImage, setIsLoadingImage] = useState(false);
@@ -34,6 +33,7 @@ const PetDetailsModal = ({ onComplete, updateUser, token, user }) => {
     if (!formData.petGender) newErrors.petGender = "Please select gender";
     if (!formData.homeVisit) newErrors.homeVisit = "Please select option";
 
+    // ✅ Pet Age Validation
     const years = parseInt(formData.petAgeYears || 0, 10);
     const months = parseInt(formData.petAgeMonths || 0, 10);
 
@@ -59,11 +59,12 @@ const PetDetailsModal = ({ onComplete, updateUser, token, user }) => {
       if (formData.petType === "Dog") {
         setLoadingBreeds(true);
         try {
-          const res = await fetch("https://dog.ceo/api/breeds/list/all");
-          const data = await res.json();
+          const res = await axios.get(
+            "https://snoutiq.com/backend/api/dog-breeds/all"
+          );
 
-          if (data.status === "success" && data.message) {
-            const breedsData = data.message;
+          if (res.data && res.data.breeds) {
+            const breedsData = res.data.breeds;
             const breedList = [];
 
             Object.entries(breedsData).forEach(([breed, subBreeds]) => {
@@ -77,17 +78,19 @@ const PetDetailsModal = ({ onComplete, updateUser, token, user }) => {
             });
 
             setBreedOptions(breedList.sort());
-            setFilteredBreeds(breedList.sort());
+          } else {
+            console.error("Invalid response format for breeds");
+            setBreedOptions([]);
           }
         } catch (err) {
           console.error("Failed to fetch breeds", err);
+          toast.error("Failed to load dog breeds");
           setBreedOptions([]);
-          setFilteredBreeds([]);
         } finally {
           setLoadingBreeds(false);
         }
       } else if (formData.petType === "Cat") {
-        const catBreeds = [
+        setBreedOptions([
           "Siamese",
           "Persian",
           "Maine Coon",
@@ -97,35 +100,16 @@ const PetDetailsModal = ({ onComplete, updateUser, token, user }) => {
           "Ragdoll",
           "Abyssinian",
           "Scottish Fold",
-          "Birman",
-          "Russian Blue",
-          "Norwegian Forest",
-        ].sort();
-        setBreedOptions(catBreeds);
-        setFilteredBreeds(catBreeds);
+        ]);
       } else {
         setBreedOptions([]);
-        setFilteredBreeds([]);
       }
     };
 
     if (formData.petType) {
       fetchBreeds();
-      setSearchQuery("");
-      setFormData(prev => ({ ...prev, petBreed: "" }));
     }
   }, [formData.petType]);
-
-  useEffect(() => {
-    if (searchQuery) {
-      const filtered = breedOptions.filter(breed =>
-        breed.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredBreeds(filtered);
-    } else {
-      setFilteredBreeds(breedOptions);
-    }
-  }, [searchQuery, breedOptions]);
 
   const toTitleCase = (str) => {
     return str.replace(/\w\S*/g, (txt) => {
@@ -148,374 +132,610 @@ const PetDetailsModal = ({ onComplete, updateUser, token, user }) => {
     }
   };
 
-  const handleBreedSelect = (breed) => {
-    setFormData(prev => ({ ...prev, petBreed: breed }));
-    setSearchQuery(breed);
-    setShowBreedDropdown(false);
-    if (errors.petBreed) setErrors(prev => ({ ...prev, petBreed: null }));
-  };
+// const handleSubmit = async () => {
+//   if (!validate()) {
+//     setTouched(Object.fromEntries(Object.keys(formData).map((k) => [k, true])));
+//     toast.error("Please fix the errors");
+//     return;
+//   }
 
-  const handleSubmit = async () => {
-    if (!validate()) {
-      setTouched(Object.fromEntries(Object.keys(formData).map((k) => [k, true])));
-      return;
-    }
+//   setIsLoading(true);
+//   try {
+//     const submitData = new FormData();
+//     submitData.append("user_id", user?.id);
+//     submitData.append("pet_type", formData.petType);
+//     submitData.append("pet_name", formData.petName.trim());
+//     submitData.append("pet_gender", formData.petGender);
+//     submitData.append("home_visit", formData.homeVisit);
 
-    setIsLoading(true);
-    try {
-      const submitData = new FormData();
-      submitData.append("user_id", user?.id);
-      submitData.append("pet_type", formData.petType);
-      submitData.append("pet_name", formData.petName.trim());
-      submitData.append("pet_gender", formData.petGender);
-      submitData.append("home_visit", formData.homeVisit);
-      submitData.append("role", "pet");
+//     // Convert years+months → total months
+//     const years = parseInt(formData.petAgeYears || 0, 10);
+//     const months = parseInt(formData.petAgeMonths || 0, 10);
+//     const totalMonths = years * 12 + months;
+//     submitData.append("pet_age", totalMonths);
 
-      const years = parseInt(formData.petAgeYears || 0, 10);
-      const months = parseInt(formData.petAgeMonths || 0, 10);
-      const totalMonths = years * 12 + months;
-      submitData.append("pet_age", totalMonths);
+//     submitData.append("breed", formData.petBreed);
+//     if (formData.petDoc1) submitData.append("pet_doc1", formData.petDoc1);
+//     if (formData.petDoc2) submitData.append("pet_doc2", formData.petDoc2);
 
-      submitData.append("breed", formData.petBreed);
-      if (formData.petDoc1) submitData.append("pet_doc1", formData.petDoc1);
-      if (formData.petDoc2) submitData.append("pet_doc2", formData.petDoc2);
+//     const res = await axios.post(
+//       "https://snoutiq.com/backend/api/auth/register",
+//       submitData,
+//       { headers: { "Content-Type": "multipart/form-data" } }
+//     );
 
-      // Simulating API call
-      console.log("Form submitted successfully", Object.fromEntries(submitData));
-      
-      setTimeout(() => {
-        setIsLoading(false);
+//     if (res.data.message && res.data.message.includes("successfully")) {
+//       toast.success("Pet profile saved successfully!");
+
+//       if (res.data.user) {
+//         updateUser(res.data.user);
+//         console.log("Updated user from registration response:", res.data.user);
+        
+//         if (onComplete) onComplete();
+//         return;
+//       }
+//       try {
+//         const userRes = await axios.get(
+//           `https://snoutiq.com/backend/api/petparents/${user.id}`,
+//           { headers: { Authorization: `Bearer ${token}` } }
+//         );
+
+//         console.log("Fetch user response:", userRes.data);
+
+//         let updatedUser = null;
+        
+//         if (userRes.data.status === "success" && userRes.data.user) {
+//           updatedUser = userRes.data.user;
+//         } else if (userRes.data.user) {
+//           updatedUser = userRes.data.user;
+//         } else if (userRes.data && !userRes.data.status) {
+//           updatedUser = userRes.data;
+//         }
+
+//         if (updatedUser) {
+//           updateUser(updatedUser);
+//           toast.success("Pet details updated!");
+//           console.log("Updated user:", updatedUser);
+          
+//           if (onComplete) onComplete();
+//         } else {
+//           console.error("No user data found in response:", userRes.data);
+//           toast.error("Failed to update user data - no user found");
+          
+//           if (onComplete) onComplete();
+//         }
+//       } catch (fetchError) {
+//         console.error("Error fetching updated user:", fetchError);
+//         toast.error("Registration successful, but failed to fetch updated data");
+        
+//         if (onComplete) onComplete();
+//       }
+//     } else {
+//       console.error("Registration failed:", res.data);
+//       toast.error(res.data.message || "Failed to save pet data");
+//     }
+//   } catch (error) {
+//     console.error("Registration error:", error);
+    
+//     if (error.response) {
+//       toast.error(`Server error: ${error.response.data?.message || 'Registration failed'}`);
+//     } else if (error.request) {
+//       toast.error("Network error: Please check your connection");
+//     } else {
+//       toast.error("Something went wrong!");
+//     }
+//   } finally {
+//     setIsLoading(false);
+//   }
+  
+// };
+
+
+const handleSubmit = async () => {
+  if (!validate()) {
+    setTouched(Object.fromEntries(Object.keys(formData).map((k) => [k, true])));
+    toast.error("Please fix the errors");
+    return;
+  }
+
+  setIsLoading(true);
+  try {
+    const submitData = new FormData();
+    submitData.append("user_id", user?.id);
+    submitData.append("pet_type", formData.petType);
+    submitData.append("pet_name", formData.petName.trim());
+    submitData.append("pet_gender", formData.petGender);
+    submitData.append("home_visit", formData.homeVisit);
+
+    // ✅ Role ko force send karo
+    submitData.append("role", "pet");
+
+    // Convert years+months → total months
+    const years = parseInt(formData.petAgeYears || 0, 10);
+    const months = parseInt(formData.petAgeMonths || 0, 10);
+    const totalMonths = years * 12 + months;
+    submitData.append("pet_age", totalMonths);
+
+    submitData.append("breed", formData.petBreed);
+    if (formData.petDoc1) submitData.append("pet_doc1", formData.petDoc1);
+    if (formData.petDoc2) submitData.append("pet_doc2", formData.petDoc2);
+
+    const res = await axios.post(
+      "https://snoutiq.com/backend/api/auth/register",
+      submitData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    if (res.data.message && res.data.message.includes("successfully")) {
+      toast.success("Pet profile saved successfully!");
+
+      if (res.data.user) {
+        // ✅ role ko force set karna for safety
+        updateUser({ ...res.data.user, role: "pet" });
+
+        console.log("Updated user from registration response:", res.data.user);
         if (onComplete) onComplete();
-      }, 1500);
-    } catch (error) {
-      console.error("Registration error:", error);
-      setIsLoading(false);
+        return;
+      }
+
+      // agar direct user return nahi hua toh fetch karo
+      try {
+        const userRes = await axios.get(
+          `https://snoutiq.com/backend/api/petparents/${user.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        let updatedUser = userRes.data?.user || userRes.data;
+        if (updatedUser) {
+          updateUser({ ...updatedUser, role: "pet" }); // ✅ ensure role
+          toast.success("Pet details updated!");
+          if (onComplete) onComplete();
+        }
+      } catch (fetchError) {
+        console.error("Error fetching updated user:", fetchError);
+        toast.error("Registration successful, but failed to fetch updated data");
+        if (onComplete) onComplete();
+      }
+    } else {
+      console.error("Registration failed:", res.data);
+      toast.error(res.data.message || "Failed to save pet data");
     }
-  };
+  } catch (error) {
+    console.error("Registration error:", error);
+    if (error.response) {
+      toast.error(`Server error: ${error.response.data?.message || 'Registration failed'}`);
+    } else if (error.request) {
+      toast.error("Network error: Please check your connection");
+    } else {
+      toast.error("Something went wrong!");
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white">
-          <h2 className="text-2xl font-bold mb-2">Complete Your Pet Profile</h2>
-          <p className="text-blue-100 text-sm">
-            Please fill in your pet's details to unlock the full Snoutiq experience
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold mb-2">Complete Your Pet Profile</h2>
+          <p className="text-gray-600 text-sm">
+            Please fill your pet's details to unlock the full Snoutiq
+            experience. You cannot access the dashboard until this form is
+            complete.
           </p>
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto px-6 py-6 flex-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Pet Type */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Pet Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={formData.petType}
-                onChange={(e) => handleInputChange("petType", e.target.value)}
-                onBlur={() => handleBlur("petType")}
-                className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                  errors.petType && touched.petType
-                    ? "border-red-400 bg-red-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <option value="">Select Pet Type</option>
-                <option value="Dog">🐕 Dog</option>
-                <option value="Cat">🐈 Cat</option>
-                <option value="Other">🐾 Other</option>
-              </select>
-              {errors.petType && touched.petType && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <Info className="w-3 h-3" /> {errors.petType}
-                </p>
-              )}
-            </div>
+        <div className="overflow-y-auto px-6 py-4 flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Pet Type */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Pet Type *
+            </label>
+            <select
+              value={formData.petType}
+              onChange={(e) => handleInputChange("petType", e.target.value)}
+              onBlur={() => handleBlur("petType")}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.petType && touched.petType
+                  ? "border-red-500"
+                  : "border-gray-300"
+              }`}
+            >
+              <option value="">Select Pet Type</option>
+              <option value="Dog">Dog</option>
+              <option value="Cat">Cat</option>
+              <option value="Other">Other</option>
+            </select>
+            {errors.petType && touched.petType && (
+              <p className="text-red-500 text-xs mt-1">{errors.petType}</p>
+            )}
+          </div>
 
-            {/* Pet Name */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Pet Name <span className="text-red-500">*</span>
+          {/* Pet Name */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Pet Name *
+            </label>
+            <input
+              type="text"
+              value={formData.petName}
+              onChange={(e) => handleInputChange("petName", e.target.value)}
+              onBlur={() => handleBlur("petName")}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.petName && touched.petName
+                  ? "border-red-500"
+                  : "border-gray-300"
+              }`}
+              placeholder="Enter your pet's name"
+            />
+            {errors.petName && touched.petName && (
+              <p className="text-red-500 text-xs mt-1">{errors.petName}</p>
+            )}
+          </div>
+
+          {/* Pet Gender */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Pet Gender *
+            </label>
+            <select
+              value={formData.petGender}
+              onChange={(e) => handleInputChange("petGender", e.target.value)}
+              onBlur={() => handleBlur("petGender")}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.petGender && touched.petGender
+                  ? "border-red-500"
+                  : "border-gray-300"
+              }`}
+            >
+              <option value="">Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+            {errors.petGender && touched.petGender && (
+              <p className="text-red-500 text-xs mt-1">{errors.petGender}</p>
+            )}
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Allow Home Visit *
+            </label>
+            <select
+              value={formData.homeVisit || ""}
+              onChange={(e) => handleInputChange("homeVisit", e.target.value)}
+              onBlur={() => handleBlur("homeVisit")}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.homeVisit && touched.homeVisit
+                  ? "border-red-500"
+                  : "border-gray-300"
+              }`}
+            >
+              <option value="">Select Option</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+            {errors.homeVisit && touched.homeVisit && (
+              <p className="text-red-500 text-xs mt-1">{errors.homeVisit}</p>
+            )}
+          </div>
+
+          {/* Pet Age (Years & Months) */}
+          <div className="mb-4 flex gap-4 col-span-2">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Pet Age (Years) *
               </label>
               <input
-                type="text"
-                value={formData.petName}
-                onChange={(e) => handleInputChange("petName", e.target.value)}
-                onBlur={() => handleBlur("petName")}
-                className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                  errors.petName && touched.petName
-                    ? "border-red-400 bg-red-50"
-                    : "border-gray-200 hover:border-gray-300"
+                type="number"
+                min="0"
+                value={formData.petAgeYears || ""}
+                onChange={(e) =>
+                  handleInputChange("petAgeYears", e.target.value)
+                }
+                onBlur={() => handleBlur("petAgeYears")}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.petAgeYears && touched.petAgeYears
+                    ? "border-red-500"
+                    : "border-gray-300"
                 }`}
-                placeholder="Enter your pet's name"
+                placeholder="Years"
               />
-              {errors.petName && touched.petName && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <Info className="w-3 h-3" /> {errors.petName}
+              {errors.petAgeYears && touched.petAgeYears && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors.petAgeYears}
                 </p>
               )}
             </div>
 
-            {/* Pet Gender */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Pet Gender <span className="text-red-500">*</span>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Pet Age (Months)
               </label>
-              <select
-                value={formData.petGender}
-                onChange={(e) => handleInputChange("petGender", e.target.value)}
-                onBlur={() => handleBlur("petGender")}
-                className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                  errors.petGender && touched.petGender
-                    ? "border-red-400 bg-red-50"
-                    : "border-gray-200 hover:border-gray-300"
+              <input
+                type="number"
+                min="0"
+                max="11"
+                value={formData.petAgeMonths || ""}
+                onChange={(e) =>
+                  handleInputChange("petAgeMonths", e.target.value)
+                }
+                onBlur={() => handleBlur("petAgeMonths")}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.petAgeMonths && touched.petAgeMonths
+                    ? "border-red-500"
+                    : "border-gray-300"
                 }`}
-              >
-                <option value="">Select Gender</option>
-                <option value="Male">♂️ Male</option>
-                <option value="Female">♀️ Female</option>
-              </select>
-              {errors.petGender && touched.petGender && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <Info className="w-3 h-3" /> {errors.petGender}
+                placeholder="Months"
+              />
+              {errors.petAgeMonths && touched.petAgeMonths && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors.petAgeMonths}
                 </p>
               )}
             </div>
-
-            {/* Home Visit */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Allow Home Visit <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={formData.homeVisit || ""}
-                onChange={(e) => handleInputChange("homeVisit", e.target.value)}
-                onBlur={() => handleBlur("homeVisit")}
-                className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                  errors.homeVisit && touched.homeVisit
-                    ? "border-red-400 bg-red-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <option value="">Select Option</option>
-                <option value="Yes">✓ Yes</option>
-                <option value="No">✗ No</option>
-              </select>
-              {errors.homeVisit && touched.homeVisit && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <Info className="w-3 h-3" /> {errors.homeVisit}
-                </p>
-              )}
-            </div>
-
-            {/* Pet Age */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Pet Age <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.petAgeYears || ""}
-                    onChange={(e) => handleInputChange("petAgeYears", e.target.value)}
-                    onBlur={() => handleBlur("petAgeYears")}
-                    className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                      errors.petAgeYears && touched.petAgeYears
-                        ? "border-red-400 bg-red-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                    placeholder="Years"
-                  />
-                  {errors.petAgeYears && touched.petAgeYears && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                      <Info className="w-3 h-3" /> {errors.petAgeYears}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    min="0"
-                    max="11"
-                    value={formData.petAgeMonths || ""}
-                    onChange={(e) => handleInputChange("petAgeMonths", e.target.value)}
-                    onBlur={() => handleBlur("petAgeMonths")}
-                    className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                      errors.petAgeMonths && touched.petAgeMonths
-                        ? "border-red-400 bg-red-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                    placeholder="Months (0-11)"
-                  />
-                  {errors.petAgeMonths && touched.petAgeMonths && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                      <Info className="w-3 h-3" /> {errors.petAgeMonths}
-                    </p>
-                  )}
-                </div>
+          </div>
+          {/* Pet Breed */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Pet Breed *
+            </label>
+            {loadingBreeds ? (
+              <div className="flex items-center justify-center py-3">
+                <svg
+                  className="animate-spin h-5 w-5 mr-2 text-blue-600"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                <span>Loading breeds...</span>
               </div>
-            </div>
+            ) : (
+              <select
+                value={formData.petBreed}
+                onChange={(e) => handleInputChange("petBreed", e.target.value)}
+                onBlur={() => handleBlur("petBreed")}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.petBreed && touched.petBreed
+                    ? "border-red-500"
+                    : "border-gray-300"
+                }`}
+                disabled={!formData.petType || breedOptions.length === 0}
+              >
+                <option value="">Select Breed</option>
+                {breedOptions.map((breed, index) => (
+                  <option key={index} value={breed}>
+                    {toTitleCase(breed)}
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.petBreed && touched.petBreed && (
+              <p className="text-red-500 text-xs mt-1">{errors.petBreed}</p>
+            )}
+          </div>
 
-            {/* Pet Breed with Search */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Pet Breed <span className="text-red-500">*</span>
+          {/* Breed Image for Dogs */}
+          {formData.petType === "Dog" && formData.petBreed && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Breed Image
               </label>
-              {loadingBreeds ? (
-                <div className="flex items-center justify-center py-8 bg-gray-50 rounded-xl border-2 border-gray-200">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <span className="ml-3 text-gray-600">Loading breeds...</span>
+              {isLoadingImage ? (
+                <div className="flex items-center justify-center py-3">
+                  <svg
+                    className="animate-spin h-5 w-5 mr-2 text-blue-600"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  <span>Loading image...</span>
+                </div>
+              ) : breedImage ? (
+                <div
+                  className="cursor-pointer"
+                  onClick={() => setShowBreedModal(true)}
+                >
+                  <img
+                    src={breedImage}
+                    alt={formData.petBreed}
+                    className="w-24 h-24 object-cover rounded-lg shadow-md"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Click to view larger image
+                  </p>
                 </div>
               ) : (
-                <div className="relative">
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setShowBreedDropdown(true);
-                      }}
-                      onFocus={() => setShowBreedDropdown(true)}
-                      onBlur={() => handleBlur("petBreed")}
-                      className={`w-full pl-12 pr-10 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                        errors.petBreed && touched.petBreed
-                          ? "border-red-400 bg-red-50"
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                      placeholder={formData.petType ? `Search ${formData.petType.toLowerCase()} breeds...` : "Select pet type first"}
-                      disabled={!formData.petType || breedOptions.length === 0}
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => {
-                          setSearchQuery("");
-                          setFormData(prev => ({ ...prev, petBreed: "" }));
-                        }}
-                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                  
-                  {showBreedDropdown && filteredBreeds.length > 0 && (
-                    <div className="absolute z-10 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                      {filteredBreeds.map((breed, index) => (
-                        <div
-                          key={index}
-                          onClick={() => handleBreedSelect(breed)}
-                          onMouseDown={(e) => e.preventDefault()}
-                          className="px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors flex items-center justify-between group"
-                        >
-                          <span className="text-gray-700 group-hover:text-blue-600">
-                            {toTitleCase(breed)}
-                          </span>
-                          {formData.petBreed === breed && (
-                            <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {showBreedDropdown && filteredBreeds.length === 0 && searchQuery && (
-                    <div className="absolute z-10 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-lg p-4 text-center text-gray-500">
-                      No breeds found matching "{searchQuery}"
-                    </div>
-                  )}
-                </div>
-              )}
-              {errors.petBreed && touched.petBreed && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <Info className="w-3 h-3" /> {errors.petBreed}
+                <p className="text-sm text-gray-500">
+                  No image available for this breed
                 </p>
               )}
             </div>
+          )}
 
-            {/* Document Uploads */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Vaccination Record History <span className="text-gray-400 text-xs">(Optional)</span>
-              </label>
-              <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
-                formData.petDoc1
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
-              }`}>
-                <div className="flex flex-col items-center justify-center">
-                  <Upload className={`w-10 h-10 mb-2 ${formData.petDoc1 ? "text-blue-600" : "text-gray-400"}`} />
-                  <p className="text-sm text-gray-600">
+          {/* Document Uploads */}
+          <div className="mb-4 col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Vaccination Record History (Optional)
+            </label>
+            <div className="flex items-center justify-center w-full">
+              <label
+                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer ${
+                  formData.petDoc1
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-300 hover:border-gray-400"
+                }`}
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <svg
+                    className="w-8 h-8 mb-4 text-gray-500"
+                    aria-hidden="true"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 20 16"
+                  >
+                    <path
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
+                    />
+                  </svg>
+                  <p className="mb-2 text-sm text-gray-500">
                     {formData.petDoc1 ? (
-                      <span className="font-medium text-blue-600">{formData.petDoc1.name}</span>
+                      formData.petDoc1.name
                     ) : (
                       <span>Click to upload or drag and drop</span>
                     )}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG (Max 5MB)</p>
                 </div>
                 <input
                   type="file"
                   className="hidden"
                   onChange={(e) => handleFileChange("petDoc1", e.target.files)}
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  multiple
                 />
               </label>
             </div>
+          </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Medical History <span className="text-gray-400 text-xs">(Optional)</span>
-              </label>
-              <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
-                formData.petDoc2
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
-              }`}>
-                <div className="flex flex-col items-center justify-center">
-                  <Upload className={`w-10 h-10 mb-2 ${formData.petDoc2 ? "text-blue-600" : "text-gray-400"}`} />
-                  <p className="text-sm text-gray-600">
+          <div className="mb-4 col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Medical History (Optional)
+            </label>
+            <div className="flex items-center justify-center w-full">
+              <label
+                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer ${
+                  formData.petDoc2
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-300 hover:border-gray-400"
+                }`}
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <svg
+                    className="w-8 h-8 mb-4 text-gray-500"
+                    aria-hidden="true"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 20 16"
+                  >
+                    <path
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
+                    />
+                  </svg>
+                  <p className="mb-2 text-sm text-gray-500">
                     {formData.petDoc2 ? (
-                      <span className="font-medium text-blue-600">{formData.petDoc2.name}</span>
+                      formData.petDoc2.name
                     ) : (
                       <span>Click to upload or drag and drop</span>
                     )}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG (Max 5MB)</p>
                 </div>
                 <input
                   type="file"
                   className="hidden"
                   onChange={(e) => handleFileChange("petDoc2", e.target.files)}
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  multiple
                 />
               </label>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-200 bg-gray-50">
+        {/* Footer with Submit Button */}
+        <div className="p-6 border-t border-gray-200">
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? (
-              <span className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Saving Pet Profile...
-              </span>
-            ) : (
-              "Save Pet Details"
-            )}
+            {isLoading ? "Saving..." : "Save Pet Details"}
           </button>
         </div>
+
+        {/* Breed Image Modal */}
+        {showBreedModal && breedImage && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">
+                  {toTitleCase(formData.petBreed)}
+                </h3>
+                <button
+                  onClick={() => setShowBreedModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+              <img
+                src={breedImage}
+                alt={formData.petBreed}
+                className="w-full h-64 object-cover rounded-lg"
+              />
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-700">
+                  Breed Information:
+                </h4>
+                <p className="text-sm text-gray-600 mt-2">
+                  This is a {formData.petBreed} breed. For more detailed
+                  information about this breed's characteristics, temperament,
+                  and care requirements, please consult a breed database or
+                  veterinarian.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
