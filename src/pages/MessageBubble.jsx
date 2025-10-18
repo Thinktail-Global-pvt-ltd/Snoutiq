@@ -4,9 +4,160 @@ import { AuthContext } from "../auth/AuthContext";
 import { socket } from "./socket";
 import DoctorAppointmentModal from "./DoctorAppointmentModal";
 import LiveDoctorSelectionModal from "./LiveDoctorSelectionModal";
+import toast from "react-hot-toast";
 
-// ------------------- DoctorSearchModal -------------------
-const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 30000 }) => {
+// ------------------- Helper function to parse and format AI response -------------------
+const parseAIResponse = (text) => {
+  const sections = {
+    recommendation: null,
+    whyAppropriate: [],
+    howToPrepare: [],
+    nextSteps: [],
+    diagnosis: null
+  };
+
+  // Extract diagnosis section
+  const diagnosisMatch = text.match(/=== DIAGNOSIS ===([\s\S]*?)=== END ===/);
+  if (diagnosisMatch) {
+    sections.diagnosis = diagnosisMatch[1].trim();
+  }
+
+  // Extract main recommendation
+  const recMatch = text.match(/\*\*([^*]+)\*\*/);
+  if (recMatch) {
+    sections.recommendation = recMatch[1];
+  }
+
+  // Extract WHY VIDEO IS APPROPRIATE
+  const whyMatch = text.match(/\*\*WHY VIDEO IS APPROPRIATE:\*\*([\s\S]*?)(?=\*\*HOW TO PREPARE:|\*\*NEXT STEPS:|=== DIAGNOSIS|$)/);
+  if (whyMatch) {
+    const bullets = whyMatch[1].match(/• ([^\n]+)/g);
+    if (bullets) {
+      sections.whyAppropriate = bullets.map(b => b.replace('• ', '').trim());
+    }
+  }
+
+  // Extract HOW TO PREPARE
+  const prepMatch = text.match(/\*\*HOW TO PREPARE:\*\*([\s\S]*?)(?=\*\*NEXT STEPS:|=== DIAGNOSIS|$)/);
+  if (prepMatch) {
+    const bullets = prepMatch[1].match(/• ([^\n]+)/g);
+    if (bullets) {
+      sections.howToPrepare = bullets.map(b => b.replace('• ', '').trim());
+    }
+  }
+
+  // Extract NEXT STEPS
+  const stepsMatch = text.match(/\*\*NEXT STEPS:\*\*([\s\S]*?)(?==== DIAGNOSIS|$)/);
+  if (stepsMatch) {
+    const bullets = stepsMatch[1].match(/• ([^\n]+)/g);
+    if (bullets) {
+      sections.nextSteps = bullets.map(b => b.replace('• ', '').trim());
+    }
+  }
+
+  return sections;
+};
+
+// ------------------- FormattedAIResponse Component - Responsive -------------------
+const FormattedAIResponse = ({ text }) => {
+  const sections = parseAIResponse(text);
+
+  return (
+    <div className="bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl lg:rounded-2xl p-4 sm:p-5 lg:p-6 border-2 border-purple-200 shadow-lg max-w-full">
+      {/* Header with Main Recommendation */}
+      {sections.recommendation && (
+        <div className="mb-4 lg:mb-5">
+          <div className="flex items-start gap-2 sm:gap-3 mb-3 lg:mb-4">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
+              <span className="text-base sm:text-lg lg:text-xl">💡</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-purple-900 text-base sm:text-lg lg:text-xl leading-tight break-words">
+                {sections.recommendation}
+              </h3>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Divider */}
+      {sections.recommendation && (sections.whyAppropriate.length > 0 || sections.howToPrepare.length > 0 || sections.nextSteps.length > 0 || sections.diagnosis) && (
+        <div className="h-px bg-gradient-to-r from-transparent via-purple-300 to-transparent mb-4 lg:mb-5"></div>
+      )}
+
+      {/* Content Sections */}
+      <div className="space-y-3 sm:space-y-4">
+        {/* Why Video is Appropriate */}
+        {sections.whyAppropriate.length > 0 && (
+          <div>
+            <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2 text-xs sm:text-sm">
+              <span className="text-green-500 flex-shrink-0">✅</span>
+              <span className="break-words">Why Video Consultation Works:</span>
+            </h4>
+            <ul className="space-y-1.5 ml-4 sm:ml-5 lg:ml-6">
+              {sections.whyAppropriate.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-green-500 text-xs mt-0.5 sm:mt-1 flex-shrink-0">●</span>
+                  <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* How to Prepare */}
+        {sections.howToPrepare.length > 0 && (
+          <div>
+            <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2 text-xs sm:text-sm">
+              <span className="text-purple-500 flex-shrink-0">📋</span>
+              <span className="break-words">How to Prepare:</span>
+            </h4>
+            <ul className="space-y-1.5 ml-4 sm:ml-5 lg:ml-6">
+              {sections.howToPrepare.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-purple-500 text-xs mt-0.5 sm:mt-1 flex-shrink-0">●</span>
+                  <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Next Steps */}
+        {sections.nextSteps.length > 0 && (
+          <div>
+            <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2 text-xs sm:text-sm">
+              <span className="text-indigo-500 flex-shrink-0">🎯</span>
+              <span className="break-words">Next Steps:</span>
+            </h4>
+            <ul className="space-y-1.5 ml-4 sm:ml-5 lg:ml-6">
+              {sections.nextSteps.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-indigo-500 text-xs mt-0.5 sm:mt-1 flex-shrink-0">●</span>
+                  <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Diagnosis */}
+        {sections.diagnosis && (
+          <div className="bg-blue-50 rounded-lg lg:rounded-xl p-3 sm:p-4 border border-blue-200 mt-3 sm:mt-4">
+            <h4 className="font-bold text-blue-900 mb-2 flex items-center gap-2 text-xs sm:text-sm">
+              <span className="flex-shrink-0">🩺</span>
+              <span className="break-words">Initial Assessment:</span>
+            </h4>
+            <p className="text-blue-800 text-xs sm:text-sm leading-relaxed break-words">{sections.diagnosis}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ------------------- DoctorSearchModal - Responsive -------------------
+const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 5 * 60 * 1000 }) => {
   const [dots, setDots] = useState("");
   const [elapsedTime, setElapsedTime] = useState(0);
   const timeRef = useRef(null);
@@ -14,8 +165,6 @@ const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 30000 }) 
   useEffect(() => {
     if (visible) {
       setElapsedTime(0);
-
-      // Start timer
       timeRef.current = setInterval(() => {
         setElapsedTime(prev => prev + 1);
       }, 1000);
@@ -45,132 +194,50 @@ const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 30000 }) 
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-3 sm:p-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 lg:p-8 w-full max-w-sm sm:max-w-md shadow-2xl relative overflow-hidden">
         {/* Ripple Effects */}
-        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-36 h-36 bg-purple-600 rounded-full animate-ping opacity-20"></div>
-        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-36 h-36 bg-pink-500 rounded-full animate-ping opacity-20 animation-delay-1000"></div>
+        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-28 h-28 sm:w-36 sm:h-36 bg-purple-600 rounded-full animate-ping opacity-20"></div>
 
         {/* Search Icon */}
-        <div className="relative z-10 mb-5 flex justify-center">
-          <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 animate-pulse">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+        <div className="relative z-10 mb-4 sm:mb-5 flex justify-center">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 animate-pulse">
+            <span className="text-2xl sm:text-3xl text-white">🐾</span>
           </div>
-          <div className="absolute -inset-2 border-2 border-purple-300 rounded-full animate-pulse"></div>
         </div>
 
         {/* Title */}
-        <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+        <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 text-center mb-2">
           Searching for Veterinarians{dots}
         </h2>
-        <p className="text-gray-600 text-center mb-6">
+        <p className="text-sm sm:text-base text-gray-600 text-center mb-4 sm:mb-6">
           Finding the best available doctors near you
         </p>
 
         {/* Time Indicator */}
-        <div className="flex items-center justify-center gap-2 mb-4 px-4 py-2 bg-purple-50 rounded-lg border border-purple-200">
-          <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-sm font-semibold text-purple-600">
+        <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4 px-3 sm:px-4 py-2 bg-purple-50 rounded-lg border border-purple-200">
+          <span className="text-purple-600">⏱️</span>
+          <span className="text-xs sm:text-sm font-semibold text-purple-600">
             {formatTime(elapsedTime)}
           </span>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full h-2 bg-gray-200 rounded-full mb-8 overflow-hidden">
+        <div className="w-full h-2 bg-gray-200 rounded-full mb-6 sm:mb-8 overflow-hidden">
           <div 
             className="h-full bg-gradient-to-r from-purple-500 to-purple-700 rounded-full transition-all duration-300"
-            style={{ 
-              width: `${Math.min((elapsedTime / (searchTime / 1000)) * 100, 100)}%` 
-            }}
+            style={{ width: `${Math.min((elapsedTime / (searchTime / 1000)) * 100, 100)}%` }}
           ></div>
         </div>
 
-        {/* Search Indicators */}
-        <div className="space-y-3 mb-6 max-h-40 overflow-y-auto">
-          <div className="flex items-center p-3 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center mr-3">
-              <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-gray-900">Location Services</p>
-              <p className="text-xs text-gray-600">Scanning nearby clinics</p>
-            </div>
-            <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-
-          <div className="flex items-center p-3 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center mr-3">
-              <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-gray-900">Network Status</p>
-              <p className="text-xs text-gray-600">Connected to servers</p>
-            </div>
-            <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-          </div>
-
-          <div className="flex items-center p-3 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center mr-3">
-              <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-gray-900">Doctor Availability</p>
-              <p className="text-xs text-gray-600">
-                {elapsedTime > 10 ? "Expanding search radius" : "Checking schedules"}
-              </p>
-            </div>
-            <span className="text-yellow-600 font-semibold animate-pulse">...</span>
-          </div>
-
-          {elapsedTime > 15 && (
-            <div className="flex items-center p-3 bg-purple-50 rounded-xl border border-purple-200">
-              <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center mr-3">
-                <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900">Extended Search</p>
-                <p className="text-xs text-gray-600">
-                  Looking for available veterinarians in wider area
-                </p>
-              </div>
-              <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-        </div>
-
-        {/* Info Text */}
-        <div className="flex items-center justify-center gap-2 mb-6 px-4 py-2 bg-yellow-50 rounded-lg">
-          <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-xs font-medium text-yellow-800">
-            Typically connects within 15-30 seconds
-          </span>
-        </div>
-
         {/* Buttons */}
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3">
           <button
             onClick={() => {
               onClose();
               setElapsedTime(0);
             }}
-            className="flex-1 py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
+            className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base"
           >
             Cancel
           </button>
@@ -180,7 +247,7 @@ const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 30000 }) 
               setElapsedTime(0);
               onFailure?.();
             }}
-            className="flex-1 py-3 px-6 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
+            className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base"
           >
             Try Alternative
           </button>
@@ -190,70 +257,15 @@ const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 30000 }) 
   );
 };
 
-// Enhanced StartCallButton with better error handling and UX
 const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const [loading, setLoading] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [callStatus, setCallStatus] = useState(null);
-  const { user, token, updateNearbyDoctors, liveDoctors } = useContext(AuthContext);
+  const { user, token, nearbyDoctors, liveDoctors } = useContext(AuthContext);
   const patientId = user?.id || "101";
   const timeoutRef = useRef(null);
-  const { updateUser } = useContext(AuthContext);
-  const [nearbyDoctors, setNearbyDoctors] = useState([]);
   const [showLiveDoctorsModal, setShowLiveDoctorsModal] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('idle');
-  const [showVideoPaymentModal, setShowVideoPaymentModal] = useState(false);
-  const [selectedDoctorForPayment, setSelectedDoctorForPayment] = useState(null);
-
-  // Enhanced doctor fetching with error handling
-  const fetchNearbyDoctors = useCallback(async () => {
-    if (!token || !user?.id) {
-      console.warn("No token or user ID available");
-      return;
-    }
-
-    try {
-      setConnectionStatus('connecting');
-      const response = await axios.get(
-        `https://snoutiq.com/backend/api/nearby-vets?user_id=${user.id}`,
-        { 
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (response.data && Array.isArray(response.data.data)) {
-        updateNearbyDoctors(response.data.data);
-        setNearbyDoctors(response.data.data);
-        setConnectionStatus(response.data.data.length > 0 ? 'connected' : 'no_doctors');
-      } else {
-        setConnectionStatus('no_doctors');
-      }
-    } catch (error) {
-      console.error("Failed to fetch nearby doctors:", error);
-      setConnectionStatus('failed');
-      
-      // Show user-friendly error
-      if (error.code === 'NETWORK_ERROR') {
-        alert(
-          "Connection Error",
-          "Unable to connect to the server. Please check your internet connection."
-        );
-      }
-    }
-  }, [token, user?.id, updateNearbyDoctors]);
-
-  useEffect(() => {
-    if (!token || !user?.id) return;
-
-    const fetchData = async () => {
-      await fetchNearbyDoctors();
-    };
-
-    fetchData();
-    const interval = setInterval(fetchData, 2 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [token, user?.id, fetchNearbyDoctors]);
 
   const handleNoResponse = useCallback(() => {
     setLoading(false);
@@ -266,15 +278,117 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       timeoutRef.current = null;
     }
 
-    if (window.confirm(
-      "No Immediate Response\nAll veterinarians are currently busy. You can try again or book a clinic appointment for guaranteed care.\n\nClick OK to see available doctors, or Cancel to try other options."
-    )) {
-      setConnectionStatus('idle');
-      setShowLiveDoctorsModal(true);
-    }
+    toast.custom((t) => (
+      <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl border border-gray-200 max-w-xs sm:max-w-sm mx-auto">
+        <div className="flex items-center gap-3 mb-3 sm:mb-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <span className="text-xl sm:text-2xl">🐕</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-gray-900 text-sm sm:text-base lg:text-lg break-words">No Immediate Response</h3>
+            <p className="text-gray-600 text-xs sm:text-sm break-words">All veterinarians are currently busy</p>
+          </div>
+        </div>
+        
+        <p className="text-gray-700 mb-3 sm:mb-4 text-xs sm:text-sm break-words">
+          You can try again or book a clinic appointment for guaranteed care.
+        </p>
+        
+        <div className="flex gap-2 sm:gap-3">
+          <button
+            onClick={() => {
+              toast.dismiss(t.id);
+              setConnectionStatus('idle');
+            }}
+            className="flex-1 py-2 px-3 sm:px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors text-xs sm:text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              toast.dismiss(t.id);
+              setConnectionStatus('idle');
+              setShowLiveDoctorsModal(true);
+            }}
+            className="flex-1 py-2 px-3 sm:px-4 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors text-xs sm:text-sm"
+          >
+            See Doctors
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 10000,
+      position: 'top-center',
+    });
   }, []);
 
-  // Enhanced socket listeners with better error handling
+  const handleCallAccepted = useCallback((data) => {
+    console.log('🔔 Call accepted - Starting navigation process', data);
+    
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    setCallStatus({ type: "accepted", ...data });
+    setLoading(false);
+    setShowSearchModal(false);
+    setConnectionStatus('connected');
+
+    const doctor = (nearbyDoctors || []).find((d) => d.id == data.doctorId) ||
+      (liveDoctors || []).find((d) => d.id == data.doctorId);
+
+    const patientIdLocal = user?.id || "101";
+
+    toast.success(`🎉 Call connected with veterinarian! Redirecting...`, {
+      duration: 3000,
+      icon: '🐾'
+    });
+
+    setTimeout(() => {
+      try {
+        if (data.requiresPayment) {
+          const query = new URLSearchParams({
+            callId: String(data.callId || ''),
+            doctorId: String(doctor?.id || data.doctorId || ''),
+            channel: String(data.channel || ''),
+            patientId: String(patientIdLocal || ''),
+          }).toString();
+
+          if (typeof navigation === 'function') {
+            navigation(`/payment/${data.callId}?${query}`, {
+              state: {
+                doctor: doctor,
+                channel: data.channel,
+                patientId: patientIdLocal,
+                callId: data.callId,
+              },
+            });
+          } else {
+            window.location.href = `/payment/${data.callId}?${query}`;
+          }
+        } else {
+          const query = new URLSearchParams({
+            uid: String(patientIdLocal || ''),
+            role: 'audience',
+            callId: String(data.callId || ''),
+            doctorId: String(doctor?.id || data.doctorId || ''),
+            patientId: String(patientIdLocal || ''),
+          }).toString();
+
+          if (typeof navigation === 'function') {
+            navigation(`/call-page/${data.channel}?${query}`);
+          } else {
+            window.location.href = `/call-page/${data.channel}?${query}`;
+          }
+        }
+      } catch (error) {
+        console.error('❌ Navigation failed:', error);
+        toast.error('Failed to redirect. Please try again.');
+      }
+    }, 800);
+  }, [navigation, nearbyDoctors, liveDoctors, user?.id]);
+
   useEffect(() => {
     if (!socket.connected) {
       socket.connect();
@@ -285,35 +399,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     const handleCallSent = (data) => {
       setCallStatus({ type: "sent", ...data });
       setConnectionStatus('connecting');
-    };
-
-    const handleCallAccepted = (data) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-
-      setCallStatus({ type: "accepted", ...data });
-      setLoading(false);
-      setShowSearchModal(false);
-      setConnectionStatus('connected');
-
-      const doctor = (nearbyDoctors || []).find((d) => d.id == data.doctorId) ||
-        (liveDoctors || []).find((d) => d.id == data.doctorId);
-
-      const patientIdLocal = user?.id || "101";
-
-      // Small delay for smooth UI transition
-      setTimeout(() => {
-        if (data.requiresPayment) {
-          // Handle payment navigation
-          console.log("Payment required for call");
-        } else {
-          // Handle video call navigation
-          console.log("Starting video call with:", doctor);
-        }
-        setCallStatus(null);
-      }, 600);
+      toast.loading('📞 Calling veterinarian...', { id: 'call-sent' });
     };
 
     const handleCallRejected = (data) => {
@@ -327,13 +413,28 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setShowSearchModal(false);
       setConnectionStatus('failed');
 
-      if (window.confirm(
-        "Call Not Available\nThe veterinarian is currently unavailable. Would you like to try another doctor?"
-      )) {
-        setCallStatus(null);
-        setConnectionStatus('idle');
-        setShowLiveDoctorsModal(true);
-      }
+      toast.dismiss('call-sent');
+      toast.error('❌ Veterinarian is currently unavailable', { duration: 4000 });
+    };
+
+    const handleDoctorBusy = (data) => {
+      setCallStatus({ type: "busy", ...data });
+      setLoading(false);
+      setShowSearchModal(false);
+      setConnectionStatus('failed');
+      
+      toast.dismiss('call-sent');
+      toast.error('🐕 Veterinarian is on another call', { duration: 4000 });
+    };
+
+    const handleCallFailed = (data) => {
+      setCallStatus({ type: "failed", ...data });
+      setLoading(false);
+      setShowSearchModal(false);
+      setConnectionStatus('failed');
+      
+      toast.dismiss('call-sent');
+      toast.error('❌ Veterinarian not available', { duration: 4000 });
     };
 
     const handleCallEnded = () => {
@@ -346,19 +447,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setShowSearchModal(false);
       setConnectionStatus('idle');
       setCallStatus(null);
-    };
-
-    const handleSocketError = (error) => {
-      console.error("Socket error:", error);
-      setConnectionStatus('failed');
-      setLoading(false);
-      setShowSearchModal(false);
-      setCallStatus(null);
-      
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      toast.dismiss('call-sent');
     };
 
     socket.on("call-sent", handleCallSent);
@@ -366,13 +455,8 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     socket.on("call-rejected", handleCallRejected);
     socket.on("call-ended", handleCallEnded);
     socket.on("call-cancelled", handleCallEnded);
-    socket.on("error", handleSocketError);
-    socket.on("connect_error", handleSocketError);
-    socket.on("disconnect", () => {
-      setConnectionStatus('failed');
-      setLoading(false);
-      setShowSearchModal(false);
-    });
+    socket.on("doctor-busy", handleDoctorBusy);
+    socket.on("call-failed", handleCallFailed);
 
     return () => {
       socket.off("call-sent", handleCallSent);
@@ -380,21 +464,19 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       socket.off("call-rejected", handleCallRejected);
       socket.off("call-ended", handleCallEnded);
       socket.off("call-cancelled", handleCallEnded);
-      socket.off("error", handleSocketError);
-      socket.off("connect_error", handleSocketError);
-      socket.off("disconnect");
+      socket.off("doctor-busy", handleDoctorBusy);
+      socket.off("call-failed", handleCallFailed);
       
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
     };
-  }, [nearbyDoctors, liveDoctors, user]);
+  }, [handleCallAccepted]);
 
-  const startCallWithDoctor = useCallback((doctor) => {
+  const handleCallDoctor = useCallback((doctor) => {
     const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const channel = `channel_${callId}`;
-    const patientIdLocal = user?.id || "101";
 
     setCallStatus(null);
     setLoading(true);
@@ -409,34 +491,27 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
 
     socket.emit("call-requested", {
       doctorId: doctor.id,
-      patientId: patientIdLocal,
+      patientId,
       channel,
       callId,
       timestamp: new Date().toISOString(),
-      requiresPayment: false,
     });
 
     timeoutRef.current = setTimeout(() => {
       if (loading || showSearchModal) {
         handleNoResponse();
       }
-    }, 30000);
-  }, [user?.id, loading, showSearchModal, handleNoResponse]);
-
-  const handleCallDoctor = useCallback((doctor) => {
-    setSelectedDoctorForPayment(doctor);
-    setShowLiveDoctorsModal(false);
-    setShowVideoPaymentModal(true);
-  }, []);
+    }, 5 * 60 * 1000);
+  }, [patientId, loading, showSearchModal, handleNoResponse]);
 
   const startCall = useCallback(() => {
     const doctorsToCall = nearbyDoctors && nearbyDoctors.length ? nearbyDoctors : [];
 
     if (!doctorsToCall.length) {
-      alert(
-        "No Doctors Available",
-        "There are no nearby veterinarians available at the moment. Please try again later or book a clinic appointment."
-      );
+      toast.error('🐾 No veterinarians available nearby. Please try again later.', {
+        duration: 5000,
+        icon: '😔'
+      });
       return;
     }
 
@@ -468,7 +543,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       if (loading && !callStatus) {
         handleNoResponse();
       }
-    }, 30000);
+    }, 5 * 60 * 1000);
   }, [nearbyDoctors, patientId, loading, callStatus, handleNoResponse]);
 
   const getButtonState = () => {
@@ -484,9 +559,9 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const getButtonText = () => {
     switch (buttonState) {
       case 'loading':
-        return 'Searching for Doctors...';
+        return 'Searching for Veterinarians...';
       case 'unavailable':
-        return 'No Doctors Available';
+        return 'No Veterinarians Available';
       default:
         return 'Start Video Consultation';
     }
@@ -496,21 +571,14 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     switch (buttonState) {
       case 'loading':
         return (
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
         );
       case 'unavailable':
-        return (
-          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-          </svg>
-        );
+        return <span className="text-white text-sm sm:text-base">🐾</span>;
       default:
         return (
-          <div className="w-7 h-7 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
+          <div className="w-6 h-6 sm:w-7 sm:h-7 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+            <span className="text-white text-sm sm:text-base">📹</span>
           </div>
         );
     }
@@ -518,70 +586,66 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
 
   return (
     <>
-      <div className="mb-4">
+      <div className="mb-3 sm:mb-4">
         <button
           className={`
-            w-full relative overflow-hidden rounded-2xl transition-all duration-300 transform hover:scale-105
+            w-full relative overflow-hidden rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105
             ${buttonDisabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-xl'}
             ${buttonState === 'loading' ? 'opacity-80' : ''}
           `}
           onClick={() => {
-            setShowLiveDoctorsModal(true);
+            if (liveDoctors && liveDoctors.length) {
+              setShowLiveDoctorsModal(true);
+            } else {
+              startCall();
+            }
           }}
           disabled={buttonDisabled}
         >
           {!buttonDisabled && buttonState !== 'loading' && (
-            <div className="absolute inset-0 bg-purple-600 rounded-2xl shadow-lg shadow-purple-500/50 animate-pulse"></div>
+            <div className="absolute inset-0 bg-purple-600 rounded-xl sm:rounded-2xl shadow-lg shadow-purple-500/50 animate-pulse"></div>
           )}
 
           <div className={`
-            relative w-full py-4 px-6 rounded-2xl bg-gradient-to-r transition-all duration-300
+            relative w-full py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-gradient-to-r transition-all duration-300
             ${buttonState === 'loading' ? 'from-gray-500 to-gray-600' :
               buttonState === 'unavailable' ? 'from-gray-500 to-gray-600' : 
               'from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600'}
           `}>
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center gap-2 sm:gap-3 lg:gap-4">
               {getButtonIcon()}
-              <span className="text-white font-bold text-lg tracking-wide">
+              <span className="text-white font-bold text-sm sm:text-base lg:text-lg tracking-wide break-words">
                 {getButtonText()}
               </span>
               {buttonState === 'available' && (
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+                <span className="text-white text-sm sm:text-base">➡️</span>
               )}
             </div>
           </div>
         </button>
 
         {buttonState === 'available' && (
-          <div className="flex items-center justify-center gap-2 mt-3">
-            <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-            <span className="text-xs font-semibold text-green-600">
+          <div className="flex items-center justify-center gap-2 mt-2 sm:mt-3">
+            <span className="text-green-500 text-xs sm:text-sm">✅</span>
+            <span className="text-[10px] sm:text-xs font-semibold text-green-600 break-words text-center">
               Licensed veterinarians • Instant connection • Secure call
             </span>
           </div>
         )}
 
         {buttonState === 'unavailable' && connectionStatus !== 'failed' && (
-          <div className="flex items-center justify-center gap-2 mt-3">
-            <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <span className="text-xs font-semibold text-yellow-600">
+          <div className="flex items-center justify-center gap-2 mt-2 sm:mt-3">
+            <span className="text-yellow-500 text-xs sm:text-sm">⚠️</span>
+            <span className="text-[10px] sm:text-xs font-semibold text-yellow-600 break-words text-center">
               Check back soon or book a clinic appointment
             </span>
           </div>
         )}
 
         {connectionStatus === 'failed' && (
-          <div className="flex items-center justify-center gap-2 mt-3">
-            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-xs font-semibold text-red-600">
+          <div className="flex items-center justify-center gap-2 mt-2 sm:mt-3">
+            <span className="text-red-500 text-xs sm:text-sm">❌</span>
+            <span className="text-[10px] sm:text-xs font-semibold text-red-600 break-words text-center">
               Connection issue • Click to retry
             </span>
           </div>
@@ -596,27 +660,9 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         loading={loading}
       />
 
-      {/* Payment step before initiating the call */}
-      {showVideoPaymentModal && selectedDoctorForPayment && (
-        <VideoCallPaymentModal
-          visible={showVideoPaymentModal}
-          doctor={selectedDoctorForPayment}
-          onClose={() => {
-            setShowVideoPaymentModal(false);
-            setSelectedDoctorForPayment(null);
-          }}
-          onSuccess={() => {
-            setShowVideoPaymentModal(false);
-            const doc = selectedDoctorForPayment;
-            setSelectedDoctorForPayment(null);
-            // After successful payment, initiate the call (Agora prep happens in call handlers)
-            startCallWithDoctor(doc);
-          }}
-        />
-      )}
-
       <DoctorSearchModal
         visible={showSearchModal}
+        searchTime={5 * 60 * 1000}
         onClose={() => {
           setShowSearchModal(false);
           setLoading(false);
@@ -625,6 +671,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
           }
+          toast.dismiss('call-sent');
         }}
         onFailure={handleNoResponse}
       />
@@ -632,7 +679,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   );
 };
 
-// ------------------- EmergencyStatusBox -------------------
+// ------------------- EmergencyStatusBox - Responsive -------------------
 const EmergencyStatusBox = ({ 
   decision, 
   nearbyDoctors, 
@@ -655,58 +702,62 @@ const EmergencyStatusBox = ({
 
   if (!decision || !isTypingComplete || !isVisible) return null;
 
+  // Common container styles for all emergency boxes
+  const Container = ({ children, gradientFrom, gradientTo, borderColor, textColor }) => (
+    <div className="my-2 sm:my-3 mx-1 sm:mx-2 max-w-full animate-fade-in-up">
+      <div className={`bg-gradient-to-r ${gradientFrom} ${gradientTo} rounded-lg sm:rounded-xl overflow-hidden border ${borderColor} shadow-sm`}>
+        <div className="p-3 sm:p-4">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+
   if (decision.includes("EMERGENCY")) {
     return (
       <>
-        <div className="my-4 mx-6 max-w-[90%] animate-fade-in-up">
-          <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-2xl overflow-hidden border border-red-200">
-            <div className="p-6">
-              <div className="flex items-start gap-4 mb-5">
-                <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
-                    <span className="text-xs font-black text-red-600 tracking-wider uppercase">
-                      URGENT
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-bold text-red-900 mb-1">
-                    Emergency Care Required
-                  </h3>
-                  <p className="text-red-700 font-medium">
-                    Immediate attention needed
-                  </p>
-                </div>
+        <Container
+          gradientFrom="from-red-50"
+          gradientTo="to-red-100"
+          borderColor="border-red-200"
+          textColor="text-red-900"
+        >
+          <div className="flex items-start gap-2 sm:gap-3 mb-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30 flex-shrink-0">
+              <span className="text-white text-sm sm:text-base">🚨</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse"></div>
+                <span className="text-[9px] sm:text-xs font-black text-red-600 tracking-wider uppercase">
+                  URGENT
+                </span>
               </div>
-
-              <div className="flex items-start gap-3 p-4 bg-white bg-opacity-70 rounded-xl border border-red-200 mb-5">
-                <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <p className="text-red-800 font-medium">
-                  Your pet's symptoms require emergency care. Please contact a veterinarian immediately.
-                </p>
-              </div>
-
-              <button
-                onClick={() => setShowAppointmentModal(true)}
-                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all transform hover:scale-105 shadow-lg shadow-red-500/30"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Find Emergency Clinic
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+              <h3 className="text-sm sm:text-base font-bold text-red-900 mb-0.5 break-words">
+                Emergency Care Required
+              </h3>
+              <p className="text-xs sm:text-sm text-red-700 font-medium break-words">
+                Immediate attention needed
+              </p>
             </div>
           </div>
-        </div>
+
+          <div className="flex items-start gap-1.5 sm:gap-2 p-2 sm:p-3 bg-white bg-opacity-70 rounded-lg border border-red-200 mb-3">
+            <span className="text-red-600 flex-shrink-0 text-xs sm:text-sm">⚠️</span>
+            <p className="text-red-800 font-medium text-xs break-words flex-1 leading-relaxed">
+              Your pet's symptoms require emergency care. Please contact a veterinarian immediately.
+            </p>
+          </div>
+
+          <button
+            onClick={() => setShowAppointmentModal(true)}
+            className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-2 sm:py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 transition-all transform hover:scale-105 shadow-lg shadow-red-500/30 text-xs sm:text-sm"
+          >
+            <span className="text-xs sm:text-sm">🏥</span>
+            <span className="break-words">Find Emergency Clinic</span>
+            <span className="text-xs sm:text-sm">➡️</span>
+          </button>
+        </Container>
 
         <DoctorAppointmentModal
           visible={showAppointmentModal}
@@ -714,9 +765,12 @@ const EmergencyStatusBox = ({
           nearbyDoctors={nearbyDoctors}
           onBook={(appointment) => {
             console.log("Appointment booked:", appointment);
-            alert(
-              "Success",
-              `Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`
+            toast.success(
+              `🎉 Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`,
+              {
+                duration: 5000,
+                icon: '🐾'
+              }
             );
             setShowAppointmentModal(false);
           }}
@@ -727,110 +781,100 @@ const EmergencyStatusBox = ({
 
   if (decision.includes("VIDEO_CONSULT")) {
     return (
-      <div className="my-4 mx-6 max-w-[90%] animate-fade-in-up">
-        <div className="bg-gradient-to-r from-purple-50 to-indigo-100 rounded-2xl overflow-hidden border border-purple-200">
-          <div className="p-6">
-            <div className="flex items-start gap-4 mb-5">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                  <span className="text-xs font-black text-purple-600 tracking-wider uppercase">
-                    RECOMMENDED
-                  </span>
-                </div>
-                <h3 className="text-xl font-bold text-purple-900 mb-1">
-                  Video Consultation
-                </h3>
-                <p className="text-purple-700 font-medium">
-                  Connect with a vet instantly
-                </p>
-              </div>
+      <Container
+        gradientFrom="from-purple-50"
+        gradientTo="to-indigo-100"
+        borderColor="border-purple-200"
+        textColor="text-purple-900"
+      >
+        <div className="flex items-start gap-2 mb-2">
+          <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 flex-shrink-0">
+            <span className="text-white text-sm">📹</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1 mb-0.5">
+              <span className="text-purple-600 text-[10px]">⭐</span>
+              <span className="text-[8px] font-black text-purple-600 tracking-wider uppercase">
+                RECOMMENDED
+              </span>
             </div>
-
-            <div className="space-y-2 p-4 bg-white bg-opacity-70 rounded-xl border border-purple-200 mb-5">
-              <div className="flex items-center gap-3">
-                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                <span className="text-purple-800 font-medium">Instant consultation</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                <span className="text-purple-800 font-medium">Professional advice</span>
-              </div>
-            </div>
-
-            <StartCallButton
-              nearbyDoctors={nearbyDoctors}
-              navigation={navigation}
-              onShowLiveDoctors={() => setShowLiveDoctorsModal(true)}
-            />
+            <h3 className="text-xs font-bold text-purple-900 mb-0.5 leading-tight">
+              Video Consultation
+            </h3>
+            <p className="text-[10px] text-purple-700 font-medium leading-tight">
+              Connect with a vet instantly
+            </p>
           </div>
         </div>
-      </div>
+  
+        <div className="space-y-1 p-2 bg-white bg-opacity-70 rounded-lg border border-purple-200 mb-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-green-500 flex-shrink-0 text-[10px]">✅</span>
+            <span className="text-purple-800 font-medium text-[10px] leading-tight">
+              Instant consultation
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-green-500 flex-shrink-0 text-[10px]">✅</span>
+            <span className="text-purple-800 font-medium text-[10px] leading-tight">
+              Professional advice
+            </span>
+          </div>
+        </div>
+  
+        <StartCallButton
+          nearbyDoctors={nearbyDoctors}
+          navigation={navigation}
+        />
+      </Container>
     );
   }
 
   if (decision.includes("IN_CLINIC")) {
     return (
       <>
-        <div className="my-4 mx-6 max-w-[90%] animate-fade-in-up">
-          <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl overflow-hidden border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-start gap-4 mb-5">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-gray-900 mb-1">
-                    Consultation Options
-                  </h3>
-                  <p className="text-gray-600 font-medium">
-                    Choose video call or clinic visit
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <StartCallButton
-                  nearbyDoctors={nearbyDoctors}
-                  navigation={navigation}
-                  onShowLiveDoctors={() => setShowLiveDoctorsModal(true)}
-                />
-
-                <div className="flex items-center my-4">
-                  <div className="flex-1 h-px bg-gray-300"></div>
-                  <span className="mx-4 text-xs font-semibold text-gray-500 uppercase">OR</span>
-                  <div className="flex-1 h-px bg-gray-300"></div>
-                </div>
-
-                <button
-                  onClick={() => setShowAppointmentModal(true)}
-                  className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-4 rounded-xl font-semibold flex items-center justify-center gap-3 transition-all border border-purple-200 hover:border-purple-300"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  Book Clinic Visit
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+        <Container
+          gradientFrom="from-gray-50"
+          gradientTo="to-blue-50"
+          borderColor="border-gray-200"
+          textColor="text-gray-900"
+        >
+          <div className="flex items-start gap-2 sm:gap-3 mb-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 flex-shrink-0">
+              <span className="text-white text-sm sm:text-base">🏥</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-0.5 break-words">
+                Consultation Options
+              </h3>
+              <p className="text-xs sm:text-sm text-gray-600 font-medium break-words">
+                Choose video call or clinic visit
+              </p>
             </div>
           </div>
-        </div>
+
+          <div className="space-y-2 sm:space-y-3">
+            <StartCallButton
+              nearbyDoctors={nearbyDoctors}
+              navigation={navigation}
+            />
+
+            <div className="flex items-center my-2">
+              <div className="flex-1 h-px bg-gray-300"></div>
+              <span className="mx-2 sm:mx-3 text-[9px] sm:text-xs font-semibold text-gray-500 uppercase">OR</span>
+              <div className="flex-1 h-px bg-gray-300"></div>
+            </div>
+
+            <button
+              onClick={() => setShowAppointmentModal(true)}
+              className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-2 sm:py-2.5 rounded-lg font-semibold flex items-center justify-center gap-1.5 sm:gap-2 transition-all border border-purple-200 hover:border-purple-300 text-xs sm:text-sm"
+            >
+              <span className="text-xs sm:text-sm">🏥</span>
+              <span className="break-words">Book Clinic Visit</span>
+              <span className="text-xs sm:text-sm">➡️</span>
+            </button>
+          </div>
+        </Container>
 
         <DoctorAppointmentModal
           visible={showAppointmentModal}
@@ -838,9 +882,12 @@ const EmergencyStatusBox = ({
           nearbyDoctors={nearbyDoctors}
           onBook={(appointment) => {
             console.log("Appointment booked:", appointment);
-            alert(
-              "Success",
-              `Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`
+            toast.success(
+              `🎉 Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`,
+              {
+                duration: 5000,
+                icon: '🐾'
+              }
             );
             setShowAppointmentModal(false);
           }}
@@ -852,7 +899,7 @@ const EmergencyStatusBox = ({
   return null;
 };
 
-// ------------------- MessageBubble -------------------
+// ------------------- MessageBubble - Fully Responsive -------------------
 const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -861,7 +908,6 @@ const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
     setIsVisible(true);
   }, []);
 
-  // Check if typing is complete
   useEffect(() => {
     if (msg.sender === "ai" && msg.text && msg.displayedText) {
       if (msg.displayedText.length >= msg.text.length) {
@@ -872,22 +918,20 @@ const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
 
   if (msg.type === "loading") {
     return (
-      <div className={`my-2 max-w-[85%] animate-fade-in-up ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+      <div className={`my-2 max-w-[90%] sm:max-w-[85%] animate-fade-in-up ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="flex items-start gap-2 sm:gap-3">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 flex-shrink-0">
+            <span className="text-white text-sm sm:text-base">🐾</span>
           </div>
 
-          <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-3 border border-gray-200 shadow-sm">
+          <div className="bg-white rounded-xl sm:rounded-2xl rounded-tl-sm px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 shadow-sm">
             <div className="mb-2">
-              <span className="text-xs font-semibold text-purple-600">AI analyzing</span>
+              <span className="text-[10px] sm:text-xs font-semibold text-purple-600">AI analyzing</span>
             </div>
             <div className="flex gap-1.5">
-              <div className="w-2 h-2 bg-purple-600 rounded-full opacity-60 animate-bounce"></div>
-              <div className="w-2 h-2 bg-purple-600 rounded-full opacity-80 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-600 rounded-full opacity-60 animate-bounce"></div>
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-600 rounded-full opacity-80 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
             </div>
           </div>
         </div>
@@ -896,34 +940,43 @@ const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
   }
 
   const isUser = msg.sender === "user";
+  const hasStructuredContent = !isUser && msg.text && (
+    msg.text.includes('**') || 
+    msg.text.includes('=== DIAGNOSIS ===') ||
+    msg.text.includes('WHY VIDEO IS APPROPRIATE')
+  );
 
   return (
     <>
-      <div className={`my-2 max-w-[85%] animate-fade-in-up ${isVisible ? 'opacity-100' : 'opacity-0'} ${isUser ? 'ml-auto' : ''}`}>
-        <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+      <div className={`my-2 max-w-[90%] sm:max-w-[85%] animate-fade-in-up ${isVisible ? 'opacity-100' : 'opacity-0'} ${isUser ? 'ml-auto' : ''}`}>
+        <div className={`flex items-start gap-2 sm:gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
           {!isUser && (
-            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 flex-shrink-0">
+              <span className="text-white text-sm sm:text-base">🐕</span>
             </div>
           )}
 
           <div className={`
-            rounded-2xl px-5 py-3 shadow-sm max-w-full
+            rounded-xl sm:rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-sm max-w-full overflow-hidden
             ${isUser 
               ? 'bg-purple-600 text-white rounded-br-sm' 
-              : 'bg-white border border-gray-200 rounded-bl-sm'
+              : hasStructuredContent 
+                ? 'bg-transparent border-0 p-0' 
+                : 'bg-white border border-gray-200 rounded-bl-sm'
             }
           `}>
-            <p className={`break-words ${isUser ? 'text-white' : 'text-gray-900'}`}>
-              {msg.displayedText || msg.text}
-            </p>
+            {hasStructuredContent && isTypingComplete ? (
+              <FormattedAIResponse text={msg.displayedText || msg.text} />
+            ) : (
+              <p className={`break-words text-xs sm:text-sm lg:text-base ${isUser ? 'text-white' : 'text-gray-900'}`}>
+                {msg.displayedText || msg.text}
+              </p>
+            )}
           </div>
         </div>
 
-        {!isUser && (
-          <div className="text-xs text-gray-500 mt-1 ml-11">
+        {!isUser && !hasStructuredContent && (
+          <div className="text-[10px] sm:text-xs text-gray-500 mt-1 ml-9 sm:ml-11">
             {new Date(msg.timestamp).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -946,74 +999,3 @@ const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
 };
 
 export { EmergencyStatusBox, MessageBubble, StartCallButton };
-
-// ------------------- VideoCallPaymentModal -------------------
-const VideoCallPaymentModal = ({ visible, doctor, onClose, onSuccess }) => {
-  const [processing, setProcessing] = useState(false);
-
-  if (!visible) return null;
-
-  const price = doctor?.chat_price || 500;
-
-  const handlePay = async () => {
-    try {
-      setProcessing(true);
-      // TODO: Integrate real payment SDK/API here
-      await new Promise((r) => setTimeout(r, 1200));
-      onSuccess?.();
-    } catch (e) {
-      console.error("Payment error", e);
-      onClose?.();
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-gray-900">Confirm Video Call</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold">
-            {(doctor?.business_status || doctor?.name || 'DR').substring(0,2).toUpperCase()}
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900">Dr. {doctor?.business_status || doctor?.name || 'Veterinarian'}</p>
-            <p className="text-sm text-gray-600">Video consultation</p>
-          </div>
-        </div>
-
-        <div className="bg-gray-50 rounded-xl p-4 mb-4">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-600">Consultation Fee</span>
-            <span className="text-lg font-bold text-green-600">₹{price}</span>
-          </div>
-        </div>
-
-        <button
-          onClick={handlePay}
-          disabled={processing}
-          className={`w-full py-3 rounded-xl text-white font-bold transition-all ${processing ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'}`}
-        >
-          {processing ? 'Processing...' : 'Pay & Connect'}
-        </button>
-
-        <button
-          onClick={onClose}
-          disabled={processing}
-          className="w-full mt-2 py-3 rounded-xl text-gray-700 font-semibold hover:bg-gray-100"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-};

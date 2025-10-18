@@ -919,7 +919,7 @@ export default function RingtonePopup({
       if (!isProcessing) {
         handleReject("timeout");
       }
-    }, 30000);
+    }, 5 * 60 * 1000); // ✅ 5 minutes (300 seconds)
 
     return () => {
       if (audioRef.current) {

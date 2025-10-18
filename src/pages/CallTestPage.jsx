@@ -929,6 +929,8 @@ export default function CallPage() {
 
   // From navigation state
   const { doctorId: stateDoctorId, patientId: statePatientId, channel, callId } = location.state || {};
+  console.log(location.state,"ankit");
+  
 
   // From query params (fallback)
   const doctorId = stateDoctorId || searchParams.get("doctorId");
@@ -1123,7 +1125,7 @@ setCallStatus("connected"); // Ensure status connected even if video fails
   // Navigate
   navigate(isHost 
     ? `/prescription/${doctorId}/${patientId}`  // pass params in route
-    : `/ratings/${doctorId}/${patientId}`
+    : `/rating/${doctorId}/${patientId}`
   );
 };
 

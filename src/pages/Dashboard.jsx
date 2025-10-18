@@ -555,7 +555,7 @@ const Dashboard = () => {
     return (
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm flex justify-between items-center">
+        <div className="bg-white border-b border-gray-200 px-6 py-2 shadow-sm flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Snoutiq AI</h1>
             <p className="text-gray-600 mt-1 text-sm">
@@ -660,70 +660,7 @@ const Dashboard = () => {
         <div className="border-t border-gray-200 bg-white p-4 shadow-lg">
           <div className="max-w-4xl mx-auto px-4">
 
-            {/* ===== Editable Pet Profile Bar (restricted to admins) ===== */}
-            {/* {canEditPetProfile && (
-              <div className="bg-gray-900 text-white px-4 py-3 rounded-xl mb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🐶</span>
-                    <span className="font-semibold">Pet Profile</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] px-2 py-1 rounded-md bg-blue-600/90">
-                      Decision: {lastDecision ?? "—"}
-                    </span>
-                    <span className="text-[11px] px-2 py-1 rounded-md bg-gray-700">
-                      Score: {lastScore != null ? `${lastScore}/10` : "—"}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={resetFromUser}
-                      className="text-xs px-2 py-1 rounded-md bg-gray-800 hover:bg-gray-700"
-                      title="Reset from saved profile"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Name"
-                    value={petProfile.pet_name}
-                    onChange={onPetChange("pet_name")}
-                  />
-                  <input
-                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Breed (e.g. Pug)"
-                    value={petProfile.pet_breed}
-                    onChange={onPetChange("pet_breed")}
-                  />
-                  <input
-                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Age (e.g. 3 years)"
-                    value={petProfile.pet_age}
-                    onChange={onPetChange("pet_age")}
-                  />
-                  <input
-                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Weight (e.g. 12 kg)"
-                    value={petProfile.pet_weight}
-                    onChange={onPetChange("pet_weight")}
-                  />
-                  <input
-                    className="bg-gray-800 text-white px-3 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 min-w-[220px]"
-                    placeholder="Location (e.g. Delhi or 28.5, 77.0)"
-                    value={petProfile.pet_location}
-                    onChange={onPetChange("pet_location")}
-                  />
-                </div>
-              </div>
-            )} */}
-            {/* ========================================= */}
-
+         
             <ChatInput onSendMessage={handleSendMessage} isLoading={sending} />
             <div className="mt-2 text-xs text-gray-500 text-center">
               ⚠️ AI-generated advice. Consult a licensed veterinarian for

@@ -13,8 +13,30 @@ const io = new Server(httpServer, {
 });
 
 // Active doctors and call sessions
-const activeDoctors = new Map();
-const activeCalls = new Map();
+const activeDoctors = new Map(); // doctorId -> { socketId, joinedAt }
+const activeCalls = new Map();   // callId -> { callId, doctorId, patientId, channel, status, ... }
+
+const isDoctorBusy = (doctorId) => {
+  for (const [, call] of activeCalls.entries()) {
+    if (
+      call.doctorId === doctorId &&
+      call.status &&
+      ["requested", "accepted", "payment_completed"].includes(call.status)
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const emitAvailableDoctors = () => {
+  const available = [];
+  for (const [doctorId] of activeDoctors.entries()) {
+    if (!isDoctorBusy(doctorId)) available.push(doctorId);
+  }
+  // broadcast available doctors list
+  io.emit("active-doctors", available);
+};
 
 io.on("connection", (socket) => {
   console.log(`⚡ Client connected: ${socket.id}`);
@@ -26,18 +48,26 @@ io.on("connection", (socket) => {
     activeDoctors.set(doctorId, { socketId: socket.id, joinedAt: new Date() });
     console.log(`✅ Doctor ${doctorId} joined`);
     socket.emit("doctor-online", { doctorId, status: "online", timestamp: new Date().toISOString() });
-    io.emit("active-doctors", Array.from(activeDoctors.keys()));
+    emitAvailableDoctors();
   });
 
   // Get active doctors
   socket.on("get-active-doctors", () => {
-    socket.emit("active-doctors", Array.from(activeDoctors.keys()));
+    const available = [];
+    for (const [doctorId] of activeDoctors.entries()) {
+      if (!isDoctorBusy(doctorId)) available.push(doctorId);
+    }
+    socket.emit("active-doctors", available);
   });
 
   // Call request
   socket.on("call-requested", ({ doctorId, patientId, channel }) => {
     if (!activeDoctors.has(doctorId)) {
       socket.emit("call-failed", { error: "Doctor not available", doctorId, patientId });
+      return;
+    }
+    if (isDoctorBusy(doctorId)) {
+      socket.emit("doctor-busy", { error: "Doctor is currently on another call", doctorId, patientId });
       return;
     }
 
@@ -47,6 +77,7 @@ io.on("connection", (socket) => {
 
     io.to(`doctor-${doctorId}`).emit("call-requested", { callId, doctorId, patientId, channel, timestamp: new Date().toISOString() });
     socket.emit("call-sent", { callId, doctorId, patientId, channel, status: "sent" });
+    emitAvailableDoctors(); // doctor becomes effectively busy
   });
 
   // Call accepted
@@ -69,6 +100,7 @@ io.on("connection", (socket) => {
         timestamp: new Date().toISOString()
       });
     }
+    emitAvailableDoctors();
   });
 
   // Call rejected
@@ -85,7 +117,10 @@ io.on("connection", (socket) => {
       io.to(callSession.patientSocketId).emit("call-rejected", { callId, reason, message: reason === 'timeout' ? 'Doctor did not respond' : 'Doctor unavailable', timestamp: new Date().toISOString() });
     }
 
-    setTimeout(() => activeCalls.delete(callId), 30000);
+    setTimeout(() => {
+      activeCalls.delete(callId);
+      emitAvailableDoctors();
+    }, 30000);
   });
 
   // Payment completed
@@ -97,13 +132,15 @@ io.on("connection", (socket) => {
     callSession.status = 'payment_completed';
     callSession.paymentId = paymentId;
     callSession.paidAt = new Date();
+    if (channel) callSession.channel = channel;
     activeCalls.set(callId, callSession);
 
-    socket.emit("payment-verified", { callId, channel, patientId, doctorId, status: 'ready_to_connect', message: 'Payment successful!', videoUrl: `/call-page/${channel}?uid=${patientId}&role=audience&callId=${callId}` });
+    socket.emit("payment-verified", { callId, channel: callSession.channel, patientId, doctorId, status: 'ready_to_connect', message: 'Payment successful!', videoUrl: `/call-page/${callSession.channel}?uid=${patientId}&role=audience&callId=${callId}` });
 
     if (callSession.doctorSocketId) {
-      io.to(callSession.doctorSocketId).emit("patient-paid", { callId, channel, patientId, doctorId, paymentId, status: 'ready_to_connect', message: 'Patient payment confirmed!', videoUrl: `/call-page/${channel}?uid=${doctorId}&role=host&callId=${callId}` });
+      io.to(callSession.doctorSocketId).emit("patient-paid", { callId, channel: callSession.channel, patientId, doctorId, paymentId, status: 'ready_to_connect', message: 'Patient payment confirmed!', videoUrl: `/call-page/${callSession.channel}?uid=${doctorId}&role=host&callId=${callId}&doctorId=${doctorId}&patientId=${patientId}` });
     }
+    emitAvailableDoctors();
   });
 
   // Call ended
@@ -120,7 +157,10 @@ io.on("connection", (socket) => {
       io.to(targetSocketId).emit("call-ended", { callId, endedBy: userId, message: 'Call ended' });
     }
 
-    setTimeout(() => activeCalls.delete(callId), 10000);
+    setTimeout(() => {
+      activeCalls.delete(callId);
+      emitAvailableDoctors();
+    }, 10000);
   });
 
   // Doctor leaves
@@ -139,7 +179,7 @@ io.on("connection", (socket) => {
     for (const [doctorId, info] of activeDoctors.entries()) {
       if (info.socketId === socket.id) {
         activeDoctors.delete(doctorId);
-        io.emit("active-doctors", Array.from(activeDoctors.keys()));
+        emitAvailableDoctors();
       }
     }
 
@@ -157,14 +197,31 @@ io.on("connection", (socket) => {
   });
 });
 
-// Periodic cleanup
+// Periodic cleanup - 5 minute timeout
 setInterval(() => {
   const now = new Date();
-  const threshold = 30 * 60 * 1000; // 30 min
+  const threshold = 5 * 60 * 1000; // ✅ 5 minutes (pehle 30 min tha)
   for (const [callId, callSession] of activeCalls.entries()) {
     const age = now - callSession.createdAt;
     if (age > threshold && !['payment_completed', 'ended'].includes(callSession.status)) {
+      console.log(`⏰ Auto-ending call ${callId} after 5 minutes timeout`);
+      
+      // Notify both parties
+      if (callSession.patientSocketId) {
+        io.to(callSession.patientSocketId).emit("call-timeout", { 
+          callId, 
+          message: 'Call timed out after 5 minutes' 
+        });
+      }
+      if (callSession.doctorSocketId) {
+        io.to(callSession.doctorSocketId).emit("call-timeout", { 
+          callId, 
+          message: 'Call timed out after 5 minutes' 
+        });
+      }
+      
       activeCalls.delete(callId);
+      emitAvailableDoctors();
     }
   }
 }, 5 * 60 * 1000);

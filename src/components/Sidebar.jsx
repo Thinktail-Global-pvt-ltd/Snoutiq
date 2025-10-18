@@ -201,8 +201,8 @@ const Sidebar = () => {
                   {item.name || "New Chat"}
                 </span> */}
                 <span className="font-medium text-gray-700 text-sm truncate block">
-                  {item.name && !item.name.startsWith("New chat -")
-                    ? item.name
+                  {item.summary && !item.summary.startsWith("New chat -")
+                    ? item.summary
                     : "New Chat"}
                 </span>
               </div>

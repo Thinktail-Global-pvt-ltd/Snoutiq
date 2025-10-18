@@ -557,7 +557,7 @@ const HeaderWithSidebar = ({ children, doctorId = 34  }) => {
   const { user } = useContext(AuthContext);
   const hasListeners = useRef(false);
   const hasSetUpListeners = useRef(false);
-  console.log(user,'sadf');
+
   
 
   // Add debug log function
@@ -861,60 +861,60 @@ const HeaderWithSidebar = ({ children, doctorId = 34  }) => {
         category: "Pet Owner",
         items: [
           {
-            text: "My Pets",
+            text: "My Profile",
             icon: <HeartIcon className="w-5 h-5" />,
             path: "/user-dashboard/pet-info",
           },
           {
             text: "Health Records",
             icon: <HeartIcon className="w-5 h-5" />,
-            path: "/user-dashboard/pet-health",
+            path: "/user-dashboard/health-records",
           },
-          {
-            text: "Daily Care",
-            icon: <HeartIcon className="w-5 h-5" />,
-            path: "/user-dashboard/pet-daily-care",
-          },
-          {
-            text: "My Bookings",
-            icon: <CalendarIcon className="w-5 h-5" />,
-            path: "/user-dashboard/my-bookings",
-          },
-          {
-            text: "History",
-            icon: <UserGroupIcon className="w-5 h-5" />,
-            path: "/user-dashboard/history",
-          },
-          {
-            text: "Vaccinations",
-            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-            path: "/user-dashboard/vaccination-tracker",
-          },
-          {
-            text: "Medication Tracker",
-            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-            path: "/user-dashboard/medical-tracker",
-          },
-          {
-            text: "Weight Monitoring",
-            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-            path: "/user-dashboard/weight-monitoring",
-          },
-          {
-            text: "Vet Visits",
-            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-            path: "/user-dashboard/vet-visits",
-          },
-          {
-            text: "Photo Timeline",
-            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-            path: "/user-dashboard/photo-timeline",
-          },
-          {
-            text: "Emergency Contacts",
-            icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-            path: "/user-dashboard/emergency-contacts",
-          },
+          // {
+          //   text: "Daily Care",
+          //   icon: <HeartIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/pet-daily-care",
+          // },
+          // {
+          //   text: "My Bookings",
+          //   icon: <CalendarIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/my-bookings",
+          // },
+          // {
+          //   text: "History",
+          //   icon: <UserGroupIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/history",
+          // },
+          // {
+          //   text: "Vaccinations",
+          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/vaccination-tracker",
+          // },
+          // {
+          //   text: "Medication Tracker",
+          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/medical-tracker",
+          // },
+          // {
+          //   text: "Weight Monitoring",
+          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/weight-monitoring",
+          // },
+          // {
+          //   text: "Vet Visits",
+          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/vet-visits",
+          // },
+          // {
+          //   text: "Photo Timeline",
+          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/photo-timeline",
+          // },
+          // {
+          //   text: "Emergency Contacts",
+          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/emergency-contacts",
+          // },
         ],
       },
     ],
@@ -949,11 +949,11 @@ const HeaderWithSidebar = ({ children, doctorId = 34  }) => {
       {
         category: "Account",
         items: [
-          {
-            text: "Ratings & Reviews",
-            icon: <StarIcon className="w-5 h-5" />,
-            path: "/user-dashboard/rating",
-          },
+          // {
+          //   text: "Ratings & Reviews",
+          //   icon: <StarIcon className="w-5 h-5" />,
+          //   path: "/user-dashboard/rating-page",
+          // },
           {
             text: "Support",
             icon: <CogIcon className="w-5 h-5" />,
@@ -1178,7 +1178,6 @@ const HeaderWithSidebar = ({ children, doctorId = 34  }) => {
         </header>
 
         <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
-          {/* Enhanced Live Status Banner */}
           {user?.business_status && isLive && (
             <div className="mb-6 flex items-center rounded-lg border border-green-200 bg-green-50 p-4">
               <div className="relative flex-shrink-0">
@@ -1270,7 +1269,7 @@ const HeaderWithSidebar = ({ children, doctorId = 34  }) => {
                               : "text-indigo-100 hover:bg-indigo-700 hover:text-white"
                           }`}
                         >
-                          <span className="mr-3">{item.icon}</span>
+                          <span className="mr-2">{item.icon}</span>
                           {item.text}
                         </button>
                       );

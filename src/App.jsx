@@ -442,6 +442,8 @@ import SuperAdminLogin from "./admin/SuperAdminLogin";
 import AuthenticatedUserRedirect from "./auth/AuthenticatedUserRedirect";
 import DoctorWaitingRoom from "./VetDashboard/DoctorWaitingRoom";
 import PrescriptionPage from "./VetDashboard/PrescriptionPage";
+import HealthRecordsScreen from "./PetDashboard/HealthRecordsScreen";
+const Ratingpop = lazy(()=>import("./PetDashboard/RatingPopup"))
 
 
 
@@ -628,11 +630,11 @@ function App() {
             />
 
             <Route
-              path="/user-dashboard/rating"
+              path="/user-dashboard/rating-page"
               element={
                 <ProtectedRoute>
                   <HeaderWithSidebar>
-                    <Ratings />
+                    <Ratingpop />
                   </HeaderWithSidebar>
                 </ProtectedRoute>
               }
@@ -659,7 +661,16 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
+<Route
+              path="/user-dashboard/health-records"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <HealthRecordsScreen />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/user-dashboard/vet-owner"
               element={
@@ -784,13 +795,14 @@ function App() {
               }
             />
               <Route
-              path="/ratings/:doctorId/:patientId"
+              path="/rating/:doctorId/:patientId"
               element={
                 <ProtectedRoute>
                   <Ratings />
                 </ProtectedRoute>
               }
             />
+            
           </Routes>
         </Suspense>
       </div>

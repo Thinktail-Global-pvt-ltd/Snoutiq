@@ -1,601 +1,584 @@
-import React, { useState } from "react";
-import {
-  FaPaw,
-  FaPlusCircle,
-  FaCamera,
-  FaTrash,
-  FaArrowLeft,
-} from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
-import axios from "../axios";
-import toast from "react-hot-toast";
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import axios from 'axios';
+import { useAuth } from '../auth/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
-const AddPetForm = () => {
-  const navigate = useNavigate();
+const API_BASE_URL = 'https://snoutiq.com/backend/api';
+const CACHE_KEYS = {
+  DOG_BREEDS: 'dog_breeds_cache',
+  PETS_DATA: 'pets_data_cache',
+};
+
+// Design System Constants
+const DESIGN = {
+  COLORS: {
+    primary: '#667eea',
+    secondary: '#764ba2',
+    white: '#FFFFFF',
+    black: '#000000',
+    gray50: '#F9FAFB',
+    gray100: '#F3F4F6',
+    gray200: '#E5E7EB',
+    gray300: '#D1D5DB',
+    gray400: '#9CA3AF',
+    gray500: '#6B7280',
+    gray600: '#4B5563',
+    gray700: '#374151',
+    gray800: '#1F2937',
+    gray900: '#111827',
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    info: '#3B82F6',
+    background: '#F0F4FF',
+    surface: '#FFFFFF',
+    overlay: 'rgba(0, 0, 0, 0.5)',
+  },
+  GRADIENTS: {
+    primary: ['#667eea', '#764ba2'],
+    background: ['#F8F9FA', '#E5E7EB'],
+  },
+};
+
+const AddPet = () => {
+  const { user, token } = useAuth();
+  const navigate = useNavigate()
+
+  
   const [formData, setFormData] = useState({
-    name: "",
-    type: "",
-    breed: "",
-    dob: "",
-    gender: "",
-    petPicture: "https://placehold.co/200x200?text=Upload+Image",
+    name: '',
+    petType: '',
+    petGender: '',
+    breed: '',
+    age: '',
+    weight: '',
+    avatar: 'https://images.unsplash.com/photo-1552053831-71594a27632d?w=150&h=150&fit=crop',
   });
-  const [petPictureFile, setPetPictureFile] = useState(null);
-  const [isPetPictureUpdated, setIsPetPictureUpdated] = useState(false);
-  const [medicalEntries, setMedicalEntries] = useState([]);
-  const [vaccinationEntries, setVaccinationEntries] = useState([]);
+  
   const [errors, setErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const today = new Date().toISOString().split("T")[0];
+  const [isSaving, setIsSaving] = useState(false);
+  const [dogBreeds, setDogBreeds] = useState([]);
+  const [loadingBreeds, setLoadingBreeds] = useState(false);
+  const [showBreedModal, setShowBreedModal] = useState(false);
+  const [filteredBreeds, setFilteredBreeds] = useState([]);
+  const [breedSearch, setBreedSearch] = useState('');
 
-  const validateForm = () => {
+  const catBreedOptions = [
+    { label: 'American Shorthair', value: 'american_shorthair' },
+    { label: 'Domestic Shorthair', value: 'domestic_shorthair' },
+    { label: 'Siamese', value: 'siamese' },
+    { label: 'Persian', value: 'persian' },
+    { label: 'Maine Coon', value: 'maine_coon' },
+    { label: 'Bengal', value: 'bengal' },
+    { label: 'Ragdoll', value: 'ragdoll' },
+    { label: 'Sphynx', value: 'sphynx' },
+    { label: 'British Shorthair', value: 'british_shorthair' },
+    { label: 'Mixed Breed', value: 'mixed_breed' },
+    { label: 'Other', value: 'other' },
+  ];
+
+  useEffect(() => {
+    fetchDogBreeds();
+  }, []);
+
+  const cacheData = async (key, data) => {
+    try {
+      localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+    } catch (error) {
+      console.error('Cache save error:', error);
+    }
+  };
+
+  const getCachedData = async (key) => {
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) return data;
+      }
+    } catch (error) {
+      console.error('Cache read error:', error);
+    }
+    return null;
+  };
+
+  const fetchDogBreeds = async () => {
+    try {
+      setLoadingBreeds(true);
+      const cachedBreeds = await getCachedData(CACHE_KEYS.DOG_BREEDS);
+      if (cachedBreeds) {
+        setDogBreeds(cachedBreeds);
+        setLoadingBreeds(false);
+        return;
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/dog-breeds/all`, { timeout: 10000 });
+      
+      if (response.data.status === 'success' && response.data.breeds) {
+        const breeds = [];
+        Object.keys(response.data.breeds).forEach(breedKey => {
+          const subBreeds = response.data.breeds[breedKey];
+          if (subBreeds.length === 0) {
+            breeds.push({
+              label: formatBreedName(breedKey),
+              value: breedKey
+            });
+          } else {
+            subBreeds.forEach(subBreed => {
+              breeds.push({
+                label: formatBreedName(breedKey, subBreed),
+                value: `${breedKey}/${subBreed}`
+              });
+            });
+          }
+        });
+        
+        breeds.sort((a, b) => a.label.localeCompare(b.label));
+        breeds.push(
+          { label: 'Mixed Breed', value: 'mixed_breed' },
+          { label: 'Other', value: 'other' }
+        );
+        
+        setDogBreeds(breeds);
+        await cacheData(CACHE_KEYS.DOG_BREEDS, breeds);
+      }
+    } catch (error) {
+      console.error('Error fetching breeds:', error);
+      toast.error('Failed to load dog breeds. Using default options.');
+      setDogBreeds([
+        { label: 'Mixed Breed', value: 'mixed_breed' },
+        { label: 'Other', value: 'other' }
+      ]);
+    } finally {
+      setLoadingBreeds(false);
+    }
+  };
+
+  const formatBreedName = (breedKey, subBreed = null) => {
+    let formattedName = breedKey.split(/[-_\s]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    if (subBreed) {
+      const formattedSubBreed = subBreed.split(/[-_\s]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      formattedName = `${formattedSubBreed} ${formattedName}`;
+    }
+    return formattedName;
+  };
+
+  const getBreedOptions = () => {
+    return formData.petType === 'dog' ? dogBreeds : formData.petType === 'cat' ? catBreedOptions : [];
+  };
+
+  const handleBreedSearch = (text) => {
+    setBreedSearch(text);
+    const options = getBreedOptions();
+    const filtered = options.filter(breed => breed.label.toLowerCase().includes(text.toLowerCase()));
+    setFilteredBreeds(filtered);
+  };
+
+  const openBreedModal = () => {
+    if (!formData.petType) {
+      toast.error('Please select whether it\'s a dog or cat first');
+      return;
+    }
+    const options = getBreedOptions();
+    setFilteredBreeds(options);
+    setBreedSearch('');
+    setShowBreedModal(true);
+  };
+
+  const selectBreed = (breed) => {
+    setFormData(prev => ({ ...prev, breed: breed.value }));
+    setShowBreedModal(false);
+    setBreedSearch('');
+    toast.success(`Selected breed: ${breed.label}`);
+  };
+
+  const validate = () => {
     const newErrors = {};
 
-    if (isPetPictureUpdated && petPictureFile) {
-      const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
-      if (!allowedTypes.includes(petPictureFile.type)) {
-        newErrors.petPicture = "Only JPEG, PNG, or GIF images are allowed";
-      } else if (petPictureFile.size > 5 * 1024 * 1024) {
-        newErrors.petPicture = "Image size must be less than 5MB";
-      }
+    if (!formData.name.trim()) {
+      newErrors.name = 'Pet name is required';
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = 'Name must be at least 2 characters';
     }
-    medicalEntries.forEach((entry, index) => {
-      if (!entry.condition.trim()) {
-        newErrors[`medicalCondition${index}`] = "Condition is required";
-      }
-      if (!entry.date) {
-        newErrors[`medicalDate${index}`] = "Date is required";
-      } else if (new Date(entry.date) > new Date()) {
-        newErrors[`medicalDate${index}`] = "Date cannot be in the future";
-      }
-    });
-    vaccinationEntries.forEach((entry, index) => {
-      if (!entry.vaccineName.trim()) {
-        newErrors[`vaccineName${index}`] = "Vaccine Name is required";
-      }
-      if (!entry.date) {
-        newErrors[`vaccineDate${index}`] = "Date is required";
-      } else if (new Date(entry.date) > new Date()) {
-        newErrors[`vaccineDate${index}`] = "Date cannot be in the future";
-      }
-    });
+
+    if (!formData.petType) newErrors.petType = 'Please select pet type';
+    if (!formData.petGender) newErrors.petGender = 'Please select gender';
+    if (!formData.breed) newErrors.breed = 'Please select breed';
+
+    if (!formData.age.trim()) {
+      newErrors.age = 'Age is required';
+    } else if (isNaN(formData.age) || parseFloat(formData.age) < 0 || parseFloat(formData.age) > 30) {
+      newErrors.age = 'Enter valid age (0-30)';
+    }
+
+    if (formData.weight.trim() && (isNaN(formData.weight) || parseFloat(formData.weight) <= 0)) {
+      newErrors.weight = 'Enter valid weight';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: "" }));
-  };
+  const handleAddPet = async () => {
+    if (!validate()) {
+      toast.error('Please fix the errors before submitting.');
+      return;
+    }
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setPetPictureFile(file);
-      setIsPetPictureUpdated(true);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setFormData((prev) => ({ ...prev, petPicture: reader.result }));
+    if (!user) {
+      toast.error('User ID not available. Please login again.');
+      return;
+    }
+
+    const savingToast = toast.loading('Adding your pet...');
+
+    try {
+      setIsSaving(true);
+      
+      const petData = {
+        name: formData.name.trim(),
+        breed: formData.breed,
+        pet_age: formData.age ? parseFloat(formData.age) : null,
+        pet_gender: formData.petGender,
+        weight: formData.weight ? parseFloat(formData.weight) : null,
       };
-      reader.readAsDataURL(file);
-    }
-  };
 
-  const handleMedicalEntryChange = (index, e) => {
-    const { name, value, type, checked } = e.target;
-    setMedicalEntries((prev) =>
-      prev.map((entry, i) =>
-        i === index
-          ? { ...entry, [name]: type === "checkbox" ? checked : value }
-          : entry
-      )
-    );
-    setErrors((prev) => ({ ...prev, [`${name}${index}`]: "" }));
-  };
-
-  const addMedicalEntry = () => {
-    setMedicalEntries((prev) => [
-      ...prev,
-      { condition: "", date: "", isRecovered: false },
-    ]);
-  };
-
-  const removeMedicalEntry = (index) => {
-    setMedicalEntries((prev) => prev.filter((_, i) => i !== index));
-    setErrors((prev) => {
-      const newErrors = { ...prev };
-      delete newErrors[`medicalCondition${index}`];
-      delete newErrors[`medicalDate${index}`];
-      return newErrors;
-    });
-  };
-
-  const handleVaccinationChange = (index, e) => {
-    const { name, value } = e.target;
-    setVaccinationEntries((prev) =>
-      prev.map((entry, i) =>
-        i === index ? { ...entry, [name]: value } : entry
-      )
-    );
-    setErrors((prev) => ({ ...prev, [`${name}${index}`]: "" }));
-  };
-
-  const addVaccination = () => {
-    setVaccinationEntries((prev) => [...prev, { vaccineName: "", date: "" }]);
-  };
-
-  const removeVaccinationEntry = (index) => {
-    setVaccinationEntries((prev) => prev.filter((_, i) => i !== index));
-    setErrors((prev) => {
-      const newErrors = { ...prev };
-      delete newErrors[`vaccineName${index}`];
-      delete newErrors[`vaccineDate${index}`];
-      return newErrors;
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (validateForm()) {
-      setIsLoading(true);
-      try {
-        const formDataPayload = new FormData();
-        formDataPayload.append("name", formData.name);
-        formDataPayload.append("type", formData.type);
-        formDataPayload.append("breed", formData.breed);
-        formDataPayload.append("dob", formData.dob);
-        formDataPayload.append("gender", formData.gender);
-        formDataPayload.append(
-          "medical_history",
-          JSON.stringify(medicalEntries)
+      const response = await axios.post(`${API_BASE_URL}/users/${user.id}/pets`, petData, {
+        timeout: 15000,
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      
+      if (response.data.status === 'success') {
+        toast.dismiss(savingToast);
+        toast.success(
+          `🎉 ${formData.name} has been added to your family!`,
+          {
+            duration: 5000,
+            icon: '🐾',
+            style: {
+              background: '#10B981',
+              color: '#FFFFFF',
+              fontSize: '16px',
+              padding: '16px',
+            },
+          }
         );
-        formDataPayload.append(
-          "vaccination_log",
-          JSON.stringify(vaccinationEntries)
-        );
-        if (isPetPictureUpdated && petPictureFile) {
-          formDataPayload.append("pet_pic", petPictureFile);
-        }
-
-        const res = await axios.post("user/add_pet", formDataPayload, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-        console.log("Pet saved:", res.data);
-        toast.success("Pet registered successfully!");
-        navigate("/dashboard");
-      } catch (error) {
-        const errorMessage =
-          error.response && error.response.data && error.response.data.message
-            ? error.response.data.message
-            : "Error getting profile";
-        toast.error(errorMessage);
-        setErrors({ submit: "Failed to register pet. Please try again." });
-      } finally {
-        setIsLoading(false);
+        window.location.reload();
+        navigate('/user-dashboard/add-pet');
+      } else {
+        throw new Error('Failed to add pet');
       }
+    } catch (error) {
+      console.error('Error adding pet:', error);
+      toast.dismiss(savingToast);
+      toast.error(
+        error.response?.data?.message || 'Failed to add pet. Please try again.',
+        {
+          duration: 4000,
+          style: {
+            background: '#EF4444',
+            color: '#FFFFFF',
+          },
+        }
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const updateField = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const renderBreedItem = (item) => (
+    <button
+      key={item.value}
+      className={`flex justify-between items-center w-full p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+        formData.breed === item.value ? 'bg-blue-50' : ''
+      }`}
+      onClick={() => selectBreed(item)}
+    >
+      <span className={`font-medium ${
+        formData.breed === item.value ? 'text-blue-600' : 'text-gray-900'
+      }`}>
+        {item.label}
+      </span>
+      {formData.breed === item.value && (
+        <span className="text-blue-600 text-lg">✓</span>
+      )}
+    </button>
+  );
 
   return (
-    <>
-      <div>
+    <div className="">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3">
         <div className="max-w-4xl mx-auto">
-          {/* Header with Back Button */}
-          <div className="flex items-center mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-              Register New Pet
-            </h1>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {/* Form Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
-              <h2 className="text-xl font-semibold">Pet Information</h2>
-              <p className="text-blue-100 text-sm">
-                Add your furry friend to the family
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-8">
-              {/* Basic Information Section */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                  Basic Information
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Pet Name */}
-                  <div>
-                    <label
-                      htmlFor="name"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Pet Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="name"
-                      name="name"
-                      type="text"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      placeholder="e.g., Luna"
-                      required
-                    />
-                  </div>
-
-                  {/* Pet Type */}
-                  <div>
-                    <label
-                      htmlFor="type"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Pet Type <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="type"
-                      name="type"
-                      value={formData.type}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      required
-                    >
-                      <option value="">Select Pet Type</option>
-                      <option value="dog">Dog</option>
-                      <option value="cat">Cat</option>
-                      <option value="bird">Bird</option>
-                      <option value="reptile">Reptile</option>
-                      <option value="small mammal">Small Mammal</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-
-                  {/* Breed */}
-                  <div>
-                    <label
-                      htmlFor="breed"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Breed <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="breed"
-                      name="breed"
-                      type="text"
-                      value={formData.breed}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      placeholder="e.g., Golden Retriever"
-                      required
-                    />
-                  </div>
-
-                  {/* Date of Birth */}
-                  <div>
-                    <label
-                      htmlFor="dob"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Date of Birth <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="dob"
-                      name="dob"
-                      type="date"
-                      value={formData.dob}
-                      onChange={handleInputChange}
-                      max={today}
-                      required
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    />
-                  </div>
-
-                  {/* Gender */}
-                  <div>
-                    <label
-                      htmlFor="gender"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Gender <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="gender"
-                      name="gender"
-                      value={formData.gender}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      required
-                    >
-                      <option value="">Select Gender</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pet Picture Section */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                  Pet Photo
-                </h3>
-
-                <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
-                  <div className="flex-shrink-0">
-                    <img
-                      src={formData.petPicture}
-                      alt="Pet Preview"
-                      className="h-32 w-32 rounded-xl object-cover border-2 border-gray-300 shadow-sm"
-                    />
-                  </div>
-
-                  <div className="flex-grow">
-                    <label
-                      htmlFor="petPicture"
-                      className="inline-flex items-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer shadow-md"
-                    >
-                      <FaCamera className="mr-2" />
-                      <span>Choose Photo</span>
-                      <input
-                        id="petPicture"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleImageUpload}
-                      />
-                    </label>
-
-                    <p className="text-sm text-gray-500 mt-2">
-                      JPEG, PNG or GIF (Max 5MB). This helps us personalize your
-                      experience.
-                    </p>
-
-                    {errors.petPicture && (
-                      <p className="text-sm text-red-600 mt-1">
-                        {errors.petPicture}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Medical History Section */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                  Medical History
-                </h3>
-
-                <div className="space-y-4">
-                  {medicalEntries.map((entry, index) => (
-                    <div
-                      key={index}
-                      className="bg-blue-50 p-4 rounded-lg border border-blue-100"
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        <div className="md:col-span-5">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Condition <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            name="condition"
-                            value={entry.condition}
-                            onChange={(e) => handleMedicalEntryChange(index, e)}
-                            placeholder="e.g., Allergies, Surgery, etc."
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            required
-                          />
-                          {errors[`medicalCondition${index}`] && (
-                            <p className="text-xs text-red-600 mt-1">
-                              {errors[`medicalCondition${index}`]}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="md:col-span-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Date <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="date"
-                            name="date"
-                            value={entry.date}
-                            onChange={(e) => handleMedicalEntryChange(index, e)}
-                            max={today}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            required
-                          />
-                          {errors[`medicalDate${index}`] && (
-                            <p className="text-xs text-red-600 mt-1">
-                              {errors[`medicalDate${index}`]}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="md:col-span-2 flex items-center h-full pt-5">
-                          <label className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              name="isRecovered"
-                              checked={entry.isRecovered}
-                              onChange={(e) =>
-                                handleMedicalEntryChange(index, e)
-                              }
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                            <span className="text-sm text-gray-700">
-                              Recovered
-                            </span>
-                          </label>
-                        </div>
-
-                        <div className="md:col-span-1 flex items-center h-full pt-5 justify-center">
-                          <button
-                            type="button"
-                            onClick={() => removeMedicalEntry(index)}
-                            className="text-red-500 hover:text-red-700 transition-colors p-1 rounded-full hover:bg-red-50"
-                            disabled={isLoading}
-                          >
-                            <FaTrash size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={addMedicalEntry}
-                    disabled={isLoading}
-                    className="flex items-center justify-center w-full py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors border border-dashed border-blue-300"
-                  >
-                    <FaPlusCircle className="mr-2" />
-                    Add Medical Entry
-                  </button>
-                </div>
-              </div>
-
-              {/* Vaccination Log Section */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                  Vaccination Records
-                </h3>
-
-                <div className="space-y-4">
-                  {vaccinationEntries.map((entry, index) => (
-                    <div
-                      key={index}
-                      className="bg-green-50 p-4 rounded-lg border border-green-100"
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                        <div className="md:col-span-5">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Vaccine Name <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            name="vaccineName"
-                            value={entry.vaccineName}
-                            onChange={(e) => handleVaccinationChange(index, e)}
-                            placeholder="e.g., Rabies, Distemper, etc."
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            required
-                          />
-                          {errors[`vaccineName${index}`] && (
-                            <p className="text-xs text-red-600 mt-1">
-                              {errors[`vaccineName${index}`]}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="md:col-span-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Date Administered{" "}
-                            <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="date"
-                            name="date"
-                            value={entry.date}
-                            onChange={(e) => handleVaccinationChange(index, e)}
-                            max={today}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            required
-                          />
-                          {errors[`vaccineDate${index}`] && (
-                            <p className="text-xs text-red-600 mt-1">
-                              {errors[`vaccineDate${index}`]}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="md:col-span-3 flex items-center h-full pt-5 justify-center">
-                          <button
-                            type="button"
-                            onClick={() => removeVaccinationEntry(index)}
-                            className="text-red-500 hover:text-red-700 transition-colors p-1 rounded-full hover:bg-red-50"
-                            disabled={isLoading}
-                          >
-                            <FaTrash size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={addVaccination}
-                    disabled={isLoading}
-                    className="flex items-center justify-center w-full py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors border border-dashed border-green-300"
-                  >
-                    <FaPlusCircle className="mr-2" />
-                    Add Vaccination Record
-                  </button>
-                </div>
-              </div>
-
-              {/* Form Actions */}
-              <div className="flex flex-col-reverse md:flex-row justify-end space-y-4 space-y-reverse md:space-y-0 md:space-x-4 pt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => navigate("user-dashboard/pet-info")}
-                  disabled={isLoading}
-                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors shadow-sm disabled:bg-gray-200 disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {isLoading ? (
-                    <>
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <FaPaw className="mr-2" />
-                      Register Pet
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={() => window.history.back()}
+              className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition-colors"
+            >
+              <span className="text-white text-lg">←</span>
+            </button>
+            <h1 className="text-xl font-bold">Add New Pet</h1>
+            <div className="w-8"></div> {/* Spacer for balance */}
           </div>
         </div>
       </div>
-    </>
+
+      {/* Main Form */}
+      <div className="max-w-4xl mx-auto p-6 space-y-6 pb-24">
+        {/* Avatar Section */}
+        <div className="text-center">
+          <div className="relative inline-block">
+            <img 
+              src={formData.avatar} 
+              alt="Pet avatar" 
+              className="w-24 h-24 rounded-full border-4 border-white shadow-lg"
+            />
+            <button 
+              className="absolute bottom-0 right-0 bg-blue-600 text-white w-10 h-10 rounded-full border-4 border-white shadow-md hover:bg-blue-700 transition-colors"
+              onClick={() => toast('📸 Photo upload feature coming soon!', { icon: '🚀' })}
+            >
+              <span className="text-lg">📷</span>
+            </button>
+          </div>
+          <p className="text-gray-600 text-sm mt-2">Add Photo (Optional)</p>
+        </div>
+
+        {/* Pet Name */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Pet Name *
+          </label>
+          <input
+            type="text"
+            placeholder="Enter your pet's name"
+            value={formData.name}
+            onChange={(e) => updateField('name', e.target.value)}
+            className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+              errors.name ? 'border-red-500' : 'border-gray-200'
+            }`}
+          />
+          {errors.name && (
+            <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+          )}
+        </div>
+
+        {/* Pet Type */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Pet Type *
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { value: 'dog', label: 'Dog', icon: '🐕' },
+              { value: 'cat', label: 'Cat', icon: '🐈' },
+            ].map((type) => (
+              <button
+                key={type.value}
+                onClick={() => updateField('petType', type.value)}
+                className={`p-4 border-2 rounded-xl flex items-center justify-center space-x-2 transition-all ${
+                  formData.petType === type.value
+                    ? 'border-blue-500 bg-blue-500 text-white shadow-lg'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'
+                }`}
+              >
+                <span className="text-xl">{type.icon}</span>
+                <span className="font-semibold">{type.label}</span>
+              </button>
+            ))}
+          </div>
+          {errors.petType && (
+            <p className="text-red-500 text-sm mt-1">{errors.petType}</p>
+          )}
+        </div>
+
+        {/* Breed */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Breed *
+          </label>
+          <button
+            onClick={openBreedModal}
+            disabled={!formData.petType || loadingBreeds}
+            className={`w-full p-4 border-2 rounded-xl flex justify-between items-center transition-colors ${
+              errors.breed 
+                ? 'border-red-500' 
+                : 'border-gray-200 hover:border-blue-300'
+            } ${
+              !formData.petType || loadingBreeds ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            <span className={formData.breed ? "text-gray-900" : "text-gray-500"}>
+              {formData.breed
+                ? getBreedOptions().find(b => b.value === formData.breed)?.label
+                : formData.petType
+                ? loadingBreeds ? 'Loading...' : `Select ${formData.petType} breed`
+                : 'Select pet type first'}
+            </span>
+            <span className="text-gray-400">▼</span>
+          </button>
+          {errors.breed && (
+            <p className="text-red-500 text-sm mt-1">{errors.breed}</p>
+          )}
+        </div>
+
+        {/* Age and Weight */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Age (years) *
+            </label>
+            <input
+              type="number"
+              placeholder="0"
+              value={formData.age}
+              onChange={(e) => updateField('age', e.target.value)}
+              className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                errors.age ? 'border-red-500' : 'border-gray-200'
+              }`}
+            />
+            {errors.age && (
+              <p className="text-red-500 text-sm mt-1">{errors.age}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Weight (kg)
+            </label>
+            <input
+              type="number"
+              placeholder="0.0"
+              step="0.1"
+              value={formData.weight}
+              onChange={(e) => updateField('weight', e.target.value)}
+              className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                errors.weight ? 'border-red-500' : 'border-gray-200'
+              }`}
+            />
+            {errors.weight && (
+              <p className="text-red-500 text-sm mt-1">{errors.weight}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Gender */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Gender *
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {['Male', 'Female'].map((gender) => (
+              <button
+                key={gender}
+                onClick={() => updateField('petGender', gender)}
+                className={`p-4 border-2 rounded-xl flex items-center justify-center space-x-2 transition-all ${
+                  formData.petGender === gender
+                    ? 'border-blue-500 bg-blue-500 text-white shadow-lg'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'
+                }`}
+              >
+                <span className="text-lg">
+                  {gender === 'Male' ? '♂' : '♀'}
+                </span>
+                <span className="font-semibold">{gender}</span>
+              </button>
+            ))}
+          </div>
+          {errors.petGender && (
+            <p className="text-red-500 text-sm mt-1">{errors.petGender}</p>
+          )}
+        </div>
+
+        {/* Info Card */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start space-x-3">
+          <span className="text-blue-500 text-lg">ℹ️</span>
+          <p className="text-blue-700 text-sm flex-1">
+            All fields marked with * are required to add your pet.
+          </p>
+        </div>
+      </div>
+
+      {/* Submit Button */}
+      <div >
+        <div className="max-w-4xl mx-auto">
+          <button
+            onClick={handleAddPet}
+            disabled={isSaving}
+            className={`w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-xl shadow-lg hover:from-purple-700 hover:to-blue-700 transition-all flex items-center justify-center space-x-2 ${
+              isSaving ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            {isSaving ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Adding Pet...</span>
+              </>
+            ) : (
+              <>
+                <span className="text-lg">✓</span>
+                <span>Add Pet</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Breed Selection Modal */}
+      {showBreedModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
+          <div className="bg-white rounded-t-3xl w-full max-w-2xl h-[80vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900">
+                Select {formData.petType === 'dog' ? 'Dog' : 'Cat'} Breed
+              </h3>
+              <button
+                onClick={() => setShowBreedModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="p-4 border-b border-gray-200">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  🔍
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search breeds..."
+                  value={breedSearch}
+                  onChange={(e) => handleBreedSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Breed List */}
+            <div className="h-full overflow-y-auto">
+              {filteredBreeds.length > 0 ? (
+                filteredBreeds.map(renderBreedItem)
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No breeds found matching your search
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
-const Add = () => {
-  return <AddPetForm />;
-};
-
-export default Add;
+export default AddPet;

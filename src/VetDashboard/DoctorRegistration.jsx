@@ -741,223 +741,222 @@ const DoctorRegistration = () => {
   //   }
   // };
 
-  
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  // Mark all fields as touched
-  const allTouched = {
-    name: true,
-    mobileNumber: true,
-    email: true,
-    address: true,
-    city: true,
-    pinCode: true,
-    chatPrice: true,
-    password: true,
-    confirmPassword: true,
-    terms: true, // Add this
-  };
-  
-  // Add doctor fields to touched
-  doctors.forEach((_, index) => {
-    allTouched[`doctor_name_${index}`] = true;
-    allTouched[`doctor_email_${index}`] = true;
-    allTouched[`doctor_mobile_${index}`] = true;
-    allTouched[`doctor_license_${index}`] = true;
-  });
-  
-  setTouched(allTouched);
+    // Mark all fields as touched
+    const allTouched = {
+      name: true,
+      mobileNumber: true,
+      email: true,
+      address: true,
+      city: true,
+      pinCode: true,
+      chatPrice: true,
+      password: true,
+      confirmPassword: true,
+      terms: true, // Add this
+    };
 
-  // Check if terms are accepted first
-  if (!acceptedTerms) {
-    toast.error("Please accept the Provider Agreement to continue");
-    // Scroll to terms section
-    const termsElement = document.querySelector('input[type="checkbox"]');
-    if (termsElement) {
-      termsElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Add a visual shake effect
-      termsElement.parentElement.classList.add('shake-animation');
-      setTimeout(() => {
-        termsElement.parentElement.classList.remove('shake-animation');
-      }, 500);
-    }
-    return;
-  }
-
-  // Validate the form
-  if (!validateForm()) {
-    toast.error("Please fix all the errors in the form");
-    // Scroll to first error
-    const firstError = document.querySelector('.border-red-500');
-    if (firstError) {
-      firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-    return;
-  }
-
-  setIsProfileSaving(true);
-  try {
-    const formData = new FormData();
-    formData.append("name", name);
-    formData.append("city", city);
-    formData.append("pincode", pinCode);
-    formData.append("mobile", mobileNumber);
-    formData.append("email", email);
-    formData.append("employee_id", "N/A");
-    formData.append("password", password);
-    formData.append("confirmPassword", confirmPassword);
-
-    // Send coordinates as an array instead of JSON string
-    if (coordinates.lat && coordinates.lng) {
-      formData.append("coordinates[]", coordinates.lat);
-      formData.append("coordinates[]", coordinates.lng);
-    }
-
-    formData.append("address", address);
-    formData.append("chat_price", chatPrice);
-    formData.append("bio", bio);
-    formData.append("inhome_grooming_services", inhome_grooming_services);
-    formData.append("acceptedTerms", acceptedTerms);
-
-    // Add all the Google Places data if available
-    if (businessDetails) {
-      formData.append("place_id", businessDetails.place_id || "");
-      formData.append(
-        "business_status",
-        businessDetails.business_status || "OPERATIONAL"
-      );
-      formData.append(
-        "formatted_address",
-        businessDetails.formatted_address || address
-      );
-      formData.append("lat", coordinates.lat);
-      formData.append("lng", coordinates.lng);
-
-      // Viewport data
-      if (businessDetails.geometry?.viewport) {
-        const viewport = businessDetails.geometry.viewport;
-        formData.append("viewport_ne_lat", viewport.getNorthEast().lat());
-        formData.append("viewport_ne_lng", viewport.getNorthEast().lng());
-        formData.append("viewport_sw_lat", viewport.getSouthWest().lat());
-        formData.append("viewport_sw_lng", viewport.getSouthWest().lng());
-      }
-
-      formData.append("icon", businessDetails.icon || "");
-      formData.append(
-        "icon_background_color",
-        businessDetails.icon_background_color || ""
-      );
-      formData.append(
-        "icon_mask_base_uri",
-        businessDetails.icon_mask_base_uri || ""
-      );
-
-      // Send open_now as boolean (not string)
-      formData.append(
-        "open_now",
-        businessDetails.opening_hours?.open_now ? "1" : "0"
-      );
-
-      // Send types as individual array items
-      if (businessDetails.types && Array.isArray(businessDetails.types)) {
-        businessDetails.types.forEach((type, index) => {
-          formData.append(`types[${index}]`, type);
-        });
-      }
-
-      // Send photos as individual array items
-      if (businessDetails.photos && Array.isArray(businessDetails.photos)) {
-        businessDetails.photos.forEach((photo, index) => {
-          formData.append(`photos[${index}][height]`, photo.height);
-          formData.append(`photos[${index}][width]`, photo.width);
-          formData.append(
-            `photos[${index}][photo_reference]`,
-            photo.photo_reference
-          );
-        });
-      }
-
-      // Plus code
-      if (businessDetails.plus_code) {
-        formData.append(
-          "compound_code",
-          businessDetails.plus_code.compound_code || ""
-        );
-        formData.append(
-          "global_code",
-          businessDetails.plus_code.global_code || ""
-        );
-      }
-
-      formData.append("rating", businessDetails.rating?.toString() || "0");
-      formData.append(
-        "user_ratings_total",
-        businessDetails.user_ratings_total?.toString() || "0"
-      );
-    }
-
-    if (clinicPictureFile) {
-      formData.append("hospital_profile", clinicPictureFile);
-    }
-
-    // Add doctors data
-    doctors.forEach((doctor, index) => {
-      formData.append(`doctors[${index}][doctor_name]`, doctor.doctor_name);
-      formData.append(`doctors[${index}][doctor_email]`, doctor.doctor_email);
-      formData.append(
-        `doctors[${index}][doctor_mobile]`,
-        doctor.doctor_mobile
-      );
-      formData.append(
-        `doctors[${index}][doctor_license]`,
-        doctor.doctor_license
-      );
-      if (doctor.doctor_image) {
-        formData.append(
-          `doctors[${index}][doctor_image]`,
-          doctor.doctor_image
-        );
-      }
+    // Add doctor fields to touched
+    doctors.forEach((_, index) => {
+      allTouched[`doctor_name_${index}`] = true;
+      allTouched[`doctor_email_${index}`] = true;
+      allTouched[`doctor_mobile_${index}`] = true;
+      allTouched[`doctor_license_${index}`] = true;
     });
 
-    const res = await axios.post(
-      "https://snoutiq.com/backend/api/vet-registerations/store",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+    setTouched(allTouched);
+
+    // Check if terms are accepted first
+    if (!acceptedTerms) {
+      toast.error("Please accept the Provider Agreement to continue");
+      // Scroll to terms section
+      const termsElement = document.querySelector('input[type="checkbox"]');
+      if (termsElement) {
+        termsElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Add a visual shake effect
+        termsElement.parentElement.classList.add("shake-animation");
+        setTimeout(() => {
+          termsElement.parentElement.classList.remove("shake-animation");
+        }, 500);
       }
-    );
-
-    if (res.status === 200 || res.status === 201) {
-      console.log(res, "ankit");
-
-      // Extract slug from backend response
-      const slug = res?.data?.data?.slug;
-
-      if (slug) {
-        // Show success message
-        toast.success(res.data.message || "Profile saved successfully!");
-
-        // Redirect to the vet profile page
-        window.location.href = `https://snoutiq.com/backend/vets/${slug}`;
-      } else {
-        toast.error("Something went wrong: slug not found");
-      }
+      return;
     }
-  } catch (error) {
-    const errorMessage =
-      error.response && error.response.data && error.response.data.message
-        ? error.response.data.message
-        : "Error saving profile";
-    toast.error(errorMessage);
-    console.log("Error details:", error.response?.data);
-  } finally {
-    setIsProfileSaving(false);
-  }
-};
+
+    // Validate the form
+    if (!validateForm()) {
+      toast.error("Please fix all the errors in the form");
+      // Scroll to first error
+      const firstError = document.querySelector(".border-red-500");
+      if (firstError) {
+        firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return;
+    }
+
+    setIsProfileSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("city", city);
+      formData.append("pincode", pinCode);
+      formData.append("mobile", mobileNumber);
+      formData.append("email", email);
+      formData.append("employee_id", "N/A");
+      formData.append("password", password);
+      formData.append("confirmPassword", confirmPassword);
+
+      // Send coordinates as an array instead of JSON string
+      if (coordinates.lat && coordinates.lng) {
+        formData.append("coordinates[]", coordinates.lat);
+        formData.append("coordinates[]", coordinates.lng);
+      }
+
+      formData.append("address", address);
+      formData.append("chat_price", chatPrice);
+      formData.append("bio", bio);
+      formData.append("inhome_grooming_services", inhome_grooming_services);
+      formData.append("acceptedTerms", acceptedTerms);
+
+      // Add all the Google Places data if available
+      if (businessDetails) {
+        formData.append("place_id", businessDetails.place_id || "");
+        formData.append(
+          "business_status",
+          businessDetails.business_status || "OPERATIONAL"
+        );
+        formData.append(
+          "formatted_address",
+          businessDetails.formatted_address || address
+        );
+        formData.append("lat", coordinates.lat);
+        formData.append("lng", coordinates.lng);
+
+        // Viewport data
+        if (businessDetails.geometry?.viewport) {
+          const viewport = businessDetails.geometry.viewport;
+          formData.append("viewport_ne_lat", viewport.getNorthEast().lat());
+          formData.append("viewport_ne_lng", viewport.getNorthEast().lng());
+          formData.append("viewport_sw_lat", viewport.getSouthWest().lat());
+          formData.append("viewport_sw_lng", viewport.getSouthWest().lng());
+        }
+
+        formData.append("icon", businessDetails.icon || "");
+        formData.append(
+          "icon_background_color",
+          businessDetails.icon_background_color || ""
+        );
+        formData.append(
+          "icon_mask_base_uri",
+          businessDetails.icon_mask_base_uri || ""
+        );
+
+        // Send open_now as boolean (not string)
+        formData.append(
+          "open_now",
+          businessDetails.opening_hours?.open_now ? "1" : "0"
+        );
+
+        // Send types as individual array items
+        if (businessDetails.types && Array.isArray(businessDetails.types)) {
+          businessDetails.types.forEach((type, index) => {
+            formData.append(`types[${index}]`, type);
+          });
+        }
+
+        // Send photos as individual array items
+        if (businessDetails.photos && Array.isArray(businessDetails.photos)) {
+          businessDetails.photos.forEach((photo, index) => {
+            formData.append(`photos[${index}][height]`, photo.height);
+            formData.append(`photos[${index}][width]`, photo.width);
+            formData.append(
+              `photos[${index}][photo_reference]`,
+              photo.photo_reference
+            );
+          });
+        }
+
+        // Plus code
+        if (businessDetails.plus_code) {
+          formData.append(
+            "compound_code",
+            businessDetails.plus_code.compound_code || ""
+          );
+          formData.append(
+            "global_code",
+            businessDetails.plus_code.global_code || ""
+          );
+        }
+
+        formData.append("rating", businessDetails.rating?.toString() || "0");
+        formData.append(
+          "user_ratings_total",
+          businessDetails.user_ratings_total?.toString() || "0"
+        );
+      }
+
+      if (clinicPictureFile) {
+        formData.append("hospital_profile", clinicPictureFile);
+      }
+
+      // Add doctors data
+      doctors.forEach((doctor, index) => {
+        formData.append(`doctors[${index}][doctor_name]`, doctor.doctor_name);
+        formData.append(`doctors[${index}][doctor_email]`, doctor.doctor_email);
+        formData.append(
+          `doctors[${index}][doctor_mobile]`,
+          doctor.doctor_mobile
+        );
+        formData.append(
+          `doctors[${index}][doctor_license]`,
+          doctor.doctor_license
+        );
+        if (doctor.doctor_image) {
+          formData.append(
+            `doctors[${index}][doctor_image]`,
+            doctor.doctor_image
+          );
+        }
+      });
+
+      const res = await axios.post(
+        "https://snoutiq.com/backend/api/vet-registerations/store",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (res.status === 200 || res.status === 201) {
+        console.log(res, "ankit");
+
+        // Extract slug from backend response
+        const slug = res?.data?.data?.slug;
+
+        if (slug) {
+          // Show success message
+          toast.success(res.data.message || "Profile saved successfully!");
+
+          // Redirect to the vet profile page
+          window.location.href = `https://snoutiq.com/backend/vets/${slug}`;
+        } else {
+          toast.error("Something went wrong: slug not found");
+        }
+      }
+    } catch (error) {
+      const errorMessage =
+        error.response && error.response.data && error.response.data.message
+          ? error.response.data.message
+          : "Error saving profile";
+      toast.error(errorMessage);
+      console.log("Error details:", error.response?.data);
+    } finally {
+      setIsProfileSaving(false);
+    }
+  };
 
   const openTermsModal = (term) => {
     setActiveTerm(term);
@@ -2338,23 +2337,25 @@ const handleSubmit = async (e) => {
               </div>
               {/* Terms and Conditions */}
               <div className="mt-6">
-              <label className={`flex items-start p-4 rounded-lg border-2 transition-all ${
-    errors.terms && touched.terms 
-      ? 'border-red-500 bg-red-50' 
-      : 'border-gray-200 hover:border-blue-300'
-  }`}>
-    <input
-      type="checkbox"
-      checked={acceptedTerms}
-      onChange={(e) => {
-        setAcceptedTerms(e.target.checked);
-        if (e.target.checked) {
-          setErrors({ ...errors, terms: "" });
-        }
-      }}
-      onBlur={() => setTouched({ ...touched, terms: true })}
-      className="mt-1 mr-3 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-    />
+                <label
+                  className={`flex items-start p-4 rounded-lg border-2 transition-all ${
+                    errors.terms && touched.terms
+                      ? "border-red-500 bg-red-50"
+                      : "border-gray-200 hover:border-blue-300"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => {
+                      setAcceptedTerms(e.target.checked);
+                      if (e.target.checked) {
+                        setErrors({ ...errors, terms: "" });
+                      }
+                    }}
+                    onBlur={() => setTouched({ ...touched, terms: true })}
+                    className="mt-1 mr-3 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
                   <span className="text-sm text-gray-700 leading-relaxed">
                     By continuing, I confirm that I have read and agree to
                     SnoutIQ’s:{" "}
@@ -2472,13 +2473,21 @@ const handleSubmit = async (e) => {
                   {" *"}
                 </label>
                 {errors.terms && touched.terms && (
-    <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
-      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-      </svg>
-      {errors.terms}
-    </p>
-  )}
+                  <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    {errors.terms}
+                  </p>
+                )}
               </div>
 
               {/* Google Maps for fine-tuning location */}
