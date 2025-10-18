@@ -341,19 +341,19 @@ class GeminiChatController extends Controller
                    "LOCATION: " . ($pet['location'] ?? 'India');
 
         if (in_array($decision, ['EMERGENCY','IN_CLINIC','VIDEO_CONSULT'], true)) {
-            return "You are PetPal AI, a veterinary triage assistant. Provide a direct service recommendation.\n\n" .
+            return "You are SnoutIQ AI, a veterinary triage assistant. Provide a direct service recommendation.\n\n" .
                    $petLine . "\n\n" .
                    'USER MESSAGE: "' . $userMessage . "\"\n\n" .
                    $this->servicePrompt($decision, $pet) .
-                   "\nRespond directly as PetPal AI - do not mention evidence scores or internal analysis.";
+                   "\nRespond directly as SnoutIQ AI - do not mention evidence scores or internal analysis.";
         }
 
         // GATHER_INFO branch
         $intro = empty($history)
-            ? "Hello! I'm PetPal AI, and I'm here to help you and your pet. I understand how worrying it can be when our furry family members aren't feeling well."
+            ? "Hello! I'm SnoutIQ AI, and I'm here to help you and your pet. I understand how worrying it can be when our furry family members aren't feeling well."
             : "Thank you for that information.";
 
-        return "You are PetPal AI, a caring veterinary triage assistant.\n\n" .
+        return "You are SnoutIQ AI, a caring veterinary triage assistant.\n\n" .
                $petLine . "\n\n" .
                'USER MESSAGE: "' . $userMessage . "\"\n\n" .
                "Start with: \"$intro\"\n\n" .
@@ -474,12 +474,12 @@ class GeminiChatController extends Controller
         $userHtml = "<div style='display:flex;justify-content:flex-end;margin:15px 0;'>".
             "<div style='background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 20px;border-radius:20px 20px 5px 20px;max-width:70%;box-shadow:0 4px 15px rgba(102,126,234,.3);'>".
             "<div style='font-size:12px;opacity:.8;margin-bottom:5px;'>You • {$ts}</div>".
-            "<div>{$userEsc}</div>".
+            "SnoutI<div>{$userEsc}</div>".
             "</div></div>";
 
         $aiHtmlBlock = "<div style='display:flex;justify-content:flex-start;margin:15px 0;'>".
             "<div style='background:white;border:2px solid #f0f0f0;padding:15px 20px;border-radius:20px 20px 20px 5px;max-width:75%;box-shadow:0 4px 15px rgba(0,0,0,.1);'>".
-            "<div style='font-size:12px;color:#666;margin-bottom:8px;'>{$avatar} PetPal AI • {$ts}</div>".
+            "<div style='font-size:12px;color:#666;margin-bottom:8px;'>{$avatar} Q AI • {$ts}</div>".
             "<div style='line-height:1.6;color:#333;'>{$aiHtml}</div>".
             "</div></div>";
 
