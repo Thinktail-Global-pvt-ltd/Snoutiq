@@ -24,6 +24,9 @@ const LiveDoctorSelectionModal = React.memo(
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("distance");
 
+    console.log(liveDoctors,"ankit11");
+    
+
     // Filter and sort doctors
     const filteredDoctors = useMemo(() => {
       if (!liveDoctors) return [];
@@ -137,14 +140,15 @@ const LiveDoctorSelectionModal = React.memo(
                 {item.profile_image && !avatarError ? (
                   <img
                     src={item.profile_image}
-                    alt={`Dr. ${item.business_status || item.name}`}
+                    alt={`Dr. ${item.business_status || item.slug}`}
                     className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow-md"
                     onError={() => handleImageError(`avatar-${item.id}`)}
                   />
                 ) : (
                   <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-md">
                     <span className="text-white font-bold text-lg">
-                      {item.business_status?.charAt(0) || item.name?.charAt(0) || "D"}
+                      {/* {item.business_status?.charAt(0) || item.name?.charAt(0) || "D"} */}
+                      {item.slug?.charAt(0) || "D"}
                     </span>
                   </div>
                 )}
@@ -158,7 +162,7 @@ const LiveDoctorSelectionModal = React.memo(
                 <div className="flex items-start justify-between mb-2">
                   <div className="min-w-0">
                     <h3 className="text-lg font-semibold text-gray-900 truncate">
-                      Dr. {item.business_status || item.name || "Veterinarian"}
+                      Dr. { item.slug || "Veterinarian"}
                     </h3>
                     <p className="text-gray-600 text-sm font-medium truncate">
                       {item.clinic_name || "Veterinary Clinic"}
