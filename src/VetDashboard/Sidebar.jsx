@@ -541,7 +541,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { socket } from '../pages/socket';
 
-const HeaderWithSidebar = ({ children, doctorId = 34  }) => {
+const HeaderWithSidebar = ({ children }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeNavItem, setActiveNavItem] = useState("Dashboard");
@@ -550,13 +550,14 @@ const HeaderWithSidebar = ({ children, doctorId = 34  }) => {
   const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [debugLogs, setDebugLogs] = useState([]);
   const [incomingCall, setIncomingCall] = useState(null);
-  const [incomingCalls, setIncomingCalls] = useState([]); // For multiple calls
+  const [incomingCalls, setIncomingCalls] = useState([]);
 
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useContext(AuthContext);
   const hasListeners = useRef(false);
   const hasSetUpListeners = useRef(false);
+  const doctorId = user.id
 
   
 

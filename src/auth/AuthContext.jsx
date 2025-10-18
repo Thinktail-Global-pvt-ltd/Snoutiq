@@ -474,30 +474,44 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // 🟢 Socket listener for live active doctors
-  useEffect(() => {
-    if (!socket) return;
+// 🟢 Socket listener for live active doctors
+useEffect(() => {
+  if (!socket) return;
 
-    socket.off("active-doctors");
-    socket.on("active-doctors", (doctorIds) => {
-      console.log("Received active-doctors:", doctorIds);
-      const liveNearbyDoctors = nearbyDoctors.filter((doc) =>
-        doctorIds.includes(doc.id)
-      );
-      setLiveDoctors(liveNearbyDoctors);
-      localStorage.setItem("live_doctors", JSON.stringify(liveNearbyDoctors));
+  const handleActiveDoctors = (doctorIds) => {
+    console.log("📡 Received active-doctors:", doctorIds);
+    console.log("📋 Current nearbyDoctors:", nearbyDoctors.map(d => d.id));
+    
+    // ✅ Filter to get only live doctors from nearby list
+    const liveNearbyDoctors = nearbyDoctors.filter((doc) => {
+      const isLive = doctorIds.includes(doc.id);
+      console.log(`Doctor ${doc.id} (${doc.name}): ${isLive ? '🟢 LIVE' : '⚫ OFFLINE'}`);
+      return isLive;
     });
+    
+    console.log(`✅ ${liveNearbyDoctors.length} live doctors found:`, 
+      liveNearbyDoctors.map(d => `${d.name} (${d.id})`));
+    
+    setLiveDoctors(liveNearbyDoctors);
+    localStorage.setItem("live_doctors", JSON.stringify(liveNearbyDoctors));
+  };
 
+  socket.off("active-doctors");
+  socket.on("active-doctors", handleActiveDoctors);
+
+  // Initial request
+  socket.emit("get-active-doctors");
+
+  // Periodic polling every 15 seconds (reduced from 30s for better real-time updates)
+  const interval = setInterval(() => {
     socket.emit("get-active-doctors");
+  }, 15000);
 
-    const interval = setInterval(() => {
-      socket.emit("get-active-doctors");
-    }, 30000);
-
-    return () => {
-      socket.off("active-doctors");
-      clearInterval(interval);
-    };
-  }, [nearbyDoctors]);
+  return () => {
+    socket.off("active-doctors");
+    clearInterval(interval);
+  };
+}, [nearbyDoctors]);
 
   // 🟢 Fetch nearby doctors from API with debouncing
   const fetchNearbyDoctors = useCallback(async () => {

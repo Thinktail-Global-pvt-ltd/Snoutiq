@@ -262,7 +262,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [callStatus, setCallStatus] = useState(null);
   const { user, token, nearbyDoctors, liveDoctors } = useContext(AuthContext);
-  const patientId = user?.id || "101";
+  const patientId = user?.id ;
   const timeoutRef = useRef(null);
   const [showLiveDoctorsModal, setShowLiveDoctorsModal] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('idle');
@@ -338,7 +338,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     const doctor = (nearbyDoctors || []).find((d) => d.id == data.doctorId) ||
       (liveDoctors || []).find((d) => d.id == data.doctorId);
 
-    const patientIdLocal = user?.id || "101";
+    const patientIdLocal = user?.id;
 
     toast.success(`🎉 Call connected with veterinarian! Redirecting...`, {
       duration: 3000,
