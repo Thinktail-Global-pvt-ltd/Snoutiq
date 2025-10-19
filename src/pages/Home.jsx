@@ -34,19 +34,19 @@ const Home = () => {
       {
         icon: "🪔",
         title: "24/7 Diwali Care",
-        description: "Round-the-clock pet safety support during festivities",
+        description: "Quick text & photo consults during festival nights — urgent advice, calm strategies and step-by-step home care.",
         gradient: "from-orange-400 via-red-400 to-pink-500"
       },
       {
         icon: "🎆",
         title: "Firework Anxiety",
-        description: "Expert tips to keep pets calm during celebrations",
+        description: "Vet-backed tips for anxiety: safe hiding spots, calming routines, and what to do if panic escalates.",
         gradient: "from-yellow-400 via-orange-400 to-red-500"
       },
       {
         icon: "🥮",
         title: "Festive Diet Guide",
-        description: "Safe treats and foods for your furry friends",
+        description: "Which sweets and snacks are risky — quick checks for mithai ingredients and safe alternatives.",
         gradient: "from-pink-400 via-purple-400 to-indigo-500"
       },
     ],
@@ -87,7 +87,7 @@ const Home = () => {
               
               <div className={`fade-in-up ${isVisible ? 'animate-in' : ''} inline-flex items-center justify-center mb-4 bg-gradient-to-r from-orange-500 via-yellow-400 to-pink-500 text-white rounded-full px-5 py-2 text-xs md:text-sm font-semibold shadow-lg`}>
                 <span className="animate-pulse mr-2">🪔</span>
-                Diwali Special Offer
+                Diwali Special Offer — ₹100 off on all video consults
                 <span className="animate-pulse ml-2">🪔</span>
               </div>
               
@@ -99,7 +99,7 @@ const Home = () => {
               </h1>
               
               <p className={`text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8 leading-relaxed fade-in-up ${isVisible ? 'animate-in' : ''}`} style={{animationDelay: '0.3s'}}>
-                AI-powered pet safety during festivals 🎆
+                24/7 local vets (Gurgaon) — instant chat & image consults to calm pets during fireworks, food worries & sudden illness.
               </p>
 
               {/* HERO CHAT INPUT - Main Focus */}
@@ -150,7 +150,7 @@ const Home = () => {
                 </div>
                 
                 <p className="text-sm md:text-base text-gray-700 mt-3 font-medium px-4">
-                  💬 Ask: "How to keep my pet calm during Diwali fireworks?"
+                  💬 Real vets. Local. Fast. Send text + images — get vet-led advice in minutes.
                 </p>
               </div>
             </div>
@@ -168,6 +168,38 @@ const Home = () => {
           >
             <StatsSection />
           </Suspense>
+
+          {/* Trust Badges */}
+          <section className="mb-16 relative">
+            <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-orange-100">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <div className="text-3xl mb-2">👨‍⚕️</div>
+                  <div className="text-2xl font-bold text-orange-600">30+</div>
+                  <div className="text-sm text-gray-600">Vets</div>
+                  <div className="text-xs text-gray-500 mt-1">Verified veterinarians on rotation from Gurgaon</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl mb-2">⚡</div>
+                  <div className="text-2xl font-bold text-orange-600">&lt;1min</div>
+                  <div className="text-sm text-gray-600">Response Time</div>
+                  <div className="text-xs text-gray-500 mt-1">Text & image consults whenever you need them</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl mb-2">⭐</div>
+                  <div className="text-2xl font-bold text-orange-600">5★</div>
+                  <div className="text-sm text-gray-600">Reviews</div>
+                  <div className="text-xs text-gray-500 mt-1">Highly-rated by pet parents who used our consults</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl mb-2">🔒</div>
+                  <div className="text-2xl font-bold text-orange-600">100%</div>
+                  <div className="text-sm text-gray-600">Secure & Private</div>
+                  <div className="text-xs text-gray-500 mt-1">Confidential consults — your pet's data stays with us</div>
+                </div>
+              </div>
+            </div>
+          </section>
 
           {/* Diwali Features */}
           <section className="w-full mb-20 relative">
@@ -202,34 +234,6 @@ const Home = () => {
             </div>
           </section>
 
-          {/* Trust Badges */}
-          <section className="mb-16 relative">
-            <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-orange-100">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <div className="text-3xl mb-2">🏆</div>
-                  <div className="text-2xl font-bold text-orange-600">50K+</div>
-                  <div className="text-sm text-gray-600">Happy Pet Parents</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl mb-2">⚡</div>
-                  <div className="text-2xl font-bold text-orange-600">&lt;1min</div>
-                  <div className="text-sm text-gray-600">Response Time</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl mb-2">🎯</div>
-                  <div className="text-2xl font-bold text-orange-600">98%</div>
-                  <div className="text-sm text-gray-600">Accuracy Rate</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl mb-2">🔒</div>
-                  <div className="text-2xl font-bold text-orange-600">100%</div>
-                  <div className="text-sm text-gray-600">Secure & Private</div>
-                </div>
-              </div>
-            </div>
-          </section>
-
           {/* Diwali CTA Section */}
           <section className="text-center py-12 md:py-16 px-4 bg-gradient-to-r from-orange-500 via-yellow-500 to-red-500 rounded-3xl text-white mb-16 relative overflow-hidden shadow-2xl">
             <div className="sparkle-overlay"></div>
@@ -240,10 +244,10 @@ const Home = () => {
                 </div>
               </div>
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-extrabold mb-4">
-                Celebrate Diwali with <span className="text-yellow-200">Happy Pets</span>!
+                Celebrate Diwali with <span className="text-yellow-200">calmer, safer pets</span>
               </h2>
               <p className="text-base md:text-lg text-orange-100 max-w-2xl mx-auto mb-8">
-                Get personalized pet care guidance for a stress-free festive season
+                Get personalised help this festival — text or upload photos and get vet-guided steps + a free Diwali Calm Kit.
               </p>
               <button
                 onClick={() => navigate("/register")}
@@ -251,8 +255,8 @@ const Home = () => {
               >
                 🪔 Start Your Free Consultation
               </button>
-              <p className="text-xs md:text-sm text-orange-100 mt-4 opacity-80">
-                No credit card required • Instant access • AI-powered insights
+              <p className="text-xs md:text-sm text-orange-100 mt-4 opacity-90">
+                No credit card required • Private & secure consults • Vet-led advice
               </p>
             </div>
           </section>
