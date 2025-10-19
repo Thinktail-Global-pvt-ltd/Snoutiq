@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,16 +12,201 @@
   <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin>
 
+  <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
+  <link rel="icon" sizes="192x192" href="/favicon-192.png" />
+  <link rel="icon" sizes="512x512" href="/favicon-512.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
 
-    <link rel="icon" href="/favicon.png" sizes="32x32" type="image/png" />
-    <link rel="icon" sizes="192x192" href="/favicon-192.png" />
-    <link rel="icon" sizes="512x512" href="/favicon-512.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
-
-  <!-- Critical CSS -->
+  <!-- Critical CSS with Professional Smooth Scrolling -->
   <style>
-    body { margin:0; font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
-    #root { min-height:100vh; display:flex; flex-direction:column;}
+    /* ============================================
+       SMOOTH SCROLLING & PROFESSIONAL SCROLL STYLES
+       ============================================ */
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      /* Smooth scrolling for the entire page */
+      scroll-behavior: smooth;
+      /* Optimized scroll performance */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      /* Enable smooth momentum scrolling on iOS */
+      -webkit-overflow-scrolling: touch;
+      /* Prevent horizontal scroll */
+      overflow-x: hidden;
+      /* Smooth scroll behavior */
+      scroll-behavior: smooth;
+    }
+
+    #root {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      /* Smooth transitions for root element */
+      transition: all 0.3s ease;
+    }
+
+    /* ============================================
+       CUSTOM SCROLLBAR STYLES (Professional Look)
+       ============================================ */
+    
+    /* For Webkit browsers (Chrome, Safari, Edge) */
+    ::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: linear-gradient(180deg, #fff5f0 0%, #ffe5d9 100%);
+      border-radius: 10px;
+      margin: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #ff6b35 0%, #f7931e 50%, #ff6b35 100%);
+      border-radius: 10px;
+      border: 3px solid #fff5f0;
+      transition: all 0.3s ease;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, #ff5722 0%, #ff8a50 50%, #ff5722 100%);
+      border: 2px solid #fff5f0;
+      box-shadow: 0 0 6px rgba(255, 107, 53, 0.5);
+    }
+
+    ::-webkit-scrollbar-thumb:active {
+      background: linear-gradient(180deg, #e64a19 0%, #ff6b35 50%, #e64a19 100%);
+    }
+
+    /* For Firefox */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #ff6b35 #fff5f0;
+    }
+
+    /* ============================================
+       SCROLL ANIMATION PERFORMANCE OPTIMIZATION
+       ============================================ */
+    
+    /* Add hardware acceleration for smooth scrolling */
+    html, body, #root {
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      will-change: scroll-position;
+    }
+
+    /* Smooth page transitions */
+    @media (prefers-reduced-motion: no-preference) {
+      html {
+        scroll-behavior: smooth;
+      }
+      
+      * {
+        scroll-behavior: smooth;
+      }
+    }
+
+    /* Respect user's motion preferences */
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+      
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* ============================================
+       MOBILE OPTIMIZATION FOR SMOOTH SCROLLING
+       ============================================ */
+    
+    @media (max-width: 768px) {
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        border: 2px solid #fff5f0;
+      }
+    }
+
+    /* Hide scrollbar on mobile but keep functionality */
+    @media (max-width: 640px) {
+      body::-webkit-scrollbar {
+        display: none;
+      }
+      
+      body {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    }
+
+    /* ============================================
+       LOADING STATE STYLES
+       ============================================ */
+    
+    .page-loading {
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .page-loaded {
+      opacity: 1;
+    }
+
+    /* ============================================
+       FESTIVE DIWALI SCROLLBAR (OPTIONAL)
+       ============================================ */
+    
+    /* Diwali-themed scrollbar with sparkle effect */
+    .diwali-theme::-webkit-scrollbar-track {
+      background: linear-gradient(180deg, #fff8f0 0%, #ffe5cc 100%);
+      position: relative;
+    }
+
+    .diwali-theme::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #ff9933 0%, #ffcc00 50%, #ff9933 100%);
+      border: 3px solid #fff8f0;
+      box-shadow: 0 0 10px rgba(255, 153, 51, 0.3);
+    }
+
+    .diwali-theme::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, #ff6600 0%, #ffb300 50%, #ff6600 100%);
+      box-shadow: 0 0 15px rgba(255, 102, 0, 0.5);
+    }
+
+    /* ============================================
+       SCROLL SNAP (Optional - for section scrolling)
+       ============================================ */
+    
+    /* Uncomment below for snap scroll sections
+    .scroll-container {
+      scroll-snap-type: y mandatory;
+      overflow-y: scroll;
+      height: 100vh;
+    }
+
+    .scroll-section {
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+    }
+    */
   </style>
 
   <!-- Deferred main CSS -->
@@ -33,23 +217,38 @@
   <script>
     window.addEventListener("load", ()=>{setTimeout(()=>{(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5D756BMW');},10000);});
   </script>
+
   <script>
-  setTimeout(function() {
-    !function(f,b,e,v,n,t,s)
-    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
-    'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '1909812439872823');
-    fbq('track', 'PageView');
-  }, 7000); // 7000 milliseconds = 7 seconds
-</script>
+    setTimeout(function() {
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '1909812439872823');
+      fbq('track', 'PageView');
+    }, 7000);
+  </script>
+
+  <!-- Smooth Scroll Polyfill for older browsers -->
+  <script>
+    // Add page loaded class for smooth transition
+    window.addEventListener('load', function() {
+      document.body.classList.add('page-loaded');
+    });
+
+    // Optional: Add Diwali theme to body
+    // Uncomment below to apply festive scrollbar
+    // document.addEventListener('DOMContentLoaded', function() {
+    //   document.body.classList.add('diwali-theme');
+    // });
+  </script>
 </head>
 
-<body>
+<body class="page-loading">
   <!-- GTM noscript fallback -->
   <noscript>
     <iframe
@@ -59,14 +258,13 @@
       style="display:none;visibility:hidden"
     ></iframe>
   </noscript>
-  <!-- Meta Pixel Code with 7 seconds delay -->
 
-<noscript>
-  <img height="1" width="1" style="display:none"
-  src="https://www.facebook.com/tr?id=1909812439872823&ev=PageView&noscript=1"
-  />
-</noscript>
-
+  <!-- Meta Pixel Code noscript -->
+  <noscript>
+    <img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=1909812439872823&ev=PageView&noscript=1"
+    />
+  </noscript>
 
   <div id="root"></div>
   <script type="module" src="/src/main.jsx" defer></script>
