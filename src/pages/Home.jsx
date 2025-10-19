@@ -6,7 +6,6 @@ import "./DiwaliHome.css";
 // Lazy load components
 const ChatInput = lazy(() => import("../components/ChatInput"));
 const Footer = lazy(() => import("../components/Footer"));
-const StatsSection = lazy(() => import("./StatsSection"));
 
 const Home = () => {
   const navigate = useNavigate();
@@ -156,18 +155,7 @@ const Home = () => {
             </div>
           </section>
            
-          {/* Stats Section */}
-          <Suspense
-            fallback={
-              <div className="mb-20 min-h-[200px] flex items-center justify-center">
-                <div className="diwali-loading text-orange-600 font-semibold">
-                  Loading festive statistics...
-                </div>
-              </div>
-            }
-          >
-            <StatsSection />
-          </Suspense>
+
 
           {/* Trust Badges */}
           <section className="mb-16 relative">
@@ -260,8 +248,186 @@ const Home = () => {
               </p>
             </div>
           </section>
-        </div>
+      
+{/* Diwali CTA Section */}
 
+          {/* How It Works Section */}
+          <section className="mb-20 relative">
+            <div className="text-center mb-12">
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-extrabold mb-3">
+                <span className="text-gray-800">How It</span>{" "}
+                <span className="diwali-gradient-text">Works</span>
+              </h2>
+              <p className="text-sm md:text-lg text-gray-600 max-w-2xl mx-auto">
+                Get vet help in 3 simple steps — fast, easy, and from your home 🏠
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="bg-white rounded-2xl p-8 shadow-lg border-2 border-orange-100 hover:border-orange-300 transition-all duration-300 transform hover:-translate-y-2">
+                <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mb-4 mx-auto">
+                  1
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-3 text-center">Tell us in 30s</h3>
+                <p className="text-gray-600 text-center mb-4">
+                  Type your problem or upload 1–3 photos of your pet.
+                </p>
+                <div className="text-center">
+                  <span className="inline-block bg-orange-50 text-orange-700 text-xs px-3 py-1 rounded-full">
+                    📸 Photos help vets diagnose faster
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-8 shadow-lg border-2 border-orange-100 hover:border-orange-300 transition-all duration-300 transform hover:-translate-y-2">
+                <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mb-4 mx-auto">
+                  2
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-3 text-center">Connect to a vet</h3>
+                <p className="text-gray-600 text-center mb-4">
+                  A Gurgaon vet reviews your case and replies by chat.
+                </p>
+                <div className="text-center">
+                  <span className="inline-block bg-orange-50 text-orange-700 text-xs px-3 py-1 rounded-full">
+                    ⚡ Usually within 1 minute
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-8 shadow-lg border-2 border-orange-100 hover:border-orange-300 transition-all duration-300 transform hover:-translate-y-2">
+                <div className="w-16 h-16 bg-gradient-to-br from-pink-400 to-red-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mb-4 mx-auto">
+                  3
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-3 text-center">Get a plan</h3>
+                <p className="text-gray-600 text-center mb-4">
+                  Immediate steps, medication suggestions (if needed) and follow-up notes.
+                </p>
+                <div className="text-center">
+                  <span className="inline-block bg-orange-50 text-orange-700 text-xs px-3 py-1 rounded-full">
+                    📋 Save & share with your clinic
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center mt-8">
+              <p className="text-sm text-gray-500 bg-gray-50 inline-block px-6 py-3 rounded-full">
+                💬 No video needed — text + photos work great
+              </p>
+            </div>
+          </section>
+
+          {/* Testimonials Section */}
+          <section className="mb-20 relative">
+            <div className="text-center mb-12">
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-extrabold mb-3">
+                <span className="text-gray-800">What Pet Parents</span>{" "}
+                <span className="diwali-gradient-text">Say</span>
+              </h2>
+              <p className="text-sm md:text-lg text-gray-600 max-w-2xl mx-auto">
+                Real experiences from Gurgaon pet owners 💛
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-orange-100 hover:shadow-xl transition-all duration-300">
+                <div className="flex items-center gap-1 mb-3 text-yellow-400 text-lg">
+                  ⭐⭐⭐⭐⭐
+                </div>
+                <p className="text-gray-700 mb-4 italic">
+                  "Sent photos at midnight — vet advised calming steps and my dog relaxed in 20 mins."
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
+                    R
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800">Ritu</p>
+                    <p className="text-sm text-gray-500">Gurgaon</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-orange-100 hover:shadow-xl transition-all duration-300">
+                <div className="flex items-center gap-1 mb-3 text-yellow-400 text-lg">
+                  ⭐⭐⭐⭐⭐
+                </div>
+                <p className="text-gray-700 mb-4 italic">
+                  "The chat reply was fast and clear. The diet tips saved my cat from a bad reaction."
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold">
+                    A
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800">Aman</p>
+                    <p className="text-sm text-gray-500">Gurgaon</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-orange-100 hover:shadow-xl transition-all duration-300">
+                <div className="flex items-center gap-1 mb-3 text-yellow-400 text-lg">
+                  ⭐⭐⭐⭐⭐
+                </div>
+                <p className="text-gray-700 mb-4 italic">
+                  "Helpful follow-up notes I could show my local clinic. Felt like someone really listened."
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-red-500 rounded-full flex items-center justify-center text-white font-bold">
+                    N
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800">Neha</p>
+                    <p className="text-sm text-gray-500">Gurgaon</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* FAQ Section */}
+          <section className="mb-20 relative">
+            <div className="text-center mb-12">
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-extrabold mb-3">
+                <span className="text-gray-800">Frequently Asked</span>{" "}
+                <span className="diwali-gradient-text">Questions</span>
+              </h2>
+            </div>
+
+            <div className="max-w-4xl mx-auto space-y-4">
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-orange-100">
+                <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-start gap-2">
+                  <span className="text-orange-500 flex-shrink-0">Q:</span>
+                  <span>How do consults work without video?</span>
+                </h3>
+                <p className="text-gray-600 ml-6">
+                  <span className="font-semibold text-orange-600">A:</span> Share text and photos — our vets review your case and reply with stepwise guidance and follow-up notes.
+                </p>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-orange-100">
+                <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-start gap-2">
+                  <span className="text-orange-500 flex-shrink-0">Q:</span>
+                  <span>Are vets truly local & live 24/7?</span>
+                </h3>
+                <p className="text-gray-600 ml-6">
+                  <span className="font-semibold text-orange-600">A:</span> Yes — we have 30+ vets from Gurgaon on rotation to respond by chat and image review.
+                </p>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-orange-100">
+                <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-start gap-2">
+                  <span className="text-orange-500 flex-shrink-0">Q:</span>
+                  <span>Is this for emergencies?</span>
+                </h3>
+                <p className="text-gray-600 ml-6">
+                  <span className="font-semibold text-orange-600">A:</span> We triage urgent issues and give immediate steps. For life-threatening emergencies, please visit the nearest clinic or call emergency services.
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
         <Suspense fallback={null}>
           <Footer />
         </Suspense>
