@@ -548,6 +548,7 @@ const RegisterBasicDetails = () => {
                 Join thousands of pet owners and veterinarians who trust Snoutiq for comprehensive pet healthcare solutions.
               </p>
               
+              
               {/* Benefits Grid */}
               <div className="grid grid-cols-1 gap-6">
                 <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
