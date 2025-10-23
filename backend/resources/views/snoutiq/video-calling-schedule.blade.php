@@ -169,6 +169,25 @@
     <div id="saveOut" class="mt-2 text-sm"></div>
   </fieldset>
 
+  {{-- Night slot modal --}}
+  <div id="nightModal" class="hidden fixed inset-0 z-40">
+    <div class="absolute inset-0 bg-gray-900/60" data-night-modal-dismiss></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+      <div class="relative w-full max-w-lg bg-white rounded-2xl shadow-xl ring-1 ring-gray-200">
+        <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900">Manage Night Slots</h3>
+            <p class="text-xs text-gray-500">Remove a recurring night slot by clicking the cross.</p>
+          </div>
+          <button type="button" class="text-gray-500 hover:text-gray-700 text-xl leading-none" data-night-modal-dismiss aria-label="Close">&times;</button>
+        </div>
+        <div class="max-h-[70vh] overflow-y-auto">
+          <div id="nightModalList" class="p-4 space-y-3 text-sm text-gray-700"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4">
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div>
@@ -249,24 +268,17 @@
         cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
         default: 'bg-gray-50 text-gray-600 border-gray-200',
       };
-      const NIGHT_STATE = { editMode: false, aggregated: [], slotsByDow: {}, errors: [], total: 0 };
+      const NIGHT_STATE = { aggregated: [], slotsByDow: {}, errors: [], total: 0, uniqueDetails: [], uniqueMap: new Map() };
       const pad2 = (n)=>String(n).padStart(2,'0');
 
       function updateEditButtonLabel(){
         const btn = document.querySelector('#btnEditNightSlots');
         if(!btn) return;
         const count = Number(NIGHT_STATE.total || 0);
-        btn.textContent = NIGHT_STATE.editMode
-          ? `Done Editing Night Slots (${count})`
-          : `Edit Night Slots (${count})`;
-        btn.classList.toggle('bg-emerald-700', NIGHT_STATE.editMode);
-        btn.classList.toggle('bg-emerald-600', !NIGHT_STATE.editMode);
-      }
-
-      function setNightEditMode(on){
-        NIGHT_STATE.editMode = !!on;
-        updateEditButtonLabel();
-        renderNightSlotsCells();
+        btn.textContent = `Manage Night Slots (${count})`;
+        btn.disabled = count === 0;
+        btn.classList.toggle('opacity-50', count === 0);
+        btn.classList.toggle('cursor-not-allowed', count === 0);
       }
 
       function renderNightSlotsCells(){
@@ -278,73 +290,114 @@
             cell.innerHTML = NIGHT_STATE.errors.map(msg=>`<div class="text-xs text-red-600">${msg}</div>`).join('');
             return;
           }
-          if(NIGHT_STATE.editMode){
-            const dow = tr.getAttribute('data-dow');
-            const items = NIGHT_STATE.slotsByDow[dow] || [];
-            if(!items.length){
-              cell.innerHTML = '<span class="text-xs text-gray-400">No night slots to edit</span>';
-              return;
-            }
-            let html = '<div class="space-y-1">';
-            items.forEach(item=>{
-              const meta = `${item.role || '-'} - ${item.status || '-'}`;
-              const stripInfo = item.strip_id ? `Strip #${item.strip_id}` : 'Strip ?';
-              html += `<div class="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 text-xs">
-                <div class="flex flex-col">
-                  <span class="font-medium text-emerald-900">${item.date_label}</span>
-                  <span class="text-emerald-800">${item.time_label}</span>
-                  <span class="text-emerald-700">${meta} - ${stripInfo}</span>
-                </div>
-                <button type="button" class="night-slot-delete text-emerald-900 hover:text-emerald-600 font-semibold" title="Remove slot" data-night-slot-remove="${item.id}">x</button>
-              </div>`;
-            });
-            html += '</div>';
-            cell.innerHTML = html;
-          } else {
-            if(!NIGHT_STATE.aggregated.length){
-              cell.innerHTML = '<span class="text-xs text-gray-400">No night slots configured</span>';
-              return;
-            }
-            const chipsHtml = NIGHT_STATE.aggregated.join('');
-            cell.innerHTML = `<div class="text-[11px] font-medium text-gray-700 mb-1">Repeats daily</div><div class="flex flex-wrap">${chipsHtml}</div>`;
+          if(!NIGHT_STATE.aggregated.length){
+            cell.innerHTML = '<span class="text-xs text-gray-400">No night slots configured</span>';
+            return;
           }
+          const chipsHtml = NIGHT_STATE.aggregated.join('');
+          cell.innerHTML = `<div class="text-[11px] font-medium text-gray-700 mb-1">Repeats daily</div><div class="flex flex-wrap">${chipsHtml}</div>`;
         });
       }
 
-      async function handleNightSlotDelete(button){
-        if(!button) return;
-        const slotId = Number(button.getAttribute('data-night-slot-remove'));
-        if(!slotId) return;
+      async function handleNightAggregateDelete(key, trigger){
+        const entry = NIGHT_STATE.uniqueMap.get(key);
+        if(!entry) return;
+        if(READONLY){
+          toast('Read-only mode: cannot modify slots', false);
+          return;
+        }
         const doctorId = getDoctorId();
         const userId   = getUserId();
         if(!doctorId){ toast('Select a doctor first', false); return; }
-        const confirm = await Swal.fire({
-          title: 'Remove night slot?',
-          text: 'This will release the slot back to the pool.',
+        if(!entry.ids || !entry.ids.length){
+          toast('No slots found for this entry', false);
+          return;
+        }
+
+        const ask = await Swal.fire({
+          title: 'Remove recurring night slot?',
+          text: `This will release ${entry.ids.length} occurrence(s).`,
           icon: 'warning',
           showCancelButton: true,
           confirmButtonText: 'Yes, remove',
           cancelButtonText: 'Cancel',
         });
-        if(!(confirm.isConfirmed)) return;
+        if(!ask.isConfirmed) return;
+
+        trigger && (trigger.disabled = true, trigger.textContent = 'Removing...');
+        let failure = null;
         try{
-          button.disabled = true;
-          button.textContent = '...';
           await window.Csrf.ensure();
+          const slotId = entry.ids[0];
           const res = await fetch(`${apiBase}/video/slots/${slotId}/release?user_id=${encodeURIComponent(userId)}`, window.Csrf.opts('DELETE', { doctor_id: doctorId }));
           if(!res.ok){
-            const msg = await res.text();
-            toast(msg || 'Failed to remove', false);
-          }else{
-            toast('Slot removed', true);
-            await loadNightScheduleTable();
+            failure = await res.text() || `Failed to remove slot #${slotId}`;
           }
         }catch(e){
-          toast(e?.message || 'Remove failed', false);
-        }finally{
-          button.disabled = false;
-          button.textContent = 'x';
+          failure = e?.message || String(e);
         }
+        trigger && (trigger.disabled = false, trigger.textContent = 'Remove');
+
+        if(failure){
+          toast(failure, false);
+        }else{
+          toast('Slot removed', true);
+          await loadNightScheduleTable();
+          populateNightModal();
+          if(!NIGHT_STATE.total){
+            closeNightModal();
+          }
+        }
+      }
+
+      function populateNightModal(){
+        const list = el('#nightModalList');
+        if(!list) return;
+        if(NIGHT_STATE.errors.length){
+          list.innerHTML = NIGHT_STATE.errors.map(msg=>`<div class="text-sm text-red-600 border border-red-200 bg-red-50 rounded-lg px-3 py-2">${msg}</div>`).join('');
+          return;
+        }
+        if(!NIGHT_STATE.uniqueDetails.length){
+          list.innerHTML = '<div class="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-6 text-center">No night slots configured.</div>';
+          return;
+        }
+
+        const rows = NIGHT_STATE.uniqueDetails.map(item=>{
+          const count = item.ids?.length || 0;
+          const occurrenceLabel = count > 1 ? `${count} occurrences` : '1 occurrence';
+          const datePreview = (item.occurrences || []).slice(0, 3).map(o=>o.date_label).join(', ');
+          const extra = datePreview ? `<div class="text-[11px] text-gray-500 mt-1">Examples: ${datePreview}${count > 3 ? ', …' : ''}</div>` : '';
+          const stripLabel = item.strip_id ? `Strip #${item.strip_id}` : 'Strip ?';
+          const roleLabel = item.role || '-';
+          const statusLabel = item.status || 'unknown';
+          const disabledAttr = READONLY ? 'disabled' : '';
+          const disabledCls = READONLY ? 'opacity-40 cursor-not-allowed' : 'hover:bg-rose-600';
+          return `
+            <div class="border border-gray-200 rounded-xl px-3 py-2 flex items-start justify-between gap-3">
+              <div>
+                <div class="text-base font-semibold text-gray-900">${item.time_label}</div>
+                <div class="text-xs text-gray-600">${roleLabel} · ${statusLabel} · ${stripLabel}</div>
+                <div class="text-[11px] text-gray-500 mt-1">${occurrenceLabel}</div>
+                ${extra}
+              </div>
+              <button type="button" class="px-2 py-1 rounded-md bg-rose-500 text-white text-xs font-semibold ${disabledCls}" data-night-bulk-remove="${item.key}" ${disabledAttr}>Remove</button>
+            </div>
+          `;
+        }).join('');
+        list.innerHTML = rows;
+      }
+
+      function openNightModal(){
+        populateNightModal();
+        const modal = el('#nightModal');
+        if(!modal) return;
+        modal.classList.remove('hidden');
+      }
+
+      function closeNightModal(){
+        const modal = el('#nightModal');
+        if(!modal) return;
+        modal.classList.add('hidden');
       }
 
       function isoAddDays(dateStr, offset){
@@ -429,14 +482,22 @@
           NIGHT_STATE.errors = ['Select a doctor to view night slots'];
           NIGHT_STATE.aggregated = [];
           NIGHT_STATE.slotsByDow = {};
+          NIGHT_STATE.total = 0;
+          NIGHT_STATE.uniqueDetails = [];
+          NIGHT_STATE.uniqueMap = new Map();
           renderNightSlotsCells();
+          updateEditButtonLabel();
           return;
         }
         if(!baseDate){
           NIGHT_STATE.errors = ['Pick a date to view night slots'];
           NIGHT_STATE.aggregated = [];
           NIGHT_STATE.slotsByDow = {};
+          NIGHT_STATE.total = 0;
+          NIGHT_STATE.uniqueDetails = [];
+          NIGHT_STATE.uniqueMap = new Map();
           renderNightSlotsCells();
+          updateEditButtonLabel();
           return;
         }
 
@@ -509,15 +570,35 @@
               entry.errors.forEach(msg => aggregatedErrors.push(`${entry.label}: ${msg || 'Failed to load'}`));
             }
             (entry.items || []).forEach(item => {
-              if(!uniqueChipMap.has(item.key)){
-                uniqueChipMap.set(item.key, item);
+              let agg = uniqueChipMap.get(item.key);
+              if(!agg){
+                agg = {
+                  key: item.key,
+                  chip: item.chip,
+                  ids: [],
+                  time_label: item.time_label,
+                  role: item.role,
+                  status: item.status,
+                  status_raw: item.status_raw,
+                  strip_id: item.strip_id,
+                  occurrences: [],
+                  hour: item.hour,
+                };
+                uniqueChipMap.set(item.key, agg);
               }
+              if(Number.isFinite(item.id)){
+                agg.ids.push(Number(item.id));
+              }
+              agg.occurrences.push({ id: item.id, date_label: entry.label });
             });
           });
         });
 
         const uniqueChips = Array.from(uniqueChipMap.values()).sort((a,b)=> a.hour - b.hour || a.key.localeCompare(b.key));
         const aggregatedChips = uniqueChips.map(item => item.chip);
+        uniqueChips.forEach(item => {
+          item.occurrences.sort((a,b)=> a.date_label.localeCompare(b.date_label));
+        });
 
         const slotsByDow = {};
         mapByDow.forEach((entries, dow) => {
@@ -551,6 +632,8 @@
         NIGHT_STATE.aggregated = aggregatedChips;
         NIGHT_STATE.total = aggregatedChips.length;
         NIGHT_STATE.slotsByDow = slotsByDow;
+        NIGHT_STATE.uniqueDetails = uniqueChips;
+        NIGHT_STATE.uniqueMap = new Map(uniqueChips.map(item => [item.key, item]));
         renderNightSlotsCells();
         updateEditButtonLabel();
       }
@@ -730,7 +813,7 @@
                 <div class="mt-0.5 flex flex-wrap gap-1"> ${stripTxt} ${chip('Role: '+(s.role||'-'))}</div>
               </div>
               <div>
-                <button class="px-2 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs" onclick="window._commitNearSlot(${s.id})">Commit</button>
+                <button class="px-2 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs" onclick="window._commitNearSlot(this, ${s.id})">Commit</button>
               </div>
             </div>
           `);
@@ -762,12 +845,27 @@
         el('#nearMeta').innerHTML = `Nearest pincode: <b>${code}</b> ${label? '('+label+')':''} - Band strip: <b>#${j?.strip_id||'?'}</b> - Found: <b>${filtered.length}</b> open slots`;
       }
 
-      window._commitNearSlot = async function(slotId){
+      window._commitNearSlot = async function(button, slotId){
         try{
           await window.Csrf.ensure();
           const doctorId = Number(document.querySelector('#doctor_id')?.value || 0);
           const userId   = getUserId();
           if(!doctorId){ return Swal?.fire({icon:'error',title:'Select a doctor',timer:1200,showConfirmButton:false}); }
+
+          if(button){
+            if(button.dataset.loading === '1') return;
+            button.dataset.loading = '1';
+            button.disabled = true;
+            button.dataset.originalText = button.innerHTML;
+            button.classList.add('cursor-wait','opacity-80');
+            button.innerHTML = `<span class="flex items-center gap-1 justify-center">
+              <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+            </span>`;
+          }
+
           const r = await fetch(`${apiBase}/video/slots/${slotId}/commit?user_id=${encodeURIComponent(userId)}`, window.Csrf.opts('POST', { doctor_id: doctorId }));
           if (r.ok){
             Swal?.fire({icon:'success',title:'Committed!',timer:900,showConfirmButton:false});
@@ -780,6 +878,18 @@
           }
         }catch(e){
           Swal?.fire({icon:'error',title:'Commit error',text:String(e?.message||e)});
+        }finally{
+          if(button){
+            button.disabled = false;
+            button.classList.remove('cursor-wait','opacity-80');
+            if(button.dataset.originalText){
+              button.innerHTML = button.dataset.originalText;
+            }else{
+              button.textContent = 'Commit';
+            }
+            delete button.dataset.originalText;
+            delete button.dataset.loading;
+          }
         }
       };
 
@@ -793,7 +903,7 @@
         setTimeout(stopCta, 12000);
 
         const doctorSelect = document.querySelector('#doctor_id');
-        doctorSelect?.addEventListener('change', ()=>{ setNightEditMode(false); loadExisting(); });
+        doctorSelect?.addEventListener('change', ()=>{ loadExisting(); });
 
         // Initial
         const dd = document.querySelector('#doctor_id');
@@ -813,31 +923,46 @@
 
         // Edit toggle (strictly UI toggle + refresh)
         const editBtn = document.querySelector('#btnEditNightSlots');
-        editBtn?.addEventListener('click', async ()=>{
-          const next = !NIGHT_STATE.editMode;
-          if(next){
-            editBtn.disabled = true;
-            try{ await loadNightScheduleTable(); }
-            catch(e){ console.error(e); }
-            finally{
-              setNightEditMode(true);
-              editBtn.disabled = false;
-              // Focus
-              const panel = editBtn.closest('fieldset'); panel?.scrollIntoView({behavior:'smooth',block:'center'});
-            }
-          }else{
-            setNightEditMode(false);
-            window.location.reload();
+        editBtn?.addEventListener('click', async (evt)=>{
+          if(editBtn.dataset.processing === '1') return;
+          if(editBtn.disabled) return;
+          editBtn.dataset.processing = '1';
+          editBtn.disabled = true;
+          editBtn.textContent = 'Loading...';
+          try{
+            await loadNightScheduleTable();
+            openNightModal();
+          }catch(e){
+            console.error(e);
+            toast(e?.message || 'Failed to load slots', false);
+          }finally{
+            editBtn.disabled = false;
+            delete editBtn.dataset.processing;
+            updateEditButtonLabel();
           }
         });
 
-        // Delete handler
         document.addEventListener('click', (event)=>{
-          const target = event.target.closest('[data-night-slot-remove]');
-          if(!target) return;
-          event.preventDefault();
-          if(!NIGHT_STATE.editMode) return;
-          handleNightSlotDelete(target);
+          const dismiss = event.target.closest('[data-night-modal-dismiss]');
+          if(dismiss){
+            event.preventDefault();
+            closeNightModal();
+            return;
+          }
+          const removeBtn = event.target.closest('[data-night-bulk-remove]');
+          if(removeBtn){
+            event.preventDefault();
+            const key = removeBtn.getAttribute('data-night-bulk-remove');
+            if(key){
+              handleNightAggregateDelete(key, removeBtn);
+            }
+          }
+        });
+
+        document.addEventListener('keydown', (event)=>{
+          if(event.key === 'Escape'){
+            closeNightModal();
+          }
         });
       });
     })();
