@@ -18,7 +18,7 @@ const Support = () => {
           </p>
 
           {/* Address */}
-          <div className="flex items-start gap-4">
+          {/* <div className="flex items-start gap-4">
             <HiLocationMarker className="h-6 w-6 text-blue-600 mt-1" />
             <div>
               <h3 className="font-medium text-gray-700">Address</h3>
@@ -26,7 +26,7 @@ const Support = () => {
                 337, 3rd Floor, Udyog Vihar, Phase 2, Gurgaon, Haryana, 122016
               </p>
             </div>
-          </div>
+          </div> */}
 
           {/* Phone */}
           <div className="flex items-start gap-4">
@@ -42,7 +42,7 @@ const Support = () => {
             <HiMail className="h-6 w-6 text-red-600 mt-1" />
             <div>
               <h3 className="font-medium text-gray-700">Email</h3>
-              <p className="text-gray-600 text-sm">info@snoutiq.co</p>
+              <p className="text-gray-600 text-sm">support@snoutiq.com</p>
             </div>
           </div>
 
@@ -93,7 +93,7 @@ const Support = () => {
             <div>
               <h3 className="font-medium text-gray-700">Technical Support</h3>
               <p className="text-gray-600 text-sm">
-                For technical issues, email us at <span className="text-blue-600">support@snoutiq.co</span>
+                For technical issues, email us at <span className="text-blue-600">support@snoutiq.com</span>
               </p>
             </div>
           </div>

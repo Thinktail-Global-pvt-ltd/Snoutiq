@@ -2574,10 +2574,10 @@ const DoctorRegistration = () => {
                     />
                   </svg>
                   <a
-                    href="mailto:info@snoutiq.com"
+                    href="mailto:support@snoutiq.com"
                     className="font-medium hover:text-blue-600 transition-colors"
                   >
-                    info@snoutiq.com
+                    support@snoutiq.com
                   </a>
                 </div>
 

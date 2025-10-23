@@ -378,12 +378,12 @@ export default function Footer() {
                 Contact
               </h4>
               <div className="space-y-4">
-                <div className="flex items-start space-x-3">
+                {/* <div className="flex items-start space-x-3">
                   <FaLocationDot className="text-orange-500 mt-1 flex-shrink-0 text-lg" />
                   <p className="text-gray-700 text-sm leading-relaxed bg-white/50 rounded-lg p-3">
                     Plot no 20, Block: H-1/A, Sector-63, Noida-201301
                   </p>
-                </div>
+                </div> */}
 
                 <div className="flex items-center space-x-3">
                   <FaMobileAlt className="text-orange-500 flex-shrink-0 text-lg" />
@@ -398,10 +398,10 @@ export default function Footer() {
                 <div className="flex items-center space-x-3">
                   <FaPaperPlane className="text-orange-500 flex-shrink-0 text-lg" />
                   <a
-                    href="mailto:info@snoutiq.com"
+                    href="mailto:support@snoutiq.com"
                     className="diwali-contact-link text-gray-700 hover:text-orange-600 transition-all duration-300 text-sm font-medium"
                   >
-                    info@snoutiq.com
+                    support@snoutiq.com
                   </a>
                 </div>
 
