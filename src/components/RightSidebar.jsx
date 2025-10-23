@@ -50,7 +50,7 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
         {/* Special Offer */}
         <div className="bg-gradient-to-r from-[#34D399] to-[#059669] rounded-xl p-5 text-white shadow">
           <h3 className="text-lg font-semibold mb-2">🎉 Special Offer</h3>
-          <p className="text-sm mb-3">First Consultation is absolutely FREE!</p>
+          <p className="text-sm mb-3">₹100 off on all video consults</p>
           <button className="bg-white text-green-600 text-sm font-semibold px-4 py-1.5 rounded-full hover:bg-gray-100 transition-colors">
             Claim Now
           </button>
@@ -110,7 +110,7 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
       {/* Special Offer */}
       <div className="bg-gradient-to-r from-[#9B51E0] to-[#2761E8] rounded-xl p-4 text-white shadow">
         <h4 className="font-semibold mb-2 text-sm">✨ Limited Time Offer</h4>
-        <p className="text-xs mb-3">First Vet Consultation FREE!</p>
+        <p className="text-xs mb-3">₹100 off on all video consults</p>
         <button className="bg-white text-indigo-600 text-xs font-semibold px-3 py-1 rounded-full hover:bg-gray-100 transition-colors">
           Claim Offer
         </button>
