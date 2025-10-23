@@ -266,7 +266,7 @@ const FormattedAIResponse = ({ text }) => {
         {/* Diagnosis - Compact */}
         {sections.diagnosis && (
           <div className="bg-blue-50 rounded p-2 border border-blue-200 mt-2">
-            <h4 className="font-bold text-blue-900 mb-1 flex items-center gap-1 text-xs">
+            <h4 className="font-bold text-blue-900 mb-1 flex items-center gap-1 text-xs ">
               <span className="flex-shrink-0">🩺</span>
               <span className="break-words">Initial Assessment:</span>
             </h4>
