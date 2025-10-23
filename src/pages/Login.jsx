@@ -208,6 +208,7 @@ const Login = () => {
             }}></div>
           </div>
           
+          
           {/* Content */}
           <div className="relative z-10 flex flex-col justify-center p-16 text-white w-full">
             <div className="max-w-lg">
