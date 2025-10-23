@@ -62,19 +62,21 @@
         <input type="number" id="max_bph" value="3" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" @if($readonly) disabled @endif>
       </div>
 
-      {{-- 24/7 toggle --}}
-      <div class="md:col-span-2">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Enable 24/7</label>
-        <div id="enable247Wrap"
-             class="flex items-center justify-between gap-3 rounded-xl border bg-white p-2.5 transition-all duration-200 @if($readonly) opacity-60 cursor-not-allowed @endif">
-          <div class="flex items-center gap-2">
-            <input type="checkbox" id="enable247" class="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500" @if($readonly) disabled @endif>
-            <span class="text-sm font-medium">All-day, all-week availability</span>
+      {{-- 24/7 toggle (debug only) --}}
+      @if(request()->get('debug')==='1')
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Enable 24/7</label>
+          <div id="enable247Wrap"
+               class="flex items-center justify-between gap-3 rounded-xl border bg-white p-2.5 transition-all duration-200 @if($readonly) opacity-60 cursor-not-allowed @endif">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="enable247" class="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500" @if($readonly) disabled @endif>
+              <span class="text-sm font-medium">All-day, all-week availability</span>
+            </div>
+            <span id="enable247Badge" class="text-xs px-2 py-0.5 rounded-full border border-gray-300 text-gray-700">OFF</span>
           </div>
-          <span id="enable247Badge" class="text-xs px-2 py-0.5 rounded-full border border-gray-300 text-gray-700">OFF</span>
+          <p class="text-xs text-gray-500 mt-1">When enabled, all 7 days will be set to 00:00-23:59 with no breaks.</p>
         </div>
-        <p class="text-xs text-gray-500 mt-1">When enabled, all 7 days will be set to 00:00-23:59 with no breaks.</p>
-      </div>
+      @endif
     </div>
   </div>
 
