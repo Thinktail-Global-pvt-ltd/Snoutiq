@@ -387,7 +387,7 @@ const RegisterBasicDetails = () => {
 
             {/* Role Selector */}
             <div className="mb-10">
-              <label className="block text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide text-xs">
+              <label className="block text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide ">
                 I am a
               </label>
               <div className="flex bg-gray-100 rounded-2xl p-2 border border-gray-200 shadow-sm">
