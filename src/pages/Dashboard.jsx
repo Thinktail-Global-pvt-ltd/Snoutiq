@@ -19,6 +19,21 @@ import {MessageBubble} from "./MessageBubble"
 import DetailedWeatherWidget from "./DetailedWeatherWidget";
 import PetDetailsModal from "./RegisterPetOwner";
 
+const deriveDecision = (decision) => {
+  const normalized = String(decision ?? "").toUpperCase();
+  if (!normalized) {
+    return "VIDEO_CONSULT";
+  }
+  if (
+    normalized.includes("EMERGENCY") ||
+    normalized.includes("VIDEO_CONSULT") ||
+    normalized.includes("IN_CLINIC")
+  ) {
+    return normalized;
+  }
+  return "VIDEO_CONSULT";
+};
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const {
@@ -213,9 +228,9 @@ const Dashboard = () => {
         let messagesFromAPI = [];
 
         if (res.data && Array.isArray(res.data)) {
-          const decision = res.data.decision || null;
+          const decision = deriveDecision(res.data.decision);
           console.log(decision,"ankit217");
-          
+
 
           messagesFromAPI =
             res.data.chats
@@ -235,7 +250,7 @@ const Dashboard = () => {
                     text: chat.answer,
                     displayedText: chat.answer,
                     timestamp: new Date(chat.created_at),
-                    decision: decision,
+                    decision,
                   },
                 ];
               })
@@ -245,6 +260,7 @@ const Dashboard = () => {
             .filter((chat) => chat.question && chat.answer)
             .map((chat) => {
               const baseId = Number(new Date(chat.created_at)) + Math.random();
+              const chatDecision = deriveDecision(chat.decision);
               return [
                 {
                   id: baseId + 1,
@@ -258,6 +274,7 @@ const Dashboard = () => {
                   text: chat.answer,
                   displayedText: chat.answer,
                   timestamp: new Date(chat.created_at),
+                  decision: chatDecision,
                 },
               ];
             })
@@ -455,10 +472,12 @@ const Dashboard = () => {
           score,
         } = res.data || {};
 
+        const finalDecision = deriveDecision(decision);
+
         if (newCtx) setContextToken(newCtx);
 
         // 🔴 update decision/score chips shown in the bar
-        setLastDecision(decision ?? null);
+        setLastDecision(finalDecision ?? null);
         setLastScore(
           typeof score === "number" ? score : score ? Number(score) : null
         );
@@ -477,7 +496,7 @@ const Dashboard = () => {
                   timestamp: new Date(),
                   emergency_status: emergency_status,
                   // (optional) keep per-message decision/score if you want later
-                  decision: decision ?? null,
+                  decision: finalDecision ?? null,
                   score:
                     typeof score === "number"
                       ? score

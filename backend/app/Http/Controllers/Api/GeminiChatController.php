@@ -41,6 +41,9 @@ class GeminiChatController extends Controller
         }
         $cacheKey  = "unified:{$sessionId}";
         $state     = Cache::get($cacheKey, $this->defaultState());
+        if (!isset($state['symptom_analysis_history']) || !is_array($state['symptom_analysis_history'])) {
+            $state['symptom_analysis_history'] = [];
+        }
 
         // soft reset on greeting only if history exists
         if ($this->isGreeting($data['question']) && !empty($state['conversation_history'])) {
@@ -57,13 +60,26 @@ class GeminiChatController extends Controller
         ];
 
         // score + decision
-        $this->updateScoreAndEvidence($state, $data['question']);
+        $symptomAnalysis = $this->analyzeSymptomsWithGemini($data['question'], $state['conversation_history']);
+        $state['symptom_analysis_history'][] = [
+            'message'   => $data['question'],
+            'analysis'  => $symptomAnalysis,
+            'timestamp' => now()->toIso8601String(),
+        ];
+
+        $this->updateScoreAndEvidence($state, $data['question'], $symptomAnalysis);
         $baseDecision = $this->makeDecision((int) $state['evidence_score']);
         $userTurnsNow = count($state['conversation_history']) + 1;
         [$decision, $backstopApplied] = $this->backstopOverride($baseDecision, $userTurnsNow);
 
+        $symptomEscalated = false;
+        if ($decision === 'GATHER_INFO' && ($symptomAnalysis['symptoms_found'] ?? false)) {
+            $decision = 'VIDEO_CONSULT';
+            $symptomEscalated = true;
+        }
+
         // prompt
-        $prompt = $this->buildPrompt($decision, $data['question'], $state['pet_profile'], $state['conversation_history']);
+        $prompt = $this->buildPrompt($decision, $data['question'], $state['pet_profile'], $state['conversation_history'], $symptomAnalysis);
         $aiText = $this->callGeminiApi_curl($prompt);
 
         // try to extract diagnosis (only present for IN_CLINIC / VIDEO_CONSULT)
@@ -79,7 +95,7 @@ class GeminiChatController extends Controller
             'timestamp'        => now()->format('H:i:s'),
         ];
 
-        $statusText = $this->statusLine($decision, (int) $state['evidence_score'], $backstopApplied);
+        $statusText = $this->statusLine($decision, (int) $state['evidence_score'], $backstopApplied || $symptomEscalated);
         $vetSummary = $this->generateVetSummary($state);
         $html       = $this->renderBubbles($data['question'], $aiText, $decision);
 
@@ -128,6 +144,7 @@ class GeminiChatController extends Controller
             'status_text'      => $statusText,
             'vet_summary'      => $vetSummary,
             'conversation_html'=> $html,
+            'symptom_analysis' => $symptomAnalysis,
         ]);
     }
 
@@ -155,6 +172,9 @@ class GeminiChatController extends Controller
         }
         $cacheKey  = "unified:{$sessionId}";
         $state     = Cache::get($cacheKey, $this->defaultState());
+        if (!isset($state['symptom_analysis_history']) || !is_array($state['symptom_analysis_history'])) {
+            $state['symptom_analysis_history'] = [];
+        }
 
         if ($this->isGreeting($data['question']) && !empty($state['conversation_history'])) {
             $this->softResetEvidence($state);
@@ -168,12 +188,25 @@ class GeminiChatController extends Controller
             'location' => $data['pet_location'] ?? 'India',
         ];
 
-        $this->updateScoreAndEvidence($state, $data['question']);
+        $symptomAnalysis = $this->analyzeSymptomsWithGemini($data['question'], $state['conversation_history']);
+        $state['symptom_analysis_history'][] = [
+            'message'   => $data['question'],
+            'analysis'  => $symptomAnalysis,
+            'timestamp' => now()->toIso8601String(),
+        ];
+
+        $this->updateScoreAndEvidence($state, $data['question'], $symptomAnalysis);
         $baseDecision = $this->makeDecision((int) $state['evidence_score']);
         $userTurnsNow = count($state['conversation_history']) + 1;
         [$decision, $backstopApplied] = $this->backstopOverride($baseDecision, $userTurnsNow);
 
-        $prompt = $this->buildPrompt($decision, $data['question'], $state['pet_profile'], $state['conversation_history']);
+        $symptomEscalated = false;
+        if ($decision === 'GATHER_INFO' && ($symptomAnalysis['symptoms_found'] ?? false)) {
+            $decision = 'VIDEO_CONSULT';
+            $symptomEscalated = true;
+        }
+
+        $prompt = $this->buildPrompt($decision, $data['question'], $state['pet_profile'], $state['conversation_history'], $symptomAnalysis);
         $aiText = $this->callGeminiApi_curl($prompt);
 
         $state['service_decision'] = $decision;
@@ -185,7 +218,7 @@ class GeminiChatController extends Controller
             'timestamp'        => now()->format('H:i:s'),
         ];
 
-        $statusText = $this->statusLine($decision, (int) $state['evidence_score'], $backstopApplied);
+        $statusText = $this->statusLine($decision, (int) $state['evidence_score'], $backstopApplied || $symptomEscalated);
         $vetSummary = $this->generateVetSummary($state);
         $html       = $this->renderBubbles($data['question'], $aiText, $decision);
 
@@ -205,6 +238,7 @@ class GeminiChatController extends Controller
             'status_text'      => $statusText,
             'vet_summary'      => $vetSummary,
             'conversation_html'=> $html,
+            'symptom_analysis' => $symptomAnalysis,
         ]);
     }
 
@@ -220,6 +254,7 @@ class GeminiChatController extends Controller
                 'symptoms' => [], 'severity' => [], 'environmental' => [], 'timeline' => [],
             ],
             'service_decision'     => null,
+            'symptom_analysis_history' => [],
         ];
     }
 
@@ -236,9 +271,88 @@ class GeminiChatController extends Controller
             'symptoms' => [], 'severity' => [], 'environmental' => [], 'timeline' => [],
         ];
         $state['service_decision'] = null;
+        $state['symptom_analysis_history'] = [];
     }
 
-    private function updateScoreAndEvidence(array &$state, string $message): void
+    private function analyzeSymptomsWithGemini(string $message, array $history = []): array
+    {
+        $historyTurns = [];
+        if (!empty($history)) {
+            foreach (array_slice($history, -3) as $turn) {
+                $historyTurns[] = [
+                    'user'       => $turn['user'] ?? null,
+                    'assistant'  => $turn['response'] ?? null,
+                    'decision'   => $turn['service_decision'] ?? null,
+                    'evidence'   => $turn['evidence_score'] ?? null,
+                ];
+            }
+        }
+
+        $historyJson  = json_encode($historyTurns, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $messageValue = json_encode($message, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $prompt = <<<PROMPT
+You are a veterinary triage signal detector. Review the latest user message about their pet and decide whether it contains specific clinical symptoms or concerns.
+
+Conversation context (JSON array of recent turns): {$historyJson}
+Latest user message: {$messageValue}
+
+Respond with **valid JSON only** using this schema:
+{
+  "symptoms_found": boolean,
+  "symptoms": [short symptom phrases],
+  "severity": "none" | "mild" | "moderate" | "severe",
+  "confidence": number between 0 and 1,
+  "reason": "short explanation"
+}
+
+Rules:
+- Treat greetings or vague check-ins (e.g. "hi", "hello") as no symptoms (symptoms_found=false, severity="none").
+- If any concrete sign, behavior change, pain description, injury or medical issue is mentioned, set symptoms_found=true and list the key findings.
+- Choose severity based on the symptom described, even if only one mild sign is present.
+- Do not add any extra text outside the JSON object.
+PROMPT;
+
+        $raw = $this->callGeminiApi_curl($prompt);
+        $decoded = $this->decodeGeminiJson($raw);
+
+        $defaults = [
+            'symptoms_found' => false,
+            'symptoms'       => [],
+            'severity'       => 'none',
+            'confidence'     => 0.0,
+            'reason'         => 'no symptoms detected',
+        ];
+
+        if (!is_array($decoded)) {
+            return $defaults;
+        }
+
+        return [
+            'symptoms_found' => (bool) ($decoded['symptoms_found'] ?? false),
+            'symptoms'       => isset($decoded['symptoms']) && is_array($decoded['symptoms']) ? $decoded['symptoms'] : [],
+            'severity'       => is_string($decoded['severity'] ?? null) ? strtolower($decoded['severity']) : 'none',
+            'confidence'     => isset($decoded['confidence']) ? (float) $decoded['confidence'] : 0.0,
+            'reason'         => is_string($decoded['reason'] ?? null) ? $decoded['reason'] : ($defaults['reason']),
+        ];
+    }
+
+    private function decodeGeminiJson(string $text): ?array
+    {
+        $start = strpos($text, '{');
+        $end   = strrpos($text, '}');
+
+        if ($start === false || $end === false || $end <= $start) {
+            return null;
+        }
+
+        $json = substr($text, $start, $end - $start + 1);
+        $decoded = json_decode($json, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function updateScoreAndEvidence(array &$state, string $message, array $analysis = []): void
     {
         $text = mb_strtolower($message);
 
@@ -315,6 +429,33 @@ class GeminiChatController extends Controller
                 $sum += (int) $m[1];
             }
         }
+
+        if (!empty($analysis) && ($analysis['symptoms_found'] ?? false)) {
+            $severity = strtolower((string) ($analysis['severity'] ?? 'mild'));
+            $severityWeights = [
+                'none'     => 0,
+                'mild'     => 2,
+                'moderate' => 4,
+                'severe'   => 7,
+            ];
+            $weight = $severityWeights[$severity] ?? 2;
+            if ($weight === 0) {
+                $weight = 2;
+            }
+            $summary = $analysis['symptoms'] ?? [];
+            $label = !empty($summary) ? implode(', ', array_slice($summary, 0, 3)) : 'symptom noted';
+            $tag = "gemini_{$severity}_{$label}: +{$weight}";
+            $added = false;
+            if (!in_array($tag, $state['evidence_details']['symptoms'], true)) {
+                $state['evidence_details']['symptoms'][] = $tag;
+                $added = true;
+            }
+            if ($added) {
+                $state['evidence_details']['severity'][] = strtoupper($severity);
+                $sum += $weight;
+            }
+        }
+
         $state['evidence_score'] = max(0, $sum);
     }
 
@@ -322,7 +463,7 @@ class GeminiChatController extends Controller
     {
         if ($score >= 10) return 'EMERGENCY';
         if ($score >= 7)  return 'IN_CLINIC';
-        if ($score >= 4)  return 'VIDEO_CONSULT';
+        if ($score >= 1)  return 'VIDEO_CONSULT';
         return 'GATHER_INFO';
     }
 
@@ -334,7 +475,7 @@ class GeminiChatController extends Controller
         return [$decision, false];
     }
 
-    private function buildPrompt(string $decision, string $userMessage, array $pet = [], array $history = []): string
+    private function buildPrompt(string $decision, string $userMessage, array $pet = [], array $history = [], array $analysis = []): string
     {
         $petLine = "PET: " . ($pet['name'] ?? 'Pet') .
                    " (" . ($pet['type'] ?? 'Pet') . ", " . ($pet['breed'] ?? 'Mixed breed') . ", " . ($pet['age'] ?? 'age unknown') . ")\n" .
@@ -349,19 +490,40 @@ class GeminiChatController extends Controller
         }
 
         // GATHER_INFO branch
-        $intro = empty($history)
-            ? "Hello! I'm SnoutIQ AI, and I'm here to help you and your pet. I understand how worrying it can be when our furry family members aren't feeling well."
-            : "Thank you for that information.";
+        $symptomFlag = (bool) ($analysis['symptoms_found'] ?? false);
+        $symptomSummary = '';
+        if ($symptomFlag) {
+            $list = isset($analysis['symptoms']) && is_array($analysis['symptoms'])
+                ? implode(', ', array_slice(array_filter($analysis['symptoms']), 0, 3))
+                : '';
+            $symptomSummary = $list !== '' ? $list : 'reported concern';
+        }
+        $severityHint = strtoupper((string) ($analysis['severity'] ?? 'unknown'));
+
+        if ($symptomFlag) {
+            return "You are SnoutIQ AI, a caring veterinary triage assistant.\n\n" .
+                   $petLine . "\n\n" .
+                   "USER MESSAGE: \"{$userMessage}\"\n\n" .
+                   "Detected symptom signals: {$symptomSummary}\n" .
+                   "Severity impression: {$severityHint}\n\n" .
+                   "Respond with a single friendly paragraph acknowledging the pet parent, briefly interpreting what this symptom most likely indicates, and outlining immediate at-home considerations. Follow with a short bullet list (max 3 bullets) of monitoring tips. Conclude with the standard reassurance that a SnoutIQ veterinarian can guide them via video consult.\n\n" .
+                   "Include the mandatory block exactly as follows at the end:\n" .
+                   "=== DIAGNOSIS ===\n" .
+                   "<one-line summary of likely causes tied to the symptom>\n" .
+                   "=== END ===\n\n" .
+                   "Do not ask any questions. Avoid question marks.";
+        }
+
+        $opening = empty($history)
+            ? "Hello! I'm SnoutIQ AI, and I'm standing by to help you and your pet."
+            : "Thanks for the update — I want to help further.";
 
         return "You are SnoutIQ AI, a caring veterinary triage assistant.\n\n" .
                $petLine . "\n\n" .
-               'USER MESSAGE: "' . $userMessage . "\"\n\n" .
-               "Start with: \"$intro\"\n\n" .
-               "Then ask 2-3 caring questions about:\n" .
-               "1. How severe the symptoms seem (mild vs concerning)\n" .
-               "2. Any other changes they've noticed\n" .
-               "3. How it's affecting their pet's daily routine\n\n" .
-               "Be warm, professional, and genuinely helpful.";
+               "USER MESSAGE: \"{$userMessage}\"\n\n" .
+               "{$opening}\n\n" .
+               "You did not detect any clear clinical signs yet. Kindly explain (without asking questions) that specific observations are needed — encourage them to share what they see, when it started, any changes in appetite/energy, and anything else unusual. Provide a concise checklist (max 3 bullet items) of the kinds of details that help a vet. Invite them to share whenever they're ready.\n\n" .
+               "Do not include questions or question marks. Keep the tone warm and professional.";
     }
 
     /**

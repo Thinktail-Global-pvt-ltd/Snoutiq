@@ -66,7 +66,7 @@ const ChatInput = ({ onSendMessage, isLoading = false }) => {
           value={message}
           onChange={handleChange}
           onKeyPress={handleKeyPress}
-          placeholder="Ask anything about your pet"
+          placeholder="Describe the issue your pet is facing"
           disabled={isLoading}
           className="w-full pl-10 sm:pl-12 pr-14 sm:pr-16 py-3 sm:py-4 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2761E8] focus:border-transparent text-gray-800 placeholder-gray-400 text-sm sm:text-base disabled:opacity-70 disabled:cursor-not-allowed transition-all"
           autoComplete="off"

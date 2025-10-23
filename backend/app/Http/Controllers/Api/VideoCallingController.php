@@ -59,7 +59,7 @@ class VideoCallingController extends Controller
         // 2) Numbers ensure karo
         $lat = (float) $user->latitude;
         $lng = (float) $user->longitude;
-        $radiusKm = 5;
+        $radiusKm = 100;
 
         // 3) Haversine with bindings
         $vets = DB::table('vet_registerations_temp')
@@ -197,4 +197,3 @@ class VideoCallingController extends Controller
         return in_array($normalized, $valid, true) ? $normalized : null;
     }
 }
-

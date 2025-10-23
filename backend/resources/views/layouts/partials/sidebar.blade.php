@@ -46,6 +46,10 @@
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <span>Video Calling Schedule</span>
       </a>
+      <a href="{{ url('/video/app/night-coverage') }}" class="{{ $baseItem }} {{ request()->is('video/app/night-coverage') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        <span>Admin Video Calling Control</span>
+      </a>
       <a href="{{ route('clinic.orders') }}" class="{{ $baseItem }} {{ $active('clinic.orders') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
         <span>Order History</span>
