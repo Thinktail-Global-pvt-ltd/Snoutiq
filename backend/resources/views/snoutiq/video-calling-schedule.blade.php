@@ -77,8 +77,155 @@
     </div>
   </div>
 
+  {{-- ===== Video Consultation Availability Builder ===== --}}
+  @php
+    $videoDaySlots = [
+      '06:00-08:00', '08:00-10:00', '10:00-12:00',
+      '12:00-14:00', '14:00-16:00', '16:00-18:00',
+    ];
+    $videoNightSlots = [
+      '18:00-20:00', '20:00-22:00', '22:00-00:00',
+      '00:00-02:00', '02:00-04:00', '04:00-06:00',
+    ];
+    $videoDowLabels = [
+      ['idx'=>0,'label'=>'Sun'],
+      ['idx'=>1,'label'=>'Mon'],
+      ['idx'=>2,'label'=>'Tue'],
+      ['idx'=>3,'label'=>'Wed'],
+      ['idx'=>4,'label'=>'Thu'],
+      ['idx'=>5,'label'=>'Fri'],
+      ['idx'=>6,'label'=>'Sat'],
+    ];
+  @endphp
+
+  <div id="videoSlotBuilder"
+       class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-6 space-y-6"
+       data-readonly="{{ $readonly ? 'true' : 'false' }}">
+    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+      <div>
+        <h3 class="text-xl font-semibold text-gray-900">Video Consultation Availability</h3>
+        <p class="text-sm text-gray-600 mt-1">
+          Select the consultation slots you want to offer. Each slot is 2 hours. We're pre-filling
+          the weekly schedule below based on your selection.
+        </p>
+      </div>
+      <div class="text-sm text-gray-600 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg px-3 py-2">
+        <div class="font-medium text-indigo-800">At a glance</div>
+        <div><span id="summaryDayHours" class="font-semibold text-indigo-900">0</span> hrs day</div>
+        <div><span id="summaryNightHours" class="font-semibold text-indigo-900">0</span> hrs night</div>
+        <div><span id="summaryActiveDays" class="font-semibold text-indigo-900">0</span> active days</div>
+      </div>
+    </div>
+
+    {{-- Day hours --}}
+    <section>
+      <h4 class="text-lg font-semibold text-gray-900">Day Hours (6 AM - 6 PM)</h4>
+      <p class="text-sm text-gray-500 mt-1 mb-4">Select at least 2 hours (each slot is 2 hours).</p>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2" id="daySlotsGrid">
+        @foreach($videoDaySlots as $slot)
+          <button type="button"
+                  class="slot-chip"
+                  data-slot-button
+                  data-period="day"
+                  data-slot="{{ $slot }}">
+            {{ $slot }}
+          </button>
+        @endforeach
+      </div>
+      <div class="mt-2 text-sm text-gray-600">
+        Selected: <span id="selectedDayHours">0</span> hours
+        <span id="daySlotHint" class="text-rose-600 hidden">(minimum 2 hours required)</span>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <label for="dayRate" class="block text-sm font-medium text-gray-700 mb-1">
+          Day Consultation Rate (per session)
+        </label>
+        <input type="number"
+               id="dayRate"
+               class="w-full md:max-w-xs rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+               placeholder="500"
+               {{ $readonly ? 'disabled' : '' }}>
+      </div>
+      <div>
+        <label for="nightRate" class="block text-sm font-medium text-gray-700 mb-1">
+          Night Consultation Rate (per session)
+        </label>
+        <input type="number"
+               id="nightRate"
+               class="w-full md:max-w-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+               placeholder="750"
+               {{ $readonly ? 'disabled' : '' }}>
+      </div>
+    </div>
+
+    {{-- Night hours --}}
+    <section>
+      <h4 class="text-lg font-semibold text-gray-900">Night Hours (6 PM - 6 AM)</h4>
+      <p class="text-sm text-gray-500 mt-1 mb-4">Select at least 2 hours (each slot is 2 hours).</p>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2" id="nightSlotsGrid">
+        @foreach($videoNightSlots as $slot)
+          <button type="button"
+                  class="slot-chip"
+                  data-slot-button
+                  data-period="night"
+                  data-slot="{{ $slot }}">
+            {{ $slot }}
+          </button>
+        @endforeach
+      </div>
+      <div class="mt-2 text-sm text-gray-600">
+        Selected: <span id="selectedNightHours">0</span> hours
+        <span id="nightSlotHint" class="text-rose-600 hidden">(minimum 2 hours required)</span>
+      </div>
+    </section>
+
+    {{-- Days --}}
+    <section class="border-t border-gray-200 pt-4">
+      <label class="flex items-center gap-3 cursor-pointer select-none">
+        <input type="checkbox"
+               id="applyScheduleAllDays"
+               class="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+               checked
+               {{ $readonly ? 'disabled' : '' }}>
+        <span class="text-sm font-medium text-gray-800">Apply this schedule to all days of the week</span>
+      </label>
+      <p class="text-xs text-gray-500 ml-7 mt-1">
+        You can always fine-tune day level availability later from the dashboard.
+      </p>
+
+      <div class="mt-4 space-y-2">
+        <div class="text-sm font-medium text-gray-700">Active Days</div>
+        <div id="dayChipList" class="flex flex-wrap gap-2">
+          @foreach($videoDowLabels as $dow)
+            <button type="button"
+                    class="day-chip"
+                    data-day-chip="{{ $dow['idx'] }}">
+              {{ $dow['label'] }}
+            </button>
+          @endforeach
+        </div>
+        <p id="dayChipHint" class="text-xs text-rose-600 hidden">Select at least one day.</p>
+      </div>
+    </section>
+
+    <div id="slotValidation" class="text-sm font-medium text-rose-600 hidden"></div>
+  </div>
+
   {{-- ====== CTA highlight styles (for the night-hours button) ====== --}}
   <style>
+    .slot-chip{padding:.75rem; border:1px solid #d1d5db; border-radius:.75rem; font-size:.875rem; font-weight:600; color:#374151; background:#fff; transition:all .2s ease; box-shadow:0 1px 2px rgba(15,23,42,.05);}
+    .slot-chip:hover{border-color:#4f46e5; color:#312e81;}
+    .slot-chip.is-active{background:#2563eb; color:#fff; border-color:#2563eb; box-shadow:0 4px 10px rgba(37,99,235,.25);}
+    .slot-chip.is-night{background:#4338ca; color:#fff; border-color:#4338ca;}
+    .slot-chip.is-night:not(.is-active){background:#fff; color:#374151; border-color:#d1d5db;}
+    .slot-chip.is-night:hover{border-color:#6366f1; color:#312e81;}
+    .slot-chip[disabled]{opacity:.5; cursor:not-allowed;}
+    .day-chip{padding:.5rem .95rem; border-radius:9999px; border:1px solid #d1d5db; font-size:.75rem; font-weight:600; color:#4b5563; background:#fff; transition:all .2s ease;}
+    .day-chip.is-active{background:#059669; border-color:#059669; color:#fff; box-shadow:0 3px 8px rgba(5,150,105,.25);}
+    .day-chip[disabled]{opacity:.45; cursor:not-allowed;}
     .ctaGlow{position:absolute; inset:-8px; border-radius:14px;
       background:radial-gradient(ellipse at center, rgba(16,185,129,.45), rgba(16,185,129,0) 60%);
       filter:blur(8px); animation:ctaglow 1.8s ease-in-out infinite;}
@@ -271,6 +418,397 @@
       const NIGHT_STATE = { aggregated: [], slotsByDow: {}, errors: [], total: 0, uniqueDetails: [], uniqueMap: new Map() };
       const pad2 = (n)=>String(n).padStart(2,'0');
 
+      // ===== video slot builder state =====
+      const DAY_SLOT_DEFS = [
+        { id:'06:00-08:00', start:'06:00', end:'08:00' },
+        { id:'08:00-10:00', start:'08:00', end:'10:00' },
+        { id:'10:00-12:00', start:'10:00', end:'12:00' },
+        { id:'12:00-14:00', start:'12:00', end:'14:00' },
+        { id:'14:00-16:00', start:'14:00', end:'16:00' },
+        { id:'16:00-18:00', start:'16:00', end:'18:00' },
+      ];
+      const NIGHT_SLOT_DEFS = [
+        { id:'18:00-20:00', start:'18:00', end:'20:00' },
+        { id:'20:00-22:00', start:'20:00', end:'22:00' },
+        { id:'22:00-00:00', start:'22:00', end:'24:00' },
+        { id:'00:00-02:00', start:'00:00', end:'02:00' },
+        { id:'02:00-04:00', start:'02:00', end:'04:00' },
+        { id:'04:00-06:00', start:'04:00', end:'06:00' },
+      ];
+      const SLOT_DEFS = { day: DAY_SLOT_DEFS, night: NIGHT_SLOT_DEFS };
+      const SLOT_MAP = new Map();
+      const SLOT_TIME_LOOKUP = new Map();
+      Object.entries(SLOT_DEFS).forEach(([period, list])=>{
+        list.forEach(def=>{
+          def.period = period;
+          def.display = def.id;
+          let storageEnd = def.end === '24:00' ? '23:59' : def.end;
+          const startMinInit = Number(def.start.slice(0,2)) * 60 + Number(def.start.slice(3,5));
+          let endMinInit;
+          if(storageEnd === '23:59'){
+            endMinInit = 23*60 + 59;
+          }else{
+            endMinInit = Number(storageEnd.slice(0,2)) * 60 + Number(storageEnd.slice(3,5));
+          }
+          if(endMinInit <= startMinInit){
+            storageEnd = '23:59';
+          }
+          def.storageEnd = storageEnd;
+          SLOT_MAP.set(def.id, def);
+          SLOT_TIME_LOOKUP.set(`${def.start}-${storageEnd}`, { period, id: def.id });
+        });
+      });
+      const ALL_DAYS = [0,1,2,3,4,5,6];
+      const DAY_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const slotState = {
+        day: new Set(),
+        night: new Set(),
+        selectedDays: new Set(ALL_DAYS),
+        applyAll: true,
+      };
+      let slotControlsLocked = false;
+      const slotEls = {
+        builder: el('#videoSlotBuilder'),
+        dayButtons: els('[data-slot-button][data-period="day"]'),
+        nightButtons: els('[data-slot-button][data-period="night"]'),
+        summaryDay: el('#summaryDayHours'),
+        summaryNight: el('#summaryNightHours'),
+        summaryDays: el('#summaryActiveDays'),
+        selectedDayHours: el('#selectedDayHours'),
+        selectedNightHours: el('#selectedNightHours'),
+        dayHint: el('#daySlotHint'),
+        nightHint: el('#nightSlotHint'),
+        validation: el('#slotValidation'),
+        applyAll: el('#applyScheduleAllDays'),
+        dayChipHint: el('#dayChipHint'),
+        dayChips: els('[data-day-chip]'),
+        dayRate: el('#dayRate'),
+        nightRate: el('#nightRate'),
+        dayChipList: el('#dayChipList'),
+        metaNote: el('#metaNote'),
+      };
+      const SLOT_BUTTON_ALL = [...slotEls.dayButtons, ...slotEls.nightButtons];
+
+      function slotBuilderActive(){ return Boolean(slotEls.builder); }
+      function timeToMinutes(str){
+        if(!str) return 0;
+        const [h,m] = str.split(':').map(Number);
+        return (Number.isFinite(h)?h:0)*60 + (Number.isFinite(m)?m:0);
+      }
+      function minutesToTime(min){
+        const clamped = Math.max(0, Math.min(1439, Number(min)||0));
+        const h = Math.floor(clamped/60);
+        const m = clamped % 60;
+        return `${pad2(h)}:${pad2(m)}`;
+      }
+      function ensureSlotView(parent, key, extraClass=''){
+        if(!parent) return null;
+        let node = parent.querySelector(`[data-slot-view="${key}"]`);
+        if(!node){
+          node = document.createElement('div');
+          node.dataset.slotView = key;
+          node.className = extraClass || 'mt-2 flex flex-wrap gap-1 text-xs';
+          parent.appendChild(node);
+        }
+        return node;
+      }
+      function slotEndMinutes(def){
+        const startMin = timeToMinutes(def.start);
+        let endMin;
+        const rawEnd = (def.end === '24:00') ? '23:59' : (def.storageEnd || def.end);
+        endMin = timeToMinutes(rawEnd);
+        if(endMin <= startMin){
+          endMin = Math.min(startMin + 120, 1439);
+        }
+        return endMin;
+      }
+      function slotEndString(def){
+        return minutesToTime(slotEndMinutes(def));
+      }
+      function getSelectedDefs(){
+        const list = [];
+        slotState.day.forEach(id=>{ const def = SLOT_MAP.get(id); if(def) list.push(def); });
+        slotState.night.forEach(id=>{ const def = SLOT_MAP.get(id); if(def) list.push(def); });
+        return list.sort((a,b)=> timeToMinutes(a.start) - timeToMinutes(b.start));
+      }
+      function refreshSlotButtons(){
+        if(!slotBuilderActive()) return;
+        slotEls.dayButtons.forEach(btn=>{
+          const id = btn.dataset.slot;
+          const on = slotState.day.has(id);
+          btn.classList.toggle('is-active', on);
+          if(READONLY || slotControlsLocked) btn.setAttribute('disabled','disabled'); else btn.removeAttribute('disabled');
+        });
+        slotEls.nightButtons.forEach(btn=>{
+          const id = btn.dataset.slot;
+          const on = slotState.night.has(id);
+          btn.classList.add('is-night');
+          btn.classList.toggle('is-active', on);
+          if(READONLY || slotControlsLocked) btn.setAttribute('disabled','disabled'); else btn.removeAttribute('disabled');
+        });
+      }
+      function refreshDayChips(){
+        if(!slotBuilderActive()) return;
+        slotEls.dayChips.forEach(btn=>{
+          const dow = Number(btn.dataset.dayChip);
+          const active = slotState.selectedDays.has(dow);
+          btn.classList.toggle('is-active', active);
+          if(slotState.applyAll || READONLY || slotControlsLocked){
+            btn.setAttribute('disabled','disabled');
+          }else{
+            btn.removeAttribute('disabled');
+          }
+        });
+      }
+      function refreshSummaries(){
+        if(!slotBuilderActive()) return;
+        const dayHours = slotState.day.size * 2;
+        const nightHours = slotState.night.size * 2;
+        const activeDays = slotState.selectedDays.size;
+        if(slotEls.summaryDay) slotEls.summaryDay.textContent = dayHours;
+        if(slotEls.summaryNight) slotEls.summaryNight.textContent = nightHours;
+        if(slotEls.summaryDays) slotEls.summaryDays.textContent = activeDays;
+        if(slotEls.selectedDayHours) slotEls.selectedDayHours.textContent = dayHours;
+        if(slotEls.selectedNightHours) slotEls.selectedNightHours.textContent = nightHours;
+      }
+      function validateSlotState(){
+        if(!slotBuilderActive()) return null;
+        if(slotState.day.size < 1) return 'Select at least one day-hour slot (2 hours).';
+        if(slotState.night.size < 1) return 'Select at least one night-hour slot (2 hours).';
+        if(slotState.selectedDays.size < 1) return 'Select at least one active day.';
+        return null;
+      }
+      function refreshValidation(){
+        if(!slotBuilderActive()) return;
+        const error = validateSlotState();
+        if(slotEls.validation){
+          if(error){
+            slotEls.validation.textContent = error;
+            slotEls.validation.classList.remove('hidden');
+          }else{
+            slotEls.validation.textContent = '';
+            slotEls.validation.classList.add('hidden');
+          }
+        }
+        if(slotEls.dayHint){
+          slotEls.dayHint.classList.toggle('hidden', slotState.day.size >= 1);
+        }
+        if(slotEls.nightHint){
+          slotEls.nightHint.classList.toggle('hidden', slotState.night.size >= 1);
+        }
+        if(slotEls.dayChipHint){
+          slotEls.dayChipHint.classList.toggle('hidden', slotState.selectedDays.size >= 1);
+        }
+      }
+      function getSelectedDefsByPeriod(period){
+        const collection = [];
+        const pool = slotState[period];
+        if(!pool) return collection;
+        pool.forEach(id=>{
+          const def = SLOT_MAP.get(id);
+          if(def && def.period === period){
+            collection.push(def);
+          }
+        });
+        return collection.sort((a,b)=> timeToMinutes(a.start) - timeToMinutes(b.start));
+      }
+      function syncTablePreview(){
+        if(!slotBuilderActive()) return;
+        const dayDefs = getSelectedDefsByPeriod('day');
+        const nightDefs = getSelectedDefsByPeriod('night');
+        const dayEarliest = dayDefs.length ? Math.min(...dayDefs.map(def=>timeToMinutes(def.start))) : null;
+        const dayLatest = dayDefs.length ? Math.max(...dayDefs.map(def=>slotEndMinutes(def))) : null;
+        const nightEarliest = nightDefs.length ? Math.min(...nightDefs.map(def=>timeToMinutes(def.start))) : null;
+        const nightLatest = nightDefs.length ? Math.max(...nightDefs.map(def=>slotEndMinutes(def))) : null;
+        const allNightLabels = nightDefs.map(def=>def.display);
+        const rows = els('tbody tr[data-dow]');
+        rows.forEach(tr=>{
+          const dow = Number(tr.dataset.dow);
+          const active = slotState.selectedDays.has(dow);
+          const activeInput = tr.querySelector('.active');
+          const startInput = tr.querySelector('.start');
+          const endInput = tr.querySelector('.end');
+          const breakStart = tr.querySelector('.break_start');
+          const breakEnd = tr.querySelector('.break_end');
+          const nightCell = tr.querySelector('.night-slots');
+          const dayParent = startInput ? startInput.parentElement : null;
+          const dayView = ensureSlotView(dayParent, 'day', 'mt-1 flex flex-wrap gap-1 text-xs');
+          if(startInput){
+            startInput.classList.add('hidden');
+          }
+          if(endInput){
+            endInput.classList.add('hidden');
+          }
+          if(activeInput){
+            activeInput.checked = active;
+            activeInput.disabled = true;
+          }
+          [startInput,endInput,breakStart,breakEnd].forEach(inp=>{
+            if(!inp) return;
+            inp.value = '';
+            inp.readOnly = true;
+            inp.disabled = true;
+          });
+          if(dayView){
+            dayView.innerHTML = active
+              ? (dayDefs.length
+                    ? `<div class="w-full text-[11px] text-gray-500 mb-1">Day slots</div>${dayDefs.map(def=>`<span class="inline-flex items-center px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700">${def.display}</span>`).join('')}`
+                    : '<span class="text-xs text-gray-400">No day slots picked</span>')
+              : '<span class="text-xs text-gray-300">Inactive</span>';
+          }
+          if(active){
+            const startCandidates = [];
+            if(dayEarliest !== null) startCandidates.push(dayEarliest);
+            if(nightEarliest !== null) startCandidates.push(nightEarliest);
+            const endCandidates = [];
+            if(dayLatest !== null) endCandidates.push(dayLatest);
+            if(nightLatest !== null) endCandidates.push(nightLatest);
+            const startVal = startCandidates.length ? minutesToTime(Math.min(...startCandidates)) : '';
+            const endVal = endCandidates.length ? minutesToTime(Math.max(...endCandidates)) : '';
+            if(startInput) startInput.value = startVal;
+            if(endInput)   endInput.value   = endVal;
+          }
+          if(nightCell){
+            nightCell.innerHTML = active
+              ? (nightDefs.length
+                    ? `<div class="text-[11px] text-gray-500 mb-1">Night slots</div>${allNightLabels.map(label=>`<span class="inline-flex items-center px-2 py-0.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 mr-1 mb-1">${label}</span>`).join('')}`
+                    : '<span class="text-xs text-gray-400">No night slots picked</span>')
+              : '<span class="text-xs text-gray-300">Inactive</span>';
+          }
+        });
+        if(slotEls.metaNote){
+          const baseText = slotState.applyAll
+            ? 'Applying the same slot selection to all seven days.'
+            : `Active days: ${Array.from(slotState.selectedDays).sort((a,b)=>a-b).map(idx=>DAY_LABELS[idx]).join(', ')}.`;
+          const daySummary = dayDefs.length ? `${dayDefs.length} day slot${dayDefs.length>1?'s':''}` : 'no day slots';
+          const nightSummary = nightDefs.length ? `${nightDefs.length} night slot${nightDefs.length>1?'s':''}` : 'no night slots';
+          const dayLabels = dayDefs.length ? dayDefs.map(def=>def.display).join(', ') : '–';
+          const nightLabels = nightDefs.length ? nightDefs.map(def=>def.display).join(', ') : '–';
+          slotEls.metaNote.innerHTML = [
+            baseText,
+            `Selected ${daySummary} and ${nightSummary}.`,
+            `<span class="text-gray-600">Day slots:</span> <span class="font-medium text-gray-800">${dayLabels}</span>`,
+            `<span class="text-gray-600">Night slots:</span> <span class="font-medium text-gray-800">${nightLabels}</span>`
+          ].join('<br>');
+        }
+      }
+      function refreshSlotBuilder(){
+        if(!slotBuilderActive()) return;
+        refreshSlotButtons();
+        refreshDayChips();
+        if(slotEls.applyAll){
+          slotEls.applyAll.checked = slotState.applyAll;
+          if(READONLY || slotControlsLocked){
+            slotEls.applyAll.setAttribute('disabled','disabled');
+          }else{
+            slotEls.applyAll.removeAttribute('disabled');
+          }
+        }
+        refreshSummaries();
+        refreshValidation();
+        syncTablePreview();
+      }
+      function toggleSlot(period, slotId){
+        if(READONLY || !slotBuilderActive()) return;
+        const target = slotState[period];
+        if(!target) return;
+        if(target.has(slotId)){ target.delete(slotId); }
+        else { target.add(slotId); }
+        refreshSlotBuilder();
+      }
+      function setApplyAllDays(on){
+        if(!slotBuilderActive()) return;
+        slotState.applyAll = !!on;
+        if(slotEls.applyAll){
+          slotEls.applyAll.checked = !!on;
+        }
+        if(slotState.applyAll){
+          slotState.selectedDays = new Set(ALL_DAYS);
+        }else if(!slotState.selectedDays.size){
+          slotState.selectedDays.add(0);
+        }
+        refreshSlotBuilder();
+      }
+      function toggleDaySelection(dow){
+        if(READONLY || !slotBuilderActive() || slotState.applyAll) return;
+        if(slotState.selectedDays.has(dow)){
+          slotState.selectedDays.delete(dow);
+        }else{
+          slotState.selectedDays.add(dow);
+        }
+        if(!slotState.selectedDays.size){
+          slotState.selectedDays.add(dow);
+        }
+        refreshSlotBuilder();
+      }
+      function setAllSlotsSelected(on){
+        if(!slotBuilderActive()) return;
+        Object.keys(SLOT_DEFS).forEach(period=>{
+          const set = slotState[period];
+          set.clear();
+          if(on){
+            SLOT_DEFS[period].forEach(def=> set.add(def.id));
+          }
+        });
+        refreshSlotBuilder();
+      }
+      function is247State(){
+        if(!slotBuilderActive()) return false;
+        return slotState.day.size === DAY_SLOT_DEFS.length &&
+               slotState.night.size === NIGHT_SLOT_DEFS.length &&
+               slotState.selectedDays.size === ALL_DAYS.length;
+      }
+      function buildAvailabilityPayload(){
+        if(!slotBuilderActive()) return { availability: [], validationError: null };
+        const avgMins = Number(el('#avg_consultation_mins')?.value || 20);
+        const maxBph  = Number(el('#max_bph')?.value || 3);
+        const dayList = Array.from(slotState.selectedDays).sort((a,b)=>a-b);
+        const availability = [];
+        const makeRow = (def, dow)=>({
+          day_of_week: dow,
+          start_time: `${def.start}:00`,
+          end_time: `${slotEndString(def)}:00`,
+          break_start: null,
+          break_end: null,
+          avg_consultation_mins: avgMins,
+          max_bookings_per_hour: maxBph
+        });
+        dayList.forEach(dow=>{
+          SLOT_DEFS.day.forEach(def=>{ if(slotState.day.has(def.id)) availability.push(makeRow(def, dow)); });
+          SLOT_DEFS.night.forEach(def=>{ if(slotState.night.has(def.id)) availability.push(makeRow(def, dow)); });
+        });
+        availability.sort((a,b)=>{
+          if(a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+          return a.start_time.localeCompare(b.start_time);
+        });
+        return { availability, validationError: validateSlotState() };
+      }
+      function applyAvailabilityToState(list){
+        if(!slotBuilderActive()) return;
+        slotState.day.clear();
+        slotState.night.clear();
+        const daySet = new Set();
+        list.forEach(row=>{ daySet.add(Number(row.day_of_week)); });
+        if(daySet.size){
+          slotState.selectedDays = new Set(daySet);
+          slotState.applyAll = daySet.size === ALL_DAYS.length;
+        }else{
+          slotState.selectedDays = new Set(ALL_DAYS);
+          slotState.applyAll = true;
+        }
+        const sampleDow = daySet.size ? Math.min(...daySet) : 0;
+        list.filter(row=>Number(row.day_of_week) === sampleDow).forEach(row=>{
+          const start = String(row.start_time||'').slice(0,5);
+          let end = String(row.end_time||'').slice(0,5);
+          if(end === '24:00'){ end = '23:59'; }
+          const match = SLOT_TIME_LOOKUP.get(`${start}-${end}`);
+          if(match){
+            slotState[match.period].add(match.id);
+          }
+        });
+        refreshSlotBuilder();
+      }
+
       function updateEditButtonLabel(){
         const btn = document.querySelector('#btnEditNightSlots');
         if(!btn) return;
@@ -282,6 +820,22 @@
       }
 
       function renderNightSlotsCells(){
+        if(slotBuilderActive()){
+          const nightDefs = getSelectedDefsByPeriod('night');
+          const nightLabels = nightDefs.map(def=>def.display);
+          const rows = els('tbody tr[data-dow]');
+          rows.forEach(tr=>{
+            const cell = tr.querySelector('.night-slots');
+            if(!cell) return;
+            const active = slotState.selectedDays.has(Number(tr.getAttribute('data-dow')));
+            cell.innerHTML = active
+              ? (nightLabels.length
+                    ? `<div class="text-[11px] text-gray-500 mb-1">Night slots</div>${nightLabels.map(label=>`<span class="inline-flex items-center px-2 py-0.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 mr-1 mb-1">${label}</span>`).join('')}`
+                    : '<span class="text-xs text-gray-400">No night slots picked</span>')
+              : '<span class="text-xs text-gray-300">Inactive</span>';
+          });
+          return;
+        }
         const rows = els('tbody tr[data-dow]');
         rows.forEach(tr=>{
           const cell = tr.querySelector('.night-slots');
@@ -647,6 +1201,12 @@
         const badge = el('#enable247Badge');
         const cb    = el('#enable247');
         if(!wrap || !cb) return;
+        if(slotBuilderActive()){
+          const shouldCheck = is247State();
+          if(cb.checked !== shouldCheck){
+            cb.checked = shouldCheck;
+          }
+        }
         wrap.classList.remove('ring-2','ring-green-300','bg-green-50','border-green-400','shadow-sm','bg-white','border-gray-200');
         if(cb.checked){
           wrap.classList.add('ring-2','ring-green-300','bg-green-50','border-green-400','shadow-sm');
@@ -657,17 +1217,26 @@
         }
       }
       function toggle247Inputs(disabled){
+        if(slotBuilderActive()){
+          slotControlsLocked = !!disabled;
+          refreshSlotBuilder();
+          return;
+        }
         els('tbody tr[data-dow] input[type="time"], tbody tr[data-dow] input[type="checkbox"]').forEach(inp=>{
           if(inp.classList.contains('active')){ inp.disabled=false; } else { inp.disabled=!!disabled; }
         });
       }
       function apply247(on){
-        els('tbody tr[data-dow]').forEach(tr=>{
-          const $active=tr.querySelector('.active'), $start=tr.querySelector('.start'), $end=tr.querySelector('.end'), $bStart=tr.querySelector('.break_start'), $bEnd=tr.querySelector('.break_end');
-          if(on){ if($active) $active.checked=true; if($start) $start.value='00:00'; if($end) $end.value='23:59'; if($bStart) $bStart.value=''; if($bEnd) $bEnd.value=''; }
-        });
-        toggle247Inputs(on);
-        const note=document.querySelector('#metaNote'); if(note && on){ note.textContent='24/7 enabled -- all days set to 00:00-23:59 with no breaks.'; }
+        if(slotBuilderActive()){
+          if(on){
+            setAllSlotsSelected(true);
+            setApplyAllDays(true);
+          }
+          toggle247Inputs(on);
+          return;
+        }else{
+          toggle247Inputs(on);
+        }
       }
 
       // ===== availability load/save =====
@@ -679,48 +1248,67 @@
           const text = await res.text(); let json=null; try{ json = JSON.parse(text.replace(/^\uFEFF/,'')); }catch{}
           if(!res.ok){ out('#saveOut', text || 'Failed to load', false); await loadNightScheduleTable(); return; }
           const list = Array.isArray(json?.availability)? json.availability: [];
-          const byDow = new Map(list.map(r=>[Number(r.day_of_week), r]));
           const avg = document.querySelector('#avg_consultation_mins'); const bph = document.querySelector('#max_bph');
           if(list[0]){ if(avg) avg.value = Number(list[0].avg_consultation_mins||20); if(bph) bph.value = Number(list[0].max_bookings_per_hour||3); }
-          els('tbody tr[data-dow]').forEach(tr=>{
-            const dow = Number(tr.getAttribute('data-dow'));
-            const row = byDow.get(dow);
-            const $active=tr.querySelector('.active'), $start=tr.querySelector('.start'), $end=tr.querySelector('.end'), $bStart=tr.querySelector('.break_start'), $bEnd=tr.querySelector('.break_end');
-            if(row){
-              if($active) $active.checked = true;
-              if($start)  $start.value = (row.start_time||'09:00:00').slice(0,5);
-              if($end)    $end.value   = (row.end_time||'18:00:00').slice(0,5);
-              if($bStart) $bStart.value= (row.break_start||'').slice(0,5);
-              if($bEnd)   $bEnd.value  = (row.break_end||'').slice(0,5);
-            } else {
-              if($active) $active.checked = false;
-              if($start)  $start.value = '09:00';
-              if($end)    $end.value   = '18:00';
-              if($bStart) $bStart.value= '';
-              if($bEnd)   $bEnd.value  = '';
-            }
-          });
 
-          try{
-            const byDowFull = new Map(list.map(r => [Number(r.day_of_week), r]));
-            let is247 = true;
-            for(let d=0; d<7; d++){
-              const r = byDowFull.get(d);
-              if(!r){ is247=false; break; }
-              const st = String(r.start_time||''); const en = String(r.end_time||'');
-              const noBreak = (!r.break_start && !r.break_end);
-              if(!(st.startsWith('00:00') && (en >= '23:59:00')) && !(st.startsWith('00:00') && en.startsWith('00:00'))){ is247=false; break; }
-              if(!noBreak){ is247=false; break; }
-            }
-            const cb247 = document.querySelector('#enable247');
-            if(cb247){ cb247.checked = !!is247; toggle247Inputs(!!is247); }
-          }catch(_){ }
+          if(slotBuilderActive()){
+            applyAvailabilityToState(list);
+          }else{
+            const byDow = new Map();
+            list.forEach(row=>{
+              const dow = Number(row.day_of_week);
+              if(!byDow.has(dow)) byDow.set(dow, []);
+              byDow.get(dow).push(row);
+            });
+            els('tbody tr[data-dow]').forEach(tr=>{
+              const dow = Number(tr.getAttribute('data-dow'));
+              const rowsForDay = byDow.get(dow) || [];
+              const row = rowsForDay[0] || null;
+              const $active=tr.querySelector('.active'), $start=tr.querySelector('.start'), $end=tr.querySelector('.end'), $bStart=tr.querySelector('.break_start'), $bEnd=tr.querySelector('.break_end');
+              if(row){
+                if($active) $active.checked = true;
+                if($start)  $start.value = (row.start_time||'09:00:00').slice(0,5);
+                if($end)    $end.value   = (row.end_time||'18:00:00').slice(0,5);
+                if($bStart) $bStart.value= (row.break_start||'').slice(0,5);
+                if($bEnd)   $bEnd.value  = (row.break_end||'').slice(0,5);
+              } else {
+                if($active) $active.checked = false;
+                if($start)  $start.value = '09:00';
+                if($end)    $end.value   = '18:00';
+                if($bStart) $bStart.value= '';
+                if($bEnd)   $bEnd.value  = '';
+              }
+            });
+            try{
+              let is247 = true;
+              for(let d=0; d<7; d++){
+                const rowsForDay = byDow.get(d) || [];
+                if(!rowsForDay.length){ is247=false; break; }
+                const coversFullDay = rowsForDay.every(r=>{
+                  const st = String(r.start_time||'');
+                  const en = String(r.end_time||'');
+                  const noBreak = (!r.break_start && !r.break_end);
+                  return st.startsWith('00:00') && (en >= '23:59:00' || en.startsWith('00:00')) && noBreak;
+                });
+                if(!coversFullDay){ is247=false; break; }
+              }
+              const cb247Legacy = document.querySelector('#enable247');
+              if(cb247Legacy){ cb247Legacy.checked = !!is247; }
+            }catch(_){}
+          }
+
           highlight247();
+          const cb247 = document.querySelector('#enable247');
+          if(cb247){ toggle247Inputs(cb247.checked); }
           await loadNightScheduleTable();
         }catch(e){ out('#saveOut', `Load error: ${e?.message||e}`, false); await loadNightScheduleTable(); }
       }
 
       function collect(){
+        if(slotBuilderActive()){
+          const { availability, validationError } = buildAvailabilityPayload();
+          return { availability, validationError };
+        }
         const avgMins = Number(document.querySelector('#avg_consultation_mins').value || 20);
         const maxBph  = Number(document.querySelector('#max_bph').value || 3);
         const availability = [];
@@ -901,6 +1489,32 @@
         btn?.addEventListener('click', ()=>{ stopCta(); findNearByPincode(); loadNightScheduleTable(); });
         btn?.addEventListener('mouseenter', stopCta);
         setTimeout(stopCta, 12000);
+
+        if(slotBuilderActive()){
+          refreshSlotBuilder();
+          SLOT_BUTTON_ALL.forEach(button=>{
+            button.addEventListener('click', ()=>{
+              const period = button.dataset.period;
+              const slotId = button.dataset.slot;
+              toggleSlot(period, slotId);
+            });
+          });
+          slotEls.dayChips.forEach(chip=>{
+            chip.addEventListener('click', ()=>{
+              toggleDaySelection(Number(chip.dataset.dayChip));
+            });
+          });
+          if(slotEls.applyAll){
+            slotEls.applyAll.addEventListener('change', (event)=>{
+              if(READONLY){
+                event.preventDefault();
+                event.target.checked = slotState.applyAll;
+                return;
+              }
+              setApplyAllDays(event.target.checked);
+            });
+          }
+        }
 
         const doctorSelect = document.querySelector('#doctor_id');
         doctorSelect?.addEventListener('change', ()=>{ loadExisting(); });
