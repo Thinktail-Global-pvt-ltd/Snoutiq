@@ -18,8 +18,19 @@ class AdminController extends Controller
         // Optional date=YYYY-MM-DD (IST)
         $date = (string) $request->query('date', '');
         $target = $date !== '' ? Carbon::createFromFormat('Y-m-d', $date, 'Asia/Kolkata') : Carbon::now('Asia/Kolkata')->startOfDay();
-        $publisher->publishNightSlots($target);
-        return response()->json(['status' => 'ok', 'published_for' => $target->toDateString()]);
+
+        $defaultSpan = (int) config('video.night.publish_span_days', 60);
+        $spanDays = (int) $request->query('span_days', $defaultSpan);
+        $spanDays = max(1, min($spanDays, (int) config('video.night.publish_span_max_days', 180)));
+
+        $publisher->publishNightSlotsForRange($target->copy(), $spanDays);
+
+        return response()->json([
+            'status' => 'ok',
+            'published_from' => $target->toDateString(),
+            'span_days' => $spanDays,
+            'published_until' => $target->copy()->addDays($spanDays - 1)->toDateString(),
+        ]);
     }
 
     // POST /api/video/admin/reset

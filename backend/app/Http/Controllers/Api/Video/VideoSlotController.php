@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\Video;
 use App\Http\Controllers\Controller;
 use App\Models\VideoSlot;
 use App\Services\CommitmentService;
+use App\Services\SlotPublisherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,10 @@ use Carbon\CarbonImmutable;
 
 class VideoSlotController extends Controller
 {
-    public function __construct(private readonly CommitmentService $commitments)
+    public function __construct(
+        private readonly CommitmentService $commitments,
+        private readonly SlotPublisherService $publisher
+    )
     {
     }
 
@@ -35,6 +39,12 @@ class VideoSlotController extends Controller
 
         if (($date === null || $date === '') && $normalizedDay === null) {
             return response()->json(['error' => 'either date (YYYY-MM-DD) or day is required'], 422);
+        }
+
+        if ($date !== null && $date !== '') {
+            $this->publisher->ensureNightSlotsForIstDate((string) $date);
+        } elseif ($normalizedDay !== null) {
+            $this->publisher->ensureUpcomingNightWindow();
         }
 
         $q = VideoSlot::query()
@@ -68,6 +78,8 @@ class VideoSlotController extends Controller
         ]);
 
         try {
+            $this->publisher->ensureRecurringWindowForSlot($slotModel);
+
             $updated = DB::transaction(function () use ($slotModel, $data) {
                 // lock the row to avoid double-commit
                 /** @var VideoSlot $row */
@@ -81,6 +93,8 @@ class VideoSlotController extends Controller
                 $row->committed_doctor_id = (int) $data['doctor_id'];
                 // (optional) set due/check-in times here if you want
                 $row->save();
+
+                $this->commitFutureSlots($row, (int) $data['doctor_id']);
 
                 return $row->fresh();
             });
@@ -107,6 +121,13 @@ class VideoSlotController extends Controller
 
         try {
             $released = $this->commitments->releaseSlot($slotModel, (int) $data['doctor_id'], $data['reason'] ?? null);
+
+            $this->publisher->ensureRecurringWindowForSlot($slotModel);
+
+            DB::transaction(function () use ($released, $data) {
+                $this->releaseFutureSlots($released, (int) $data['doctor_id'], $data['reason'] ?? null);
+            });
+
             return response()->json(['slot' => $released], 200);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 409);
@@ -149,6 +170,97 @@ class VideoSlotController extends Controller
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 409);
         }
+    }
+
+    private function commitFutureSlots(VideoSlot $slot, int $doctorId): void
+    {
+        $baseDate = $this->slotDateString($slot);
+        $endDate = $this->recurringWindowEnd($slot)->toDateString();
+
+        $futureSlots = VideoSlot::query()
+            ->where('id', '!=', $slot->id)
+            ->where('strip_id', $slot->strip_id)
+            ->where('hour_24', $slot->hour_24)
+            ->where('role', $slot->role)
+            ->whereBetween('slot_date', [$baseDate, $endDate])
+            ->whereIn('status', ['open', 'held'])
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($futureSlots as $future) {
+            $future->status = 'committed';
+            $future->committed_doctor_id = $doctorId;
+            $future->save();
+        }
+    }
+
+    private function releaseFutureSlots(VideoSlot $slot, int $doctorId, ?string $reason = null): void
+    {
+        $baseDate = $this->slotDateString($slot);
+        $endDate = $this->recurringWindowEnd($slot)->toDateString();
+
+        $futureSlots = VideoSlot::query()
+            ->where('id', '!=', $slot->id)
+            ->where('strip_id', $slot->strip_id)
+            ->where('hour_24', $slot->hour_24)
+            ->where('role', $slot->role)
+            ->whereBetween('slot_date', [$baseDate, $endDate])
+            ->where('committed_doctor_id', $doctorId)
+            ->whereIn('status', ['committed', 'held'])
+            ->lockForUpdate()
+            ->get();
+
+        $releasedAt = now('UTC')->toIso8601String();
+
+        foreach ($futureSlots as $future) {
+            $future->status = 'open';
+            $future->committed_doctor_id = null;
+            $future->checkin_due_at = null;
+            $future->checked_in_at = null;
+            $future->in_progress_at = null;
+            $future->finished_at = null;
+
+            $meta = $future->meta ?? [];
+            $meta['released_at'] = $releasedAt;
+            $meta['released_by_doctor'] = $doctorId;
+            if ($reason !== null && $reason !== '') {
+                $meta['release_reason'] = $reason;
+            }
+            $future->meta = $meta;
+
+            $future->save();
+        }
+    }
+
+    private function recurringWindowEnd(VideoSlot $slot): CarbonImmutable
+    {
+        $days = (int) config('video.night.recurring_commit_days', 60);
+        $days = max(1, $days);
+
+        return $this->slotDateImmutable($slot)->addDays($days - 1);
+    }
+
+    private function slotDateString(VideoSlot $slot): string
+    {
+        $value = $slot->getAttribute('slot_date');
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        return (string) $value;
+    }
+
+    private function slotDateImmutable(VideoSlot $slot): CarbonImmutable
+    {
+        $value = $slot->getAttribute('slot_date');
+        if ($value instanceof CarbonImmutable) {
+            return $value;
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return CarbonImmutable::instance($value);
+        }
+
+        return CarbonImmutable::createFromFormat('Y-m-d', (string) $value, 'UTC');
     }
 
     // GET /api/video/slots/doctor?doctor_id=ID&date=YYYY-MM-DD&tz=IST

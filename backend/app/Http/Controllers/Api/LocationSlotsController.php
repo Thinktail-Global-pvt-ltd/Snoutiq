@@ -8,12 +8,17 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\VideoSlot;
+use App\Services\SlotPublisherService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
 
 class LocationSlotsController extends Controller
 {
+    public function __construct(private readonly SlotPublisherService $publisher)
+    {
+    }
+
     // Gurugram bbox for strip banding (adjust if your data differs)
     private float $minLon = 76.80;
     private float $maxLon = 77.25;
@@ -148,6 +153,13 @@ class LocationSlotsController extends Controller
             return response()->json(['error' => 'either date (YYYY-MM-DD, IST) or day is required'], 422);
         }
 
+        if ($normalizedDay !== null) {
+            $this->publisher->ensureUpcomingNightWindow();
+        }
+        if ($dateIst !== '') {
+            $this->publisher->ensureNightSlotsForIstDate($dateIst);
+        }
+
         // Locate user and map to nearest geo_strips row (by longitude center)
         [, $lon] = $this->getSessionUserCoords($r);
         $stripId = $this->nearestStripIdByLon((float) $lon, $dateIst ?: date('Y-m-d'));
@@ -220,6 +232,13 @@ class LocationSlotsController extends Controller
 
         if ($dateIst === '' && $normalizedDay === null) {
             return response()->json(['error' => 'either date (YYYY-MM-DD, IST) or day is required'], 422);
+        }
+
+        if ($normalizedDay !== null) {
+            $this->publisher->ensureUpcomingNightWindow();
+        }
+        if ($dateIst !== '') {
+            $this->publisher->ensureNightSlotsForIstDate($dateIst);
         }
 
         $code = (string) $r->query('code', '');

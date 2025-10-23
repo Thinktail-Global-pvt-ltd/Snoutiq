@@ -47,10 +47,12 @@
           <input type="checkbox" id="night_autoref" class="rounded border-gray-300">
           Auto-refresh (30s)
         </label>
-        <button id="btnNightPublish" class="px-3 py-1.5 rounded bg-indigo-600 text-white text-sm">Publish Tonight</button>
         <button id="btnNightReset" class="px-3 py-1.5 rounded bg-rose-600 text-white text-sm">Reset Data</button>
         <button id="btnNightLoad" class="px-3 py-1.5 rounded bg-gray-800 text-white text-sm">Load Coverage</button>
       </div>
+      <p class="text-xs text-gray-500">
+        Slots are created automatically and persist nightly—admin review only if doctors change availability.
+      </p>
     </div>
 
     <div class="flex flex-wrap items-center gap-2 text-[11px] text-gray-600 mb-2">
@@ -188,8 +190,6 @@
         renderMatrix(matrix, stripRows);
       }
 
-      async function publishTonight(){ const d=el('#night_date')?.value; if(!d){ toast('Pick date',false); return; }
-        await window.Csrf.ensure(); const r=await fetch(`${apiBase}/video/admin/publish?date=${encodeURIComponent(d)}&tz=IST`, window.Csrf.opts('POST')); if(!r.ok) return toast('Publish failed',false); toast('Published'); loadNightCoverage(); }
       async function resetTonight(){
         const yes=await (window.Swal? Swal.fire({title:'Reset all slots?',text:'This clears video slots and commitments.',icon:'warning',showCancelButton:true,confirmButtonText:'Yes, reset'}): Promise.resolve({isConfirmed:confirm('Reset all slots?')}));
         if(!(yes && (yes.isConfirmed||yes===true))) return;
@@ -207,7 +207,6 @@
         el('#night_date').value=`${ist.getFullYear()}-${pad(ist.getMonth()+1)}-${pad(ist.getDate())}`;
         el('#route_ts').value=`${el('#night_date').value}T19:30:00+05:30`;
         el('#btnNightLoad').addEventListener('click', loadNightCoverage);
-        el('#btnNightPublish').addEventListener('click', publishTonight);
         el('#btnNightReset').addEventListener('click', resetTonight);
         el('#btnRouteTest').addEventListener('click', tryRoute);
         el('#night_autoref')?.addEventListener('change',e=>setAuto(!!e.target.checked));

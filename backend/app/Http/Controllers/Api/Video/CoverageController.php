@@ -7,11 +7,16 @@ namespace App\Http\Controllers\Api\Video;
 use App\Http\Controllers\Controller;
 use App\Models\GeoStrip;
 use App\Models\VideoSlot;
+use App\Services\SlotPublisherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CoverageController extends Controller
 {
+    public function __construct(private readonly SlotPublisherService $publisher)
+    {
+    }
+
     // GET /api/video/coverage?date=YYYY-MM-DD&hour=H
     public function matrix(Request $request): JsonResponse
     {
@@ -21,6 +26,8 @@ class CoverageController extends Controller
             return response()->json(['error' => 'date and hour are required'], 422);
         }
         $hour = (int) $hour;
+
+        $this->publisher->ensureNightSlotsForUtcWindow($date, $hour);
 
         $strips = GeoStrip::active()->orderBy('min_lon')->get(['id','name']);
         $rows = [];
@@ -37,4 +44,3 @@ class CoverageController extends Controller
         return response()->json(['date' => $date, 'hour' => $hour, 'coverage' => $rows]);
     }
 }
-
