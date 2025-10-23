@@ -60,7 +60,12 @@ class GeminiChatController extends Controller
         ];
 
         // score + decision
-        $symptomAnalysis = $this->analyzeSymptomsWithGemini($data['question'], $state['conversation_history']);
+        if ($this->isNonDiagnosticSmalltalk($data['question'])) {
+            $symptomAnalysis = $this->defaultSymptomAnalysis();
+        } else {
+            $heuristic = $this->heuristicSymptomAnalysis($data['question']);
+            $symptomAnalysis = $heuristic ?? $this->analyzeSymptomsWithGemini($data['question'], $state['conversation_history']);
+        }
         $state['symptom_analysis_history'][] = [
             'message'   => $data['question'],
             'analysis'  => $symptomAnalysis,
@@ -188,7 +193,12 @@ class GeminiChatController extends Controller
             'location' => $data['pet_location'] ?? 'India',
         ];
 
-        $symptomAnalysis = $this->analyzeSymptomsWithGemini($data['question'], $state['conversation_history']);
+        if ($this->isNonDiagnosticSmalltalk($data['question'])) {
+            $symptomAnalysis = $this->defaultSymptomAnalysis();
+        } else {
+            $heuristic = $this->heuristicSymptomAnalysis($data['question']);
+            $symptomAnalysis = $heuristic ?? $this->analyzeSymptomsWithGemini($data['question'], $state['conversation_history']);
+        }
         $state['symptom_analysis_history'][] = [
             'message'   => $data['question'],
             'analysis'  => $symptomAnalysis,
@@ -274,6 +284,123 @@ class GeminiChatController extends Controller
         $state['symptom_analysis_history'] = [];
     }
 
+    private function defaultSymptomAnalysis(): array
+    {
+        return [
+            'symptoms_found' => false,
+            'symptoms'       => [],
+            'severity'       => 'none',
+            'confidence'     => 0.0,
+            'reason'         => 'no symptoms detected',
+        ];
+    }
+
+    private function heuristicSymptomAnalysis(string $message): ?array
+    {
+        $text = mb_strtolower($message);
+        $symptoms = [];
+        $severity = 'mild';
+
+        $patterns = [
+            [
+                'regex'    => '/\\bletharg(?:y|ic)\\b/',
+                'symptom'  => 'lethargy or very low energy',
+                'severity' => 'moderate',
+            ],
+            [
+                'regex'    => '/\\b(really|very|extremely|quite|noticeably)\\s+low\\s+energy\\b/',
+                'symptom'  => 'very low energy',
+                'severity' => 'moderate',
+            ],
+            [
+                'regex'    => '/\\b(low|less|reduced|decreased)\\s+energy\\b/',
+                'symptom'  => 'low energy',
+                'severity' => 'moderate',
+            ],
+            [
+                'regex'    => '/\\benergy\\s+levels?\\b/',
+                'symptom'  => 'changes in energy level',
+                'severity' => 'mild',
+            ],
+            [
+                'regex'    => '/\\bno\\s+energy\\b/',
+                'symptom'  => 'complete loss of energy',
+                'severity' => 'moderate',
+            ],
+            [
+                'regex'    => '/\\bweak(ness)?\\b/',
+                'symptom'  => 'general weakness',
+                'severity' => 'moderate',
+            ],
+            [
+                'regex'    => '/\\bfaint(ing)?\\b/',
+                'symptom'  => 'fainting episodes',
+                'severity' => 'severe',
+            ],
+            [
+                'regex'    => '/\\bcollapse(d|s|ing)?\\b/',
+                'symptom'  => 'collapse episodes',
+                'severity' => 'severe',
+            ],
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern['regex'], $text)) {
+                $symptoms[] = $pattern['symptom'];
+                $sevRank = ['none' => 0, 'mild' => 1, 'moderate' => 2, 'severe' => 3];
+                if ($sevRank[$pattern['severity']] > $sevRank[$severity]) {
+                    $severity = $pattern['severity'];
+                }
+            }
+        }
+
+        if (empty($symptoms)) {
+            return null;
+        }
+
+        return [
+            'symptoms_found' => true,
+            'symptoms'       => array_values(array_unique($symptoms)),
+            'severity'       => $severity,
+            'confidence'     => 0.55,
+            'reason'         => 'keyword match: ' . implode(', ', $symptoms),
+        ];
+    }
+
+    private function isNonDiagnosticSmalltalk(string $message): bool
+    {
+        $trimmed = trim(mb_strtolower($message));
+        if ($trimmed === '') {
+            return true;
+        }
+
+        if ($this->isGreeting($message)) {
+            return true;
+        }
+
+        $smalltalkPhrases = [
+            'good morning','good evening','good afternoon','hey there','hi there','hello there',
+            'whats up','what\'s up','how are you','how r u','howdy','yo','sup','hii','helo','hlo',
+            'gm','gn','good night','goodnight'
+        ];
+        foreach ($smalltalkPhrases as $phrase) {
+            if ($trimmed === $phrase) {
+                return true;
+            }
+        }
+
+        $wordCount = str_word_count($trimmed);
+        if ($wordCount <= 3 && preg_match('/^(hi|hey|hello|yo|sup|heyya|hola|namaste)$/', $trimmed)) {
+            return true;
+        }
+
+        if ($wordCount <= 2 && !preg_match('/[a-z]/', $trimmed)) {
+            return true;
+        }
+
+        return false;
+    }
+
     private function analyzeSymptomsWithGemini(string $message, array $history = []): array
     {
         $historyTurns = [];
@@ -316,13 +443,7 @@ PROMPT;
         $raw = $this->callGeminiApi_curl($prompt);
         $decoded = $this->decodeGeminiJson($raw);
 
-        $defaults = [
-            'symptoms_found' => false,
-            'symptoms'       => [],
-            'severity'       => 'none',
-            'confidence'     => 0.0,
-            'reason'         => 'no symptoms detected',
-        ];
+        $defaults = $this->defaultSymptomAnalysis();
 
         if (!is_array($decoded)) {
             return $defaults;
@@ -516,14 +637,15 @@ PROMPT;
 
         $opening = empty($history)
             ? "Hello! I'm SnoutIQ AI, and I'm standing by to help you and your pet."
-            : "Thanks for the update — I want to help further.";
+            : "Thanks for the update — I'm ready to understand more.";
 
         return "You are SnoutIQ AI, a caring veterinary triage assistant.\n\n" .
                $petLine . "\n\n" .
                "USER MESSAGE: \"{$userMessage}\"\n\n" .
                "{$opening}\n\n" .
-               "You did not detect any clear clinical signs yet. Kindly explain (without asking questions) that specific observations are needed — encourage them to share what they see, when it started, any changes in appetite/energy, and anything else unusual. Provide a concise checklist (max 3 bullet items) of the kinds of details that help a vet. Invite them to share whenever they're ready.\n\n" .
-               "Do not include questions or question marks. Keep the tone warm and professional.";
+               "You did not detect any clear clinical signs yet. Provide a short, compassionate paragraph that guides the pet parent to describe specific symptoms and when they noticed them. You may ask up to two gentle questions that invite details (questions are allowed). Avoid headings or labels such as 'What you're seeing' or 'Specific Observations'.\n\n" .
+               "After the paragraph, include a concise checklist (maximum 3 bullet points) prefixed with \"•\" that highlights the most useful symptom details to share (e.g., onset, changes in appetite, visible injuries).\n\n" .
+               "Finish with an encouraging closing sentence inviting them to respond. Keep the tone warm, professional, and free of unnecessary headings.";
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Http\Controllers\VideoSchedulePageController;
 use App\Http\Controllers\VideoScheduleTestPageController;
 
 // Public routes
+
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');
 Route::get('/logout', function (\Illuminate\Http\Request $request) {
     $request->session()->flush();
@@ -229,6 +230,269 @@ Route::middleware('web')->get('/video/app/night-coverage', function () {
         'page_title' => 'Night Video Coverage',
     ]);
 });
+
+Route::middleware('web')->get('/admin/video/slot-overview', function () {
+    return view('snoutiq.admin-video-slot-overview', [
+        'page_title' => 'Video Slots Overview',
+    ]);
+})->name('admin.video.slot-overview');
+
+Route::middleware('web')->get('/api/video/coverage/pincode', function (\Illuminate\Http\Request $request) {
+    $dateParam = $request->query('date');
+    $date = $dateParam && strtotime($dateParam) ? date('Y-m-d', strtotime($dateParam)) : date('Y-m-d');
+    $dow = (int) date('w', strtotime($date));
+    $doctorId = (int) $request->query('doctor_id', 0);
+
+    $toMinutes = static function (?string $time): ?int {
+        if (!$time) {
+            return null;
+        }
+        $parts = explode(':', $time);
+        if (count($parts) < 2) {
+            return null;
+        }
+        return ((int) $parts[0]) * 60 + ((int) $parts[1]);
+    };
+
+    $rows = DB::table('doctor_video_availability as dva')
+        ->join('doctors as d', 'dva.doctor_id', '=', 'd.id')
+        ->join('vet_registerations_temp as vrt', 'd.vet_registeration_id', '=', 'vrt.id')
+        ->select(
+            'vrt.pincode',
+            'vrt.clinic_profile',
+            'vrt.name as vet_name',
+            'dva.start_time',
+            'dva.end_time',
+            'dva.break_start',
+            'dva.break_end'
+        )
+        ->where('dva.is_active', 1)
+        ->where('dva.day_of_week', $dow)
+        ->whereNotNull('vrt.pincode')
+        ->when($doctorId > 0, function ($query) use ($doctorId) {
+            $query->where('dva.doctor_id', $doctorId);
+        })
+        ->get();
+
+    $matrix = [];
+    foreach ($rows as $row) {
+        $code = trim((string) $row->pincode);
+        if ($code === '') {
+            $code = 'Unknown';
+        }
+
+        if (!isset($matrix[$code])) {
+            $hours = [];
+            for ($h = 0; $h < 24; $h++) {
+                $hours[$h] = [];
+            }
+            $matrix[$code] = [
+                'pincode' => $code,
+                'clinics' => [],
+                'hours' => $hours,
+                'slot_labels' => [],
+            ];
+        }
+
+        $clinicName = $row->clinic_profile ?: $row->vet_name;
+        if ($clinicName) {
+            $matrix[$code]['clinics'][$clinicName] = true;
+        }
+
+        $segments = [
+            [$row->start_time, $row->end_time],
+        ];
+        if ($row->break_start && $row->break_end) {
+            $segments = [
+                [$row->start_time, $row->break_start],
+                [$row->break_end, $row->end_time],
+            ];
+        }
+
+        foreach ($segments as [$segStart, $segEnd]) {
+            if (!$segStart || !$segEnd) {
+                continue;
+            }
+            $startMin = $toMinutes($segStart);
+            $endMin = $toMinutes($segEnd);
+            if ($startMin === null || $endMin === null) {
+                continue;
+            }
+            if ($endMin <= $startMin) {
+                $endMin += 1440;
+            }
+            $label = substr($segStart, 0, 5) . '-' . substr($segEnd, 0, 5);
+            $matrix[$code]['slot_labels'][$label] = true;
+            for ($m = $startMin; $m < $endMin; $m += 60) {
+                $hour = (int) floor($m / 60) % 24;
+                $matrix[$code]['hours'][$hour][] = $label;
+            }
+        }
+    }
+
+    $rowsOut = array_map(function (array $entry) {
+        $clinics = array_keys($entry['clinics']);
+        sort($clinics, SORT_NATURAL);
+        $hours = [];
+        for ($h = 0; $h < 24; $h++) {
+            $labels = $entry['hours'][$h] ?? [];
+            $hours[$h] = array_values(array_unique($labels));
+        }
+        return [
+            'pincode' => $entry['pincode'],
+            'clinics' => $clinics,
+            'hours' => $hours,
+            'slots' => array_keys($entry['slot_labels']),
+        ];
+    }, array_values($matrix));
+
+    usort($rowsOut, static function ($a, $b) {
+        return strcmp($a['pincode'], $b['pincode']);
+    });
+
+    return response()->json([
+        'date' => $date,
+        'day_of_week' => $dow,
+        'rows' => $rowsOut,
+    ]);
+});
+
+Route::middleware('web')->get('/api/admin/video/pincode-slots', function (\Illuminate\Http\Request $request) {
+    $tz = 'Asia/Kolkata';
+    $dateQuery = $request->query('date');
+    try {
+        $date = $dateQuery ? \Carbon\CarbonImmutable::parse($dateQuery, $tz) : \Carbon\CarbonImmutable::now($tz);
+    } catch (\Throwable $e) {
+        $date = \Carbon\CarbonImmutable::now($tz);
+    }
+    $dateStr = $date->toDateString();
+    $dow = (int) $date->dayOfWeek;
+
+    $doctorId = (int) $request->query('doctor_id', 0);
+    $pincodeFilter = trim((string) $request->query('pincode', ''));
+
+    $toMinutes = static function (?string $time): ?int {
+        if (!$time) {
+            return null;
+        }
+        $parts = explode(':', $time);
+        if (count($parts) < 2) {
+            return null;
+        }
+        return (int)$parts[0] * 60 + (int)$parts[1];
+    };
+
+    $matrix = [];
+    $overallDoctorIds = [];
+
+    $availability = DB::table('doctor_video_availability as dva')
+        ->join('doctors as d', 'dva.doctor_id', '=', 'd.id')
+        ->join('vet_registerations_temp as vrt', 'd.vet_registeration_id', '=', 'vrt.id')
+        ->select(
+            'dva.doctor_id',
+            'vrt.pincode',
+            'vrt.clinic_profile',
+            'vrt.name as vet_name',
+            'dva.start_time',
+            'dva.end_time',
+            'dva.break_start',
+            'dva.break_end',
+            'dva.max_bookings_per_hour'
+        )
+        ->where('dva.is_active', 1)
+        ->where('dva.day_of_week', $dow)
+        ->whereNotNull('vrt.pincode')
+        ->when($doctorId > 0, fn($q) => $q->where('dva.doctor_id', $doctorId))
+        ->when($pincodeFilter !== '', fn($q) => $q->where('vrt.pincode', $pincodeFilter))
+        ->get();
+
+    foreach ($availability as $row) {
+        $code = trim((string) $row->pincode);
+        if ($code === '') {
+            $code = 'Unknown';
+        }
+        if (!isset($matrix[$code])) {
+            $matrix[$code] = [
+                'pincode' => $code,
+                'clinics' => [],
+                'hours' => array_fill(0, 24, ['doctors' => []]),
+                'doctor_ids' => [],
+            ];
+        }
+        $clinicName = $row->clinic_profile ?: $row->vet_name;
+        if ($clinicName) {
+            $matrix[$code]['clinics'][$clinicName] = true;
+        }
+
+        $startMin = $toMinutes($row->start_time);
+        $endMin = $toMinutes($row->end_time);
+        if ($startMin === null || $endMin === null) {
+            continue;
+        }
+        if ($endMin <= $startMin) {
+            $endMin += 1440; // wrap to next day
+        }
+        $segments = [[$startMin, $endMin]];
+        $breakStart = $toMinutes($row->break_start);
+        $breakEnd = $toMinutes($row->break_end);
+        if ($breakStart !== null && $breakEnd !== null && $breakEnd > $breakStart) {
+            $segments = [];
+            if ($breakStart > $startMin) {
+                $segments[] = [$startMin, min($breakStart, $endMin)];
+            }
+            if ($breakEnd < $endMin) {
+                $segments[] = [max($breakEnd, $startMin), $endMin];
+            }
+        }
+
+        foreach ($segments as [$segStart, $segEnd]) {
+            if ($segEnd <= $segStart) {
+                continue;
+            }
+            $startBlock = (int) floor($segStart / 60);
+            $endBlock = (int) floor(($segEnd - 1) / 60);
+            for ($block = $startBlock; $block <= $endBlock; $block++) {
+                $hourIndex = $block % 24;
+                if ($hourIndex < 0 || $hourIndex > 23) {
+                    continue;
+                }
+                $matrix[$code]['hours'][$hourIndex]['doctors'][$row->doctor_id] = true;
+                $matrix[$code]['doctor_ids'][$row->doctor_id] = true;
+                $overallDoctorIds[$row->doctor_id] = true;
+            }
+        }
+    }
+
+    $totalDoctorHours = 0;
+    foreach ($matrix as $code => $entry) {
+        $clinics = array_keys($entry['clinics']);
+        sort($clinics, SORT_NATURAL);
+        $matrix[$code]['clinics'] = $clinics;
+        $rowTotals = ['doctor_hours' => 0, 'unique_doctors' => count($entry['doctor_ids'])];
+        foreach ($entry['hours'] as $hour => $cell) {
+            $count = isset($cell['doctors']) ? count($cell['doctors']) : 0;
+            $matrix[$code]['hours'][$hour] = ['count' => $count];
+            $rowTotals['doctor_hours'] += $count;
+        }
+        $matrix[$code]['totals'] = $rowTotals;
+        $totalDoctorHours += $rowTotals['doctor_hours'];
+    }
+
+    $rowsOut = array_values($matrix);
+    usort($rowsOut, static function ($a, $b) {
+        return strcmp($a['pincode'], $b['pincode']);
+    });
+
+    return response()->json([
+        'date' => $dateStr,
+        'rows' => $rowsOut,
+        'summary' => [
+            'doctor_hours' => $totalDoctorHours,
+            'unique_doctors' => count($overallDoctorIds),
+        ],
+    ]);
+});
+
 // routes/web.php
 Route::get('/backend/video/night/edit', function (\Illuminate\Http\Request $req) {
     return view('snoutiq.video-calling-night-edit', [

@@ -50,6 +50,12 @@
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         <span>Admin Video Calling Control</span>
       </a>
+      <a href="{{ route('admin.video.slot-overview') }}" class="{{ $baseItem }} {{ $active('admin.video.slot-overview') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+        <span>Video Slots Overview</span>
+      </a>
       <a href="{{ route('clinic.orders') }}" class="{{ $baseItem }} {{ $active('clinic.orders') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
         <span>Order History</span>

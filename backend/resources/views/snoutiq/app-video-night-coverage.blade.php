@@ -69,6 +69,15 @@
       Each row shows all Gurugram pincodes mapped to that strip’s longitude window (empty bands fall back to nearest pincode in tooltip).
     </p>
 
+    <div class="mt-4">
+      <h4 class="text-sm font-semibold text-gray-800">Clinic Coverage (Pincode × 24h)</h4>
+      <p class="text-xs text-gray-600">
+        Source: <code>vet_registerations_temp.pincode</code> + doctor video availability. Green cells mark at least one clinic doctor active in that hour.
+      </p>
+      <div id="clinicMatrixWrap" class="mt-2 overflow-x-auto"></div>
+      <div id="clinicSummary" class="mt-2 text-xs text-gray-700"></div>
+    </div>
+
     <div id="nightMatrixWrap" class="mt-3 overflow-x-auto"></div>
     <div id="nightSummary" class="mt-2 text-xs text-gray-700"></div>
 
@@ -114,7 +123,9 @@
       };
 
       const hoursIST = [19,20,21,22,23,0,1,2,3,4,5,6];
+      const hours24 = Array.from({length:24}, (_,i)=>i);
       const el=(s)=>document.querySelector(s), h2=(n)=>String(n).padStart(2,'0'), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+      const hourLabel = (h)=>`${h2(h)}:00`;
       const toast=(m,ok=true)=>{ if(window.Swal) Swal.fire({toast:true,position:'top',timer:1000,showConfirmButton:false,icon:ok?'success':'error',title:String(m)}); };
 
       async function fetchGgnPincodes(){
@@ -148,6 +159,61 @@
       const color=(st)=> st==='committed'||st==='in_progress' ? 'bg-green-100 text-green-800' : (st==='done' ? 'bg-blue-100 text-blue-800' : 'bg-gray-50 text-gray-500');
       const onlyFulfilled=(st)=>{ const s=String(st||'').toLowerCase(); return allow.has(s)? s:null; };
 
+      function renderClinicMatrix(rows){
+        const wrap = el('#clinicMatrixWrap');
+        const summary = el('#clinicSummary');
+        if(!wrap) return;
+        if(!rows || !rows.length){
+          wrap.innerHTML = '<div class="text-xs text-red-600">No clinic availability found for this date.</div>';
+          if(summary) summary.textContent = '';
+          return;
+        }
+        let filledCells = 0;
+        let html = '<table class="min-w-full text-xs border border-green-200 rounded-lg overflow-hidden"><thead><tr class="bg-green-50">';
+        html += '<th class="px-2 py-1 text-left">Pincode</th>';
+        html += '<th class="px-2 py-1 text-left">Clinics</th>';
+        hours24.forEach(h => { html += `<th class="px-1 py-1 text-center">${hourLabel(h)}</th>`; });
+        html += '</tr></thead><tbody>';
+        rows.forEach(row=>{
+          const clinics = Array.isArray(row.clinics) && row.clinics.length ? row.clinics.join(', ') : '—';
+          html += `<tr class="border-t"><td class="px-2 py-1 font-semibold text-gray-800">${esc(row.pincode)}</td>`;
+          html += `<td class="px-2 py-1 text-gray-600">${esc(clinics)}</td>`;
+          hours24.forEach(h=>{
+            const labels = (row.hours && row.hours[h]) ? row.hours[h] : [];
+            const has = Array.isArray(labels) && labels.length > 0;
+            if(has) filledCells += 1;
+            const title = has ? ` title="${esc(labels.join(', '))}"` : '';
+            html += `<td class="px-1 py-1 text-center"${title}>${has
+              ? `<span class="inline-block px-2 py-0.5 rounded bg-green-500 text-white text-[11px] font-semibold">OPEN</span>`
+              : `<span class="inline-block px-2 py-0.5 rounded bg-gray-200 text-gray-500 text-[11px] font-semibold">Closed</span>`}</td>`;
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+        if(summary){
+          const slotSet = new Set();
+          rows.forEach(r => { (r.slots || []).forEach(lbl => slotSet.add(lbl)); });
+          summary.innerHTML = `Pincodes: <b>${rows.length}</b> · Filled hour cells: <b>${filledCells}</b> · Unique slot blocks: <b>${slotSet.size}</b>`;
+        }
+      }
+
+      async function loadClinicCoverage(dateIst){
+        try{
+          const doctorId = Number(document.querySelector('#doctor_id')?.value || 0);
+          const params = new URLSearchParams({ date: dateIst });
+          if(doctorId > 0){ params.set('doctor_id', String(doctorId)); }
+          const res = await fetch(`${apiBase}/video/coverage/pincode?${params.toString()}`, {credentials:'include'});
+          if(!res.ok){ renderClinicMatrix([]); return; }
+          const data = await res.json().catch(()=>({}));
+          const rows = Array.isArray(data?.rows) ? data.rows : [];
+          renderClinicMatrix(rows);
+        }catch(err){
+          console.error('clinic coverage load failed', err);
+          renderClinicMatrix([]);
+        }
+      }
+
       function renderMatrix(matrix, stripRows){
         if(!stripRows.length){ el('#nightMatrixWrap').innerHTML='<div class="text-xs text-red-600">No strips loaded. Check API.</div>'; el('#nightSummary').textContent=''; return; }
         let totals={committed:0,in_progress:0,done:0};
@@ -172,6 +238,13 @@
 
       async function loadNightCoverage(){
         const d=el('#night_date')?.value; if(!d){ toast('Pick date',false); return; }
+        await Promise.allSettled([
+          loadClinicCoverage(d),
+          loadLegacyStripCoverage(d),
+        ]);
+      }
+
+      async function loadLegacyStripCoverage(dateIst){
         const [strips,pins]=await Promise.all([fetchStrips(),fetchGgnPincodes()]);
         const pinsByStrip=mapPinsToStrips(strips,pins);
         const stripRows=strips.map(s=>{
@@ -182,7 +255,7 @@
 
         const matrix={};
         for(const h of hoursIST){
-          const {date,hour}=istToUtcParts(d,h);
+          const {date,hour}=istToUtcParts(dateIst,h);
           const res=await fetch(`${apiBase}/video/coverage?date=${date}&hour=${hour}`,{credentials:'include'}); if(!res.ok) continue;
           const j=await res.json().catch(()=>({})); const rows=(j.coverage||j.rows||[]);
           rows.forEach(row=>{ const sid=Number(row.strip_id??row.id); matrix[sid] ||= {}; matrix[sid][h]={primary:row.primary??null, bench:row.bench??null}; });
@@ -210,6 +283,8 @@
         el('#btnNightReset').addEventListener('click', resetTonight);
         el('#btnRouteTest').addEventListener('click', tryRoute);
         el('#night_autoref')?.addEventListener('change',e=>setAuto(!!e.target.checked));
+        document.querySelector('#doctor_id')?.addEventListener('change', loadNightCoverage);
+        loadNightCoverage();
       });
     })();
   </script>

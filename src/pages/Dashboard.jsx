@@ -20,9 +20,9 @@ import DetailedWeatherWidget from "./DetailedWeatherWidget";
 import PetDetailsModal from "./RegisterPetOwner";
 
 const deriveDecision = (decision) => {
-  const normalized = String(decision ?? "").toUpperCase();
+  const normalized = String(decision ?? "").toUpperCase().trim();
   if (!normalized) {
-    return "VIDEO_CONSULT";
+    return null;
   }
   if (
     normalized.includes("EMERGENCY") ||
@@ -31,7 +31,7 @@ const deriveDecision = (decision) => {
   ) {
     return normalized;
   }
-  return "VIDEO_CONSULT";
+  return null;
 };
 
 const Dashboard = () => {
