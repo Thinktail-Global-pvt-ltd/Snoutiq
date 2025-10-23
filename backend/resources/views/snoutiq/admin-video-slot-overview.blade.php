@@ -31,7 +31,13 @@
 
 <script>
   (function(){
-    const ADMIN_API_BASE = `${window.location.origin}/api/admin`;
+    const pathnamePrefix = (() => {
+      const path = window.location.pathname || '';
+      if (path.startsWith('/backend/')) return '/backend';
+      if (path === '/backend' || path === '/backend/') return '/backend';
+      return '';
+    })();
+    const ADMIN_API_BASE = `${window.location.origin}${pathnamePrefix}/api/admin`;
     const el = (selector) => document.querySelector(selector);
     const hours = Array.from({length: 24}, (_, i) => i);
 

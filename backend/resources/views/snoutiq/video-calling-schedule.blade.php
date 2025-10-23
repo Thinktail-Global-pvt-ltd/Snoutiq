@@ -12,6 +12,7 @@
 @section('page_title', $page_title)
 
 @section('content')
+@php $isDebugView = request()->boolean('debug'); @endphp
 <div class="max-w-5xl mx-auto space-y-6">
   @if(request()->get('onboarding')==='1')
     @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 2))])
@@ -33,7 +34,7 @@
   {{-- =================== Doctor & Settings =================== --}}
   <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4">
     <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-      <div class="md:col-span-2">
+      <div class="md:col-span-2" @unless($isDebugView) style="display:none" @endunless>
         <label class="block text-sm font-medium text-gray-700">Doctor</label>
         <select id="doctor_id" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
           @if(isset($doctors) && $doctors->count())
@@ -101,7 +102,8 @@
   <div id="videoSlotBuilder"
        class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-6 space-y-6"
        data-readonly="{{ $readonly ? 'true' : 'false' }}">
-    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4"
+         @unless($isDebugView) style="display:none" @endunless>
       <div>
         <h3 class="text-xl font-semibold text-gray-900">Video Consultation Availability</h3>
         <p class="text-sm text-gray-600 mt-1">
@@ -244,7 +246,7 @@
   {{-- =================== Near Me (PINCODE only) -- Title & date hidden =================== --}}
   <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4">
     <div class="flex items-center justify-end mb-2">
-      <div class="relative inline-block" id="nightCtaWrap">
+      <div class="relative inline-block" id="nightCtaWrap" @unless($isDebugView) style="display:none" @endunless>
         <span class="ctaGlow" id="nightGlow" aria-hidden="true"></span>
         <span class="ctaPulse" id="nightPulse" aria-hidden="true"></span>
 
@@ -257,8 +259,8 @@
       </div>
     </div>
 
-    <div id="nearMeta" class="text-xs text-gray-600"></div>
-    <div id="nearSlots" class="mt-2 text-sm"></div>
+    <div id="nearMeta" class="text-xs text-gray-600" @unless($isDebugView) style="display:none" @endunless></div>
+    <div id="nearSlots" class="mt-2 text-sm" @unless($isDebugView) style="display:none" @endunless></div>
   </div>
 
   {{-- =================== Weekly Schedule Form =================== --}}
@@ -335,7 +337,7 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4">
+  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4" @unless($isDebugView) style="display:none" @endunless>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div>
         <label class="block text-sm font-medium text-gray-700">Date</label>
