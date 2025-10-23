@@ -398,6 +398,7 @@ const RegisterBasicDetails = () => {
                       ? "bg-white text-blue-700 shadow-lg shadow-blue-100 border border-blue-100 transform scale-105"
                       : "text-gray-600 hover:text-gray-800 hover:bg-gray-50/50"
                   }`}
+                  
                 >
                   <div className="flex items-center justify-center gap-3">
                     <span className="text-lg">🐾</span>
