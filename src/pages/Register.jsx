@@ -374,15 +374,6 @@ const RegisterBasicDetails = () => {
         <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-8 lg:px-16 xl:px-24 bg-gradient-to-br from-slate-50 to-blue-50/30 ">
           <div className="w-full max-w-md shadow-xl rounded-xl overflow-hidden p-6 sm:p-8 bg-white">
             {/* Mobile Logo */}
-            <div className="lg:hidden flex justify-center mb-10">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg">
-                <img
-                  src={logo}
-                  alt="Snoutiq"
-                  className="h-8"
-                />
-              </div>
-            </div>
 
             {/* Header */}
             <div className="text-center mb-10">
@@ -547,7 +538,7 @@ const RegisterBasicDetails = () => {
               <p className="text-xl text-blue-100 mb-10 leading-relaxed font-light">
                 Join thousands of pet owners and veterinarians who trust Snoutiq for comprehensive pet healthcare solutions.
               </p>
-              
+
               
               {/* Benefits Grid */}
               <div className="grid grid-cols-1 gap-6">
