@@ -186,79 +186,121 @@
 <!-- =============================
      Add Service Modal (hidden by default)
 ============================= -->
-<div id="add-service-modal" class="hidden fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-  <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-4xl p-6 relative">
-    <button type="button" id="svc-close"
-            class="absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">âœ•</button>
+<div id="add-service-modal" class="hidden fixed inset-0 z-[70] bg-slate-900/70 backdrop-blur flex items-center justify-center px-4 py-6">
+  <div class="relative w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+    <button type="button" id="svc-close" class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:scale-105 hover:text-slate-900">
+      <span class="sr-only">Close</span>
+      ✕
+    </button>
 
-    <div class="mb-2">
-      <h3 class="text-xl font-semibold text-gray-800">Add New Service</h3>
-      <p class="text-sm text-gray-500">Fill the details below to list a new grooming service</p>
+    <div class="grid gap-0 md:grid-cols-[260px_1fr]">
+      <aside class="hidden md:flex flex-col justify-between border-r border-slate-100 bg-gradient-to-br from-indigo-600 via-indigo-500 to-indigo-400 p-8 text-white">
+        <div class="space-y-6">
+          <div>
+            <p class="text-xs uppercase tracking-[0.35em] text-indigo-100/80">SnoutIQ Clinic</p>
+            <h3 class="mt-3 text-2xl font-semibold leading-tight">Launch a new in-clinic experience</h3>
+          </div>
+          <ul class="space-y-4 text-sm text-indigo-50/90">
+            <li class="flex items-start gap-3">
+              <span class="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-sm font-semibold">1</span>
+              Define a crisp name so pet parents instantly recognise the service.
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-sm font-semibold">2</span>
+              Share the duration and pricing to auto-calculate slot availability.
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-sm font-semibold">3</span>
+              Add optional notes to highlight inclusions or pre-visit requirements.
+            </li>
+          </ul>
+        </div>
+        <div class="rounded-2xl border border-white/20 bg-white/10 p-4 text-xs text-indigo-100/90">
+          Pro-tip: keep the description action-oriented (e.g. “Full body grooming with nail trim”) so your reception team can pitch it in seconds.
+        </div>
+      </aside>
+
+      <div class="p-6 md:p-10">
+        <header class="space-y-3">
+          <p class="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600">In-clinic · Service catalogue</p>
+          <div>
+            <h3 class="text-2xl font-semibold text-slate-900">Add New Service</h3>
+            <p class="text-sm text-slate-500">Craft a polished card that shows up instantly on your clinic listings.</p>
+          </div>
+        </header>
+
+        <form id="svc-form" class="mt-8 space-y-8">
+          <section class="space-y-6">
+            <h4 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Core details</h4>
+            <div class="grid gap-5 lg:grid-cols-2">
+              <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-700" for="svc-name">Service Name</label>
+                <input id="svc-name" type="text" placeholder="Eg. Premium Grooming Session" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 shadow-sm transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200" required>
+                <p class="text-xs text-slate-400">Displayed on the service catalogue and booking flow.</p>
+              </div>
+
+              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div class="space-y-2">
+                  <label class="text-sm font-medium text-slate-700" for="svc-duration">Duration (mins)</label>
+                  <input id="svc-duration" type="number" min="1" step="1" placeholder="45" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 shadow-sm transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200" required>
+                </div>
+                <div class="space-y-2">
+                  <label class="text-sm font-medium text-slate-700" for="svc-price">Price (₹)</label>
+                  <input id="svc-price" type="number" min="0" step="0.01" placeholder="1299" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 shadow-sm transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200" required>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="space-y-6">
+            <h4 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Categorise the visit</h4>
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-700" for="svc-pet-type">Pet Type</label>
+                <select id="svc-pet-type" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 shadow-sm transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200" required>
+                  <option value="" selected disabled>Select pet category</option>
+                  <option value="dog">Dog</option>
+                  <option value="cat">Cat</option>
+                  <option value="bird">Bird</option>
+                  <option value="rabbit">Rabbit</option>
+                  <option value="hamster">Hamster</option>
+                  <option value="all">All Pets</option>
+                </select>
+              </div>
+              <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-700" for="svc-main">Service Category</label>
+                <select id="svc-main" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 shadow-sm transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200" required>
+                  <option value="" selected disabled>Select category</option>
+                  <option value="grooming">Grooming</option>
+                  <option value="video_call">Video Call</option>
+                  <option value="vet">Vet Service</option>
+                  <option value="pet_walking">Pet Walking</option>
+                  <option value="sitter">Sitter</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Optional notes</h4>
+              <span class="text-xs font-medium text-indigo-500">Use for add-ons or prep instructions</span>
+            </div>
+            <textarea id="svc-notes" rows="5" placeholder="Mention what's included, preparation guidelines or recovery notes." class="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 shadow-sm transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"></textarea>
+          </section>
+
+          <div class="flex flex-col gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-xs text-slate-500">
+              New services go live instantly for your clinic once saved.
+            </div>
+            <div class="flex items-center gap-3">
+              <button type="button" id="svc-cancel" class="inline-flex items-center justify-center rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">Cancel</button>
+              <button type="submit" id="svc-submit" class="inline-flex items-center justify-center rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700">Save Service</button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
-
-    <form id="svc-form" class="space-y-5">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Service Name</label>
-            <input id="svc-name" type="text" placeholder="Enter Service Name, eg. Premium Grooming"
-                   class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Duration (mins)</label>
-            <input id="svc-duration" type="number" min="1" step="1" placeholder="Enter Duration (In Mins)"
-                   class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
-          </div>
-        </div>
-
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Price (â‚¹)</label>
-            <input id="svc-price" type="number" min="0" step="0.01" placeholder="Enter Service price in â‚¹"
-                   class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Pet Type</label>
-            <select id="svc-pet-type" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
-              <option value="" selected disabled>Select Pet type</option>
-              <option value="dog">Dog</option>
-              <option value="cat">Cat</option>
-              <option value="bird">Bird</option>
-              <option value="rabbit">Rabbit</option>
-              <option value="hamster">Hamster</option>
-              <option value="all">All Pets</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Service Category</label>
-            <select id="svc-main" class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2" required>
-              <option value="" selected disabled>Select category</option>
-              <option value="grooming">Grooming</option>
-              <option value="video_call">Video Call</option>
-              <option value="vet">Vet Service</option>
-              <option value="pet_walking">Pet Walking</option>
-              <option value="sitter">Sitter</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-1">
-          Additional Notes <span class="font-normal text-gray-500">(Optional)</span>
-        </label>
-        <textarea id="svc-notes" rows="4" placeholder="Add more details about the service"
-                  class="w-full rounded-lg bg-gray-100 border-0 focus:ring-2 focus:ring-blue-500 text-sm px-3 py-2"></textarea>
-      </div>
-
-      <div class="flex items-center justify-end gap-2 pt-2">
-        <button type="button" id="svc-cancel" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold">Cancel</button>
-        <button type="submit" id="svc-submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">Add Service</button>
-      </div>
-    </form>
   </div>
 </div>
 

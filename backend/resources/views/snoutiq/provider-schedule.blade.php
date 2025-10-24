@@ -5,30 +5,25 @@
 @section('page_title','Weekly Schedule')
 
 @section('content')
-<div class="max-w-5xl mx-auto space-y-6">
+<div class="max-w-6xl mx-auto space-y-10">
   @if(request()->get('onboarding')==='1')
     @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 3))])
   @endif
 
-  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-    <div>
-      <h1 class="text-xl font-semibold text-gray-900">Complete Your Profile</h1>
-      <p class="text-sm text-gray-500">Step 3 of 3 · Set your in-clinic availability</p>
+  <section class="rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/50">
+    <div class="flex flex-col gap-3 border-b border-slate-100 p-6 md:flex-row md:items-center md:justify-between md:p-8">
+      <div>
+        <h2 class="text-lg font-semibold text-slate-900">Configure the doctor roster</h2>
+        <p class="text-sm text-slate-500">Tie availability to the right doctor profile and set default slot logic.</p>
+      </div>
+      <div class="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-1.5 text-xs font-semibold text-indigo-600">
+        In-clinic services are pre-selected for this setup
+      </div>
     </div>
-    <div class="flex items-center gap-3 text-sm">
-      <span class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-semibold">1</span>
-      <span class="h-px w-10 bg-indigo-200"></span>
-      <span class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-semibold">2</span>
-      <span class="h-px w-10 bg-indigo-200"></span>
-      <span class="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-600 text-white font-semibold">3</span>
-    </div>
-  </div>
-
-  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4">
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-      <div class="md:col-span-2">
-        <label class="block text-sm font-medium text-gray-700">Doctor</label>
-        <select id="doctor_id" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+    <div class="grid gap-6 p-6 md:grid-cols-2 lg:grid-cols-4 md:p-8">
+      <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="doctor_id">Doctor</label>
+        <select id="doctor_id" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
           @if(isset($doctors) && $doctors->count())
             @foreach($doctors as $doc)
               <option value="{{ $doc->id }}">{{ $doc->doctor_name }} (ID: {{ $doc->id }})</option>
@@ -37,102 +32,141 @@
             <option value="">No doctors found for your account</option>
           @endif
         </select>
-        <div class="text-xs text-gray-500 mt-1" id="docIdNote">
+        <div class="mt-2 text-xs text-slate-500" id="docIdNote">
           @if(!empty($vetId))
             Vet session ID: {{ $vetId }}
           @endif
         </div>
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Service Type</label>
-        <select id="service_type" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 text-gray-700" disabled>
+      <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="service_type">Service Type</label>
+        <select id="service_type" class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700 focus:outline-none" disabled>
           <option value="in_clinic" selected>in_clinic</option>
         </select>
-        <div class="mt-1 text-xs text-gray-500">Fixed to in_clinic for this page</div>
+        <p class="mt-2 text-xs text-slate-500">This flow is scoped to in-clinic visits.</p>
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Avg Consultation (mins)</label>
-        <input type="number" id="avg_consultation_mins" value="20" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+      <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="avg_consultation_mins">Avg Consultation (mins)</label>
+        <input type="number" id="avg_consultation_mins" value="20" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+        <p class="mt-2 text-xs text-slate-500">Determines the slot length in booking flows.</p>
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Max bookings / hour</label>
-        <input type="number" id="max_bph" value="3" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+      <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="max_bph">Max bookings / hour</label>
+        <input type="number" id="max_bph" value="3" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+        <p class="mt-2 text-xs text-slate-500">Keep this aligned with table capacity or staff strength.</p>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4">
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="text-sm font-semibold text-gray-800">Weekly Clinic Schedule</h3>
-      <span class="text-xs text-gray-500">Toggle a day off or adjust start/end & breaks.</span>
+  <section class="rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/50">
+    <div class="flex flex-col gap-3 border-b border-slate-100 p-6 md:flex-row md:items-center md:justify-between md:p-8">
+      <div>
+        <h3 class="text-lg font-semibold text-slate-900">Weekly clinic schedule</h3>
+        <p class="text-sm text-slate-500">Set your default hours once — we’ll mirror them to weekdays, keep weekends off and auto-save.</p>
+      </div>
+      <div class="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-600">
+        <span class="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+        Saving happens automatically
+      </div>
     </div>
 
     @php
       $days = [
-        ['idx'=>0,'name'=>'Sunday'],
-        ['idx'=>1,'name'=>'Monday'],
-        ['idx'=>2,'name'=>'Tuesday'],
-        ['idx'=>3,'name'=>'Wednesday'],
-        ['idx'=>4,'name'=>'Thursday'],
-        ['idx'=>5,'name'=>'Friday'],
-        ['idx'=>6,'name'=>'Saturday'],
+        ['idx'=>1,'name'=>'Monday','weekend'=>false],
+        ['idx'=>2,'name'=>'Tuesday','weekend'=>false],
+        ['idx'=>3,'name'=>'Wednesday','weekend'=>false],
+        ['idx'=>4,'name'=>'Thursday','weekend'=>false],
+        ['idx'=>5,'name'=>'Friday','weekend'=>false],
+        ['idx'=>6,'name'=>'Saturday','weekend'=>true],
+        ['idx'=>0,'name'=>'Sunday','weekend'=>true],
       ];
     @endphp
 
-    <div class="space-y-4">
-      @foreach($days as $d)
-        <div class="border border-gray-200 rounded-xl p-4 js-day-card" data-dow="{{ $d['idx'] }}">
-          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <div class="text-base font-semibold text-gray-900">{{ $d['name'] }}</div>
-              <div class="text-xs text-gray-500">Set your clinic availability for {{ strtolower($d['name']) }}.</div>
-            </div>
-            <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-              <input type="checkbox" class="active h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
-              <span>Active</span>
-            </label>
+    <div class="p-6 md:p-8">
+      <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-6 shadow-sm">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h4 class="text-base font-semibold text-slate-900">Default clinic hours</h4>
+            <p class="text-xs text-slate-500">Fill these once — after we auto-save, weekday cards will unlock for fine tuning.</p>
           </div>
-
-          <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label class="block text-xs font-medium text-gray-600 uppercase tracking-wide">Start</label>
-              <input type="time" class="start mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" value="09:00">
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-gray-600 uppercase tracking-wide">End</label>
-              <input type="time" class="end mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" value="18:00">
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-gray-600 uppercase tracking-wide">Break Start</label>
-              <input type="time" class="break_start mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-gray-600 uppercase tracking-wide">Break End</label>
-              <input type="time" class="break_end mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
+          <label class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600">
+            <input type="checkbox" id="allow_weekends" class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+            <span>Allow weekend bookings</span>
+          </label>
+        </div>
+        <div class="mt-6 grid gap-4 md:grid-cols-4">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="default_start">Start</label>
+            <input type="time" id="default_start" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
           </div>
-
-          <div class="mt-2 text-xs text-gray-500">
-            Leave break fields empty if the doctor is available continuously between start and end.
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="default_end">End</label>
+            <input type="time" id="default_end" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="default_break_start">Break start</label>
+            <input type="time" id="default_break_start" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="default_break_end">Break end</label>
+            <input type="time" id="default_break_end" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
           </div>
         </div>
-      @endforeach
+      </div>
+
+      <div id="weeklyCards" class="mt-6 space-y-6 hidden">
+        @foreach($days as $d)
+          <div class="js-day-card group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-5 shadow-sm transition hover:border-indigo-200 hover:bg-white" data-dow="{{ $d['idx'] }}" data-weekend="{{ $d['weekend'] ? '1' : '0' }}">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="text-base font-semibold text-slate-900">{{ $d['name'] }}</div>
+                <div class="text-xs text-slate-500">Craft availability for {{ strtolower($d['name']) }} visitors.</div>
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="button" class="text-xs font-semibold text-indigo-500 underline-offset-2 hover:underline" data-reset-default>Use default</button>
+                <label class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-medium text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600">
+                  <input type="checkbox" class="active h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" {{ $d['weekend'] ? '' : 'checked' }}>
+                  <span>Active</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="mt-6 grid gap-4 md:grid-cols-4">
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Start</label>
+                <input type="time" class="start mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">End</label>
+                <input type="time" class="end mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Break start</label>
+                <input type="time" class="break_start mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Break end</label>
+                <input type="time" class="break_end mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+              </div>
+            </div>
+
+            <p class="mt-4 text-xs text-slate-500">Leave the break window blank to indicate continuous availability.</p>
+          </div>
+        @endforeach
+      </div>
     </div>
 
-    <div class="mt-3 text-xs text-gray-500" id="metaNote"></div>
-    <div class="flex items-center justify-between mt-5">
-      <div class="text-xs text-gray-500 max-w-md">
-        Need split hours? Add break start/end to carve out mid-day downtime.
+    <div class="border-t border-slate-100 bg-slate-50/60 p-6 md:flex md:items-center md:justify-between md:p-8">
+      <div class="max-w-lg text-xs text-slate-500" id="metaNote"></div>
+      <div class="mt-4 text-xs text-slate-500 md:mt-0">
+        As soon as you tweak the defaults we’ll copy them across weekdays, save and move you ahead.
       </div>
-      <button id="btnSave" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1">
-        Save Weekly Availability
-      </button>
     </div>
-    <div id="saveOut" class="mt-2 text-sm"></div>
-  </div>
+    <div id="saveOut" class="px-6 pb-6 text-sm md:px-8"></div>
+  </section>
 </div>
 
 <script>
@@ -146,6 +180,155 @@
 
   const el  = (selector) => document.querySelector(selector);
   const els = (selector) => Array.from(document.querySelectorAll(selector));
+  const defaultFields = {
+    start:      el('#default_start'),
+    end:        el('#default_end'),
+    breakStart: el('#default_break_start'),
+    breakEnd:   el('#default_break_end'),
+    weekends:   el('#allow_weekends')
+  };
+  const weeklyContainer = el('#weeklyCards');
+  let weeklyVisible = weeklyContainer ? !weeklyContainer.classList.contains('hidden') : false;
+  const hideWeekly = () => {
+    if (!weeklyContainer) return;
+    weeklyContainer.classList.add('hidden');
+    weeklyVisible = false;
+  };
+  const revealWeekly = () => {
+    if (!weeklyContainer) return;
+    if (weeklyVisible) return;
+    weeklyContainer.classList.remove('hidden');
+    weeklyVisible = true;
+  };
+  const metaNoteEl = el('#metaNote');
+  const setMetaNote = (msg) => {
+    if (!metaNoteEl) return;
+    metaNoteEl.textContent = msg || '';
+  };
+
+  let isBootstrapping = true;
+  let autoSaveTimer   = null;
+  let isSaving        = false;
+  let pendingAutoSave = false;
+  const AUTO_SAVE_DELAY = 700;
+
+  const getDefaultHours = () => ({
+    start:      defaultFields.start?.value || '',
+    end:        defaultFields.end?.value || '',
+    breakStart: defaultFields.breakStart?.value || '',
+    breakEnd:   defaultFields.breakEnd?.value || ''
+  });
+  const shouldAllowWeekends = () => !!defaultFields.weekends?.checked;
+
+  const setManual = (card, manual) => {
+    if (!card) return;
+    if (manual) {
+      card.dataset.manual = '1';
+    } else {
+      delete card.dataset.manual;
+    }
+  };
+
+  const setCardHours = (card, hours = {}) => {
+    if (!card) return;
+    const { start, end, breakStart, breakEnd } = hours;
+    const assign = (selector, value) => {
+      const input = card.querySelector(selector);
+      if (input && value !== undefined) input.value = value ?? '';
+    };
+    assign('.start', start ?? '');
+    assign('.end', end ?? '');
+    assign('.break_start', breakStart ?? '');
+    assign('.break_end', breakEnd ?? '');
+  };
+
+  const setCardToDefault = (card) => {
+    const defaults = getDefaultHours();
+    setCardHours(card, defaults);
+  };
+
+  const updateWeekendAppearance = () => {
+    const allow = shouldAllowWeekends();
+    els('.js-day-card').forEach(card => {
+      if (card.dataset.weekend === '1') {
+        const active = card.querySelector('.active');
+        card.classList.toggle('opacity-60', !allow && !(active?.checked));
+      }
+    });
+  };
+
+  const applyDefaultHours = (force = false) => {
+    const defaults = getDefaultHours();
+    const allowWeekends = shouldAllowWeekends();
+
+    els('.js-day-card').forEach(card => {
+      const isWeekend = card.dataset.weekend === '1';
+      const active = card.querySelector('.active');
+      const manual = card.dataset.manual === '1';
+
+      if (force || !manual) {
+        setCardHours(card, defaults);
+        if (!isWeekend || allowWeekends) {
+          if (active) active.checked = true;
+        } else if (active) {
+          active.checked = false;
+        }
+        if (force) setManual(card, false);
+      }
+
+      if (isWeekend && !allowWeekends) {
+        if (active && !manual) active.checked = false;
+      }
+    });
+
+    updateWeekendAppearance();
+  };
+
+  const queueAutoSave = () => {
+    if (isBootstrapping) return;
+    const defaults = getDefaultHours();
+    if (!defaults.start || !defaults.end) return;
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+      saveAvailability(true);
+    }, AUTO_SAVE_DELAY);
+  };
+
+  const wireDayCard = (card) => {
+    if (!card || card.dataset.wired === '1') return;
+    card.dataset.wired = '1';
+
+    const markManual = () => {
+      setManual(card, true);
+      if (!isBootstrapping) queueAutoSave();
+    };
+
+    card.querySelectorAll('input[type="time"]').forEach(input => {
+      input.addEventListener('input', markManual);
+      input.addEventListener('change', markManual);
+    });
+
+    const active = card.querySelector('.active');
+    active?.addEventListener('change', markManual);
+
+    const resetBtn = card.querySelector('[data-reset-default]');
+    resetBtn?.addEventListener('click', () => {
+      setManual(card, false);
+      setCardToDefault(card);
+      const isWeekend = card.dataset.weekend === '1';
+      const allow = shouldAllowWeekends();
+      if (active) {
+        if (!isWeekend || allow) {
+          active.checked = true;
+        } else {
+          active.checked = false;
+        }
+      }
+      updateWeekendAppearance();
+      if (!isBootstrapping) queueAutoSave();
+    });
+  };
+
   const toast = (msg, ok = true) => {
     if (window.Swal) {
       Swal.fire({ toast:true, position:'top', timer:1400, showConfirmButton:false, icon: ok ? 'success' : 'error', title:String(msg) });
@@ -188,12 +371,15 @@
   async function loadExistingAvailability() {
     const doctorId = getSelectedDoctorId();
     if (!doctorId) {
-      const note = el('#metaNote'); if (note) note.textContent = 'Select a doctor to load availability.';
+      setMetaNote('Select a doctor to load availability.');
+      hideWeekly();
+      isBootstrapping = false;
       return;
     }
     const serviceType = el('#service_type')?.value || 'in_clinic';
 
     try {
+      isBootstrapping = true;
       const url  = `${apiBase}/doctors/${doctorId}/availability` + (serviceType ? `?service_type=${encodeURIComponent(serviceType)}` : '');
       const res  = await fetch(url, { headers: { Accept: 'application/json' } });
       const text = await res.text();
@@ -202,10 +388,18 @@
 
       const list  = Array.isArray(json?.availability) ? json.availability : [];
       const byDow = new Map(list.map(r => [Number(r.day_of_week), r]));
+      const hasWeekend = list.some(r => [0,6].includes(Number(r.day_of_week)));
+      if (defaultFields.weekends) defaultFields.weekends.checked = hasWeekend;
 
-      const note = el('#metaNote');
-      if (note) note.textContent = `Loaded ${list.length} of 7 days from server for "${serviceType}".`;
+      if (list.length) {
+        revealWeekly();
+        setMetaNote(`Loaded ${list.length} of 7 days from server for "${serviceType}".`);
+      } else {
+        hideWeekly();
+        setMetaNote('Defaults not saved yet — fill the block above to unlock weekday cards.');
+      }
 
+      const defaults = getDefaultHours();
       els('.js-day-card').forEach(card => {
         const dow = Number(card.getAttribute('data-dow'));
         const row = byDow.get(dow);
@@ -217,18 +411,35 @@
 
         if (row) {
           if ($active) $active.checked = true;
-          if ($start)  $start.value    = toHM(row.start_time || '09:00:00');
-          if ($end)    $end.value      = toHM(row.end_time   || '18:00:00');
-          if ($bStart) $bStart.value   = toHM(row.break_start || '');
-          if ($bEnd)   $bEnd.value     = toHM(row.break_end   || '');
+          if ($start)  $start.value    = toHM(row.start_time || defaults.start);
+          if ($end)    $end.value      = toHM(row.end_time   || defaults.end);
+          if ($bStart) $bStart.value   = toHM(row.break_start || defaults.breakStart);
+          if ($bEnd)   $bEnd.value     = toHM(row.break_end   || defaults.breakEnd);
+          setManual(card, true);
         } else {
-          if ($active) $active.checked = false;
-          if ($start)  $start.value    = '09:00';
-          if ($end)    $end.value      = '18:00';
-          if ($bStart) $bStart.value   = '';
-          if ($bEnd)   $bEnd.value     = '';
+          setManual(card, false);
+          setCardToDefault(card);
+          const isWeekend = card.dataset.weekend === '1';
+          const allow = shouldAllowWeekends();
+          if ($active) {
+            if (!isWeekend || allow) {
+              $active.checked = true;
+            } else {
+              $active.checked = false;
+            }
+          }
         }
       });
+
+      updateWeekendAppearance();
+
+      const baseline = list.find(r => ![0,6].includes(Number(r.day_of_week))) || list[0];
+      if (baseline) {
+        if (defaultFields.start) defaultFields.start.value = toHM(baseline.start_time || defaults.start);
+        if (defaultFields.end) defaultFields.end.value = toHM(baseline.end_time || defaults.end);
+        if (defaultFields.breakStart) defaultFields.breakStart.value = toHM(baseline.break_start || defaults.breakStart);
+        if (defaultFields.breakEnd) defaultFields.breakEnd.value = toHM(baseline.break_end || defaults.breakEnd);
+      }
 
       const first = list[0] ?? null;
       if (first) {
@@ -237,9 +448,15 @@
         if (avg && first.avg_consultation_mins != null) avg.value = Number(first.avg_consultation_mins);
         if (bph && first.max_bookings_per_hour != null) bph.value = Number(first.max_bookings_per_hour);
       }
+      if (!list.length) {
+        const defaults = getDefaultHours();
+        if (!defaults.start) defaultFields.start?.focus();
+      }
     } catch (e) {
       out('#saveOut', `Load error: ${e?.message || e}`, false);
       console.error('[schedule] loadExistingAvailability error', e);
+    } finally {
+      isBootstrapping = false;
     }
   }
 
@@ -282,17 +499,25 @@
     return { availability, validationError };
   }
 
-  async function saveAvailability() {
+  async function saveAvailability(autoTriggered = false) {
     const doctorId = getSelectedDoctorId();
-    if (!doctorId) { alert('Select a doctor first'); return; }
+    if (!doctorId) {
+      if (!autoTriggered) alert('Select a doctor first');
+      return;
+    }
+
+    if (isSaving) {
+      pendingAutoSave = true;
+      return;
+    }
 
     const { availability, validationError } = collectAvailability();
     if (validationError) { out('#saveOut', validationError, false); return; }
     if (!availability.length) { out('#saveOut', 'Select at least one active day with valid times', false); return; }
 
-    const btn = el('#btnSave');
-    btn.disabled = true; btn.textContent = 'Saving…';
-    out('#saveOut', '', true);
+    isSaving = true;
+    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+    out('#saveOut', autoTriggered ? 'Saving your clinic hours…' : '', true);
 
     try {
       const res  = await fetch(`${apiBase}/doctors/${doctorId}/availability`, {
@@ -308,13 +533,15 @@
           ? json.message
           : (typeof json === 'string' ? json : 'Clinic schedule saved');
         out('#saveOut', successMessage, true);
-        toast(successMessage);
+        if (!autoTriggered) toast(successMessage);
+        revealWeekly();
+        setMetaNote('Clinic schedule saved. You can fine-tune weekdays below.');
         await loadExistingAvailability();
         try{
           const u = new URL(location.href);
           const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
           if ((u.searchParams.get('onboarding')||'') === '1'){
-            if (window.Swal){
+            if (window.Swal && !autoTriggered){
               Swal.fire({
                 icon:'success',
                 title:'Clinic schedule saved',
@@ -339,7 +566,11 @@
       toast(failMessage, false);
       console.error('[schedule] saveAvailability error', err);
     } finally {
-      btn.disabled = false; btn.textContent = 'Save Weekly Availability';
+      isSaving = false;
+      if (pendingAutoSave) {
+        pendingAutoSave = false;
+        queueAutoSave();
+      }
     }
   }
 
@@ -349,7 +580,174 @@
 
     dd?.addEventListener('change', loadExistingAvailability);
     el('#service_type')?.addEventListener('change', loadExistingAvailability);
-    el('#btnSave')?.addEventListener('click', saveAvailability);
+
+    els('.js-day-card').forEach(wireDayCard);
+    Object.values(defaultFields).forEach(field => {
+      field?.addEventListener('change', () => {
+        applyDefaultHours(false);
+        queueAutoSave();
+      });
+      field?.addEventListener('input', () => {
+        applyDefaultHours(false);
+        queueAutoSave();
+      });
+    });
+
+    if (!weeklyVisible) {
+      setMetaNote('Defaults not saved yet — fill the block above to unlock weekday cards.');
+    }
+
+    applyDefaultHours(true);
+    isBootstrapping = false;
   });
+</script>
+
+<script>
+  /* =========================
+     Create in-clinic service inline
+  ========================= */
+  (function(){
+    const form = document.getElementById('svc-form');
+    if (!form) return;
+
+    const fields = {
+      name:     document.getElementById('svc-name'),
+      duration: document.getElementById('svc-duration'),
+      price:    document.getElementById('svc-price'),
+      petType:  document.getElementById('svc-pet-type'),
+      main:     document.getElementById('svc-main'),
+      notes:    document.getElementById('svc-notes'),
+      submit:   document.getElementById('svc-submit'),
+      reset:    document.getElementById('svc-reset')
+    };
+
+    const API_POST_SVC = 'https://snoutiq.com/backend/api/groomer/service';
+    const PATH_BASE    = (typeof window !== 'undefined' && typeof window.PATH_PREFIX === 'string' && window.PATH_PREFIX.length)
+      ? window.PATH_PREFIX
+      : (location.pathname.startsWith('/backend') ? '/backend' : '');
+    const CSRF_URL     = `${PATH_BASE}/sanctum/csrf-cookie`;
+
+    const getCookie = (name) => document.cookie.split('; ').find(r => r.startsWith(name + '='))?.split('=')[1] || '';
+    const xsrfHeader = () => {
+      const raw = getCookie('XSRF-TOKEN');
+      return raw ? decodeURIComponent(raw) : '';
+    };
+
+    async function bootstrapAuth(){
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (token) return { mode:'bearer', token };
+      try {
+        await fetch(CSRF_URL, { credentials:'include' });
+        const xsrf = xsrfHeader();
+        if (xsrf) return { mode:'cookie', xsrf };
+      } catch (err) {
+        console.warn('csrf bootstrap failed', err);
+      }
+      return { mode:'none' };
+    }
+
+    const buildHeaders = (auth) => {
+      const headers = {
+        'Accept':'application/json',
+        'X-Acting-User':  String(CURRENT_USER_ID ?? ''),
+        'X-Session-User': String(SESSION_USER_ID ?? '')
+      };
+      if (auth.mode === 'bearer' && auth.token) {
+        headers['Authorization'] = 'Bearer ' + auth.token;
+      }
+      if (auth.mode === 'cookie') {
+        headers['X-Requested-With'] = 'XMLHttpRequest';
+        const xsrf = xsrfHeader();
+        if (xsrf) headers['X-XSRF-TOKEN'] = xsrf;
+      }
+      return headers;
+    };
+
+    const showAlert = (opts) => {
+      if (window.Swal) {
+        Swal.fire(opts);
+      } else {
+        alert(opts.title || opts.text || 'Something went wrong');
+      }
+    };
+
+    const toggleLoading = (on) => {
+      if (!fields.submit) return;
+      fields.submit.disabled = !!on;
+      if (on) {
+        fields.submit.dataset.oldText = fields.submit.textContent;
+        fields.submit.textContent = 'Saving…';
+      } else if (fields.submit.dataset.oldText) {
+        fields.submit.textContent = fields.submit.dataset.oldText;
+        delete fields.submit.dataset.oldText;
+      }
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const payload = {
+        name:     (fields.name?.value || '').trim(),
+        duration: Number(fields.duration?.value || 0),
+        price:    Number(fields.price?.value || 0),
+        petType:  fields.petType?.value || '',
+        main:     fields.main?.value || '',
+        notes:    (fields.notes?.value || '').trim()
+      };
+
+      if (!payload.name || !payload.duration || !payload.price || !payload.petType || !payload.main) {
+        showAlert({ icon:'warning', title:'Missing details', text:'Please fill all required service fields.' });
+        return;
+      }
+
+      toggleLoading(true);
+
+      try {
+        const auth = await bootstrapAuth();
+        if (auth.mode === 'none') {
+          showAlert({ icon:'warning', title:'Authentication needed', text:'Log in again or paste a Bearer token in local storage.' });
+          toggleLoading(false);
+          return;
+        }
+
+        const fd = new FormData();
+        fd.append('serviceName', payload.name);
+        fd.append('description', payload.notes);
+        fd.append('petType', payload.petType);
+        fd.append('price', payload.price);
+        fd.append('duration', payload.duration);
+        fd.append('main_service', payload.main);
+        fd.append('status', 'Active');
+        fd.append('user_id', String(CURRENT_USER_ID ?? ''));
+
+        const res = await fetch(API_POST_SVC, {
+          method:'POST',
+          headers: buildHeaders(auth),
+          body: fd,
+          credentials: 'include'
+        });
+
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); } catch (_){ }
+
+        if (!res.ok) {
+          const message = json?.message || json?.error || text || 'Failed to create service';
+          throw new Error(message);
+        }
+
+        showAlert({ icon:'success', title:'Service saved', text:'Your in-clinic service is now live.' });
+        form.reset();
+      } catch (err) {
+        showAlert({ icon:'error', title:'Could not save service', text: err?.message || 'Unexpected error' });
+      } finally {
+        toggleLoading(false);
+      }
+    });
+
+    fields.reset?.addEventListener('click', () => {
+      setTimeout(() => form.reset(), 0);
+    });
+  })();
 </script>
 @endsection
