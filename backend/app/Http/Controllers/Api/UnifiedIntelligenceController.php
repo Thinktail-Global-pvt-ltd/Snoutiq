@@ -441,9 +441,14 @@ class UnifiedIntelligenceController extends Controller
 
     private function callGeminiApi_curl(string $prompt, ?string $imagePath): string
     {
-        // TEMP: hard-coded creds (your request)
-        $apiKey = 'AIzaSyCIB0yfzSQGGwpVUruqy_sd2WqujTLa1Rk';
-        $url    = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+        $apiKey = 'AIzaSyB4VexpIoEsOrcNEytgf-RS3cG764A9Xvk';
+        $model  = 'gemini-2.0-flash';
+
+        $url = sprintf(
+            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
+            $model,
+            urlencode($apiKey)
+        );
 
         $parts = [['text' => $prompt]];
         if ($imagePath && is_readable($imagePath)) {
@@ -452,13 +457,18 @@ class UnifiedIntelligenceController extends Controller
             $parts[] = ['inline_data' => ['mime_type' => $mime, 'data' => $data]];
         }
 
-        $payload = json_encode(['contents' => [[ 'role' => 'user', 'parts' => $parts ]]], JSON_UNESCAPED_SLASHES);
+        $payload = json_encode([
+            'contents' => [[ 'role' => 'user', 'parts' => $parts ]],
+            'generationConfig' => [
+                'maxOutputTokens' => 450,
+            ],
+        ], JSON_UNESCAPED_SLASHES);
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json','X-goog-api-key: '.$apiKey],
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
             CURLOPT_POSTFIELDS     => $payload,
             CURLOPT_TIMEOUT        => 40,
             CURLOPT_CONNECTTIMEOUT => 15,
@@ -480,10 +490,21 @@ class UnifiedIntelligenceController extends Controller
 
         if ($http < 200 || $http >= 300) {
             Log::error('Gemini HTTP non-2xx', ['status' => $http, 'body' => $resp]);
-            return "AI error: HTTP {$http}";
+            $message = $this->extractGeminiErrorMessage($resp, $http);
+            return "AI error: {$message}";
         }
 
         $json = json_decode($resp, true);
         return $json['candidates'][0]['content']['parts'][0]['text'] ?? "No response.";
+    }
+
+    private function extractGeminiErrorMessage(string $body, int $status): string
+    {
+        $decoded = json_decode($body, true);
+        if (isset($decoded['error']['message']) && $decoded['error']['message'] !== '') {
+            return $decoded['error']['message'];
+        }
+
+        return "HTTP {$status}";
     }
 }
