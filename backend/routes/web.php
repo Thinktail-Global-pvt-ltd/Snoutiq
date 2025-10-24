@@ -8,6 +8,9 @@ use App\Models\Payment;
 use App\Http\Middleware\EnsureSessionUser;
 use App\Http\Controllers\VideoSchedulePageController;
 use App\Http\Controllers\VideoScheduleTestPageController;
+use App\Http\Controllers\EmergencyHoursPageController;
+use App\Http\Controllers\Api\ClinicEmergencyHoursController;
+
 
 // Public routes
 
@@ -90,6 +93,11 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         }
         return view('snoutiq.provider-schedule', compact('doctors', 'vetId'));
     })->name('doctor.schedule');
+
+    Route::get('/doctor/emergency-hours', [EmergencyHoursPageController::class, 'editor'])->name('doctor.emergency-hours');
+
+    Route::get('/api/clinic/emergency-hours', [ClinicEmergencyHoursController::class, 'show'])->name('api.clinic.emergency-hours.show');
+    Route::post('/api/clinic/emergency-hours', [ClinicEmergencyHoursController::class, 'upsert'])->name('api.clinic.emergency-hours.upsert');
 
     // New: Pet parent page using separate table & API (read-only)
     Route::get('/pet/video-calling-schedule', [VideoSchedulePageController::class, 'petIndex'])

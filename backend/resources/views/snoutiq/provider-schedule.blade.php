@@ -170,23 +170,14 @@
       const u = new URL(location.href);
       const isOnb = (u.searchParams.get('onboarding')||'') === '1';
       const step  = u.searchParams.get('step')||'';
-      const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
       if (isOnb && step==='3' && localStorage.getItem('onboarding_v1_done') !== '1'){
         const show = ()=>{
           if (!window.Swal) { setTimeout(show, 150); return; }
           Swal.fire({
             icon:'info',
-            title:'Set clinic schedule',
-            html:'Toggle the days you are available for in-clinic visits and set working hours.',
-            showCancelButton:true,
-            confirmButtonText:'Finish Setup',
-            cancelButtonText:'I will update this first'
-          }).then(r=>{
-            if (r.isConfirmed){
-              localStorage.setItem('onboarding_v1_done','1');
-              Swal.fire({icon:'success', title:'All set!', timer:1200, showConfirmButton:false});
-              setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor`; }, 900);
-            }
+            title:'Step 3: Clinic schedule',
+            html:'Set your weekly in-clinic hours. After saving, continue to emergency coverage to finish onboarding.',
+            confirmButtonText:'Got it',
           });
         };
         show();
@@ -323,9 +314,16 @@
           const u = new URL(location.href);
           const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
           if ((u.searchParams.get('onboarding')||'') === '1'){
-            localStorage.setItem('onboarding_v1_done','1');
-            if (window.Swal){ Swal.fire({icon:'success', title:'Clinic schedule saved', timer:900, showConfirmButton:false}); }
-            setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor`; }, 600);
+            if (window.Swal){
+              Swal.fire({
+                icon:'success',
+                title:'Clinic schedule saved',
+                text:'Next: confirm your emergency coverage hours.',
+                timer:1200,
+                showConfirmButton:false,
+              });
+            }
+            setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor/emergency-hours?onboarding=1&step=4`; }, 800);
           }
         }catch(_){ }
       } else {

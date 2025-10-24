@@ -76,6 +76,13 @@
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <span>Clinic Schedule</span>
       </a>
+      <a href="{{ route('doctor.emergency-hours') }}" class="{{ $baseItem }} {{ $active('doctor.emergency-hours') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636A9 9 0 105.636 18.364 9 9 0 1018.364 5.636z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l2.5 2.5"/>
+        </svg>
+        <span>Emergency Coverage</span>
+      </a>
     @endif
   </nav>
 </aside>
