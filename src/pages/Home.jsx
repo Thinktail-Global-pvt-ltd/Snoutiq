@@ -47,6 +47,7 @@ const Home = () => {
   );
 
   return (
+    
     <>
       <Header />
       <main className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex flex-col">
