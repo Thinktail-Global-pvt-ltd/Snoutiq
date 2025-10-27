@@ -112,6 +112,15 @@
         </div>
     </div>
 
+    <div class="d-flex justify-content-end mb-3">
+        <form method="POST" action="{{ route('admin.onboarding.logout') }}">
+            @csrf
+            <button type="submit" class="btn btn-outline-light btn-sm text-white">
+                Logout
+            </button>
+        </form>
+    </div>
+
     <div class="card admin-card">
         <div class="card-header border-0 pt-4 pb-0">
             <ul class="nav nav-pills tab-pill mb-0" id="admin-tab" role="tablist">

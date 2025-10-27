@@ -46,6 +46,12 @@ Route::get('/vets/{slug}', [VetLandingController::class, 'show']);
 Route::get('/admin/login', [AdminOnboardingStatusPageController::class, 'panel'])
     ->name('admin.onboarding.panel');
 
+Route::post('/admin/login/gate', [AdminOnboardingStatusPageController::class, 'authenticate'])
+    ->name('admin.onboarding.authenticate');
+
+Route::post('/admin/logout/gate', [AdminOnboardingStatusPageController::class, 'logout'])
+    ->name('admin.onboarding.logout');
+
 Route::prefix('admin/onboarding')->group(function () {
     Route::redirect('/services', '/admin/login#services')->name('admin.onboarding.services');
     Route::redirect('/video', '/admin/login#video')->name('admin.onboarding.video');
