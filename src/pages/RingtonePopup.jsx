@@ -869,31 +869,35 @@ export default function RingtonePopup({
   const [isProcessing, setIsProcessing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [waitingStatus, setWaitingStatus] = useState("");
-  const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
-  console.log(patientId, "paads");
+  const navigate = useNavigate();
+  const cleanupRef = useRef(false);
 
+  console.log("Patient ID:", patientId);
+
+  // Fetch patient summary
   useEffect(() => {
     const fetchSummary = async () => {
       try {
         const response = await axios.post(
           "https://snoutiq.com/backend/api/summary",
-          {
-            user_id: patientId,
-          }
+          { user_id: patientId }
         );
-        console.log(response, "ankit");
-
+        console.log("Summary response:", response);
         setSummary(response.data);
       } catch (error) {
         console.error("Error fetching summary:", error);
       }
     };
 
-    fetchSummary();
+    if (patientId) {
+      fetchSummary();
+    }
   }, [patientId]);
-  console.log(summary, "ankit2");
 
+  console.log("Summary data:", summary);
+
+  // Play ringtone and setup timers
   useEffect(() => {
     const playRingtone = async () => {
       try {
@@ -909,17 +913,18 @@ export default function RingtonePopup({
 
     playRingtone();
 
-    // Start call duration timer
+    // Call duration timer
     const timer = setInterval(() => {
       setCallDuration((prev) => prev + 1);
     }, 1000);
 
-    // Auto-reject after 30 seconds (only if not processing)
+    // Auto-reject after 5 minutes (only if not processing)
     const autoRejectTimer = setTimeout(() => {
-      if (!isProcessing) {
+      if (!isProcessing && !cleanupRef.current) {
+        console.log("Auto-rejecting call after 5 minutes");
         handleReject("timeout");
       }
-    }, 5 * 60 * 1000); // ✅ 5 minutes (300 seconds)
+    }, 5 * 60 * 1000);
 
     return () => {
       if (audioRef.current) {
@@ -931,14 +936,108 @@ export default function RingtonePopup({
     };
   }, [isProcessing]);
 
-  // Cleanup socket listeners on unmount
+  // ✅ ENHANCED: Setup disconnect listeners
   useEffect(() => {
+    console.log("Setting up disconnect listeners for call:", call.id);
+
+    // Handler for when other party disconnects
+    const handleOtherPartyDisconnected = (data) => {
+      console.log("Other party disconnected event:", data);
+      
+      if (data.callId === call.id && !cleanupRef.current) {
+        cleanupRef.current = true;
+        
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+
+        // Show notification
+        const message = `Call ended: ${data.message}`;
+        alert(message);
+        
+        // Close popup
+        if (onClose) onClose();
+      }
+    };
+
+    // Handler for when other party ends call intentionally
+    const handleCallEndedByOther = (data) => {
+      console.log("Call ended by other party event:", data);
+      
+      if (data.callId === call.id && !cleanupRef.current) {
+        cleanupRef.current = true;
+        
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+
+        // Show notification
+        const endedByText = data.endedBy === 'doctor' ? 'Doctor' : 'Patient';
+        const message = data.reason === 'disconnect' 
+          ? `${endedByText} lost connection. Call ended.`
+          : `${endedByText} ended the call.`;
+        
+        alert(message);
+        
+        // Close popup
+        if (onClose) onClose();
+      }
+    };
+
+    // Handler for call status updates (broadcast backup)
+    const handleCallStatusUpdate = (data) => {
+      console.log("Call status update:", data);
+      
+      if (data.callId === call.id && (data.status === 'ended' || data.status === 'disconnected') && !cleanupRef.current) {
+        cleanupRef.current = true;
+        
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+
+        alert(`Call ${data.status}. Returning to dashboard.`);
+        
+        if (onClose) onClose();
+      }
+    };
+
+    // Handler for own socket disconnect
+    const handleSocketDisconnect = (reason) => {
+      console.log("Socket disconnected:", reason);
+      
+      if (!cleanupRef.current) {
+        cleanupRef.current = true;
+        
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+
+        // Notify user
+        alert("Connection lost. Please check your internet and try again.");
+        
+        // Close popup
+        if (onClose) onClose();
+      }
+    };
+
+    // Register all listeners
+    socket.on("other-party-disconnected", handleOtherPartyDisconnected);
+    socket.on("call-ended-by-other", handleCallEndedByOther);
+    socket.on("call-status-update", handleCallStatusUpdate);
+    socket.on("disconnect", handleSocketDisconnect);
+
+    // Cleanup function
     return () => {
+      console.log("Cleaning up disconnect listeners");
+      socket.off("other-party-disconnected", handleOtherPartyDisconnected);
+      socket.off("call-ended-by-other", handleCallEndedByOther);
+      socket.off("call-status-update", handleCallStatusUpdate);
+      socket.off("disconnect", handleSocketDisconnect);
       socket.off("patient-paid");
       socket.off("payment-cancelled");
       socket.off("payment-verified");
     };
-  }, []);
+  }, [call.id, onClose]);
 
   const enableAudio = async () => {
     try {
@@ -952,6 +1051,8 @@ export default function RingtonePopup({
   };
 
   const handleAccept = () => {
+    if (cleanupRef.current) return;
+    
     setIsProcessing(true);
     setWaitingStatus("Accepting call...");
 
@@ -961,7 +1062,7 @@ export default function RingtonePopup({
 
     console.log("Doctor accepting call:", call.id);
 
-    // Emit call-accepted event with correct data structure
+    // Emit call-accepted event
     socket.emit("call-accepted", {
       callId: call.id,
       doctorId: doctorId,
@@ -975,44 +1076,36 @@ export default function RingtonePopup({
 
     // Listen for patient payment confirmation
     const handlePatientPaid = (data) => {
-      if (data.callId === call.id) {
+      if (data.callId === call.id && !cleanupRef.current) {
         console.log("Patient payment confirmed, navigating to video call");
+        cleanupRef.current = true;
         setWaitingStatus("Payment confirmed! Joining video call...");
 
-        // Small delay to show confirmation message
-        // setTimeout(() => {
-        //   navigate(
-        //     `/call-page/${data.channel}?uid=${doctorId}&role=host&callId=${data.callId}`
-        //   );
         setTimeout(() => {
-  navigate(
-    `/call-page/${data.channel}?uid=${doctorId}&role=host&callId=${data.callId}&doctorId=${doctorId}&patientId=${data.patientId}`,
-    {
-      state: {
-        doctorId,
-        patientId: data.patientId,
-        channel: data.channel,
-        callId: data.callId
-      }
-    }
-  );
+          navigate(
+            `/call-page/${data.channel}?uid=${doctorId}&role=host&callId=${data.callId}&doctorId=${doctorId}&patientId=${data.patientId}`,
+            {
+              state: {
+                doctorId,
+                patientId: data.patientId,
+                channel: data.channel,
+                callId: data.callId
+              }
+            }
+          );
 
-  // Cleanup listeners
-  socket.off("patient-paid", handlePatientPaid);
-  socket.off("payment-cancelled", handlePaymentCancelled);
-  onClose?.();
-}, 1500);
-
-        //   socket.off("patient-paid", handlePatientPaid);
-        //   socket.off("payment-cancelled", handlePaymentCancelled);
-        //   onClose?.();
-        // }, 1500);
+          // Cleanup listeners
+          socket.off("patient-paid", handlePatientPaid);
+          socket.off("payment-cancelled", handlePaymentCancelled);
+          if (onClose) onClose();
+        }, 1500);
       }
     };
 
     const handlePaymentCancelled = (data) => {
-      if (data.callId === call.id) {
+      if (data.callId === call.id && !cleanupRef.current) {
         console.log("Patient cancelled payment:", data.reason);
+        cleanupRef.current = true;
 
         const message =
           data.reason === "timeout"
@@ -1025,7 +1118,7 @@ export default function RingtonePopup({
         setTimeout(() => {
           socket.off("payment-cancelled", handlePaymentCancelled);
           socket.off("patient-paid", handlePatientPaid);
-          onClose?.();
+          if (onClose) onClose();
         }, 3000);
       }
     };
@@ -1036,6 +1129,9 @@ export default function RingtonePopup({
   };
 
   const handleReject = (reason = "rejected") => {
+    if (cleanupRef.current) return;
+    
+    cleanupRef.current = true;
     setIsProcessing(true);
 
     if (audioRef.current) {
@@ -1044,20 +1140,45 @@ export default function RingtonePopup({
 
     console.log("Doctor rejecting call:", call.id, "reason:", reason);
 
-    // Notify patient that call is rejected
+    // Professional rejection message
+    const rejectionMessage = reason === "timeout"
+      ? "Doctor did not respond within 5 minutes"
+      : reason === "busy"
+      ? "Doctor is currently on another call"
+      : "Doctor is currently unavailable";
+
+    // Notify patient that call is rejected with enhanced data
     socket.emit("call-rejected", {
       callId: call.id,
       doctorId: doctorId,
       patientId: call.patientId,
       reason: reason,
-      message:
-        reason === "timeout"
-          ? "Doctor did not respond within 30 seconds"
-          : "Doctor is currently unavailable",
+      message: rejectionMessage,
+      timestamp: new Date().toISOString()
     });
 
-    // Close popup immediately
-    onClose?.();
+    // Show professional feedback
+    toast.custom((t) => (
+      <div className="bg-white rounded-xl p-4 shadow-2xl border border-gray-200 max-w-sm mx-auto">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+            <span className="text-2xl">❌</span>
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Call Rejected</h3>
+            <p className="text-gray-600 text-sm">{rejectionMessage}</p>
+          </div>
+        </div>
+      </div>
+    ), {
+      duration: 3000,
+      position: 'top-center',
+    });
+
+    // Close popup after a brief delay
+    setTimeout(() => {
+      if (onClose) onClose();
+    }, 1000);
   };
 
   const formatTime = (seconds) => {

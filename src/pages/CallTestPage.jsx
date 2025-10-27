@@ -911,12 +911,12 @@
 //     </div>
 //   );
 // }
-
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { useParams, useSearchParams, useNavigate,useLocation } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
 import { socket } from "./socket";
 import logo from '../assets/images/logo.webp';
+import toast from 'react-hot-toast';
 
 const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
 
@@ -924,22 +924,15 @@ export default function CallPage() {
   const { channelName } = useParams();
   const [qs] = useSearchParams();
   const navigate = useNavigate();
-    const location = useLocation();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   // From navigation state
   const { doctorId: stateDoctorId, patientId: statePatientId, channel, callId } = location.state || {};
-  console.log(location.state,"ankit");
-  
 
   // From query params (fallback)
   const doctorId = stateDoctorId || searchParams.get("doctorId");
   const patientId = statePatientId || searchParams.get("patientId");
-
-  console.log("Doctor ID:", doctorId);
-  console.log("Patient ID:", patientId);
-  console.log("Channel:", channel);
-  console.log("Call ID:", callId);
 
   const safeChannel = useMemo(() => {
     return (channelName || "default_channel")
@@ -959,6 +952,7 @@ export default function CallPage() {
   const clientRef = useRef(AgoraRTC.createClient({ mode: "rtc", codec: "vp8" }));
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const hasEndedRef = useRef(false);
 
   // State
   const [localTracks, setLocalTracks] = useState([]);
@@ -968,8 +962,78 @@ export default function CallPage() {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
 
-  console.log("QS params:", Object.fromEntries(qs.entries()));
-  console.log("Role:", role, "UID:", uid);
+  // ✅ ENHANCED: Listen for call-ended-by-other and disconnect events
+  useEffect(() => {
+    const handleCallEndedByOther = (data) => {
+      console.log('🔔 Call ended by other party:', data);
+      
+      if (hasEndedRef.current) {
+        console.log('⚠️ Already ended, ignoring duplicate event');
+        return;
+      }
+
+      hasEndedRef.current = true;
+      
+      // Professional notification based on reason
+      const isDisconnect = data.reason === 'disconnect';
+      const endedByText = data.endedBy === 'doctor' ? 'Doctor' : 'Patient';
+      const message = isDisconnect 
+        ? `${endedByText} lost connection. Call ended.`
+        : `${endedByText} has ended the call.`;
+      
+      toast.custom((t) => (
+        <div className="bg-white rounded-xl p-4 shadow-2xl border border-gray-200 max-w-sm mx-auto">
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              isDisconnect ? 'bg-yellow-100' : 'bg-red-100'
+            }`}>
+              <span className="text-2xl">{isDisconnect ? '⚠️' : '📞'}</span>
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900">
+                {isDisconnect ? 'Connection Lost' : 'Call Ended'}
+              </h3>
+              <p className="text-gray-600 text-sm">{message}</p>
+            </div>
+          </div>
+        </div>
+      ), {
+        duration: 4000,
+        position: 'top-center',
+      });
+
+      // Cleanup and navigate
+      setTimeout(async () => {
+        await cleanup();
+        navigate(isHost 
+          ? `/prescription/${doctorId}/${patientId}`
+          : `/rating/${doctorId}/${patientId}`
+        );
+      }, 1500);
+    };
+
+    const handleCallStatusUpdate = (data) => {
+      console.log('📊 Call status update:', data);
+      
+      if (data.callId === callId && (data.status === 'ended' || data.status === 'disconnected')) {
+        handleCallEndedByOther({
+          callId: data.callId,
+          endedBy: data.endedBy || data.disconnectedBy,
+          reason: data.status === 'disconnected' ? 'disconnect' : 'ended'
+        });
+      }
+    };
+
+    socket.on("call-ended-by-other", handleCallEndedByOther);
+    socket.on("other-party-disconnected", handleCallEndedByOther);
+    socket.on("call-status-update", handleCallStatusUpdate);
+
+    return () => {
+      socket.off("call-ended-by-other", handleCallEndedByOther);
+      socket.off("other-party-disconnected", handleCallEndedByOther);
+      socket.off("call-status-update", handleCallStatusUpdate);
+    };
+  }, [navigate, isHost, doctorId, patientId, callId]);
 
   // Join channel effect
   useEffect(() => {
@@ -989,34 +1053,32 @@ export default function CallPage() {
         setJoined(true);
         setCallStatus("connected");
 
-        // Create tracks (host only)
-      let audioTrack = null;
-let videoTrack = null;
+        // Create tracks
+        let audioTrack = null;
+        let videoTrack = null;
 
-try {
-  audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-} catch (err) {
-  console.warn("Audio track error:", err);
-}
+        try {
+          audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        } catch (err) {
+          console.warn("Audio track error:", err);
+        }
 
-try {
-  videoTrack = await AgoraRTC.createCameraVideoTrack();
-} catch (err) {
-  console.warn("Video track error:", err);
-  setIsCameraOff(true); // show camera off
-}
+        try {
+          videoTrack = await AgoraRTC.createCameraVideoTrack();
+        } catch (err) {
+          console.warn("Video track error:", err);
+          setIsCameraOff(true);
+        }
 
-// Publish whatever tracks are available
-const tracksToPublish = [];
-if (audioTrack) tracksToPublish.push(audioTrack);
-if (videoTrack) tracksToPublish.push(videoTrack);
+        const tracksToPublish = [];
+        if (audioTrack) tracksToPublish.push(audioTrack);
+        if (videoTrack) tracksToPublish.push(videoTrack);
 
-if (tracksToPublish.length) {
-  await client.publish(tracksToPublish);
-}
-setLocalTracks(tracksToPublish);
-setCallStatus("connected"); // Ensure status connected even if video fails
-
+        if (tracksToPublish.length) {
+          await client.publish(tracksToPublish);
+        }
+        setLocalTracks(tracksToPublish);
+        setCallStatus("connected");
 
         if (videoTrack && localVideoRef.current) {
           videoTrack.play(localVideoRef.current);
@@ -1066,7 +1128,9 @@ setCallStatus("connected"); // Ensure status connected even if video fails
 
     return () => {
       mounted = false;
-      cleanup();
+      if (!hasEndedRef.current) {
+        cleanup();
+      }
     };
   }, [safeChannel, role, uid]);
 
@@ -1107,28 +1171,33 @@ setCallStatus("connected"); // Ensure status connected even if video fails
     }
   };
 
-  // const handleEndCall = async () => {
-  //   await cleanup();
-  //   socket.emit("call-ended", { channel: safeChannel });
-  //   navigate(isHost ? "/prescriptionPage" : "/ratings");
-  // };
   const handleEndCall = async () => {
-  await cleanup();
+    if (hasEndedRef.current) {
+      console.log('⚠️ Call already ended, preventing duplicate');
+      return;
+    }
 
-  // Emit call-ended with doctorId and patientId
-  socket.emit("call-ended", { 
-    channel: safeChannel,
-    doctorId: doctorId,     // make sure these variables are defined in your component
-    patientId: patientId
-  });
+    hasEndedRef.current = true;
 
-  // Navigate
-  navigate(isHost 
-    ? `/prescription/${doctorId}/${patientId}`  // pass params in route
-    : `/rating/${doctorId}/${patientId}`
-  );
-};
+    await cleanup();
 
+    // ✅ Emit call-ended with all required info
+    socket.emit("call-ended", { 
+      callId: callId,
+      channel: safeChannel,
+      userId: isHost ? doctorId : patientId,
+      role: role,
+      doctorId: doctorId,
+      patientId: patientId,
+      timestamp: new Date().toISOString()
+    });
+
+    // Navigate
+    navigate(isHost 
+      ? `/prescription/${doctorId}/${patientId}`
+      : `/rating/${doctorId}/${patientId}`
+    );
+  };
 
   const getStatusColor = () => {
     switch (callStatus) {
@@ -1139,240 +1208,178 @@ setCallStatus("connected"); // Ensure status connected even if video fails
     }
   };
 
-  // return (
-  //   <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
-  //     <div style={{ marginBottom: 20 }}>
-  //       <h2>Video Call</h2>
-  //       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-  //         <span>UID: <strong>{uid}</strong></span>
-  //         <span>Channel: <strong>{safeChannel}</strong></span>
-  //         <span>Role: <strong>{role}</strong></span>
-  //         <span style={{
-  //           padding: "4px 8px",
-  //           borderRadius: 12,
-  //           fontSize: 12,
-  //           fontWeight: "bold",
-  //           background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
-  //           color: getStatusColor()
-  //         }}>
-  //           {callStatus.toUpperCase()}
-  //         </span>
-  //       </div>
-  //     </div>
-
-  //     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-  //       <div style={{ position: "relative" }}>
-  //         <div ref={localVideoRef} style={{ width: "100%", height: 300, background: "#000", borderRadius: 12, overflow: "hidden" }} />
-  //         <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
-  //           You ({isHost ? "Doctor" : "Patient"})
-  //         </div>
-  //         {isCameraOff && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", fontSize: 18 }}>📷 Camera Off</div>}
-  //       </div>
-
-  //       <div style={{ position: "relative" }}>
-  //         <div ref={remoteVideoRef} style={{ width: "100%", height: 300, background: "#000", borderRadius: 12, overflow: "hidden" }} />
-  //         <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
-  //           {remoteUsers.length > 0 ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})` : "Waiting for other participant..."}
-  //         </div>
-  //         {remoteUsers.length === 0 && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", textAlign: "center" }}>
-  //           <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
-  //           <div>Waiting for {isHost ? "patient" : "doctor"}...</div>
-  //         </div>}
-  //       </div>
-  //     </div>
-
-  //     {joined && (
-  //       <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: 16, background: "#f9fafb", borderRadius: 12 }}>
-  //         <button onClick={toggleMute} style={{ padding: "12px 16px", borderRadius: 8, background: isMuted ? "#dc2626" : "#6b7280", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
-  //           {isMuted ? "🔇 Unmute" : "🎤 Mute"}
-  //         </button>
-  //         <button onClick={toggleCamera} style={{ padding: "12px 16px", borderRadius: 8, background: isCameraOff ? "#dc2626" : "#6b7280", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
-  //           {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
-  //         </button>
-  //         <button onClick={handleEndCall} style={{ padding: "12px 16px", borderRadius: 8, background: "#dc2626", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
-  //           📞 End Call
-  //         </button>
-  //       </div>
-  //     )}
-  //   </div>
-  // );
-
   return (
-  <div style={{
-    position: "relative",
-    width: "100vw",
-    height: "100vh",
-    backgroundColor: "#0b0f19",
-    overflow: "hidden",
-    color: "white",
-    fontFamily: "Inter, sans-serif"
-  }}>
-    
-    {/* --- Snoutiq Logo --- */}
     <div style={{
-      position: "absolute",
-      top: 16,
-      left: 20,
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      zIndex: 10
+      position: "relative",
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "#0b0f19",
+      overflow: "hidden",
+      color: "white",
+      fontFamily: "Inter, sans-serif"
     }}>
-      <img
-        src={logo}
-        alt="Snoutiq"
-      />
-    </div>
-
-    {/* --- Remote (Patient) Video --- */}
-    <div ref={remoteVideoRef} style={{
-      position: "absolute",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      background: "#000",
-      borderRadius: 0,
-      objectFit: "cover",
-      overflow: "hidden"
-    }} />
-
-    {/* Waiting state */}
-    {remoteUsers.length === 0 && (
+      
+      {/* Logo */}
       <div style={{
         position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        textAlign: "center",
-        color: "white",
-        opacity: 0.8
+        top: 16,
+        left: 20,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        zIndex: 10
       }}>
-        <div style={{ fontSize: 56, marginBottom: 8 }}>⏳</div>
-        <div style={{ fontSize: 18 }}>Waiting for {isHost ? "Patient" : "Doctor"} to join...</div>
+        <img src={logo} alt="Snoutiq" />
       </div>
-    )}
 
-    {/* --- Local (Doctor) Preview --- */}
-    <div style={{
-      position: "absolute",
-      bottom: 100,
-      right: 30,
-      width: 220,
-      height: 150,
-      borderRadius: 12,
-      overflow: "hidden",
-      border: "2px solid rgba(255,255,255,0.3)",
-      boxShadow: "0 0 20px rgba(0,0,0,0.4)",
-      background: "#000",
-      zIndex: 5
-    }}>
-      <div ref={localVideoRef} style={{ width: "100%", height: "100%" }} />
-      {isCameraOff && (
+      {/* Remote Video */}
+      <div ref={remoteVideoRef} style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        background: "#000",
+        borderRadius: 0,
+        objectFit: "cover",
+        overflow: "hidden"
+      }} />
+
+      {/* Waiting state */}
+      {remoteUsers.length === 0 && (
         <div style={{
           position: "absolute",
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          color: "white"
+          textAlign: "center",
+          color: "white",
+          opacity: 0.8
         }}>
-          📷 Camera Off
+          <div style={{ fontSize: 56, marginBottom: 8 }}>⏳</div>
+          <div style={{ fontSize: 18 }}>Waiting for {isHost ? "Patient" : "Doctor"} to join...</div>
         </div>
       )}
+
+      {/* Local Preview */}
       <div style={{
         position: "absolute",
-        bottom: 4,
-        left: 4,
-        background: "rgba(0,0,0,0.6)",
-        padding: "2px 8px",
-        borderRadius: 6,
-        fontSize: 12
+        bottom: 100,
+        right: 30,
+        width: 220,
+        height: 150,
+        borderRadius: 12,
+        overflow: "hidden",
+        border: "2px solid rgba(255,255,255,0.3)",
+        boxShadow: "0 0 20px rgba(0,0,0,0.4)",
+        background: "#000",
+        zIndex: 5
       }}>
-        You ({isHost ? "Doctor" : "Patient"})
+        <div ref={localVideoRef} style={{ width: "100%", height: "100%" }} />
+        {isCameraOff && (
+          <div style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            color: "white"
+          }}>
+            📷 Camera Off
+          </div>
+        )}
+        <div style={{
+          position: "absolute",
+          bottom: 4,
+          left: 4,
+          background: "rgba(0,0,0,0.6)",
+          padding: "2px 8px",
+          borderRadius: 6,
+          fontSize: 12
+        }}>
+          You ({isHost ? "Doctor" : "Patient"})
+        </div>
       </div>
-    </div>
 
-    {/* --- Top Status Bar --- */}
-    <div style={{
-      position: "absolute",
-      top: 16,
-      right: 20,
-      background: "rgba(255,255,255,0.1)",
-      padding: "8px 16px",
-      borderRadius: 12,
-      fontSize: 13,
-      fontWeight: 500,
-      display: "flex",
-      alignItems: "center",
-      gap: 10
-    }}>
-      <span>Channel: {safeChannel}</span>
-      <span style={{
-        width: 10,
-        height: 10,
-        borderRadius: "50%",
-        background: getStatusColor()
-      }}></span>
-      <span>{callStatus}</span>
-    </div>
-
-    {/* --- Controls --- */}
-    {joined && (
+      {/* Status Bar */}
       <div style={{
         position: "absolute",
-        bottom: 20,
-        left: "50%",
-        transform: "translateX(-50%)",
+        top: 16,
+        right: 20,
+        background: "rgba(255,255,255,0.1)",
+        padding: "8px 16px",
+        borderRadius: 12,
+        fontSize: 13,
+        fontWeight: 500,
         display: "flex",
-        gap: 20,
-        justifyContent: "center",
-        background: "rgba(0,0,0,0.5)",
-        padding: "12px 24px",
-        borderRadius: 50,
-        backdropFilter: "blur(6px)",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.3)"
+        alignItems: "center",
+        gap: 10
       }}>
-        <button onClick={toggleMute} style={{
-          width: 60,
-          height: 60,
+        <span>Channel: {safeChannel}</span>
+        <span style={{
+          width: 10,
+          height: 10,
           borderRadius: "50%",
-          border: "none",
-          background: isMuted ? "#dc2626" : "#4b5563",
-          color: "white",
-          fontSize: 20,
-          cursor: "pointer"
-        }}>
-          {isMuted ? "🔇" : "🎤"}
-        </button>
-
-        <button onClick={toggleCamera} style={{
-          width: 60,
-          height: 60,
-          borderRadius: "50%",
-          border: "none",
-          background: isCameraOff ? "#dc2626" : "#4b5563",
-          color: "white",
-          fontSize: 20,
-          cursor: "pointer"
-        }}>
-          {isCameraOff ? "📷" : "📹"}
-        </button>
-
-        <button onClick={handleEndCall} style={{
-          width: 60,
-          height: 60,
-          borderRadius: "50%",
-          border: "none",
-          background: "#dc2626",
-          color: "white",
-          fontSize: 22,
-          cursor: "pointer"
-        }}>
-          📞
-        </button>
+          background: getStatusColor()
+        }}></span>
+        <span>{callStatus}</span>
       </div>
-    )}
-  </div>
-);
 
+      {/* Controls */}
+      {joined && (
+        <div style={{
+          position: "absolute",
+          bottom: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          gap: 20,
+          justifyContent: "center",
+          background: "rgba(0,0,0,0.5)",
+          padding: "12px 24px",
+          borderRadius: 50,
+          backdropFilter: "blur(6px)",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.3)"
+        }}>
+          <button onClick={toggleMute} style={{
+            width: 60,
+            height: 60,
+            borderRadius: "50%",
+            border: "none",
+            background: isMuted ? "#dc2626" : "#4b5563",
+            color: "white",
+            fontSize: 20,
+            cursor: "pointer"
+          }}>
+            {isMuted ? "🔇" : "🎤"}
+          </button>
+
+          <button onClick={toggleCamera} style={{
+            width: 60,
+            height: 60,
+            borderRadius: "50%",
+            border: "none",
+            background: isCameraOff ? "#dc2626" : "#4b5563",
+            color: "white",
+            fontSize: 20,
+            cursor: "pointer"
+          }}>
+            {isCameraOff ? "📷" : "📹"}
+          </button>
+
+          <button onClick={handleEndCall} style={{
+            width: 60,
+            height: 60,
+            borderRadius: "50%",
+            border: "none",
+            background: "#dc2626",
+            color: "white",
+            fontSize: 22,
+            cursor: "pointer"
+          }}>
+            📞
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }

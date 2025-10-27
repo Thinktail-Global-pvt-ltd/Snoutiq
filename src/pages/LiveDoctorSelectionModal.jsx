@@ -81,10 +81,16 @@ const LiveDoctorSelectionModal = React.memo(
 
     const handleCallDoctor = useCallback(
       (doctor) => {
+        if (loading) return;
+        
         setSelectedDoctor(doctor.id);
+        
+        // Show professional loading state
+        console.log(`📞 Calling Dr. ${doctor.name}...`);
+        
         onCallDoctor(doctor);
       },
-      [onCallDoctor]
+      [onCallDoctor, loading]
     );
 
     const handleViewProfile = useCallback((doctor) => {

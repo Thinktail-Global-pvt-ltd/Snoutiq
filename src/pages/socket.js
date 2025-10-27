@@ -54,18 +54,56 @@ socket.on("reconnect_failed", () => {
   console.error("❌ Failed to reconnect after maximum attempts");
 });
 
-// Notification listener
+// ✅ ENHANCED: Notification listener with better error handling
 socket.on("receive_notification", (data) => {
   if (typeof window !== "undefined" && "Notification" in window) {
     if (Notification.permission === "granted") {
-      new Notification(data.title, { body: data.message });
+      try {
+        new Notification(data.title, { 
+          body: data.message,
+          icon: '/favicon.ico',
+          tag: data.id || 'snoutiq-notification'
+        });
+      } catch (error) {
+        console.error("Failed to show notification:", error);
+      }
     } else {
       Notification.requestPermission().then((permission) => {
         if (permission === "granted") {
-          new Notification(data.title, { body: data.message });
+          try {
+            new Notification(data.title, { 
+              body: data.message,
+              icon: '/favicon.ico',
+              tag: data.id || 'snoutiq-notification'
+            });
+          } catch (error) {
+            console.error("Failed to show notification:", error);
+          }
         }
+      }).catch(error => {
+        console.error("Failed to request notification permission:", error);
       });
     }
+  }
+});
+
+// ✅ ENHANCED: Call status update listener
+socket.on("call-status-update", (data) => {
+  console.log("📊 Call status update:", data);
+  
+  // Handle different call statuses
+  switch (data.status) {
+    case 'ended':
+      console.log(`🔚 Call ${data.callId} ended by ${data.endedBy}`);
+      break;
+    case 'disconnected':
+      console.log(`🔌 Call ${data.callId} disconnected by ${data.disconnectedBy}`);
+      break;
+    case 'rejected':
+      console.log(`❌ Call ${data.callId} rejected by ${data.rejectedBy}`);
+      break;
+    default:
+      console.log(`📊 Call ${data.callId} status: ${data.status}`);
   }
 });
 

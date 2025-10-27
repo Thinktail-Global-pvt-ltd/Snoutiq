@@ -1,4 +1,10 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import axios from "axios";
 import { AuthContext } from "../auth/AuthContext";
 import { socket } from "./socket";
@@ -13,7 +19,7 @@ const parseAIResponse = (text) => {
     whyAppropriate: [],
     howToPrepare: [],
     nextSteps: [],
-    diagnosis: null
+    diagnosis: null,
   };
 
   // Extract diagnosis section
@@ -22,7 +28,7 @@ const parseAIResponse = (text) => {
     sections.diagnosis = diagnosisMatch[1].trim();
   }
 
-  // Extract main recommendation
+  // Extract main recommendation with bold support
   const recMatch = text.match(/\*\*([^*]+)\*\*/);
   if (recMatch) {
     const recText = recMatch[1].trim();
@@ -32,38 +38,45 @@ const parseAIResponse = (text) => {
       "Specific Observations:",
       "Specific Observations",
       "Observation Summary:",
-      "Observation Summary"
+      "Observation Summary",
     ];
-    if (!blockedHeadings.some((heading) => recText.toLowerCase() === heading.toLowerCase())) {
-      sections.recommendation = recText;
+    if (
+      !blockedHeadings.some(
+        (heading) => recText.toLowerCase() === heading.toLowerCase()
+      )
+    ) {
+      sections.recommendation = recText; // Store raw text, bold will be handled in rendering
     }
   }
 
-  // Extract WHY VIDEO IS APPROPRIATE
-  const whyMatch = text.match(/\*\*WHY VIDEO IS APPROPRIATE:\*\*([\s\S]*?)(?=\*\*HOW TO PREPARE:|\*\*NEXT STEPS:|=== DIAGNOSIS|$)/);
+  // Extract and format WHY VIDEO IS APPROPRIATE with bold support
+  const whyMatch = text.match(
+    /\*\*WHY VIDEO IS APPROPRIATE:\*\*([\s\S]*?)(?=\*\*HOW TO PREPARE:|\*\*NEXT STEPS:|=== DIAGNOSIS|$)/
+  );
   if (whyMatch) {
-    const bullets = whyMatch[1].match(/• ([^\n]+)/g);
-    if (bullets) {
-      sections.whyAppropriate = bullets.map(b => b.replace('• ', '').trim());
-    }
+    const content = whyMatch[1].trim();
+    const bullets = content.match(/• ([^\n]+)/g) || [];
+    sections.whyAppropriate = bullets.map((b) => b.replace("• ", "").trim());
   }
 
-  // Extract HOW TO PREPARE
-  const prepMatch = text.match(/\*\*HOW TO PREPARE:\*\*([\s\S]*?)(?=\*\*NEXT STEPS:|=== DIAGNOSIS|$)/);
+  // Extract and format HOW TO PREPARE with bold support
+  const prepMatch = text.match(
+    /\*\*HOW TO PREPARE:\*\*([\s\S]*?)(?=\*\*NEXT STEPS:|=== DIAGNOSIS|$)/
+  );
   if (prepMatch) {
-    const bullets = prepMatch[1].match(/• ([^\n]+)/g);
-    if (bullets) {
-      sections.howToPrepare = bullets.map(b => b.replace('• ', '').trim());
-    }
+    const content = prepMatch[1].trim();
+    const bullets = content.match(/• ([^\n]+)/g) || [];
+    sections.howToPrepare = bullets.map((b) => b.replace("• ", "").trim());
   }
 
-  // Extract NEXT STEPS
-  const stepsMatch = text.match(/\*\*NEXT STEPS:\*\*([\s\S]*?)(?==== DIAGNOSIS|$)/);
+  // Extract and format NEXT STEPS with bold support
+  const stepsMatch = text.match(
+    /\*\*NEXT STEPS:\*\*([\s\S]*?)(?==== DIAGNOSIS|$)/
+  );
   if (stepsMatch) {
-    const bullets = stepsMatch[1].match(/• ([^\n]+)/g);
-    if (bullets) {
-      sections.nextSteps = bullets.map(b => b.replace('• ', '').trim());
-    }
+    const content = stepsMatch[1].trim();
+    const bullets = content.match(/• ([^\n]+)/g) || [];
+    sections.nextSteps = bullets.map((b) => b.replace("• ", "").trim());
   }
 
   return sections;
@@ -72,6 +85,22 @@ const parseAIResponse = (text) => {
 // ------------------- FormattedAIResponse Component - Responsive -------------------
 const FormattedAIResponse = ({ text }) => {
   const sections = parseAIResponse(text);
+
+  // Function to render text with bold formatting
+  const renderWithBold = (text) => {
+    if (!text) return null;
+    const parts = text.split(/(\*\*[^*]+\*\*)/g); // Split by bold markers
+    return parts.map((part, index) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return (
+          <span key={index} className="font-bold">
+            {part.replace(/^\*\*|\*\*$/g, '')}
+          </span>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
 
   return (
     <div className="bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl lg:rounded-2xl p-4 sm:p-5 lg:p-6 border-2 border-purple-200 shadow-lg max-w-full">
@@ -84,7 +113,7 @@ const FormattedAIResponse = ({ text }) => {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-purple-900 text-base sm:text-lg lg:text-xl leading-tight break-words">
-                {sections.recommendation}
+                {renderWithBold(sections.recommendation)}
               </h3>
             </div>
           </div>
@@ -92,9 +121,13 @@ const FormattedAIResponse = ({ text }) => {
       )}
 
       {/* Divider */}
-      {sections.recommendation && (sections.whyAppropriate.length > 0 || sections.howToPrepare.length > 0 || sections.nextSteps.length > 0 || sections.diagnosis) && (
-        <div className="h-px bg-gradient-to-r from-transparent via-purple-300 to-transparent mb-4 lg:mb-5"></div>
-      )}
+      {sections.recommendation &&
+        (sections.whyAppropriate.length > 0 ||
+          sections.howToPrepare.length > 0 ||
+          sections.nextSteps.length > 0 ||
+          sections.diagnosis) && (
+          <div className="h-px bg-gradient-to-r from-transparent via-purple-300 to-transparent mb-4 lg:mb-5"></div>
+        )}
 
       {/* Content Sections */}
       <div className="space-y-3 sm:space-y-4">
@@ -108,8 +141,12 @@ const FormattedAIResponse = ({ text }) => {
             <ul className="space-y-1.5 ml-4 sm:ml-5 lg:ml-6">
               {sections.whyAppropriate.map((item, idx) => (
                 <li key={idx} className="flex items-start gap-2">
-                  <span className="text-green-500 text-xs mt-0.5 sm:mt-1 flex-shrink-0">●</span>
-                  <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">{item}</span>
+                  <span className="text-green-500 text-xs mt-0.5 sm:mt-1 flex-shrink-0">
+                    ●
+                  </span>
+                  <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">
+                    {renderWithBold(item)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -126,8 +163,12 @@ const FormattedAIResponse = ({ text }) => {
             <ul className="space-y-1.5 ml-4 sm:ml-5 lg:ml-6">
               {sections.howToPrepare.map((item, idx) => (
                 <li key={idx} className="flex items-start gap-2">
-                  <span className="text-purple-500 text-xs mt-0.5 sm:mt-1 flex-shrink-0">●</span>
-                  <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">{item}</span>
+                  <span className="text-purple-500 text-xs mt-0.5 sm:mt-1 flex-shrink-0">
+                    ●
+                  </span>
+                  <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">
+                    {renderWithBold(item)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -144,8 +185,12 @@ const FormattedAIResponse = ({ text }) => {
             <ul className="space-y-1.5 ml-4 sm:ml-5 lg:ml-6">
               {sections.nextSteps.map((item, idx) => (
                 <li key={idx} className="flex items-start gap-2">
-                  <span className="text-indigo-500 text-xs mt-0.5 sm:mt-1 flex-shrink-0">●</span>
-                  <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">{item}</span>
+                  <span className="text-indigo-500 text-xs mt-0.5 sm:mt-1 flex-shrink-0">
+                    ●
+                  </span>
+                  <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">
+                    {renderWithBold(item)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -159,7 +204,9 @@ const FormattedAIResponse = ({ text }) => {
               <span className="flex-shrink-0">🩺</span>
               <span className="break-words">Initial Assessment:</span>
             </h4>
-            <p className="text-blue-800 text-xs sm:text-sm leading-relaxed break-words">{sections.diagnosis}</p>
+            <p className="text-blue-800 text-xs sm:text-sm leading-relaxed break-words">
+              {renderWithBold(sections.diagnosis)}
+            </p>
           </div>
         )}
       </div>
@@ -168,7 +215,12 @@ const FormattedAIResponse = ({ text }) => {
 };
 
 // ------------------- DoctorSearchModal - Responsive -------------------
-const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 5 * 60 * 1000 }) => {
+const DoctorSearchModal = ({
+  visible,
+  onClose,
+  onFailure,
+  searchTime = 5 * 60 * 1000,
+}) => {
   const [dots, setDots] = useState("");
   const [elapsedTime, setElapsedTime] = useState(0);
   const timeRef = useRef(null);
@@ -177,7 +229,7 @@ const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 5 * 60 * 
     if (visible) {
       setElapsedTime(0);
       timeRef.current = setInterval(() => {
-        setElapsedTime(prev => prev + 1);
+        setElapsedTime((prev) => prev + 1);
       }, 1000);
 
       const interval = setInterval(() => {
@@ -199,7 +251,7 @@ const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 5 * 60 * 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
   if (!visible) return null;
@@ -235,9 +287,14 @@ const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 5 * 60 * 
 
         {/* Progress Bar */}
         <div className="w-full h-2 bg-gray-200 rounded-full mb-6 sm:mb-8 overflow-hidden">
-          <div 
+          <div
             className="h-full bg-gradient-to-r from-purple-500 to-purple-700 rounded-full transition-all duration-300"
-            style={{ width: `${Math.min((elapsedTime / (searchTime / 1000)) * 100, 100)}%` }}
+            style={{
+              width: `${Math.min(
+                (elapsedTime / (searchTime / 1000)) * 100,
+                100
+              )}%`,
+            }}
           ></div>
         </div>
 
@@ -268,20 +325,51 @@ const DoctorSearchModal = ({ visible, onClose, onFailure, searchTime = 5 * 60 * 
   );
 };
 
+// ------------------- StartCallButton Component -------------------
 const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const [loading, setLoading] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [callStatus, setCallStatus] = useState(null);
-  const { user, token, nearbyDoctors, liveDoctors } = useContext(AuthContext);
-  const patientId = user?.id ;
+
+  // Safe context access with defaults
+  const authContext = useContext(AuthContext);
+  const {
+    user = {},
+    token = null,
+    nearbyDoctors = [],
+    liveDoctors = [],
+  } = authContext || {};
+
+  const patientId = user?.id || "temp_user";
   const timeoutRef = useRef(null);
   const [showLiveDoctorsModal, setShowLiveDoctorsModal] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState('idle');
+  const [connectionStatus, setConnectionStatus] = useState("idle");
+  
+  // Track active toasts to prevent duplicates
+  const activeToastIds = useRef(new Set());
+
+  const clearAllToasts = useCallback(() => {
+    activeToastIds.current.forEach(id => {
+      toast.dismiss(id);
+    });
+    activeToastIds.current.clear();
+  }, []);
+
+  const showToast = useCallback((message, options = {}) => {
+    const toastId = toast(message, options);
+    activeToastIds.current.add(toastId);
+    return toastId;
+  }, []);
+
+  const dismissToast = useCallback((toastId) => {
+    toast.dismiss(toastId);
+    activeToastIds.current.delete(toastId);
+  }, []);
 
   const handleNoResponse = useCallback(() => {
     setLoading(false);
     setShowSearchModal(false);
-    setConnectionStatus('failed');
+    setConnectionStatus("failed");
     setCallStatus(null);
 
     if (timeoutRef.current) {
@@ -289,118 +377,144 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       timeoutRef.current = null;
     }
 
-    toast.custom((t) => (
-      <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl border border-gray-200 max-w-xs sm:max-w-sm mx-auto">
-        <div className="flex items-center gap-3 mb-3 sm:mb-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-xl sm:text-2xl">🐕</span>
+    // Clear previous toasts first
+    clearAllToasts();
+
+    const toastId = toast.custom(
+      (t) => (
+        <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl border border-gray-200 max-w-xs sm:max-w-sm mx-auto">
+          <div className="flex items-center gap-3 mb-3 sm:mb-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-xl sm:text-2xl">🐕</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base lg:text-lg break-words">
+                No Immediate Response
+              </h3>
+              <p className="text-gray-600 text-xs sm:text-sm break-words">
+                All veterinarians are currently busy
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-gray-900 text-sm sm:text-base lg:text-lg break-words">No Immediate Response</h3>
-            <p className="text-gray-600 text-xs sm:text-sm break-words">All veterinarians are currently busy</p>
+
+          <p className="text-gray-700 mb-3 sm:mb-4 text-xs sm:text-sm break-words">
+            You can try again or book a clinic appointment for guaranteed care.
+          </p>
+
+          <div className="flex gap-2 sm:gap-3">
+            <button
+              onClick={() => {
+                dismissToast(t.id);
+                setConnectionStatus("idle");
+              }}
+              className="flex-1 py-2 px-3 sm:px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors text-xs sm:text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                dismissToast(t.id);
+                setConnectionStatus("idle");
+                setShowLiveDoctorsModal(true);
+              }}
+              className="flex-1 py-2 px-3 sm:px-4 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors text-xs sm:text-sm"
+            >
+              See Doctors
+            </button>
           </div>
         </div>
-        
-        <p className="text-gray-700 mb-3 sm:mb-4 text-xs sm:text-sm break-words">
-          You can try again or book a clinic appointment for guaranteed care.
-        </p>
-        
-        <div className="flex gap-2 sm:gap-3">
-          <button
-            onClick={() => {
-              toast.dismiss(t.id);
-              setConnectionStatus('idle');
-            }}
-            className="flex-1 py-2 px-3 sm:px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors text-xs sm:text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              toast.dismiss(t.id);
-              setConnectionStatus('idle');
-              setShowLiveDoctorsModal(true);
-            }}
-            className="flex-1 py-2 px-3 sm:px-4 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors text-xs sm:text-sm"
-          >
-            See Doctors
-          </button>
-        </div>
-      </div>
-    ), {
-      duration: 10000,
-      position: 'top-center',
-    });
-  }, []);
-
-  const handleCallAccepted = useCallback((data) => {
-    console.log('🔔 Call accepted - Starting navigation process', data);
-    
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-
-    setCallStatus({ type: "accepted", ...data });
-    setLoading(false);
-    setShowSearchModal(false);
-    setConnectionStatus('connected');
-
-    const doctor = (nearbyDoctors || []).find((d) => d.id == data.doctorId) ||
-      (liveDoctors || []).find((d) => d.id == data.doctorId);
-
-    const patientIdLocal = user?.id;
-
-    toast.success(`🎉 Call connected with veterinarian! Redirecting...`, {
-      duration: 3000,
-      icon: '🐾'
-    });
-
-    setTimeout(() => {
-      try {
-        if (data.requiresPayment) {
-          const query = new URLSearchParams({
-            callId: String(data.callId || ''),
-            doctorId: String(doctor?.id || data.doctorId || ''),
-            channel: String(data.channel || ''),
-            patientId: String(patientIdLocal || ''),
-          }).toString();
-
-          if (typeof navigation === 'function') {
-            navigation(`/payment/${data.callId}?${query}`, {
-              state: {
-                doctor: doctor,
-                channel: data.channel,
-                patientId: patientIdLocal,
-                callId: data.callId,
-              },
-            });
-          } else {
-            window.location.href = `/payment/${data.callId}?${query}`;
-          }
-        } else {
-          const query = new URLSearchParams({
-            uid: String(patientIdLocal || ''),
-            role: 'audience',
-            callId: String(data.callId || ''),
-            doctorId: String(doctor?.id || data.doctorId || ''),
-            patientId: String(patientIdLocal || ''),
-          }).toString();
-
-          if (typeof navigation === 'function') {
-            navigation(`/call-page/${data.channel}?${query}`);
-          } else {
-            window.location.href = `/call-page/${data.channel}?${query}`;
-          }
-        }
-      } catch (error) {
-        console.error('❌ Navigation failed:', error);
-        toast.error('Failed to redirect. Please try again.');
+      ),
+      {
+        duration: 10000,
+        position: "top-center",
       }
-    }, 800);
-  }, [navigation, nearbyDoctors, liveDoctors, user?.id]);
+    );
+    
+    activeToastIds.current.add(toastId);
+  }, [clearAllToasts, dismissToast]);
+
+  const handleCallAccepted = useCallback(
+    (data) => {
+      console.log("🔔 Call accepted - Starting navigation process", data);
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
+      // Clear all previous toasts
+      clearAllToasts();
+
+      setCallStatus({ type: "accepted", ...data });
+      setLoading(false);
+      setShowSearchModal(false);
+      setConnectionStatus("connected");
+
+      const doctor =
+        (nearbyDoctors || []).find((d) => d.id == data.doctorId) ||
+        (liveDoctors || []).find((d) => d.id == data.doctorId);
+
+      const patientIdLocal = user?.id || "temp_user";
+
+      const toastId = toast.success(`🎉 Call connected with veterinarian! Redirecting...`, {
+        duration: 3000,
+        icon: "🐾",
+      });
+      activeToastIds.current.add(toastId);
+
+      setTimeout(() => {
+        try {
+          if (data.requiresPayment) {
+            const query = new URLSearchParams({
+              callId: String(data.callId || ""),
+              doctorId: String(doctor?.id || data.doctorId || ""),
+              channel: String(data.channel || ""),
+              patientId: String(patientIdLocal || ""),
+            }).toString();
+
+            if (typeof navigation === "function") {
+              navigation(`/payment/${data.callId}?${query}`, {
+                state: {
+                  doctor: doctor,
+                  channel: data.channel,
+                  patientId: patientIdLocal,
+                  callId: data.callId,
+                },
+              });
+            } else {
+              window.location.href = `/payment/${data.callId}?${query}`;
+            }
+          } else {
+            const query = new URLSearchParams({
+              uid: String(patientIdLocal || ""),
+              role: "audience",
+              callId: String(data.callId || ""),
+              doctorId: String(doctor?.id || data.doctorId || ""),
+              patientId: String(patientIdLocal || ""),
+            }).toString();
+
+            if (typeof navigation === "function") {
+              navigation(`/call-page/${data.channel}?${query}`);
+            } else {
+              window.location.href = `/call-page/${data.channel}?${query}`;
+            }
+          }
+        } catch (error) {
+          console.error("❌ Navigation failed:", error);
+          const errorToastId = toast.error("Failed to redirect. Please try again.");
+          activeToastIds.current.add(errorToastId);
+        }
+      }, 800);
+    },
+    [navigation, nearbyDoctors, liveDoctors, user?.id, clearAllToasts]
+  );
 
   useEffect(() => {
+    if (!socket) {
+      console.error("Socket not available");
+      return;
+    }
+
     if (!socket.connected) {
       socket.connect();
     }
@@ -409,8 +523,11 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
 
     const handleCallSent = (data) => {
       setCallStatus({ type: "sent", ...data });
-      setConnectionStatus('connecting');
-      toast.loading('📞 Calling veterinarian...', { id: 'call-sent' });
+      setConnectionStatus("connecting");
+      // Clear previous loading toasts
+      toast.dismiss("call-sent");
+      const toastId = toast.loading("📞 Calling veterinarian...", { id: "call-sent" });
+      activeToastIds.current.add(toastId);
     };
 
     const handleCallRejected = (data) => {
@@ -419,48 +536,100 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         timeoutRef.current = null;
       }
 
+      // Clear previous toasts
+      clearAllToasts();
+
       setCallStatus({ type: "rejected", ...data });
       setLoading(false);
       setShowSearchModal(false);
-      setConnectionStatus('failed');
+      setConnectionStatus("failed");
 
-      toast.dismiss('call-sent');
-      toast.error('❌ Veterinarian is currently unavailable', { duration: 4000 });
+      // Professional error message based on rejection reason
+      const errorMessage =
+        data.reason === "timeout"
+          ? "⏰ No veterinarian responded within 5 minutes. Please try again or book a clinic appointment."
+          : "❌ Veterinarian is currently unavailable. Please try again later.";
+
+      const toastId = toast.custom(
+        (t) => (
+          <div className="bg-white rounded-xl p-4 shadow-2xl border border-gray-200 max-w-sm mx-auto">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">🐕</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900">Call Not Available</h3>
+                <p className="text-gray-600 text-sm">{errorMessage}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  dismissToast(t.id);
+                  setConnectionStatus("idle");
+                }}
+                className="flex-1 py-2 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  dismissToast(t.id);
+                  setConnectionStatus("idle");
+                  setShowLiveDoctorsModal(true);
+                }}
+                className="flex-1 py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors text-sm"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        ),
+        {
+          duration: 8000,
+          position: "top-center",
+        }
+      );
+      activeToastIds.current.add(toastId);
     };
 
     const handleDoctorBusy = (data) => {
       setCallStatus({ type: "busy", ...data });
       setLoading(false);
       setShowSearchModal(false);
-      setConnectionStatus('failed');
-      
-      toast.dismiss('call-sent');
-      toast.error('🐕 Veterinarian is on another call', { duration: 4000 });
+      setConnectionStatus("failed");
+
+      clearAllToasts();
+      const toastId = toast.error("🐕 Veterinarian is on another call", { duration: 4000 });
+      activeToastIds.current.add(toastId);
     };
 
     const handleCallFailed = (data) => {
       setCallStatus({ type: "failed", ...data });
       setLoading(false);
       setShowSearchModal(false);
-      setConnectionStatus('failed');
-      
-      toast.dismiss('call-sent');
-      toast.error('❌ Veterinarian not available', { duration: 4000 });
+      setConnectionStatus("failed");
+    
+      // ✅ Dismiss any existing toasts before showing a new one
+      toast.dismiss();
+      toast.error("❌ Veterinarian not available", { duration: 4000 });
     };
+    
 
     const handleCallEnded = () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      
+
       setLoading(false);
       setShowSearchModal(false);
-      setConnectionStatus('idle');
+      setConnectionStatus("idle");
       setCallStatus(null);
-      toast.dismiss('call-sent');
+      clearAllToasts();
     };
 
+    // Add event listeners
     socket.on("call-sent", handleCallSent);
     socket.on("call-accepted", handleCallAccepted);
     socket.on("call-rejected", handleCallRejected);
@@ -470,6 +639,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     socket.on("call-failed", handleCallFailed);
 
     return () => {
+      // Remove event listeners
       socket.off("call-sent", handleCallSent);
       socket.off("call-accepted", handleCallAccepted);
       socket.off("call-rejected", handleCallRejected);
@@ -477,72 +647,106 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       socket.off("call-cancelled", handleCallEnded);
       socket.off("doctor-busy", handleDoctorBusy);
       socket.off("call-failed", handleCallFailed);
-      
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
+      
+      clearAllToasts();
     };
-  }, [handleCallAccepted]);
+  }, [handleCallAccepted, clearAllToasts, dismissToast]);
 
-  const handleCallDoctor = useCallback((doctor) => {
-    const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const channel = `channel_${callId}`;
+  const handleCallDoctor = useCallback(
+    (doctor) => {
+      const callId = `call_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 8)}`;
+      const channel = `channel_${callId}`;
 
-    setCallStatus(null);
-    setLoading(true);
-    setShowLiveDoctorsModal(false);
-    setShowSearchModal(true);
-    setConnectionStatus('connecting');
+      // Clear previous toasts
+      clearAllToasts();
 
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+      setCallStatus(null);
+      setLoading(true);
+      setShowLiveDoctorsModal(false);
+      setShowSearchModal(true);
+      setConnectionStatus("connecting");
 
-    socket.emit("call-requested", {
-      doctorId: doctor.id,
-      patientId,
-      channel,
-      callId,
-      timestamp: new Date().toISOString(),
-    });
-
-    timeoutRef.current = setTimeout(() => {
-      if (loading || showSearchModal) {
-        handleNoResponse();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
-    }, 5 * 60 * 1000);
-  }, [patientId, loading, showSearchModal, handleNoResponse]);
 
-  const startCall = useCallback(() => {
-    const doctorsToCall = nearbyDoctors && nearbyDoctors.length ? nearbyDoctors : [];
-
-    if (!doctorsToCall.length) {
-      toast.error('🐾 No veterinarians available nearby. Please try again later.', {
-        duration: 5000,
-        icon: '😔'
-      });
-      return;
-    }
-
-    setLoading(true);
-    setShowSearchModal(true);
-    setConnectionStatus('connecting');
-
-    const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const channel = `channel_${callId}`;
-
-    try {
-      doctorsToCall.forEach((doc) => {
+      if (socket) {
         socket.emit("call-requested", {
-          doctorId: doc.id,
+          doctorId: doctor.id,
           patientId,
           channel,
           callId,
           timestamp: new Date().toISOString(),
         });
-      });
+
+        timeoutRef.current = setTimeout(() => {
+          if (loading || showSearchModal) {
+            handleNoResponse();
+          }
+        }, 5 * 60 * 1000);
+      } else {
+        console.error("Socket not available");
+        handleNoResponse();
+      }
+    },
+    [patientId, loading, showSearchModal, handleNoResponse, clearAllToasts]
+  );
+
+  const startCall = useCallback(() => {
+    const doctorsToCall =
+      nearbyDoctors && nearbyDoctors.length ? nearbyDoctors : [];
+
+    if (!doctorsToCall.length) {
+      // Clear previous toasts first
+      clearAllToasts();
+      
+      const toastId = toast.error(
+        "🐾 No veterinarians available nearby. Please try again later.",
+        {
+          duration: 5000,
+          icon: "😔",
+        }
+      );
+      activeToastIds.current.add(toastId);
+      return;
+    }
+
+    // Clear previous toasts
+    clearAllToasts();
+
+    setLoading(true);
+    setShowSearchModal(true);
+    setConnectionStatus("connecting");
+
+    const callId = `call_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 8)}`;
+    const channel = `channel_${callId}`;
+
+    try {
+      if (socket) {
+        doctorsToCall.forEach((doc) => {
+          socket.emit("call-requested", {
+            doctorId: doc.id,
+            patientId,
+            channel,
+            callId,
+            timestamp: new Date().toISOString(),
+          });
+        });
+      } else {
+        console.error("Socket not available");
+        handleNoResponse();
+        return;
+      }
     } catch (error) {
       console.error("Error sending call requests:", error);
       handleNoResponse();
@@ -555,36 +759,38 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         handleNoResponse();
       }
     }, 5 * 60 * 1000);
-  }, [nearbyDoctors, patientId, loading, callStatus, handleNoResponse]);
+  }, [nearbyDoctors, patientId, loading, callStatus, handleNoResponse, clearAllToasts]);
 
   const getButtonState = () => {
-    if (loading) return 'loading';
-    if (connectionStatus === 'no_doctors' || connectionStatus === 'failed') return 'unavailable';
-    if (!nearbyDoctors?.length && !liveDoctors?.length) return 'unavailable';
-    return 'available';
+    if (loading) return "loading";
+    if (connectionStatus === "no_doctors" || connectionStatus === "failed")
+      return "unavailable";
+    if (!nearbyDoctors?.length && !liveDoctors?.length) return "unavailable";
+    return "available";
   };
 
   const buttonState = getButtonState();
-  const buttonDisabled = buttonState === 'unavailable' || buttonState === 'loading';
+  const buttonDisabled =
+    buttonState === "unavailable" || buttonState === "loading";
 
   const getButtonText = () => {
     switch (buttonState) {
-      case 'loading':
-        return 'Searching for Veterinarians...';
-      case 'unavailable':
-        return 'No Veterinarians Available';
+      case "loading":
+        return "Searching for Veterinarians...";
+      case "unavailable":
+        return "No Veterinarians Available";
       default:
-        return 'Start Video Consultation';
+        return "Start Video Consultation";
     }
   };
 
   const getButtonIcon = () => {
     switch (buttonState) {
-      case 'loading':
+      case "loading":
         return (
           <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
         );
-      case 'unavailable':
+      case "unavailable":
         return <span className="text-white text-sm sm:text-base">🐾</span>;
       default:
         return (
@@ -601,8 +807,12 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         <button
           className={`
             w-full relative overflow-hidden rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105
-            ${buttonDisabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-xl'}
-            ${buttonState === 'loading' ? 'opacity-80' : ''}
+            ${
+              buttonDisabled
+                ? "opacity-60 cursor-not-allowed"
+                : "hover:shadow-xl"
+            }
+            ${buttonState === "loading" ? "opacity-80" : ""}
           `}
           onClick={() => {
             if (liveDoctors && liveDoctors.length) {
@@ -613,29 +823,35 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
           }}
           disabled={buttonDisabled}
         >
-          {!buttonDisabled && buttonState !== 'loading' && (
+          {!buttonDisabled && buttonState !== "loading" && (
             <div className="absolute inset-0 bg-purple-600 rounded-xl sm:rounded-2xl shadow-lg shadow-purple-500/50 animate-pulse"></div>
           )}
 
-          <div className={`
+          <div
+            className={`
             relative w-full py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-gradient-to-r transition-all duration-300
-            ${buttonState === 'loading' ? 'from-gray-500 to-gray-600' :
-              buttonState === 'unavailable' ? 'from-gray-500 to-gray-600' : 
-              'from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600'}
-          `}>
+            ${
+              buttonState === "loading"
+                ? "from-gray-500 to-gray-600"
+                : buttonState === "unavailable"
+                ? "from-gray-500 to-gray-600"
+                : "from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600"
+            }
+          `}
+          >
             <div className="flex items-center justify-center gap-2 sm:gap-3 lg:gap-4">
               {getButtonIcon()}
               <span className="text-white font-bold text-sm sm:text-base lg:text-lg tracking-wide break-words">
                 {getButtonText()}
               </span>
-              {buttonState === 'available' && (
+              {buttonState === "available" && (
                 <span className="text-white text-sm sm:text-base">➡️</span>
               )}
             </div>
           </div>
         </button>
 
-        {buttonState === 'available' && (
+        {buttonState === "available" && (
           <div className="flex items-center justify-center gap-2 mt-2 sm:mt-3">
             <span className="text-green-500 text-xs sm:text-sm">✅</span>
             <span className="text-[10px] sm:text-xs font-semibold text-green-600 break-words text-center">
@@ -644,7 +860,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
           </div>
         )}
 
-        {buttonState === 'unavailable' && connectionStatus !== 'failed' && (
+        {buttonState === "unavailable" && connectionStatus !== "failed" && (
           <div className="flex items-center justify-center gap-2 mt-2 sm:mt-3">
             <span className="text-yellow-500 text-xs sm:text-sm">⚠️</span>
             <span className="text-[10px] sm:text-xs font-semibold text-yellow-600 break-words text-center">
@@ -653,10 +869,21 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
           </div>
         )}
 
-        {connectionStatus === 'failed' && (
-          <div className="flex items-center justify-center gap-2 mt-2 sm:mt-3">
+        {connectionStatus === "failed" && (
+          <div
+            onClick={() => {
+              if (liveDoctors && liveDoctors.length) {
+                setShowLiveDoctorsModal(true);
+              } else {
+                startCall();
+              }
+            }}
+            className="flex items-center justify-center gap-2 mt-2 sm:mt-3 
+               cursor-pointer hover:bg-red-50 active:scale-95 transition-all 
+               px-3 py-2 rounded-lg border border-red-200 select-none"
+          >
             <span className="text-red-500 text-xs sm:text-sm">❌</span>
-            <span className="text-[10px] sm:text-xs font-semibold text-red-600 break-words text-center">
+            <span className="text-[10px] sm:text-xs font-semibold text-red-600 text-center">
               Connection issue • Click to retry
             </span>
           </div>
@@ -677,12 +904,12 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         onClose={() => {
           setShowSearchModal(false);
           setLoading(false);
-          setConnectionStatus('idle');
+          setConnectionStatus("idle");
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
           }
-          toast.dismiss('call-sent');
+          clearAllToasts();
         }}
         onFailure={handleNoResponse}
       />
@@ -691,15 +918,18 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
 };
 
 // ------------------- EmergencyStatusBox - Responsive -------------------
-const EmergencyStatusBox = ({ 
-  decision, 
-  nearbyDoctors, 
-  navigation, 
-  messageId, 
-  isTypingComplete 
+const EmergencyStatusBox = ({
+  decision,
+  nearbyDoctors,
+  navigation,
+  messageId,
+  isTypingComplete,
 }) => {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  
+  // Track if we've already shown the toast for this message
+  const hasShownToast = useRef(false);
 
   useEffect(() => {
     if (decision && isTypingComplete) {
@@ -714,17 +944,25 @@ const EmergencyStatusBox = ({
   if (!decision || !isTypingComplete || !isVisible) return null;
 
   // Common container styles for all emergency boxes
-  const Container = ({ children, gradientFrom, gradientTo, borderColor, textColor }) => (
+  const Container = ({
+    children,
+    gradientFrom,
+    gradientTo,
+    borderColor,
+    textColor,
+  }) => (
     <div className="my-2 sm:my-3 mx-1 sm:mx-2 max-w-full animate-fade-in-up">
-      <div className={`bg-gradient-to-r ${gradientFrom} ${gradientTo} rounded-lg sm:rounded-xl overflow-hidden border ${borderColor} shadow-sm`}>
-        <div className="p-3 sm:p-4">
-          {children}
-        </div>
+      <div
+        className={`bg-gradient-to-r ${gradientFrom} ${gradientTo} rounded-lg sm:rounded-xl overflow-hidden border ${borderColor} shadow-sm`}
+      >
+        <div className="p-3 sm:p-4">{children}</div>
       </div>
     </div>
   );
 
-  if (decision.includes("EMERGENCY")) {
+  const decisionUpper = decision.toUpperCase();
+
+  if (decisionUpper.includes("EMERGENCY")) {
     return (
       <>
         <Container
@@ -754,9 +992,12 @@ const EmergencyStatusBox = ({
           </div>
 
           <div className="flex items-start gap-1.5 sm:gap-2 p-2 sm:p-3 bg-white bg-opacity-70 rounded-lg border border-red-200 mb-3">
-            <span className="text-red-600 flex-shrink-0 text-xs sm:text-sm">⚠️</span>
+            <span className="text-red-600 flex-shrink-0 text-xs sm:text-sm">
+              ⚠️
+            </span>
             <p className="text-red-800 font-medium text-xs break-words flex-1 leading-relaxed">
-              Your pet's symptoms require emergency care. Please contact a veterinarian immediately.
+              Your pet's symptoms require emergency care. Please contact a
+              veterinarian immediately.
             </p>
           </div>
 
@@ -776,13 +1017,17 @@ const EmergencyStatusBox = ({
           nearbyDoctors={nearbyDoctors}
           onBook={(appointment) => {
             console.log("Appointment booked:", appointment);
-            toast.success(
-              `🎉 Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`,
-              {
-                duration: 5000,
-                icon: '🐾'
-              }
-            );
+            // Only show success toast once
+            if (!hasShownToast.current) {
+              toast.success(
+                `🎉 Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`,
+                {
+                  duration: 5000,
+                  icon: "🐾",
+                }
+              );
+              hasShownToast.current = true;
+            }
             setShowAppointmentModal(false);
           }}
         />
@@ -790,7 +1035,7 @@ const EmergencyStatusBox = ({
     );
   }
 
-  if (decision.includes("VIDEO_CONSULT")) {
+  if (decisionUpper.includes("VIDEO_CONSULT")) {
     return (
       <Container
         gradientFrom="from-purple-50"
@@ -817,7 +1062,7 @@ const EmergencyStatusBox = ({
             </p>
           </div>
         </div>
-  
+
         <div className="space-y-1 p-2 bg-white bg-opacity-70 rounded-lg border border-purple-200 mb-2">
           <div className="flex items-center gap-1.5">
             <span className="text-green-500 flex-shrink-0 text-[10px]">✅</span>
@@ -832,7 +1077,7 @@ const EmergencyStatusBox = ({
             </span>
           </div>
         </div>
-  
+
         <StartCallButton
           nearbyDoctors={nearbyDoctors}
           navigation={navigation}
@@ -841,7 +1086,7 @@ const EmergencyStatusBox = ({
     );
   }
 
-  if (decision.includes("IN_CLINIC")) {
+  if (decisionUpper.includes("IN_CLINIC")) {
     return (
       <>
         <Container
@@ -872,7 +1117,9 @@ const EmergencyStatusBox = ({
 
             <div className="flex items-center my-2">
               <div className="flex-1 h-px bg-gray-300"></div>
-              <span className="mx-2 sm:mx-3 text-[9px] sm:text-xs font-semibold text-gray-500 uppercase">OR</span>
+              <span className="mx-2 sm:mx-3 text-[9px] sm:text-xs font-semibold text-gray-500 uppercase">
+                OR
+              </span>
               <div className="flex-1 h-px bg-gray-300"></div>
             </div>
 
@@ -893,13 +1140,17 @@ const EmergencyStatusBox = ({
           nearbyDoctors={nearbyDoctors}
           onBook={(appointment) => {
             console.log("Appointment booked:", appointment);
-            toast.success(
-              `🎉 Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`,
-              {
-                duration: 5000,
-                icon: '🐾'
-              }
-            );
+            // Only show success toast once
+            if (!hasShownToast.current) {
+              toast.success(
+                `🎉 Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`,
+                {
+                  duration: 5000,
+                  icon: "🐾",
+                }
+              );
+              hasShownToast.current = true;
+            }
             setShowAppointmentModal(false);
           }}
         />
@@ -929,7 +1180,11 @@ const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
 
   if (msg.type === "loading") {
     return (
-      <div className={`my-2 max-w-[90%] sm:max-w-[85%] animate-fade-in-up ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+      <div
+        className={`my-2 max-w-[90%] sm:max-w-[85%] animate-fade-in-up ${
+          isVisible ? "opacity-100" : "opacity-0"
+        }`}
+      >
         <div className="flex items-start gap-2 sm:gap-3">
           <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 flex-shrink-0">
             <span className="text-white text-sm sm:text-base">🐾</span>
@@ -937,12 +1192,20 @@ const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
 
           <div className="bg-white rounded-xl sm:rounded-2xl rounded-tl-sm px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 shadow-sm">
             <div className="mb-2">
-              <span className="text-[10px] sm:text-xs font-semibold text-purple-600">AI analyzing</span>
+              <span className="text-[10px] sm:text-xs font-semibold text-purple-600">
+                AI analyzing
+              </span>
             </div>
             <div className="flex gap-1.5">
               <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-600 rounded-full opacity-60 animate-bounce"></div>
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-600 rounded-full opacity-80 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div
+                className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-600 rounded-full opacity-80 animate-bounce"
+                style={{ animationDelay: "0.1s" }}
+              ></div>
+              <div
+                className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-600 rounded-full animate-bounce"
+                style={{ animationDelay: "0.2s" }}
+              ></div>
             </div>
           </div>
         </div>
@@ -951,38 +1214,58 @@ const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
   }
 
   const isUser = msg.sender === "user";
-  const decisionTag = typeof msg.decision === "string" ? msg.decision.toUpperCase() : "";
-  const hasStructuredDecision = decisionTag.includes("VIDEO_CONSULT") || decisionTag.includes("IN_CLINIC") || decisionTag.includes("EMERGENCY");
-  const hasStructuredMarkers = msg.text && (
-    msg.text.includes('**') || 
-    msg.text.includes('=== DIAGNOSIS ===') ||
-    msg.text.includes('WHY VIDEO IS APPROPRIATE')
-  );
-  const hasStructuredContent = !isUser && hasStructuredDecision && hasStructuredMarkers;
+  const decisionTag =
+    typeof msg.decision === "string" ? msg.decision.toUpperCase() : "";
+  const hasStructuredDecision =
+    decisionTag.includes("VIDEO_CONSULT") ||
+    decisionTag.includes("IN_CLINIC") ||
+    decisionTag.includes("EMERGENCY");
+  const hasStructuredMarkers =
+    msg.text &&
+    (msg.text.includes("**") ||
+      msg.text.includes("=== DIAGNOSIS ===") ||
+      msg.text.includes("WHY VIDEO IS APPROPRIATE"));
+  const hasStructuredContent =
+    !isUser && hasStructuredDecision && hasStructuredMarkers;
 
   return (
     <>
-      <div className={`my-2 max-w-[90%] sm:max-w-[85%] animate-fade-in-up ${isVisible ? 'opacity-100' : 'opacity-0'} ${isUser ? 'ml-auto' : ''}`}>
-        <div className={`flex items-start gap-2 sm:gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+      <div
+        className={`my-2 max-w-[90%] sm:max-w-[85%] animate-fade-in-up ${
+          isVisible ? "opacity-100" : "opacity-0"
+        } ${isUser ? "ml-auto" : ""}`}
+      >
+        <div
+          className={`flex items-start gap-2 sm:gap-3 ${
+            isUser ? "flex-row-reverse" : ""
+          }`}
+        >
           {!isUser && (
             <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 flex-shrink-0">
               <span className="text-white text-sm sm:text-base">🐕</span>
             </div>
           )}
 
-          <div className={`
+          <div
+            className={`
             rounded-xl sm:rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-sm max-w-full overflow-hidden
-            ${isUser 
-              ? 'bg-purple-600 text-white rounded-br-sm' 
-              : hasStructuredContent 
-                ? 'bg-transparent border-0 p-0' 
-                : 'bg-white border border-gray-200 rounded-bl-sm'
+            ${
+              isUser
+                ? "bg-purple-600 text-white rounded-br-sm"
+                : hasStructuredContent
+                ? "bg-transparent border-0 p-0"
+                : "bg-white border border-gray-200 rounded-bl-sm"
             }
-          `}>
+          `}
+          >
             {hasStructuredContent && isTypingComplete ? (
               <FormattedAIResponse text={msg.displayedText || msg.text} />
             ) : (
-              <p className={`break-words text-xs sm:text-sm lg:text-base ${isUser ? 'text-white' : 'text-gray-900'}`}>
+              <p
+                className={`break-words text-xs sm:text-sm lg:text-base ${
+                  isUser ? "text-white" : "text-gray-900"
+                }`}
+              >
                 {msg.displayedText || msg.text}
               </p>
             )}

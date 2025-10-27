@@ -13,7 +13,7 @@ const io = new Server(httpServer, {
 });
 
 // Active doctors and call sessions
-const activeDoctors = new Map(); // doctorId -> { socketId, joinedAt }
+const activeDoctors = new Map(); // doctorId -> { socketId, joinedAt, location }
 const activeCalls = new Map();   // callId -> { callId, doctorId, patientId, channel, status, ... }
 
 const isDoctorBusy = (doctorId) => {
@@ -46,7 +46,6 @@ io.on("connection", (socket) => {
     const roomName = `doctor-${doctorId}`;
     socket.join(roomName);
     
-    // ✅ Check if doctor already exists
     if (activeDoctors.has(doctorId)) {
       console.log(`⚠️ Doctor ${doctorId} reconnecting (old socket: ${activeDoctors.get(doctorId).socketId})`);
     }
@@ -150,28 +149,58 @@ io.on("connection", (socket) => {
 
   // Call rejected
   socket.on("call-rejected", (data) => {
-    const { callId, reason = "rejected" } = data;
-    console.log(`❌ Call ${callId} rejected: ${reason}`);
+    const { callId, reason = "rejected", doctorId, patientId } = data;
+    console.log(`❌ Call ${callId} rejected by doctor ${doctorId}: ${reason}`);
     
     const callSession = activeCalls.get(callId);
-    if (!callSession) return;
+    if (!callSession) {
+      console.log(`❌ Call session ${callId} not found for rejection`);
+      return;
+    }
 
     callSession.status = 'rejected';
     callSession.rejectedAt = new Date();
     callSession.rejectionReason = reason;
 
+    // Method 1: Notify patient via stored socket ID (most reliable)
     if (callSession.patientSocketId) {
       io.to(callSession.patientSocketId).emit("call-rejected", { 
         callId, 
+        doctorId: callSession.doctorId,
+        patientId: callSession.patientId,
         reason, 
-        message: reason === 'timeout' ? 'Doctor did not respond' : 'Doctor unavailable', 
+        message: reason === 'timeout' ? 'Doctor did not respond within 5 minutes' : 'Doctor is currently unavailable', 
         timestamp: new Date().toISOString() 
+      });
+      console.log(`📤 Notified patient via socket: ${callSession.patientSocketId}`);
+    }
+
+    // Method 2: Notify via rooms (backup)
+    if (callSession.patientId) {
+      io.to(`patient-${callSession.patientId}`).emit("call-rejected", {
+        callId,
+        doctorId: callSession.doctorId,
+        patientId: callSession.patientId,
+        reason,
+        message: reason === 'timeout' ? 'Doctor did not respond within 5 minutes' : 'Doctor is currently unavailable',
+        timestamp: new Date().toISOString()
       });
     }
 
+    // Method 3: Broadcast status update (additional backup)
+    io.emit("call-status-update", {
+      callId,
+      status: 'rejected',
+      rejectedBy: 'doctor',
+      reason,
+      timestamp: new Date().toISOString()
+    });
+
+    // Clean up after delay
     setTimeout(() => {
       activeCalls.delete(callId);
       emitAvailableDoctors();
+      console.log(`🗑️ Cleaned up rejected call ${callId}`);
     }, 30000);
   });
 
@@ -217,29 +246,79 @@ io.on("connection", (socket) => {
     emitAvailableDoctors();
   });
 
-  // Call ended
-  socket.on("call-ended", ({ callId, userId, role }) => {
+  // ✅ ENHANCED: Call ended - notify both parties with multiple methods
+  socket.on("call-ended", ({ callId, userId, role, doctorId, patientId, channel }) => {
     console.log(`🔚 Call ${callId} ended by ${userId} (${role})`);
     
     const callSession = activeCalls.get(callId);
-    if (!callSession) return;
+    
+    if (callSession) {
+      callSession.status = 'ended';
+      callSession.endedAt = new Date();
+      callSession.endedBy = userId;
 
-    callSession.status = 'ended';
-    callSession.endedAt = new Date();
-    callSession.endedBy = userId;
+      // Determine who to notify based on role
+      const isDoctorEnding = role === 'host';
+      const isPatientEnding = role === 'audience';
 
-    const targetSocketId = role === 'host' ? callSession.patientSocketId : callSession.doctorSocketId;
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("call-ended", { 
-        callId, 
-        endedBy: userId, 
-        message: 'Call ended' 
-      });
+      // Method 1: Notify via stored socket IDs (most reliable)
+      if (isDoctorEnding && callSession.patientSocketId) {
+        io.to(callSession.patientSocketId).emit("call-ended-by-other", { 
+          callId, 
+          endedBy: 'doctor',
+          reason: 'ended',
+          message: 'Doctor has ended the call',
+          timestamp: new Date().toISOString()
+        });
+        console.log(`📤 Notified patient via socket: ${callSession.patientSocketId}`);
+      }
+      
+      if (isPatientEnding && callSession.doctorSocketId) {
+        io.to(callSession.doctorSocketId).emit("call-ended-by-other", { 
+          callId, 
+          endedBy: 'patient',
+          reason: 'ended',
+          message: 'Patient has ended the call',
+          timestamp: new Date().toISOString()
+        });
+        console.log(`📤 Notified doctor via socket: ${callSession.doctorSocketId}`);
+      }
+
+      // Method 2: Notify via rooms (backup for reliability)
+      if (callSession.doctorId) {
+        io.to(`doctor-${callSession.doctorId}`).emit("call-ended-by-other", {
+          callId,
+          endedBy: isDoctorEnding ? 'doctor' : 'patient',
+          reason: 'ended',
+          message: isDoctorEnding ? 'Doctor has ended the call' : 'Patient has ended the call',
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      if (callSession.patientId) {
+        io.to(`patient-${callSession.patientId}`).emit("call-ended-by-other", {
+          callId,
+          endedBy: isDoctorEnding ? 'doctor' : 'patient',
+          reason: 'ended',
+          message: isDoctorEnding ? 'Doctor has ended the call' : 'Patient has ended the call',
+          timestamp: new Date().toISOString()
+        });
+      }
     }
 
+    // Method 3: Broadcast to all with this callId (additional backup)
+    io.emit("call-status-update", {
+      callId,
+      status: 'ended',
+      endedBy: role,
+      timestamp: new Date().toISOString()
+    });
+
+    // Clean up after delay
     setTimeout(() => {
       activeCalls.delete(callId);
       emitAvailableDoctors();
+      console.log(`🗑️ Cleaned up ended call ${callId}`);
     }, 10000);
   });
 
@@ -259,7 +338,27 @@ io.on("connection", (socket) => {
     emitAvailableDoctors();
   });
 
-  // Disconnect handling
+  // Update doctor location
+  socket.on("update-doctor-location", ({ doctorId, latitude, longitude }) => {
+    console.log(`📍 Updating location for doctor ${doctorId}: ${latitude}, ${longitude}`);
+    
+    const doctor = activeDoctors.get(doctorId);
+    if (doctor) {
+      doctor.location = { latitude, longitude, updatedAt: new Date() };
+      activeDoctors.set(doctorId, doctor);
+      
+      socket.emit("location-updated", {
+        doctorId,
+        latitude,
+        longitude,
+        timestamp: new Date().toISOString()
+      });
+      
+      emitAvailableDoctors();
+    }
+  });
+
+  // ✅ ENHANCED: Disconnect handling with proper notification to other party
   socket.on("disconnect", (reason) => {
     console.log(`❌ Disconnected: ${socket.id}, reason: ${reason}`);
 
@@ -272,19 +371,72 @@ io.on("connection", (socket) => {
       }
     }
 
-    // Clean up active calls
+    // ✅ Clean up active calls and notify other party
     for (const [callId, callSession] of activeCalls.entries()) {
+      // Check if disconnected socket is part of this call
       if (callSession.patientSocketId === socket.id || callSession.doctorSocketId === socket.id) {
         console.log(`🔌 Handling disconnect for call ${callId}`);
+        
+        const isDoctor = callSession.doctorSocketId === socket.id;
+        const isPatient = callSession.patientSocketId === socket.id;
+        
+        // Mark call as disconnected
         callSession.status = 'disconnected';
         callSession.disconnectedAt = new Date();
-        const otherSocketId = callSession.patientSocketId === socket.id ? callSession.doctorSocketId : callSession.patientSocketId;
+        callSession.disconnectedBy = isDoctor ? 'doctor' : 'patient';
+        
+        // Get the OTHER party's socket ID
+        const otherSocketId = isDoctor 
+          ? callSession.patientSocketId 
+          : callSession.doctorSocketId;
+        
+        // Method 1: Notify via socket ID
         if (otherSocketId) {
           io.to(otherSocketId).emit("other-party-disconnected", { 
-            callId, 
-            message: 'The other party disconnected unexpectedly' 
+            callId,
+            disconnectedBy: isDoctor ? 'doctor' : 'patient',
+            message: `The ${isDoctor ? 'doctor' : 'patient'} disconnected unexpectedly`,
+            timestamp: new Date().toISOString()
+          });
+          
+          console.log(`📤 Sent disconnect notification to ${isDoctor ? 'patient' : 'doctor'} (socket: ${otherSocketId})`);
+        }
+        
+        // Method 2: Notify via rooms (backup)
+        if (callSession.doctorId) {
+          socket.to(`doctor-${callSession.doctorId}`).emit("call-ended-by-other", {
+            callId,
+            endedBy: isDoctor ? 'doctor' : 'patient',
+            reason: 'disconnect',
+            message: 'Call ended due to connection loss',
+            timestamp: new Date().toISOString()
           });
         }
+        
+        if (callSession.patientId) {
+          socket.to(`patient-${callSession.patientId}`).emit("call-ended-by-other", {
+            callId,
+            endedBy: isDoctor ? 'doctor' : 'patient',
+            reason: 'disconnect',
+            message: 'Call ended due to connection loss',
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        // Method 3: Broadcast to all (additional backup)
+        io.emit("call-status-update", {
+          callId,
+          status: 'disconnected',
+          disconnectedBy: isDoctor ? 'doctor' : 'patient',
+          timestamp: new Date().toISOString()
+        });
+        
+        // Clean up the call after a delay
+        setTimeout(() => {
+          activeCalls.delete(callId);
+          emitAvailableDoctors();
+          console.log(`🗑️ Cleaned up disconnected call ${callId}`);
+        }, 5000);
       }
     }
   });
