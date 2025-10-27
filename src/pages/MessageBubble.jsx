@@ -28,7 +28,7 @@ const parseAIResponse = (text) => {
     sections.diagnosis = diagnosisMatch[1].trim();
   }
 
-  // Extract main recommendation with bold support
+  // Extract main recommendation
   const recMatch = text.match(/\*\*([^*]+)\*\*/);
   if (recMatch) {
     const recText = recMatch[1].trim();
@@ -45,38 +45,41 @@ const parseAIResponse = (text) => {
         (heading) => recText.toLowerCase() === heading.toLowerCase()
       )
     ) {
-      sections.recommendation = recText; // Store raw text, bold will be handled in rendering
+      sections.recommendation = recText;
     }
   }
 
-  // Extract and format WHY VIDEO IS APPROPRIATE with bold support
+  // Extract WHY VIDEO IS APPROPRIATE
   const whyMatch = text.match(
     /\*\*WHY VIDEO IS APPROPRIATE:\*\*([\s\S]*?)(?=\*\*HOW TO PREPARE:|\*\*NEXT STEPS:|=== DIAGNOSIS|$)/
   );
   if (whyMatch) {
-    const content = whyMatch[1].trim();
-    const bullets = content.match(/• ([^\n]+)/g) || [];
-    sections.whyAppropriate = bullets.map((b) => b.replace("• ", "").trim());
+    const bullets = whyMatch[1].match(/• ([^\n]+)/g);
+    if (bullets) {
+      sections.whyAppropriate = bullets.map((b) => b.replace("• ", "").trim());
+    }
   }
 
-  // Extract and format HOW TO PREPARE with bold support
+  // Extract HOW TO PREPARE
   const prepMatch = text.match(
     /\*\*HOW TO PREPARE:\*\*([\s\S]*?)(?=\*\*NEXT STEPS:|=== DIAGNOSIS|$)/
   );
   if (prepMatch) {
-    const content = prepMatch[1].trim();
-    const bullets = content.match(/• ([^\n]+)/g) || [];
-    sections.howToPrepare = bullets.map((b) => b.replace("• ", "").trim());
+    const bullets = prepMatch[1].match(/• ([^\n]+)/g);
+    if (bullets) {
+      sections.howToPrepare = bullets.map((b) => b.replace("• ", "").trim());
+    }
   }
 
-  // Extract and format NEXT STEPS with bold support
+  // Extract NEXT STEPS
   const stepsMatch = text.match(
     /\*\*NEXT STEPS:\*\*([\s\S]*?)(?==== DIAGNOSIS|$)/
   );
   if (stepsMatch) {
-    const content = stepsMatch[1].trim();
-    const bullets = content.match(/• ([^\n]+)/g) || [];
-    sections.nextSteps = bullets.map((b) => b.replace("• ", "").trim());
+    const bullets = stepsMatch[1].match(/• ([^\n]+)/g);
+    if (bullets) {
+      sections.nextSteps = bullets.map((b) => b.replace("• ", "").trim());
+    }
   }
 
   return sections;
@@ -85,22 +88,6 @@ const parseAIResponse = (text) => {
 // ------------------- FormattedAIResponse Component - Responsive -------------------
 const FormattedAIResponse = ({ text }) => {
   const sections = parseAIResponse(text);
-
-  // Function to render text with bold formatting
-  const renderWithBold = (text) => {
-    if (!text) return null;
-    const parts = text.split(/(\*\*[^*]+\*\*)/g); // Split by bold markers
-    return parts.map((part, index) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        return (
-          <span key={index} className="font-bold">
-            {part.replace(/^\*\*|\*\*$/g, '')}
-          </span>
-        );
-      }
-      return <span key={index}>{part}</span>;
-    });
-  };
 
   return (
     <div className="bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl lg:rounded-2xl p-4 sm:p-5 lg:p-6 border-2 border-purple-200 shadow-lg max-w-full">
@@ -113,7 +100,7 @@ const FormattedAIResponse = ({ text }) => {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-purple-900 text-base sm:text-lg lg:text-xl leading-tight break-words">
-                {renderWithBold(sections.recommendation)}
+                {sections.recommendation}
               </h3>
             </div>
           </div>
@@ -145,7 +132,7 @@ const FormattedAIResponse = ({ text }) => {
                     ●
                   </span>
                   <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">
-                    {renderWithBold(item)}
+                    {item}
                   </span>
                 </li>
               ))}
@@ -167,7 +154,7 @@ const FormattedAIResponse = ({ text }) => {
                     ●
                   </span>
                   <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">
-                    {renderWithBold(item)}
+                    {item}
                   </span>
                 </li>
               ))}
@@ -189,7 +176,7 @@ const FormattedAIResponse = ({ text }) => {
                     ●
                   </span>
                   <span className="text-gray-700 text-xs sm:text-sm leading-relaxed break-words flex-1">
-                    {renderWithBold(item)}
+                    {item}
                   </span>
                 </li>
               ))}
@@ -205,7 +192,7 @@ const FormattedAIResponse = ({ text }) => {
               <span className="break-words">Initial Assessment:</span>
             </h4>
             <p className="text-blue-800 text-xs sm:text-sm leading-relaxed break-words">
-              {renderWithBold(sections.diagnosis)}
+              {sections.diagnosis}
             </p>
           </div>
         )}
@@ -344,12 +331,12 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const timeoutRef = useRef(null);
   const [showLiveDoctorsModal, setShowLiveDoctorsModal] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("idle");
-  
+
   // Track active toasts to prevent duplicates
   const activeToastIds = useRef(new Set());
 
   const clearAllToasts = useCallback(() => {
-    activeToastIds.current.forEach(id => {
+    activeToastIds.current.forEach((id) => {
       toast.dismiss(id);
     });
     activeToastIds.current.clear();
@@ -429,7 +416,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         position: "top-center",
       }
     );
-    
+
     activeToastIds.current.add(toastId);
   }, [clearAllToasts, dismissToast]);
 
@@ -456,10 +443,13 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
 
       const patientIdLocal = user?.id || "temp_user";
 
-      const toastId = toast.success(`🎉 Call connected with veterinarian! Redirecting...`, {
-        duration: 3000,
-        icon: "🐾",
-      });
+      const toastId = toast.success(
+        `🎉 Call connected with veterinarian! Redirecting...`,
+        {
+          duration: 3000,
+          icon: "🐾",
+        }
+      );
       activeToastIds.current.add(toastId);
 
       setTimeout(() => {
@@ -501,7 +491,9 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
           }
         } catch (error) {
           console.error("❌ Navigation failed:", error);
-          const errorToastId = toast.error("Failed to redirect. Please try again.");
+          const errorToastId = toast.error(
+            "Failed to redirect. Please try again."
+          );
           activeToastIds.current.add(errorToastId);
         }
       }, 800);
@@ -526,7 +518,9 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setConnectionStatus("connecting");
       // Clear previous loading toasts
       toast.dismiss("call-sent");
-      const toastId = toast.loading("📞 Calling veterinarian...", { id: "call-sent" });
+      const toastId = toast.loading("📞 Calling veterinarian...", {
+        id: "call-sent",
+      });
       activeToastIds.current.add(toastId);
     };
 
@@ -600,7 +594,9 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setConnectionStatus("failed");
 
       clearAllToasts();
-      const toastId = toast.error("🐕 Veterinarian is on another call", { duration: 4000 });
+      const toastId = toast.error("🐕 Veterinarian is on another call", {
+        duration: 4000,
+      });
       activeToastIds.current.add(toastId);
     };
 
@@ -609,12 +605,11 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setLoading(false);
       setShowSearchModal(false);
       setConnectionStatus("failed");
-    
+
       // ✅ Dismiss any existing toasts before showing a new one
       toast.dismiss();
       toast.error("❌ Veterinarian not available", { duration: 4000 });
     };
-    
 
     const handleCallEnded = () => {
       if (timeoutRef.current) {
@@ -652,7 +647,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      
+
       clearAllToasts();
     };
   }, [handleCallAccepted, clearAllToasts, dismissToast]);
@@ -707,7 +702,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     if (!doctorsToCall.length) {
       // Clear previous toasts first
       clearAllToasts();
-      
+
       const toastId = toast.error(
         "🐾 No veterinarians available nearby. Please try again later.",
         {
@@ -759,7 +754,15 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         handleNoResponse();
       }
     }, 5 * 60 * 1000);
-  }, [nearbyDoctors, patientId, loading, callStatus, handleNoResponse, clearAllToasts]);
+  }, [
+    nearbyDoctors,
+    patientId,
+    loading,
+    callStatus,
+    handleNoResponse,
+    clearAllToasts,
+  ]);
+  
 
   const getButtonState = () => {
     if (loading) return "loading";
@@ -927,7 +930,7 @@ const EmergencyStatusBox = ({
 }) => {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  
+
   // Track if we've already shown the toast for this message
   const hasShownToast = useRef(false);
 
