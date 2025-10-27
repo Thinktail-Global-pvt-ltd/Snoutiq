@@ -55,7 +55,7 @@
                    <!-- <img src="{{url(Auth::user()->profile->logo ?? '') ?? ''}}"  width="50px" height="50px"  style="border-radius:50%; border:2px solid blur" alt="logo icon">  -->
                 </div>
                 <div>
-                  <h4 class="logo-text">    {{ Auth::user()->profile->college_name ?? 'Admin' }}
+                  <h4 class="logo-text">    {{ optional(Auth::user()->profile)->college_name ?? 'Admin' }}
 </h4>
                 </div>
                 <div class="toggle-icon ms-auto"><i class='bx bx-arrow-to-left'></i>
@@ -88,15 +88,44 @@
             </a>
         </li>
            
-                   <li>
+        <li>
             <a href="{{url('admin/supports')}}" >
                 <div class="parent-icon     active"><i class="bx bx-time-five"></i>
                 </div>
                 <div class="menu-title"> Supports</div>
             </a>
         </li>
-           
-          
+
+        <li class="{{ request()->is('admin/onboarding/services') ? 'mm-active' : '' }}">
+            <a href="{{ url('admin/onboarding/services') }}">
+                <div class="parent-icon     active"><i class="bx bx-list-check"></i>
+                </div>
+                <div class="menu-title"> Onboarding - Services</div>
+            </a>
+        </li>
+        <li class="{{ request()->is('admin/onboarding/video') ? 'mm-active' : '' }}">
+            <a href="{{ url('admin/onboarding/video') }}">
+                <div class="parent-icon     active"><i class="bx bx-video"></i>
+                </div>
+                <div class="menu-title"> Onboarding - Video</div>
+            </a>
+        </li>
+        <li class="{{ request()->is('admin/onboarding/clinic-hours') ? 'mm-active' : '' }}">
+            <a href="{{ url('admin/onboarding/clinic-hours') }}">
+                <div class="parent-icon     active"><i class="bx bx-time"></i>
+                </div>
+                <div class="menu-title"> Onboarding - Clinic Hours</div>
+            </a>
+        </li>
+        <li class="{{ request()->is('admin/onboarding/emergency') ? 'mm-active' : '' }}">
+            <a href="{{ url('admin/onboarding/emergency') }}">
+                <div class="parent-icon     active"><i class="bx bx-plus-medical"></i>
+                </div>
+                <div class="menu-title"> Onboarding - Emergency</div>
+            </a>
+        </li>
+
+
 
 
             </ul>

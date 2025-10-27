@@ -242,6 +242,14 @@
       const loginDataRaw    = res?.data;
       const loginDataParsed = parseDeepJSON(loginDataRaw);
 
+      if (loginDataParsed?.role === 'admin') {
+        const adminTarget = loginDataParsed?.redirect || `${WEB_BASE}/admin/dashboard`;
+        dump({ loginDataRaw, loginDataParsed, adminTarget }, 'Admin Login');
+        console.log('[redirect][admin] ->', adminTarget);
+        setTimeout(()=> window.location.replace(adminTarget), 150);
+        return;
+      }
+
       console.log('[auth][vet] parsed:', loginDataParsed);
       const computedUserId = extractUserId(loginDataParsed, true);
       console.log('[auth][vet] computedUserId:', computedUserId);

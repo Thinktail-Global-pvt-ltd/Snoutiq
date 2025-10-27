@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VetLandingController;
+use App\Http\Controllers\Admin\AdminOnboardingStatusPageController;
 use App\Models\Doctor;
 use App\Models\VetRegisterationTemp;
 use App\Models\Payment;
@@ -10,16 +11,47 @@ use App\Http\Controllers\VideoSchedulePageController;
 use App\Http\Controllers\VideoScheduleTestPageController;
 use App\Http\Controllers\EmergencyHoursPageController;
 use App\Http\Controllers\Api\ClinicEmergencyHoursController;
+use App\Http\Controllers\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Admin\AdminPanelController;
+use App\Http\Middleware\EnsureAdminAuthenticated;
 
 
 // Public routes
+
+Route::redirect('/', '/admin/login');
 
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');
 Route::get('/logout', function (\Illuminate\Http\Request $request) {
     $request->session()->flush();
     return redirect()->route('custom-doctor-login');
 })->name('logout');
+Route::prefix('admin')->group(function () {
+    Route::middleware([EnsureAdminAuthenticated::class])->get('/', function () {
+        return redirect()->route('admin.dashboard');
+    })->name('admin.index');
+    Route::get('/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
+    Route::post('/login', [AdminAuthController::class, 'login'])->name('admin.login.attempt');
+    Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+
+    Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
+        Route::get('/dashboard', [AdminPanelController::class, 'index'])->name('admin.dashboard');
+        Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
+        Route::get('/bookings', [AdminPanelController::class, 'bookings'])->name('admin.bookings');
+        Route::get('/supports', [AdminPanelController::class, 'supports'])->name('admin.supports');
+        Route::get('/sp/{user}', [AdminPanelController::class, 'serviceProviderProfile'])->name('admin.sp.profile');
+    });
+});
 Route::get('/vets/{slug}', [VetLandingController::class, 'show']);
+
+Route::get('/admin/login', [AdminOnboardingStatusPageController::class, 'panel'])
+    ->name('admin.onboarding.panel');
+
+Route::prefix('admin/onboarding')->group(function () {
+    Route::redirect('/services', '/admin/login#services')->name('admin.onboarding.services');
+    Route::redirect('/video', '/admin/login#video')->name('admin.onboarding.video');
+    Route::redirect('/clinic-hours', '/admin/login#clinicHours')->name('admin.onboarding.clinic-hours');
+    Route::redirect('/emergency', '/admin/login#emergency')->name('admin.onboarding.emergency');
+});
 
 // Video consult entry points (public views)
 // Patient-facing lobby to pick a doctor and place a call

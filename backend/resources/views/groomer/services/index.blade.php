@@ -252,15 +252,34 @@
     return Number.isFinite(num) && num > 0 ? num : null;
   })();
 
+  const AUTH_FULL = (() => {
+    try {
+      const raw = localStorage.getItem('auth_full') || sessionStorage.getItem('auth_full');
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (_) {
+      return null;
+    }
+  })();
+
+  function pickFirstString(candidates){
+    for (const value of candidates){
+      if (typeof value === 'string'){
+        const trimmed = value.trim();
+        if (trimmed) return trimmed;
+      }
+    }
+    return null;
+  }
+
   // ===== CURRENT_USER_ID strictly from frontend =====
   const CURRENT_USER_ID = (() => {
     try {
       const url = new URL(location.href);
       const qRaw = url.searchParams.get('userId') ?? url.searchParams.get('doctorId');
       const qid = Number(qRaw);
-      const authFull = JSON.parse(localStorage.getItem('auth_full') || sessionStorage.getItem('auth_full') || 'null');
       const stg = Number(localStorage.getItem('user_id') || sessionStorage.getItem('user_id'));
-      const fromAuth = Number(authFull?.user?.id ?? authFull?.user_id);
+      const fromAuth = Number(AUTH_FULL?.user?.id ?? AUTH_FULL?.user_id);
       const candidates = [qid, SERVER_USER_ID, fromAuth, stg];
       for (const value of candidates){
         if (Number.isFinite(value) && value > 0){
@@ -272,6 +291,39 @@
   })();
   console.log('[services] CURRENT_USER_ID:', CURRENT_USER_ID);
 
+  const CLINIC_SLUG = (() => {
+    try {
+      const url = new URL(location.href);
+      const qSlug = url.searchParams.get('vet_slug') || url.searchParams.get('clinic_slug');
+      if (qSlug && qSlug.trim()) return qSlug.trim();
+    } catch (_) { /* noop */ }
+
+    const fromStorage = pickFirstString([
+      localStorage.getItem('vet_slug'),
+      sessionStorage.getItem('vet_slug'),
+      localStorage.getItem('clinic_slug'),
+      sessionStorage.getItem('clinic_slug'),
+    ]);
+    if (fromStorage) return fromStorage;
+
+    const fromAuth = pickFirstString([
+      AUTH_FULL?.clinic?.slug,
+      AUTH_FULL?.clinic?.vet_slug,
+      AUTH_FULL?.clinic_slug,
+      AUTH_FULL?.vet?.slug,
+      AUTH_FULL?.vet_slug,
+      AUTH_FULL?.user?.clinic?.slug,
+      AUTH_FULL?.user?.clinic_slug,
+      AUTH_FULL?.profile?.clinic_slug,
+      AUTH_FULL?.profile?.slug,
+      AUTH_FULL?.slug,
+    ]);
+    if (fromAuth) return fromAuth;
+
+    return null;
+  })();
+  console.log('[services] CLINIC_SLUG:', CLINIC_SLUG);
+
   // ===== CONFIG (backend endpoints) =====
   const CONFIG = {
     API_BASE: @json(url('/api')),
@@ -279,13 +331,48 @@
     LOGIN_API: @json(url('/api/login')),
     SESSION_LOGIN: SESSION_LOGIN_URL,
   };
+  function targetQuery(extra={}){
+    const params = new URLSearchParams();
+    if (CURRENT_USER_ID){
+      params.set('user_id', String(CURRENT_USER_ID));
+    } else if (CLINIC_SLUG){
+      params.set('vet_slug', CLINIC_SLUG);
+    }
+    Object.entries(extra).forEach(([key,value])=>{
+      if (value === undefined || value === null || value === '') return;
+      params.set(key, String(value));
+    });
+    const qs = params.toString();
+    return qs ? `?${qs}` : '';
+  }
+
   const API = {
-    list:   (uid) => `${CONFIG.API_BASE}/groomer/services?user_id=${encodeURIComponent(uid ?? '')}`,
+    list:   () => `${CONFIG.API_BASE}/groomer/services${targetQuery()}`,
     create: `${CONFIG.API_BASE}/groomer/service`,
-    show:   (id,uid) => `${CONFIG.API_BASE}/groomer/service/${id}?user_id=${encodeURIComponent(uid ?? '')}`,
-    update: (id,uid) => `${CONFIG.API_BASE}/groomer/service/${id}/update?user_id=${encodeURIComponent(uid ?? '')}`,
-    delete: (id,uid) => `${CONFIG.API_BASE}/groomer/service/${id}?user_id=${encodeURIComponent(uid ?? '')}`,
+    show:   (id) => `${CONFIG.API_BASE}/groomer/service/${id}${targetQuery()}`,
+    update: (id) => `${CONFIG.API_BASE}/groomer/service/${id}/update${targetQuery()}`,
+    delete: (id) => `${CONFIG.API_BASE}/groomer/service/${id}${targetQuery()}`,
   };
+
+  function hasTarget(){
+    return Boolean(CURRENT_USER_ID || CLINIC_SLUG);
+  }
+
+  function appendTarget(formData){
+    if (CURRENT_USER_ID){
+      formData.append('user_id', String(CURRENT_USER_ID));
+    } else if (CLINIC_SLUG){
+      formData.append('vet_slug', CLINIC_SLUG);
+    }
+  }
+
+  function alertMissingTarget(){
+    Swal.fire({
+      icon: 'warning',
+      title: 'user_id missing',
+      text: 'Add ?userId=... or ?vet_slug=... to the URL, or log in through the dashboard.',
+    });
+  }
 
   // ===== Logger =====
   (function(){
@@ -340,6 +427,8 @@
       const h={ 'Accept':'application/json', ...base };
       if (CURRENT_USER_ID){
         h['X-User-Id'] = String(CURRENT_USER_ID);
+      } else if (CLINIC_SLUG){
+        h['X-Vet-Slug'] = CLINIC_SLUG;
       }
       if (this.mode==='bearer'){
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -400,15 +489,16 @@
   // ===== List + Render =====
   let ALL = [];
   async function fetchServices(){
-    if (!CURRENT_USER_ID){
+    if (!CURRENT_USER_ID && !CLINIC_SLUG){
       const helpUrl = `${CONFIG.SESSION_LOGIN}?user_id=YOUR_ID`;
-      rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">user_id missing (add ?userId=... in URL or visit <a class="text-blue-600 underline" target="_blank" rel="noreferrer" href="${esc(helpUrl)}">${esc(CONFIG.SESSION_LOGIN)}?user_id=YOUR_ID</a> then reload)</td></tr>`;
+      const extra = 'If you are using a clinic slug, append ?vet_slug=YOUR-SLUG to the page URL.';
+      rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">user_id missing (add ?userId=... in URL or visit <a class="text-blue-600 underline" target="_blank" rel="noreferrer" href="${esc(helpUrl)}">${esc(CONFIG.SESSION_LOGIN)}?user_id=YOUR_ID</a> then reload). ${esc(extra)}</td></tr>`;
       return;
     }
     rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-gray-500" colspan="7">Loadingâ€¦</td></tr>`;
     try{
       await Auth.bootstrap();
-      const res = await apiFetch(API.list(CURRENT_USER_ID), {
+      const res = await apiFetch(API.list(), {
         headers: Auth.headers()
       });
       const items = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
@@ -462,7 +552,7 @@
 
   document.getElementById('create-form').addEventListener('submit', async (e)=>{
     e.preventDefault();
-    if (!CURRENT_USER_ID){ Swal.fire({icon:'warning',title:'user_id missing'}); return; }
+    if (!hasTarget()){ alertMissingTarget(); return; }
 
     const fd = new FormData(e.target);
     const payload = new FormData();
@@ -473,8 +563,8 @@
     payload.append('duration',     fd.get('duration'));
     payload.append('main_service', fd.get('main_service'));
     payload.append('status',       fd.get('status'));
-    // â­ send user_id from frontend
-    payload.append('user_id',      String(CURRENT_USER_ID));
+    // â­ send user_id from frontend (or vet_slug when available)
+    appendTarget(payload);
 
     try{
       await Auth.bootstrap();
@@ -513,7 +603,7 @@
     if(act==='edit'){
       try{
         await Auth.bootstrap();
-        const data = await apiFetch(API.show(id, CURRENT_USER_ID), { headers: Auth.headers() });
+        const data = await apiFetch(API.show(id), { headers: Auth.headers() });
         const s = data?.data || data;
         fillEdit(s);
         open(editModal);
@@ -536,8 +626,8 @@
 
       try{
         await Auth.bootstrap();
-        // DELETE with header + query ?user_id=
-        await apiFetch(API.delete(id, CURRENT_USER_ID), {
+        // DELETE with header + query (user_id / vet_slug)
+        await apiFetch(API.delete(id), {
           method:'DELETE',
           headers: Auth.headers()
         }, true);
@@ -547,8 +637,8 @@
         // Fallback: POST override if server blocks DELETE
         try{
           const payload = new FormData();
-          payload.append('user_id', String(CURRENT_USER_ID));
-          await apiFetch(API.delete(id, CURRENT_USER_ID), {
+          appendTarget(payload);
+          await apiFetch(API.delete(id), {
             method:'POST',
             headers: Auth.headers({'X-HTTP-Method-Override':'DELETE'}),
             body: payload
@@ -580,7 +670,7 @@
 
   document.getElementById('edit-form').addEventListener('submit', async (e)=>{
     e.preventDefault();
-    if (!CURRENT_USER_ID){ Swal.fire({icon:'warning',title:'user_id missing'}); return; }
+    if (!hasTarget()){ alertMissingTarget(); return; }
 
     const f = e.target;
     const id = f.elements['id'].value;
@@ -592,12 +682,12 @@
     payload.append('duration',     f.elements['duration'].value);
     payload.append('main_service', f.elements['main_service'].value);
     payload.append('status',       f.elements['status'].value);
-    // â­ send user_id from frontend
-    payload.append('user_id',      String(CURRENT_USER_ID));
+    // â­ send user_id from frontend (or vet_slug when available)
+    appendTarget(payload);
 
     try{
       await Auth.bootstrap();
-      const res = await apiFetch(API.update(id, CURRENT_USER_ID), {
+      const res = await apiFetch(API.update(id), {
         method:'POST',
         headers: Auth.headers(),
         body: payload
@@ -609,7 +699,7 @@
     }catch(err){
       // Fallback: PUT w/ override
       try{
-        const res2 = await apiFetch(`${CONFIG.API_BASE}/groomer/services/${id}?user_id=${encodeURIComponent(CURRENT_USER_ID)}`, {
+        const res2 = await apiFetch(`${CONFIG.API_BASE}/groomer/services/${id}${targetQuery()}`, {
           method:'POST',
           headers: Auth.headers({'X-HTTP-Method-Override':'PUT'}),
           body: payload

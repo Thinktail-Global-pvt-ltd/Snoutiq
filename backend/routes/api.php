@@ -35,10 +35,18 @@ use App\Http\Controllers\CallController as CoreCallController;    // handles ses
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 
 use App\Http\Controllers\Api\VetController;
+use App\Http\Controllers\Api\AdminOnboardingStatusController;
 
 Route::get('/vets', [VetController::class, 'index']);        // All vets
 Route::get('/vets/{id}', [VetController::class, 'show']);    // Single vet
 Route::delete('/vets/{id}', [VetController::class, 'destroy']); // Delete vet
+
+Route::prefix('admin/onboarding')->group(function () {
+    Route::get('/services', [AdminOnboardingStatusController::class, 'services']);
+    Route::get('/video', [AdminOnboardingStatusController::class, 'video']);
+    Route::get('/clinic-hours', [AdminOnboardingStatusController::class, 'clinicHours']);
+    Route::get('/emergency', [AdminOnboardingStatusController::class, 'emergency']);
+});
 
 
 Route::get('/agora/appid', function () {

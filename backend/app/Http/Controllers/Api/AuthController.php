@@ -610,6 +610,7 @@ public function login(Request $request)
     try {
         $email = $request->input('email') ?? $request->input('login');
         $role  = $request->input('role'); // 👈 role pick karo
+        $password = (string) $request->input('password', '');
         $roomTitle = $request->input('room_title');
 
         if (empty($email) || empty($role)) {
@@ -618,6 +619,39 @@ public function login(Request $request)
 
         $room = null;
         $plainToken = null;
+
+        $adminEmail = strtolower(trim((string) config('admin.email', 'admin@snoutiq.com')));
+        if ($adminEmail === '') {
+            $adminEmail = 'admin@snoutiq.com';
+        }
+
+        $adminPassword = (string) config('admin.password', 'snoutiqvet');
+        if ($adminPassword === '') {
+            $adminPassword = 'snoutiqvet';
+        }
+
+        if ($role === 'vet' && $adminEmail && strtolower(trim((string) $email)) === $adminEmail) {
+            if (!hash_equals($adminPassword, (string) $password)) {
+                return response()->json([
+                    'message' => 'Invalid admin credentials',
+                ], 401);
+            }
+
+            $request->session()->put([
+                'is_admin' => true,
+                'admin_email' => $adminEmail,
+                'role' => 'admin',
+            ]);
+
+            $request->session()->regenerate();
+
+            return response()->json([
+                'message' => 'Admin login successful',
+                'role' => 'admin',
+                'email' => $adminEmail,
+                'redirect' => route('admin.dashboard'),
+            ], 200);
+        }
 
         if ($role === 'pet') {
             // 🔹 Search in users table
