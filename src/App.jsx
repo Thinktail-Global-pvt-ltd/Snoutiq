@@ -789,9 +789,9 @@ function App() {
                <Route
               path="/prescription/:doctorId/:patientId"
               element={
-                <ProtectedRoute>
+                // <ProtectedRoute>
                   <PrescriptionPage />
-                </ProtectedRoute>
+                // </ProtectedRoute>
               }
             />
               <Route
