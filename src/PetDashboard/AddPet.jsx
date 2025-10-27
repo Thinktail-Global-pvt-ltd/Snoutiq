@@ -5,10 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const API_BASE_URL = 'https://snoutiq.com/backend/api';
-const CACHE_KEYS = {
-  DOG_BREEDS: 'dog_breeds_cache',
-  PETS_DATA: 'pets_data_cache',
-};
 
 // Design System Constants
 const DESIGN = {
@@ -82,36 +78,9 @@ const AddPet = () => {
     fetchDogBreeds();
   }, []);
 
-  const cacheData = async (key, data) => {
-    try {
-      localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
-    } catch (error) {
-      console.error('Cache save error:', error);
-    }
-  };
-
-  const getCachedData = async (key) => {
-    try {
-      const cached = localStorage.getItem(key);
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) return data;
-      }
-    } catch (error) {
-      console.error('Cache read error:', error);
-    }
-    return null;
-  };
-
   const fetchDogBreeds = async () => {
     try {
       setLoadingBreeds(true);
-      const cachedBreeds = await getCachedData(CACHE_KEYS.DOG_BREEDS);
-      if (cachedBreeds) {
-        setDogBreeds(cachedBreeds);
-        setLoadingBreeds(false);
-        return;
-      }
 
       const response = await axios.get(`${API_BASE_URL}/dog-breeds/all`, { timeout: 10000 });
       
@@ -141,7 +110,6 @@ const AddPet = () => {
         );
         
         setDogBreeds(breeds);
-        await cacheData(CACHE_KEYS.DOG_BREEDS, breeds);
       }
     } catch (error) {
       console.error('Error fetching breeds:', error);

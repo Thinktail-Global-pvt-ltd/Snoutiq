@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
+import HeroSection from "./HeroSection";
 
 const ChatInput = lazy(() => import("../components/ChatInput"));
 const Footer = lazy(() => import("../components/Footer"));
@@ -51,10 +52,11 @@ const Home = () => {
 
     <>
       <Header />
+      <HeroSection/>
       <main className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex flex-col">
         <div className="flex-1 flex flex-col px-4 py-8 max-w-6xl mx-auto w-full">
           {/* Hero */}
-          <section className="text-center py-12 md:py-20">
+          {/* <section className="text-center py-12 md:py-20">
             <div className="inline-flex items-center justify-center mb-4 bg-blue-100 text-blue-800 rounded-full px-4 py-2 text-sm font-medium">
               🐶 AI-Powered Pet Care Assistant
             </div>
@@ -71,7 +73,7 @@ const Home = () => {
               powered by advanced AI technology
             </p>
 
-            {/* Chat Input */}
+       
             <div className="max-w-xl mx-auto mb-16">
               <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
                 <Suspense
@@ -90,7 +92,7 @@ const Home = () => {
                 Ask anything about your pet's health, behavior, or training
               </p>
             </div>
-          </section>
+          </section> */}
 
           <section
             className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"

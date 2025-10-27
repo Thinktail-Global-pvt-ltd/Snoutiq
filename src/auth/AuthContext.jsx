@@ -583,9 +583,11 @@ useEffect(() => {
     fetchNearbyDoctors();
 
     // Refresh every 5 minutes (increased from 2 minutes)
-    const interval = setInterval(() => {
-      fetchNearbyDoctors();
-    }, 5 * 60 * 1000);
+ // Refresh every 30 seconds
+const interval = setInterval(() => {
+  fetchNearbyDoctors();
+}, 30 * 1000);
+
 
     return () => clearInterval(interval);
   }, [token, user?.id, fetchNearbyDoctors]);

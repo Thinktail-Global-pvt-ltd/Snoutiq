@@ -1,916 +1,3 @@
-// // src/pages/CallPage.jsx
-// import React, { useEffect, useMemo, useRef, useState } from "react";
-// import { useParams, useSearchParams } from "react-router-dom";
-// import AgoraRTC from "agora-rtc-sdk-ng";
-
-// const APP_ID = "e20a4d60afd8494eab490563ad2e61d1"; // Agora App ID
-
-// export default function CallPage() {
-//   const { channelName } = useParams();
-//   const [qs] = useSearchParams();
-
-//   // sanitize channel name
-//   const safeChannel = useMemo(() => {
-//     return (channelName || "default_channel")
-//       .replace(/[^a-zA-Z0-9_]/g, "")
-//       .slice(0, 63);
-//   }, [channelName]);
-
-//   // unique uid
-//   const uid = useMemo(() => {
-//     const q = Number(qs.get("uid"));
-//     return Number.isFinite(q) ? q : Math.floor(Math.random() * 1e6);
-//   }, [qs]);
-
-//   const role = (qs.get("role") || "audience").toLowerCase();
-
-//   // refs
-//   const localRef = useRef(null);
-//   const remoteRef = useRef(null);
-
-//   const [client] = useState(() =>
-//     AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
-//   );
-//   const [localTracks, setLocalTracks] = useState([]);
-//   const [joined, setJoined] = useState(false);
-
-//   useEffect(() => {
-//     let mounted = true;
-
-//     async function joinChannel() {
-//       try {
-//         console.log(`Joining channel: ${safeChannel}, role=${role}, uid=${uid}`);
-
-//         await client.join(APP_ID, safeChannel, null, uid);
-
-//         // ✅ Only doctor publishes
-//         if (role === "host") {
-//           const mic = await AgoraRTC.createMicrophoneAudioTrack();
-//           const cam = await AgoraRTC.createCameraVideoTrack();
-//           if (!mounted) return;
-
-//           setLocalTracks([mic, cam]);
-//           cam.play(localRef.current);
-//           await client.publish([mic, cam]);
-//           console.log("✅ Doctor published tracks");
-//         }
-
-//         // Remote user handling
-//         client.on("user-published", async (user, mediaType) => {
-//           await client.subscribe(user, mediaType);
-//           console.log("📡 Subscribed to", user.uid, mediaType);
-
-//           if (mediaType === "video") {
-//             user.videoTrack.play(remoteRef.current);
-//           }
-//           if (mediaType === "audio") {
-//             user.audioTrack.play();
-//           }
-//         });
-
-//         client.on("user-unpublished", (user) => {
-//           console.log("❌ User unpublished:", user.uid);
-//           if (remoteRef.current) remoteRef.current.innerHTML = "";
-//         });
-
-//         setJoined(true);
-//       } catch (err) {
-//         console.error("❌ Agora join error:", err);
-//       }
-//     }
-
-//     joinChannel();
-
-//     return () => {
-//       mounted = false;
-//       localTracks.forEach((t) => t.close());
-//       client.leave();
-//     };
-//   }, [client, safeChannel, role, uid]);
-
-//   const handleMute = () => {
-//     if (localTracks[0]) {
-//       const mic = localTracks[0];
-//       mic.setEnabled(!mic.enabled);
-//       console.log(mic.enabled ? "🎤 Unmuted" : "🔇 Muted");
-//     }
-//   };
-
-//   const handleCamera = () => {
-//     if (localTracks[1]) {
-//       const cam = localTracks[1];
-//       cam.setEnabled(!cam.enabled);
-//       console.log(cam.enabled ? "📷 Camera On" : "📷 Camera Off");
-//     }
-//   };
-
-//   const handleLeave = async () => {
-//     localTracks.forEach((t) => t.close());
-//     await client.leave();
-//     setJoined(false);
-//     console.log("🚪 Left the channel");
-//   };
-
-//   return (
-//     <div style={{ padding: 20 }}>
-//       <h2>Agora Call</h2>
-//       <p>
-//         uid: <b>{uid}</b> · channel: <b>{safeChannel}</b> · role:{" "}
-//         <b>{role}</b>
-//       </p>
-
-//       <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
-//         <div
-//           ref={localRef}
-//           style={{
-//             width: 320,
-//             height: 240,
-//             background: "#000",
-//             borderRadius: 8,
-//           }}
-//         />
-//         <div
-//           ref={remoteRef}
-//           style={{
-//             width: 320,
-//             height: 240,
-//             background: "#000",
-//             borderRadius: 8,
-//           }}
-//         />
-//       </div>
-
-//       {/* Controls only for doctor (host) */}
-//       {joined && role === "host" && (
-//         <div style={{ marginTop: 20 }}>
-//           <button onClick={handleMute} style={{ marginRight: 10 }}>
-//             🎤 Toggle Mute
-//           </button>
-//           <button onClick={handleCamera} style={{ marginRight: 10 }}>
-//             📷 Toggle Camera
-//           </button>
-//           <button onClick={handleLeave}>🚪 Leave</button>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-
-// import React, { useEffect, useMemo, useRef, useState } from "react";
-// import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-// import AgoraRTC from "agora-rtc-sdk-ng";
-// import { socket } from "./socket";
-
-// const APP_ID = "e20a4d60afd8494eab490563ad2e61d1"; // Replace with your Agora App ID
-
-// export default function CallPage() {
-//   const { channelName } = useParams();
-//   const [qs] = useSearchParams();
-//   const navigate = useNavigate();
-
-//   // Sanitize channel name
-//   const safeChannel = useMemo(() => {
-//     return (channelName || "default_channel")
-//       .replace(/[^a-zA-Z0-9_]/g, "")
-//       .slice(0, 63);
-//   }, [channelName]);
-
-//   // Get UID and role from URL params
-//   const uid = useMemo(() => {
-//     const q = Number(qs.get("uid"));
-//     return Number.isFinite(q) ? q : Math.floor(Math.random() * 1e6);
-//   }, [qs]);
-
-//   const role = (qs.get("role") || "audience").toLowerCase();
-//   const isHost = role === "host"; // Doctor is host
-
-//   // Refs for video elements
-//   const localVideoRef = useRef(null);
-//   const remoteVideoRef = useRef(null);
-
-//   // State
-//   const [client] = useState(() => 
-//     AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
-//   );
-//   const [localTracks, setLocalTracks] = useState([]);
-//   const [remoteUsers, setRemoteUsers] = useState([]);
-//   const [joined, setJoined] = useState(false);
-//   const [callStatus, setCallStatus] = useState("connecting");
-//   const [isMuted, setIsMuted] = useState(false);
-//   const [isCameraOff, setIsCameraOff] = useState(false);
-
-//   useEffect(() => {
-//     let mounted = true;
-
-//     async function joinChannel() {
-//       try {
-//         setCallStatus("connecting");
-//         console.log(`Joining channel: ${safeChannel}, role=${role}, uid=${uid}`);
-
-//         // Join the channel
-//         await client.join(APP_ID, safeChannel, null, uid);
-        
-//         if (!mounted) return;
-//         setJoined(true);
-//         setCallStatus("connected");
-
-//         // Create and publish tracks for host (doctor)
-//         if (isHost) {
-//           try {
-//             const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-//               encoderConfig: "music_standard",
-//             });
-//             const videoTrack = await AgoraRTC.createCameraVideoTrack({
-//               encoderConfig: "720p_1",
-//             });
-            
-//             if (!mounted) return;
-
-//             setLocalTracks([audioTrack, videoTrack]);
-            
-//             // Play local video
-//             if (localVideoRef.current) {
-//               videoTrack.play(localVideoRef.current);
-//             }
-            
-//             // Publish tracks
-//             await client.publish([audioTrack, videoTrack]);
-//             console.log("✅ Published local tracks");
-            
-//           } catch (error) {
-//             console.error("❌ Error creating local tracks:", error);
-//             setCallStatus("error");
-//           }
-//         }
-
-//         // Handle remote users
-//         client.on("user-published", async (user, mediaType) => {
-//           try {
-//             await client.subscribe(user, mediaType);
-//             console.log(`📡 Subscribed to user ${user.uid} ${mediaType}`);
-
-//             if (mediaType === "video" && remoteVideoRef.current) {
-//               user.videoTrack?.play(remoteVideoRef.current);
-//               setRemoteUsers(prev => {
-//                 const updated = prev.filter(u => u.uid !== user.uid);
-//                 return [...updated, user];
-//               });
-//             }
-            
-//             if (mediaType === "audio") {
-//               user.audioTrack?.play();
-//             }
-//           } catch (error) {
-//             console.error("❌ Error subscribing to user:", error);
-//           }
-//         });
-
-//         client.on("user-unpublished", (user, mediaType) => {
-//           console.log(`📡 User ${user.uid} unpublished ${mediaType}`);
-//           if (mediaType === "video") {
-//             setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-//           }
-//         });
-
-//         client.on("user-left", (user) => {
-//           console.log(`👋 User ${user.uid} left the channel`);
-//           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-//         });
-
-//       } catch (error) {
-//         console.error("❌ Join channel error:", error);
-//         setCallStatus("error");
-//       }
-//     }
-
-//     joinChannel();
-
-//     // Cleanup on unmount
-//     return () => {
-//       mounted = false;
-//       cleanup();
-//     };
-//   }, [client, safeChannel, role, uid, isHost]);
-
-//   const cleanup = async () => {
-//     try {
-//       // Close local tracks
-//       localTracks.forEach(track => {
-//         track.stop();
-//         track.close();
-//       });
-      
-//       // Leave channel
-//       if (joined) {
-//         await client.leave();
-//         console.log("🚪 Left the channel");
-//       }
-      
-//       setLocalTracks([]);
-//       setRemoteUsers([]);
-//       setJoined(false);
-//     } catch (error) {
-//       console.error("❌ Cleanup error:", error);
-//     }
-//   };
-
-//   const toggleMute = async () => {
-//     if (localTracks[0]) {
-//       const audioTrack = localTracks[0];
-//       await audioTrack.setEnabled(isMuted);
-//       setIsMuted(!isMuted);
-//       console.log(isMuted ? "🎤 Unmuted" : "🔇 Muted");
-//     }
-//   };
-
-//   const toggleCamera = async () => {
-//     if (localTracks[1]) {
-//       const videoTrack = localTracks[1];
-//       await videoTrack.setEnabled(isCameraOff);
-//       setIsCameraOff(!isCameraOff);
-//       console.log(isCameraOff ? "📷 Camera On" : "📷 Camera Off");
-//     }
-//   };
-
-//   const handleEndCall = async () => {
-//     await cleanup();
-    
-//     // Notify server about call end
-//     socket.emit("call-ended", { channel: safeChannel });
-    
-//     // Navigate back
-//     if (isHost) {
-//       navigate("/doctor-dashboard");
-//     } else {
-//       navigate("/patient-dashboard");
-//     }
-//   };
-
-//   const getStatusColor = () => {
-//     switch (callStatus) {
-//       case "connected": return "#16a34a";
-//       case "connecting": return "#f59e0b";
-//       case "error": return "#dc2626";
-//       default: return "#6b7280";
-//     }
-//   };
-
-//   return (
-//     <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
-//       {/* Header */}
-//       <div style={{ marginBottom: 20 }}>
-//         <h2>Video Call</h2>
-//         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-//           <span>UID: <strong>{uid}</strong></span>
-//           <span>Channel: <strong>{safeChannel}</strong></span>
-//           <span>Role: <strong>{role}</strong></span>
-//           <span style={{
-//             padding: "4px 8px",
-//             borderRadius: 12,
-//             fontSize: 12,
-//             fontWeight: "bold",
-//             background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
-//             color: getStatusColor()
-//           }}>
-//             {callStatus.toUpperCase()}
-//           </span>
-//         </div>
-//       </div>
-
-//       {/* Video Grid */}
-//       <div style={{ 
-//         display: "grid", 
-//         gridTemplateColumns: remoteUsers.length > 0 ? "1fr 1fr" : "1fr",
-//         gap: 20, 
-//         marginBottom: 20 
-//       }}>
-//         {/* Local Video (Doctor only) */}
-//         {isHost && (
-//           <div style={{ position: "relative" }}>
-//             <div
-//               ref={localVideoRef}
-//               style={{
-//                 width: "100%",
-//                 height: 300,
-//                 background: "#000",
-//                 borderRadius: 12,
-//                 overflow: "hidden"
-//               }}
-//             />
-//             <div style={{
-//               position: "absolute",
-//               bottom: 8,
-//               left: 8,
-//               background: "rgba(0,0,0,0.7)",
-//               color: "white",
-//               padding: "4px 8px",
-//               borderRadius: 4,
-//               fontSize: 12
-//             }}>
-//               You (Doctor)
-//             </div>
-//             {isCameraOff && (
-//               <div style={{
-//                 position: "absolute",
-//                 top: "50%",
-//                 left: "50%",
-//                 transform: "translate(-50%, -50%)",
-//                 color: "white",
-//                 fontSize: 18
-//               }}>
-//                 📷 Camera Off
-//               </div>
-//             )}
-//           </div>
-//         )}
-
-//         {/* Remote Video */}
-//         <div style={{ position: "relative" }}>
-//           <div
-//             ref={remoteVideoRef}
-//             style={{
-//               width: "100%",
-//               height: 300,
-//               background: "#000",
-//               borderRadius: 12,
-//               overflow: "hidden"
-//             }}
-//           />
-//           <div style={{
-//             position: "absolute",
-//             bottom: 8,
-//             left: 8,
-//             background: "rgba(0,0,0,0.7)",
-//             color: "white",
-//             padding: "4px 8px",
-//             borderRadius: 4,
-//             fontSize: 12
-//           }}>
-//             {remoteUsers.length > 0 
-//               ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})`
-//               : "Waiting for other participant..."
-//             }
-//           </div>
-//           {remoteUsers.length === 0 && (
-//             <div style={{
-//               position: "absolute",
-//               top: "50%",
-//               left: "50%",
-//               transform: "translate(-50%, -50%)",
-//               color: "white",
-//               textAlign: "center"
-//             }}>
-//               <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
-//               <div>Waiting for {isHost ? "patient" : "doctor"}...</div>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-
-//       {/* Controls (Host/Doctor only) */}
-//       {joined && isHost && (
-//         <div style={{
-//           display: "flex",
-//           justifyContent: "center",
-//           gap: 12,
-//           padding: 16,
-//           background: "#f9fafb",
-//           borderRadius: 12
-//         }}>
-//           <button
-//             onClick={toggleMute}
-//             style={{
-//               padding: "12px 16px",
-//               borderRadius: 8,
-//               background: isMuted ? "#dc2626" : "#6b7280",
-//               color: "white",
-//               border: "none",
-//               cursor: "pointer",
-//               fontWeight: "bold",
-//               minWidth: 120
-//             }}
-//           >
-//             {isMuted ? "🔇 Unmute" : "🎤 Mute"}
-//           </button>
-          
-//           <button
-//             onClick={toggleCamera}
-//             style={{
-//               padding: "12px 16px",
-//               borderRadius: 8,
-//               background: isCameraOff ? "#dc2626" : "#6b7280",
-//               color: "white",
-//               border: "none",
-//               cursor: "pointer",
-//               fontWeight: "bold",
-//               minWidth: 120
-//             }}
-//           >
-//             {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
-//           </button>
-          
-//           <button
-//             onClick={handleEndCall}
-//             style={{
-//               marginTop: 12,
-//               padding: "8px 16px",
-//               borderRadius: 6,
-//               background: "#374151",
-//               color: "white",
-//               border: "none",
-//               cursor: "pointer"
-//             }}
-//           >
-//             Go Back
-//           </button>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-
-// import React, { useEffect, useMemo, useRef, useState } from "react";
-// import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-// import AgoraRTC from "agora-rtc-sdk-ng";
-// import { socket } from "./socket";
-
-// const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
-
-// export default function CallPage() {
-//   const { channelName } = useParams();
-//   const [qs] = useSearchParams();
-//   const navigate = useNavigate();
-
-//   // Sanitize channel name
-//   const safeChannel = useMemo(() => {
-//     return (channelName || "default_channel")
-//       .replace(/[^a-zA-Z0-9_]/g, "")
-//       .slice(0, 63);
-//   }, [channelName]);
-
-//   // Get UID and role from URL params
-//   const uid = useMemo(() => {
-//     const q = Number(qs.get("uid"));
-//     return Number.isFinite(q) ? q : Math.floor(Math.random() * 1e6);
-//   }, [qs]);
-
-//   // const role = (qs.get("host") || "audience").toLowerCase();
-//   const role = qs.get("role") === "host" ? "host" : "audience";
-
-//   const isHost = role === "host";
-
-//   // Refs for video elements
-//   const localVideoRef = useRef(null);
-//   const remoteVideoRef = useRef(null);
-
-//   // State
-//   const [client] = useState(() => 
-//     AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
-//   );
-//   const [localTracks, setLocalTracks] = useState([]);
-//   const [remoteUsers, setRemoteUsers] = useState([]);
-//   const [joined, setJoined] = useState(false);
-//   const [callStatus, setCallStatus] = useState("connecting");
-//   const [isMuted, setIsMuted] = useState(false);
-//   const [isCameraOff, setIsCameraOff] = useState(false);
-//   console.log("QS params:", Object.fromEntries(qs.entries()));
-// console.log("Role:", role, "UID:", uid);
-
-
-//   useEffect(() => {
-//     let mounted = true;
-
-//     async function joinChannel() {
-//       try {
-//         setCallStatus("connecting");
-//         console.log(`Joining channel: ${safeChannel}, role=${role}, uid=${uid}`);
-
-//         // Join the channel
-//         await client.join(APP_ID, safeChannel, null, uid);
-        
-//         if (!mounted) return;
-//         setJoined(true);
-//         setCallStatus("connected");
-
-//         // Create and publish tracks for ALL users (both doctor and patient)
-//         try {
-//           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-//             encoderConfig: "music_standard",
-//           });
-//           const videoTrack = await AgoraRTC.createCameraVideoTrack({
-//             encoderConfig: "720p_1",
-//           });
-          
-//           if (!mounted) return;
-
-//           setLocalTracks([audioTrack, videoTrack]);
-          
-//           // Play local video
-//           if (localVideoRef.current) {
-//             videoTrack.play(localVideoRef.current);
-//           }
-          
-//           // Publish tracks for ALL users
-//           await client.publish([audioTrack, videoTrack]);
-//           console.log("✅ Published local tracks");
-          
-//         } catch (error) {
-//           console.error("❌ Error creating local tracks:", error);
-//           // If user denies camera/mic access, continue without tracks
-//           setCallStatus("connected");
-//         }
-
-//         // Handle remote users
-//         client.on("user-published", async (user, mediaType) => {
-//           try {
-//             await client.subscribe(user, mediaType);
-//             console.log(`📡 Subscribed to user ${user.uid} ${mediaType}`);
-
-//             if (mediaType === "video") {
-//               if (remoteVideoRef.current) {
-//                 user.videoTrack?.play(remoteVideoRef.current);
-//               }
-//               setRemoteUsers(prev => {
-//                 const exists = prev.some(u => u.uid === user.uid);
-//                 if (!exists) {
-//                   return [...prev, user];
-//                 }
-//                 return prev;
-//               });
-//             }
-            
-//             if (mediaType === "audio") {
-//               user.audioTrack?.play();
-//             }
-//           } catch (error) {
-//             console.error("❌ Error subscribing to user:", error);
-//           }
-//         });
-
-//         client.on("user-unpublished", (user, mediaType) => {
-//           console.log(`📡 User ${user.uid} unpublished ${mediaType}`);
-//           if (mediaType === "video") {
-//             setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-//           }
-//         });
-
-//         client.on("user-left", (user) => {
-//           console.log(`👋 User ${user.uid} left the channel`);
-//           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-//         });
-
-//       } catch (error) {
-//         console.error("❌ Join channel error:", error);
-//         setCallStatus("error");
-//       }
-//     }
-
-//     joinChannel();
-
-//     // Cleanup on unmount
-//     return () => {
-//       mounted = false;
-//       cleanup();
-//     };
-//   }, [client, safeChannel, role, uid]);
-
-//   const cleanup = async () => {
-//     try {
-//       // Close local tracks
-//       localTracks.forEach(track => {
-//         track.stop();
-//         track.close();
-//       });
-      
-//       // Leave channel
-//       if (joined) {
-//         await client.leave();
-//         console.log("🚪 Left the channel");
-//       }
-      
-//       setLocalTracks([]);
-//       setRemoteUsers([]);
-//       setJoined(false);
-//     } catch (error) {
-//       console.error("❌ Cleanup error:", error);
-//     }
-//   };
-
-//   const toggleMute = async () => {
-//     if (localTracks[0]) {
-//       const audioTrack = localTracks[0];
-//       await audioTrack.setEnabled(isMuted);
-//       setIsMuted(!isMuted);
-//       console.log(isMuted ? "🎤 Unmuted" : "🔇 Muted");
-//     }
-//   };
-
-//   const toggleCamera = async () => {
-//     if (localTracks[1]) {
-//       const videoTrack = localTracks[1];
-//       await videoTrack.setEnabled(isCameraOff);
-//       setIsCameraOff(!isCameraOff);
-//       console.log(isCameraOff ? "📷 Camera On" : "📷 Camera Off");
-//     }
-//   };
-
-//   const handleEndCall = async () => {
-//     await cleanup();
-    
-//     // Notify server about call end
-//     socket.emit("call-ended", { channel: safeChannel });
-    
-//     // Navigate back
-//     if (isHost) {
-//       navigate("/doctor-dashboard");
-//     } else {
-//       navigate("/patient-dashboard");
-//     }
-//   };
-
-//   const getStatusColor = () => {
-//     switch (callStatus) {
-//       case "connected": return "#16a34a";
-//       case "connecting": return "#f59e0b";
-//       case "error": return "#dc2626";
-//       default: return "#6b7280";
-//     }
-//   };
-
-//   return (
-//     <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
-//       {/* Header */}
-//       <div style={{ marginBottom: 20 }}>
-//         <h2>Video Call</h2>
-//         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-//           <span>UID: <strong>{uid}</strong></span>
-//           <span>Channel: <strong>{safeChannel}</strong></span>
-//           <span>Role: <strong>{role}</strong></span>
-//           <span style={{
-//             padding: "4px 8px",
-//             borderRadius: 12,
-//             fontSize: 12,
-//             fontWeight: "bold",
-//             background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
-//             color: getStatusColor()
-//           }}>
-//             {callStatus.toUpperCase()}
-//           </span>
-//         </div>
-//       </div>
-
-//       {/* Video Grid */}
-//       <div style={{ 
-//         display: "grid", 
-//         gridTemplateColumns: "1fr 1fr",
-//         gap: 20, 
-//         marginBottom: 20 
-//       }}>
-//         {/* Local Video */}
-//         <div style={{ position: "relative" }}>
-//           <div
-//             ref={localVideoRef}
-//             style={{
-//               width: "100%",
-//               height: 300,
-//               background: "#000",
-//               borderRadius: 12,
-//               overflow: "hidden"
-//             }}
-//           />
-//           <div style={{
-//             position: "absolute",
-//             bottom: 8,
-//             left: 8,
-//             background: "rgba(0,0,0,0.7)",
-//             color: "white",
-//             padding: "4px 8px",
-//             borderRadius: 4,
-//             fontSize: 12
-//           }}>
-//             You ({isHost ? "Doctor" : "Patient"})
-//           </div>
-//           {isCameraOff && (
-//             <div style={{
-//               position: "absolute",
-//               top: "50%",
-//               left: "50%",
-//               transform: "translate(-50%, -50%)",
-//               color: "white",
-//               fontSize: 18
-//             }}>
-//               📷 Camera Off
-//             </div>
-//           )}
-//         </div>
-
-//         {/* Remote Video */}
-//         <div style={{ position: "relative" }}>
-//           <div
-//             ref={remoteVideoRef}
-//             style={{
-//               width: "100%",
-//               height: 300,
-//               background: "#000",
-//               borderRadius: 12,
-//               overflow: "hidden"
-//             }}
-//           />
-//           <div style={{
-//             position: "absolute",
-//             bottom: 8,
-//             left: 8,
-//             background: "rgba(0,0,0,0.7)",
-//             color: "white",
-//             padding: "4px 8px",
-//             borderRadius: 4,
-//             fontSize: 12
-//           }}>
-//             {remoteUsers.length > 0 
-//               ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})`
-//               : "Waiting for other participant..."
-//             }
-//           </div>
-//           {remoteUsers.length === 0 && (
-//             <div style={{
-//               position: "absolute",
-//               top: "50%",
-//               left: "50%",
-//               transform: "translate(-50%, -50%)",
-//               color: "white",
-//               textAlign: "center"
-//             }}>
-//               <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
-//               <div>Waiting for {isHost ? "patient" : "doctor"}...</div>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-
-//       {/* Controls */}
-//       {joined && (
-//         <div style={{
-//           display: "flex",
-//           justifyContent: "center",
-//           gap: 12,
-//           padding: 16,
-//           background: "#f9fafb",
-//           borderRadius: 12
-//         }}>
-//           <button
-//             onClick={toggleMute}
-//             style={{
-//               padding: "12px 16px",
-//               borderRadius: 8,
-//               background: isMuted ? "#dc2626" : "#6b7280",
-//               color: "white",
-//               border: "none",
-//               cursor: "pointer",
-//               fontWeight: "bold",
-//               minWidth: 120
-//             }}
-//           >
-//             {isMuted ? "🔇 Unmute" : "🎤 Mute"}
-//           </button>
-          
-//           <button
-//             onClick={toggleCamera}
-//             style={{
-//               padding: "12px 16px",
-//               borderRadius: 8,
-//               background: isCameraOff ? "#dc2626" : "#6b7280",
-//               color: "white",
-//               border: "none",
-//               cursor: "pointer",
-//               fontWeight: "bold",
-//               minWidth: 120
-//             }}
-//           >
-//             {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
-//           </button>
-          
-//           <button
-//             onClick={handleEndCall}
-//             style={{
-//               padding: "12px 16px",
-//               borderRadius: 8,
-//               background: "#dc2626",
-//               color: "white",
-//               border: "none",
-//               cursor: "pointer",
-//               fontWeight: "bold",
-//               minWidth: 120
-//             }}
-//           >
-//             📞 End Call
-//           </button>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useParams, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
@@ -961,6 +48,105 @@ export default function CallPage() {
   const [callStatus, setCallStatus] = useState("connecting");
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCamera, setSelectedCamera] = useState("");
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(true);
+  const [permissions, setPermissions] = useState({
+    camera: false,
+    microphone: false
+  });
+
+  // Get available cameras
+  const getCameras = async () => {
+    try {
+      const devices = await AgoraRTC.getDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      setCameras(videoDevices);
+      
+      if (videoDevices.length > 0) {
+        setSelectedCamera(videoDevices[0].deviceId);
+      }
+      
+      return videoDevices;
+    } catch (error) {
+      console.error("Error getting cameras:", error);
+      return [];
+    }
+  };
+
+  // Request permissions
+  const requestPermissions = async () => {
+    try {
+      // Request camera permission
+      const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          setPermissions(prev => ({ ...prev, camera: true }));
+          stream.getTracks().forEach(track => track.stop());
+          return true;
+        })
+        .catch(() => false);
+
+      // Request microphone permission
+      const microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          setPermissions(prev => ({ ...prev, microphone: true }));
+          stream.getTracks().forEach(track => track.stop());
+          return true;
+        })
+        .catch(() => false);
+
+      if (cameraStream && microphoneStream) {
+        setShowPermissionModal(false);
+        toast.success("Permissions granted!");
+      } else {
+        toast.error("Please grant permissions to continue");
+      }
+
+      return { camera: cameraStream, microphone: microphoneStream };
+    } catch (error) {
+      console.error("Permission request error:", error);
+      toast.error("Error requesting permissions");
+      return { camera: false, microphone: false };
+    }
+  };
+
+  // Switch camera
+  const switchCamera = async (deviceId) => {
+    if (!localTracks[1]) return;
+
+    try {
+      const videoTrack = localTracks[1];
+      
+      // Create new track with selected camera
+      const newVideoTrack = await AgoraRTC.createCameraVideoTrack({ 
+        cameraId: deviceId 
+      });
+      
+      // Replace the old track with new one
+      await clientRef.current.unpublish([videoTrack]);
+      await clientRef.current.publish([newVideoTrack]);
+      
+      // Update local tracks
+      const newLocalTracks = [localTracks[0], newVideoTrack];
+      setLocalTracks(newLocalTracks);
+      
+      // Play new video track
+      if (localVideoRef.current) {
+        newVideoTrack.play(localVideoRef.current);
+      }
+      
+      // Close old track
+      videoTrack.close();
+      
+      setSelectedCamera(deviceId);
+      setShowCameraModal(false);
+      toast.success("Camera switched successfully");
+    } catch (error) {
+      console.error("Error switching camera:", error);
+      toast.error("Failed to switch camera");
+    }
+  };
 
   // ✅ ENHANCED: Listen for call-ended-by-other and disconnect events
   useEffect(() => {
@@ -1053,6 +239,9 @@ export default function CallPage() {
         setJoined(true);
         setCallStatus("connected");
 
+        // Get available cameras
+        await getCameras();
+
         // Create tracks
         let audioTrack = null;
         let videoTrack = null;
@@ -1061,6 +250,7 @@ export default function CallPage() {
           audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
         } catch (err) {
           console.warn("Audio track error:", err);
+          toast.error("Microphone access denied");
         }
 
         try {
@@ -1068,6 +258,7 @@ export default function CallPage() {
         } catch (err) {
           console.warn("Video track error:", err);
           setIsCameraOff(true);
+          toast.error("Camera access denied");
         }
 
         const tracksToPublish = [];
@@ -1121,10 +312,13 @@ export default function CallPage() {
       } catch (error) {
         console.error("Join channel error:", error);
         setCallStatus("error");
+        toast.error("Failed to join call");
       }
     }
 
-    joinChannel();
+    if (!showPermissionModal) {
+      joinChannel();
+    }
 
     return () => {
       mounted = false;
@@ -1132,7 +326,7 @@ export default function CallPage() {
         cleanup();
       }
     };
-  }, [safeChannel, role, uid]);
+  }, [safeChannel, role, uid, showPermissionModal]);
 
   const cleanup = async () => {
     const client = clientRef.current;
@@ -1160,6 +354,7 @@ export default function CallPage() {
       const audioTrack = localTracks[0];
       await audioTrack.setEnabled(isMuted);
       setIsMuted(!isMuted);
+      toast.success(isMuted ? "Microphone unmuted" : "Microphone muted");
     }
   };
 
@@ -1168,6 +363,7 @@ export default function CallPage() {
       const videoTrack = localTracks[1];
       await videoTrack.setEnabled(isCameraOff);
       setIsCameraOff(!isCameraOff);
+      toast.success(isCameraOff ? "Camera turned on" : "Camera turned off");
     }
   };
 
@@ -1201,35 +397,295 @@ export default function CallPage() {
 
   const getStatusColor = () => {
     switch (callStatus) {
-      case "connected": return "#16a34a";
+      case "connected": return "#10b981";
       case "connecting": return "#f59e0b";
-      case "error": return "#dc2626";
+      case "error": return "#ef4444";
       default: return "#6b7280";
     }
   };
+
+  // Permission Modal Component
+  const PermissionModal = () => (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(0, 0, 0, 0.8)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      backdropFilter: "blur(10px)"
+    }}>
+      <div style={{
+        background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
+        padding: "2rem",
+        borderRadius: "20px",
+        maxWidth: "500px",
+        width: "90%",
+        textAlign: "center",
+        border: "1px solid rgba(255,255,255,0.1)",
+        boxShadow: "0 20px 40px rgba(0,0,0,0.3)"
+      }}>
+        <div style={{
+          width: "80px",
+          height: "80px",
+          background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 1.5rem",
+          fontSize: "2rem"
+        }}>
+          📹
+        </div>
+        
+        <h2 style={{
+          color: "white",
+          fontSize: "1.5rem",
+          fontWeight: "600",
+          marginBottom: "1rem"
+        }}>
+          Camera & Microphone Access
+        </h2>
+        
+        <p style={{
+          color: "#d1d5db",
+          fontSize: "1rem",
+          lineHeight: "1.5",
+          marginBottom: "2rem"
+        }}>
+          To start the video call, we need access to your camera and microphone. 
+          Please allow permissions when prompted by your browser.
+        </p>
+
+        <div style={{
+          display: "flex",
+          gap: "1rem",
+          justifyContent: "center",
+          flexWrap: "wrap"
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            background: permissions.camera ? "rgba(34, 197, 94, 0.2)" : "rgba(100, 116, 139, 0.3)",
+            padding: "0.75rem 1rem",
+            borderRadius: "10px",
+            border: permissions.camera ? "1px solid #22c55e" : "1px solid #475569"
+          }}>
+            <span style={{ fontSize: "1.25rem" }}>📷</span>
+            <span style={{ color: "white", fontSize: "0.9rem" }}>
+              {permissions.camera ? "Camera Granted" : "Camera Access"}
+            </span>
+          </div>
+
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            background: permissions.microphone ? "rgba(34, 197, 94, 0.2)" : "rgba(100, 116, 139, 0.3)",
+            padding: "0.75rem 1rem",
+            borderRadius: "10px",
+            border: permissions.microphone ? "1px solid #22c55e" : "1px solid #475569"
+          }}>
+            <span style={{ fontSize: "1.25rem" }}>🎤</span>
+            <span style={{ color: "white", fontSize: "0.9rem" }}>
+              {permissions.microphone ? "Microphone Granted" : "Microphone Access"}
+            </span>
+          </div>
+        </div>
+
+        <div style={{
+          display: "flex",
+          gap: "1rem",
+          justifyContent: "center",
+          marginTop: "2rem"
+        }}>
+          <button
+            onClick={requestPermissions}
+            style={{
+              background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+              color: "white",
+              border: "none",
+              padding: "0.75rem 2rem",
+              borderRadius: "10px",
+              fontSize: "1rem",
+              fontWeight: "600",
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
+            onMouseOver={(e) => e.target.style.transform = "translateY(-2px)"}
+            onMouseOut={(e) => e.target.style.transform = "translateY(0)"}
+          >
+            Allow Permissions
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Camera Selection Modal
+  const CameraModal = () => (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(0, 0, 0, 0.8)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      backdropFilter: "blur(10px)"
+    }}>
+      <div style={{
+        background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
+        padding: "2rem",
+        borderRadius: "20px",
+        maxWidth: "400px",
+        width: "90%",
+        border: "1px solid rgba(255,255,255,0.1)",
+        boxShadow: "0 20px 40px rgba(0,0,0,0.3)"
+      }}>
+        <h3 style={{
+          color: "white",
+          fontSize: "1.25rem",
+          fontWeight: "600",
+          marginBottom: "1.5rem",
+          textAlign: "center"
+        }}>
+          Select Camera
+        </h3>
+
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.5rem",
+          marginBottom: "2rem"
+        }}>
+          {cameras.map((camera, index) => (
+            <button
+              key={camera.deviceId}
+              onClick={() => switchCamera(camera.deviceId)}
+              style={{
+                background: selectedCamera === camera.deviceId 
+                  ? "rgba(59, 130, 246, 0.3)" 
+                  : "rgba(100, 116, 139, 0.2)",
+                color: "white",
+                border: selectedCamera === camera.deviceId 
+                  ? "1px solid #3b82f6" 
+                  : "1px solid #475569",
+                padding: "1rem",
+                borderRadius: "10px",
+                cursor: "pointer",
+                textAlign: "left",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => {
+                if (selectedCamera !== camera.deviceId) {
+                  e.target.style.background = "rgba(100, 116, 139, 0.3)";
+                }
+              }}
+              onMouseOut={(e) => {
+                if (selectedCamera !== camera.deviceId) {
+                  e.target.style.background = "rgba(100, 116, 139, 0.2)";
+                }
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span style={{ fontSize: "1.25rem" }}>
+                  {camera.label.toLowerCase().includes("back") ? "📱" : "📷"}
+                </span>
+                <span style={{ fontSize: "0.9rem" }}>
+                  {camera.label || `Camera ${index + 1}`}
+                </span>
+                {selectedCamera === camera.deviceId && (
+                  <span style={{ 
+                    marginLeft: "auto", 
+                    color: "#10b981",
+                    fontSize: "0.8rem"
+                  }}>
+                    ● Active
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+          <button
+            onClick={() => setShowCameraModal(false)}
+            style={{
+              background: "rgba(100, 116, 139, 0.3)",
+              color: "white",
+              border: "1px solid #475569",
+              padding: "0.75rem 1.5rem",
+              borderRadius: "10px",
+              cursor: "pointer",
+              fontSize: "0.9rem",
+              fontWeight: "500"
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{
       position: "relative",
       width: "100vw",
       height: "100vh",
-      backgroundColor: "#0b0f19",
+      backgroundColor: "#0f172a",
       overflow: "hidden",
       color: "white",
-      fontFamily: "Inter, sans-serif"
+      fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif"
     }}>
+      
+      {/* Permission Modal */}
+      {showPermissionModal && <PermissionModal />}
+
+      {/* Camera Selection Modal */}
+      {showCameraModal && <CameraModal />}
       
       {/* Logo */}
       <div style={{
         position: "absolute",
-        top: 16,
-        left: 20,
+        top: 20,
+        left: 24,
         display: "flex",
         alignItems: "center",
-        gap: 8,
-        zIndex: 10
+        gap: 12,
+        zIndex: 50,
+        background: "rgba(15, 23, 42, 0.8)",
+        padding: "8px 16px",
+        borderRadius: "12px",
+        backdropFilter: "blur(10px)",
+        border: "1px solid rgba(255,255,255,0.1)"
       }}>
-        <img src={logo} alt="Snoutiq" />
+        <img src={logo} alt="Snoutiq" style={{ height: 32 }} />
+        <div style={{
+          height: 20,
+          width: 1,
+          background: "rgba(255,255,255,0.2)"
+        }} />
+        <span style={{
+          fontSize: 14,
+          fontWeight: 600,
+          background: "linear-gradient(135deg, #60a5fa, #a78bfa)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent"
+        }}>
+          Video Consult
+        </span>
       </div>
 
       {/* Remote Video */}
@@ -1239,10 +695,8 @@ export default function CallPage() {
         left: 0,
         width: "100%",
         height: "100%",
-        background: "#000",
-        borderRadius: 0,
-        objectFit: "cover",
-        overflow: "hidden"
+        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+        objectFit: "cover"
       }} />
 
       {/* Waiting state */}
@@ -1254,132 +708,288 @@ export default function CallPage() {
           transform: "translate(-50%, -50%)",
           textAlign: "center",
           color: "white",
-          opacity: 0.8
+          zIndex: 10
         }}>
-          <div style={{ fontSize: 56, marginBottom: 8 }}>⏳</div>
-          <div style={{ fontSize: 18 }}>Waiting for {isHost ? "Patient" : "Doctor"} to join...</div>
+          <div style={{
+            width: 120,
+            height: 120,
+            background: "rgba(255,255,255,0.1)",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 1.5rem",
+            fontSize: 48,
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.2)"
+          }}>
+            ⏳
+          </div>
+          <div style={{ 
+            fontSize: 18, 
+            fontWeight: 500,
+            marginBottom: "0.5rem"
+          }}>
+            Waiting for {isHost ? "Patient" : "Doctor"}
+          </div>
+          <div style={{ 
+            fontSize: 14, 
+            opacity: 0.7,
+            color: "#d1d5db"
+          }}>
+            They will join shortly...
+          </div>
         </div>
       )}
 
       {/* Local Preview */}
       <div style={{
         position: "absolute",
-        bottom: 100,
-        right: 30,
-        width: 220,
-        height: 150,
-        borderRadius: 12,
+        bottom: 120,
+        right: 24,
+        width: 240,
+        height: 160,
+        borderRadius: 16,
         overflow: "hidden",
         border: "2px solid rgba(255,255,255,0.3)",
-        boxShadow: "0 0 20px rgba(0,0,0,0.4)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
         background: "#000",
-        zIndex: 5
+        zIndex: 20
       }}>
-        <div ref={localVideoRef} style={{ width: "100%", height: "100%" }} />
+        <div ref={localVideoRef} style={{ 
+          width: "100%", 
+          height: "100%",
+          objectFit: "cover"
+        }} />
+        
+        {/* Camera Off Overlay */}
         {isCameraOff && (
           <div style={{
             position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            color: "white"
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "column",
+            gap: 8
           }}>
-            📷 Camera Off
+            <div style={{ fontSize: 24 }}>📷</div>
+            <div style={{ fontSize: 12, color: "white" }}>Camera Off</div>
           </div>
         )}
+        
+        {/* User Badge */}
         <div style={{
           position: "absolute",
-          bottom: 4,
-          left: 4,
-          background: "rgba(0,0,0,0.6)",
-          padding: "2px 8px",
-          borderRadius: 6,
-          fontSize: 12
+          bottom: 8,
+          left: 8,
+          background: "rgba(0,0,0,0.7)",
+          padding: "4px 12px",
+          borderRadius: 20,
+          fontSize: 12,
+          fontWeight: 500,
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.2)"
         }}>
-          You ({isHost ? "Doctor" : "Patient"})
+          You • {isHost ? "Doctor" : "Patient"}
         </div>
       </div>
 
       {/* Status Bar */}
       <div style={{
         position: "absolute",
-        top: 16,
-        right: 20,
-        background: "rgba(255,255,255,0.1)",
+        top: 20,
+        right: 24,
+        background: "rgba(15, 23, 42, 0.8)",
         padding: "8px 16px",
         borderRadius: 12,
         fontSize: 13,
         fontWeight: 500,
         display: "flex",
         alignItems: "center",
-        gap: 10
+        gap: 12,
+        backdropFilter: "blur(10px)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        zIndex: 50
       }}>
-        <span>Channel: {safeChannel}</span>
-        <span style={{
-          width: 10,
-          height: 10,
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6
+        }}>
+          <span style={{ opacity: 0.7 }}>Status:</span>
+          <span style={{ 
+            color: getStatusColor(),
+            fontWeight: 600,
+            textTransform: "capitalize"
+          }}>
+            {callStatus}
+          </span>
+        </div>
+        <div style={{
+          width: 6,
+          height: 6,
           borderRadius: "50%",
           background: getStatusColor()
-        }}></span>
-        <span>{callStatus}</span>
+        }} />
       </div>
 
-      {/* Controls */}
+      {/* Enhanced Controls */}
       {joined && (
         <div style={{
           position: "absolute",
-          bottom: 20,
+          bottom: 24,
           left: "50%",
           transform: "translateX(-50%)",
           display: "flex",
-          gap: 20,
+          gap: 16,
           justifyContent: "center",
-          background: "rgba(0,0,0,0.5)",
-          padding: "12px 24px",
-          borderRadius: 50,
-          backdropFilter: "blur(6px)",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.3)"
+          background: "rgba(15, 23, 42, 0.8)",
+          padding: "16px 32px",
+          borderRadius: 24,
+          backdropFilter: "blur(20px)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          zIndex: 30
         }}>
-          <button onClick={toggleMute} style={{
-            width: 60,
-            height: 60,
-            borderRadius: "50%",
-            border: "none",
-            background: isMuted ? "#dc2626" : "#4b5563",
-            color: "white",
-            fontSize: 20,
-            cursor: "pointer"
-          }}>
+          {/* Mute/Unmute */}
+          <button 
+            onClick={toggleMute}
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              border: "none",
+              background: isMuted 
+                ? "linear-gradient(135deg, #ef4444, #dc2626)" 
+                : "linear-gradient(135deg, #475569, #374151)",
+              color: "white",
+              fontSize: 20,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+            }}
+            onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
+            onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+          >
             {isMuted ? "🔇" : "🎤"}
           </button>
 
-          <button onClick={toggleCamera} style={{
-            width: 60,
-            height: 60,
-            borderRadius: "50%",
-            border: "none",
-            background: isCameraOff ? "#dc2626" : "#4b5563",
-            color: "white",
-            fontSize: 20,
-            cursor: "pointer"
-          }}>
+          {/* Camera Toggle */}
+          <button 
+            onClick={toggleCamera}
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              border: "none",
+              background: isCameraOff 
+                ? "linear-gradient(135deg, #ef4444, #dc2626)" 
+                : "linear-gradient(135deg, #475569, #374151)",
+              color: "white",
+              fontSize: 20,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+            }}
+            onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
+            onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+          >
             {isCameraOff ? "📷" : "📹"}
           </button>
 
-          <button onClick={handleEndCall} style={{
-            width: 60,
-            height: 60,
-            borderRadius: "50%",
-            border: "none",
-            background: "#dc2626",
-            color: "white",
-            fontSize: 22,
-            cursor: "pointer"
-          }}>
+          {/* Switch Camera */}
+          {cameras.length > 1 && (
+            <button 
+              onClick={() => setShowCameraModal(true)}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                border: "none",
+                background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+                color: "white",
+                fontSize: 20,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+              }}
+              onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
+              onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+            >
+              🔄
+            </button>
+          )}
+
+          {/* End Call */}
+          <button 
+            onClick={handleEndCall}
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: "50%",
+              border: "none",
+              background: "linear-gradient(135deg, #ef4444, #dc2626)",
+              color: "white",
+              fontSize: 20,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+            }}
+            onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
+            onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+          >
             📞
           </button>
         </div>
       )}
+
+      {/* Connection Quality Indicator */}
+      <div style={{
+        position: "absolute",
+        top: 70,
+        right: 24,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        background: "rgba(15, 23, 42, 0.8)",
+        padding: "6px 12px",
+        borderRadius: 8,
+        fontSize: 12,
+        backdropFilter: "blur(10px)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        zIndex: 50
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4
+        }}>
+          <span style={{ opacity: 0.7 }}>Connection:</span>
+          <span style={{ 
+            color: callStatus === "connected" ? "#10b981" : "#f59e0b",
+            fontWeight: 500
+          }}>
+            {callStatus === "connected" ? "Excellent" : "Connecting..."}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

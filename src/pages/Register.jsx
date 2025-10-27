@@ -9,7 +9,8 @@ import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 
 // Background image for the right side
-const registerBackground = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1974&q=80";
+const registerBackground =
+  "https://images.unsplash.com/photo-1450778869180-41d0601e046e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1974&q=80";
 
 const RegisterBasicDetails = () => {
   const navigate = useNavigate();
@@ -148,7 +149,7 @@ const RegisterBasicDetails = () => {
   };
 
   const handleGoogleSuccess = async (credentialResponse) => {
-    const frontendRole = "pet"; 
+    const frontendRole = "pet";
 
     try {
       setLoading(true);
@@ -228,7 +229,7 @@ const RegisterBasicDetails = () => {
         login(userWithRole, token, chatRoomToken);
 
         localStorage.setItem("user", JSON.stringify(userWithRole));
-        
+
         toast.success("Login successful!");
         navigate("/dashboard");
       } else {
@@ -321,8 +322,16 @@ const RegisterBasicDetails = () => {
       case "granted":
         return (
           <div className="flex items-center justify-center text-green-600 text-sm mb-4 p-3 bg-green-50 rounded-xl border border-green-100">
-            <svg className="w-4 h-4 mr-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+            <svg
+              className="w-4 h-4 mr-3"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              ></path>
             </svg>
             Location access granted
           </div>
@@ -331,8 +340,16 @@ const RegisterBasicDetails = () => {
         return (
           <div className="mb-4">
             <div className="flex items-center justify-center text-red-600 text-sm mb-3 p-3 bg-red-50 rounded-xl border border-red-100">
-              <svg className="w-4 h-4 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
+              <svg
+                className="w-4 h-4 mr-3"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                ></path>
               </svg>
               Location access denied
             </div>
@@ -348,8 +365,16 @@ const RegisterBasicDetails = () => {
         return (
           <div className="mb-4">
             <div className="flex items-center justify-center text-yellow-600 text-sm mb-3 p-3 bg-yellow-50 rounded-xl border border-yellow-100">
-              <svg className="w-4 h-4 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
+              <svg
+                className="w-4 h-4 mr-3"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                ></path>
               </svg>
               Location access needed for better service
             </div>
@@ -390,34 +415,29 @@ const RegisterBasicDetails = () => {
               <label className="block text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide ">
                 I am a
               </label>
-              <div className="flex bg-gray-100 rounded-2xl p-2 border border-gray-200 shadow-sm">
-                <button
-                  onClick={() => setUserType("pet_owner")}
-                  className={`flex-1 py-4 px-6 rounded-xl text-base font-semibold transition-all duration-300 ${
-                    userType === "pet_owner"
-                      ? "bg-white text-blue-700 shadow-lg shadow-blue-100 border border-blue-100 transform scale-105"
-                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-50/50"
-                  }`}
-                  
-                >
-                  <div className="flex items-center justify-center gap-3">
-                    <span className="text-lg">🐾</span>
-                    <span>Pet Owner</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setUserType("veterinarian")}
-                  className={`flex-1 py-4 px-6 rounded-xl text-base font-semibold transition-all duration-300 ${
-                    userType === "veterinarian"
-                      ? "bg-white text-blue-700 shadow-lg shadow-blue-100 border border-blue-100 transform scale-105"
-                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-50/50"
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-3">
-                    <span className="text-lg">🩺</span>
-                    <span>Veterinarian</span>
-                  </div>
-                </button>
+              <div className="mb-8">
+                <div className="flex bg-gray-100 rounded-xl p-1.5 border border-gray-200">
+                  <button
+                    onClick={() => setUserType("pet_owner")}
+                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                      userType === "pet_owner"
+                        ? "bg-white text-blue-600 shadow-sm shadow-blue-100 border border-blue-100"
+                        : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                    }`}
+                  >
+                    🐾 Pet Owner
+                  </button>
+                  <button
+                    onClick={() => setUserType("veterinarian")}
+                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                      userType === "veterinarian"
+                        ? "bg-white text-blue-600 shadow-sm shadow-blue-100 border border-blue-100"
+                        : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                    }`}
+                  >
+                    🩺 Veterinarian
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -442,9 +462,7 @@ const RegisterBasicDetails = () => {
 
               {/* Google Login */}
               <div className="w-full">
-                <GoogleOAuthProvider
-                  clientId="325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com"
-                >
+                <GoogleOAuthProvider clientId="325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com">
                   <div className="flex justify-center">
                     <GoogleLogin
                       onSuccess={handleGoogleSuccess}
@@ -463,11 +481,13 @@ const RegisterBasicDetails = () => {
 
                 {/* Message below button */}
                 {googleMessage && (
-                  <p className={`mt-4 text-sm text-center p-3 rounded-xl ${
-                    googleMessage.includes("successful")
-                      ? "text-green-700 bg-green-50 border border-green-100"
-                      : "text-red-700 bg-red-50 border border-red-100"
-                  }`}>
+                  <p
+                    className={`mt-4 text-sm text-center p-3 rounded-xl ${
+                      googleMessage.includes("successful")
+                        ? "text-green-700 bg-green-50 border border-green-100"
+                        : "text-red-700 bg-red-50 border border-red-100"
+                    }`}
+                  >
                     {googleMessage}
                   </p>
                 )}
@@ -509,38 +529,40 @@ const RegisterBasicDetails = () => {
 
         {/* Right Side - Brand Section */}
         <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-blue-900 to-indigo-900">
-          <div 
+          <div
             className="absolute inset-0 bg-cover bg-center bg-no-repeat"
             style={{ backgroundImage: `url(${registerBackground})` }}
           >
             {/* Overlay */}
             <div className="absolute inset-0 bg-blue-900/70"></div>
           </div>
-          
+
           {/* Background Pattern */}
           <div className="absolute inset-0 opacity-10">
-            <div className="absolute inset-0" style={{
-              backgroundImage: `radial-gradient(circle at 25px 25px, rgba(255,255,255,0.3) 2%, transparent 40%)`,
-              backgroundSize: '50px 50px'
-            }}></div>
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `radial-gradient(circle at 25px 25px, rgba(255,255,255,0.3) 2%, transparent 40%)`,
+                backgroundSize: "50px 50px",
+              }}
+            ></div>
           </div>
-          
+
           {/* Content */}
           <div className="relative z-10 flex flex-col justify-center p-16 text-white w-full">
             <div className="max-w-lg">
-
               <h1 className="text-5xl font-bold mb-6 leading-tight">
                 Start Your{" "}
                 <span className="bg-gradient-to-r from-blue-300 to-indigo-200 bg-clip-text text-transparent">
                   Pet Care Journey
                 </span>
               </h1>
-              
+
               <p className="text-xl text-blue-100 mb-10 leading-relaxed font-light">
-                Join thousands of pet owners and veterinarians who trust Snoutiq for comprehensive pet healthcare solutions.
+                Join thousands of pet owners and veterinarians who trust Snoutiq
+                for comprehensive pet healthcare solutions.
               </p>
 
-              
               {/* Benefits Grid */}
               <div className="grid grid-cols-1 gap-6">
                 <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
@@ -548,18 +570,26 @@ const RegisterBasicDetails = () => {
                     <span className="text-lg">🚀</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-white mb-1">Quick Setup</h3>
-                    <p className="text-blue-100 text-sm font-light">Get started in seconds with Google Sign Up</p>
+                    <h3 className="font-semibold text-white mb-1">
+                      Quick Setup
+                    </h3>
+                    <p className="text-blue-100 text-sm font-light">
+                      Get started in seconds with Google Sign Up
+                    </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
                   <div className="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center flex-shrink-0 border border-indigo-400/30">
                     <span className="text-lg">📍</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-white mb-1">Location-Based Services</h3>
-                    <p className="text-blue-100 text-sm font-light">Find nearby veterinarians and services</p>
+                    <h3 className="font-semibold text-white mb-1">
+                      Location-Based Services
+                    </h3>
+                    <p className="text-blue-100 text-sm font-light">
+                      Find nearby veterinarians and services
+                    </p>
                   </div>
                 </div>
 
@@ -568,8 +598,12 @@ const RegisterBasicDetails = () => {
                     <span className="text-lg">💫</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-white mb-1">Personalized Experience</h3>
-                    <p className="text-blue-100 text-sm font-light">Tailored recommendations for your pets</p>
+                    <h3 className="font-semibold text-white mb-1">
+                      Personalized Experience
+                    </h3>
+                    <p className="text-blue-100 text-sm font-light">
+                      Tailored recommendations for your pets
+                    </p>
                   </div>
                 </div>
               </div>

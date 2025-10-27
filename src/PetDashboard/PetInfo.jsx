@@ -35,15 +35,6 @@ const DESIGN = {
   },
 };
 
-const CACHE_KEYS = {
-  USER_PROFILE: "user_profile_cache",
-  PETS_DATA: "pets_data_cache",
-  STATS_DATA: "stats_data_cache",
-  DOG_BREEDS: "dog_breeds_cache",
-};
-
-const CACHE_DURATION = 10 * 60 * 1000;
-
 const ProfileScreen = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -108,54 +99,9 @@ const ProfileScreen = () => {
   ]);
   const [loadingBreeds, setLoadingBreeds] = useState(false);
 
-  // Cache implementation
-  const cacheData = async (key, data) => {
-    try {
-      localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
-    } catch (error) {
-      console.error("Cache save error:", error);
-    }
-  };
-
-  const getCachedData = async (key, forceRefresh = false) => {
-    try {
-      if (forceRefresh) return null;
-      const cached = localStorage.getItem(key);
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < CACHE_DURATION) return data;
-      }
-    } catch (error) {
-      console.error("Cache read error:", error);
-    }
-    return null;
-  };
-
-  const clearCache = async (key) => {
-    try {
-      localStorage.removeItem(key);
-    } catch (error) {
-      console.error("Cache clear error:", error);
-    }
-  };
-
-  const clearAllProfileCache = async () => {
-    try {
-      Object.values(CACHE_KEYS).forEach(key => clearCache(key));
-    } catch (error) {
-      console.error("Error clearing cache:", error);
-    }
-  };
-
   const fetchDogBreeds = async () => {
     setLoadingBreeds(true);
     try {
-      const cachedBreeds = await getCachedData(CACHE_KEYS.DOG_BREEDS);
-      if (cachedBreeds) {
-        setDogBreeds(cachedBreeds);
-        return;
-      }
-
       const response = await axios.get("https://snoutiq.com/backend/api/dog-breeds/all", {
         timeout: 10000,
       });
@@ -184,7 +130,6 @@ const ProfileScreen = () => {
           { label: "Other", value: "other" }
         );
         setDogBreeds(breeds);
-        await cacheData(CACHE_KEYS.DOG_BREEDS, breeds);
         toast.success("Dog breeds loaded successfully!");
       }
     } catch (error) {
@@ -195,13 +140,9 @@ const ProfileScreen = () => {
     }
   };
 
-  const fetchPetsFromAPI = async (userId, forceRefresh = false) => {
+  const fetchPetsFromAPI = async (userId) => {
     try {
       setPetsLoading(true);
-      if (!forceRefresh) {
-        const cachedPets = await getCachedData(CACHE_KEYS.PETS_DATA);
-        if (cachedPets) return cachedPets;
-      }
 
       const response = await axios.get(
         `https://snoutiq.com/backend/api/users/${userId}/pets`,
@@ -226,17 +167,12 @@ const ProfileScreen = () => {
           weight: pet.weight || "",
         }));
 
-        await cacheData(CACHE_KEYS.PETS_DATA, transformedPets);
         return transformedPets;
       }
       return [];
     } catch (error) {
       console.error("Error fetching pets:", error);
       toast.error("Failed to load pets data");
-      if (!forceRefresh) {
-        const cachedPets = await getCachedData(CACHE_KEYS.PETS_DATA);
-        return cachedPets || [];
-      }
       return [];
     } finally {
       setPetsLoading(false);
@@ -246,18 +182,6 @@ const ProfileScreen = () => {
   const fetchUserData = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      if (forceRefresh) await clearAllProfileCache();
-
-      if (!forceRefresh) {
-        const cachedProfile = await getCachedData(CACHE_KEYS.USER_PROFILE);
-        if (cachedProfile) {
-          setUserProfile(cachedProfile);
-          const cachedStats = await getCachedData(CACHE_KEYS.STATS_DATA);
-          if (cachedStats) setStats(cachedStats);
-          setLoading(false);
-          return;
-        }
-      }
 
       let petsArray = [];
       let joinDate = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -269,7 +193,7 @@ const ProfileScreen = () => {
         daysActive = Math.round((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)).toString();
 
         if (user.id) {
-          const apiPets = await fetchPetsFromAPI(user.id, forceRefresh);
+          const apiPets = await fetchPetsFromAPI(user.id);
           if (apiPets && apiPets.length > 0) petsArray = apiPets;
         }
 
@@ -290,9 +214,6 @@ const ProfileScreen = () => {
           { ...stats[2] },
         ];
         setStats(updatedStats);
-
-        await cacheData(CACHE_KEYS.USER_PROFILE, profileData);
-        await cacheData(CACHE_KEYS.STATS_DATA, updatedStats);
         
         if (forceRefresh) {
           toast.success("Profile data refreshed!");
