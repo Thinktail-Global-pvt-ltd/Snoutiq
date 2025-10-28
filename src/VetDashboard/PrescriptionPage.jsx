@@ -1,8 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
+import { useLocation } from "react-router-dom";
 export default function PrescriptionPage() {
-  const { doctorId, patientId } = useParams(); // Extract doctorId and patientId from URL
+   const { doctorId: paramDoctorId, patientId: paramPatientId } = useParams();
+  const location = useLocation();
+  
+  // Get IDs from state (preferred) or params (fallback)
+  const doctorId = location.state?.doctorId || paramDoctorId || 'unknown';
+  const patientId = location.state?.patientId || paramPatientId || 'unknown';
+  // const { doctorId, patientId } = useParams(); // Extract doctorId and patientId from URL
   const [file, setFile] = useState(null);
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);

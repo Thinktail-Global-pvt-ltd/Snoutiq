@@ -420,7 +420,9 @@ const PaymentPage = lazy(() => import("./PetDashboard/Payment"));
 const WaitingForDoctor = lazy(() => import("./PetDashboard/WaitingForDoctor"));
 
 // Vet/Admin pages
-const DoctorRegistration = lazy(() => import("./VetDashboard/DoctorRegistration"));
+const DoctorRegistration = lazy(() =>
+  import("./VetDashboard/DoctorRegistration")
+);
 const VetHome = lazy(() => import("./VetDashboard/VetHome"));
 const HeaderWithSidebar = lazy(() => import("./VetDashboard/Sidebar"));
 const VetOnwerProfile = lazy(() => import("./VetDashboard/VetOnwerProfile"));
@@ -430,12 +432,20 @@ const Ratings = lazy(() => import("./VetDashboard/Rating"));
 const Support = lazy(() => import("./pages/Support"));
 const VetOwner = lazy(() => import("./admin/VetOwner"));
 const PetOwner = lazy(() => import("./admin/PetOwner"));
-const DoctorEmergencySearch = lazy(() => import("./VetDashboard/DoctorEmergencySearch"));
-const VaccinationTracker = lazy(() => import("./PetDashboard/VaccinationTracker"));
+const DoctorEmergencySearch = lazy(() =>
+  import("./VetDashboard/DoctorEmergencySearch")
+);
+const VaccinationTracker = lazy(() =>
+  import("./PetDashboard/VaccinationTracker")
+);
 const PetHealth = lazy(() => import("./PetDashboard/PetHealth"));
 const PetDailyCare = lazy(() => import("./PetDashboard/PetDailyCare"));
-const PetWeightMonitoring = lazy(() => import("./PetDashboard/PetWeightMonitoring"));
-const PetMedicationTracker = lazy(() => import("./PetDashboard/PetMedicationTracker"));
+const PetWeightMonitoring = lazy(() =>
+  import("./PetDashboard/PetWeightMonitoring")
+);
+const PetMedicationTracker = lazy(() =>
+  import("./PetDashboard/PetMedicationTracker")
+);
 const CallPage = lazy(() => import("../src/pages/CallTestPage"));
 
 import SuperAdminLogin from "./admin/SuperAdminLogin";
@@ -443,9 +453,7 @@ import AuthenticatedUserRedirect from "./auth/AuthenticatedUserRedirect";
 import DoctorWaitingRoom from "./VetDashboard/DoctorWaitingRoom";
 import PrescriptionPage from "./VetDashboard/PrescriptionPage";
 import HealthRecordsScreen from "./PetDashboard/HealthRecordsScreen";
-const Ratingpop = lazy(()=>import("./PetDashboard/RatingPopup"))
-
-
+const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
   return (
@@ -475,40 +483,52 @@ function App() {
           <Routes>
             {/* Home page - will redirect authenticated users to dashboard */}
             <Route path="/" element={<AuthenticatedUserRedirect />} />
-            
             {/* Public Routes - authenticated users will be redirected from these */}
             <Route path="/login" element={<Login />} />
-            <Route path="/superadmin/login" element={<SuperAdminLogin/>}/>
+            <Route path="/superadmin/login" element={<SuperAdminLogin />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/register-pet-details" element={<RegisterPetDetails />} />
-            <Route 
-              path="/register-password" 
+            <Route
+              path="/register-pet-details"
+              element={<RegisterPetDetails />}
+            />
+            <Route
+              path="/register-password"
               element={
                 <RegistrationProvider>
                   <RegisterPassword />
                 </RegistrationProvider>
-              } 
+              }
             />
             <Route path="/vet-register" element={<DoctorRegistration />} />
             <Route path="/pet-data-register" element={<RegisterPetOwner />} />
-
             {/* Policy pages (public) */}
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TearmsCondition />} />
             <Route path="/cancellation-policy" element={<Cancelation />} />
             <Route path="/cookie-policy" element={<CookiePolicy />} />
-            <Route path="/medical-data-consent" element={<MedicalDataConsent />} />
+            <Route
+              path="/medical-data-consent"
+              element={<MedicalDataConsent />}
+            />
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
-
-          <Route path="/patient-dashboard" element={<PatientDashboard />} />
-          <Route path="/doctor-dashboard" element={<DoctorDashboard doctorId={501} />} />
-          <Route path="/call-page/:channelName" element={<CallPage />} />
-          
-          {/* Multiple doctor routes if needed */}
-          <Route path="/doctor-dashboard/:doctorId" element={
-            <DoctorDashboard doctorId={parseInt(window.location.pathname.split('/')[2]) || 501} />
-          } />
+            <Route path="/patient-dashboard" element={<PatientDashboard />} />
+            <Route
+              path="/doctor-dashboard"
+              element={<DoctorDashboard doctorId={501} />}
+            />
+            <Route path="/call-page/:channelName" element={<CallPage />} />
+            {/* Multiple doctor routes if needed */}
+            <Route
+              path="/doctor-dashboard/:doctorId"
+              element={
+                <DoctorDashboard
+                  doctorId={
+                    parseInt(window.location.pathname.split("/")[2]) || 501
+                  }
+                />
+              }
+            />
             {/* Protected Routes - require authentication */}
             <Route
               path="/user/pets"
@@ -526,7 +546,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Main dashboard */}
             <Route
               path="/dashboard"
@@ -536,7 +555,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/chat/:chat_room_token"
               element={
@@ -545,7 +563,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/video-call"
               element={
@@ -554,7 +571,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/searching-doctor"
               element={
@@ -563,7 +579,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* User Dashboard Routes */}
             <Route
               path="/user-dashboard/*"
@@ -573,7 +588,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/pet-info"
               element={
@@ -584,7 +598,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/add-pet"
               element={
@@ -595,7 +608,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/vet-profile"
               element={
@@ -606,7 +618,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/vet-document"
               element={
@@ -617,7 +628,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/vet-payment"
               element={
@@ -628,7 +638,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/rating-page"
               element={
@@ -639,7 +648,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/support"
               element={
@@ -650,7 +658,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/pet-owner"
               element={
@@ -661,7 +668,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-<Route
+            <Route
               path="/user-dashboard/health-records"
               element={
                 <ProtectedRoute>
@@ -681,7 +688,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/doctor-emergency-search"
               element={
@@ -692,7 +698,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/vaccination-tracker"
               element={
@@ -703,7 +708,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/pet-health"
               element={
@@ -714,7 +718,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/pet-daily-care"
               element={
@@ -725,7 +728,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/weight-monitoring"
               element={
@@ -736,7 +738,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/user-dashboard/medical-tracker"
               element={
@@ -747,7 +748,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/doctor-testing"
               element={
@@ -756,7 +756,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/waiting-for-doctor"
               element={
@@ -765,7 +764,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/payment/:sid"
               element={
@@ -774,8 +772,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
-             <Route
+            <Route
               path="/doctor-waiting-room"
               element={
                 <ProtectedRoute>
@@ -783,26 +780,20 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route path="/call" element={<CallPage />} />
-
-               <Route
-              path="/prescription/:doctorId/:patientId"
-              element={
-                // <ProtectedRoute>
-                  <PrescriptionPage />
-                // </ProtectedRoute>
-              }
+            // In your App.jsx or routing file
+            <Route
+              path="/prescription/:doctorId?/:patientId?"
+              element={<PrescriptionPage />}
             />
-              <Route
-              path="/rating/:doctorId/:patientId"
+            <Route
+              path="/rating/:doctorId?/:patientId?"
               element={
                 <ProtectedRoute>
                   <Ratings />
                 </ProtectedRoute>
               }
             />
-            
           </Routes>
         </Suspense>
       </div>
