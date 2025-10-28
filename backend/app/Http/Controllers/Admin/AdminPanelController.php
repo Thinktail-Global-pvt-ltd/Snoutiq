@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Contracts\View\View;
 use App\Services\DoctorAvailabilityService;
+use Illuminate\Support\Collection;
 
 class AdminPanelController extends Controller
 {
@@ -28,25 +29,10 @@ class AdminPanelController extends Controller
             'total_supports' => CustomerTicket::count(),
         ];
 
-        $activeDoctorIds = $this->doctorAvailabilityService->getActiveDoctorIds();
+        $onlineClinics = $this->getOnlineClinics();
+        $activeDoctors = $this->formatActiveDoctorLabels();
 
-        $onlineClinics = $activeDoctorIds->isEmpty()
-            ? collect()
-            : VetRegisterationTemp::query()
-                ->whereHas('doctors', function ($query) use ($activeDoctorIds) {
-                    $query->where('toggle_availability', 1)
-                        ->whereIn('id', $activeDoctorIds->all());
-                })
-                ->withCount([
-                    'doctors as available_doctors_count' => function ($query) use ($activeDoctorIds) {
-                        $query->where('toggle_availability', 1)
-                            ->whereIn('id', $activeDoctorIds->all());
-                    },
-                ])
-                ->orderBy('name')
-                ->get();
-
-        return view('admin.dashboard', compact('stats', 'onlineClinics'));
+        return view('admin.dashboard', compact('stats', 'onlineClinics', 'activeDoctors'));
     }
 
     public function users(): View
@@ -93,18 +79,10 @@ class AdminPanelController extends Controller
 
     public function onlineDoctors(): View
     {
-        $activeDoctorIds = $this->doctorAvailabilityService->getActiveDoctorIds();
+        $onlineClinics = $this->getOnlineClinics();
+        $activeDoctors = $this->formatActiveDoctorLabels();
 
-        $onlineDoctors = $activeDoctorIds->isEmpty()
-            ? collect()
-            : Doctor::query()
-                ->with('clinic')
-                ->where('toggle_availability', 1)
-                ->whereIn('id', $activeDoctorIds->all())
-                ->orderBy('doctor_name')
-                ->get();
-
-        return view('admin.online-doctors', compact('onlineDoctors'));
+        return view('admin.online-doctors', compact('onlineClinics', 'activeDoctors'));
     }
 
     public function vetRegistrations(): View
@@ -112,5 +90,41 @@ class AdminPanelController extends Controller
         $clinics = VetRegisterationTemp::withCount('doctors')->orderByDesc('created_at')->get();
 
         return view('admin.vet-registrations', compact('clinics'));
+    }
+
+    private function getOnlineClinics(?Collection $activeClinicIds = null): Collection
+    {
+        $activeClinicIds = $activeClinicIds ?? $this->doctorAvailabilityService->getActiveClinicIds();
+
+        if ($activeClinicIds->isEmpty()) {
+            return collect();
+        }
+
+        return VetRegisterationTemp::query()
+            ->whereIn('id', $activeClinicIds->all())
+            ->withCount([
+                'doctors as available_doctors_count' => function ($query) {
+                    $query->where('toggle_availability', 1);
+                },
+            ])
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function formatActiveDoctorLabels(): Collection
+    {
+        return $this->doctorAvailabilityService
+            ->getActiveDoctorSummaries()
+            ->map(static function (array $doctor) {
+                $id = $doctor['id'];
+                $name = $doctor['name'] ?? null;
+
+                if ($name) {
+                    return sprintf("%d (%s)", $id, $name);
+                }
+
+                return (string) $id;
+            })
+            ->values();
     }
 }

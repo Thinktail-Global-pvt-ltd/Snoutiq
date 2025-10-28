@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Doctor;
+use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
 use App\Services\DoctorAvailabilityService;
 
@@ -20,16 +20,7 @@ class AuthController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        $activeDoctorIds = $this->doctorAvailabilityService->getActiveDoctorIds();
-
-        $onlineDoctors = $activeDoctorIds->isEmpty()
-            ? collect()
-            : Doctor::query()
-                ->with(['clinic'])
-                ->where('toggle_availability', 1)
-                ->whereIn('id', $activeDoctorIds->all())
-                ->orderBy('doctor_name')
-                ->get();
+        $onlineClinics = $this->fetchOnlineClinics();
 
         $adminEmail = (string) config('admin.email', 'admin@snoutiq.com');
         if ($adminEmail === '') {
@@ -42,7 +33,7 @@ class AuthController extends Controller
         }
 
         return view('admin.auth.login', [
-            'onlineDoctors' => $onlineDoctors,
+            'onlineClinics' => $onlineClinics,
             'adminEmail' => $adminEmail,
             'adminPassword' => $adminPassword,
         ]);
@@ -95,5 +86,23 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('admin.login');
+    }
+    private function fetchOnlineClinics()
+    {
+        $activeClinicIds = $this->doctorAvailabilityService->getActiveClinicIds();
+
+        if ($activeClinicIds->isEmpty()) {
+            return collect();
+        }
+
+        return VetRegisterationTemp::query()
+            ->whereIn('id', $activeClinicIds->all())
+            ->withCount([
+                'doctors as available_doctors_count' => function ($query) {
+                    $query->where('toggle_availability', 1);
+                },
+            ])
+            ->orderBy('name')
+            ->get();
     }
 }

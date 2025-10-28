@@ -147,6 +147,7 @@ Route::delete('/chat-rooms/{chat_room_token}', [GeminiChatController::class, 'de
 Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
 
 Route::post('/vet-registerations/store', [VetRegisterationTempController::class, 'store']);
+Route::get('/vet-registerations/{vet}', [VetRegisterationTempController::class, 'show']);
 
 Route::get('/ai-stats', function (Request $Request) {
             
@@ -453,6 +454,7 @@ Route::post('/bookings/{id}/rate', [\App\Http\Controllers\Api\BookingsController
 Route::post('/bookings/{id}/verify-payment', [\App\Http\Controllers\Api\BookingsController::class, 'verifyPayment']);
 Route::get('/doctors', [DoctorController::class, 'index']);
 Route::get('/doctors/{id}/bookings', [\App\Http\Controllers\Api\BookingsController::class, 'doctorBookings']);
+Route::get('/socket/doctors/{doctor}', [\App\Http\Controllers\Api\SocketDoctorController::class, 'show']);
 
 // Coverage endpoints
 Route::get('/coverage/dashboard', [\App\Http\Controllers\Api\CoverageController::class, 'dashboard']);
@@ -628,4 +630,3 @@ Route::get('/video/slots/doctor-test', function (\Illuminate\Http\Request $reque
         'slots'     => $mapped,
     ]);
 });
-

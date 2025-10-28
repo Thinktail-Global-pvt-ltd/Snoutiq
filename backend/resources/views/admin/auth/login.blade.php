@@ -85,7 +85,7 @@
                 <nav aria-label="Admin quick links" class="mb-4">
                     <div class="list-group list-group-flush">
                         <a href="{{ route('admin.online-doctors') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Online Doctors</span>
+                            <span class="fw-semibold">Available Clinics</span>
                             <span class="badge bg-success rounded-pill">Live</span>
                         </a>
                         <a href="{{ route('admin.video.slot-overview') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
@@ -130,42 +130,47 @@
 
         <div class="auth-card status-card">
             <div class="card-header">
-                <h1>Online Doctors</h1>
+                <h1>Available Clinics</h1>
                 <p class="text-muted online-count mb-0">
-                    {{ $onlineDoctors->count() }} {{ \Illuminate\Support\Str::plural('doctor', $onlineDoctors->count()) }} currently online.
+                    {{ $onlineClinics->count() }} {{ \Illuminate\Support\Str::plural('clinic', $onlineClinics->count()) }} currently available.
                 </p>
             </div>
             <div class="card-body">
-                @if ($onlineDoctors->isEmpty())
+                @if ($onlineClinics->isEmpty())
                     <div class="text-center text-muted online-empty">
-                        <div class="fw-semibold mb-1">No doctors online right now</div>
-                        <div class="small">Doctors appear here when they toggle their availability on.</div>
+                        <div class="fw-semibold mb-1">No clinics are live right now</div>
+                        <div class="small">Clinics appear here when at least one doctor toggles on and connects to the console.</div>
                     </div>
                 @else
                     <div class="list-group list-group-flush">
-                        @foreach ($onlineDoctors as $doctor)
+                        @foreach ($onlineClinics as $clinic)
                             <div class="list-group-item py-3">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
-                                        <div class="fw-semibold">{{ $doctor->doctor_name ?? 'Unnamed doctor' }}</div>
+                                        <div class="fw-semibold">{{ $clinic->name ?? 'Clinic name unavailable' }}</div>
                                         <div class="small text-muted">
-                                            {{ $doctor->clinic->name ?? 'Clinic not assigned' }}
-                                            @if (!empty($doctor->clinic?->city))
-                                                • {{ $doctor->clinic->city }}
+                                            @if (!empty($clinic->city))
+                                                {{ $clinic->city }}
+                                            @endif
+                                            @if (!empty($clinic->available_doctors_count))
+                                                @if (!empty($clinic->city))
+                                                    •
+                                                @endif
+                                                {{ $clinic->available_doctors_count }} {{ \Illuminate\Support\Str::plural('doctor', $clinic->available_doctors_count) }} online
                                             @endif
                                         </div>
                                     </div>
                                     <span class="badge text-bg-success-subtle text-success-emphasis">Online</span>
                                 </div>
                                 <div class="small text-muted mt-2 d-flex flex-wrap gap-3">
-                                    @if (!empty($doctor->doctor_email))
-                                        <span>Email: <a href="mailto:{{ $doctor->doctor_email }}" class="text-decoration-none">{{ $doctor->doctor_email }}</a></span>
+                                    @if (!empty($clinic->email))
+                                        <span>Email: <a href="mailto:{{ $clinic->email }}" class="text-decoration-none">{{ $clinic->email }}</a></span>
                                     @endif
-                                    @if (!empty($doctor->doctor_mobile))
-                                        <span>Phone: <a href="tel:{{ $doctor->doctor_mobile }}" class="text-decoration-none">{{ $doctor->doctor_mobile }}</a></span>
+                                    @if (!empty($clinic->mobile))
+                                        <span>Phone: <a href="tel:{{ $clinic->mobile }}" class="text-decoration-none">{{ $clinic->mobile }}</a></span>
                                     @endif
-                                    @if (!empty($doctor->doctor_license))
-                                        <span>License: {{ $doctor->doctor_license }}</span>
+                                    @if (!empty($clinic->address))
+                                        <span>Address: {{ $clinic->address }}</span>
                                     @endif
                                 </div>
                             </div>
