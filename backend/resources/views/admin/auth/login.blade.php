@@ -20,6 +20,14 @@
             <p class="text-muted mb-0">Sign in with the static admin credentials to continue.</p>
         </div>
         <div class="card-body">
+            <nav aria-label="Admin quick links" class="mb-4">
+                <div class="list-group list-group-flush">
+                    <a href="{{ route('admin.video.slot-overview') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Video Slot Overview</span>
+                        <span class="badge bg-primary rounded-pill">Open</span>
+                    </a>
+                </div>
+            </nav>
             @if ($errors->any())
                 <div class="alert alert-danger">
                     <ul class="mb-0">

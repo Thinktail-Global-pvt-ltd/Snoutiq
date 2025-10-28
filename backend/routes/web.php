@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VetLandingController;
 use App\Http\Controllers\Admin\AdminOnboardingStatusPageController;
+use App\Http\Controllers\Admin\AdminVideoSlotOverviewController;
 use App\Models\Doctor;
 use App\Models\VetRegisterationTemp;
 use App\Models\Payment;
@@ -280,11 +281,8 @@ Route::middleware('web')->get('/video/app/night-coverage', function () {
     ]);
 });
 
-Route::middleware('web')->get('/admin/video/slot-overview', function () {
-    return view('snoutiq.admin-video-slot-overview', [
-        'page_title' => 'Video Slots Overview',
-    ]);
-})->name('admin.video.slot-overview');
+Route::middleware('web')->get('/admin/video/slot-overview', AdminVideoSlotOverviewController::class)
+    ->name('admin.video.slot-overview');
 
 Route::middleware('web')->get('/api/video/coverage/pincode', function (\Illuminate\Http\Request $request) {
     $dateParam = $request->query('date');

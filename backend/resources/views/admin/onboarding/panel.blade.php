@@ -374,6 +374,16 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                @if($key === 'video')
+                                    @include('admin.partials.video-slot-matrix', [
+                                        'slotMatrixTitle' => 'Video Calling Slot Coverage',
+                                        'slotMatrixDescription' => 'Live doctor availability matrix for onboarding clinics.',
+                                        'slotMatrixBadge' => 'Select a date to refresh',
+                                        'slotMatrixCardClass' => 'card admin-card border-0',
+                                        'slotMatrixShowControls' => true,
+                                        'slotMatrixRefreshLabel' => 'Refresh Coverage'
+                                    ])
+                                @endif
                             </div>
                         @endforeach
                     </div>

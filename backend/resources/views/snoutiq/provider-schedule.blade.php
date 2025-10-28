@@ -399,7 +399,22 @@
         setMetaNote('Defaults not saved yet — fill the block above to unlock weekday cards.');
       }
 
-      const defaults = getDefaultHours();
+      let defaults = getDefaultHours();
+      const baseline = list.find(r => ![0,6].includes(Number(r.day_of_week))) || list[0] || null;
+      if (baseline) {
+        const baseHours = {
+          start: toHM(baseline.start_time) || '',
+          end: toHM(baseline.end_time) || '',
+          breakStart: toHM(baseline.break_start) || '',
+          breakEnd: toHM(baseline.break_end) || ''
+        };
+        if (defaultFields.start) defaultFields.start.value = baseHours.start;
+        if (defaultFields.end) defaultFields.end.value = baseHours.end;
+        if (defaultFields.breakStart) defaultFields.breakStart.value = baseHours.breakStart;
+        if (defaultFields.breakEnd) defaultFields.breakEnd.value = baseHours.breakEnd;
+        defaults = baseHours;
+      }
+
       els('.js-day-card').forEach(card => {
         const dow = Number(card.getAttribute('data-dow'));
         const row = byDow.get(dow);
@@ -411,11 +426,22 @@
 
         if (row) {
           if ($active) $active.checked = true;
-          if ($start)  $start.value    = toHM(row.start_time || defaults.start);
-          if ($end)    $end.value      = toHM(row.end_time   || defaults.end);
-          if ($bStart) $bStart.value   = toHM(row.break_start || defaults.breakStart);
-          if ($bEnd)   $bEnd.value     = toHM(row.break_end   || defaults.breakEnd);
-          setManual(card, true);
+          const hours = {
+            start: toHM(row.start_time) || defaults.start,
+            end: toHM(row.end_time) || defaults.end,
+            breakStart: toHM(row.break_start) || defaults.breakStart,
+            breakEnd: toHM(row.break_end) || defaults.breakEnd
+          };
+          if ($start)  $start.value  = hours.start ?? '';
+          if ($end)    $end.value    = hours.end ?? '';
+          if ($bStart) $bStart.value = hours.breakStart ?? '';
+          if ($bEnd)   $bEnd.value   = hours.breakEnd ?? '';
+          const matchesDefaults =
+            (hours.start || '') === (defaults.start || '') &&
+            (hours.end || '') === (defaults.end || '') &&
+            (hours.breakStart || '') === (defaults.breakStart || '') &&
+            (hours.breakEnd || '') === (defaults.breakEnd || '');
+          setManual(card, matchesDefaults ? false : true);
         } else {
           setManual(card, false);
           setCardToDefault(card);
@@ -432,14 +458,6 @@
       });
 
       updateWeekendAppearance();
-
-      const baseline = list.find(r => ![0,6].includes(Number(r.day_of_week))) || list[0];
-      if (baseline) {
-        if (defaultFields.start) defaultFields.start.value = toHM(baseline.start_time || defaults.start);
-        if (defaultFields.end) defaultFields.end.value = toHM(baseline.end_time || defaults.end);
-        if (defaultFields.breakStart) defaultFields.breakStart.value = toHM(baseline.break_start || defaults.breakStart);
-        if (defaultFields.breakEnd) defaultFields.breakEnd.value = toHM(baseline.break_end || defaults.breakEnd);
-      }
 
       const first = list[0] ?? null;
       if (first) {
