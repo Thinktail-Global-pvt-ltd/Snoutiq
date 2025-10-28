@@ -107,6 +107,17 @@ socket.on("call-status-update", (data) => {
   }
 });
 
+// ✅ GLOBAL: Log all patient-paid events for debugging
+socket.on("patient-paid", (data) => {
+  console.log("💰💰💰 GLOBAL patient-paid event received:", data);
+  console.log("💰 Event details:", {
+    callId: data.callId,
+    doctorId: data.doctorId,
+    patientId: data.patientId,
+    channel: data.channel
+  });
+});
+
 // Helper to get connection info
 export const getConnectionInfo = () => ({
   url: socketUrl,

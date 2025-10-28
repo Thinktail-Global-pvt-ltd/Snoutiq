@@ -809,7 +809,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       <div className="mb-3 sm:mb-4">
         <button
           className={`
-            w-full relative overflow-hidden rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105
+            w-full relative overflow-hidden rounded-xl sm:rounded-2xl 
             ${
               buttonDisabled
                 ? "opacity-60 cursor-not-allowed"

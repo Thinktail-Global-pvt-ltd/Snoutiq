@@ -317,8 +317,7 @@ const Navbar = () => {
                 </div>
               )}
             </div>
-            <div>
-              {/* Tail Talks Button */}
+            {/* <div>
               <a
                 href="https://snoutiq.com/blog"
                 className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center h-12"
@@ -328,7 +327,7 @@ const Navbar = () => {
                   <span>Tail Talks</span>
                 </div>
               </a>
-            </div>
+            </div> */}
             {/* User Profile or Login Button */}
             <div className="flex items-center  h-full">
               {!user ? (

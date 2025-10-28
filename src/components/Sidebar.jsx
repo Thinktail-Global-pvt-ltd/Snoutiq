@@ -14,7 +14,6 @@ import PowBrosPic from "../assets/pets/Paw Bros, 2 Years, New Delhi.webp";
 import BabyLokiPine from "../assets/pets/Baby Loki, 20 days, Pune.webp";
 import TigerPic from "../assets/pets/I am Tiger, 1 year, Haryana.webp";
 import Kitty from "../assets/pets/Kitty, 2 months, Delhi.webp";
-
 import LuckyPic from "../assets/pets/Lucy, 7 years, Pune.webp";
 import NotTwins from "../assets/pets/Not Twins, 2 years, New Delhi,.webp";
 import OliverPic from "../assets/pets/Oliver, 40 days, Faridabad.webp";
@@ -26,13 +25,11 @@ const Sidebar = () => {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  const { user, chatRoomToken, updateChatRoomToken } = useContext(AuthContext);
+  const { user, updateChatRoomToken } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // ✅ Get current chat room token from URL params
   const { chat_room_token: currentChatRoomToken } = useParams();
 
-  // Fetch chat history
   const fetchHistory = async () => {
     if (!user) return;
     setLoading(true);
@@ -55,8 +52,6 @@ const Sidebar = () => {
     }
   };
 
-
-  // Start new chat
   const handleNewChat = async () => {
     if (!user) return;
     try {
@@ -96,11 +91,8 @@ const Sidebar = () => {
       );
 
       toast.success("Chat deleted");
-
-      // Remove deleted chat from state
       setHistory((prev) => prev.filter((c) => c.id !== chatId));
 
-      // ✅ FIX: Only create new chat if the deleted chat is the current active chat
       if (chatRoomToken === currentChatRoomToken) {
         handleNewChat();
       }
@@ -119,7 +111,6 @@ const Sidebar = () => {
       updateChatRoomToken(chatRoomToken);
     }
 
-    // Wait a tick to ensure Dashboard sees updated context
     setTimeout(() => {
       navigate(`/chat/${chatRoomToken}`);
       window.dispatchEvent(
@@ -130,7 +121,6 @@ const Sidebar = () => {
     }, 0);
   };
 
-  // Pet of the day
   useEffect(() => {
     const pets = [
       { name: "Paw Bros", img: PowBrosPic, age: "2 years", loc: "New Delhi" },
@@ -146,36 +136,27 @@ const Sidebar = () => {
   }, []);
 
   useEffect(() => {
-    fetchHistory();
+    const init = async () => {
+      await fetchHistory();
+    };
+    init();
   }, []);
 
-  const formatDate = (dateStr) => {
-    const d = new Date(dateStr);
-    const diff = Math.floor((new Date() - d) / (1000 * 60 * 60 * 24));
-    return diff === 0
-      ? "Today"
-      : diff === 1
-      ? "Yesterday"
-      : diff < 7
-      ? `${diff} days ago`
-      : d.toLocaleDateString();
-  };
-
   return (
-    <div className="fixed left-0 top-[70px] h-[calc(100vh-70px)] w-[260px] bg-[#EFF6FF] border-r border-gray-200 flex flex-col">
+    <div className="fixed left-0 top-[70px] h-[calc(100vh-70px)] w-[260px] bg-white rounded-tr-xl shadow-md border-r border-gray-200 flex flex-col p-4">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-700">Chat History</h3>
         <button
           onClick={handleNewChat}
-          className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 p-1 rounded hover:bg-blue-50 transition-colors"
+          className="text-blue-600 hover:text-blue-700 transition-colors"
         >
-          <PlusCircleIcon className="w-4 h-4" /> New Chat
+          <PlusCircleIcon className="w-5 h-5" />
         </button>
       </div>
 
       {/* History */}
-      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+      <div className="flex-1 overflow-y-auto space-y-2 mb-6">
         {loading ? (
           <div className="flex justify-center items-center h-20">
             <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
@@ -191,70 +172,58 @@ const Sidebar = () => {
             </button>
           </div>
         ) : (
-          history.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => handleHistoryClick(item.chat_room_token)}
-              className="group flex items-center justify-between p-2 rounded-md hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all duration-200"
-            >
-              <div className="flex-1 min-w-0">
-                {/* <span className="font-medium text-gray-700 text-sm truncate block">
-                  {item.name || "New Chat"}
-                </span> */}
-                <span className="font-medium text-gray-700 text-sm truncate block">
-                  {item.summary && !item.summary.startsWith("New chat -")
-                    ? item.summary
-                    : "New Chat"}
-                </span>
-              </div>
-              <button
-                onClick={(e) =>
-                  handleDeleteChat(item.id, item.chat_room_token, e)
-                }
-                disabled={deletingId === item.id}
-                className="opacity-0 group-hover:opacity-60 hover:opacity-100 p-1 rounded hover:bg-gray-200 transition-all duration-200 ml-2"
+          history.map((item) =>
+            item ? (
+              <div
+                key={item.id}
+                onClick={() => handleHistoryClick(item.chat_room_token)}
+                className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all text-sm ${
+                  currentChatRoomToken === item.chat_room_token
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'hover:bg-gray-100 text-gray-700'
+                }`}
               >
-                {deletingId === item.id ? (
-                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <TrashIcon className="w-4 h-4 text-gray-500" />
-                )}
-              </button>
-            </div>
-          ))
+                <div className="flex-1 min-w-0">
+                  <span className="truncate block">
+                    {item.summary || "New Chat"}
+                  </span>
+                </div>
+                <button
+                  onClick={(e) =>
+                    handleDeleteChat(item.id, item.chat_room_token, e)
+                  }
+                  disabled={deletingId === item.id}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                >
+                  {deletingId === item.id ? (
+                    <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <TrashIcon className="w-3.5 h-3.5 text-red-500" />
+                  )}
+                </button>
+              </div>
+            ) : null
+          )
         )}
       </div>
 
-      {/* Pet of the day - Improved Section */}
+      {/* Pet of the Day */}
       {mainPet && (
-        <div className="border-t p-3 bg-gray-50">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold text-gray-600">
-              Pet of the Day
-            </h3>
-            <span className="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full">
-              LIVE
-            </span>
-          </div>
-          <div className="bg-orange-100 rounded-lg p-3 flex flex-col items-center">
-            <div className="relative w-full aspect-square max-w-[180px] mb-2">
+        <div className="mt-auto pt-6 border-t">
+          <p className="text-xs font-semibold uppercase text-gray-500 mb-3">
+            Pet of the Day
+          </p>
+          <div className="bg-orange-50 rounded-lg p-3">
+            <div className="w-full h-36 mb-3 rounded-lg overflow-hidden">
               <img
                 src={mainPet.img}
                 alt={mainPet.name}
-                className="w-full h-full rounded-lg object-cover shadow-sm"
-                width="180"
-                height="180"
+                className="w-full h-full object-cover"
                 loading="lazy"
               />
             </div>
-            <div className="text-center">
-              <h4 className="text-sm font-medium text-gray-800">
-                {mainPet.name}
-              </h4>
-              <p className="text-xs text-gray-600">
-                {mainPet.age}, {mainPet.loc}
-              </p>
-            </div>
+            <p className="text-sm font-semibold text-gray-800">{mainPet.name}</p>
+            <p className="text-xs text-gray-600">{mainPet.age}, {mainPet.loc}</p>
           </div>
         </div>
       )}

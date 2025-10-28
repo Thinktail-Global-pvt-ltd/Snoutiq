@@ -1,7 +1,50 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
 
-const httpServer = createServer();
+const httpServer = createServer((req, res) => {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      });
+      res.end();
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/health") {
+      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(JSON.stringify({ status: "ok" }));
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/active-doctors") {
+      const available = [];
+      for (const [doctorId] of activeDoctors.entries()) {
+        if (!isDoctorBusy(doctorId)) {
+          available.push(doctorId);
+        }
+      }
+
+      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(JSON.stringify({
+        activeDoctors: available,
+        updatedAt: new Date().toISOString(),
+      }));
+      return;
+    }
+
+    res.writeHead(404, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify({ error: "Not Found" }));
+  } catch (error) {
+    console.error("HTTP server error:", error);
+    res.writeHead(500, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify({ error: "Server error" }));
+  }
+});
 
 const io = new Server(httpServer, {
   cors: {

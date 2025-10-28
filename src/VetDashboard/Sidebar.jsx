@@ -557,7 +557,7 @@ const HeaderWithSidebar = ({ children }) => {
   const { user } = useContext(AuthContext);
   const hasListeners = useRef(false);
   const hasSetUpListeners = useRef(false);
-  console.log(user,"ankit");
+  // console.log(user,"ankit");
   
   const doctorId = user.id
 
@@ -567,7 +567,7 @@ const HeaderWithSidebar = ({ children }) => {
   const addDebugLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = `${timestamp}: ${message}`;
-    console.log(logEntry);
+    // console.log(logEntry);
     setDebugLogs(prev => [...prev.slice(-9), logEntry]); // Keep last 10 logs
   };
 
@@ -700,32 +700,31 @@ const HeaderWithSidebar = ({ children }) => {
       }
     };
 
-    const handleCallRequested = (callData) => {
-      addDebugLog(`📞 Incoming call received: ${JSON.stringify(callData)}`);
-      
-      // Create call object for RingtonePopup
-      const incomingCallData = {
-        id: callData.callId,
-        patientId: callData.patientId,
-        channel: callData.channel,
-        timestamp: Date.now(),
-        doctorId,
-      };
+    // In HeaderWithSidebar component, update the handleCallRequested function:
+const handleCallRequested = (callData) => {
+  addDebugLog(`📞 Incoming call received: ${JSON.stringify(callData)}`);
+  
+  // Create call object for RingtonePopup - FIX patientId mapping
+  const incomingCallData = {
+    id: callData.callId,
+    patientId: callData.patientId, // ✅ This was missing
+    channel: callData.channel,
+    timestamp: Date.now(),
+    doctorId,
+  };
 
-      // Set single incoming call for popup
-      setIncomingCall(incomingCallData);
-      
-      // Also add to incoming calls list for dashboard view
-      setIncomingCalls(prev => {
-        const exists = prev.some(call => call.id === callData.callId);
-        if (exists) {
-          addDebugLog(`⚠️ Duplicate call ignored: ${callData.callId}`);
-          return prev;
-        }
-        
-        return [...prev, { ...callData, id: callData.callId }];
-      });
-    };
+  setIncomingCall(incomingCallData);
+  
+  setIncomingCalls(prev => {
+    const exists = prev.some(call => call.id === callData.callId);
+    if (exists) {
+      addDebugLog(`⚠️ Duplicate call ignored: ${callData.callId}`);
+      return prev;
+    }
+    
+    return [...prev, { ...callData, id: callData.callId }];
+  });
+};
 
     // Error handling events
     const handleJoinError = (error) => {
@@ -1207,8 +1206,10 @@ const HeaderWithSidebar = ({ children }) => {
             <RingtonePopup
               call={incomingCall}
               doctorId={doctorId}
-              onClose={handleCallClose}
-       patientId={incomingCall.patientId}
+              // onClose={handleCallClose}
+      //  patientId={incomingCall.patientId}
+      patientId={incomingCall?.patientId}
+       onClose={() => setIncomingCall(null)}
             />
           )}
 

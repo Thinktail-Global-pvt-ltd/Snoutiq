@@ -1,14 +1,11 @@
-import React, { lazy, useEffect, useState } from "react";
-import axiosClient from "../axios";
+import React, { useState } from "react";
 import playstore from '../assets/images/googlePlay.webp'
 import DoctorAppointmentModal from "../pages/DoctorAppointmentModal";
-import { AuthContext } from "../auth/AuthContext"; // Import AuthContext for nearbyDoctors
+import { AuthContext } from "../auth/AuthContext";
 
 export default function RightSidebar({ isMobile = false, onItemClick }) {
-  const [activeTab, setActiveTab] = useState('vets');
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   
-  // Get nearby doctors from context
   const authContext = React.useContext(AuthContext);
   const { nearbyDoctors = [] } = authContext || {};
 
@@ -19,7 +16,6 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
   };
 
   const handleEmergencyClick = () => {
-    // Show appointment modal for emergency clinic booking
     setShowAppointmentModal(true);
   };
 
@@ -27,58 +23,32 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
   if (isMobile) {
     return (
       <>
-        <div className="w-full space-y-6 p-4 bg-[#EFF6FF]">
+        <div className="w-full space-y-4 p-4 bg-gray-50">
           {/* Emergency Contact */}
-          <div className="bg-red-50 rounded-xl p-4 border border-red-200">
-            <h3 className="font-semibold text-red-800 mb-2 text-sm">🚨 Emergency</h3>
-            <p className="text-xs text-red-600 mb-3">Immediate veterinary care</p>
+          <div className="bg-white rounded-xl shadow-md p-5">
+            <h3 className="text-sm font-semibold text-red-600 mb-1">🚨 Emergency</h3>
+            <p className="text-xs text-gray-600 mb-3">Immediate veterinary care</p>
             <button 
               onClick={handleEmergencyClick}
-              className="w-full bg-red-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-red-700 transition-colors"
+              className="w-full bg-red-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-red-700 transition-colors"
             >
               Find Emergency Clinic
             </button>
           </div>
 
-          {/* Service Providers Tabs */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="flex border-b border-gray-200">
-              <button
-                className={`flex-1 py-3 text-sm font-medium ${activeTab === 'vets' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
-                onClick={() => setActiveTab('vets')}
-              >
-                Nearby Vets
-              </button>
-              <button
-                className={`flex-1 py-3 text-sm font-medium ${activeTab === 'groomers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
-                onClick={() => setActiveTab('groomers')}
-              >
-                Groomers
-              </button>
-            </div>
-            
-            <div className="p-4 max-h-60 overflow-y-auto">
-              {/* {activeTab === 'vets' ? (
-                <VetList data={data} handleItemClick={handleItemClick} />
-              ) : (
-                <GroomerList data={data} handleItemClick={handleItemClick} />
-              )} */}
-            </div>
-          </div>
-
           {/* Special Offer */}
-          <div className="bg-gradient-to-r from-[#34D399] to-[#059669] rounded-xl p-5 text-white shadow">
-            <h3 className="text-lg font-semibold mb-2">🎉 Special Offer</h3>
-            <p className="text-sm mb-3">₹100 off on all video consults</p>
-            <button className="bg-white text-green-600 text-sm font-semibold px-4 py-1.5 rounded-full hover:bg-gray-100 transition-colors">
-              Claim Now
+          <div className="bg-white rounded-xl shadow-md p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">✨ Limited Time Offer</h3>
+            <p className="text-xs text-gray-600 mb-3">₹100 off on all video consults</p>
+            <button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 rounded-lg text-sm font-semibold hover:from-blue-700 hover:to-blue-800 transition-all">
+              Claim Offer
             </button>
           </div>
 
           {/* App Download */}
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
-            <h3 className="font-semibold text-gray-800 mb-2">Get Our App</h3>
-            <p className="text-sm text-gray-600 mb-3">Better experience on mobile</p>
+          <div className="bg-white rounded-xl p-5 shadow-md text-center">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Get the App</h3>
+            <p className="text-xs text-gray-600 mb-2">Coming Soon...</p>
             <a
               href="https://play.google.com/store/apps/details?id=your.app.id"
               target="_blank"
@@ -87,22 +57,21 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
               <img
                 src={playstore}
                 alt="Get it on Google Play"
+                className="mx-auto"
               />
             </a>
           </div>
         </div>
 
-        {/* Appointment Modal */}
         <DoctorAppointmentModal
           visible={showAppointmentModal}
           onClose={() => setShowAppointmentModal(false)}
           nearbyDoctors={nearbyDoctors}
           onBook={(appointment) => {
             console.log("Emergency appointment booked:", appointment);
-            // You can add toast notification here if needed
             setShowAppointmentModal(false);
           }}
-          isEmergency={true} // Pass emergency flag if needed
+          isEmergency={true}
         />
       </>
     );
@@ -111,57 +80,33 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
   // ---------------- DESKTOP VERSION ----------------
   return (
     <>
-      <div className="relative w-62 bg-[#EFF6FF] border-l border-gray-200 overflow-y-auto px-4 py-6 space-y-5 custom-scroll">
-        {/* Service Providers Tabs */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="flex border-b border-gray-200">
-            <button
-              className={`flex-1 py-2 text-xs font-medium ${activeTab === 'vets' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
-              onClick={() => setActiveTab('vets')}
-            >
-              Nearby Vets
-            </button>
-            <button
-              className={`flex-1 py-2 text-xs font-medium ${activeTab === 'groomers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
-              onClick={() => setActiveTab('groomers')}
-            >
-              Groomers
-            </button>
-          </div>
-          
-          <div className="p-3 max-h-48 overflow-y-auto">
-            {/* {activeTab === 'vets' ? (
-              <VetList data={data} handleItemClick={handleItemClick} />
-            ) : (
-              <GroomerList data={data} handleItemClick={handleItemClick} />
-            )} */}
-          </div>
-        </div>
-
-        {/* Special Offer */}
-        <div className="bg-gradient-to-r from-[#9B51E0] to-[#2761E8] rounded-xl p-4 text-white shadow">
-          <h4 className="font-semibold mb-2 text-sm">✨ Limited Time Offer</h4>
-          <p className="text-xs mb-3">₹100 off on all video consults</p>
-          <button className="bg-white text-indigo-600 text-xs font-semibold px-3 py-1 rounded-full hover:bg-gray-100 transition-colors">
+      <div className="fixed right-0 top-[70px] h-[calc(100vh-70px)] w-[260px] bg-white rounded-tl-xl shadow-md border-l border-gray-200 overflow-y-auto p-4 space-y-4">
+        
+        {/* Limited Time Offer */}
+        <div className="bg-white rounded-xl shadow-md p-5 border border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">✨ Limited Time Offer</h3>
+          <p className="text-xs text-gray-600 mb-3">₹100 off on all video consults</p>
+          <button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 rounded-lg text-sm font-semibold hover:from-blue-700 hover:to-blue-800 transition-all">
             Claim Offer
           </button>
         </div>
 
-        {/* Emergency Contact - UPDATED */}
-        <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-          <h3 className="font-semibold text-red-800 mb-2 text-sm">🚨 Emergency</h3>
-          <p className="text-xs text-red-600 mb-3">Immediate veterinary care</p>
+        {/* Emergency */}
+        <div className="bg-white rounded-xl shadow-md p-5 border border-gray-200">
+          <h3 className="text-sm font-semibold text-red-600 mb-1">🚨 Emergency</h3>
+          <p className="text-xs text-gray-600 mb-3">Immediate veterinary care</p>
           <button 
             onClick={handleEmergencyClick}
-            className="w-full bg-red-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-red-700 transition-colors"
+            className="w-full bg-red-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-red-700 transition-colors"
           >
             Find Emergency Clinic
           </button>
         </div>
 
-        {/* App Download - Sticky at bottom */}
-        <div className="sticky bottom-4 bg-white rounded-lg p-3 shadow-lg border border-gray-200">
-          <p className="text-xs text-gray-600 mb-2 text-center">Better experience on our app</p>
+        {/* App Download */}
+        <div className="bg-white rounded-xl shadow-md p-5 border border-gray-200 text-center">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Get the App</h3>
+          <p className="text-xs text-gray-600 mb-2">Coming Soon...</p>
           <a
             href="https://play.google.com/store/apps/details?id=your.app.id"
             target="_blank"
@@ -172,22 +117,21 @@ export default function RightSidebar({ isMobile = false, onItemClick }) {
               src={playstore}
               loading="lazy"
               alt="Get it on Google Play"
+              className="mx-auto w-full h-16 object-contain bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg"
             />
           </a>
         </div>
       </div>
 
-      {/* Appointment Modal */}
       <DoctorAppointmentModal
         visible={showAppointmentModal}
         onClose={() => setShowAppointmentModal(false)}
         nearbyDoctors={nearbyDoctors}
         onBook={(appointment) => {
           console.log("Emergency appointment booked:", appointment);
-          // You can add toast notification here if needed
           setShowAppointmentModal(false);
         }}
-        isEmergency={true} // Pass emergency flag if needed
+        isEmergency={true}
       />
     </>
   );

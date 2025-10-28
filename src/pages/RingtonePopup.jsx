@@ -857,7 +857,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { socket } from "./socket";
 import axios from "axios";
-
+import { toast } from 'react-hot-toast'; // or whatever toast library you're using
 export default function RingtonePopup({
   call,
   doctorId,
@@ -937,107 +937,34 @@ export default function RingtonePopup({
   }, [isProcessing]);
 
   // ✅ ENHANCED: Setup disconnect listeners
-  useEffect(() => {
-    console.log("Setting up disconnect listeners for call:", call.id);
+  // In RingtonePopup component, enhance the disconnect useEffect:
+useEffect(() => {
+  console.log("Setting up disconnect listeners for call:", call.id);
 
-    // Handler for when other party disconnects
-    const handleOtherPartyDisconnected = (data) => {
-      console.log("Other party disconnected event:", data);
+  const handleOtherPartyDisconnected = (data) => {
+    console.log("Other party disconnected event:", data);
+    
+    if (data.callId === call.id && !cleanupRef.current) {
+      cleanupRef.current = true;
       
-      if (data.callId === call.id && !cleanupRef.current) {
-        cleanupRef.current = true;
-        
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-
-        // Show notification
-        const message = `Call ended: ${data.message}`;
-        alert(message);
-        
-        // Close popup
-        if (onClose) onClose();
+      if (audioRef.current) {
+        audioRef.current.pause();
       }
-    };
 
-    // Handler for when other party ends call intentionally
-    const handleCallEndedByOther = (data) => {
-      console.log("Call ended by other party event:", data);
+      const message = data.message || "The other party disconnected unexpectedly";
+      alert(`Call ended: ${message}`);
       
-      if (data.callId === call.id && !cleanupRef.current) {
-        cleanupRef.current = true;
-        
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
+      if (onClose) onClose();
+    }
+  };
 
-        // Show notification
-        const endedByText = data.endedBy === 'doctor' ? 'Doctor' : 'Patient';
-        const message = data.reason === 'disconnect' 
-          ? `${endedByText} lost connection. Call ended.`
-          : `${endedByText} ended the call.`;
-        
-        alert(message);
-        
-        // Close popup
-        if (onClose) onClose();
-      }
-    };
+  socket.on("other-party-disconnected", handleOtherPartyDisconnected);
 
-    // Handler for call status updates (broadcast backup)
-    const handleCallStatusUpdate = (data) => {
-      console.log("Call status update:", data);
-      
-      if (data.callId === call.id && (data.status === 'ended' || data.status === 'disconnected') && !cleanupRef.current) {
-        cleanupRef.current = true;
-        
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
+  return () => {
+    socket.off("other-party-disconnected", handleOtherPartyDisconnected);
+  };
+}, [call.id, onClose]);
 
-        alert(`Call ${data.status}. Returning to dashboard.`);
-        
-        if (onClose) onClose();
-      }
-    };
-
-    // Handler for own socket disconnect
-    const handleSocketDisconnect = (reason) => {
-      console.log("Socket disconnected:", reason);
-      
-      if (!cleanupRef.current) {
-        cleanupRef.current = true;
-        
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-
-        // Notify user
-        alert("Connection lost. Please check your internet and try again.");
-        
-        // Close popup
-        if (onClose) onClose();
-      }
-    };
-
-    // Register all listeners
-    socket.on("other-party-disconnected", handleOtherPartyDisconnected);
-    socket.on("call-ended-by-other", handleCallEndedByOther);
-    socket.on("call-status-update", handleCallStatusUpdate);
-    socket.on("disconnect", handleSocketDisconnect);
-
-    // Cleanup function
-    return () => {
-      console.log("Cleaning up disconnect listeners");
-      socket.off("other-party-disconnected", handleOtherPartyDisconnected);
-      socket.off("call-ended-by-other", handleCallEndedByOther);
-      socket.off("call-status-update", handleCallStatusUpdate);
-      socket.off("disconnect", handleSocketDisconnect);
-      socket.off("patient-paid");
-      socket.off("payment-cancelled");
-      socket.off("payment-verified");
-    };
-  }, [call.id, onClose]);
 
   const enableAudio = async () => {
     try {

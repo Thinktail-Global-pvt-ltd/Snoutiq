@@ -309,11 +309,16 @@ const Payment = () => {
   //  const { callId } = useParams();
   const location = useLocation();
   // const { doctor, channel, patientId } = location.state || {};
-   const callIdFromParams = searchParams.get("callId");
-  const { doctor, channel, patientId, callId: callIdFromState } = location.state || {};
+  const callIdFromParams = searchParams.get("callId");
+  const {
+    doctor,
+    channel,
+    patientId,
+    callId: callIdFromState,
+  } = location.state || {};
   const callId = callIdFromState || callIdFromParams;
   const doctorId = doctor?.id || searchParams.get("doctorId");
-  console.log(doctor, channel, patientId, );
+  console.log(doctor, channel, patientId);
 
   // Resolve from URL when state missing
   const channelFromParams = searchParams.get("channel");
@@ -328,7 +333,6 @@ const Payment = () => {
     const all = [...(nearbyDoctors || []), ...(liveDoctors || [])];
     return all.find((d) => String(d.id) === idStr) || null;
   }, [doctorId, nearbyDoctors, liveDoctors]);
-  
 
   // Load Razorpay script dynamically
   useEffect(() => {
@@ -372,7 +376,15 @@ const Payment = () => {
         address: src.formatted_address || src.address || "Not available",
         photo:
           src.image ||
-          (src.photos ? (() => { try { return JSON.parse(src.photos)[0]?.photo_reference; } catch { return null; } })() : null),
+          (src.photos
+            ? (() => {
+                try {
+                  return JSON.parse(src.photos)[0]?.photo_reference;
+                } catch {
+                  return null;
+                }
+              })()
+            : null),
       });
     } else {
       setDoctorInfo(null);
@@ -389,7 +401,7 @@ const Payment = () => {
   const handlePaymentTimeout = () => {
     setPaymentStatus("timeout");
     socket.emit("payment-cancelled", {
-     callId: callId,
+      callId: callId,
       patientId,
       doctorId,
       reason: "timeout",
@@ -518,32 +530,38 @@ const Payment = () => {
       setPaymentStatus("error");
       return;
     }
-  
+
     setLoading(true);
     setPaymentStatus(null);
-  
+
     try {
       // 1. Create order on backend
-      const orderRes = await axios.post(
-        `${API_BASE}/api/create-order`,
-        {
-          amount: Number(doctorInfo?.chat_price || doctor?.chat_price || doctorFromContext?.chat_price || 500),
-          callId: callId,
-          doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
-          patientId: patientIdValue,
-          channel: channelValue,
-        }
-      );
-  
+      const orderRes = await axios.post(`${API_BASE}/api/create-order`, {
+        amount: Number(
+          doctorInfo?.chat_price ||
+            doctor?.chat_price ||
+            doctorFromContext?.chat_price ||
+            500
+        ),
+        callId: callId,
+        doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
+        patientId: patientIdValue,
+        channel: channelValue,
+      });
+
       console.log("Order API Response:", orderRes.data);
-  
+
       // Validate backend response
-      if (!orderRes.data?.success || !orderRes.data?.order_id || !orderRes.data?.key) {
+      if (
+        !orderRes.data?.success ||
+        !orderRes.data?.order_id ||
+        !orderRes.data?.key
+      ) {
         throw new Error("Invalid order response");
       }
-  
+
       const { order_id, key } = orderRes.data;
-  
+
       // 2. Razorpay options
       const options = {
         key,
@@ -556,24 +574,21 @@ const Payment = () => {
           console.log("Payment ID:", response.razorpay_payment_id);
           console.log("Order ID:", response.razorpay_order_id);
           console.log("Signature:", response.razorpay_signature);
-  
+
           try {
             // 3. Verify payment with backend
-            const verifyRes = await axios.post(
-              `${API_BASE}/api/rzp/verify`,
-              {
-                callId: callId,
-                doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
-                patientId: patientIdValue,
-                channel: channelValue,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              }
-            );
-  
+            const verifyRes = await axios.post(`${API_BASE}/api/rzp/verify`, {
+              callId: callId,
+              doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
+              patientId: patientIdValue,
+              channel: channelValue,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+
             console.log("Verify API Response:", verifyRes.data);
-  
+
             // 4. Notify via socket
             socket.emit("payment-completed", {
               callId: callId,
@@ -582,20 +597,22 @@ const Payment = () => {
               channel: channelValue,
               paymentId: response.razorpay_payment_id,
             });
-  
+
             setPaymentStatus("success");
             setLoading(false);
-  
+
             // 5. Redirect with complete query parameters
             setTimeout(() => {
               const query = new URLSearchParams({
-                uid: String(patientIdValue || ''),
-                role: 'audience',
-                callId: String(callId || ''),
-                doctorId: String(doctorInfo?.id || doctorFromContext?.id || doctorId || ''),
-                patientId: String(patientIdValue || ''),
+                uid: String(patientIdValue || ""),
+                role: "audience",
+                callId: String(callId || ""),
+                doctorId: String(
+                  doctorInfo?.id || doctorFromContext?.id || doctorId || ""
+                ),
+                patientId: String(patientIdValue || ""),
               }).toString();
-  
+
               navigate(`/call-page/${channelValue}?${query}`);
             }, 1500);
           } catch (error) {
@@ -609,7 +626,7 @@ const Payment = () => {
             console.warn("Payment popup closed by user");
             setLoading(false);
             setPaymentStatus("cancelled");
-  
+
             socket.emit("payment-cancelled", {
               callId: callId,
               patientId: patientIdValue,
@@ -619,7 +636,7 @@ const Payment = () => {
           },
         },
       };
-  
+
       // 6. Open Razorpay
       const rzp = new window.Razorpay(options);
       rzp.open();
@@ -880,7 +897,17 @@ const Payment = () => {
                 </span>
               </div>
             </div>
-
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                <p className="text-green-800 text-sm font-medium">
+                  ₹100 OFF coupon applied successfully
+                </p>
+              </div>
+              <span className="text-[11px] font-semibold text-green-800 bg-white border border-green-200 px-2 py-0.5 rounded-md">
+                FIRST100
+              </span>
+            </div>
             {/* Payment Button */}
             <button
               onClick={handlePayment}

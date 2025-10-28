@@ -1,62 +1,23 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useParams ,useNavigate } from "react-router-dom";
 import axios from "../axios";
 
-const Ratings = ({ visible = true, onClose }) => {
+const Ratings = ({ visible = true }) => {
   const { doctorId, patientId } = useParams();
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
-  const navigate = useNavigate();
-
-  // Handle Escape key press to close modal
-  useEffect(() => {
-    const handleEscape = (event) => {
-      if (event.keyCode === 27 && visible) {
-        handleClose();
-      }
-    };
-
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [visible]);
-
-  // Prevent body scroll when modal is open
-  useEffect(() => {
-    if (visible) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [visible]);
-
+  const navigate = useNavigate(); 
   const handleRatingClick = (value) => setRating(value);
 
+
   const handleClose = () => {
-    if (loading) return; // Prevent closing while submitting
-    
-    // Reset form state
-    setRating(0);
-    setHover(0);
-    setComment("");
-    setFeedback(null);
-    
-    // Call the onClose prop
-    if (onClose) {
-      onClose();
-    } else {
-      // Fallback navigation if no onClose provided
-      navigate("/dashboard");
-    }
+    navigate("/dashboard");
+    window.location.reload();
   };
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,10 +41,13 @@ const Ratings = ({ visible = true, onClose }) => {
       console.log("API Response:", res.data);
 
       setFeedback({ type: "success", msg: "⭐ Rating submitted successfully!" });
+      setRating(0);
+      setComment("");
 
       // ✅ Navigate after short delay
       setTimeout(() => {
-        handleClose();
+        setFeedback(null);
+        onClose?.();
         navigate("/dashboard"); // ✅ redirect to dashboard
       }, 2000);
     } catch (err) {
@@ -96,7 +60,6 @@ const Ratings = ({ visible = true, onClose }) => {
       setLoading(false);
     }
   };
-
   // Star Icon Component
   const StarIcon = ({ filled, className = "" }) => (
     <svg 
@@ -118,14 +81,7 @@ const Ratings = ({ visible = true, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      {/* Backdrop Click Handler */}
-      <div 
-        className="absolute inset-0" 
-        onClick={handleClose}
-      />
-      
-      {/* Modal Container */}
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100 relative z-10">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div>
@@ -138,11 +94,7 @@ const Ratings = ({ visible = true, onClose }) => {
           </div>
           <button
             onClick={handleClose}
-            disabled={loading}
-            className={`
-              text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors
-              ${loading ? "opacity-50 cursor-not-allowed" : ""}
-            `}
+            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -161,11 +113,7 @@ const Ratings = ({ visible = true, onClose }) => {
                   onClick={() => handleRatingClick(star)}
                   onMouseEnter={() => setHover(star)}
                   onMouseLeave={() => setHover(0)}
-                  disabled={loading}
-                  className={`
-                    p-1 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-full
-                    ${loading ? "cursor-not-allowed opacity-60" : ""}
-                  `}
+                  className="p-1 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-full"
                 >
                   <StarIcon
                     filled={star <= (hover || rating)}
@@ -197,11 +145,7 @@ const Ratings = ({ visible = true, onClose }) => {
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Share your experience with the doctor..."
                 rows="3"
-                disabled={loading}
-                className={`
-                  w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors
-                  ${loading ? "bg-gray-100 cursor-not-allowed opacity-60" : ""}
-                `}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
               />
             </div>
 
@@ -218,46 +162,27 @@ const Ratings = ({ visible = true, onClose }) => {
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              {/* Close Button */}
-              <button
-                type="button"
-                onClick={handleClose}
-                disabled={loading}
-                className={`
-                  flex-1 py-3 px-4 rounded-lg font-semibold transition-all duration-200 border
-                  ${loading 
-                    ? "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed" 
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
-                  }
-                `}
-              >
-                Close
-              </button>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={loading || rating === 0}
-                className={`
-                  flex-1 py-3 px-4 rounded-lg font-semibold transition-all duration-200
-                  ${loading || rating === 0
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
-                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
-                  }
-                `}
-              >
-                {loading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Submitting...
-                  </div>
-                ) : (
-                  "Submit Rating"
-                )}
-              </button>
-            </div>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading || rating === 0}
+              className={`
+                w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200
+                ${loading || rating === 0
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+                }
+              `}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Submitting...
+                </div>
+              ) : (
+                "Submit Rating"
+              )}
+            </button>
           </form>
 
           {/* Footer Note */}

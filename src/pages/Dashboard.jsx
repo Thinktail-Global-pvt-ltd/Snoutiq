@@ -576,11 +576,12 @@ const Dashboard = () => {
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-2 shadow-sm flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Snoutiq AI</h1>
+            <h1 className="text-2xl font-bold text-gray-900">SnoutIQ Symptom Checker</h1>
             <p className="text-gray-600 mt-1 text-sm">
-              {currentChatRoomToken
+              {/* {currentChatRoomToken
                 ? `Ask questions about ${user?.pet_name || "your pet"}'s health`
-                : ``}
+                : ``} */}
+                Check symptoms, get instant advice, and connect to a vet faster.
             </p>
           </div>
           <DetailedWeatherWidget />
@@ -600,7 +601,7 @@ const Dashboard = () => {
         {/* Chat Container */}
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto px-4 bg-gray-50 custom-scroll"
+          className="flex-1 overflow-y-auto px-4 bg-gray-50 custom-scroll "
         >
           <div className="max-w-4xl mx-auto py-4">
             {isLoading ? (
