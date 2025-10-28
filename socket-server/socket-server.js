@@ -137,6 +137,7 @@ io.on("connection", (socket) => {
       return;
     }
 
+    
     const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const callSession = { 
       callId, 
