@@ -13,11 +13,6 @@
   <style>
     @keyframes ring{0%{transform:rotate(0)}10%{transform:rotate(15deg)}20%{transform:rotate(-15deg)}30%{transform:rotate(10deg)}40%{transform:rotate(-10deg)}50%{transform:rotate(5deg)}60%{transform:rotate(-5deg)}100%{transform:rotate(0)}}
     .ringing{animation:ring 1s infinite}
-    #client-logger{font-family:ui-monospace,Menlo,Consolas,monospace}
-    /* Hide diagnostics button and extra header bits */
-    #toggle-diag{ display:none !important; }
-    header .text-right .text-xs{ display:none !important; }
-    header .w-9.h-9.rounded-full.bg-gradient-to-br.from-indigo-500.to-purple-500{ display:none !important; }
   </style>
 </head>
 <body class="h-screen bg-gray-50">
@@ -87,7 +82,6 @@
       </div>
 
       <div class="flex items-center gap-3">
-        <button id="toggle-diag" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800">Diagnostics</button>
         <button id="btn-add-service" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white">+ Add Service</button>
         <div class="text-right">
           <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? 'Doctor' }}</div>
@@ -100,42 +94,16 @@
     </header>
 
     <section class="flex-1 p-6">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 order-1">
-          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-            <div class="flex items-center justify-between mb-3">
-              <h2 class="text-base font-semibold text-gray-800">Incoming Calls (<span id="calls-count">0</span>)</h2>
-              <div class="text-xs text-gray-500">Keep this page open to receive calls</div>
-            </div>
-            <div id="calls" class="space-y-3">
-              <div id="no-calls" class="bg-gray-50 text-gray-600 rounded-lg p-6 text-center border border-dashed border-gray-200">
-                <p>No incoming calls at the moment</p>
-                <p class="text-xs mt-1" id="no-calls-sub">Connect to receive calls</p>
-              </div>
-            </div>
+      <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-base font-semibold text-gray-800">Incoming Calls (<span id="calls-count">0</span>)</h2>
+            <div class="text-xs text-gray-500">Keep this page open to receive calls</div>
           </div>
-        </div>
-
-        <div class="lg:col-span-1 order-2">
-          <div id="diagnostics" class="hidden space-y-6">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <div class="text-sm text-gray-700 mb-2">Doctor ID: <strong id="doctor-id">â€¦</strong></div>
-              <div class="text-sm space-y-1">
-                <div>Socket ID: <code id="socket-id" class="text-gray-600">Not connected</code></div>
-                <div>Connection Status: <strong id="conn-status" class="text-gray-800">connecting</strong></div>
-                <div>Socket Connected: <strong id="socket-connected" class="text-gray-800">No</strong></div>
-                <div>Is Online: <strong id="is-online" class="text-gray-800">No</strong></div>
-              </div>
-              <div class="mt-4 grid grid-cols-3 gap-2">
-                <button id="btn-rejoin" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">ðŸ”„ Rejoin</button>
-                <button id="btn-test" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm font-medium hover:bg-black">ðŸ§ª Test</button>
-                <button id="btn-clear" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm font-medium hover:bg-gray-300">ðŸ—‘ï¸ Clear</button>
-              </div>
-            </div>
-
-            <div class="bg-black text-green-400 rounded-xl p-4 text-xs font-mono max-h-64 overflow-y-auto border border-gray-800">
-              <div class="font-bold mb-2">Debug Logs</div>
-              <div id="logs"></div>
+          <div id="calls" class="space-y-3">
+            <div id="no-calls" class="bg-gray-50 text-gray-600 rounded-lg p-6 text-center border border-dashed border-gray-200">
+              <p>No incoming calls at the moment</p>
+              <p class="text-xs mt-1" id="no-calls-sub">Connect to receive calls</p>
             </div>
           </div>
         </div>
@@ -164,24 +132,6 @@
     </div>
   </div>
 </div>
-
-{{-- Frontend Logger (toggle with button or Ctrl+`) --}}
-<div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[420px] max-h-[70vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
-  <div class="flex items-center justify-between px-3 py-2 border-b">
-    <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
-    <div class="flex items-center gap-2">
-      <input id="log-token" placeholder="paste Bearer tokenâ€¦" class="px-2 py-1 rounded bg-gray-100 text-xs w-40">
-      <button id="log-token-save" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs">Save</button>
-      <button id="log-download" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Download</button>
-      <button id="log-clear" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Clear</button>
-      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">âœ•</button>
-    </div>
-  </div>
-  <div id="log-body" class="text-[11px] leading-4 text-gray-800 px-3 py-2 overflow-y-auto whitespace-pre-wrap"></div>
-</div>
-<button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">
-  ðŸªµ Logs (<span id="log-count">0</span>)
-</button>
 
 <!-- =============================
      Add Service Modal (hidden by default)
@@ -303,50 +253,6 @@
     </div>
   </div>
 </div>
-
-<script>
-/* =========================
-   Logger (Ctrl+` to toggle)
-========================= */
-(function(){
-  const ui={panel:document.getElementById('client-logger'),body:document.getElementById('log-body'),toggle:document.getElementById('log-toggle'),count:document.getElementById('log-count'),close:document.getElementById('log-close'),clear:document.getElementById('log-clear'),dl:document.getElementById('log-download'),tokenI:document.getElementById('log-token'),tokenS:document.getElementById('log-token-save'),};
-  const MAX=500,buf=[];
-  function trunc(s,n){ if(typeof s!=='string') try{s=String(s)}catch(_){return '<unserializable>'}; return s.length>n?s.slice(0,n)+'â€¦':s; }
-  function stamp(){return new Date().toISOString()}
-  function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); div.textContent=`[${row.t}] ${level.toUpperCase()} ${msg}${meta?' '+trunc(typeof meta==='string'?meta:JSON.stringify(meta),2000):''}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
-  const Log={info:(m,d)=>push('info',m,d),warn:(m,d)=>push('warn',m,d),error:(m,d)=>push('error',m,d),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{PATH_PREFIX,API_BASE,SOCKET_URL,USER_ID:CURRENT_USER_ID,url:location.href,ua:navigator.userAgent,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token')),auth_mode:window.__authMode||'unknown'},logs:buf})};
-  window.ClientLog=Log;
-
-  ui.toggle.addEventListener('click',Log.open);
-  ui.close.addEventListener('click',Log.close);
-  ui.clear.addEventListener('click',Log.clear);
-  ui.dl.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(Log.dump(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='frontend-logs.json'; a.click(); URL.revokeObjectURL(a.href); });
-  ui.tokenS.addEventListener('click',()=>{ const t=ui.tokenI.value.trim(); if(!t) return; localStorage.setItem('token',t); sessionStorage.setItem('token',t); Swal.fire({icon:'success',title:'Token saved',timer:1200,showConfirmButton:false}); });
-
-  window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='`'){ e.preventDefault(); ui.panel.classList.toggle('hidden'); }});
-
-  // instrument fetch
-  const origFetch=window.fetch.bind(window);
-  window.fetch=async function(input,init={}){
-    const url=(typeof input==='string')?input:input.url;
-    const method=(init?.method||(typeof input==='object'&&input.method)||'GET').toUpperCase();
-    const start=performance.now();
-    Log.info('NET:REQUEST', {method,url,headers:init?.headers||{},cred:init?.credentials||'default',body:(init?.body instanceof FormData ? '[FormData]' : undefined)});
-    try{
-      const res=await origFetch(input,init);
-      const ct=res.headers.get('content-type')||'';
-      const ms=Math.round(performance.now()-start);
-      Log.info('NET:RESPONSE', {method,url,status:res.status,ok:res.ok,duration_ms:ms,content_type:ct});
-      return res;
-    }catch(err){
-      Log.error('NET:FAILED',{method,url,error:err?.message||String(err)});
-      throw err;
-    }
-  };
-
-  Log.info('env', { PATH_PREFIX, API_BASE, SOCKET_URL, DOCTOR_ID: CURRENT_USER_ID, token_present: !!(localStorage.getItem('token')||sessionStorage.getItem('token')) });
-})();
-</script>
 
 <script>
 /* =========================
@@ -478,7 +384,7 @@
 
       Swal.fire({icon:'success', title:'Service Created', text:'Your service has been created successfully.'});
       resetForm();
-      ClientLog?.info('service.create.success', data);
+      console.log('[service.create] success', data);
 
     }catch(err){
       const msg = err?.body?.message
@@ -486,8 +392,7 @@
         || err?.hint
         || 'Error creating service';
       Swal.fire({icon:'error', title:'Create failed', text: msg});
-      ClientLog?.error('service.create.failed', { err, CURRENT_USER_ID, SESSION_USER_ID });
-      ClientLog?.open();
+      console.error('[service.create] failed', { err, CURRENT_USER_ID, SESSION_USER_ID });
     }finally{
       loading(els.submit,false);
     }
@@ -495,9 +400,6 @@
 
   // init
   document.addEventListener('DOMContentLoaded', ()=>{
-    const label=document.getElementById('doctor-id');
-    if(label) label.textContent=String(CURRENT_USER_ID ?? 'â€”');
-
     // open modal via button
     document.getElementById('btn-add-service')?.addEventListener('click', ()=>show(els.modal));
   });
@@ -538,8 +440,6 @@
   const elConn     = $('#conn-status');
   const elConnYes  = $('#socket-connected');
   const elIsOnline = $('#is-online');
-  const elLogs     = document.getElementById('logs');
-  const elDiagWrap = document.getElementById('diagnostics');
   const elHeaderDot= document.getElementById('status-dot');
   const elNoCallsSub = document.getElementById('no-calls-sub');
   const modal      = document.getElementById('incoming-modal');
@@ -594,9 +494,7 @@
     reconnection: true
   });
 
-  function addLog(msg){
-    try { if (elLogs){ const t=new Date().toLocaleTimeString(); elLogs.textContent += `[${t}] ${msg}\n`; elLogs.scrollTop = elLogs.scrollHeight; } } catch(_){}
-  }
+  function addLog(msg){ console.log('[doctor][log]', msg); }
 
   function setConn(state){
     if (elConn) elConn.textContent = state ? 'connected' : 'disconnected';
@@ -699,13 +597,6 @@
     }catch(e){ /* no-op */ }
   });
 
-  document.getElementById('btn-rejoin')?.addEventListener('click', ()=>{
-    if (socket?.connected && doctorId){ socket.emit('join-doctor', Number(doctorId)); addLog('Manual rejoin ' + doctorId); }
-  });
-  document.getElementById('btn-test')?.addEventListener('click', ()=>{ try{ socket.emit('get-server-status'); addLog('emit get-server-status'); }catch(_){} });
-  document.getElementById('btn-clear')?.addEventListener('click', ()=>{ try{ if(elLogs) elLogs.textContent=''; }catch(_){} });
-
-  socket.on('server-status', (s)=>{ addLog('server-status: ' + JSON.stringify(s)); });
 
   // Auto-join like /doctor/live?doctorId=...&live=1
   if (autoLive && doctorId && isVisible()) {
@@ -714,14 +605,6 @@
     if (socket.connected) { socket.emit('join-doctor', Number(doctorId)); addLog('Auto join-doctor ' + doctorId); }
   }
 
-  // Toggle diagnostics panel and optionally auto-open with ?diag=1
-  document.getElementById('toggle-diag')?.addEventListener('click', ()=>{
-    if (!elDiagWrap) return;
-    elDiagWrap.classList.toggle('hidden');
-  });
-  if (new URL(location.href).searchParams.get('diag') === '1') {
-    elDiagWrap?.classList.remove('hidden');
-  }
 
   // Toggle behaviour: connect/disconnect and SweetAlerts
   if (toggle) {

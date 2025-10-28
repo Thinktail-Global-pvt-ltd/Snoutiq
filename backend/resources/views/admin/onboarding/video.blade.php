@@ -129,5 +129,13 @@
             </div>
         </div>
     </div>
+
+    @include('admin.partials.video-slot-matrix', [
+        'slotMatrixTitle' => 'Hourly Slot Coverage',
+        'slotMatrixDescription' => 'Doctor availability counts per pincode for the selected date.',
+        'slotMatrixBadge' => 'Select a date to refresh',
+        'slotMatrixCardClass' => 'card shadow-sm',
+        'slotMatrixShowControls' => true
+    ])
 </div>
 @endsection

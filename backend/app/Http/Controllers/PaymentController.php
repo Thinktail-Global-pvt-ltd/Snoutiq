@@ -15,8 +15,8 @@ class PaymentController extends Controller
 
     public function __construct()
     {
-        $this->key    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_live_RGBIfjaGxq1Ma4';
-        $this->secret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'WypJ2plLEmScSrVjrLzixWyN';
+        $this->key    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_test_1nhE9190sR3rkP';
+        $this->secret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'L6CPZlUwrKQpdC9N3TRX8gIh';
     }
 
     public function testView()

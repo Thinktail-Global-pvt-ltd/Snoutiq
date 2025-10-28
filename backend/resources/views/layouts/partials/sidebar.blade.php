@@ -1,7 +1,58 @@
 {{-- Global sidebar partial used across dashboards --}}
+@php
+  $sessionAuth = session('auth_full');
+  $sessionUser = session('user');
+  $sessionRole = session('role') ?? data_get($sessionUser, 'role');
+  $clinicName = data_get($sessionAuth, 'user.clinic_profile')
+    ?? data_get($sessionAuth, 'user.clinic_name')
+    ?? data_get($sessionAuth, 'user.name')
+    ?? data_get($sessionUser, 'clinic_profile')
+    ?? data_get($sessionUser, 'clinic_name')
+    ?? data_get($sessionUser, 'name')
+    ?? optional(auth()->user())->clinic_profile
+    ?? optional(auth()->user())->clinic_name
+    ?? optional(auth()->user())->name
+    ?? null;
+  $clinicEmail = data_get($sessionAuth, 'user.email')
+    ?? data_get($sessionUser, 'email')
+    ?? optional(auth()->user())->email
+    ?? null;
+  $clinicId = data_get($sessionAuth, 'user.id')
+    ?? data_get($sessionUser, 'id')
+    ?? optional(auth()->user())->id
+    ?? session('user_id');
+
+  // If nothing in session resolved, fall back to clinic record for vets/doctors
+  if ((!$clinicName || !$clinicEmail) && ($sessionVetId = session('vet_id')
+      ?? session('vet_registeration_id')
+      ?? session('vet_registerations_temp_id')
+      ?? session('user_id'))) {
+    $clinic = \App\Models\VetRegisterationTemp::query()
+      ->select('id', 'clinic_profile', 'name', 'email')
+      ->find($sessionVetId);
+
+    if ($clinic) {
+      $clinicName = $clinicName ?: ($clinic->clinic_profile ?: $clinic->name);
+      $clinicEmail = $clinicEmail ?: $clinic->email;
+      $clinicId = $clinicId ?: $clinic->id;
+    }
+  }
+
+  $clinicName = $clinicName ?: 'Clinic';
+@endphp
+
 <aside class="w-64 bg-gradient-to-b from-indigo-700 to-purple-700 text-white flex flex-col">
-  <div class="h-16 flex items-center px-6 border-b border-white/10">
-    <span class="text-xl font-bold tracking-wide">SnoutIQ</span>
+  <div class="px-6 py-4 border-b border-white/10">
+    <span class="block text-xl font-bold tracking-wide">SnoutIQ</span>
+    <div class="mt-3 space-y-1">
+      <p class="text-sm font-semibold leading-tight">{{ $clinicName }}</p>
+      @if($clinicEmail)
+        <p class="text-xs text-white/70 break-all">{{ $clinicEmail }}</p>
+      @endif
+      @if($clinicId && !in_array($sessionRole, ['pet','patient','user'], true))
+        <p class="text-[11px] text-white/50">ID: {{ $clinicId }}</p>
+      @endif
+    </div>
   </div>
   <nav class="px-3 py-4 space-y-1 text-sm grow">
     @php
@@ -46,6 +97,7 @@
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <span>Video Calling Schedule</span>
       </a>
+      {{--
       <a href="{{ url('/video/app/night-coverage') }}" class="{{ $baseItem }} {{ request()->is('video/app/night-coverage') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         <span>Admin Video Calling Control</span>
@@ -56,6 +108,7 @@
         </svg>
         <span>Video Slots Overview</span>
       </a>
+      --}}
       <a href="{{ route('clinic.orders') }}" class="{{ $baseItem }} {{ $active('clinic.orders') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
         <span>Order History</span>

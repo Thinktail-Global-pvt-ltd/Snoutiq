@@ -3,17 +3,49 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Doctor;
 use Illuminate\Http\Request;
+use App\Services\DoctorAvailabilityService;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly DoctorAvailabilityService $doctorAvailabilityService,
+    ) {
+    }
+
     public function showLoginForm(Request $request)
     {
         if ($request->session()->get('is_admin') === true) {
             return redirect()->route('admin.dashboard');
         }
 
-        return view('admin.auth.login');
+        $activeDoctorIds = $this->doctorAvailabilityService->getActiveDoctorIds();
+
+        $onlineDoctors = $activeDoctorIds->isEmpty()
+            ? collect()
+            : Doctor::query()
+                ->with(['clinic'])
+                ->where('toggle_availability', 1)
+                ->whereIn('id', $activeDoctorIds->all())
+                ->orderBy('doctor_name')
+                ->get();
+
+        $adminEmail = (string) config('admin.email', 'admin@snoutiq.com');
+        if ($adminEmail === '') {
+            $adminEmail = 'admin@snoutiq.com';
+        }
+
+        $adminPassword = (string) config('admin.password', 'snoutiqvet');
+        if ($adminPassword === '') {
+            $adminPassword = 'snoutiqvet';
+        }
+
+        return view('admin.auth.login', [
+            'onlineDoctors' => $onlineDoctors,
+            'adminEmail' => $adminEmail,
+            'adminPassword' => $adminPassword,
+        ]);
     }
 
     public function login(Request $request)
