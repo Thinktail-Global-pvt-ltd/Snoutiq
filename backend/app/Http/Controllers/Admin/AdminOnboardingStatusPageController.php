@@ -8,7 +8,6 @@ use App\Models\Pet;
 use App\Models\User;
 use App\Models\VetRegisterationTemp;
 use App\Services\AdminOnboardingStatusService;
-use Illuminate\Http\Request;
 
 class AdminOnboardingStatusPageController extends Controller
 {
@@ -75,12 +74,8 @@ class AdminOnboardingStatusPageController extends Controller
         return view('admin.onboarding.emergency', compact('clinics', 'stats'));
     }
 
-    public function panel(Request $request)
+    public function panel()
     {
-        if (!$request->session()->get('admin_onboarding_authenticated')) {
-            return view('admin.onboarding.login');
-        }
-
         $services = collect($this->statusService->getServicesData());
         $video = collect($this->statusService->getVideoData());
         $clinicHours = collect($this->statusService->getClinicHoursData());
@@ -255,36 +250,5 @@ class AdminOnboardingStatusPageController extends Controller
             'recentDoctors',
             'recentClinics'
         ));
-    }
-
-    public function authenticate(Request $request)
-    {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
-        ]);
-
-        $expectedEmail = env('ONBOARDING_PANEL_EMAIL', 'maayank@snoutiq.com');
-        $expectedPassword = env('ONBOARDING_PANEL_PASSWORD', '123456');
-
-        if (
-            hash_equals(strtolower($expectedEmail), strtolower($credentials['email'])) &&
-            hash_equals($expectedPassword, $credentials['password'])
-        ) {
-            $request->session()->put('admin_onboarding_authenticated', true);
-
-            return redirect()->route('admin.onboarding.panel');
-        }
-
-        return back()
-            ->withErrors(['email' => 'Invalid credentials provided.'])
-            ->withInput(['email' => $credentials['email']]);
-    }
-
-    public function logout(Request $request)
-    {
-        $request->session()->forget('admin_onboarding_authenticated');
-
-        return redirect()->route('admin.onboarding.panel');
     }
 }

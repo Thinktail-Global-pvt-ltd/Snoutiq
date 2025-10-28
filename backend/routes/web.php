@@ -35,33 +35,26 @@ Route::prefix('admin')->group(function () {
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
     Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
+        Route::get('/onboarding', [AdminOnboardingStatusPageController::class, 'panel'])->name('admin.onboarding.panel');
         Route::get('/dashboard', [AdminPanelController::class, 'index'])->name('admin.dashboard');
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
         Route::get('/pets', [AdminPanelController::class, 'pets'])->name('admin.pets');
         Route::get('/doctors', [AdminPanelController::class, 'doctors'])->name('admin.doctors');
+        Route::get('/online-doctors', [AdminPanelController::class, 'onlineDoctors'])->name('admin.online-doctors');
         Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
         Route::get('/bookings', [AdminPanelController::class, 'bookings'])->name('admin.bookings');
         Route::get('/supports', [AdminPanelController::class, 'supports'])->name('admin.supports');
         Route::get('/sp/{user}', [AdminPanelController::class, 'serviceProviderProfile'])->name('admin.sp.profile');
+
+        Route::prefix('onboarding')->group(function () {
+            Route::redirect('/services', '/admin/onboarding#services')->name('admin.onboarding.services');
+            Route::redirect('/video', '/admin/onboarding#video')->name('admin.onboarding.video');
+            Route::redirect('/clinic-hours', '/admin/onboarding#clinicHours')->name('admin.onboarding.clinic-hours');
+            Route::redirect('/emergency', '/admin/onboarding#emergency')->name('admin.onboarding.emergency');
+        });
     });
 });
 Route::get('/vets/{slug}', [VetLandingController::class, 'show']);
-
-Route::get('/admin/login', [AdminOnboardingStatusPageController::class, 'panel'])
-    ->name('admin.onboarding.panel');
-
-Route::post('/admin/login/gate', [AdminOnboardingStatusPageController::class, 'authenticate'])
-    ->name('admin.onboarding.authenticate');
-
-Route::post('/admin/logout/gate', [AdminOnboardingStatusPageController::class, 'logout'])
-    ->name('admin.onboarding.logout');
-
-Route::prefix('admin/onboarding')->group(function () {
-    Route::redirect('/services', '/admin/login#services')->name('admin.onboarding.services');
-    Route::redirect('/video', '/admin/login#video')->name('admin.onboarding.video');
-    Route::redirect('/clinic-hours', '/admin/login#clinicHours')->name('admin.onboarding.clinic-hours');
-    Route::redirect('/emergency', '/admin/login#emergency')->name('admin.onboarding.emergency');
-});
 
 // Video consult entry points (public views)
 // Patient-facing lobby to pick a doctor and place a call

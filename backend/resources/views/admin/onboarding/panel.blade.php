@@ -1,32 +1,17 @@
-@extends('layouts.admin-standalone')
+@extends('layouts.admin-panel')
 
+@section('page-title', 'Onboarding Overview')
 
-@section('sidebar')
-    <div class="brand">
-        SnoutIQ Admin
-        <span>Onboarding Console</span>
-    </div>
-    <nav class="admin-nav" data-panel-nav>
+@section('sidebar-secondary')
+    <div class="text-uppercase text-white-50 small fw-semibold mb-3">Onboarding Console</div>
+    <nav class="admin-secondary-nav" data-panel-nav>
         <a href="#overview" class="active">Overview</a>
         <a href="#users">Users</a>
         <a href="#pets">Pets</a>
         <a href="#doctors">Doctors</a>
         <a href="#clinics">Vet Registrations</a>
     </nav>
-    <small class="text-white-50">Jump to detailed lists without leaving this overview.</small>
-@endsection
-
-
-@section('header')
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-        <div>
-            <h1 class="h3 mb-1">SnoutIQ Admin Overview</h1>
-            <p class="mb-0 text-white-50">Review clinic onboarding data without requiring authentication.</p>
-        </div>
-        <div class="text-end header-meta small">
-            Updated <span id="adminCurrentDate"></span>
-        </div>
-    </div>
+    <small class="text-white-50 d-block mt-3">Jump to detailed lists without leaving this overview.</small>
 @endsection
 
 @php
@@ -110,48 +95,49 @@
 @endphp
 
 @section('content')
-        <section id="overview" class="mb-5">
-            <div class="card admin-card mb-4">
-                <div class="card-body p-4">
-                    <div class="row g-3">
-                        <div class="col-md-3 col-sm-6">
-                            <div class="stat-chip text-center">
-                                <strong>{{ number_format($summary['clinics']) }}</strong>
-                                <span>Total Clinics</span>
-                            </div>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+        <div>
+            <h2 class="h4 mb-1">SnoutIQ Admin Overview</h2>
+            <p class="mb-0 text-muted">Review clinic onboarding progress alongside the rest of the admin tools.</p>
+        </div>
+        <div class="text-end small text-muted">
+            Updated {{ now()->format('d M Y') }}
+        </div>
+    </div>
+
+    <section id="overview" class="mb-5">
+        <div class="card admin-card mb-4">
+            <div class="card-body p-4">
+                <div class="row g-3">
+                    <div class="col-md-3 col-sm-6">
+                        <div class="stat-chip text-center">
+                            <strong>{{ number_format($summary['clinics']) }}</strong>
+                            <span>Total Clinics</span>
                         </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="stat-chip text-center">
-                                <strong>{{ number_format($summary['doctors']) }}</strong>
-                                <span>Total Doctors</span>
-                            </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="stat-chip text-center">
+                            <strong>{{ number_format($summary['doctors']) }}</strong>
+                            <span>Total Doctors</span>
                         </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="stat-chip text-center">
-                                <strong>{{ number_format($summary['video_ready']) }}</strong>
-                                <span>Doctors with Video</span>
-                            </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="stat-chip text-center">
+                            <strong>{{ number_format($summary['video_ready']) }}</strong>
+                            <span>Doctors with Video</span>
                         </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="stat-chip text-center">
-                                <strong>{{ number_format($summary['emergency_ready']) }}</strong>
-                                <span>Emergency Ready</span>
-                            </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="stat-chip text-center">
+                            <strong>{{ number_format($summary['emergency_ready']) }}</strong>
+                            <span>Emergency Ready</span>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="d-flex justify-content-end mb-3">
-                <form method="POST" action="{{ route('admin.onboarding.logout') }}">
-                    @csrf
-                    <button type="submit" class="btn btn-outline-light btn-sm text-white">
-                        Logout
-                    </button>
-                </form>
-            </div>
-
-            <div class="card admin-card">
+        <div class="card admin-card">
                 <div class="card-header border-0 pt-4 pb-0">
                     <ul class="nav nav-pills tab-pill mb-0" id="admin-tab" role="tablist">
                         @foreach($sections as $key => $section)
