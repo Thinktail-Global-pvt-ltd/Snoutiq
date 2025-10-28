@@ -3,17 +3,63 @@
 namespace App\Services;
 
 use App\Models\Doctor;
+use App\Models\VetRegisterationTemp;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class DoctorAvailabilityService
 {
-    public function getActiveDoctorIds(): Collection
+    protected ?array $socketSnapshot = null;
+    protected bool $syncPerformed = false;
+
+    public function getActiveClinicIds(): Collection
     {
+        $snapshot = $this->fetchSocketSnapshot();
+
+        return $snapshot['clinicIds'];
+    }
+
+    public function getActiveDoctorSummaries(): Collection
+    {
+        $snapshot = $this->fetchSocketSnapshot();
+        $doctorIds = $snapshot['doctorIds'];
+
+        if ($doctorIds->isEmpty()) {
+            return collect();
+        }
+
+        $vetsById = VetRegisterationTemp::query()
+            ->whereIn('id', $doctorIds->all())
+            ->get(['id', 'name'])
+            ->keyBy('id');
+
+        return $doctorIds
+            ->map(static function (int $doctorId) use ($vetsById) {
+                $vet = $vetsById->get($doctorId);
+
+                return [
+                    'id' => $doctorId,
+                    'name' => $vet?->name,
+                ];
+            })
+            ->values();
+    }
+
+    protected function fetchSocketSnapshot(): array
+    {
+        if ($this->socketSnapshot !== null) {
+            return $this->socketSnapshot;
+        }
+
+        $emptySnapshot = [
+            'clinicIds' => collect(),
+            'doctorIds' => collect(),
+        ];
+
         $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
         if (!$socketUrl) {
-            return collect();
+            return $this->socketSnapshot = $emptySnapshot;
         }
 
         $endpoint = rtrim($socketUrl, '/') . '/active-doctors';
@@ -26,33 +72,59 @@ class DoctorAvailabilityService
                     'body' => $response->body(),
                 ]);
 
-                return collect();
+                return $this->socketSnapshot = $emptySnapshot;
             }
 
             $payload = $response->json();
-            $rawIds = $payload['activeDoctors'] ?? $payload['availableDoctorIds'] ?? $payload ?? [];
+            $rawClinicIds = $payload['activeClinics'] ?? [];
+            $clinicDetails = $payload['clinics'] ?? [];
+            $rawDoctorIds = $payload['activeDoctors'] ?? [];
 
-            if (!is_array($rawIds)) {
+            if (!is_array($rawClinicIds) && !is_array($rawDoctorIds)) {
                 Log::warning('DoctorAvailabilityService: unexpected payload format', ['payload' => $payload]);
 
-                return collect();
+                return $this->socketSnapshot = $emptySnapshot;
             }
 
-            $activeDoctorIds = collect($rawIds)
+            $activeClinicIds = collect($rawClinicIds)
                 ->map(static fn ($id) => (int) $id)
                 ->filter(static fn ($id) => $id > 0)
                 ->unique()
                 ->values();
 
-            $this->syncDoctorToggleFlags($activeDoctorIds);
+            $doctorIdsForSync = collect($clinicDetails)
+                ->flatMap(static fn ($clinic) => (array) ($clinic['doctorIds'] ?? []))
+                ->merge(is_array($rawDoctorIds) ? $rawDoctorIds : [])
+                ->map(static fn ($id) => (int) $id)
+                ->filter(static fn ($id) => $id > 0)
+                ->unique()
+                ->values();
 
-            return $activeDoctorIds;
+            if ($activeClinicIds->isEmpty() && $doctorIdsForSync->isNotEmpty()) {
+                $activeClinicIds = Doctor::query()
+                    ->whereIn('id', $doctorIdsForSync->all())
+                    ->pluck('vet_registeration_id')
+                    ->map(static fn ($id) => (int) $id)
+                    ->filter(static fn ($id) => $id > 0)
+                    ->unique()
+                    ->values();
+            }
+
+            if (!$this->syncPerformed && $doctorIdsForSync->isNotEmpty()) {
+                $this->syncDoctorToggleFlags($doctorIdsForSync);
+                $this->syncPerformed = true;
+            }
+
+            return $this->socketSnapshot = [
+                'clinicIds' => $activeClinicIds,
+                'doctorIds' => $doctorIdsForSync,
+            ];
         } catch (\Throwable $e) {
             Log::warning('DoctorAvailabilityService: failed to reach socket server', [
                 'message' => $e->getMessage(),
             ]);
 
-            return collect();
+            return $this->socketSnapshot = $emptySnapshot;
         }
     }
 

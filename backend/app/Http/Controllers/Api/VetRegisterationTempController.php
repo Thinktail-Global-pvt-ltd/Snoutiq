@@ -14,6 +14,15 @@ use Illuminate\Support\Str;
 
 class VetRegisterationTempController extends Controller
 {
+    public function show(VetRegisterationTemp $vet)
+    {
+        return response()->json([
+            'id' => $vet->id,
+            'name' => $vet->name,
+            'city' => $vet->city,
+        ]);
+    }
+
     /** Make a unique slug from a name */
     private function makeUniqueSlug(string $name): string
     {
