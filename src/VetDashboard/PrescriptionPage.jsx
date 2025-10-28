@@ -9,6 +9,7 @@ export default function PrescriptionPage() {
   const [sendSuccess, setSendSuccess] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+console.log(doctorId, patientId);
 
   // Optional: Fetch doctor/patient details for display
   const [doctor, setDoctor] = useState(null);

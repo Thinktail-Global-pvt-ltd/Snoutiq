@@ -1029,26 +1029,36 @@ useEffect(() => {
       }
     };
 
-    const handlePaymentCancelled = (data) => {
-      if (data.callId === call.id && !cleanupRef.current) {
-        console.log("Patient cancelled payment:", data.reason);
-        cleanupRef.current = true;
+   const handlePaymentCancelled = (data) => {
+  if (data.callId === call.id && !cleanupRef.current) {
+    console.log("Patient cancelled or payment failed:", data.reason);
+    cleanupRef.current = true;
 
-        const message =
-          data.reason === "timeout"
-            ? "Payment timed out. Call ended."
-            : "Patient cancelled payment. Call ended.";
+    // Stop ringtone or processing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
 
-        setWaitingStatus(message);
+    // Optional feedback message
+    const message =
+      data.reason === "timeout"
+        ? "Payment timed out. Call ended."
+        : data.reason === "failed"
+        ? "Payment failed. Call ended."
+        : "Patient cancelled payment. Call ended.";
 
-        // Close after showing message
-        setTimeout(() => {
-          socket.off("payment-cancelled", handlePaymentCancelled);
-          socket.off("patient-paid", handlePatientPaid);
-          if (onClose) onClose();
-        }, 3000);
-      }
-    };
+    setWaitingStatus(message);
+
+    toast.error(message, { position: "top-center" });
+
+    // ✅ Immediately close popup and cleanup
+    socket.off("payment-cancelled", handlePaymentCancelled);
+    socket.off("patient-paid", handlePatientPaid);
+
+    if (onClose) onClose();
+  }
+};
+
 
     // Set up listeners for payment events
     socket.on("patient-paid", handlePatientPaid);

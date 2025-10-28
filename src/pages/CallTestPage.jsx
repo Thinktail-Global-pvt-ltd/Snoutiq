@@ -20,6 +20,7 @@ export default function CallPage() {
   // From query params (fallback)
   const doctorId = stateDoctorId || searchParams.get("doctorId");
   const patientId = statePatientId || searchParams.get("patientId");
+  
 
   const safeChannel = useMemo(() => {
     return (channelName || "default_channel")

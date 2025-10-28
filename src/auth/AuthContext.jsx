@@ -19,12 +19,10 @@ export const AuthProvider = ({ children }) => {
   const [chatRoomToken, setChatRoomToken] = useState(null);
   const [nearbyDoctors, setNearbyDoctors] = useState([]);
   const [liveDoctors, setLiveDoctors] = useState([]);
-  const [allActiveDoctors, setAllActiveDoctors] = useState([]); // ✅ Track all active doctor IDs from socket
-  
-  // ✅ Prevent duplicate API calls
+  const [allActiveDoctors, setAllActiveDoctors] = useState([]); 
   const isFetchingRef = useRef(false);
   const lastFetchTimeRef = useRef(0);
-  const FETCH_COOLDOWN = 5000; // 5 seconds cooldown between fetches
+  const FETCH_COOLDOWN = 5000; 
 
   const memoizedNearbyDoctors = useMemo(() => nearbyDoctors, [nearbyDoctors]);
   const memoizedLiveDoctors = useMemo(() => liveDoctors, [liveDoctors]);
@@ -50,7 +48,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // 🟢 Socket listener for ALL active doctors - FIXED VERSION
   useEffect(() => {
     if (!socket) {
       console.warn("Socket not available");
