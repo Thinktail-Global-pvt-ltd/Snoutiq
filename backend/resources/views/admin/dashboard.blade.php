@@ -54,36 +54,3 @@
     </div>
 </div>
 @endsection
-
-@extends('layouts.admin-panel')
-
-@section('page-title', 'Dashboard')
-
-@section('content')
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="text-muted text-uppercase small mb-1">Total Users</p>
-                <h2 class="fw-bold mb-0">{{ number_format($stats['total_users']) }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="text-muted text-uppercase small mb-1">Total Bookings</p>
-                <h2 class="fw-bold mb-0">{{ number_format($stats['total_bookings']) }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="text-muted text-uppercase small mb-1">Support Tickets</p>
-                <h2 class="fw-bold mb-0">{{ number_format($stats['total_supports']) }}</h2>
-            </div>
-        </div>
-    </div>
-</div>
-@endsection

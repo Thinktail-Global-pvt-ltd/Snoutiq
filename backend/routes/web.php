@@ -36,6 +36,9 @@ Route::prefix('admin')->group(function () {
     Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
         Route::get('/dashboard', [AdminPanelController::class, 'index'])->name('admin.dashboard');
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
+        Route::get('/pets', [AdminPanelController::class, 'pets'])->name('admin.pets');
+        Route::get('/doctors', [AdminPanelController::class, 'doctors'])->name('admin.doctors');
+        Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
         Route::get('/bookings', [AdminPanelController::class, 'bookings'])->name('admin.bookings');
         Route::get('/supports', [AdminPanelController::class, 'supports'])->name('admin.supports');
         Route::get('/sp/{user}', [AdminPanelController::class, 'serviceProviderProfile'])->name('admin.sp.profile');

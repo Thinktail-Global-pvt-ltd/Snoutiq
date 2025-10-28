@@ -25,6 +25,57 @@
             display: flex;
             flex-direction: column;
         }
+        .admin-frame {
+            flex: 1;
+            display: flex;
+        }
+        .admin-sidebar {
+            width: 250px;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(18px);
+            color: rgba(226, 232, 240, 0.85);
+            padding: 2rem 1.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .admin-sidebar .brand {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+        .admin-sidebar .brand span {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 400;
+            color: rgba(226, 232, 240, 0.6);
+            margin-top: 0.35rem;
+        }
+        .admin-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .admin-nav a {
+            display: block;
+            padding: 0.65rem 0.9rem;
+            border-radius: 0.75rem;
+            text-decoration: none;
+            color: rgba(226, 232, 240, 0.75);
+            font-weight: 500;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+        .admin-nav a.active,
+        .admin-nav a:hover {
+            color: #fff;
+            background: rgba(59, 130, 246, 0.25);
+        }
+        .admin-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
         .admin-header {
             background: rgba(15, 23, 42, 0.85);
             backdrop-filter: blur(12px);
@@ -32,6 +83,9 @@
         }
         .admin-header h1 {
             color: #fff;
+        }
+        .admin-header .header-meta {
+            color: rgba(226, 232, 240, 0.65);
         }
         .admin-content {
             flex: 1;
@@ -96,6 +150,22 @@
             letter-spacing: 0.04em;
             text-transform: uppercase;
         }
+        @media (max-width: 1200px) {
+            .admin-frame {
+                flex-direction: column;
+            }
+            .admin-sidebar {
+                width: 100%;
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+                gap: 1rem;
+            }
+            .admin-nav {
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+        }
         @media (max-width: 992px) {
             .tab-pill {
                 flex-wrap: wrap;
@@ -106,30 +176,38 @@
 </head>
 <body>
 <div class="admin-shell">
-    <header class="admin-header py-4">
-        <div class="container">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                <div>
-                    <h1 class="h3 mb-1">SnoutIQ Admin Overview</h1>
-                    <p class="mb-0 text-white-50">Review clinic onboarding data without requiring authentication.</p>
+    <div class="admin-frame">
+        @php($hasSidebar = $__env->hasSection('sidebar'))
+        @if($hasSidebar)
+            <aside class="admin-sidebar">
+                @yield('sidebar')
+            </aside>
+        @endif
+        <div class="admin-main">
+            @hasSection('header')
+                <header class="admin-header py-4">
+                    <div class="container-fluid">
+                        @yield('header')
+                    </div>
+                </header>
+            @endif
+            @php($containerClass = $hasSidebar ? 'container-fluid' : 'container')
+            <main class="admin-content">
+                <div class="{{ $containerClass }}">
+                    @yield('content')
                 </div>
-                <div class="text-end text-white-50 small">
-                    Updated <span id="adminCurrentDate"></span>
-                </div>
-            </div>
+            </main>
         </div>
-    </header>
-    <main class="admin-content">
-        <div class="container">
-            @yield('content')
-        </div>
-    </main>
+    </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    document.getElementById('adminCurrentDate').textContent = new Date().toLocaleDateString(undefined, {
-        day: '2-digit', month: 'short', year: 'numeric'
-    });
+    const dateTarget = document.getElementById('adminCurrentDate');
+    if (dateTarget) {
+        dateTarget.textContent = new Date().toLocaleDateString(undefined, {
+            day: '2-digit', month: 'short', year: 'numeric'
+        });
+    }
 </script>
 @stack('scripts')
 </body>

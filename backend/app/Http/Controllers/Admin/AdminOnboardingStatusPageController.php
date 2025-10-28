@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Doctor;
+use App\Models\Pet;
+use App\Models\User;
+use App\Models\VetRegisterationTemp;
 use App\Services\AdminOnboardingStatusService;
 use Illuminate\Http\Request;
 
@@ -214,6 +218,29 @@ class AdminOnboardingStatusPageController extends Controller
             ],
         ];
 
+        $recentUsers = User::select(['id', 'name', 'email', 'phone', 'created_at'])
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get();
+
+        $recentPets = Pet::select(['id', 'name', 'breed', 'pet_age', 'pet_gender', 'user_id', 'created_at'])
+            ->with(['owner:id,name,email'])
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get();
+
+        $recentDoctors = Doctor::select(['id', 'doctor_name', 'doctor_email', 'doctor_mobile', 'doctor_license', 'vet_registeration_id', 'created_at'])
+            ->with(['clinic:id,name,city'])
+            ->orderBy('doctor_name')
+            ->limit(25)
+            ->get();
+
+        $recentClinics = VetRegisterationTemp::select(['id', 'name', 'email', 'city', 'pincode', 'created_at'])
+            ->withCount('doctors')
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get();
+
         return view('admin.onboarding.panel', compact(
             'services',
             'video',
@@ -222,7 +249,11 @@ class AdminOnboardingStatusPageController extends Controller
             'summary',
             'stats',
             'doctorProgress',
-            'stepLabels'
+            'stepLabels',
+            'recentUsers',
+            'recentPets',
+            'recentDoctors',
+            'recentClinics'
         ));
     }
 

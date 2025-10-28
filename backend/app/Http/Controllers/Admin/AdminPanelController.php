@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\CustomerTicket;
+use App\Models\Doctor;
 use App\Models\GroomerBooking;
 use App\Models\GroomerProfile;
+use App\Models\Pet;
 use App\Models\User;
+use App\Models\VetRegisterationTemp;
 use Illuminate\Contracts\View\View;
 
 class AdminPanelController extends Controller
@@ -48,5 +51,26 @@ class AdminPanelController extends Controller
         $profile = GroomerProfile::where('user_id', $user->id)->first();
 
         return view('admin.sp_profile', compact('profile'));
+    }
+
+    public function pets(): View
+    {
+        $pets = Pet::with('owner')->orderByDesc('created_at')->get();
+
+        return view('admin.pets', compact('pets'));
+    }
+
+    public function doctors(): View
+    {
+        $doctors = Doctor::with('clinic')->orderBy('doctor_name')->get();
+
+        return view('admin.doctors', compact('doctors'));
+    }
+
+    public function vetRegistrations(): View
+    {
+        $clinics = VetRegisterationTemp::withCount('doctors')->orderByDesc('created_at')->get();
+
+        return view('admin.vet-registrations', compact('clinics'));
     }
 }
