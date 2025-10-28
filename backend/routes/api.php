@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\CallController as ApiCallController; // handles lig
 use App\Http\Controllers\CallController as CoreCallController;    // handles sessions + token
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
+Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
 
 use App\Http\Controllers\Api\VetController;
 use App\Http\Controllers\Api\AdminOnboardingStatusController;

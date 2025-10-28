@@ -122,9 +122,19 @@
       <h3 class="text-xl font-semibold text-gray-800">Incoming Call</h3>
     </div>
     <div class="space-y-2 text-gray-700">
-      <div><span class="font-semibold">Patient:</span> <span id="m-patient"></span></div>
+      <div><span class="font-semibold">Patient ID:</span> <span id="m-patient"></span></div>
       <div><span class="font-semibold">Channel:</span> <span id="m-channel" class="break-all"></span></div>
       <div class="text-xs text-gray-500"><span class="font-semibold">Time:</span> <span id="m-time"></span></div>
+    </div>
+    <div class="mt-4 border-t border-gray-200 pt-4">
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-semibold text-gray-800">AI Chat Summary</span>
+        <span class="text-[11px] uppercase tracking-wide text-gray-400">Last 5 chats</span>
+      </div>
+      <div class="mt-2 rounded-xl bg-gray-50 border border-gray-200 p-3 max-h-48 overflow-y-auto">
+        <p id="m-summary-status" class="text-xs text-gray-500">AI summary will appear here when available.</p>
+        <div id="m-summary" class="mt-2 space-y-2 text-sm text-gray-700 leading-relaxed"></div>
+      </div>
     </div>
     <div class="mt-6 grid grid-cols-2 gap-3">
       <button id="m-accept" class="py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow">âœ… Accept</button>
@@ -446,6 +456,129 @@
   const elMPatient = document.getElementById('m-patient');
   const elMChannel = document.getElementById('m-channel');
   const elMTime    = document.getElementById('m-time');
+  const elMSummary = document.getElementById('m-summary');
+  const elMSummaryStatus = document.getElementById('m-summary-status');
+
+  let audioCtx = null;
+  let ringtoneOsc = null;
+  let ringtoneGain = null;
+
+  function ensureAudioContext(){
+    if (audioCtx) return audioCtx;
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    audioCtx = new Ctor();
+    return audioCtx;
+  }
+
+  function startIncomingTone(){
+    const ctx = ensureAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(()=>{});
+    }
+    stopIncomingTone();
+    ringtoneOsc = ctx.createOscillator();
+    ringtoneGain = ctx.createGain();
+    ringtoneOsc.type = 'sine';
+    ringtoneOsc.frequency.setValueAtTime(660, ctx.currentTime);
+    ringtoneGain.gain.setValueAtTime(0, ctx.currentTime);
+    ringtoneOsc.connect(ringtoneGain).connect(ctx.destination);
+    ringtoneOsc.start();
+    ringtoneGain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.05);
+  }
+
+  function stopIncomingTone(){
+    try {
+      if (ringtoneGain) {
+        const ctx = ringtoneGain.context;
+        const stopTime = ctx?.currentTime ?? 0;
+        try {
+          ringtoneGain.gain.cancelScheduledValues(0);
+          ringtoneGain.gain.setValueAtTime(0, stopTime);
+        } catch (_) {}
+        ringtoneGain.disconnect();
+      }
+      if (ringtoneOsc) {
+        ringtoneOsc.stop();
+        ringtoneOsc.disconnect();
+      }
+    } catch (_) { /* ignore */ }
+    ringtoneOsc = null;
+    ringtoneGain = null;
+  }
+
+  let summaryFetchToken = 0;
+  async function loadAiSummary(patientId){
+    const hasSummaryTargets = !!(elMSummary || elMSummaryStatus);
+    if (!hasSummaryTargets) return;
+
+    const token = ++summaryFetchToken;
+
+    if (elMSummary) {
+      elMSummary.innerHTML = '';
+    }
+    if (elMSummaryStatus) {
+      elMSummaryStatus.textContent = patientId ? 'Fetching AI summary…' : 'Patient ID missing.';
+      elMSummaryStatus.classList.remove('hidden');
+    }
+
+    if (!patientId) {
+      return;
+    }
+
+    try {
+      const url = `${API_BASE}/ai/summary?user_id=${encodeURIComponent(patientId)}&limit=5&summarize=1`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (summaryFetchToken !== token) return; // stale
+      const summaryText = (data?.summary || '').trim();
+
+      if (summaryText) {
+        if (elMSummaryStatus) {
+          elMSummaryStatus.classList.add('hidden');
+        }
+        if (elMSummary) {
+          elMSummary.innerHTML = '';
+          summaryText.split(/\n+/).forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+            const p = document.createElement('p');
+            p.className = 'text-sm text-gray-700 leading-relaxed';
+            if (/^(Q|A):/i.test(trimmed)) {
+              const label = trimmed.slice(0, 2).toUpperCase();
+              const value = trimmed.slice(2).trim();
+              const strong = document.createElement('span');
+              strong.className = 'font-semibold text-gray-800 pr-1';
+              strong.textContent = label;
+              p.appendChild(strong);
+              p.appendChild(document.createTextNode(value));
+            } else {
+              p.textContent = trimmed;
+            }
+            elMSummary.appendChild(p);
+          });
+        }
+        if (elMSummary && elMSummary.childElementCount === 0 && elMSummaryStatus) {
+          elMSummaryStatus.textContent = 'No recent AI chats found.';
+          elMSummaryStatus.classList.remove('hidden');
+        }
+      } else if (elMSummaryStatus) {
+        elMSummaryStatus.textContent = 'No recent AI chats found.';
+        elMSummaryStatus.classList.remove('hidden');
+      }
+    } catch (err) {
+      if (summaryFetchToken !== token) return; // stale
+      console.warn('[doctor] failed to load AI summary', err);
+      if (elMSummaryStatus) {
+        elMSummaryStatus.textContent = 'Unable to load AI chat summary.';
+        elMSummaryStatus.classList.remove('hidden');
+      }
+    }
+  }
 
   let joined = false;
   let lastCall = null;
@@ -563,9 +696,24 @@
     lastCall = payload || null;
     try{
       if (!modal) return;
-      if (elMPatient) elMPatient.textContent = String(payload?.patientId ?? '');
+      const patientId = payload?.patientId ?? '';
+      if (elMPatient) {
+        const numericId = Number(patientId);
+        const displayId = Number.isFinite(numericId) && numericId > 0 ? `#${numericId}` : String(patientId || 'Unknown');
+        elMPatient.textContent = displayId;
+      }
       if (elMChannel) elMChannel.textContent = String(payload?.channel ?? '');
       if (elMTime)    elMTime.textContent    = new Date().toLocaleString();
+      if (elMSummaryStatus) {
+        elMSummaryStatus.textContent = 'Fetching AI summary…';
+        elMSummaryStatus.classList.remove('hidden');
+      }
+      if (elMSummary) {
+        elMSummary.innerHTML = '';
+      }
+      stopIncomingTone();
+      startIncomingTone();
+      loadAiSummary(patientId);
       modal.classList.remove('hidden');
       addLog('Incoming call for doctor ' + doctorId + ' ch=' + (payload?.channel||''));
     }catch(e){ console.warn('[doctor] call-requested render failed', e); }
@@ -574,6 +722,7 @@
   document.getElementById('m-accept')?.addEventListener('click', ()=>{
     try{
       modal?.classList.add('hidden');
+      stopIncomingTone();
       const ch = (lastCall?.channel || elMChannel?.textContent || '').trim();
       const callId = (lastCall?.callId || '').trim();
       if (callId) {
@@ -592,6 +741,7 @@
   document.getElementById('m-reject')?.addEventListener('click', ()=>{
     try{
       modal?.classList.add('hidden');
+      stopIncomingTone();
       const callId = (lastCall?.callId || '').trim();
       if (callId) socket.emit('call-rejected', { callId, reason: 'rejected' });
     }catch(e){ /* no-op */ }
