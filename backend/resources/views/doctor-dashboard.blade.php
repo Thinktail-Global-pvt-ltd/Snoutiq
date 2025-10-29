@@ -150,8 +150,8 @@
       </div>
     </div>
     <div class="mt-6 grid grid-cols-2 gap-3">
-      <button id="m-accept" class="py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow">âœ… Accept</button>
-      <button id="m-reject" class="py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow">âŒ Reject</button>
+      <button id="m-accept" class="py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow"> Accept</button>
+      <button id="m-reject" class="py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow">Reject</button>
     </div>
   </div>
 </div>
@@ -721,6 +721,9 @@
   }
 
   function setHeaderStatus(status){
+    if (window.snoutiqCall?.setStatus) {
+      try { window.snoutiqCall.setStatus(status); } catch(_){}
+    }
     if (!elHeaderDot) return;
     elHeaderDot.classList.remove('bg-yellow-400','bg-green-500','bg-red-500');
     if (status==='online') elHeaderDot.classList.add('bg-green-500');
@@ -749,6 +752,8 @@
       socket.emit('join-doctor', Number(doctorId));
       addLog('emit join-doctor ' + doctorId);
       console.log('[doctor] emit join-doctor', doctorId);
+      joined = true;
+      setHeaderStatus('online');
     }
   });
 
@@ -817,6 +822,7 @@
         doctorId: Number(doctorId || window.CURRENT_USER_ID || 0),
         patientId: Number(lastCall?.patientId || 0),
       };
+      console.log('[doctor] accept redirect payload', payload);
       if (window.snoutiqCall?.accept) {
         window.snoutiqCall.accept(payload);
         return;
@@ -829,7 +835,14 @@
           channel: ch,
         });
       }
-      const callUrl = '/call-page/' + encodeURIComponent(ch) + '?uid=' + encodeURIComponent(doctorId||'') + '&role=host' + (callId ? ('&callId=' + encodeURIComponent(callId)) : '') + '&pip=1';
+      const patientParam = (lastCall?.patientId || lastCall?.patient_id || '').toString();
+      const callUrl = '/call-page/' + encodeURIComponent(ch)
+        + '?uid=' + encodeURIComponent(doctorId||'')
+        + '&role=host'
+        + (callId ? ('&callId=' + encodeURIComponent(callId)) : '')
+        + '&pip=1'
+        + (patientParam ? ('&patientId=' + encodeURIComponent(patientParam)) : '');
+      console.log('[doctor] redirecting to call-page', callUrl);
       window.location.href = callUrl;
     }catch(e){ console.warn('[doctor] accept failed', e); }
   });

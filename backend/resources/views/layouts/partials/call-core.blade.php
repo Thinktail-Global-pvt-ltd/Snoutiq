@@ -271,6 +271,7 @@
         pip: '1',
       });
       if (payload?.callId) search.append('callId', String(payload.callId));
+      if (payload?.patientId) search.append('patientId', String(payload.patientId));
       return `${base}/call-page/${encodeURIComponent(channel)}?${search.toString()}`;
     }
 
@@ -406,6 +407,7 @@
       }
 
       if (statusPill) statusPill.classList.remove('hidden');
+      emitCallEvent('snoutiq:socket-status', { state, doctorId: currentDoctorId });
     }
 
     function applyVisibility(on){
@@ -547,6 +549,7 @@
       accept: acceptGlobalCall,
       reject: rejectGlobalCall,
       dismiss: dismissGlobalCall,
+      setStatus: setHeaderStatus,
       updateDoctorId,
       get doctorId(){ return currentDoctorId; },
       get currentCall(){ return globalCall; },
