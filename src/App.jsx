@@ -781,7 +781,6 @@ function App() {
               }
             />
             <Route path="/call" element={<CallPage />} />
-            // In your App.jsx or routing file
             <Route
               path="/prescription/:doctorId?/:patientId?"
               element={<PrescriptionPage />}

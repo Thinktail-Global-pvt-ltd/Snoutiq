@@ -949,83 +949,38 @@ export default function CallPage() {
   const [callStatus, setCallStatus] = useState("connecting");
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
-
-  console.log("QS params:", Object.fromEntries(qs.entries()));
-  console.log("Role:", role, "UID:", uid);
+  const [usingFrontCamera, setUsingFrontCamera] = useState(true);
 
   // Join channel effect
   useEffect(() => {
-    let mounted = true;
     const client = clientRef.current;
+    let mounted = true;
 
     async function joinChannel() {
       try {
         if (client.connectionState === "CONNECTED" || client.connectionState === "CONNECTING") {
-          console.log("Client already connected, leaving previous session...");
           await client.leave();
         }
 
-        console.log(`Joining channel: ${safeChannel}, role=${role}, uid=${uid}`);
         await client.join(APP_ID, safeChannel, null, uid);
-
         setJoined(true);
         setCallStatus("connected");
 
-        // Create tracks (host only)
-      let audioTrack = null;
-let videoTrack = null;
+        // Create audio and video tracks
+        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        const videoTrack = await AgoraRTC.createCameraVideoTrack({ cameraId: undefined });
 
-try {
-  audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-} catch (err) {
-  console.warn("Audio track error:", err);
-}
+        setLocalTracks([audioTrack, videoTrack]);
+        await client.publish([audioTrack, videoTrack]);
+        videoTrack.play(localVideoRef.current);
 
-try {
-  videoTrack = await AgoraRTC.createCameraVideoTrack();
-} catch (err) {
-  console.warn("Video track error:", err);
-  setIsCameraOff(true); // show camera off
-}
-
-// Publish whatever tracks are available
-const tracksToPublish = [];
-if (audioTrack) tracksToPublish.push(audioTrack);
-if (videoTrack) tracksToPublish.push(videoTrack);
-
-if (tracksToPublish.length) {
-  await client.publish(tracksToPublish);
-}
-setLocalTracks(tracksToPublish);
-setCallStatus("connected"); // Ensure status connected even if video fails
-
-
-        if (videoTrack && localVideoRef.current) {
-          videoTrack.play(localVideoRef.current);
-        }
-
-        // Remote user handling
+        // Subscribe remote users
         client.on("user-published", async (user, mediaType) => {
-          try {
-            await client.subscribe(user, mediaType);
-            console.log(`Subscribed to user ${user.uid} ${mediaType}`);
+          await client.subscribe(user, mediaType);
+          if (mediaType === "video") user.videoTrack?.play(remoteVideoRef.current);
+          if (mediaType === "audio") user.audioTrack?.play();
 
-            if (mediaType === "video" && remoteVideoRef.current) {
-              user.videoTrack?.play(remoteVideoRef.current);
-            }
-            if (mediaType === "audio") {
-              user.audioTrack?.play();
-            }
-
-            setRemoteUsers(prev => {
-              if (!prev.some(u => u.uid === user.uid)) {
-                return [...prev, user];
-              }
-              return prev;
-            });
-          } catch (err) {
-            console.error("Error subscribing to user:", err);
-          }
+          setRemoteUsers(prev => [...prev.filter(u => u.uid !== user.uid), user]);
         });
 
         client.on("user-unpublished", (user, mediaType) => {
@@ -1046,12 +1001,10 @@ setCallStatus("connected"); // Ensure status connected even if video fails
 
     joinChannel();
 
-    return () => {
-      mounted = false;
-      cleanup();
-    };
-  }, [safeChannel, role, uid]);
+    return () => cleanup();
+  }, [safeChannel, uid, role]);
 
+  // Cleanup
   const cleanup = async () => {
     const client = clientRef.current;
     try {
@@ -1059,106 +1012,134 @@ setCallStatus("connected"); // Ensure status connected even if video fails
         track.stop();
         track.close();
       });
-
-      if (client.connectionState === "CONNECTED") {
-        await client.leave();
-        console.log("Left the channel");
-      }
-
+      if (client.connectionState === "CONNECTED") await client.leave();
       setLocalTracks([]);
       setRemoteUsers([]);
       setJoined(false);
-    } catch (error) {
-      console.error("Cleanup error:", error);
+    } catch (err) {
+      console.error(err);
     }
   };
 
+  // Toggle audio
   const toggleMute = async () => {
     if (localTracks[0]) {
-      const audioTrack = localTracks[0];
-      await audioTrack.setEnabled(isMuted);
+      await localTracks[0].setEnabled(isMuted);
       setIsMuted(!isMuted);
     }
   };
 
+  // Toggle camera
   const toggleCamera = async () => {
     if (localTracks[1]) {
-      const videoTrack = localTracks[1];
-      await videoTrack.setEnabled(isCameraOff);
+      await localTracks[1].setEnabled(isCameraOff);
       setIsCameraOff(!isCameraOff);
     }
   };
 
-  const handleEndCall = async () => {
-    await cleanup();
-    socket.emit("call-ended", { channel: safeChannel });
-    navigate(isHost ? "/doctor-dashboard" : "/patient-dashboard");
+  // Switch front/back camera
+  const switchCamera = async () => {
+    if (!localTracks[1]) return;
+    const currentTrack = localTracks[1];
+    const devices = await AgoraRTC.getCameras();
+    const newCameraId = devices.find(d => d.facingMode === (usingFrontCamera ? "environment" : "user"))?.deviceId;
+
+    if (!newCameraId) return;
+
+    const newVideoTrack = await AgoraRTC.createCameraVideoTrack({ cameraId: newCameraId });
+    await clientRef.current.unpublish([currentTrack]);
+    currentTrack.stop();
+    currentTrack.close();
+
+    await clientRef.current.publish([newVideoTrack]);
+    newVideoTrack.play(localVideoRef.current);
+    setLocalTracks([localTracks[0], newVideoTrack]);
+    setUsingFrontCamera(!usingFrontCamera);
   };
+
+  // End call
+const doctorId = qs.get("doctorId"); // from query params if available
+const patientId = qs.get("patientId");
+
+const handleEndCall = async () => {
+  await cleanup();
+  socket.emit("call-ended", { channel: safeChannel });
+
+  if (isHost) {
+    // Doctor -> Prescription page
+    navigate(`/prescription/${doctorId || uid}/${patientId || ""}`);
+  } else {
+    // Patient -> Ratings page
+    navigate(`/rating/${doctorId || ""}/${patientId || uid}`);
+  }
+};
+
 
   const getStatusColor = () => {
     switch (callStatus) {
-      case "connected": return "#16a34a";
-      case "connecting": return "#f59e0b";
-      case "error": return "#dc2626";
-      default: return "#6b7280";
+      case "connected": return "text-green-500";
+      case "connecting": return "text-yellow-400";
+      case "error": return "text-red-500";
+      default: return "text-gray-400";
     }
   };
 
   return (
-    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2>Video Call</h2>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span>UID: <strong>{uid}</strong></span>
-          <span>Channel: <strong>{safeChannel}</strong></span>
-          <span>Role: <strong>{role}</strong></span>
-          <span style={{
-            padding: "4px 8px",
-            borderRadius: 12,
-            fontSize: 12,
-            fontWeight: "bold",
-            background: callStatus === "connected" ? "#dcfce7" : "#fef3c7",
-            color: getStatusColor()
-          }}>
-            {callStatus.toUpperCase()}
-          </span>
-        </div>
+    <div className="w-screen h-screen bg-gray-900 flex flex-col">
+      {/* Top bar */}
+      <div className="flex justify-between items-center p-4 bg-gray-800 text-white">
+        <span>Channel: <strong>{safeChannel}</strong></span>
+        <span className={getStatusColor()}>Status: {callStatus.toUpperCase()}</span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-        <div style={{ position: "relative" }}>
-          <div ref={localVideoRef} style={{ width: "100%", height: 300, background: "#000", borderRadius: 12, overflow: "hidden" }} />
-          <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
-            You ({isHost ? "Doctor" : "Patient"})
-          </div>
-          {isCameraOff && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", fontSize: 18 }}>📷 Camera Off</div>}
+      {/* Video Area */}
+      <div className="flex-1 relative flex justify-center items-center bg-black">
+        {/* Remote video */}
+        <div ref={remoteVideoRef} className="w-full h-full rounded-md bg-black flex justify-center items-center">
+          {remoteUsers.length === 0 && (
+            <div className="text-white text-center">
+              <div className="text-6xl mb-4">⏳</div>
+              <div>Waiting for {isHost ? "patient" : "doctor"}...</div>
+            </div>
+          )}
         </div>
 
-        <div style={{ position: "relative" }}>
-          <div ref={remoteVideoRef} style={{ width: "100%", height: 300, background: "#000", borderRadius: 12, overflow: "hidden" }} />
-          <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
-            {remoteUsers.length > 0 ? `${isHost ? "Patient" : "Doctor"} (${remoteUsers[0]?.uid})` : "Waiting for other participant..."}
-          </div>
-          {remoteUsers.length === 0 && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", textAlign: "center" }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>⏳</div>
-            <div>Waiting for {isHost ? "patient" : "doctor"}...</div>
-          </div>}
+        {/* Local video floating */}
+        <div className="w-48 h-36 absolute bottom-8 right-8 rounded-lg overflow-hidden shadow-lg">
+          <div ref={localVideoRef} className="w-full h-full bg-black" />
+          {isCameraOff && <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center text-white text-lg">📷 Camera Off</div>}
         </div>
+
+        {/* Controls */}
+        {joined && (
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-4 bg-black bg-opacity-60 p-3 rounded-3xl shadow-lg">
+            <button
+              onClick={toggleMute}
+              className={`px-4 py-2 rounded-full font-bold text-white ${isMuted ? "bg-red-600" : "bg-gray-600"}`}
+            >
+              {isMuted ? "🔇 Unmute" : "🎤 Mute"}
+            </button>
+            <button
+              onClick={toggleCamera}
+              className={`px-4 py-2 rounded-full font-bold text-white ${isCameraOff ? "bg-red-600" : "bg-gray-600"}`}
+            >
+              {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
+            </button>
+            <button
+              onClick={switchCamera}
+              className="px-4 py-2 rounded-full font-bold text-white bg-gray-600"
+            >
+              🔄 Switch Camera
+            </button>
+            <button
+              onClick={handleEndCall}
+              className="px-4 py-2 rounded-full font-bold text-white bg-red-600"
+            >
+              📞 End Call
+            </button>
+          </div>
+        )}
       </div>
-
-      {joined && (
-        <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: 16, background: "#f9fafb", borderRadius: 12 }}>
-          <button onClick={toggleMute} style={{ padding: "12px 16px", borderRadius: 8, background: isMuted ? "#dc2626" : "#6b7280", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
-            {isMuted ? "🔇 Unmute" : "🎤 Mute"}
-          </button>
-          <button onClick={toggleCamera} style={{ padding: "12px 16px", borderRadius: 8, background: isCameraOff ? "#dc2626" : "#6b7280", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
-            {isCameraOff ? "📷 Camera On" : "📹 Camera Off"}
-          </button>
-          <button onClick={handleEndCall} style={{ padding: "12px 16px", borderRadius: 8, background: "#dc2626", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", minWidth: 120 }}>
-            📞 End Call
-          </button>
-        </div>
-      )}
     </div>
   );
 }
