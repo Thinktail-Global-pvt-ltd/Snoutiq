@@ -43,6 +43,7 @@
 
 <script>
   // ========= runtime env from server =========
+  window.DOCTOR_PAGE_HANDLE_CALLS = true;
   const PATH_PREFIX_SERVER = @json($pathPrefix ? "/$pathPrefix" : ""); // "" locally, "/backend" in prod
   const PATH_PREFIX_GUESS = (() => {
     try {
@@ -646,6 +647,25 @@
   const autoLive = (url.searchParams.get('live') === '1');
   const doctorId = Number(url.searchParams.get('doctorId') || window.CURRENT_USER_ID || DEFAULT_DOCTOR_ID || 0) || null;
 
+  if (window.snoutiqCall && typeof window.snoutiqCall.updateDoctorId === 'function') {
+    window.snoutiqCall.updateDoctorId(doctorId || window.CURRENT_USER_ID || DEFAULT_DOCTOR_ID || null);
+    if (typeof window.snoutiqCall.goOnline === 'function' && window.snoutiqCall.isVisible && window.snoutiqCall.isVisible()) {
+      try { window.snoutiqCall.goOnline({ showAlert: false }); } catch(_){}
+    }
+  }
+
+  window.addEventListener('snoutiq:call-api-ready', function(event){
+    try{
+      const api = event?.detail;
+      if (api && typeof api.updateDoctorId === 'function') {
+        api.updateDoctorId(doctorId || window.CURRENT_USER_ID || DEFAULT_DOCTOR_ID || null);
+        if (typeof api.goOnline === 'function' && typeof api.isVisible === 'function' && api.isVisible()) {
+          try { api.goOnline({ showAlert: false }); } catch(_){}
+        }
+      }
+    }catch(_){ }
+  }, { once: true });
+
   // ===== Visibility state (persisted) =====
   function isVisible(){ return (localStorage.getItem('clinic_visible') ?? 'on') !== 'off'; }
   function setVisible(v){ localStorage.setItem('clinic_visible', v ? 'on' : 'off'); }
@@ -679,13 +699,19 @@
   }
   updateNoCalls(initialVisible);
 
-  const socket = io(SOCKET_URL, {
-    transports: ['websocket','polling'],
-    withCredentials: false,
-    path: '/socket.io/',
-    autoConnect: initialVisible,
-    reconnection: true
-  });
+  const socket = (window.snoutiqCall && typeof window.snoutiqCall.ensureSocket === 'function')
+    ? window.snoutiqCall.ensureSocket()
+    : io(SOCKET_URL, {
+        transports: ['websocket','polling'],
+        withCredentials: false,
+        path: '/socket.io/',
+        autoConnect: initialVisible,
+        reconnection: true
+      });
+
+  if (typeof window !== 'undefined' && !window.__SNOUTIQ_SOCKET) {
+    window.__SNOUTIQ_SOCKET = socket;
+  }
 
   function addLog(msg){ console.log('[doctor][log]', msg); }
 
@@ -785,6 +811,16 @@
       stopIncomingTone();
       const ch = (lastCall?.channel || elMChannel?.textContent || '').trim();
       const callId = (lastCall?.callId || '').trim();
+      const payload = {
+        callId,
+        channel: ch,
+        doctorId: Number(doctorId || window.CURRENT_USER_ID || 0),
+        patientId: Number(lastCall?.patientId || 0),
+      };
+      if (window.snoutiqCall?.accept) {
+        window.snoutiqCall.accept(payload);
+        return;
+      }
       if (callId) {
         socket.emit('call-accepted', {
           callId,
@@ -803,6 +839,10 @@
       modal?.classList.add('hidden');
       stopIncomingTone();
       const callId = (lastCall?.callId || '').trim();
+      if (window.snoutiqCall?.reject) {
+        window.snoutiqCall.reject(lastCall || { callId }, 'rejected');
+        return;
+      }
       if (callId) socket.emit('call-rejected', { callId, reason: 'rejected' });
     }catch(e){ /* no-op */ }
   });
@@ -824,18 +864,28 @@
       if (toggleLabel) toggleLabel.textContent = on ? 'Visible' : 'Hidden';
       updateNoCalls(on);
       if (on) {
-        setHeaderStatus('connecting');
-        try{ socket.io.opts.reconnection = true; socket.connect(); }catch(_){ }
-        if (window.Swal) Swal.fire({icon:'success', title:'Online', text:'Your clinic is currently visible to patients within 10 km.'});
+        if (window.snoutiqCall?.goOnline) {
+          window.snoutiqCall.goOnline({ showAlert: true });
+        } else {
+          setHeaderStatus('connecting');
+          try{ socket.io.opts.reconnection = true; socket.connect(); }catch(_){ }
+          if (window.Swal) Swal.fire({icon:'success', title:'Online', text:'Your clinic is currently visible to patients within 10 km.'});
+        }
       } else {
-        try{ socket.io.opts.reconnection = false; socket.disconnect(); }catch(_){ }
-        setHeaderStatus('offline');
-        if (window.Swal) Swal.fire({icon:'info', title:'Offline', text:'You will not be receiving calls. Turn on this button to receive video consultation calls.'});
+        if (window.snoutiqCall?.goOffline) {
+          window.snoutiqCall.goOffline({ showAlert: true });
+        } else {
+          try{ socket.io.opts.reconnection = false; socket.disconnect(); }catch(_){ }
+          setHeaderStatus('offline');
+          if (window.Swal) Swal.fire({icon:'info', title:'Offline', text:'You will not be receiving calls. Turn on this button to receive video consultation calls.'});
+        }
       }
     });
   }
 })();
 </script>
 
+
+@include('layouts.partials.call-core', ['socketUrl' => $socketUrl, 'pathPrefix' => $pathPrefix, 'sessionUser' => session('user'), 'sessionAuth' => session('auth_full'), 'sessionDoctor' => session('doctor')])
 </body>
 </html>
