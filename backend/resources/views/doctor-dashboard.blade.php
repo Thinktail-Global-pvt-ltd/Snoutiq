@@ -44,8 +44,7 @@
 <script>
   // ========= runtime env from server =========
   const PATH_PREFIX_SERVER = @json($pathPrefix ? "/$pathPrefix" : ""); // "" locally, "/backend" in prod
-  const PATH_PREFIX = (() => {
-    if (PATH_PREFIX_SERVER) return PATH_PREFIX_SERVER;
+  const PATH_PREFIX_GUESS = (() => {
     try {
       const path = window.location?.pathname || '';
       const knownPrefixes = ['backend', 'petparent', 'admin'];
@@ -55,8 +54,10 @@
       return '';
     }
   })();
+  const PATH_PREFIX = PATH_PREFIX_SERVER || '';
+  const API_PREFIX = PATH_PREFIX_SERVER || PATH_PREFIX_GUESS || '';
   const RAW_SOCKET_URL = @json($socketUrl);
-  const API_BASE    = (PATH_PREFIX || '') + '/api';
+  const API_BASE    = (API_PREFIX || '') + '/api';
   const DEFAULT_DOCTOR_ID = Number(@json($serverDoctorId ?? ($doctorId ?? null))) || null;
   const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
   const SOCKET_URL = (!IS_LOCAL && /localhost|127\.0\.0\.1/i.test(RAW_SOCKET_URL))
