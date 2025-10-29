@@ -43,7 +43,18 @@
 
 <script>
   // ========= runtime env from server =========
-  const PATH_PREFIX = @json($pathPrefix ? "/$pathPrefix" : ""); // "" locally, "/backend" in prod
+  const PATH_PREFIX_SERVER = @json($pathPrefix ? "/$pathPrefix" : ""); // "" locally, "/backend" in prod
+  const PATH_PREFIX = (() => {
+    if (PATH_PREFIX_SERVER) return PATH_PREFIX_SERVER;
+    try {
+      const path = window.location?.pathname || '';
+      const knownPrefixes = ['backend', 'petparent', 'admin'];
+      const found = knownPrefixes.find(prefix => path === `/${prefix}` || path.startsWith(`/${prefix}/`));
+      return found ? `/${found}` : '';
+    } catch (_) {
+      return '';
+    }
+  })();
   const RAW_SOCKET_URL = @json($socketUrl);
   const API_BASE    = (PATH_PREFIX || '') + '/api';
   const DEFAULT_DOCTOR_ID = Number(@json($serverDoctorId ?? ($doctorId ?? null))) || null;
@@ -535,7 +546,14 @@
       }
       const data = await res.json();
       if (summaryFetchToken !== token) return; // stale
-      const summaryText = (data?.summary || '').trim();
+      const summaryRaw = [
+        data?.summary,
+        data?.data?.summary,
+        data?.data?.data?.summary,
+        data?.payload?.summary,
+        data?.result?.summary
+      ].find(value => typeof value === 'string' && value.trim());
+      const summaryText = (summaryRaw || '').trim();
 
       if (summaryText) {
         if (elMSummaryStatus) {

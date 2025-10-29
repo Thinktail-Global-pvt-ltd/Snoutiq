@@ -378,7 +378,19 @@
     // Use Gemini 1.5 Flash to summarize chats for current session user
     const res = await api('GET', `${apiBase}/ai/summary?format=paragraph`);
     console.log('[schedule] GET /ai/summary =>', res);
-    if(res.ok && res.json){ const ta = el('[name="ai_summary"]'); if(ta){ ta.value = res.json.summary || ''; } }
+    if(res.ok && res.json){
+      const ta = el('[name="ai_summary"]');
+      if(ta){
+        const summaryRaw = [
+          res.json.summary,
+          res.json.data?.summary,
+          res.json.data?.data?.summary,
+          res.json.payload?.summary,
+          res.json.result?.summary
+        ].find(value => typeof value === 'string' && value.trim());
+        ta.value = summaryRaw ? summaryRaw : '';
+      }
+    }
   }
 
   document.getElementById('btnRefetchAi')?.addEventListener('click', async ()=>{
