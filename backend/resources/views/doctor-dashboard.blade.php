@@ -793,7 +793,7 @@
           channel: ch,
         });
       }
-      const callUrl = (PATH_PREFIX || '') + '/call-page/' + encodeURIComponent(ch) + '?uid=' + encodeURIComponent(doctorId||'') + '&role=host' + (callId ? ('&callId=' + encodeURIComponent(callId)) : '') + '&pip=1';
+      const callUrl = '/call-page/' + encodeURIComponent(ch) + '?uid=' + encodeURIComponent(doctorId||'') + '&role=host' + (callId ? ('&callId=' + encodeURIComponent(callId)) : '') + '&pip=1';
       window.location.href = callUrl;
     }catch(e){ console.warn('[doctor] accept failed', e); }
   });
