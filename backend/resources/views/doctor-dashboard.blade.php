@@ -561,24 +561,68 @@
         }
         if (elMSummary) {
           elMSummary.innerHTML = '';
+          const entries = [];
+          let current = null;
           summaryText.split(/\n+/).forEach(line => {
             const trimmed = line.trim();
             if (!trimmed) return;
-            const p = document.createElement('p');
-            p.className = 'text-sm text-gray-700 leading-relaxed';
-            if (/^(Q|A):/i.test(trimmed)) {
-              const label = trimmed.slice(0, 2).toUpperCase();
-              const value = trimmed.slice(2).trim();
-              const strong = document.createElement('span');
-              strong.className = 'font-semibold text-gray-800 pr-1';
-              strong.textContent = label;
-              p.appendChild(strong);
-              p.appendChild(document.createTextNode(value));
-            } else {
-              p.textContent = trimmed;
+            if (/^Q:/i.test(trimmed)) {
+              current = { question: trimmed.replace(/^Q:\s*/i, '').trim(), diagnosis: [], inDiagnosis: false };
+              entries.push(current);
+              return;
             }
-            elMSummary.appendChild(p);
+            if (/^===\s*DIAGNOSIS\s*===/i.test(trimmed)) {
+              if (!current) {
+                current = { question: '', diagnosis: [], inDiagnosis: true };
+                entries.push(current);
+              } else {
+                current.inDiagnosis = true;
+              }
+              return;
+            }
+            if (/^===\s*END\s*===/i.test(trimmed)) {
+              if (current) current.inDiagnosis = false;
+              return;
+            }
+            if (current?.inDiagnosis) {
+              current.diagnosis.push(trimmed.replace(/^A:\s*/i, '').trim());
+            }
           });
+          const structuredRendered = entries.some(entry => entry.question || entry.diagnosis.length);
+          if (structuredRendered) {
+            entries.forEach(entry => {
+              if (!entry.question && entry.diagnosis.length === 0) return;
+              if (entry.question) {
+                const p = document.createElement('p');
+                p.className = 'text-sm text-gray-700 leading-relaxed';
+                const strong = document.createElement('span');
+                strong.className = 'font-semibold text-gray-800 pr-1';
+                strong.textContent = 'Q';
+                p.appendChild(strong);
+                p.appendChild(document.createTextNode(entry.question));
+                elMSummary.appendChild(p);
+              }
+              if (entry.diagnosis.length) {
+                const p = document.createElement('p');
+                p.className = 'text-sm text-gray-700 leading-relaxed';
+                const strong = document.createElement('span');
+                strong.className = 'font-semibold text-gray-800 pr-1';
+                strong.textContent = 'Diagnosis';
+                p.appendChild(strong);
+                p.appendChild(document.createTextNode(entry.diagnosis.join(' ')));
+                elMSummary.appendChild(p);
+              }
+            });
+          } else {
+            summaryText.split(/\n+/).forEach(line => {
+              const trimmed = line.trim();
+              if (!trimmed) return;
+              const p = document.createElement('p');
+              p.className = 'text-sm text-gray-700 leading-relaxed';
+              p.textContent = trimmed;
+              elMSummary.appendChild(p);
+            });
+          }
         }
         if (elMSummary && elMSummary.childElementCount === 0 && elMSummaryStatus) {
           elMSummaryStatus.textContent = 'No recent AI chats found.';
