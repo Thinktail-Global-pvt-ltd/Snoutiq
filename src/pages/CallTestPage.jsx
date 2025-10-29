@@ -1,27 +1,20 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
-import { socket } from "./socket";
-
-// Icons
 import { 
   FiMic, 
   FiMicOff, 
   FiVideo, 
   FiVideoOff, 
-  FiPhone, 
   FiPhoneOff,
   FiUser,
   FiUsers,
-  FiSettings,
-  FiMessageSquare,
-  FiArrowLeft
+  FiArrowLeft,
+  FiMonitor
 } from "react-icons/fi";
 import { 
   MdScreenShare, 
   MdStopScreenShare,
-  MdFlipCameraAndroid,
-  MdClosedCaption
+  MdFlipCameraAndroid
 } from "react-icons/md";
 import { 
   HiOutlineViewGrid, 
@@ -31,9 +24,10 @@ import {
 const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
 
 export default function CallPage() {
-  const { channelName } = useParams();
-  const [qs] = useSearchParams();
-  const navigate = useNavigate();
+  // Mock params for demo
+  const channelName = "demo-channel";
+  const role = "host";
+  const isHost = role === "host";
 
   const safeChannel = useMemo(() => {
     return (channelName || "default_channel")
@@ -42,22 +36,14 @@ export default function CallPage() {
   }, [channelName]);
 
   const uid = useMemo(() => {
-    const q = Number(qs.get("uid"));
-    return Number.isFinite(q) ? q : Math.floor(Math.random() * 1e6);
-  }, [qs]);
-
-  const role = qs.get("role") === "host" ? "host" : "audience";
-  const isHost = role === "host";
-
-  // Get additional parameters for navigation
-  const doctorId = qs.get("doctorId");
-  const patientId = qs.get("patientId");
+    return Math.floor(Math.random() * 1e6);
+  }, []);
 
   // Refs
-  const clientRef = useRef(AgoraRTC.createClient({ mode: "rtc", codec: "vp8" }));
+  const clientRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const localTracksRef = useRef([]); // Additional ref for tracks
+  const localTracksRef = useRef([]);
 
   // State
   const [localTracks, setLocalTracks] = useState([]);
@@ -67,10 +53,16 @@ export default function CallPage() {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [cameraType, setCameraType] = useState("front");
+  const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
   const [videoLayout, setVideoLayout] = useState("grid");
   const [participants, setParticipants] = useState([]);
   const [availableCameras, setAvailableCameras] = useState([]);
+  const [showCameraList, setShowCameraList] = useState(false);
+
+  // Initialize Agora client
+  useEffect(() => {
+    clientRef.current = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+  }, []);
 
   // Get available cameras
   useEffect(() => {
@@ -86,39 +78,29 @@ export default function CallPage() {
     getCameras();
   }, []);
 
-  // Join channel effect - FIXED VERSION
+  // Join channel
   useEffect(() => {
+    if (!clientRef.current || availableCameras.length === 0) return;
+
     let mounted = true;
     const client = clientRef.current;
 
     async function joinChannel() {
       try {
-        // Cleanup previous session
-        if (client.connectionState === "CONNECTED" || client.connectionState === "CONNECTING") {
-          console.log("Cleaning up previous session...");
-          await cleanup();
-        }
-
         console.log(`Joining channel: ${safeChannel}, role=${role}, uid=${uid}`);
         
-        // Join the channel first
         await client.join(APP_ID, safeChannel, null, uid);
         console.log("Successfully joined channel");
 
+        if (!mounted) return;
         setJoined(true);
         setCallStatus("connected");
 
-        // Create and publish tracks for host
         if (isHost) {
           await createAndPublishTracks();
         }
 
-        // Setup remote user event handlers
         setupRemoteUserHandlers();
-
-        // Socket events for call ending
-        socket.on("call-ended", handleRemoteEndCall);
-
       } catch (error) {
         console.error("Join channel error:", error);
         setCallStatus("error");
@@ -133,74 +115,49 @@ export default function CallPage() {
         try {
           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
           tracks.push(audioTrack);
-          console.log("Audio track created successfully");
+          console.log("Audio track created");
         } catch (err) {
           console.warn("Could not create audio track:", err);
         }
 
-        // Create video track
+        // Create video track with current camera
         try {
-          let cameraConfig = {};
-          
-          // Use specific camera device if available
-          if (availableCameras.length > 0) {
-            const cameraDevice = cameraType === "front" 
-              ? availableCameras.find(cam => cam.label.toLowerCase().includes('front')) || availableCameras[0]
-              : availableCameras.find(cam => cam.label.toLowerCase().includes('back')) || availableCameras[availableCameras.length - 1];
-            
-            if (cameraDevice) {
-              cameraConfig = {
-                cameraId: cameraDevice.deviceId,
-                encoderConfig: "720p_1"
-              };
-            }
-          }
-
-          const videoTrack = await AgoraRTC.createCameraVideoTrack(cameraConfig);
+          const cameraDevice = availableCameras[currentCameraIndex];
+          const videoTrack = await AgoraRTC.createCameraVideoTrack({
+            cameraId: cameraDevice.deviceId,
+            encoderConfig: "720p_1"
+          });
           tracks.push(videoTrack);
-          console.log("Video track created successfully");
+          console.log("Video track created");
 
-          // Play video track
           if (localVideoRef.current) {
             videoTrack.play(localVideoRef.current, { fit: "cover" });
-            console.log("Video track playing on local video element");
-          } else {
-            console.warn("Local video ref not available");
           }
-
         } catch (err) {
           console.error("Video track creation failed:", err);
           setIsCameraOff(true);
         }
 
-        // Publish tracks
         if (tracks.length > 0) {
-          await clientRef.current.publish(tracks);
-          console.log("Tracks published successfully");
+          await client.publish(tracks);
+          console.log("Tracks published");
         }
 
-        // Update state and ref
         setLocalTracks(tracks);
         localTracksRef.current = tracks;
-
       } catch (error) {
         console.error("Error creating/publishing tracks:", error);
       }
     };
 
     const setupRemoteUserHandlers = () => {
-      const client = clientRef.current;
-
       client.on("user-published", async (user, mediaType) => {
         try {
           await client.subscribe(user, mediaType);
           console.log(`Subscribed to user ${user.uid} ${mediaType}`);
 
-          if (mediaType === "video") {
-            if (remoteVideoRef.current) {
-              user.videoTrack?.play(remoteVideoRef.current, { fit: "cover" });
-            }
-            
+          if (mediaType === "video" && remoteVideoRef.current) {
+            user.videoTrack?.play(remoteVideoRef.current, { fit: "cover" });
             setRemoteUsers(prev => {
               if (!prev.some(u => u.uid === user.uid)) {
                 return [...prev, user];
@@ -213,7 +170,6 @@ export default function CallPage() {
             user.audioTrack?.play();
           }
 
-          // Update participants list
           setParticipants(prev => {
             if (!prev.some(p => p.uid === user.uid)) {
               return [...prev, {
@@ -223,7 +179,6 @@ export default function CallPage() {
             }
             return prev;
           });
-
         } catch (err) {
           console.error("Error subscribing to user:", err);
         }
@@ -245,16 +200,15 @@ export default function CallPage() {
 
     return () => {
       mounted = false;
-      socket.off("call-ended", handleRemoteEndCall);
+      cleanup();
     };
-  }, [safeChannel, role, uid, cameraType, availableCameras]);
+  }, [safeChannel, role, uid, availableCameras, currentCameraIndex]);
 
-  // Improved cleanup function
   const cleanup = async () => {
     const client = clientRef.current;
+    if (!client) return;
     
     try {
-      // Stop and close local tracks
       localTracksRef.current.forEach(track => {
         try {
           track.stop();
@@ -264,90 +218,66 @@ export default function CallPage() {
         }
       });
 
-      // Leave channel
       if (client.connectionState === "CONNECTED") {
         await client.leave();
-        console.log("Left the channel");
       }
 
-      // Clear states
       setLocalTracks([]);
       localTracksRef.current = [];
       setRemoteUsers([]);
       setJoined(false);
-      
     } catch (error) {
       console.error("Cleanup error:", error);
     }
   };
 
-  // Fixed toggle functions
   const toggleMute = async () => {
-    if (localTracksRef.current.length > 0) {
-      const audioTrack = localTracksRef.current.find(track => track.trackMediaType === 'audio');
-      if (audioTrack) {
-        await audioTrack.setEnabled(!isMuted);
-        setIsMuted(!isMuted);
-      }
+    const audioTrack = localTracksRef.current.find(track => track.trackMediaType === 'audio');
+    if (audioTrack) {
+      await audioTrack.setEnabled(!isMuted);
+      setIsMuted(!isMuted);
     }
   };
 
   const toggleCamera = async () => {
-    if (localTracksRef.current.length > 0) {
-      const videoTrack = localTracksRef.current.find(track => track.trackMediaType === 'video');
-      if (videoTrack) {
-        await videoTrack.setEnabled(isCameraOff);
-        setIsCameraOff(!isCameraOff);
-      }
+    const videoTrack = localTracksRef.current.find(track => track.trackMediaType === 'video');
+    if (videoTrack) {
+      await videoTrack.setEnabled(isCameraOff);
+      setIsCameraOff(!isCameraOff);
     }
   };
 
-  const switchCamera = async () => {
+  const switchToCamera = async (cameraIndex) => {
+    if (cameraIndex === currentCameraIndex || availableCameras.length <= cameraIndex) return;
+
     try {
-      // Get current video track
       const currentVideoTrack = localTracksRef.current.find(track => track.trackMediaType === 'video');
       
-      if (currentVideoTrack) {
-        // Unpublish current video track
+      if (currentVideoTrack && clientRef.current) {
         await clientRef.current.unpublish(currentVideoTrack);
-        
-        // Stop and close current track
         currentVideoTrack.stop();
         currentVideoTrack.close();
         
-        // Create new track with different camera
-        const newCameraType = cameraType === "front" ? "back" : "front";
-        let cameraConfig = {};
+        const cameraDevice = availableCameras[cameraIndex];
+        const newVideoTrack = await AgoraRTC.createCameraVideoTrack({
+          cameraId: cameraDevice.deviceId,
+          encoderConfig: "720p_1"
+        });
         
-        if (availableCameras.length > 0) {
-          const cameraDevice = newCameraType === "front" 
-            ? availableCameras.find(cam => cam.label.toLowerCase().includes('front')) || availableCameras[0]
-            : availableCameras.find(cam => cam.label.toLowerCase().includes('back')) || availableCameras[availableCameras.length - 1];
-          
-          if (cameraDevice) {
-            cameraConfig = { cameraId: cameraDevice.deviceId };
-          }
-        }
-        
-        const newVideoTrack = await AgoraRTC.createCameraVideoTrack(cameraConfig);
-        
-        // Update tracks
         const newTracks = localTracksRef.current.filter(track => track.trackMediaType !== 'video');
         newTracks.push(newVideoTrack);
         
-        // Publish new track
         await clientRef.current.publish(newVideoTrack);
         
-        // Play new track
         if (localVideoRef.current) {
           newVideoTrack.play(localVideoRef.current, { fit: "cover" });
         }
         
-        // Update state and ref
         setLocalTracks(newTracks);
         localTracksRef.current = newTracks;
-        setCameraType(newCameraType);
+        setCurrentCameraIndex(cameraIndex);
         setIsCameraOff(false);
+        setShowCameraList(false);
       }
     } catch (error) {
       console.error("Error switching camera:", error);
@@ -361,20 +291,16 @@ export default function CallPage() {
           encoderConfig: "720p_1"
         });
         
-        // Unpublish current video track
         const currentVideoTrack = localTracksRef.current.find(track => track.trackMediaType === 'video');
         if (currentVideoTrack) {
           await clientRef.current.unpublish(currentVideoTrack);
         }
         
-        // Publish screen track
         await clientRef.current.publish(screenTrack);
         
-        // Update tracks
         const newTracks = localTracksRef.current.filter(track => track.trackMediaType !== 'video');
         newTracks.push(screenTrack);
         
-        // Play screen track
         if (localVideoRef.current) {
           screenTrack.play(localVideoRef.current, { fit: "cover" });
         }
@@ -383,19 +309,16 @@ export default function CallPage() {
         localTracksRef.current = newTracks;
         setIsScreenSharing(true);
         
-        // Handle screen share end
         if (screenTrack.on) {
           screenTrack.on("track-ended", () => {
             toggleScreenShare();
           });
         }
-        
       } catch (error) {
         console.error("Error sharing screen:", error);
       }
     } else {
       try {
-        // Stop screen share and switch back to camera
         const screenTrack = localTracksRef.current.find(track => track.trackMediaType === 'video');
         if (screenTrack) {
           await clientRef.current.unpublish(screenTrack);
@@ -403,28 +326,17 @@ export default function CallPage() {
           screenTrack.close();
         }
         
-        // Create camera track
-        let cameraConfig = {};
-        if (availableCameras.length > 0) {
-          const cameraDevice = cameraType === "front" 
-            ? availableCameras.find(cam => cam.label.toLowerCase().includes('front')) || availableCameras[0]
-            : availableCameras.find(cam => cam.label.toLowerCase().includes('back')) || availableCameras[availableCameras.length - 1];
-          
-          if (cameraDevice) {
-            cameraConfig = { cameraId: cameraDevice.deviceId };
-          }
-        }
+        const cameraDevice = availableCameras[currentCameraIndex];
+        const videoTrack = await AgoraRTC.createCameraVideoTrack({
+          cameraId: cameraDevice.deviceId,
+          encoderConfig: "720p_1"
+        });
         
-        const videoTrack = await AgoraRTC.createCameraVideoTrack(cameraConfig);
-        
-        // Publish camera track
         await clientRef.current.publish(videoTrack);
         
-        // Update tracks
         const newTracks = localTracksRef.current.filter(track => track.trackMediaType !== 'video');
         newTracks.push(videoTrack);
         
-        // Play camera track
         if (localVideoRef.current) {
           videoTrack.play(localVideoRef.current, { fit: "cover" });
         }
@@ -432,32 +344,15 @@ export default function CallPage() {
         setLocalTracks(newTracks);
         localTracksRef.current = newTracks;
         setIsScreenSharing(false);
-        
       } catch (error) {
         console.error("Error stopping screen share:", error);
       }
     }
   };
 
-  const handleRemoteEndCall = () => {
-    cleanup();
-    navigateToPostCall();
-  };
-
-  const navigateToPostCall = () => {
-    if (isHost && doctorId && patientId) {
-      navigate(`/prescription/${doctorId}/${patientId}`);
-    } else if (!isHost && doctorId && patientId) {
-      navigate(`/rating/${doctorId}/${patientId}`);
-    } else {
-      navigate(isHost ? "/doctor-dashboard" : "/patient-dashboard");
-    }
-  };
-
   const handleEndCall = async () => {
     await cleanup();
-    socket.emit("call-ended", { channel: safeChannel });
-    navigateToPostCall();
+    alert("Call ended");
   };
 
   const toggleLayout = () => {
@@ -465,41 +360,40 @@ export default function CallPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+      <header className="bg-gray-800 bg-opacity-80 backdrop-blur-lg border-b border-gray-700 px-6 py-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button 
-              onClick={() => navigate(-1)}
+              onClick={() => alert("Going back...")}
               className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
             >
               <FiArrowLeft className="w-5 h-5" />
             </button>
             <div>
               <h1 className="text-xl font-semibold">Video Consultation</h1>
-              <div className="flex items-center space-x-4 text-sm text-gray-300">
-                <span>Room: <strong>{safeChannel}</strong></span>
+              <div className="flex items-center space-x-4 text-sm text-gray-300 mt-1">
+                <span>Room: <strong className="text-blue-400">{safeChannel}</strong></span>
                 <span>•</span>
-                <span>ID: <strong>{uid}</strong></span>
+                <span>ID: <strong className="text-blue-400">{uid}</strong></span>
                 <span>•</span>
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  callStatus === "connected" ? "bg-green-500" : 
-                  callStatus === "connecting" ? "bg-yellow-500" : "bg-red-500"
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  callStatus === "connected" ? "bg-green-500 text-white" : 
+                  callStatus === "connecting" ? "bg-yellow-500 text-black" : "bg-red-500 text-white"
                 }`}>
-                  {callStatus === "connected" ? "Connected" : 
-                   callStatus === "connecting" ? "Connecting..." : "Error"}
+                  {callStatus === "connected" ? "● Connected" : 
+                   callStatus === "connecting" ? "○ Connecting..." : "✕ Error"}
                 </span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 text-sm">
-              <FiUsers className="w-4 h-4" />
+            <div className="flex items-center space-x-2 text-sm bg-gray-700 px-3 py-2 rounded-lg">
+              <FiUsers className="w-4 h-4 text-blue-400" />
               <span>{participants.length + 1} participants</span>
             </div>
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
           </div>
         </div>
       </header>
@@ -507,137 +401,226 @@ export default function CallPage() {
       {/* Main Content */}
       <div className="flex h-[calc(100vh-80px)]">
         {/* Video Area */}
-        <div className={`flex-1 p-6 ${videoLayout === "grid" && remoteUsers.length > 0 ? "grid grid-cols-2 gap-4" : ""}`}>
-          
-          {/* Local Video - Always show */}
-          <div className={`relative bg-black rounded-xl overflow-hidden ${
-            videoLayout === "focus" && remoteUsers.length > 0 ? "h-1/3 mb-4" : "h-full"
-          }`}>
-            <div 
-              ref={localVideoRef}
-              className="w-full h-full bg-gray-800"
-            />
-            <div className="absolute bottom-4 left-4 bg-black bg-opacity-60 px-3 py-1 rounded-lg text-sm">
-              You ({isHost ? "Doctor" : "Patient"}) 
-              {isCameraOff && " • Camera Off"}
-              {isScreenSharing && " • Screen Sharing"}
-            </div>
+        <div className="flex-1 p-6">
+          <div className={`h-full ${videoLayout === "grid" && remoteUsers.length > 0 ? "grid grid-cols-2 gap-4" : "flex flex-col gap-4"}`}>
             
-            {(isCameraOff || localTracks.length === 0) && !isScreenSharing && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                <div className="text-center">
-                  <FiUser className="w-16 h-16 mx-auto mb-2 text-gray-400" />
-                  <p className="text-gray-300">
-                    {isCameraOff ? "Camera is off" : "Initializing camera..."}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Remote Video */}
-          {remoteUsers.length > 0 ? (
-            <div className={`relative bg-black rounded-xl overflow-hidden ${
-              videoLayout === "focus" ? "h-2/3" : "h-full"
+            {/* Local Video */}
+            <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700 ${
+              videoLayout === "focus" && remoteUsers.length > 0 ? "h-1/3" : "flex-1"
             }`}>
               <div 
-                ref={remoteVideoRef}
-                className="w-full h-full bg-gray-800"
+                ref={localVideoRef}
+                className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900"
               />
-              <div className="absolute bottom-4 left-4 bg-black bg-opacity-60 px-3 py-1 rounded-lg text-sm">
-                {isHost ? "Patient" : "Doctor"} ({remoteUsers[0]?.uid})
-              </div>
-            </div>
-          ) : (
-            videoLayout === "grid" && (
-              <div className="relative bg-gray-800 rounded-xl overflow-hidden h-full flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FiUser className="w-10 h-10 text-gray-400" />
+              
+              {/* Video Label */}
+              <div className="absolute top-4 left-4 bg-black bg-opacity-70 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium border border-gray-600">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span>You ({isHost ? "Doctor" : "Patient"})</span>
+                </div>
+                {(isCameraOff || isScreenSharing) && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    {isCameraOff && "Camera Off"}
+                    {isScreenSharing && "Screen Sharing"}
                   </div>
-                  <h3 className="text-xl font-medium mb-2">Waiting for participant</h3>
-                  <p className="text-gray-400">
-                    Waiting for {isHost ? "patient" : "doctor"} to join...
-                  </p>
+                )}
+              </div>
+
+              {/* Camera Selector */}
+              {availableCameras.length > 1 && !isScreenSharing && (
+                <div className="absolute top-4 right-4">
+                  <button
+                    onClick={() => setShowCameraList(!showCameraList)}
+                    className="bg-black bg-opacity-70 backdrop-blur-sm p-2 rounded-lg hover:bg-opacity-90 transition-all border border-gray-600"
+                    title="Switch Camera"
+                  >
+                    <MdFlipCameraAndroid className="w-5 h-5" />
+                  </button>
+                  
+                  {showCameraList && (
+                    <div className="absolute top-full right-0 mt-2 bg-gray-800 rounded-lg shadow-xl border border-gray-600 p-2 min-w-[250px] z-10">
+                      <div className="text-xs text-gray-400 px-2 py-1 font-medium">Available Cameras</div>
+                      {availableCameras.map((camera, index) => (
+                        <button
+                          key={camera.deviceId}
+                          onClick={() => switchToCamera(index)}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                            currentCameraIndex === index
+                              ? "bg-blue-600 text-white"
+                              : "hover:bg-gray-700 text-gray-200"
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <FiVideo className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">{camera.label || `Camera ${index + 1}`}</span>
+                            {currentCameraIndex === index && (
+                              <span className="ml-auto text-xs">●</span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Camera Off Placeholder */}
+              {(isCameraOff || localTracks.length === 0) && !isScreenSharing && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <FiUser className="w-10 h-10 text-gray-400" />
+                    </div>
+                    <p className="text-gray-300 font-medium">
+                      {isCameraOff ? "Camera is off" : "Initializing camera..."}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {availableCameras.length} camera(s) available
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Remote Video */}
+            {remoteUsers.length > 0 ? (
+              <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700 ${
+                videoLayout === "focus" ? "flex-1" : ""
+              }`}>
+                <div 
+                  ref={remoteVideoRef}
+                  className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900"
+                />
+                <div className="absolute top-4 left-4 bg-black bg-opacity-70 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium border border-gray-600">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span>{isHost ? "Patient" : "Doctor"} ({remoteUsers[0]?.uid})</span>
+                  </div>
                 </div>
               </div>
-            )
-          )}
+            ) : (
+              videoLayout === "grid" && (
+                <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden flex-1 flex items-center justify-center border border-gray-700 shadow-xl">
+                  <div className="text-center">
+                    <div className="w-24 h-24 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <FiUser className="w-12 h-12 text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold mb-2">Waiting for participant</h3>
+                    <p className="text-gray-400">
+                      Waiting for {isHost ? "patient" : "doctor"} to join the call...
+                    </p>
+                    <div className="mt-4 flex items-center justify-center space-x-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                    </div>
+                  </div>
+                </div>
+              )
+            )}
+          </div>
         </div>
 
         {/* Sidebar - Participants */}
-        <div className="w-80 bg-gray-800 border-l border-gray-700 p-4">
-          <h3 className="font-semibold mb-4 flex items-center">
-            <FiUsers className="w-5 h-5 mr-2" />
-            Participants ({participants.length + 1})
+        <div className="w-80 bg-gray-800 bg-opacity-80 backdrop-blur-lg border-l border-gray-700 p-4 shadow-xl">
+          <h3 className="font-semibold mb-4 flex items-center text-lg">
+            <FiUsers className="w-5 h-5 mr-2 text-blue-400" />
+            Participants <span className="ml-auto text-sm text-gray-400">({participants.length + 1})</span>
           </h3>
           <div className="space-y-2">
             {/* Local user */}
-            <div className="flex items-center space-x-3 p-2 rounded-lg bg-gray-700">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-sm font-medium">
+            <div className="flex items-center space-x-3 p-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg">
+              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-sm font-bold">
                 {isHost ? "D" : "P"}
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">You ({isHost ? "Doctor" : "Patient"})</p>
-                <p className="text-xs text-gray-400">ID: {uid}</p>
+                <p className="text-sm font-semibold">You ({isHost ? "Doctor" : "Patient"})</p>
+                <p className="text-xs text-blue-200">ID: {uid}</p>
               </div>
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <div className="w-2 h-2 bg-green-400 rounded-full shadow-lg shadow-green-400/50"></div>
             </div>
             
             {/* Remote participants */}
             {participants.map((participant) => (
-              <div key={participant.uid} className="flex items-center space-x-3 p-2 rounded-lg bg-gray-700">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-sm font-medium">
+              <div key={participant.uid} className="flex items-center space-x-3 p-3 rounded-xl bg-gray-700 hover:bg-gray-650 transition-colors">
+                <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center text-sm font-bold">
                   {participant.role.charAt(0)}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium">{participant.role}</p>
                   <p className="text-xs text-gray-400">ID: {participant.uid}</p>
                 </div>
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <div className="w-2 h-2 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>
               </div>
             ))}
+          </div>
+
+          {/* Camera Info */}
+          <div className="mt-6 p-4 bg-gray-700 rounded-xl">
+            <h4 className="text-sm font-semibold mb-3 flex items-center">
+              <FiMonitor className="w-4 h-4 mr-2 text-blue-400" />
+              Camera Info
+            </h4>
+            <div className="space-y-2 text-xs text-gray-300">
+              <div className="flex justify-between">
+                <span>Total Cameras:</span>
+                <span className="font-semibold">{availableCameras.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Active Camera:</span>
+                <span className="font-semibold">{currentCameraIndex + 1}</span>
+              </div>
+              {availableCameras[currentCameraIndex] && (
+                <div className="mt-2 pt-2 border-t border-gray-600">
+                  <p className="text-gray-400 mb-1">Current:</p>
+                  <p className="font-mono text-xs truncate">
+                    {availableCameras[currentCameraIndex].label || `Camera ${currentCameraIndex + 1}`}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2">
-        <div className="flex items-center space-x-4 bg-gray-800 bg-opacity-90 px-6 py-3 rounded-2xl shadow-lg">
+      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="flex items-center space-x-3 bg-gray-800 bg-opacity-95 backdrop-blur-lg px-6 py-4 rounded-2xl shadow-2xl border border-gray-700">
           {/* Mute/Unmute */}
           <button 
             onClick={toggleMute}
-            className={`p-3 rounded-full transition-all ${
-              isMuted ? "bg-red-500 hover:bg-red-600" : "bg-gray-600 hover:bg-gray-500"
+            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
+              isMuted 
+                ? "bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/50" 
+                : "bg-gray-600 hover:bg-gray-500"
             }`}
+            title={isMuted ? "Unmute" : "Mute"}
           >
-            {isMuted ? (
-              <FiMicOff className="w-6 h-6" />
-            ) : (
-              <FiMic className="w-6 h-6" />
-            )}
+            {isMuted ? <FiMicOff className="w-6 h-6" /> : <FiMic className="w-6 h-6" />}
           </button>
 
           {/* Camera On/Off */}
           <button 
             onClick={toggleCamera}
-            className={`p-3 rounded-full transition-all ${
-              isCameraOff ? "bg-red-500 hover:bg-red-600" : "bg-gray-600 hover:bg-gray-500"
+            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
+              isCameraOff 
+                ? "bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/50" 
+                : "bg-gray-600 hover:bg-gray-500"
             }`}
+            title={isCameraOff ? "Turn On Camera" : "Turn Off Camera"}
           >
-            {isCameraOff ? (
-              <FiVideoOff className="w-6 h-6" />
-            ) : (
-              <FiVideo className="w-6 h-6" />
-            )}
+            {isCameraOff ? <FiVideoOff className="w-6 h-6" /> : <FiVideo className="w-6 h-6" />}
           </button>
 
           {/* Switch Camera */}
           <button 
-            onClick={switchCamera}
+            onClick={() => setShowCameraList(!showCameraList)}
             disabled={availableCameras.length <= 1}
-            className={`p-3 rounded-full transition-all ${
-              availableCameras.length <= 1 ? "bg-gray-700 cursor-not-allowed" : "bg-gray-600 hover:bg-gray-500"
+            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
+              availableCameras.length <= 1 
+                ? "bg-gray-700 cursor-not-allowed opacity-50" 
+                : "bg-gray-600 hover:bg-gray-500"
             }`}
             title={availableCameras.length <= 1 ? "Only one camera available" : "Switch Camera"}
           >
@@ -647,48 +630,39 @@ export default function CallPage() {
           {/* Screen Share */}
           <button 
             onClick={toggleScreenShare}
-            className={`p-3 rounded-full transition-all ${
-              isScreenSharing ? "bg-blue-500 hover:bg-blue-600" : "bg-gray-600 hover:bg-gray-500"
+            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
+              isScreenSharing 
+                ? "bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/50" 
+                : "bg-gray-600 hover:bg-gray-500"
             }`}
+            title={isScreenSharing ? "Stop Sharing" : "Share Screen"}
           >
-            {isScreenSharing ? (
-              <MdStopScreenShare className="w-6 h-6" />
-            ) : (
-              <MdScreenShare className="w-6 h-6" />
-            )}
+            {isScreenSharing ? <MdStopScreenShare className="w-6 h-6" /> : <MdScreenShare className="w-6 h-6" />}
           </button>
 
           {/* Layout Toggle */}
           <button 
             onClick={toggleLayout}
             disabled={remoteUsers.length === 0}
-            className={`p-3 rounded-full transition-all ${
-              remoteUsers.length === 0 ? "bg-gray-700 cursor-not-allowed" : "bg-gray-600 hover:bg-gray-500"
+            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
+              remoteUsers.length === 0 
+                ? "bg-gray-700 cursor-not-allowed opacity-50" 
+                : "bg-gray-600 hover:bg-gray-500"
             }`}
+            title="Change Layout"
           >
-            {videoLayout === "grid" ? (
-              <HiOutlineViewList className="w-6 h-6" />
-            ) : (
-              <HiOutlineViewGrid className="w-6 h-6" />
-            )}
+            {videoLayout === "grid" ? <HiOutlineViewList className="w-6 h-6" /> : <HiOutlineViewGrid className="w-6 h-6" />}
           </button>
 
           {/* End Call */}
           <button 
             onClick={handleEndCall}
-            className="p-3 rounded-full bg-red-500 hover:bg-red-600 transition-all"
+            className="p-4 rounded-xl bg-red-500 hover:bg-red-600 transition-all transform hover:scale-105 shadow-lg shadow-red-500/50"
+            title="End Call"
           >
             <FiPhoneOff className="w-6 h-6" />
           </button>
         </div>
-      </div>
-
-      {/* Debug info - remove in production */}
-      <div className="fixed top-20 left-6 bg-black bg-opacity-70 p-3 rounded-lg text-xs">
-        <div>Local Tracks: {localTracks.length}</div>
-        <div>Remote Users: {remoteUsers.length}</div>
-        <div>Cameras: {availableCameras.length}</div>
-        <div>Camera Type: {cameraType}</div>
       </div>
     </div>
   );
