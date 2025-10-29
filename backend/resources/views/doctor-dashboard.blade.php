@@ -539,7 +539,7 @@
     }
 
     try {
-      const url = `${API_BASE}/ai/summary?user_id=${encodeURIComponent(patientId)}&limit=5&summarize=1`;
+      const url = `${API_BASE}/ai/summary?user_id=${encodeURIComponent(patientId)}&limit=1&summarize=1`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
@@ -588,31 +588,28 @@
               current.diagnosis.push(trimmed.replace(/^A:\s*/i, '').trim());
             }
           });
-          const structuredRendered = entries.some(entry => entry.question || entry.diagnosis.length);
-          if (structuredRendered) {
-            entries.forEach(entry => {
-              if (!entry.question && entry.diagnosis.length === 0) return;
-              if (entry.question) {
-                const p = document.createElement('p');
-                p.className = 'text-sm text-gray-700 leading-relaxed';
-                const strong = document.createElement('span');
-                strong.className = 'font-semibold text-gray-800 pr-1';
-                strong.textContent = 'Q';
-                p.appendChild(strong);
-                p.appendChild(document.createTextNode(entry.question));
-                elMSummary.appendChild(p);
-              }
-              if (entry.diagnosis.length) {
-                const p = document.createElement('p');
-                p.className = 'text-sm text-gray-700 leading-relaxed';
-                const strong = document.createElement('span');
-                strong.className = 'font-semibold text-gray-800 pr-1';
-                strong.textContent = 'Diagnosis';
-                p.appendChild(strong);
-                p.appendChild(document.createTextNode(entry.diagnosis.join(' ')));
-                elMSummary.appendChild(p);
-              }
-            });
+          const primaryEntry = entries.find(entry => entry.question || entry.diagnosis.length);
+          if (primaryEntry) {
+            if (primaryEntry.question) {
+              const p = document.createElement('p');
+              p.className = 'text-sm text-gray-700 leading-relaxed';
+              const strong = document.createElement('span');
+              strong.className = 'font-semibold text-gray-800 pr-1';
+              strong.textContent = 'Q';
+              p.appendChild(strong);
+              p.appendChild(document.createTextNode(primaryEntry.question));
+              elMSummary.appendChild(p);
+            }
+            if (primaryEntry.diagnosis.length) {
+              const p = document.createElement('p');
+              p.className = 'text-sm text-gray-700 leading-relaxed';
+              const strong = document.createElement('span');
+              strong.className = 'font-semibold text-gray-800 pr-1';
+              strong.textContent = 'Diagnosis';
+              p.appendChild(strong);
+              p.appendChild(document.createTextNode(primaryEntry.diagnosis[0]));
+              elMSummary.appendChild(p);
+            }
           } else {
             summaryText.split(/\n+/).forEach(line => {
               const trimmed = line.trim();
