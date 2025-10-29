@@ -905,7 +905,7 @@ const Payment = () => {
                 </p>
               </div>
               <span className="text-[11px] font-semibold text-green-800 bg-white border border-green-200 px-2 py-0.5 rounded-md">
-                FIRST100
+                SPECIAL100
               </span>
             </div>
             {/* Payment Button */}

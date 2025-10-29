@@ -22,72 +22,66 @@ const LiveDoctorSelectionModal = React.memo(
     const [profileDoctor, setProfileDoctor] = useState(null);
     const [imageLoadErrors, setImageLoadErrors] = useState({});
     const [searchTerm, setSearchTerm] = useState("");
-    const [sortBy, setSortBy] = useState("distance");
+    const [sortBy, setSortBy] = useState("online-first");
 
-    console.log("🔍 Modal Props - Live Doctors:", liveDoctors);
-    console.log("🔍 Modal Props - All Active Doctors:", allActiveDoctors);
-    console.log("🔍 Modal Props - Nearby Doctors:", nearbyDoctors);
+    console.log("Live Doctors:", liveDoctors);
+    console.log("All Active Doctors:", allActiveDoctors);
+    console.log("Nearby Doctors:", nearbyDoctors);
 
-    // Check if a doctor is online - FIXED VERSION
+    // Check if a doctor is online
     const isDoctorOnline = useCallback((doctorId) => {
-      const isOnline = allActiveDoctors && allActiveDoctors.includes(doctorId);
-      console.log(`🔎 Checking doctor ${doctorId}: ${isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}`);
-      return isOnline;
+      return allActiveDoctors && allActiveDoctors.includes(doctorId);
     }, [allActiveDoctors]);
 
-    // Filter and sort doctors - use nearbyDoctors as the complete list
+    // Filter and sort doctors - UPDATED LOGIC
     const filteredDoctors = useMemo(() => {
+      // ✅ ALWAYS use nearbyDoctors - never return empty
       if (!nearbyDoctors || nearbyDoctors.length === 0) {
         console.log("⚠️ No nearby doctors available");
         return [];
       }
 
       let doctors = [...nearbyDoctors];
-      console.log(`📋 Starting with ${doctors.length} nearby doctors`);
 
       // Filter by search term
       if (searchTerm) {
         doctors = doctors.filter(
           (doctor) =>
             doctor.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            doctor.clinic_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            doctor.specialization?.toLowerCase().includes(searchTerm.toLowerCase())
+            doctor.clinic_name
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase()) ||
+            doctor.specialization
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase())
         );
-        console.log(`🔍 After search filter: ${doctors.length} doctors`);
       }
 
-      // Sort doctors - prioritize online doctors
-      switch (sortBy) {
-        case "rating":
-          doctors.sort((a, b) => {
-            const aOnline = isDoctorOnline(a.id);
-            const bOnline = isDoctorOnline(b.id);
-            if (aOnline !== bOnline) return bOnline ? 1 : -1; // Online first
+      // ✅ ENHANCED SORTING: Online doctors first, then by selected criteria
+      doctors.sort((a, b) => {
+        const aOnline = isDoctorOnline(a.id);
+        const bOnline = isDoctorOnline(b.id);
+
+        // 1. Online status priority (online first)
+        if (aOnline && !bOnline) return -1;
+        if (!aOnline && bOnline) return 1;
+
+        // 2. Secondary sorting based on user selection
+        switch (sortBy) {
+          case "rating":
             return (b.rating || 0) - (a.rating || 0);
-          });
-          break;
-        case "experience":
-          doctors.sort((a, b) => {
-            const aOnline = isDoctorOnline(a.id);
-            const bOnline = isDoctorOnline(b.id);
-            if (aOnline !== bOnline) return bOnline ? 1 : -1; // Online first
+          case "experience":
             return (b.experience || 0) - (a.experience || 0);
-          });
-          break;
-        case "distance":
-        default:
-          doctors.sort((a, b) => {
-            const aOnline = isDoctorOnline(a.id);
-            const bOnline = isDoctorOnline(b.id);
-            if (aOnline !== bOnline) return bOnline ? 1 : -1; // Online first
+          case "distance":
             return (a.distance || 0) - (b.distance || 0);
-          });
-          break;
-      }
+          case "online-first":
+          default:
+            // If both have same online status, sort by distance
+            return (a.distance || 0) - (b.distance || 0);
+        }
+      });
 
-      const onlineCount = doctors.filter(d => isDoctorOnline(d.id)).length;
-      console.log(`✅ Final list: ${doctors.length} doctors (${onlineCount} online)`);
-
+      console.log(`✅ Filtered ${doctors.length} doctors (${doctors.filter(d => isDoctorOnline(d.id)).length} online)`);
       return doctors;
     }, [nearbyDoctors, searchTerm, sortBy, isDoctorOnline]);
 
@@ -112,38 +106,29 @@ const LiveDoctorSelectionModal = React.memo(
     const doctorCountText = useMemo(() => {
       const count = filteredDoctors.length;
       const onlineCount = filteredDoctors.filter(d => isDoctorOnline(d.id)).length;
-      return `${count} doctor${count !== 1 ? "s" : ""} (${onlineCount} online)`;
+      const offlineCount = count - onlineCount;
+      return `${count} doctor${count !== 1 ? "s" : ""} (${onlineCount} online${offlineCount > 0 ? `, ${offlineCount} offline` : ""})`;
     }, [filteredDoctors, isDoctorOnline]);
 
     const handleCallDoctor = useCallback(
       (doctor) => {
-        const isOnline = isDoctorOnline(doctor.id);
-        
-        console.log(`📞 Attempting to call doctor ${doctor.id} (${doctor.name})`);
-        console.log(`   Online status: ${isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}`);
-        console.log(`   Loading: ${loading}`);
-
         // Check if doctor is online
-        if (!isOnline) {
-          console.log(`❌ Cannot call - Doctor ${doctor.id} is OFFLINE`);
+        if (!isDoctorOnline(doctor.id)) {
+          console.log(`❌ Doctor ${doctor.id} is offline, cannot call`);
+          alert("This doctor is currently offline. Please select an online doctor.");
           return;
         }
 
-        if (loading) {
-          console.log(`❌ Cannot call - Already loading`);
-          return;
-        }
+        if (loading) return;
 
         setSelectedDoctor(doctor.id);
-        console.log(`✅ Calling Dr. ${doctor.name} (ID: ${doctor.id})...`);
-
+        console.log(`📞 Calling Dr. ${doctor.name}...`);
         onCallDoctor(doctor);
       },
       [onCallDoctor, loading, isDoctorOnline]
     );
 
     const handleViewProfile = useCallback((doctor) => {
-      console.log(`👁️ Viewing profile for doctor ${doctor.id}`);
       setProfileDoctor(doctor);
       setShowProfile(true);
     }, []);
@@ -159,7 +144,9 @@ const LiveDoctorSelectionModal = React.memo(
     const handleShareDoctor = useCallback(async (doctor) => {
       try {
         const shareUrl = `https://snoutiq.com/backend/vet/${doctor.slug}`;
-        const message = `Check out Dr. ${doctor.business_status || doctor.name}\n${doctor.clinic_name || "Veterinary Clinic"}\n\n${shareUrl}`;
+        const message = `Check out Dr. ${
+          doctor.business_status || doctor.name
+        }\n${doctor.clinic_name || "Veterinary Clinic"}\n\n${shareUrl}`;
 
         if (navigator.share) {
           await navigator.share({
@@ -186,8 +173,6 @@ const LiveDoctorSelectionModal = React.memo(
         const avatarError = imageLoadErrors[`avatar-${item.id}`];
         const isOnline = isDoctorOnline(item.id);
 
-        console.log(`🎨 Rendering doctor ${item.id} - Online: ${isOnline}`);
-
         return (
           <div className={`bg-white rounded-lg border border-gray-200 shadow-xs hover:shadow-md transition-all duration-200 mb-3 overflow-hidden group ${!isOnline ? 'opacity-60' : ''}`}>
             <div className="p-4 flex items-center gap-3">
@@ -207,26 +192,18 @@ const LiveDoctorSelectionModal = React.memo(
                     </span>
                   </div>
                 )}
-                {/* Online/Offline Indicator */}
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white border-2 border-white shadow-sm flex items-center justify-center">
-                  <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-white border border-white shadow-xs flex items-center justify-center">
+                  <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
                 </div>
               </div>
 
               {/* Doctor Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-gray-900 truncate">
-                        {item.name || "Veterinarian"}
-                      </h3>
-                      {isOnline && (
-                        <span className="text-[10px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-200">
-                          ONLINE
-                        </span>
-                      )}
-                    </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-gray-900 truncate">
+                      {item.name || "Veterinarian"}
+                    </h3>
                     <p className="text-gray-600 text-xs truncate">
                       {item.clinic_name || "Veterinary Clinic"}
                     </p>
@@ -234,7 +211,7 @@ const LiveDoctorSelectionModal = React.memo(
 
                   {/* Price */}
                   {item.chat_price && (
-                    <div className="flex items-center gap-1 ml-2">
+                    <div className="flex items-center gap-1">
                       <div className="bg-green-50 border border-green-200 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
                         ₹{item.chat_price}
                         <span className="text-gray-500 font-medium ml-0.5">
@@ -252,6 +229,14 @@ const LiveDoctorSelectionModal = React.memo(
 
                 {/* Stats */}
                 <div className="flex items-center gap-2 mb-2">
+                  {/* Online/Offline Badge */}
+                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${isOnline ? 'bg-green-50' : 'bg-gray-50'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    <span className={`text-xs font-medium ${isOnline ? 'text-green-700' : 'text-gray-600'}`}>
+                      {isOnline ? 'Online' : 'Offline'}
+                    </span>
+                  </div>
+                  
                   {item.rating && (
                     <div className="flex items-center gap-1 bg-yellow-50 px-1.5 py-0.5 rounded text-xs">
                       <svg
@@ -326,7 +311,7 @@ const LiveDoctorSelectionModal = React.memo(
                     className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-medium text-xs transition-all ${
                       isLoading || !isOnline
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 hover:shadow-sm active:scale-95"
+                        : "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
                     }`}
                   >
                     {isLoading ? (
@@ -341,7 +326,7 @@ const LiveDoctorSelectionModal = React.memo(
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
-                          <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" />
+                          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                         </svg>
                         Offline
                       </>
@@ -417,8 +402,10 @@ const LiveDoctorSelectionModal = React.memo(
     const DoctorProfileView = useMemo(() => {
       if (!profileDoctor) return null;
 
-      const profileAvatarError = imageLoadErrors[`profile-avatar-${profileDoctor.id}`];
-      const isCallingThisDoctor = selectedDoctor === profileDoctor.id && loading;
+      const profileAvatarError =
+        imageLoadErrors[`profile-avatar-${profileDoctor.id}`];
+      const isCallingThisDoctor =
+        selectedDoctor === profileDoctor.id && loading;
       const isOnline = isDoctorOnline(profileDoctor.id);
 
       return (
@@ -487,7 +474,9 @@ const LiveDoctorSelectionModal = React.memo(
                     {profileDoctor.profile_image && !profileAvatarError ? (
                       <img
                         src={profileDoctor.profile_image}
-                        alt={`${profileDoctor.business_status || profileDoctor.name}`}
+                        alt={`${
+                          profileDoctor.business_status || profileDoctor.name
+                        }`}
                         className="w-14 h-14 rounded-xl object-cover border border-gray-200"
                         onError={() =>
                           handleImageError(`profile-avatar-${profileDoctor.id}`)
@@ -503,22 +492,15 @@ const LiveDoctorSelectionModal = React.memo(
                       </div>
                     )}
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white border border-white shadow-xs flex items-center justify-center">
-                      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                     </div>
                   </div>
 
                   {/* Basic Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h1 className="text-lg font-bold text-gray-900 truncate">
-                        {profileDoctor.name || "Veterinarian"}
-                      </h1>
-                      {isOnline && (
-                        <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-200">
-                          ONLINE NOW
-                        </span>
-                      )}
-                    </div>
+                    <h1 className="text-lg font-bold text-gray-900 truncate">
+                      {profileDoctor.name || "Veterinarian"}
+                    </h1>
                     <p className="text-gray-600 text-sm truncate">
                       {profileDoctor.clinic_name || "Veterinary Clinic"}
                     </p>
@@ -527,6 +509,10 @@ const LiveDoctorSelectionModal = React.memo(
                         {profileDoctor.specialization}
                       </p>
                     )}
+                    <div className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs ${isOnline ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                      <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                      {isOnline ? 'Online' : 'Offline'}
+                    </div>
                   </div>
                 </div>
 
@@ -677,7 +663,7 @@ const LiveDoctorSelectionModal = React.memo(
                     <div className="bg-gray-50 rounded-lg p-3">
                       <h3 className="text-sm font-semibold text-gray-900 mb-2">
                         About{" "}
-                        {profileDoctor.business_status || profileDoctor.name}
+                        {profileDoctor.name}
                       </h3>
                       <p className="text-gray-700 text-sm leading-relaxed line-clamp-4">
                         {profileDoctor.bio}
@@ -694,13 +680,13 @@ const LiveDoctorSelectionModal = React.memo(
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   <span className="text-white font-semibold text-sm">
                     Connecting to{" "}
-                    {profileDoctor.business_status || profileDoctor.name}...
+                    {profileDoctor.name}...
                   </span>
                 </div>
               ) : !isOnline ? (
                 <div className="flex items-center justify-center gap-3 py-3 bg-gray-400 rounded-lg cursor-not-allowed">
                   <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" />
+                    <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                   </svg>
                   <span className="text-white font-semibold text-sm">
                     Doctor is Currently Offline
@@ -714,7 +700,7 @@ const LiveDoctorSelectionModal = React.memo(
                       handleCallDoctor(profileDoctor);
                     }, 300);
                   }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md active:scale-95"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md"
                 >
                   <svg
                     className="w-4 h-4"
@@ -743,6 +729,7 @@ const LiveDoctorSelectionModal = React.memo(
       isDoctorOnline,
     ]);
 
+    // ✅ ALWAYS show modal when visible is true
     if (!visible) return null;
 
     return (
@@ -781,8 +768,8 @@ const LiveDoctorSelectionModal = React.memo(
                 </button>
               </div>
 
-              {/* Search and Filter - Uncomment if needed */}
-              {/* <div className="flex gap-2">
+              {/* Search and Filter */}
+              <div className="flex gap-2">
                 <div className="flex-1 relative">
                   <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -800,11 +787,12 @@ const LiveDoctorSelectionModal = React.memo(
                   onChange={(e) => setSortBy(e.target.value)}
                   className="px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
                 >
+                  <option value="online-first">Online First</option>
                   <option value="distance">Nearest</option>
                   <option value="rating">Top Rated</option>
                   <option value="experience">Experienced</option>
                 </select>
-              </div> */}
+              </div>
             </div>
 
             {/* Doctors List */}
@@ -829,4 +817,4 @@ const LiveDoctorSelectionModal = React.memo(
   }
 );
 
-export default LiveDoctorSelectionModal
+export default LiveDoctorSelectionModal;
