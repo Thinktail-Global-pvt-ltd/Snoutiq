@@ -313,12 +313,12 @@ const DoctorSearchModal = ({
 };
 
 // ------------------- StartCallButton Component -------------------
+// ------------------- StartCallButton Component - FIXED -------------------
 const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const [loading, setLoading] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [callStatus, setCallStatus] = useState(null);
 
-  // Safe context access with defaults
   const authContext = useContext(AuthContext);
   const {
     user = {},
@@ -331,8 +331,6 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const timeoutRef = useRef(null);
   const [showLiveDoctorsModal, setShowLiveDoctorsModal] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("idle");
-
-  // Track active toasts to prevent duplicates
   const activeToastIds = useRef(new Set());
 
   const clearAllToasts = useCallback(() => {
@@ -364,7 +362,6 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       timeoutRef.current = null;
     }
 
-    // Clear previous toasts first
     clearAllToasts();
 
     const toastId = toast.custom(
@@ -411,10 +408,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
           </div>
         </div>
       ),
-      {
-        duration: 10000,
-        position: "top-center",
-      }
+      { duration: 10000, position: "top-center" }
     );
 
     activeToastIds.current.add(toastId);
@@ -429,9 +423,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         timeoutRef.current = null;
       }
 
-      // Clear all previous toasts
       clearAllToasts();
-
       setCallStatus({ type: "accepted", ...data });
       setLoading(false);
       setShowSearchModal(false);
@@ -445,10 +437,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
 
       const toastId = toast.success(
         `🎉 Call connected with veterinarian! Redirecting...`,
-        {
-          duration: 3000,
-          icon: "🐾",
-        }
+        { duration: 3000, icon: "🐾" }
       );
       activeToastIds.current.add(toastId);
 
@@ -491,9 +480,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
           }
         } catch (error) {
           console.error("❌ Navigation failed:", error);
-          const errorToastId = toast.error(
-            "Failed to redirect. Please try again."
-          );
+          const errorToastId = toast.error("Failed to redirect. Please try again.");
           activeToastIds.current.add(errorToastId);
         }
       }, 800);
@@ -516,11 +503,8 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     const handleCallSent = (data) => {
       setCallStatus({ type: "sent", ...data });
       setConnectionStatus("connecting");
-      // Clear previous loading toasts
       toast.dismiss("call-sent");
-      const toastId = toast.loading("📞 Calling veterinarian...", {
-        id: "call-sent",
-      });
+      const toastId = toast.loading("📞 Calling veterinarian...", { id: "call-sent" });
       activeToastIds.current.add(toastId);
     };
 
@@ -530,15 +514,12 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         timeoutRef.current = null;
       }
 
-      // Clear previous toasts
       clearAllToasts();
-
       setCallStatus({ type: "rejected", ...data });
       setLoading(false);
       setShowSearchModal(false);
       setConnectionStatus("failed");
 
-      // Professional error message based on rejection reason
       const errorMessage =
         data.reason === "timeout"
           ? "⏰ No veterinarian responded within 5 minutes. Please try again or book a clinic appointment."
@@ -579,10 +560,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
             </div>
           </div>
         ),
-        {
-          duration: 8000,
-          position: "top-center",
-        }
+        { duration: 8000, position: "top-center" }
       );
       activeToastIds.current.add(toastId);
     };
@@ -592,11 +570,8 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setLoading(false);
       setShowSearchModal(false);
       setConnectionStatus("failed");
-
       clearAllToasts();
-      const toastId = toast.error("🐕 Veterinarian is on another call", {
-        duration: 4000,
-      });
+      const toastId = toast.error("🐕 Veterinarian is on another call", { duration: 4000 });
       activeToastIds.current.add(toastId);
     };
 
@@ -605,8 +580,6 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setLoading(false);
       setShowSearchModal(false);
       setConnectionStatus("failed");
-
-      // ✅ Dismiss any existing toasts before showing a new one
       toast.dismiss();
       toast.error("❌ Veterinarian not available", { duration: 4000 });
     };
@@ -616,7 +589,6 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-
       setLoading(false);
       setShowSearchModal(false);
       setConnectionStatus("idle");
@@ -624,7 +596,6 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       clearAllToasts();
     };
 
-    // Add event listeners
     socket.on("call-sent", handleCallSent);
     socket.on("call-accepted", handleCallAccepted);
     socket.on("call-rejected", handleCallRejected);
@@ -634,7 +605,6 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     socket.on("call-failed", handleCallFailed);
 
     return () => {
-      // Remove event listeners
       socket.off("call-sent", handleCallSent);
       socket.off("call-accepted", handleCallAccepted);
       socket.off("call-rejected", handleCallRejected);
@@ -647,21 +617,16 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-
       clearAllToasts();
     };
   }, [handleCallAccepted, clearAllToasts, dismissToast]);
 
   const handleCallDoctor = useCallback(
     (doctor) => {
-      const callId = `call_${Date.now()}_${Math.random()
-        .toString(36)
-        .substring(2, 8)}`;
+      const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const channel = `channel_${callId}`;
 
-      // Clear previous toasts
       clearAllToasts();
-
       setCallStatus(null);
       setLoading(true);
       setShowLiveDoctorsModal(false);
@@ -695,86 +660,16 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     [patientId, loading, showSearchModal, handleNoResponse, clearAllToasts]
   );
 
-  const startCall = useCallback(() => {
-    const doctorsToCall =
-      nearbyDoctors && nearbyDoctors.length ? nearbyDoctors : [];
-
-    if (!doctorsToCall.length) {
-      // Clear previous toasts first
-      clearAllToasts();
-
-      const toastId = toast.error(
-        "🐾 No veterinarians available nearby. Please try again later.",
-        {
-          duration: 5000,
-          icon: "😔",
-        }
-      );
-      activeToastIds.current.add(toastId);
-      return;
-    }
-
-    // Clear previous toasts
-    clearAllToasts();
-
-    setLoading(true);
-    setShowSearchModal(true);
-    setConnectionStatus("connecting");
-
-    const callId = `call_${Date.now()}_${Math.random()
-      .toString(36)
-      .substring(2, 8)}`;
-    const channel = `channel_${callId}`;
-
-    try {
-      if (socket) {
-        doctorsToCall.forEach((doc) => {
-          socket.emit("call-requested", {
-            doctorId: doc.id,
-            patientId,
-            channel,
-            callId,
-            timestamp: new Date().toISOString(),
-          });
-        });
-      } else {
-        console.error("Socket not available");
-        handleNoResponse();
-        return;
-      }
-    } catch (error) {
-      console.error("Error sending call requests:", error);
-      handleNoResponse();
-      return;
-    }
-
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      if (loading && !callStatus) {
-        handleNoResponse();
-      }
-    }, 5 * 60 * 1000);
-  }, [
-    nearbyDoctors,
-    patientId,
-    loading,
-    callStatus,
-    handleNoResponse,
-    clearAllToasts,
-  ]);
-  
-
+  // ✅ FIXED: Only check nearbyDoctors, not online status
   const getButtonState = () => {
     if (loading) return "loading";
-    if (connectionStatus === "no_doctors" || connectionStatus === "failed")
-      return "unavailable";
-    if (!nearbyDoctors?.length && !liveDoctors?.length) return "unavailable";
-    return "available";
+    if (connectionStatus === "failed") return "unavailable";
+    if (!nearbyDoctors?.length) return "unavailable"; // Only check if ANY doctors exist
+    return "available"; // Available if we have nearby doctors (online or offline)
   };
 
   const buttonState = getButtonState();
-  const buttonDisabled =
-    buttonState === "unavailable" || buttonState === "loading";
+  const buttonDisabled = buttonState === "unavailable" || buttonState === "loading";
 
   const getButtonText = () => {
     switch (buttonState) {
@@ -810,18 +705,21 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         <button
           className={`
             w-full relative overflow-hidden rounded-xl sm:rounded-2xl 
-            ${
-              buttonDisabled
-                ? "opacity-60 cursor-not-allowed"
-                : "hover:shadow-xl"
-            }
+            ${buttonDisabled ? "opacity-60 cursor-not-allowed" : "hover:shadow-xl"}
             ${buttonState === "loading" ? "opacity-80" : ""}
           `}
           onClick={() => {
-            if (liveDoctors && liveDoctors.length) {
+            // ✅ FIXED: Always show modal if we have ANY nearby doctors
+            if (nearbyDoctors && nearbyDoctors.length) {
               setShowLiveDoctorsModal(true);
             } else {
-              startCall();
+              // Only show error if NO doctors exist at all
+              clearAllToasts();
+              const toastId = toast.error(
+                "🐾 No veterinarians available nearby. Please try again later.",
+                { duration: 5000, icon: "😔" }
+              );
+              activeToastIds.current.add(toastId);
             }
           }}
           disabled={buttonDisabled}
@@ -875,10 +773,8 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         {connectionStatus === "failed" && (
           <div
             onClick={() => {
-              if (liveDoctors && liveDoctors.length) {
+              if (nearbyDoctors && nearbyDoctors.length) {
                 setShowLiveDoctorsModal(true);
-              } else {
-                startCall();
               }
             }}
             className="flex items-center justify-center gap-2 mt-2 sm:mt-3 
@@ -893,22 +789,16 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         )}
       </div>
 
-      {/* <LiveDoctorSelectionModal
+      {/* ✅ Pass all required props to LiveDoctorSelectionModal */}
+      <LiveDoctorSelectionModal
         visible={showLiveDoctorsModal}
         onClose={() => setShowLiveDoctorsModal(false)}
         liveDoctors={liveDoctors}
+        nearbyDoctors={nearbyDoctors}
+        allActiveDoctors={authContext?.allActiveDoctors || []}
         onCallDoctor={handleCallDoctor}
         loading={loading}
-      /> */}
-      <LiveDoctorSelectionModal
-  visible={showLiveDoctorsModal}
-  onClose={() => setShowLiveDoctorsModal(false)}
-  liveDoctors={liveDoctors}
-  nearbyDoctors={nearbyDoctors}
-  allActiveDoctors={authContext?.allActiveDoctors || []}
-  onCallDoctor={handleCallDoctor}
-  loading={loading}
-/>
+      />
 
       <DoctorSearchModal
         visible={showSearchModal}

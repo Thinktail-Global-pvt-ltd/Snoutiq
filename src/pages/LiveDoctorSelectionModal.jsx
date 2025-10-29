@@ -33,14 +33,15 @@ const LiveDoctorSelectionModal = React.memo(
       return allActiveDoctors && allActiveDoctors.includes(doctorId);
     }, [allActiveDoctors]);
 
-    // Filter and sort doctors - UPDATED LOGIC
+    // ✅ FIXED: Always show doctors regardless of online status
     const filteredDoctors = useMemo(() => {
-      // ✅ ALWAYS use nearbyDoctors - never return empty
+      // Always use nearbyDoctors, even if no one is online
       if (!nearbyDoctors || nearbyDoctors.length === 0) {
         console.log("⚠️ No nearby doctors available");
         return [];
       }
 
+      // Start with all nearby doctors
       let doctors = [...nearbyDoctors];
 
       // Filter by search term

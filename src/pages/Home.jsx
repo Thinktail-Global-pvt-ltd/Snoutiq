@@ -10,7 +10,6 @@ const Home = () => {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const mainHeadingRef = React.useRef(null);
-  
 
   useEffect(() => {
     const stored = localStorage.getItem("messageIntended");
@@ -49,10 +48,9 @@ const Home = () => {
   );
 
   return (
-
     <>
       <Header />
-      <HeroSection/>
+      <HeroSection />
       <main className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex flex-col">
         <div className="flex-1 flex flex-col px-4 py-8 max-w-6xl mx-auto w-full">
           {/* Hero */}
@@ -99,10 +97,10 @@ const Home = () => {
             style={{ minHeight: "200px" }}
           >
             {[
-              { value: "10K+", label: "Happy Pets" },
-              { value: "24/7", label: "Support" },
-              { value: "98%", label: "Accuracy" },
-              { value: "500+", label: "Pet Experts" },
+              { value: "50+", label: "Registered Vets" },
+              { value: "24/7", label: "Fast, Easy, Available" },
+              { value: "Under 10", label: "Min Connect" },
+              { value: "AI System", label: "Check" },
             ].map((stat, i) => (
               <div
                 key={i}
@@ -134,7 +132,7 @@ const Home = () => {
               {features.map((f, idx) => (
                 <div
                   key={idx}
-                  className="bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-2xl p-6 shadow-lg transform transition-all duration-300 hover:-translate-y-2"
+                  className="bg-blue-600 text-white rounded-2xl p-6 shadow-lg transform transition-all duration-300 hover:-translate-y-2"
                 >
                   <div className="w-14 h-14 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mb-5 text-2xl">
                     {f.icon}
@@ -147,7 +145,7 @@ const Home = () => {
           </section>
 
           {/* CTA */}
-          <section className="text-center py-12 px-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl text-white mb-16">
+          <section className="text-center py-12 px-4 bg-blue-600 rounded-2xl text-white mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
               Ready to Transform Your Pet's Life?
             </h2>
