@@ -32,9 +32,7 @@
 </head>
 <body>
 <div class="wrap">
-  <main class="card">
-    <img class="logo" src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/>
-    <h1>Welcome Back!</h1>
+  <main class="card"><h1>Welcome Back!</h1>
     <p class="sub">Sign in to continue to your Test Clinic account</p>
 
     <!-- Vet form only -->
