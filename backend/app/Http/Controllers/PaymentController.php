@@ -114,6 +114,9 @@ class PaymentController extends Controller
             if ($request->filled('service_id')) {
                 $notes['service_id'] = (string) $request->input('service_id');
             }
+            if ($request->filled('call_session_id')) {
+                $notes['call_session_id'] = (string) $request->input('call_session_id');
+            }
 
             // Upsert into DB (idempotent on payment_id)
             $record = Payment::updateOrCreate(
@@ -142,6 +145,7 @@ class PaymentController extends Controller
                     'status'   => $record->status,
                     'amount'   => $record->amount,
                     'currency' => $record->currency,
+                    'db_id'    => $record->id,
                 ],
             ]);
 

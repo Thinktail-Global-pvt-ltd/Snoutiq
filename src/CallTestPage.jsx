@@ -20,6 +20,7 @@ export default function CallTestPage() {
   const clientRef = useRef(null);
   const localTracksRef = useRef({ mic: null, cam: null });
   const remoteUsersRef = useRef(new Map()); // uid -> { videoTrack }
+  const callStartedAtRef = useRef(null);
 
   const log = (msg) =>
     setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -224,6 +225,16 @@ export default function CallTestPage() {
       await client.publish([mic, cam]);
       setJoined(true);
       log(`🎥 Joined Agora: ch=${channelName}, uid=${uid}`);
+
+      callStartedAtRef.current = Date.now();
+      try {
+        await axios.post(`${API_BASE}/api/call/${sid}/start`, {
+          started_at: new Date(callStartedAtRef.current).toISOString(),
+        });
+        log("🕑 Marked call session as started");
+      } catch (error) {
+        log("⚠️ Failed to mark call start: " + (error?.message || String(error)));
+      }
     } catch (e) {
       log("Agora join error: " + (e?.message || String(e)));
     }
@@ -253,6 +264,39 @@ export default function CallTestPage() {
       clearRemoteContainer();
       setJoined(false);
       log("🚪 Left Agora");
+
+      const sessionId = session?.session_id ?? session?.id ?? session?.session?.id;
+      if (sessionId) {
+        const endedAt = Date.now();
+        const durationSeconds = callStartedAtRef.current
+          ? Math.max(0, Math.round((endedAt - callStartedAtRef.current) / 1000))
+          : null;
+
+        const payload = {
+          ended_at: new Date(endedAt).toISOString(),
+        };
+
+        if (callStartedAtRef.current) {
+          payload.started_at = new Date(callStartedAtRef.current).toISOString();
+        }
+
+        if (durationSeconds !== null) {
+          payload.duration_seconds = durationSeconds;
+        }
+
+        let marked = false;
+        try {
+          await axios.post(`${API_BASE}/api/call/${sessionId}/end`, payload);
+          marked = true;
+        } catch (error) {
+          log("⚠️ Failed to mark call end: " + (error?.message || String(error)));
+        } finally {
+          if (marked) {
+            log("🛑 Marked call session as ended");
+          }
+        }
+      }
+      callStartedAtRef.current = null;
     } catch (e) {
       log("Leave error: " + (e?.message || String(e)));
     }

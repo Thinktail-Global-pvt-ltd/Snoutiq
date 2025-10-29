@@ -36,6 +36,7 @@ class CallAccepted implements ShouldBroadcastNow
             'channel_name'   => $this->session->channel_name,
             'status'         => $this->session->status,
             'payment_status' => $this->session->payment_status,
+            'accepted_at'    => optional($this->session->accepted_at)->toIso8601String(),
         ];
     }
 }

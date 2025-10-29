@@ -122,6 +122,7 @@
   let pollingId   = null;
   let wantMic     = true;
   let wantCam     = true;
+  let callStartedAt = null;
 
   // Agora
   const clientRef       = { current: null };
@@ -356,6 +357,16 @@
       elHdrChannel.textContent = channelName;
       log(`🎥 Joined Agora: ch=${channelName}, uid=${rtcUid}`);
 
+      callStartedAt = Date.now();
+      try {
+        await axios.post(`${API_BASE}/api/call/${sessionId}/start`, {
+          started_at: new Date(callStartedAt).toISOString(),
+        });
+        log('🕑 Marked call session as started');
+      } catch (err) {
+        log('⚠️ Failed to mark call start: ' + (err?.message || String(err)));
+      }
+
       // UI
       btnJoin.classList.add('hidden');
       btnLeave.classList.remove('hidden');
@@ -385,6 +396,34 @@
       joined = false;
       setStatus('Left', 'yellow');
       log('🚪 Left Agora');
+
+      const endedAt = Date.now();
+      const durationSeconds = callStartedAt ? Math.max(0, Math.round((endedAt - callStartedAt) / 1000)) : null;
+      const sessionId = session?.session_id ?? session?.id ?? session?.session?.id;
+      let marked = false;
+      try {
+        const payload = {
+          ended_at: new Date(endedAt).toISOString(),
+        };
+        if (callStartedAt) {
+          payload.started_at = new Date(callStartedAt).toISOString();
+        }
+        if (durationSeconds !== null) {
+          payload.duration_seconds = durationSeconds;
+        }
+        if (sessionId) {
+          await axios.post(`${API_BASE}/api/call/${sessionId}/end`, payload);
+          marked = true;
+        }
+      } catch (err) {
+        log('⚠️ Failed to mark call end: ' + (err?.message || String(err)));
+      } finally {
+        callStartedAt = null;
+      }
+
+      if (marked) {
+        log('🛑 Marked call session as ended');
+      }
 
       btnLeave.classList.add('hidden');
       btnPiP?.classList.add('hidden');

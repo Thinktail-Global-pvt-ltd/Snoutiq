@@ -11,6 +11,7 @@ use App\Models\Pet;
 use App\Models\User;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Contracts\View\View;
+use App\Services\CallAnalyticsService;
 use App\Services\DoctorAvailabilityService;
 use Illuminate\Support\Collection;
 
@@ -18,6 +19,7 @@ class AdminPanelController extends Controller
 {
     public function __construct(
         private readonly DoctorAvailabilityService $doctorAvailabilityService,
+        private readonly CallAnalyticsService $callAnalyticsService,
     ) {
     }
 
@@ -31,8 +33,10 @@ class AdminPanelController extends Controller
 
         $onlineClinics = $this->getOnlineClinics();
         $activeDoctors = $this->formatActiveDoctorLabels();
+        $callMetrics   = $this->callAnalyticsService->summary();
+        $recentCalls   = $this->callAnalyticsService->recentSessions();
 
-        return view('admin.dashboard', compact('stats', 'onlineClinics', 'activeDoctors'));
+        return view('admin.dashboard', compact('stats', 'onlineClinics', 'activeDoctors', 'callMetrics', 'recentCalls'));
     }
 
     public function users(): View
