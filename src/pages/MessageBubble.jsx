@@ -893,13 +893,22 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         )}
       </div>
 
-      <LiveDoctorSelectionModal
+      {/* <LiveDoctorSelectionModal
         visible={showLiveDoctorsModal}
         onClose={() => setShowLiveDoctorsModal(false)}
         liveDoctors={liveDoctors}
         onCallDoctor={handleCallDoctor}
         loading={loading}
-      />
+      /> */}
+      <LiveDoctorSelectionModal
+  visible={showLiveDoctorsModal}
+  onClose={() => setShowLiveDoctorsModal(false)}
+  liveDoctors={liveDoctors}
+  nearbyDoctors={nearbyDoctors}
+  allActiveDoctors={authContext?.allActiveDoctors || []}
+  onCallDoctor={handleCallDoctor}
+  loading={loading}
+/>
 
       <DoctorSearchModal
         visible={showSearchModal}
