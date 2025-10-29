@@ -174,181 +174,156 @@ const LiveDoctorSelectionModal = React.memo(
         const avatarError = imageLoadErrors[`avatar-${item.id}`];
         const isOnline = isDoctorOnline(item.id);
 
-        return (
-          <div className={`bg-white rounded-lg border border-gray-200 shadow-xs hover:shadow-md transition-all duration-200 mb-3 overflow-hidden group ${!isOnline ? 'opacity-60' : ''}`}>
-            <div className="p-4 flex items-center gap-3">
-              {/* Doctor Avatar */}
-              <div className="relative flex-shrink-0">
-                {item.profile_image && !avatarError ? (
-                  <img
-                    src={item.profile_image}
-                    alt={`Dr. ${item.business_status || item.slug}`}
-                    className="w-12 h-12 rounded-lg object-cover border border-gray-200"
-                    onError={() => handleImageError(`avatar-${item.id}`)}
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                    <span className="text-white font-semibold text-sm">
-                      {item.slug?.charAt(0)?.toUpperCase() || "D"}
-                    </span>
-                  </div>
-                )}
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-white border border-white shadow-xs flex items-center justify-center">
-                  <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                </div>
+   return (
+  <div
+    className={`relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 mb-4 overflow-hidden group ${
+      !isOnline ? "opacity-70" : "hover:border-blue-300"
+    }`}
+  >
+    <div className="p-5 flex items-start gap-5">
+      {/* Doctor Avatar */}
+      <div className="relative flex-shrink-0">
+        {item.profile_image && !avatarError ? (
+          <img
+            src={item.profile_image}
+            alt={`Dr. ${item.name || "Veterinarian"}`}
+            className="w-16 h-16 rounded-2xl object-cover border border-gray-200 group-hover:scale-105 transition-transform duration-300 shadow-sm"
+            onError={() => handleImageError(`avatar-${item.id}`)}
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-inner">
+            <span className="text-white font-bold text-lg">
+              {item.slug?.charAt(0)?.toUpperCase() || "D"}
+            </span>
+          </div>
+        )}
+
+        {/* Online Indicator */}
+        <div className="absolute -bottom-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-white flex items-center justify-center shadow-md">
+          <div
+            className={`w-2.5 h-2.5 rounded-full ${
+              isOnline ? "bg-green-500 animate-pulse" : "bg-gray-400"
+            }`}
+          ></div>
+        </div>
+      </div>
+
+      {/* Doctor Info */}
+      <div className="flex-1 min-w-0">
+        {/* Header */}
+        <div className="flex justify-between items-start mb-3">
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-gray-900 truncate">
+              {item.name || "Veterinarian"}
+            </h3>
+            <p className="text-gray-500 text-sm truncate">
+              {item.clinic_name || "Veterinary Clinic"}
+            </p>
+          </div>
+
+          {/* Price */}
+          {item.chat_price && (
+            <div className="text-right">
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-bold text-green-700">
+                  ₹{item.chat_price}
+                </span>
+                <span className="text-xs text-gray-500 font-medium">
+                  /session
+                </span>
               </div>
-
-              {/* Doctor Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900 truncate">
-                      {item.name || "Veterinarian"}
-                    </h3>
-                    <p className="text-gray-600 text-xs truncate">
-                      {item.clinic_name || "Veterinary Clinic"}
-                    </p>
-                  </div>
-
-                  {/* Price */}
-                  {item.chat_price && (
-                    <div className="flex items-center gap-1">
-                      <div className="bg-green-50 border border-green-200 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
-                        ₹{item.chat_price}
-                        <span className="text-gray-500 font-medium ml-0.5">
-                          /session
-                        </span>
-                      </div>
-
-                      {/* Discount Badge */}
-                      <span className="text-[10px] font-semibold text-green-700 bg-green-100 border border-green-200 px-1.5 py-0.5 rounded-md shadow-sm">
-                        ₹100 OFF
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Stats */}
-                <div className="flex items-center gap-2 mb-2">
-                  {/* Online/Offline Badge */}
-                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${isOnline ? 'bg-green-50' : 'bg-gray-50'}`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                    <span className={`text-xs font-medium ${isOnline ? 'text-green-700' : 'text-gray-600'}`}>
-                      {isOnline ? 'Online' : 'Offline'}
-                    </span>
-                  </div>
-                  
-                  {item.rating && (
-                    <div className="flex items-center gap-1 bg-yellow-50 px-1.5 py-0.5 rounded text-xs">
-                      <svg
-                        className="w-2.5 h-2.5 text-yellow-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                      <span className="text-xs font-medium text-gray-700">
-                        {item.rating}
-                      </span>
-                    </div>
-                  )}
-                  {item.distance && (
-                    <div className="flex items-center gap-1 bg-blue-50 px-1.5 py-0.5 rounded text-xs">
-                      <svg
-                        className="w-2.5 h-2.5 text-blue-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <span className="text-xs font-medium text-gray-700">
-                        {item.distance.toFixed(1)} km
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewProfile(item);
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 text-gray-500 hover:text-gray-700 font-normal text-xs transition-colors"
-                  >
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      />
-                    </svg>
-                    Profile
-                  </button>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCallDoctor(item);
-                    }}
-                    disabled={isLoading || !isOnline}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-medium text-xs transition-all ${
-                      isLoading || !isOnline
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
-                    }`}
-                  >
-                    {isLoading ? (
-                      <>
-                        <div className="w-2 h-2 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        Calling...
-                      </>
-                    ) : !isOnline ? (
-                      <>
-                        <svg
-                          className="w-3 h-3"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                        </svg>
-                        Offline
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          className="w-3 h-3"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                        </svg>
-                        Call Now
-                      </>
-                    )}
-                  </button>
-                </div>
+              <div className="mt-1 inline-block bg-green-50 border border-green-200 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-md tracking-wide">
+                ₹100 OFF Today
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Badges Row */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {/* Online Status */}
+          <div
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+              isOnline
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-gray-50 text-gray-600 border border-gray-200"
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isOnline ? "bg-green-500" : "bg-gray-400"
+              }`}
+            ></span>
+            {isOnline ? "Online Now" : "Offline"}
           </div>
-        );
+
+          {/* Rating */}
+          {item.rating && (
+            <div className="flex items-center gap-1 bg-yellow-50 border border-yellow-200 px-2 py-1 rounded-full text-xs font-semibold text-yellow-700">
+              ⭐ {item.rating}
+            </div>
+          )}
+
+          {/* Distance */}
+          {item.distance && (
+            <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-1 rounded-full text-xs font-semibold text-blue-700">
+              📍 {item.distance.toFixed(1)} km
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewProfile(item);
+            }}
+            className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg font-medium text-sm transition-all duration-200"
+          >
+            👁️ View Profile
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCallDoctor(item);
+            }}
+            disabled={isLoading || !isOnline}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
+              isLoading || !isOnline
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-indigo-600 shadow-md hover:shadow-lg"
+            }`}
+          >
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Connecting...
+              </>
+            ) : !isOnline ? (
+              <>
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                </svg>
+                Offline
+              </>
+            ) : (
+              <>
+                📞 Start Call
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
       },
       [
         handleViewProfile,

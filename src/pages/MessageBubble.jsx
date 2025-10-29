@@ -247,27 +247,27 @@ const DoctorSearchModal = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-3 sm:p-4">
       <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 lg:p-8 w-full max-w-sm sm:max-w-md shadow-2xl relative overflow-hidden">
         {/* Ripple Effects */}
-        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-28 h-28 sm:w-36 sm:h-36 bg-purple-600 rounded-full animate-ping opacity-20"></div>
+        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-28 h-28 sm:w-36 sm:h-36 bg-blue-500 rounded-full animate-ping opacity-20"></div>
 
-        {/* Search Icon */}
+        {/* Call Icon */}
         <div className="relative z-10 mb-4 sm:mb-5 flex justify-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-purple-500 to-purple-700 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 animate-pulse">
-            <span className="text-2xl sm:text-3xl text-white">🐾</span>
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30 animate-pulse">
+            <span className="text-2xl sm:text-3xl text-white">📞</span>
           </div>
         </div>
 
         {/* Title */}
         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 text-center mb-2">
-          Searching for Veterinarians{dots}
+          Connecting to Doctor{dots}
         </h2>
         <p className="text-sm sm:text-base text-gray-600 text-center mb-4 sm:mb-6">
-          Finding the best available doctors near you
+          Please wait while we connect your call
         </p>
 
         {/* Time Indicator */}
-        <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4 px-3 sm:px-4 py-2 bg-purple-50 rounded-lg border border-purple-200">
-          <span className="text-purple-600">⏱️</span>
-          <span className="text-xs sm:text-sm font-semibold text-purple-600">
+        <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4 px-3 sm:px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
+          <span className="text-blue-600">⏱️</span>
+          <span className="text-xs sm:text-sm font-semibold text-blue-600">
             {formatTime(elapsedTime)}
           </span>
         </div>
@@ -275,7 +275,7 @@ const DoctorSearchModal = ({
         {/* Progress Bar */}
         <div className="w-full h-2 bg-gray-200 rounded-full mb-6 sm:mb-8 overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-purple-500 to-purple-700 rounded-full transition-all duration-300"
+            className="h-full bg-gradient-to-r from-blue-500 to-blue-700 rounded-full transition-all duration-300"
             style={{
               width: `${Math.min(
                 (elapsedTime / (searchTime / 1000)) * 100,
@@ -285,8 +285,17 @@ const DoctorSearchModal = ({
           ></div>
         </div>
 
+        {/* Status Messages */}
+        <div className="text-center mb-4 sm:mb-6">
+          <div className="text-xs sm:text-sm text-gray-500 space-y-1">
+            <p>✓ Doctor selected successfully</p>
+            <p>✓ Establishing connection...</p>
+            <p>● Waiting for call acceptance</p>
+          </div>
+        </div>
+
         {/* Buttons */}
-        <div className="flex gap-2 sm:gap-3">
+        {/* <div className="flex gap-2 sm:gap-3">
           <button
             onClick={() => {
               onClose();
@@ -294,7 +303,7 @@ const DoctorSearchModal = ({
             }}
             className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base"
           >
-            Cancel
+            Cancel Call
           </button>
           <button
             onClick={() => {
@@ -302,16 +311,15 @@ const DoctorSearchModal = ({
               setElapsedTime(0);
               onFailure?.();
             }}
-            className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base"
+            className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base"
           >
-            Try Alternative
+            Try Another Doctor
           </button>
-        </div>
+        </div> */}
       </div>
     </div>
   );
 };
-
 // ------------------- StartCallButton Component -------------------
 // ------------------- StartCallButton Component - FIXED -------------------
 const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
