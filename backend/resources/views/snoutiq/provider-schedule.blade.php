@@ -359,7 +359,7 @@
           Swal.fire({
             icon:'info',
             title:'Step 3: Clinic schedule',
-            html:'Set your weekly in-clinic hours. After saving, continue to emergency coverage to finish onboarding.',
+            html:'Set your weekly in-clinic hours. Saving these details will complete your onboarding.',
             confirmButtonText:'Got it',
           });
         };
@@ -563,12 +563,13 @@
               Swal.fire({
                 icon:'success',
                 title:'Clinic schedule saved',
-                text:'Next: confirm your emergency coverage hours.',
-                timer:1200,
+                text:'All set! Your onboarding is complete.',
+                timer:1500,
                 showConfirmButton:false,
               });
             }
-            setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor/emergency-hours?onboarding=1&step=4`; }, 800);
+            try { localStorage.setItem('onboarding_v1_done','1'); } catch (_) {}
+            setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor/dashboard`; }, 900);
           }
         }catch(_){ }
       } else {

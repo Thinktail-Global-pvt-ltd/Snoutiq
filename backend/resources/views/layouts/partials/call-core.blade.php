@@ -52,9 +52,9 @@
     let ackTimer = null;
     let globalCall = null;
     let globalAlertOpen = false;
-    let ringCtx = null;
-    let ringOsc = null;
-    let ringGain = null;
+    let ringAudio = null;
+    let ringResumePending = false;
+    let ringResumeListener = null;
 
     function readAuthFull(){
       try{
@@ -149,65 +149,80 @@
       return RAW_SOCKET_URL;
     })();
 
-    function ensureAudioContext(){
-      if (ringCtx) return ringCtx;
-      const Ctor = window.AudioContext || window.webkitAudioContext;
-      if (!Ctor) return null;
-      ringCtx = new Ctor();
-      return ringCtx;
+    function resolveFrontendAsset(path){
+      const cleanPath = `/${String(path || '').replace(/^\/+/, '')}`;
+      const base = (FRONTEND_BASE || '').toString().trim();
+      if (!base) return cleanPath;
+      return `${base.replace(/\/+$/, '')}${cleanPath}`;
+    }
+
+    function ensureRingAudio(){
+      if (ringAudio) return ringAudio;
+      try{
+        const audio = new Audio(resolveFrontendAsset('ringtone.mp3'));
+        audio.loop = true;
+        audio.preload = 'auto';
+        ringAudio = audio;
+      }catch(err){
+        ringAudio = null;
+        console.warn('[snoutiq-call] unable to initialise ringtone audio', err);
+      }
+      return ringAudio;
+    }
+
+    function cancelRingResume(){
+      if (!ringResumeListener) {
+        ringResumePending = false;
+        return;
+      }
+      document.removeEventListener('click', ringResumeListener);
+      document.removeEventListener('touchstart', ringResumeListener);
+      ringResumeListener = null;
+      ringResumePending = false;
+    }
+
+    function scheduleRingResume(){
+      if (ringResumePending) return;
+      ringResumePending = true;
+      ringResumeListener = () => {
+        cancelRingResume();
+        startGlobalTone();
+      };
+      document.addEventListener('click', ringResumeListener, { once: true });
+      document.addEventListener('touchstart', ringResumeListener, { once: true });
     }
 
     function startGlobalTone(){
       try{
-        const ctx = ensureAudioContext();
-        if (!ctx) return;
-        if (ctx.state === 'suspended') ctx.resume().catch(()=>{});
+        cancelRingResume();
+        const audio = ensureRingAudio();
+        if (!audio) return;
         stopGlobalTone(true);
-        ringOsc = ctx.createOscillator();
-        ringGain = ctx.createGain();
-        ringOsc.type = 'triangle';
-        ringOsc.frequency.setValueAtTime(660, ctx.currentTime);
-        ringGain.gain.setValueAtTime(0, ctx.currentTime);
-        ringOsc.connect(ringGain).connect(ctx.destination);
-        ringOsc.start();
-        ringGain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.05);
-        ringGain.gain.setValueAtTime(0.22, ctx.currentTime + 0.25);
-        ringGain.gain.linearRampToValueAtTime(0.02, ctx.currentTime + 0.55);
-        ringGain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.8);
-        setTimeout(()=>{
-          if (ringOsc) {
-            ringOsc.frequency.setValueAtTime(770, ctx.currentTime);
-          }
-        }, 400);
+        try { audio.currentTime = 0; }catch(_){ }
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(err => {
+            console.warn('[snoutiq-call] unable to autoplay ringtone', err);
+            scheduleRingResume();
+          });
+        }
       }catch(err){
         console.warn('[snoutiq-call] unable to start ringtone', err);
       }
     }
 
-    function stopGlobalTone(skipFade){
+    function stopGlobalTone(skipReset){
       try{
-        if (ringGain) {
-          const ctx = ringGain.context;
-          if (ctx) {
-            const now = ctx.currentTime;
-            ringGain.gain.cancelScheduledValues(now);
-            if (skipFade) {
-              ringGain.gain.setValueAtTime(0, now);
-            } else {
-              ringGain.gain.linearRampToValueAtTime(0, now + 0.1);
-            }
+        cancelRingResume();
+        if (ringAudio) {
+          ringAudio.pause();
+          if (!skipReset) {
+            try { ringAudio.currentTime = 0; }catch(_){ }
           }
-          ringGain.disconnect();
-        }
-        if (ringOsc) {
-          try { ringOsc.stop(); } catch(_){}
-          ringOsc.disconnect();
         }
       }catch(err){
         console.warn('[snoutiq-call] unable to stop ringtone', err);
       }
-      ringOsc = null;
-      ringGain = null;
     }
 
     function emitCallEvent(name, detail){

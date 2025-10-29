@@ -19,6 +19,16 @@
 </head>
 <body class="h-screen bg-gray-50">
 
+@php
+  $isOnboarding = request()->get('onboarding') === '1';
+  $onboardingDefaults = [
+    'duration' => 30,
+    'petType' => 'all',
+    'main_service' => 'vet',
+    'status' => 'Active',
+  ];
+@endphp
+
 <div class="flex h-full">
   {{-- Shared sidebar --}}
   @include('layouts.partials.sidebar')
@@ -112,41 +122,49 @@
           <label class="block text-sm font-semibold mb-1">Price (&#8377;)</label>
           <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
-        <div>
-          <label class="block text-sm font-semibold mb-1">Duration (mins)</label>
-          <input name="duration" type="number" min="1" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
-        </div>
-        <div>
-          <label class="block text-sm font-semibold mb-1">Pet Type</label>
-          <select name="petType" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
-            <option value="">Select Pet</option>
-            <option value="dog">Dog</option>
-            <option value="cat">Cat</option>
-            <option value="bird">Bird</option>
-            <option value="rabbit">Rabbit</option>
-            <option value="hamster">Hamster</option>
-            <option value="all">All</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-semibold mb-1">Service Category</label>
-          <select name="main_service" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
-            <option value="">Select</option>
-            <option value="grooming">Grooming</option>
-            <option value="video_call">Video Call</option>
-            <option value="vet">Vet Service</option>
-            <option value="pet_walking">Pet Walking</option>
-            <option value="sitter">Sitter</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-semibold mb-1">Status</label>
-          <select name="status" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
-        </div>
+        @unless($isOnboarding)
+          <div>
+            <label class="block text-sm font-semibold mb-1">Duration (mins)</label>
+            <input name="duration" type="number" min="1" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Pet Type</label>
+            <select name="petType" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
+              <option value="">Select Pet</option>
+              <option value="dog">Dog</option>
+              <option value="cat">Cat</option>
+              <option value="bird">Bird</option>
+              <option value="rabbit">Rabbit</option>
+              <option value="hamster">Hamster</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Service Category</label>
+            <select name="main_service" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
+              <option value="">Select</option>
+              <option value="grooming">Grooming</option>
+              <option value="video_call">Video Call</option>
+              <option value="vet">Vet Service</option>
+              <option value="pet_walking">Pet Walking</option>
+              <option value="sitter">Sitter</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Status</label>
+            <select name="status" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+        @endunless
       </div>
+      @if($isOnboarding)
+        <input type="hidden" name="duration" value="{{ $onboardingDefaults['duration'] }}">
+        <input type="hidden" name="petType" value="{{ $onboardingDefaults['petType'] }}">
+        <input type="hidden" name="main_service" value="{{ $onboardingDefaults['main_service'] }}">
+        <input type="hidden" name="status" value="{{ $onboardingDefaults['status'] }}">
+      @endif
       <div>
         <label class="block text-sm font-semibold mb-1">Notes (optional)</label>
         <textarea name="description" rows="3" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm"></textarea>
