@@ -1293,7 +1293,7 @@ useEffect(() => {
           <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DwwG4gBTV2y/LQeisFJHfH8N2QQAoUXrTp66hVFAo=" />
         </audio>
 
-        <style jsx>{`
+        <style>{`
           @keyframes pulse-ring {
             0% {
               transform: scale(0.9);
