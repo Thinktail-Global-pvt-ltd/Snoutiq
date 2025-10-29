@@ -269,7 +269,7 @@
 
 // export default PaymentPage;
 
-import React, { useState, useEffect, useContext, useMemo } from "react";
+import React, { useState, useEffect, useContext, useMemo, useRef } from "react";
 import {
   useParams,
   useSearchParams,
@@ -298,17 +298,14 @@ const Payment = () => {
   const navigate = useNavigate();
   const { nearbyDoctors, liveDoctors, user } = useContext(AuthContext);
 
-  // const doctorId = searchParams.get("doctorId");
-  // const callId = searchParams.get("callId");
   const [loading, setLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [doctorInfo, setDoctorInfo] = useState(null);
   const [selectedMethod, setSelectedMethod] = useState("card");
   const [timeLeft, setTimeLeft] = useState(5 * 60);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
-  //  const { callId } = useParams();
+  
   const location = useLocation();
-  // const { doctor, channel, patientId } = location.state || {};
   const callIdFromParams = searchParams.get("callId");
   const {
     doctor,
@@ -316,9 +313,14 @@ const Payment = () => {
     patientId,
     callId: callIdFromState,
   } = location.state || {};
+  
   const callId = callIdFromState || callIdFromParams;
   const doctorId = doctor?.id || searchParams.get("doctorId");
-  console.log(doctor, channel, patientId);
+
+  // ✅ NEW: Refs to track cleanup state
+  const hasCleanedUp = useRef(false);
+  const countdownInterval = useRef(null);
+  const paymentWindowActive = useRef(false);
 
   // Resolve from URL when state missing
   const channelFromParams = searchParams.get("channel");
@@ -334,11 +336,42 @@ const Payment = () => {
     return all.find((d) => String(d.id) === idStr) || null;
   }, [doctorId, nearbyDoctors, liveDoctors]);
 
+  // ✅ ENHANCED: Centralized cleanup function
+  const performCleanup = (reason = "unknown") => {
+    if (hasCleanedUp.current) {
+      console.log("⚠️ Cleanup already performed, skipping...");
+      return;
+    }
+
+    console.log(`🧹 Performing cleanup - Reason: ${reason}`);
+    hasCleanedUp.current = true;
+
+    // Clear countdown timer
+    if (countdownInterval.current) {
+      clearInterval(countdownInterval.current);
+      countdownInterval.current = null;
+    }
+
+    // Emit cancellation to socket if payment was never completed
+    if (paymentStatus !== "success" && socket) {
+      socket.emit("payment-cancelled", {
+        callId: callId,
+        patientId: patientIdValue,
+        doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
+        reason: reason,
+        timestamp: new Date().toISOString(),
+      });
+      console.log(`📤 Emitted payment-cancelled: ${reason}`);
+    }
+
+    // Mark payment window as inactive
+    paymentWindowActive.current = false;
+  };
+
   // Load Razorpay script dynamically
   useEffect(() => {
     const loadRazorpayScript = () => {
       return new Promise((resolve) => {
-        // Check if Razorpay is already loaded
         if (window.Razorpay) {
           setRazorpayLoaded(true);
           resolve(true);
@@ -353,6 +386,8 @@ const Payment = () => {
         };
         script.onerror = () => {
           console.error("Failed to load Razorpay script");
+          setPaymentStatus("error");
+          performCleanup("razorpay-load-failed");
           resolve(false);
         };
         document.body.appendChild(script);
@@ -391,148 +426,105 @@ const Payment = () => {
     }
   }, [doctor, doctorFromContext]);
 
-  // Fallback display price helper
-  const getDisplayPrice = () => {
-    if (doctorInfo?.price) return doctorInfo.price;
-    if (doctor?.chat_price) return `₹${doctor.chat_price}`;
-    return "₹500";
-  };
+  // ✅ ENHANCED: 5-minute countdown with auto-cleanup
+  useEffect(() => {
+    countdownInterval.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval.current);
+          setPaymentStatus("timeout");
+          performCleanup("5-minute-timeout");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-  const handlePaymentTimeout = () => {
-    setPaymentStatus("timeout");
-    socket.emit("payment-cancelled", {
-      callId: callId,
-      patientId,
-      doctorId,
-      reason: "timeout",
-    });
-  };
+    return () => {
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current);
+      }
+    };
+  }, []);
 
-  // const handlePayment = async () => {
-  //   if (!window.Razorpay) {
-  //     console.error("Razorpay SDK not loaded");
-  //     setPaymentStatus("error");
-  //     return;
-  //   }
+  // ✅ NEW: Socket event listeners for doctor-side cancellations
+  useEffect(() => {
+    if (!socket) return;
 
-  //   setLoading(true);
-  //   setPaymentStatus(null);
+    const handleDoctorCancelled = (data) => {
+      console.log("📞 Doctor cancelled the call:", data);
+      if (data.callId === callId) {
+        setPaymentStatus("doctor-cancelled");
+        performCleanup("doctor-cancelled");
+      }
+    };
 
-  //   try {
-  //     // 1. Create order on backend (same as Blade page)
-  //     const orderRes = await axios.post(
-  //       `https://snoutiq.com/backend/api/create-order`,
-  //       {
-  //         amount: Number(doctorInfo?.chat_price || doctor?.chat_price || doctorFromContext?.chat_price || 500), // safe default amount
-  //             callId: callId,
-  //         doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
-  //         patientId: patientIdValue,
-  //         channel: channelValue,
-  //       }
-  //     );
+    const handleCallRejected = (data) => {
+      console.log("❌ Call rejected:", data);
+      if (data.callId === callId) {
+        setPaymentStatus("doctor-cancelled");
+        performCleanup("call-rejected");
+      }
+    };
 
-  //     console.log("Order API Response:", orderRes.data);
+    const handleCallTimeout = (data) => {
+      console.log("⏰ Call timeout:", data);
+      if (data.callId === callId) {
+        setPaymentStatus("timeout");
+        performCleanup("call-timeout");
+      }
+    };
 
-  //     // ✅ Match backend response { success, order_id, key }
-  //     if (
-  //       !orderRes.data?.success ||
-  //       !orderRes.data?.order_id ||
-  //       !orderRes.data?.key
-  //     ) {
-  //       throw new Error("Invalid order response");
-  //     }
+    socket.on("call-rejected", handleCallRejected);
+    socket.on("doctor-cancelled", handleDoctorCancelled);
+    socket.on("call-timeout", handleCallTimeout);
 
-  //     const { order_id, key } = orderRes.data;
+    return () => {
+      socket.off("call-rejected", handleCallRejected);
+      socket.off("doctor-cancelled", handleDoctorCancelled);
+      socket.off("call-timeout", handleCallTimeout);
+    };
+  }, [callId]);
 
-  //     // 2. Razorpay options (match HTML page)
-  //     const options = {
-  //       key,
-  //       order_id,
-  //       name: "Snoutiq Veterinary Consultation",
-  //       description: `Video consultation with ${doctorInfo?.name || "Doctor"}`,
-  //       image: "https://snoutiq.com/logo.webp",
-  //       theme: { color: "#4F46E5" },
-  //       handler: async (response) => {
-  //         console.log("Payment ID:", response.razorpay_payment_id);
-  //         console.log("Order ID:", response.razorpay_order_id);
-  //         console.log("Signature:", response.razorpay_signature);
+  // ✅ ENHANCED: Component unmount cleanup
+  useEffect(() => {
+    return () => {
+      // Only cleanup if payment wasn't successful
+      if (paymentStatus !== "success") {
+        performCleanup("component-unmount");
+      }
+    };
+  }, [paymentStatus]);
 
-  //         try {
-  //           // 3. Verify payment with backend
-  //           const verifyRes = await axios.post(
-  //             `https://snoutiq.com/backend/api/rzp/verify`,
-  //             {
-  //               callId: callId,
-  //               doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
-  //               patientId: patientIdValue,
-  //               channel: channelValue,
-  //               razorpay_order_id: response.razorpay_order_id,
-  //               razorpay_payment_id: response.razorpay_payment_id,
-  //               razorpay_signature: response.razorpay_signature,
-  //             }
-  //           );
+  // ✅ ENHANCED: Browser tab close/navigation cleanup
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (paymentStatus !== "success" && paymentWindowActive.current) {
+        performCleanup("browser-close");
+        // Show confirmation dialog
+        e.preventDefault();
+        e.returnValue = "Payment in progress. Are you sure you want to leave?";
+      }
+    };
 
-  //           console.log("Verify API Response:", verifyRes.data);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
-  //           // 4. Notify via socket
-  //           socket.emit("payment-completed", {
-  //             callId: callId,
-  //             patientId: patientIdValue,
-  //             doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
-  //             channel: channelValue,
-  //             paymentId: response.razorpay_payment_id,
-  //           });
-
-  //           setPaymentStatus("success");
-  //           setLoading(false);
-
-  //           // 5. Redirect
-  //           setTimeout(() => {
-  //             navigate(
-  //               `/call-page/${channelValue}?uid=${patientIdValue}&role=audience&callId=${callId}`
-  //             );
-  //           }, 1500);
-  //         } catch (error) {
-  //           console.error("Payment verification error:", error);
-  //           setPaymentStatus("verification-failed");
-  //           setLoading(false);
-  //         }
-  //       },
-  //       modal: {
-  //         ondismiss: () => {
-  //           console.warn("Payment popup closed by user");
-  //           setLoading(false);
-  //           setPaymentStatus("cancelled");
-
-  //           socket.emit("payment-cancelled", {
-  //             callId: callId,
-  //             patientId: patientIdValue,
-  //             doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
-  //             reason: "user-cancelled",
-  //           });
-  //         },
-  //       },
-  //     };
-
-  //     // 6. Open Razorpay
-  //     const rzp = new window.Razorpay(options);
-  //     rzp.open();
-  //   } catch (error) {
-  //     console.error("Payment initiation error:", error);
-  //     setPaymentStatus("error");
-  //     setLoading(false);
-  //   }
-  // };
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [paymentStatus]);
 
   const handlePayment = async () => {
     if (!window.Razorpay) {
       console.error("Razorpay SDK not loaded");
       setPaymentStatus("error");
+      performCleanup("razorpay-not-loaded");
       return;
     }
 
     setLoading(true);
     setPaymentStatus(null);
+    paymentWindowActive.current = true;
 
     try {
       // 1. Create order on backend
@@ -551,7 +543,6 @@ const Payment = () => {
 
       console.log("Order API Response:", orderRes.data);
 
-      // Validate backend response
       if (
         !orderRes.data?.success ||
         !orderRes.data?.order_id ||
@@ -571,9 +562,8 @@ const Payment = () => {
         image: "https://snoutiq.com/logo.webp",
         theme: { color: "#4F46E5" },
         handler: async (response) => {
-          console.log("Payment ID:", response.razorpay_payment_id);
-          console.log("Order ID:", response.razorpay_order_id);
-          console.log("Signature:", response.razorpay_signature);
+          console.log("✅ Payment successful:", response.razorpay_payment_id);
+          paymentWindowActive.current = false;
 
           try {
             // 3. Verify payment with backend
@@ -619,37 +609,54 @@ const Payment = () => {
             console.error("Payment verification error:", error);
             setPaymentStatus("verification-failed");
             setLoading(false);
+            performCleanup("verification-failed");
           }
         },
         modal: {
           ondismiss: () => {
-            console.warn("Payment popup closed by user");
+            console.warn("💳 Payment popup closed by user");
             setLoading(false);
             setPaymentStatus("cancelled");
-
-            socket.emit("payment-cancelled", {
-              callId: callId,
-              patientId: patientIdValue,
-              doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
-              reason: "user-cancelled",
-            });
+            paymentWindowActive.current = false;
+            performCleanup("user-cancelled");
           },
+          // ✅ NEW: Handle Razorpay errors
+          escape: false, // Prevent accidental ESC key dismissal
         },
       };
 
       // 6. Open Razorpay
       const rzp = new window.Razorpay(options);
+      
+      // ✅ NEW: Error handler for Razorpay failures
+      rzp.on('payment.failed', function (response) {
+        console.error("💳 Payment failed:", response.error);
+        setPaymentStatus("error");
+        setLoading(false);
+        paymentWindowActive.current = false;
+        performCleanup("payment-failed");
+      });
+
       rzp.open();
     } catch (error) {
       console.error("Payment initiation error:", error);
       setPaymentStatus("error");
       setLoading(false);
+      paymentWindowActive.current = false;
+      performCleanup("payment-initiation-failed");
     }
   };
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const getDisplayPrice = () => {
+    if (doctorInfo?.price) return doctorInfo.price;
+    if (doctor?.chat_price) return `₹${doctor.chat_price}`;
+    return "₹500";
   };
 
   const paymentMethods = [
@@ -897,6 +904,7 @@ const Payment = () => {
                 </span>
               </div>
             </div>
+
             <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircleIcon className="w-5 h-5 text-green-600" />
@@ -908,6 +916,7 @@ const Payment = () => {
                 SPECIAL100
               </span>
             </div>
+
             {/* Payment Button */}
             <button
               onClick={handlePayment}

@@ -20,12 +20,23 @@ class CallController extends Controller
         $data = $request->validate([
             'patient_id' => 'required|integer',
             'doctor_id'  => 'nullable|integer',
+            'channel_name' => 'nullable|string|max:64',
         ]);
+
+        $requestedChannel = $data['channel_name'] ?? null;
+        if (is_string($requestedChannel)) {
+            $requestedChannel = substr(preg_replace('/[^A-Za-z0-9_\-]/', '', $requestedChannel), 0, 63);
+            if ($requestedChannel === '') {
+                $requestedChannel = null;
+            }
+        } else {
+            $requestedChannel = null;
+        }
 
         $session = CallSession::create([
             'patient_id'   => $data['patient_id'],
             'doctor_id'    => $data['doctor_id'] ?? null,
-            'channel_name' => 'call_' . Str::random(8),
+            'channel_name' => $requestedChannel ?: 'call_' . Str::random(8),
             'currency'     => 'INR',
         ]);
 

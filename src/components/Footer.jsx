@@ -6,7 +6,11 @@ import {
   FaPaperPlane,
   FaHeart,
 } from "react-icons/fa";
-import { FaSquareXTwitter, FaLocationDot, FaSquareInstagram} from "react-icons/fa6";
+import {
+  FaSquareXTwitter,
+  FaLocationDot,
+  FaSquareInstagram,
+} from "react-icons/fa6";
 import { Link } from "react-router-dom";
 import logo from "../assets/images/logo.webp";
 import React from "react";
@@ -36,10 +40,10 @@ export default function Footer() {
                 />
               </div>
               <p className="text-gray-700 leading-relaxed mb-6 max-w-md text-sm">
-                We're Tanul and Nisha—passionate pet parents to Sherif (our
-                resilient rescue dog) and three incredible cats: Shadow, Tokyo,
-                and Tiger. Each of our pets came into our lives through unique,
-                sometimes challenging circumstances.
+                Made by passionate pet parents, for pet parents — so your furry
+                ones always get expert care, anytime they need it. We’re on a
+                mission to ensure every pet finds help when it’s needed most,
+                and every pet parent finds peace of mind.
               </p>
 
               {/* Social Media */}
