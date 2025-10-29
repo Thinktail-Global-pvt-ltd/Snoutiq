@@ -59,7 +59,7 @@ class DoctorController extends Controller
         }
 
         $clinic = DB::table('vet_registerations_temp')
-            ->select('id', 'name', 'clinic_profile', 'email', 'phone')
+            ->select('id', 'name', 'clinic_profile', 'email', 'mobile')
             ->where('id', $doctor->vet_registeration_id)
             ->first();
 
