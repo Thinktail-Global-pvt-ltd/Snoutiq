@@ -1,25 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng";
-import { 
-  FiMic, 
-  FiMicOff, 
-  FiVideo, 
-  FiVideoOff, 
-  FiPhoneOff,
-  FiUser,
-  FiUsers,
-  FiArrowLeft,
-  FiMonitor
-} from "react-icons/fi";
-import { 
-  MdScreenShare, 
-  MdStopScreenShare,
-  MdFlipCameraAndroid
-} from "react-icons/md";
-import { 
-  HiOutlineViewGrid, 
-  HiOutlineViewList 
-} from "react-icons/hi";
 
 const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
 
@@ -44,66 +24,90 @@ export default function CallPage() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localTracksRef = useRef([]);
+  const hasJoinedRef = useRef(false);
 
   // State
   const [localTracks, setLocalTracks] = useState([]);
   const [remoteUsers, setRemoteUsers] = useState([]);
   const [joined, setJoined] = useState(false);
-  const [callStatus, setCallStatus] = useState("connecting");
+  const [callStatus, setCallStatus] = useState("initializing");
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
-  const [videoLayout, setVideoLayout] = useState("grid");
-  const [participants, setParticipants] = useState([]);
   const [availableCameras, setAvailableCameras] = useState([]);
   const [showCameraList, setShowCameraList] = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(true);
+  const [permissions, setPermissions] = useState({
+    camera: false,
+    microphone: false
+  });
 
   // Initialize Agora client
   useEffect(() => {
     clientRef.current = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    console.log("✅ Agora client initialized");
   }, []);
 
-  // Get available cameras
-  useEffect(() => {
-    const getCameras = async () => {
-      try {
-        const devices = await AgoraRTC.getCameras();
-        setAvailableCameras(devices);
-        console.log("Available cameras:", devices);
-      } catch (error) {
-        console.error("Error getting cameras:", error);
-      }
-    };
-    getCameras();
-  }, []);
+  // Request permissions and get cameras
+  const requestPermissions = async () => {
+    try {
+      console.log("📹 Requesting permissions...");
+      
+      // Request both permissions together
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: true 
+      });
+      
+      console.log("✅ Permissions granted");
+      setPermissions({ camera: true, microphone: true });
+      
+      // Get available cameras
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      console.log("📷 Found cameras:", videoDevices.length);
+      setAvailableCameras(videoDevices);
+      
+      // Stop the test stream
+      stream.getTracks().forEach(track => track.stop());
+      
+      setShowPermissionModal(false);
+      return true;
+    } catch (error) {
+      console.error("❌ Permission error:", error);
+      alert("Please allow camera and microphone access to continue");
+      return false;
+    }
+  };
 
-  // Join channel
+  // Join channel and create tracks
   useEffect(() => {
-    if (!clientRef.current || availableCameras.length === 0) return;
+    if (showPermissionModal || !clientRef.current || hasJoinedRef.current) return;
 
     let mounted = true;
     const client = clientRef.current;
 
     async function joinChannel() {
       try {
-        console.log(`Joining channel: ${safeChannel}, role=${role}, uid=${uid}`);
+        setCallStatus("connecting");
+        console.log(`🔗 Joining channel: ${safeChannel}, uid: ${uid}`);
         
         await client.join(APP_ID, safeChannel, null, uid);
-        console.log("Successfully joined channel");
-
-        if (!mounted) return;
+        hasJoinedRef.current = true;
+        
+        console.log("✅ Joined channel successfully");
         setJoined(true);
         setCallStatus("connected");
 
-        if (isHost) {
-          await createAndPublishTracks();
-        }
+        // Create and publish tracks
+        await createAndPublishTracks();
 
+        // Setup remote user handlers
         setupRemoteUserHandlers();
       } catch (error) {
-        console.error("Join channel error:", error);
+        console.error("❌ Join channel error:", error);
         setCallStatus("error");
+        alert("Failed to join call: " + error.message);
       }
     }
 
@@ -112,41 +116,46 @@ export default function CallPage() {
         const tracks = [];
         
         // Create audio track
+        console.log("🎤 Creating audio track...");
         try {
           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
           tracks.push(audioTrack);
-          console.log("Audio track created");
+          console.log("✅ Audio track created");
         } catch (err) {
-          console.warn("Could not create audio track:", err);
+          console.warn("⚠️ Audio track failed:", err);
         }
 
-        // Create video track with current camera
+        // Create video track
+        console.log("📹 Creating video track...");
         try {
           const cameraDevice = availableCameras[currentCameraIndex];
           const videoTrack = await AgoraRTC.createCameraVideoTrack({
-            cameraId: cameraDevice.deviceId,
+            cameraId: cameraDevice?.deviceId,
             encoderConfig: "720p_1"
           });
           tracks.push(videoTrack);
-          console.log("Video track created");
+          console.log("✅ Video track created");
 
+          // Play video track locally
           if (localVideoRef.current) {
             videoTrack.play(localVideoRef.current, { fit: "cover" });
+            console.log("✅ Local video playing");
           }
         } catch (err) {
-          console.error("Video track creation failed:", err);
+          console.error("❌ Video track failed:", err);
           setIsCameraOff(true);
         }
 
+        // Publish tracks
         if (tracks.length > 0) {
           await client.publish(tracks);
-          console.log("Tracks published");
+          console.log("✅ Tracks published:", tracks.length);
         }
 
         setLocalTracks(tracks);
         localTracksRef.current = tracks;
       } catch (error) {
-        console.error("Error creating/publishing tracks:", error);
+        console.error("❌ Error creating/publishing tracks:", error);
       }
     };
 
@@ -154,7 +163,7 @@ export default function CallPage() {
       client.on("user-published", async (user, mediaType) => {
         try {
           await client.subscribe(user, mediaType);
-          console.log(`Subscribed to user ${user.uid} ${mediaType}`);
+          console.log(`✅ Subscribed to user ${user.uid} ${mediaType}`);
 
           if (mediaType === "video" && remoteVideoRef.current) {
             user.videoTrack?.play(remoteVideoRef.current, { fit: "cover" });
@@ -169,30 +178,21 @@ export default function CallPage() {
           if (mediaType === "audio") {
             user.audioTrack?.play();
           }
-
-          setParticipants(prev => {
-            if (!prev.some(p => p.uid === user.uid)) {
-              return [...prev, {
-                uid: user.uid,
-                role: isHost ? "Patient" : "Doctor"
-              }];
-            }
-            return prev;
-          });
         } catch (err) {
-          console.error("Error subscribing to user:", err);
+          console.error("❌ Error subscribing:", err);
         }
       });
 
       client.on("user-unpublished", (user, mediaType) => {
+        console.log(`User ${user.uid} unpublished ${mediaType}`);
         if (mediaType === "video") {
           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
         }
       });
 
       client.on("user-left", (user) => {
+        console.log(`User ${user.uid} left`);
         setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-        setParticipants(prev => prev.filter(p => p.uid !== user.uid));
       });
     };
 
@@ -200,15 +200,19 @@ export default function CallPage() {
 
     return () => {
       mounted = false;
-      cleanup();
+      if (hasJoinedRef.current) {
+        cleanup();
+      }
     };
-  }, [safeChannel, role, uid, availableCameras, currentCameraIndex]);
+  }, [showPermissionModal, safeChannel, uid, availableCameras, currentCameraIndex]);
 
   const cleanup = async () => {
     const client = clientRef.current;
     if (!client) return;
     
     try {
+      console.log("🧹 Cleaning up...");
+      
       localTracksRef.current.forEach(track => {
         try {
           track.stop();
@@ -220,14 +224,16 @@ export default function CallPage() {
 
       if (client.connectionState === "CONNECTED") {
         await client.leave();
+        console.log("✅ Left channel");
       }
 
       setLocalTracks([]);
       localTracksRef.current = [];
       setRemoteUsers([]);
       setJoined(false);
+      hasJoinedRef.current = false;
     } catch (error) {
-      console.error("Cleanup error:", error);
+      console.error("❌ Cleanup error:", error);
     }
   };
 
@@ -236,6 +242,7 @@ export default function CallPage() {
     if (audioTrack) {
       await audioTrack.setEnabled(!isMuted);
       setIsMuted(!isMuted);
+      console.log(isMuted ? "🎤 Unmuted" : "🔇 Muted");
     }
   };
 
@@ -244,6 +251,7 @@ export default function CallPage() {
     if (videoTrack) {
       await videoTrack.setEnabled(isCameraOff);
       setIsCameraOff(!isCameraOff);
+      console.log(isCameraOff ? "📹 Camera on" : "📷 Camera off");
     }
   };
 
@@ -251,6 +259,7 @@ export default function CallPage() {
     if (cameraIndex === currentCameraIndex || availableCameras.length <= cameraIndex) return;
 
     try {
+      console.log(`🔄 Switching to camera ${cameraIndex}`);
       const currentVideoTrack = localTracksRef.current.find(track => track.trackMediaType === 'video');
       
       if (currentVideoTrack && clientRef.current) {
@@ -278,390 +287,590 @@ export default function CallPage() {
         setCurrentCameraIndex(cameraIndex);
         setIsCameraOff(false);
         setShowCameraList(false);
+        console.log("✅ Camera switched");
       }
     } catch (error) {
-      console.error("Error switching camera:", error);
-    }
-  };
-
-  const toggleScreenShare = async () => {
-    if (!isScreenSharing) {
-      try {
-        const screenTrack = await AgoraRTC.createScreenVideoTrack({
-          encoderConfig: "720p_1"
-        });
-        
-        const currentVideoTrack = localTracksRef.current.find(track => track.trackMediaType === 'video');
-        if (currentVideoTrack) {
-          await clientRef.current.unpublish(currentVideoTrack);
-        }
-        
-        await clientRef.current.publish(screenTrack);
-        
-        const newTracks = localTracksRef.current.filter(track => track.trackMediaType !== 'video');
-        newTracks.push(screenTrack);
-        
-        if (localVideoRef.current) {
-          screenTrack.play(localVideoRef.current, { fit: "cover" });
-        }
-        
-        setLocalTracks(newTracks);
-        localTracksRef.current = newTracks;
-        setIsScreenSharing(true);
-        
-        if (screenTrack.on) {
-          screenTrack.on("track-ended", () => {
-            toggleScreenShare();
-          });
-        }
-      } catch (error) {
-        console.error("Error sharing screen:", error);
-      }
-    } else {
-      try {
-        const screenTrack = localTracksRef.current.find(track => track.trackMediaType === 'video');
-        if (screenTrack) {
-          await clientRef.current.unpublish(screenTrack);
-          screenTrack.stop();
-          screenTrack.close();
-        }
-        
-        const cameraDevice = availableCameras[currentCameraIndex];
-        const videoTrack = await AgoraRTC.createCameraVideoTrack({
-          cameraId: cameraDevice.deviceId,
-          encoderConfig: "720p_1"
-        });
-        
-        await clientRef.current.publish(videoTrack);
-        
-        const newTracks = localTracksRef.current.filter(track => track.trackMediaType !== 'video');
-        newTracks.push(videoTrack);
-        
-        if (localVideoRef.current) {
-          videoTrack.play(localVideoRef.current, { fit: "cover" });
-        }
-        
-        setLocalTracks(newTracks);
-        localTracksRef.current = newTracks;
-        setIsScreenSharing(false);
-      } catch (error) {
-        console.error("Error stopping screen share:", error);
-      }
+      console.error("❌ Error switching camera:", error);
     }
   };
 
   const handleEndCall = async () => {
+    console.log("📞 Ending call...");
     await cleanup();
     alert("Call ended");
   };
 
-  const toggleLayout = () => {
-    setVideoLayout(prev => prev === "grid" ? "focus" : "grid");
-  };
+  // Permission Modal
+  const PermissionModal = () => (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      backgroundColor: "rgba(0, 0, 0, 0.9)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      backdropFilter: "blur(10px)"
+    }}>
+      <div style={{
+        background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
+        padding: "2.5rem",
+        borderRadius: "24px",
+        maxWidth: "500px",
+        width: "90%",
+        textAlign: "center",
+        border: "1px solid rgba(255,255,255,0.1)",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.5)"
+      }}>
+        <div style={{
+          width: "80px",
+          height: "80px",
+          background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 1.5rem",
+          fontSize: "2.5rem",
+          boxShadow: "0 8px 24px rgba(59, 130, 246, 0.3)"
+        }}>
+          📹
+        </div>
+        
+        <h2 style={{
+          color: "white",
+          fontSize: "1.75rem",
+          fontWeight: "700",
+          marginBottom: "1rem"
+        }}>
+          Camera & Microphone Access
+        </h2>
+        
+        <p style={{
+          color: "#cbd5e1",
+          fontSize: "1.05rem",
+          lineHeight: "1.6",
+          marginBottom: "2rem"
+        }}>
+          To start the video consultation, we need access to your camera and microphone. 
+          Click the button below to grant permissions.
+        </p>
+
+        <div style={{
+          display: "flex",
+          gap: "1rem",
+          justifyContent: "center",
+          flexWrap: "wrap",
+          marginBottom: "2rem"
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            background: permissions.camera ? "rgba(34, 197, 94, 0.2)" : "rgba(100, 116, 139, 0.2)",
+            padding: "0.875rem 1.25rem",
+            borderRadius: "12px",
+            border: permissions.camera ? "1px solid #22c55e" : "1px solid #475569"
+          }}>
+            <span style={{ fontSize: "1.5rem" }}>📷</span>
+            <span style={{ color: "white", fontSize: "0.95rem", fontWeight: "500" }}>
+              {permissions.camera ? "✓ Camera" : "Camera"}
+            </span>
+          </div>
+
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            background: permissions.microphone ? "rgba(34, 197, 94, 0.2)" : "rgba(100, 116, 139, 0.2)",
+            padding: "0.875rem 1.25rem",
+            borderRadius: "12px",
+            border: permissions.microphone ? "1px solid #22c55e" : "1px solid #475569"
+          }}>
+            <span style={{ fontSize: "1.5rem" }}>🎤</span>
+            <span style={{ color: "white", fontSize: "0.95rem", fontWeight: "500" }}>
+              {permissions.microphone ? "✓ Microphone" : "Microphone"}
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={requestPermissions}
+          style={{
+            background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+            color: "white",
+            border: "none",
+            padding: "1rem 2.5rem",
+            borderRadius: "12px",
+            fontSize: "1.1rem",
+            fontWeight: "600",
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: "0 4px 16px rgba(59, 130, 246, 0.3)"
+          }}
+          onMouseOver={(e) => {
+            e.target.style.transform = "translateY(-2px)";
+            e.target.style.boxShadow = "0 6px 20px rgba(59, 130, 246, 0.4)";
+          }}
+          onMouseOut={(e) => {
+            e.target.style.transform = "translateY(0)";
+            e.target.style.boxShadow = "0 4px 16px rgba(59, 130, 246, 0.3)";
+          }}
+        >
+          Allow Access
+        </button>
+
+        <p style={{
+          color: "#94a3b8",
+          fontSize: "0.85rem",
+          marginTop: "1.5rem",
+          lineHeight: "1.4"
+        }}>
+          Your privacy is important. You can disable access anytime from your browser settings.
+        </p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+    <div style={{
+      position: "relative",
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "#0f172a",
+      overflow: "hidden",
+      color: "white",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    }}>
+      
+      {/* Permission Modal */}
+      {showPermissionModal && <PermissionModal />}
+
       {/* Header */}
-      <header className="bg-gray-800 bg-opacity-80 backdrop-blur-lg border-b border-gray-700 px-6 py-4 shadow-xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button 
-              onClick={() => alert("Going back...")}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <FiArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-xl font-semibold">Video Consultation</h1>
-              <div className="flex items-center space-x-4 text-sm text-gray-300 mt-1">
-                <span>Room: <strong className="text-blue-400">{safeChannel}</strong></span>
-                <span>•</span>
-                <span>ID: <strong className="text-blue-400">{uid}</strong></span>
-                <span>•</span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  callStatus === "connected" ? "bg-green-500 text-white" : 
-                  callStatus === "connecting" ? "bg-yellow-500 text-black" : "bg-red-500 text-white"
-                }`}>
-                  {callStatus === "connected" ? "● Connected" : 
-                   callStatus === "connecting" ? "○ Connecting..." : "✕ Error"}
-                </span>
-              </div>
-            </div>
+      <div style={{
+        position: "absolute",
+        top: 20,
+        left: 24,
+        right: 24,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        zIndex: 50
+      }}>
+        {/* Logo */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          background: "rgba(15, 23, 42, 0.8)",
+          padding: "10px 20px",
+          borderRadius: "12px",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.1)"
+        }}>
+          <div style={{
+            width: 32,
+            height: 32,
+            background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+            borderRadius: "8px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "1.2rem"
+          }}>
+            🏥
           </div>
-
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 text-sm bg-gray-700 px-3 py-2 rounded-lg">
-              <FiUsers className="w-4 h-4 text-blue-400" />
-              <span>{participants.length + 1} participants</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="flex h-[calc(100vh-80px)]">
-        {/* Video Area */}
-        <div className="flex-1 p-6">
-          <div className={`h-full ${videoLayout === "grid" && remoteUsers.length > 0 ? "grid grid-cols-2 gap-4" : "flex flex-col gap-4"}`}>
-            
-            {/* Local Video */}
-            <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700 ${
-              videoLayout === "focus" && remoteUsers.length > 0 ? "h-1/3" : "flex-1"
-            }`}>
-              <div 
-                ref={localVideoRef}
-                className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900"
-              />
-              
-              {/* Video Label */}
-              <div className="absolute top-4 left-4 bg-black bg-opacity-70 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium border border-gray-600">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span>You ({isHost ? "Doctor" : "Patient"})</span>
-                </div>
-                {(isCameraOff || isScreenSharing) && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    {isCameraOff && "Camera Off"}
-                    {isScreenSharing && "Screen Sharing"}
-                  </div>
-                )}
-              </div>
-
-              {/* Camera Selector */}
-              {availableCameras.length > 1 && !isScreenSharing && (
-                <div className="absolute top-4 right-4">
-                  <button
-                    onClick={() => setShowCameraList(!showCameraList)}
-                    className="bg-black bg-opacity-70 backdrop-blur-sm p-2 rounded-lg hover:bg-opacity-90 transition-all border border-gray-600"
-                    title="Switch Camera"
-                  >
-                    <MdFlipCameraAndroid className="w-5 h-5" />
-                  </button>
-                  
-                  {showCameraList && (
-                    <div className="absolute top-full right-0 mt-2 bg-gray-800 rounded-lg shadow-xl border border-gray-600 p-2 min-w-[250px] z-10">
-                      <div className="text-xs text-gray-400 px-2 py-1 font-medium">Available Cameras</div>
-                      {availableCameras.map((camera, index) => (
-                        <button
-                          key={camera.deviceId}
-                          onClick={() => switchToCamera(index)}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                            currentCameraIndex === index
-                              ? "bg-blue-600 text-white"
-                              : "hover:bg-gray-700 text-gray-200"
-                          }`}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <FiVideo className="w-4 h-4 flex-shrink-0" />
-                            <span className="truncate">{camera.label || `Camera ${index + 1}`}</span>
-                            {currentCameraIndex === index && (
-                              <span className="ml-auto text-xs">●</span>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Camera Off Placeholder */}
-              {(isCameraOff || localTracks.length === 0) && !isScreenSharing && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
-                  <div className="text-center">
-                    <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FiUser className="w-10 h-10 text-gray-400" />
-                    </div>
-                    <p className="text-gray-300 font-medium">
-                      {isCameraOff ? "Camera is off" : "Initializing camera..."}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {availableCameras.length} camera(s) available
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Remote Video */}
-            {remoteUsers.length > 0 ? (
-              <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700 ${
-                videoLayout === "focus" ? "flex-1" : ""
-              }`}>
-                <div 
-                  ref={remoteVideoRef}
-                  className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900"
-                />
-                <div className="absolute top-4 left-4 bg-black bg-opacity-70 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium border border-gray-600">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span>{isHost ? "Patient" : "Doctor"} ({remoteUsers[0]?.uid})</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              videoLayout === "grid" && (
-                <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden flex-1 flex items-center justify-center border border-gray-700 shadow-xl">
-                  <div className="text-center">
-                    <div className="w-24 h-24 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FiUser className="w-12 h-12 text-gray-400" />
-                    </div>
-                    <h3 className="text-xl font-semibold mb-2">Waiting for participant</h3>
-                    <p className="text-gray-400">
-                      Waiting for {isHost ? "patient" : "doctor"} to join the call...
-                    </p>
-                    <div className="mt-4 flex items-center justify-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                    </div>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
+          <span style={{
+            fontSize: 16,
+            fontWeight: 600,
+            background: "linear-gradient(135deg, #60a5fa, #a78bfa)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent"
+          }}>
+            Video Consult
+          </span>
         </div>
 
-        {/* Sidebar - Participants */}
-        <div className="w-80 bg-gray-800 bg-opacity-80 backdrop-blur-lg border-l border-gray-700 p-4 shadow-xl">
-          <h3 className="font-semibold mb-4 flex items-center text-lg">
-            <FiUsers className="w-5 h-5 mr-2 text-blue-400" />
-            Participants <span className="ml-auto text-sm text-gray-400">({participants.length + 1})</span>
-          </h3>
-          <div className="space-y-2">
-            {/* Local user */}
-            <div className="flex items-center space-x-3 p-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg">
-              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-sm font-bold">
-                {isHost ? "D" : "P"}
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold">You ({isHost ? "Doctor" : "Patient"})</p>
-                <p className="text-xs text-blue-200">ID: {uid}</p>
-              </div>
-              <div className="w-2 h-2 bg-green-400 rounded-full shadow-lg shadow-green-400/50"></div>
-            </div>
-            
-            {/* Remote participants */}
-            {participants.map((participant) => (
-              <div key={participant.uid} className="flex items-center space-x-3 p-3 rounded-xl bg-gray-700 hover:bg-gray-650 transition-colors">
-                <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center text-sm font-bold">
-                  {participant.role.charAt(0)}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{participant.role}</p>
-                  <p className="text-xs text-gray-400">ID: {participant.uid}</p>
-                </div>
-                <div className="w-2 h-2 bg-green-500 rounded-full shadow-lg shadow-green-500/50"></div>
-              </div>
-            ))}
-          </div>
-
-          {/* Camera Info */}
-          <div className="mt-6 p-4 bg-gray-700 rounded-xl">
-            <h4 className="text-sm font-semibold mb-3 flex items-center">
-              <FiMonitor className="w-4 h-4 mr-2 text-blue-400" />
-              Camera Info
-            </h4>
-            <div className="space-y-2 text-xs text-gray-300">
-              <div className="flex justify-between">
-                <span>Total Cameras:</span>
-                <span className="font-semibold">{availableCameras.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Active Camera:</span>
-                <span className="font-semibold">{currentCameraIndex + 1}</span>
-              </div>
-              {availableCameras[currentCameraIndex] && (
-                <div className="mt-2 pt-2 border-t border-gray-600">
-                  <p className="text-gray-400 mb-1">Current:</p>
-                  <p className="font-mono text-xs truncate">
-                    {availableCameras[currentCameraIndex].label || `Camera ${currentCameraIndex + 1}`}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+        {/* Status */}
+        <div style={{
+          background: "rgba(15, 23, 42, 0.8)",
+          padding: "10px 20px",
+          borderRadius: "12px",
+          fontSize: 14,
+          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.1)"
+        }}>
+          <div style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: callStatus === "connected" ? "#10b981" : 
+                       callStatus === "connecting" ? "#f59e0b" : "#ef4444",
+            boxShadow: `0 0 10px ${callStatus === "connected" ? "#10b981" : 
+                                   callStatus === "connecting" ? "#f59e0b" : "#ef4444"}`
+          }} />
+          <span style={{
+            color: callStatus === "connected" ? "#10b981" : 
+                   callStatus === "connecting" ? "#f59e0b" : "#ef4444"
+          }}>
+            {callStatus === "connected" ? "Connected" : 
+             callStatus === "connecting" ? "Connecting..." : 
+             callStatus === "error" ? "Error" : "Initializing"}
+          </span>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
-        <div className="flex items-center space-x-3 bg-gray-800 bg-opacity-95 backdrop-blur-lg px-6 py-4 rounded-2xl shadow-2xl border border-gray-700">
-          {/* Mute/Unmute */}
+      {/* Remote Video (Full Screen) */}
+      <div 
+        ref={remoteVideoRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+          objectFit: "cover"
+        }}
+      />
+
+      {/* Waiting State */}
+      {remoteUsers.length === 0 && joined && (
+        <div style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          textAlign: "center",
+          zIndex: 10
+        }}>
+          <div style={{
+            width: 120,
+            height: 120,
+            background: "rgba(59, 130, 246, 0.1)",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 1.5rem",
+            fontSize: 60,
+            border: "2px solid rgba(59, 130, 246, 0.3)",
+            animation: "pulse 2s ease-in-out infinite"
+          }}>
+            ⏳
+          </div>
+          <h3 style={{
+            fontSize: 22,
+            fontWeight: 600,
+            marginBottom: "0.5rem",
+            color: "white"
+          }}>
+            Waiting for {isHost ? "Patient" : "Doctor"}
+          </h3>
+          <p style={{
+            fontSize: 15,
+            color: "#94a3b8"
+          }}>
+            They will join shortly...
+          </p>
+        </div>
+      )}
+
+      {/* Local Video Preview (Picture-in-Picture) */}
+      <div style={{
+        position: "absolute",
+        bottom: 120,
+        right: 24,
+        width: 280,
+        height: 200,
+        borderRadius: 20,
+        overflow: "hidden",
+        border: "3px solid rgba(59, 130, 246, 0.5)",
+        boxShadow: "0 12px 48px rgba(0,0,0,0.5)",
+        background: "#000",
+        zIndex: 20
+      }}>
+        <div 
+          ref={localVideoRef}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover"
+          }}
+        />
+        
+        {/* Camera Off Overlay */}
+        {(isCameraOff || localTracks.length === 0) && (
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,0.9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "column",
+            gap: 12
+          }}>
+            <div style={{
+              width: 60,
+              height: 60,
+              background: "rgba(59, 130, 246, 0.2)",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 28
+            }}>
+              📷
+            </div>
+            <div style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>
+              {localTracks.length === 0 ? "Starting camera..." : "Camera Off"}
+            </div>
+          </div>
+        )}
+        
+        {/* User Badge */}
+        <div style={{
+          position: "absolute",
+          bottom: 12,
+          left: 12,
+          background: "rgba(0,0,0,0.8)",
+          padding: "6px 14px",
+          borderRadius: 20,
+          fontSize: 13,
+          fontWeight: 600,
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.2)"
+        }}>
+          You • {isHost ? "Doctor" : "Patient"}
+        </div>
+
+        {/* Camera Switch Button */}
+        {availableCameras.length > 1 && !isCameraOff && (
+          <button
+            onClick={() => setShowCameraList(!showCameraList)}
+            style={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              border: "none",
+              background: "rgba(0,0,0,0.7)",
+              color: "white",
+              fontSize: 18,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backdropFilter: "blur(10px)",
+              transition: "all 0.2s"
+            }}
+            onMouseOver={(e) => e.target.style.background = "rgba(59, 130, 246, 0.8)"}
+            onMouseOut={(e) => e.target.style.background = "rgba(0,0,0,0.7)"}
+          >
+            🔄
+          </button>
+        )}
+
+        {/* Camera List Dropdown */}
+        {showCameraList && availableCameras.length > 1 && (
+          <div style={{
+            position: "absolute",
+            top: 60,
+            right: 12,
+            background: "rgba(15, 23, 42, 0.95)",
+            borderRadius: "12px",
+            padding: "8px",
+            minWidth: "200px",
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+            zIndex: 30
+          }}>
+            {availableCameras.map((camera, index) => (
+              <button
+                key={camera.deviceId}
+                onClick={() => switchToCamera(index)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  marginBottom: index < availableCameras.length - 1 ? "4px" : 0,
+                  background: currentCameraIndex === index ? "rgba(59, 130, 246, 0.3)" : "transparent",
+                  border: "1px solid",
+                  borderColor: currentCameraIndex === index ? "#3b82f6" : "transparent",
+                  borderRadius: "8px",
+                  color: "white",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.2s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+                onMouseOver={(e) => {
+                  if (currentCameraIndex !== index) {
+                    e.target.style.background = "rgba(100, 116, 139, 0.3)";
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (currentCameraIndex !== index) {
+                    e.target.style.background = "transparent";
+                  }
+                }}
+              >
+                <span style={{ fontSize: "16px" }}>
+                  {camera.label.toLowerCase().includes("front") ? "🤳" : 
+                   camera.label.toLowerCase().includes("back") ? "📱" : "📷"}
+                </span>
+                <span style={{
+                  flex: 1,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap"
+                }}>
+                  {camera.label || `Camera ${index + 1}`}
+                </span>
+                {currentCameraIndex === index && (
+                  <span style={{ color: "#10b981", fontSize: "12px" }}>●</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Control Panel */}
+      {joined && (
+        <div style={{
+          position: "absolute",
+          bottom: 28,
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          gap: 20,
+          background: "rgba(15, 23, 42, 0.9)",
+          padding: "20px 40px",
+          borderRadius: "28px",
+          backdropFilter: "blur(20px)",
+          boxShadow: "0 12px 48px rgba(0,0,0,0.5)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          zIndex: 30
+        }}>
+          {/* Mute Button */}
           <button 
             onClick={toggleMute}
-            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
-              isMuted 
-                ? "bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/50" 
-                : "bg-gray-600 hover:bg-gray-500"
-            }`}
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              border: "none",
+              background: isMuted 
+                ? "linear-gradient(135deg, #ef4444, #dc2626)" 
+                : "linear-gradient(135deg, #475569, #334155)",
+              color: "white",
+              fontSize: 26,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+              boxShadow: isMuted ? "0 8px 24px rgba(239, 68, 68, 0.4)" : "0 4px 12px rgba(0,0,0,0.3)"
+            }}
+            onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
+            onMouseOut={(e) => e.target.style.transform = "scale(1)"}
             title={isMuted ? "Unmute" : "Mute"}
           >
-            {isMuted ? <FiMicOff className="w-6 h-6" /> : <FiMic className="w-6 h-6" />}
+            {isMuted ? "🔇" : "🎤"}
           </button>
 
-          {/* Camera On/Off */}
+          {/* Camera Button */}
           <button 
             onClick={toggleCamera}
-            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
-              isCameraOff 
-                ? "bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/50" 
-                : "bg-gray-600 hover:bg-gray-500"
-            }`}
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              border: "none",
+              background: isCameraOff 
+                ? "linear-gradient(135deg, #ef4444, #dc2626)" 
+                : "linear-gradient(135deg, #475569, #334155)",
+              color: "white",
+              fontSize: 26,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+              boxShadow: isCameraOff ? "0 8px 24px rgba(239, 68, 68, 0.4)" : "0 4px 12px rgba(0,0,0,0.3)"
+            }}
+            onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
+            onMouseOut={(e) => e.target.style.transform = "scale(1)"}
             title={isCameraOff ? "Turn On Camera" : "Turn Off Camera"}
           >
-            {isCameraOff ? <FiVideoOff className="w-6 h-6" /> : <FiVideo className="w-6 h-6" />}
+            {isCameraOff ? "📷" : "📹"}
           </button>
 
-          {/* Switch Camera */}
-          <button 
-            onClick={() => setShowCameraList(!showCameraList)}
-            disabled={availableCameras.length <= 1}
-            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
-              availableCameras.length <= 1 
-                ? "bg-gray-700 cursor-not-allowed opacity-50" 
-                : "bg-gray-600 hover:bg-gray-500"
-            }`}
-            title={availableCameras.length <= 1 ? "Only one camera available" : "Switch Camera"}
-          >
-            <MdFlipCameraAndroid className="w-6 h-6" />
-          </button>
-
-          {/* Screen Share */}
-          <button 
-            onClick={toggleScreenShare}
-            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
-              isScreenSharing 
-                ? "bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/50" 
-                : "bg-gray-600 hover:bg-gray-500"
-            }`}
-            title={isScreenSharing ? "Stop Sharing" : "Share Screen"}
-          >
-            {isScreenSharing ? <MdStopScreenShare className="w-6 h-6" /> : <MdScreenShare className="w-6 h-6" />}
-          </button>
-
-          {/* Layout Toggle */}
-          <button 
-            onClick={toggleLayout}
-            disabled={remoteUsers.length === 0}
-            className={`p-4 rounded-xl transition-all transform hover:scale-105 ${
-              remoteUsers.length === 0 
-                ? "bg-gray-700 cursor-not-allowed opacity-50" 
-                : "bg-gray-600 hover:bg-gray-500"
-            }`}
-            title="Change Layout"
-          >
-            {videoLayout === "grid" ? <HiOutlineViewList className="w-6 h-6" /> : <HiOutlineViewGrid className="w-6 h-6" />}
-          </button>
-
-          {/* End Call */}
+          {/* End Call Button */}
           <button 
             onClick={handleEndCall}
-            className="p-4 rounded-xl bg-red-500 hover:bg-red-600 transition-all transform hover:scale-105 shadow-lg shadow-red-500/50"
-            title="End Call"
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              border: "none",
+              background: "linear-gradient(135deg, #ef4444, #dc2626)",
+              color: "white",
+              fontSize: 20,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+            }}
+            onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
+            onMouseOut={(e) => e.target.style.transform = "scale(1)"}
           >
-            <FiPhoneOff className="w-6 h-6" />
+            📞
           </button>
+        </div>
+      )}
+
+      {/* Connection Quality Indicator */}
+      <div style={{
+        position: "absolute",
+        top: 70,
+        right: 24,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        background: "rgba(15, 23, 42, 0.8)",
+        padding: "6px 12px",
+        borderRadius: 8,
+        fontSize: 12,
+        backdropFilter: "blur(10px)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        zIndex: 50
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4
+        }}>
+          <span style={{ opacity: 0.7 }}>Connection:</span>
+          <span style={{ 
+            color: callStatus === "connected" ? "#10b981" : "#f59e0b",
+            fontWeight: 500
+          }}>
+            {callStatus === "connected" ? "Excellent" : "Connecting..."}
+          </span>
         </div>
       </div>
     </div>
