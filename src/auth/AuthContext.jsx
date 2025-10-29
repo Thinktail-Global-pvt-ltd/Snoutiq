@@ -96,7 +96,6 @@ export const AuthProvider = ({ children }) => {
     console.log("🔄 Requesting initial active doctors list");
     socket.emit("get-active-doctors");
 
-    // Periodic polling every 20 seconds
     const interval = setInterval(() => {
       socket.emit("get-active-doctors");
     }, 20000);
@@ -108,9 +107,8 @@ export const AuthProvider = ({ children }) => {
       socket.off("doctor-offline", handleDoctorOffline);
       clearInterval(interval);
     };
-  }, [nearbyDoctors]); // ✅ Only depend on nearbyDoctors
+  }, [nearbyDoctors]); 
 
-  // 🟢 Update live doctors whenever nearbyDoctors OR allActiveDoctors changes
   useEffect(() => {
     if (nearbyDoctors.length > 0 && allActiveDoctors.length > 0) {
       const updatedLiveDoctors = nearbyDoctors.filter(doctor => 
@@ -232,26 +230,56 @@ export const AuthProvider = ({ children }) => {
   };
 
   // 🟢 Login function
-  const login = async (userData, jwtToken, initialChatToken = null) => {
-    try {
-      setUser(userData);
-      setToken(jwtToken);
-      localStorage.setItem("token", jwtToken);
-      localStorage.setItem("user", JSON.stringify(userData));
+  // const login = async (userData, jwtToken, initialChatToken = null) => {
+  //   try {
+  //     setUser(userData);
+  //     setToken(jwtToken);
+  //     localStorage.setItem("token", jwtToken);
+  //     localStorage.setItem("user", JSON.stringify(userData));
 
-      if (initialChatToken) {
-        setChatRoomToken(initialChatToken);
-        localStorage.setItem("chat_room_token", initialChatToken);
-      }
+  //     // if (initialChatToken) {
+  //     //   setChatRoomToken(initialChatToken);
+  //     //   localStorage.setItem("chat_room_token", initialChatToken);
+  //     // }
 
-      // Fetch doctors after login
-      setTimeout(() => {
-        fetchNearbyDoctors();
-      }, 1000);
-    } catch (error) {
-      console.error("Error during login:", error);
+  //     // Fetch doctors after login
+  //     setTimeout(() => {
+  //       fetchNearbyDoctors();
+  //     }, 1000);
+  //   } catch (error) {
+  //     console.error("Error during login:", error);
+  //   }
+  // };
+
+const login = async (userData, jwtToken, initialChatToken = null) => {
+  try {
+    setUser(userData);
+    setToken(jwtToken);
+    localStorage.setItem("token", jwtToken);
+    localStorage.setItem("user", JSON.stringify(userData));
+
+    // ❌ Backend se aane wale chat token ko ignore karo
+    if (initialChatToken) {
+      console.log("⚠️ Ignoring backend chat token to avoid auto chat creation.");
     }
-  };
+
+    // ✅ Purane chat_room_token ko hamesha clear karo
+    localStorage.removeItem("chat_room_token");
+    setChatRoomToken(null);
+
+    // ✅ Nearby doctors sirf pet user ke liye fetch karo
+    setTimeout(() => {
+      if (userData?.business_status !== 1) {
+        fetchNearbyDoctors();
+      } else {
+        console.log("🩺 Doctor account detected, skipping nearby doctors fetch.");
+      }
+    }, 1200);
+  } catch (error) {
+    console.error("❌ Error during login:", error);
+  }
+};
+
 
   // 🟢 Update nearby doctors and merge new ones
   const updateNearbyDoctors = useCallback((newDoctors) => {

@@ -212,7 +212,7 @@ const Login = () => {
 
       console.log("✅ Login Response:", res);
 
-      const chatRoomToken = res.data.chat_room?.token || null;
+      // const chatRoomToken = res.data.chat_room?.token || null;
       const { token, user } = res.data;
 
       if (token && user) {
@@ -225,7 +225,9 @@ const Login = () => {
           finalUser = { ...user, role: "super_admin" };
         }
 
-        login(finalUser, token, chatRoomToken);
+        // login(finalUser, token);
+        login(finalUser, token, null);
+
         toast.success("Login successful!");
 
         if (finalUser.role === "vet") {
@@ -282,11 +284,14 @@ const Login = () => {
         }
       );
 
-      const chatRoomToken = res.data.chat_room?.token || null;
+      // const chatRoomToken = res.data.chat_room?.token || null;
       const { token, user } = res.data;
 
       if (token && user) {
-        login(user, token, chatRoomToken);
+        // login(user, token, chatRoomToken);
+        // login(user, token);
+        login(user, token, null);
+
         toast.success("Login successful!");
         navigate("/dashboard");
       } else {

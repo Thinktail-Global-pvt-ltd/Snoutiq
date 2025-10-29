@@ -15,19 +15,11 @@ export default function CallPage() {
   const [searchParams] = useSearchParams();
 
   // From navigation state
-  const { doctorId: stateDoctorId, patientId: statePatientId, channel, callId: stateCallId } = location.state || {};
+  const { doctorId: stateDoctorId, patientId: statePatientId, channel, callId } = location.state || {};
 
   // From query params (fallback)
-  const queryDoctorId = searchParams.get("doctorId");
-  const queryPatientId = searchParams.get("patientId");
-  const queryCallId = searchParams.get("callId");
-  
-  // Final values with proper fallbacks
-  const doctorId = stateDoctorId || queryDoctorId || 'unknown';
-  const patientId = statePatientId || queryPatientId || 'unknown';
-  const callId = stateCallId || queryCallId || `call_${Date.now()}`;
-
-  console.log('CallPage IDs:', { doctorId, patientId, callId, locationState: location.state });
+  const doctorId = stateDoctorId || searchParams.get("doctorId");
+  const patientId = statePatientId || searchParams.get("patientId");
 
   const safeChannel = useMemo(() => {
     return (channelName || "default_channel")
@@ -199,20 +191,9 @@ export default function CallPage() {
       // Cleanup and navigate
       setTimeout(async () => {
         await cleanup();
-        const targetDoctorId = doctorId || 'unknown';
-        const targetPatientId = patientId || 'unknown';
-        
         navigate(isHost 
-          ? `/prescription/${targetDoctorId}/${targetPatientId}`
-          : `/rating/${targetDoctorId}/${targetPatientId}`,
-          {
-            state: {
-              doctorId: targetDoctorId,
-              patientId: targetPatientId,
-              callId: callId,
-              fromCall: true
-            }
-          }
+          ? `/prescription/${doctorId}/${patientId}`
+          : `/rating/${doctorId}/${patientId}`
         );
       }, 1500);
     };
@@ -407,42 +388,11 @@ export default function CallPage() {
       timestamp: new Date().toISOString()
     });
 
-    // ✅ Ensure we have valid IDs before navigating
-    const targetDoctorId = doctorId || 'unknown';
-    const targetPatientId = patientId || 'unknown';
-
-    console.log('Navigating with:', { 
-      doctorId: targetDoctorId, 
-      patientId: targetPatientId,
-      isHost 
-    });
-
-    try {
-      // Navigate with proper state
-      navigate(isHost 
-        ? `/prescription/${targetDoctorId}/${targetPatientId}`
-        : `/rating/${targetDoctorId}/${targetPatientId}`,
-        {
-          state: {
-            doctorId: targetDoctorId,
-            patientId: targetPatientId,
-            callId: callId,
-            channel: safeChannel,
-            fromCall: true
-          }
-        }
-      );
-    } catch (error) {
-      console.error('Navigation error:', error);
-      // Fallback navigation
-      navigate(isHost ? '/prescription' : '/rating', {
-        state: {
-          doctorId: targetDoctorId,
-          patientId: targetPatientId,
-          fromCall: true
-        }
-      });
-    }
+    // Navigate
+    navigate(isHost 
+      ? `/prescription/${doctorId}/${patientId}`
+      : `/rating/${doctorId}/${patientId}`
+    );
   };
 
   const getStatusColor = () => {
