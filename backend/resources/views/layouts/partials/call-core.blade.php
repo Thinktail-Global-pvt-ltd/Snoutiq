@@ -265,8 +265,10 @@
       const channel = (payload?.channel || '').trim();
       if (!channel) return null;
       const base = FRONTEND_BASE || '';
+      const doctorValue = String(currentDoctorId || payload?.doctorId || '');
       const search = new URLSearchParams({
-        uid: String(currentDoctorId || payload?.doctorId || ''),
+        uid: doctorValue,
+        doctorId: doctorValue,
         role: 'host',
         pip: '1',
       });

@@ -822,6 +822,7 @@
         doctorId: Number(doctorId || window.CURRENT_USER_ID || 0),
         patientId: Number(lastCall?.patientId || 0),
       };
+      payload.uid = String(payload.doctorId || '');
       console.log('[doctor] accept redirect payload', payload);
       if (window.snoutiqCall?.accept) {
         window.snoutiqCall.accept(payload);
@@ -838,6 +839,7 @@
       const patientParam = (lastCall?.patientId || lastCall?.patient_id || '').toString();
       const callUrl = '/call-page/' + encodeURIComponent(ch)
         + '?uid=' + encodeURIComponent(doctorId||'')
+        + '&doctorId=' + encodeURIComponent(doctorId||'')
         + '&role=host'
         + (callId ? ('&callId=' + encodeURIComponent(callId)) : '')
         + '&pip=1'
