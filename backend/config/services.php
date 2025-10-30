@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'razorpay' => [
+        'key' => env('RAZORPAY_KEY', 'rzp_live_RGBIfjaGxq1Ma4'),
+        'secret' => env('RAZORPAY_SECRET', 'WypJ2plLEmScSrVjrLzixWyN'),
+    ],
+
 ];

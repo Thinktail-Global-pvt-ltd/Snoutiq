@@ -20,7 +20,10 @@ class RazorpayController  extends Controller
 {
     public function createOrder(Request $request)
     {
-        $api = new Api(env('RAZORPAY_KEY'), env('RAZORPAY_SECRET'));
+        $api = new Api(
+            config('services.razorpay.key'),
+            config('services.razorpay.secret')
+        );
 
         $order = $api->order->create([
             'receipt' => 'rcptid_' . time(),
@@ -30,7 +33,7 @@ class RazorpayController  extends Controller
 
         return response()->json([
             'order_id' => $order->id,
-            'razorpay_key' => env('RAZORPAY_KEY'),
+            'razorpay_key' => config('services.razorpay.key'),
             'amount' => $request->amount * 100,
             'currency' => 'INR',
         ]);
@@ -46,7 +49,10 @@ class RazorpayController  extends Controller
     $paymentId = $request->razorpay_payment_id;
     $orderId = $request->razorpay_order_id;
 
-    $api = new Api(env('RAZORPAY_KEY'), env('RAZORPAY_SECRET'));
+    $api = new Api(
+        config('services.razorpay.key'),
+        config('services.razorpay.secret')
+    );
 
     // try {
         // Verify payment signature

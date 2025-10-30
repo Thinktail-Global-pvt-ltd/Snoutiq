@@ -64,8 +64,8 @@ class BookingsController extends Controller
         ]);
 
         // Create Razorpay order for payment
-        $rzKey    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_test_1nhE9190sR3rkP';
-        $rzSecret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'L6CPZlUwrKQpdC9N3TRX8gIh';
+        $rzKey    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_live_RGBIfjaGxq1Ma4';
+        $rzSecret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'WypJ2plLEmScSrVjrLzixWyN';
         $orderId = null; $orderArr = null; $currency = 'INR';
         try {
             $api = new Api($rzKey, $rzSecret);
@@ -116,8 +116,8 @@ class BookingsController extends Controller
             return response()->json(['success' => false, 'error' => 'Booking not found'], 404);
         }
 
-        $rzKey    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_test_1nhE9190sR3rkP';
-        $rzSecret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'L6CPZlUwrKQpdC9N3TRX8gIh';
+        $rzKey    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_live_RGBIfjaGxq1Ma4';
+        $rzSecret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'WypJ2plLEmScSrVjrLzixWyN';
 
         try {
             $api = new Api($rzKey, $rzSecret);

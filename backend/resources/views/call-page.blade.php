@@ -32,7 +32,7 @@
   // ==== Config ====
   $API_BASE         = config('app.call_api_base') ?? env('CALL_API_BASE', 'https://snoutiq.com/backend');
   $AGORA_APP_ID     = config('services.agora.app_id') ?? env('AGORA_APP_ID', '88a602d093ed47d6b77a29726aa6c35e');
-  $RAZORPAY_KEY_ID  = config('services.razorpay.key') ?? env('RAZORPAY_KEY_ID', 'rzp_test_1nhE9190sR3rkP');
+  $RAZORPAY_KEY_ID  = config('services.razorpay.key') ?? env('RAZORPAY_KEY_ID', 'rzp_live_RGBIfjaGxq1Ma4');
 
   // ==== Params from URL ====
   $channel  = request()->route('channel');            // /call-page/{channel}

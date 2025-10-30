@@ -25,7 +25,10 @@ if($price!=0){
     $paymentId = $request->razorpay_payment_id;
     $orderId = $request->razorpay_order_id;
 
-    $api = new Api(env('RAZORPAY_KEY'), env('RAZORPAY_SECRET'));
+    $api = new Api(
+        config('services.razorpay.key'),
+        config('services.razorpay.secret')
+    );
  $attributes = [
             'razorpay_order_id' => $orderId,
             'razorpay_payment_id' => $paymentId,
