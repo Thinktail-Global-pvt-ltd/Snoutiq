@@ -1,5 +1,19 @@
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
+## Web Push Configuration
+
+The doctor PWA now relies on Web Push as a fallback when Socket.IO connections are suspended. Configure the following environment variables in your backend `.env` file:
+
+```env
+WEB_PUSH_PUBLIC_KEY="<base64-url-encoded VAPID public key>"
+WEB_PUSH_PRIVATE_KEY="<base64-url-encoded VAPID private key>"
+WEB_PUSH_SUBJECT="mailto:alerts@snoutiq.com"
+WEB_PUSH_TTL=60
+SOCKET_SERVER_BASE_URL="https://snoutiq.com" # points to the socket server health endpoint
+```
+
+The VAPID keys must be generated once (for example with `web-push generate-vapid-keys`) and supplied in base64-url format without padding. The subject can be a `mailto:` or `https://` URL used by push services to contact the sender. The socket server URL should reference the domain that exposes the `/active-doctors` endpoint so the backend can detect when a doctor is offline before dispatching push alerts.
+
 <p align="center">
 <a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>

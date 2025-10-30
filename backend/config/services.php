@@ -40,4 +40,8 @@ return [
         'secret' => env('RAZORPAY_SECRET', 'WypJ2plLEmScSrVjrLzixWyN'),
     ],
 
+    'socket_server' => [
+        'base_url' => env('SOCKET_SERVER_BASE_URL'),
+    ],
+
 ];

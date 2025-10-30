@@ -807,8 +807,9 @@
 //   );
 // }
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import useDoctorHeartbeat from "../hooks/useDoctorHeartbeat";
 import { socket } from "./socket";
 
 export default function DoctorDashboard({ doctorId = 501 }) {
@@ -818,6 +819,9 @@ export default function DoctorDashboard({ doctorId = 501 }) {
   const [debugLogs, setDebugLogs] = useState([]);
   const navigate = useNavigate();
   const hasSetUpListeners = useRef(false);
+
+  const heartbeatOptions = useMemo(() => ({ pageTag: "DoctorDashboard" }), []);
+  useDoctorHeartbeat(doctorId, heartbeatOptions);
 
   // Add debug log function
   const addDebugLog = (message) => {

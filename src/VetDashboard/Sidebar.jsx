@@ -520,10 +520,12 @@
 
 // export default HeaderWithSidebar;
 
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { AuthContext } from "../auth/AuthContext";
 import RingtonePopup from '../pages/RingtonePopup';
+import useDoctorPushNotifications from "../hooks/useDoctorPushNotifications";
+import useDoctorHeartbeat from "../hooks/useDoctorHeartbeat";
 // Heroicons (outline set)
 import {
   Bars3Icon,
@@ -558,8 +560,12 @@ const HeaderWithSidebar = ({ children }) => {
   const hasListeners = useRef(false);
   const hasSetUpListeners = useRef(false);
   // console.log(user,"ankit");
-  
-  const doctorId = user.id
+
+  const doctorId = user?.id;
+
+  useDoctorPushNotifications(doctorId);
+  const heartbeatOptions = useMemo(() => ({ pageTag: "VetDashboardSidebar" }), []);
+  useDoctorHeartbeat(doctorId, heartbeatOptions);
 
   
 

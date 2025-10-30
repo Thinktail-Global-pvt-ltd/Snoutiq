@@ -32,6 +32,7 @@ class CallSession extends Model
         'ended_at'          => 'datetime',
         'duration_seconds'  => 'integer',
         'amount_paid'       => 'integer',
+        'push_notified_at'  => 'datetime',
     ];
 
     public function refreshComputedLinks(?string $frontendBase = null): self

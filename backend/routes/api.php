@@ -31,9 +31,20 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AgoraController;
 use App\Http\Controllers\Api\CallController as ApiCallController; // handles lightweight requestCall
 use App\Http\Controllers\CallController as CoreCallController;    // handles sessions + token
+use App\Http\Controllers\Api\DoctorPushSubscriptionController;
+use App\Http\Controllers\Api\IncomingCallNotificationController;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
+
+Route::post('/doctor/push-subscriptions', [DoctorPushSubscriptionController::class, 'store']);
+Route::delete('/doctor/push-subscriptions', [DoctorPushSubscriptionController::class, 'destroy']);
+Route::post('/doctor/push/incoming-call', [IncomingCallNotificationController::class, 'show']);
+Route::get('/config/webpush', function () {
+    return response()->json([
+        'publicKey' => config('webpush.public_key'),
+    ]);
+});
 
 use App\Http\Controllers\Api\VetController;
 use App\Http\Controllers\Api\AdminOnboardingStatusController;

@@ -22,12 +22,8 @@ const httpServer = createServer((req, res) => {
     }
 
     if (req.method === "GET" && url.pathname === "/active-doctors") {
-      const available = [];
-      for (const [doctorId] of activeDoctors.entries()) {
-        if (!isDoctorBusy(doctorId)) {
-          available.push(doctorId);
-        }
-      }
+      purgeInactiveDoctors("http-active-doctors");
+      const available = getAvailableDoctors();
 
       res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
       res.end(JSON.stringify({
@@ -55,9 +51,27 @@ const io = new Server(httpServer, {
   path: "/socket.io/",
 });
 
+const DOCTOR_HEARTBEAT_EVENT = "doctor-heartbeat";
+const DOCTOR_HEARTBEAT_GRACE_MS = 5 * 60 * 1000;
+const DOCTOR_HEARTBEAT_LOG_THROTTLE_MS = 60 * 1000;
+
 // Active doctors and call sessions
-const activeDoctors = new Map(); // doctorId -> { socketId, joinedAt, location }
+const activeDoctors = new Map(); // doctorId -> { socketId, joinedAt, location, lastHeartbeatAt, lastHeartbeatVisible, lastHeartbeatSource, lastHeartbeatLoggedAt }
 const activeCalls = new Map();   // callId -> { callId, doctorId, patientId, channel, status, ... }
+
+const purgeInactiveDoctors = (reason = "periodic") => {
+  const now = Date.now();
+  let removed = false;
+  for (const [doctorId, info] of activeDoctors.entries()) {
+    const lastHeartbeatAt = info?.lastHeartbeatAt ? new Date(info.lastHeartbeatAt).getTime() : null;
+    if (lastHeartbeatAt && now - lastHeartbeatAt > DOCTOR_HEARTBEAT_GRACE_MS) {
+      console.log(`⏱️ Removing doctor ${doctorId} after heartbeat timeout (${reason})`);
+      activeDoctors.delete(doctorId);
+      removed = true;
+    }
+  }
+  return removed;
+};
 
 const isDoctorBusy = (doctorId) => {
   for (const [, call] of activeCalls.entries()) {
@@ -72,11 +86,19 @@ const isDoctorBusy = (doctorId) => {
   return false;
 };
 
-const emitAvailableDoctors = () => {
+const getAvailableDoctors = () => {
   const available = [];
   for (const [doctorId] of activeDoctors.entries()) {
     if (!isDoctorBusy(doctorId)) available.push(doctorId);
   }
+  return available;
+};
+
+const emitAvailableDoctors = (reason = "broadcast", { skipPurge = false } = {}) => {
+  if (!skipPurge) {
+    purgeInactiveDoctors(reason);
+  }
+  const available = getAvailableDoctors();
   console.log(`📤 Broadcasting ${available.length} available doctors:`, available);
   io.emit("active-doctors", available);
 };
@@ -88,21 +110,58 @@ io.on("connection", (socket) => {
   socket.on("join-doctor", (doctorId) => {
     const roomName = `doctor-${doctorId}`;
     socket.join(roomName);
-    
+
     if (activeDoctors.has(doctorId)) {
       console.log(`⚠️ Doctor ${doctorId} reconnecting (old socket: ${activeDoctors.get(doctorId).socketId})`);
     }
-    
-    activeDoctors.set(doctorId, { socketId: socket.id, joinedAt: new Date() });
-    console.log(`✅ Doctor ${doctorId} joined (Total active: ${activeDoctors.size})`);
-    
-    socket.emit("doctor-online", { 
-      doctorId, 
-      status: "online", 
-      timestamp: new Date().toISOString() 
+
+    const now = new Date();
+    activeDoctors.set(doctorId, {
+      socketId: socket.id,
+      joinedAt: now,
+      lastHeartbeatAt: now,
+      lastHeartbeatVisible: true,
+      lastHeartbeatSource: "join-doctor",
+      lastHeartbeatLoggedAt: now,
     });
-    
+    console.log(`✅ Doctor ${doctorId} joined (Total active: ${activeDoctors.size})`);
+
+    socket.emit("doctor-online", {
+      doctorId,
+      status: "online",
+      timestamp: new Date().toISOString()
+    });
+
     emitAvailableDoctors();
+  });
+
+  socket.on(DOCTOR_HEARTBEAT_EVENT, (payload = {}) => {
+    const doctorIdRaw = payload?.doctorId ?? payload?.id;
+    const doctorId = Number(doctorIdRaw);
+    if (!doctorId || Number.isNaN(doctorId)) {
+      console.warn(`⚠️ Heartbeat received without valid doctorId:`, payload);
+      return;
+    }
+
+    const timestamp = typeof payload.at === "number" ? payload.at : Date.now();
+    const heartbeatDate = new Date(timestamp);
+    const existing = activeDoctors.get(doctorId) || {
+      socketId: socket.id,
+      joinedAt: new Date(),
+    };
+
+    existing.socketId = socket.id;
+    existing.lastHeartbeatAt = heartbeatDate;
+    existing.lastHeartbeatVisible = Boolean(payload.visible ?? payload.isVisible ?? payload.visibility);
+    existing.lastHeartbeatSource = payload.page || payload.pageTag || payload.source || existing.lastHeartbeatSource || null;
+
+    const lastLoggedAt = existing.lastHeartbeatLoggedAt ? new Date(existing.lastHeartbeatLoggedAt).getTime() : 0;
+    if (!lastLoggedAt || timestamp - lastLoggedAt >= DOCTOR_HEARTBEAT_LOG_THROTTLE_MS || payload.immediate) {
+      console.log(`❤️‍🔥 Heartbeat from doctor ${doctorId} (visible: ${existing.lastHeartbeatVisible ? "yes" : "no"}${existing.lastHeartbeatSource ? `, source: ${existing.lastHeartbeatSource}` : ""})`);
+      existing.lastHeartbeatLoggedAt = new Date(timestamp);
+    }
+
+    activeDoctors.set(doctorId, existing);
   });
 
   // Get active doctors
@@ -409,9 +468,11 @@ io.on("connection", (socket) => {
     // Clean up doctor
     for (const [doctorId, info] of activeDoctors.entries()) {
       if (info.socketId === socket.id) {
-        console.log(`🔌 Removing disconnected doctor ${doctorId}`);
-        activeDoctors.delete(doctorId);
-        emitAvailableDoctors();
+        console.log(`🔌 Marking doctor ${doctorId} disconnected (awaiting heartbeat timeout)`);
+        info.socketId = null;
+        info.lastHeartbeatAt = new Date();
+        info.lastHeartbeatSource = "disconnect";
+        activeDoctors.set(doctorId, info);
       }
     }
 
@@ -485,6 +546,12 @@ io.on("connection", (socket) => {
     }
   });
 });
+
+setInterval(() => {
+  if (purgeInactiveDoctors("heartbeat-interval")) {
+    emitAvailableDoctors("heartbeat-interval", { skipPurge: true });
+  }
+}, 60 * 1000);
 
 // Periodic cleanup - 5 minute timeout
 setInterval(() => {
