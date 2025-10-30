@@ -29,7 +29,8 @@ const httpServer = createServer((req, res) => {
     // public: list active (available) doctors
     if (req.method === "GET" && url.pathname === "/active-doctors") {
       const available = [];
-      for (const [doctorId] of activeDoctors.entries()) {
+      for (const [doctorId, info] of activeDoctors.entries()) {
+        if (info?.manualOffline) continue;
         if (!isDoctorBusy(doctorId)) {
           available.push(doctorId);
         }
@@ -139,6 +140,19 @@ const upsertDoctorEntry = (doctorId, values = {}) => {
     joinedAt: values.joinedAt || existing.joinedAt || new Date(),
   };
 
+  if (values.manualOffline === undefined) {
+    entry.manualOffline = existing.manualOffline || false;
+  } else {
+    entry.manualOffline = values.manualOffline;
+  }
+
+  if (entry.manualOffline) {
+    entry.manualOfflineSince =
+      values.manualOfflineSince || existing.manualOfflineSince || new Date();
+  } else if (values.manualOffline === false) {
+    entry.manualOfflineSince = null;
+  }
+
   if (!entry.connectionStatus) {
     entry.connectionStatus = "connected";
   }
@@ -195,6 +209,7 @@ const emitAvailableDoctors = () => {
   const available = [];
   for (const [doctorId, info] of activeDoctors.entries()) {
     const status = info.connectionStatus || "connected";
+    if (info.manualOffline) continue;
     if (!["connected", "grace"].includes(status)) continue;
     if (!isDoctorBusy(doctorId)) {
       available.push(doctorId);
@@ -274,6 +289,8 @@ io.on("connection", (socket) => {
       joinedAt: new Date(),
       lastSeen: new Date(),
       connectionStatus: "connected",
+      manualOffline: false,
+      manualOfflineSince: null,
     });
 
     console.log(
@@ -660,10 +677,13 @@ io.on("connection", (socket) => {
   // doctor explicitly "goes offline"
   // ---------------------------------
   socket.on("leave-doctor", (doctorId) => {
-    console.log(`👋 Doctor ${doctorId} leaving`);
+    console.log(`👋 Doctor ${doctorId} leaving (manual offline)`);
 
-    socket.leave(`doctor-${doctorId}`);
-    activeDoctors.delete(doctorId);
+    upsertDoctorEntry(doctorId, {
+      manualOffline: true,
+      manualOfflineSince: new Date(),
+      connectionStatus: "manual_offline",
+    });
 
     socket.emit("doctor-offline", {
       doctorId,
