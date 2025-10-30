@@ -353,39 +353,42 @@
         const style = document.createElement('style');
         style.id = 'snoutiq-call-styles';
         style.textContent = `
-          .snoutiq-incoming-call{border-radius:28px!important;padding:0!important;background:#fff!important;box-shadow:0 30px 70px -40px rgba(15,23,42,.55)!important;font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;color:#111827!important;}
+          .snoutiq-incoming-call{border-radius:28px!important;padding:0!important;background:#fff!important;box-shadow:0 28px 90px -45px rgba(15,23,42,.65)!important;font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;color:#111827!important;overflow:hidden;}
           .snoutiq-incoming-call .swal2-title{display:none!important;}
-          .snoutiq-incoming-call .swal2-html-container{margin:0!important;padding:30px 32px 8px!important;}
-          .snoutiq-incoming-call .swal2-actions{margin:0!important;padding:0 32px 28px!important;display:flex!important;gap:16px!important;}
-          .snoutiq-incoming-call .snoutiq-btn{flex:1 1 0%;border-radius:14px;padding:15px 0;font-weight:600;font-size:15px;letter-spacing:.01em;transition:transform .2s ease, box-shadow .2s ease;}
+          .snoutiq-incoming-call .swal2-html-container{margin:0!important;padding:32px 34px 10px!important;}
+          .snoutiq-incoming-call .swal2-actions{margin:0!important;padding:0 34px 30px!important;display:flex!important;gap:16px!important;}
+          .snoutiq-incoming-call .snoutiq-btn{flex:1 1 0%;border-radius:14px;padding:15px 0;font-weight:600;font-size:15px;letter-spacing:.01em;transition:transform .2s ease, box-shadow .2s ease, background .2s ease;}
           .snoutiq-incoming-call .snoutiq-btn:focus{outline:none!important;box-shadow:0 0 0 3px rgba(59,130,246,.35)!important;}
           .snoutiq-incoming-call .snoutiq-btn-accept{background:#22c55e;color:#fff;border:none;}
-          .snoutiq-incoming-call .snoutiq-btn-accept:hover{transform:translateY(-1px);box-shadow:0 18px 26px -18px rgba(34,197,94,.85);}
+          .snoutiq-incoming-call .snoutiq-btn-accept:hover{transform:translateY(-1px);box-shadow:0 20px 32px -20px rgba(34,197,94,.9);}
           .snoutiq-incoming-call .snoutiq-btn-reject{background:#ef4444;color:#fff;border:none;}
-          .snoutiq-incoming-call .snoutiq-btn-reject:hover{transform:translateY(-1px);box-shadow:0 18px 26px -18px rgba(239,68,68,.85);}
-          .snoutiq-call-card{display:flex;flex-direction:column;gap:22px;}
-          .snoutiq-call-header{display:flex;align-items:center;gap:18px;}
-          .snoutiq-call-header-icon{flex-shrink:0;width:56px;height:56px;border-radius:20px;background:#fee2e2;display:flex;align-items:center;justify-content:center;color:#dc2626;box-shadow:inset 0 0 0 1px rgba(254,205,211,.8);}
-          .snoutiq-call-header-icon svg{width:28px;height:28px;}
-          .snoutiq-call-title{font-size:20px;font-weight:700;color:#111827;}
-          .snoutiq-call-patient{margin-top:6px;font-size:15px;font-weight:600;color:#374151;}
-          .snoutiq-call-meta{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;align-items:flex-end;}
+          .snoutiq-incoming-call .snoutiq-btn-reject:hover{transform:translateY(-1px);box-shadow:0 20px 32px -20px rgba(239,68,68,.92);}
+          .snoutiq-call-card{display:flex;flex-direction:column;gap:24px;}
+          .snoutiq-call-header{display:flex;align-items:flex-start;gap:18px;}
+          .snoutiq-call-header-icon{flex-shrink:0;width:60px;height:60px;border-radius:22px;background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);display:flex;align-items:center;justify-content:center;color:#dc2626;box-shadow:inset 0 0 0 1px rgba(254,205,211,.9);}
+          .snoutiq-call-header-icon svg{width:30px;height:30px;}
+          .snoutiq-call-header-main{flex:1 1 auto;display:flex;flex-direction:column;gap:6px;min-width:0;}
+          .snoutiq-call-title{font-size:22px;font-weight:800;color:#111827;letter-spacing:-.015em;white-space:nowrap;}
+          .snoutiq-call-patient{font-size:15px;font-weight:600;color:#1f2937;}
+          .snoutiq-call-patient-sub{font-size:13px;color:#6b7280;}
+          .snoutiq-call-patient-sub.is-hidden{display:none;}
+          .snoutiq-call-meta{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;align-items:flex-end;min-width:130px;}
           .snoutiq-call-meta-channel{display:flex;align-items:center;gap:8px;}
-          .snoutiq-call-meta-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;}
-          .snoutiq-call-meta .snoutiq-call-channel{font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;font-size:12px;color:#111827;background:#f3f4f6;padding:4px 10px;border-radius:8px;display:inline-flex;align-items:center;justify-content:flex-end;}
-          .snoutiq-call-meta-time{font-size:12px;color:#6b7280;}
-          .snoutiq-call-section{border:1px solid #e5e7eb;border-radius:18px;padding:18px;background:#f9fafb;display:flex;flex-direction:column;gap:10px;}
-          .snoutiq-call-section-title{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;}
-          .snoutiq-call-lines{display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.6;color:#374151;}
-          .snoutiq-call-line{position:relative;padding-left:16px;}
-          .snoutiq-call-line::before{content:'';position:absolute;top:9px;left:4px;width:4px;height:4px;border-radius:9999px;background:#9ca3af;}
+          .snoutiq-call-meta-label{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#9ca3af;}
+          .snoutiq-call-meta .snoutiq-call-channel{font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;font-size:12px;color:#111827;background:#f3f4f6;padding:5px 12px;border-radius:10px;display:inline-flex;align-items:center;justify-content:flex-end;box-shadow:inset 0 -1px 0 rgba(148,163,184,.35);}
+          .snoutiq-call-meta-time{font-size:12px;color:#6b7280;white-space:nowrap;}
+          .snoutiq-call-section{position:relative;border:1px solid #e5e7eb;border-radius:20px;padding:20px;background:linear-gradient(180deg,#f9fafb 0%,#f3f4f6 100%);display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.8);}
+          .snoutiq-call-section-title{font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#6b7280;}
+          .snoutiq-call-lines{display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.65;color:#374151;}
+          .snoutiq-call-line{position:relative;padding-left:18px;}
+          .snoutiq-call-line::before{content:'';position:absolute;top:8.5px;left:6px;width:5px;height:5px;border-radius:9999px;background:#9ca3af;}
           .snoutiq-call-line-strong{font-weight:600;color:#111827;}
-          .snoutiq-call-summary{border-color:rgba(248,113,113,.45);background:#fef2f2;}
+          .snoutiq-call-summary{border:1px solid rgba(248,113,113,.55);background:linear-gradient(180deg,#fff5f5 0%,#fee2e2 100%);box-shadow:0 18px 38px -26px rgba(248,113,113,.8);}
           .snoutiq-call-summary-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-          .snoutiq-call-summary-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#b91c1c;}
-          .snoutiq-call-summary-tag{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:#f43f5e;}
+          .snoutiq-call-summary-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.18em;color:#b91c1c;}
+          .snoutiq-call-summary-tag{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:#f43f5e;}
           .snoutiq-call-summary-status{font-size:13px;color:#b91c1c;}
-          .snoutiq-call-summary-body{font-size:13px;line-height:1.6;color:#7f1d1d;}
+          .snoutiq-call-summary-body{font-size:13px;line-height:1.65;color:#7f1d1d;}
           .snoutiq-call-footer{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;}
           .snoutiq-call-footer-note{font-size:11px;color:#9ca3af;}
         `;
@@ -730,6 +733,7 @@
     function populateSwalContent(container, payload){
       if (!container) return;
       const patientEl = container.querySelector('[data-role="call-patient"]');
+      const patientSubEl = container.querySelector('[data-role="call-patient-sub"]');
       const timeEl = container.querySelector('[data-role="call-time"]');
       const channelEl = container.querySelector('[data-role="call-channel"]');
       const templateEl = container.querySelector('[data-role="template"]');
@@ -737,14 +741,16 @@
       const patientId = extractPatientId(payload);
       const patientName = extractPatientName(payload);
       if (patientEl) {
+        const displayName = patientName || (patientId ? `Patient ID #${patientId}` : 'Incoming video consultation');
+        patientEl.textContent = displayName;
+      }
+      if (patientSubEl) {
         if (patientName && patientId) {
-          patientEl.textContent = `${patientName} (Patient ID #${patientId})`;
-        } else if (patientName) {
-          patientEl.textContent = patientName;
-        } else if (patientId) {
-          patientEl.textContent = `Patient ID #${patientId}`;
+          patientSubEl.textContent = `Patient ID #${patientId}`;
+          patientSubEl.classList.remove('is-hidden');
         } else {
-          patientEl.textContent = 'Incoming video consultation';
+          patientSubEl.textContent = '';
+          patientSubEl.classList.add('is-hidden');
         }
       }
 
@@ -795,9 +801,10 @@
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </div>
-              <div>
+              <div class="snoutiq-call-header-main">
                 <div class="snoutiq-call-title">Incoming Call</div>
                 <div class="snoutiq-call-patient" data-role="call-patient"></div>
+                <div class="snoutiq-call-patient-sub is-hidden" data-role="call-patient-sub"></div>
               </div>
               <div class="snoutiq-call-meta">
                 <div class="snoutiq-call-meta-channel">
