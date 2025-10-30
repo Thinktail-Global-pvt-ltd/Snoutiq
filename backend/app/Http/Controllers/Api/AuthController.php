@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
 
 use App\Models\ChatRoom;
+use App\Models\Pet;
 
 
 use Illuminate\Support\Facades\Http;
@@ -344,32 +345,58 @@ public function register(Request $request)
         $summaryText = $this->describePetImageDynamic($imagePath);
     }
 
-    // ✅ Update user with final details
-    $user->update([
-        // 'home_visit'        => $request->home_visit,
-        // 'email'       => $request->email,
-        // 'phone'       => $request->mobileNumber,
-        // 'password'    => $request->password, // ⚠ plain (unsafe in prod)
-        'pet_name'    => $request->pet_name,
-        'pet_gender'  => $request->pet_gender,
-        'pet_age'     => $request->pet_age,
-        'pet_doc1'    => $doc1Path,
-        'pet_doc2'    => $doc2Path,
-        'summary'     => $summaryText,
-       // 'google_token'=> $request->google_token,
-        'breed'       => $request->breed,
-        // 'latitude'    => $request->latitude,
-        // 'longitude'   => $request->longitude,
-    ]);
-
-    // ✅ plain token generate and save
     $plainToken = bin2hex(random_bytes(32));
-    $user->api_token_hash = $plainToken;
-    $user->save();
+
+    try {
+        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $plainToken) {
+            // ✅ Update user with final details
+            $user->fill([
+                'pet_name'    => $request->pet_name,
+                'pet_gender'  => $request->pet_gender,
+                'pet_age'     => $request->pet_age,
+                'pet_doc1'    => $doc1Path,
+                'pet_doc2'    => $doc2Path,
+                'summary'     => $summaryText,
+                'breed'       => $request->breed,
+            ]);
+
+            $user->api_token_hash = $plainToken;
+            $user->save();
+
+            $petAttributes = [
+                'name'       => $request->pet_name,
+                'breed'      => $request->breed,
+                'pet_age'    => $request->pet_age,
+                'pet_gender' => $request->pet_gender,
+                'pet_doc1'   => $doc1Path,
+                'pet_doc2'   => $doc2Path,
+            ];
+
+            $existingPet = Pet::where('user_id', $user->id)->first();
+
+            if ($existingPet) {
+                $existingPet->fill($petAttributes);
+                $existingPet->save();
+                $pet = $existingPet;
+            } else {
+                $pet = Pet::create(array_merge(['user_id' => $user->id], $petAttributes));
+            }
+
+            return $pet;
+        });
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => 'Unable to complete registration at this time',
+        ], 500);
+    }
+
+    $user->refresh();
 
     return response()->json([
         'message'    => 'User registered successfully (updated)',
         'user'       => $user,
+        'pet'        => $pet,
         'token'      => $plainToken,
         'token_type' => 'Bearer',
     ], 200);
