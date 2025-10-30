@@ -66,12 +66,129 @@
     let socket = null;
     let joined = false;
     let ackTimer = null;
+    let shouldHoldOnline = true;
+    let reconnectTimer = null;
+    const RECONNECT_INTERVAL = 8000;
     let globalCall = null;
     let globalAlertOpen = false;
     let ringAudio = null;
     let ringResumePending = false;
     let ringResumeListener = null;
     const callSessionCache = new Map();
+
+    const HEARTBEAT_EVENT = 'doctor-heartbeat';
+    const HEARTBEAT_INTERVAL = 25000;
+    const BACKGROUND_HOLD_MS = 5 * 60 * 1000; // keep UI online for up to 5 minutes while suspended
+
+    let heartbeatTimer = null;
+    let backgroundHoldTimer = null;
+    let backgroundHoldActive = false;
+
+    function isDocumentHidden(){
+      try {
+        return typeof document !== 'undefined' && document.hidden;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function clearReconnectTimer(){
+      if (reconnectTimer) {
+        clearInterval(reconnectTimer);
+        reconnectTimer = null;
+      }
+    }
+
+    function scheduleReconnect(opts = {}){
+      if (!shouldHoldOnline) return;
+      if (!socket || socket.connected) {
+        clearReconnectTimer();
+        return;
+      }
+      if (!reconnectTimer) {
+        reconnectTimer = setInterval(()=>{
+          if (!shouldHoldOnline) {
+            clearReconnectTimer();
+            return;
+          }
+          if (!socket || socket.connected) {
+            clearReconnectTimer();
+            return;
+          }
+          try {
+            socket.connect();
+          } catch (err) {
+            console.warn('[snoutiq-call] reconnect attempt failed', err);
+          }
+        }, RECONNECT_INTERVAL);
+      }
+      if (opts.immediate) {
+        try {
+          socket.connect();
+        } catch (err) {
+          console.warn('[snoutiq-call] reconnect failed', err);
+        }
+      }
+    }
+
+    function sendHeartbeat(immediate){
+      if (!currentDoctorId) return;
+      const sock = socket && socket.connected ? socket : null;
+      if (!sock) return;
+      try {
+        sock.emit(HEARTBEAT_EVENT, {
+          doctorId: Number(currentDoctorId),
+          at: Date.now(),
+          immediate: immediate ? 1 : 0,
+        });
+      } catch (err) {
+        console.warn('[snoutiq-call] heartbeat send failed', err);
+      }
+    }
+
+    function startHeartbeat(){
+      if (!shouldHoldOnline) return;
+      stopHeartbeat();
+      sendHeartbeat(true);
+      heartbeatTimer = setInterval(()=>{
+        if (!shouldHoldOnline) return;
+        sendHeartbeat(false);
+      }, HEARTBEAT_INTERVAL);
+    }
+
+    function stopHeartbeat(){
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+    }
+
+    function enterBackgroundHold(reason){
+      if (!shouldHoldOnline) return;
+      backgroundHoldActive = true;
+      if (backgroundHoldTimer) {
+        clearTimeout(backgroundHoldTimer);
+        backgroundHoldTimer = null;
+      }
+      backgroundHoldTimer = setTimeout(()=>{
+        backgroundHoldActive = false;
+        if (!socket || !socket.connected) {
+          setHeaderStatus('connecting');
+        }
+      }, BACKGROUND_HOLD_MS);
+      if (reason) {
+        try { console.debug('[snoutiq-call] entering background hold due to', reason); } catch(_){ }
+      }
+      setHeaderStatus('online');
+    }
+
+    function exitBackgroundHold(){
+      backgroundHoldActive = false;
+      if (backgroundHoldTimer) {
+        clearTimeout(backgroundHoldTimer);
+        backgroundHoldTimer = null;
+      }
+    }
 
     function readAuthFull(){
       try{
@@ -153,7 +270,7 @@
     const storageDoctorId = extractDoctorId(authFull) || readStoredDoctorId();
     const queryId         = queryDoctorId();
     if (!currentDoctorId) {
-      currentDoctorId = queryId || storageDoctorId || sessionUserId || currentDoctorId;
+        currentDoctorId = queryId || storageDoctorId || sessionUserId || currentDoctorId;
     }
     window.CURRENT_DOCTOR_ID = currentDoctorId;
 
@@ -165,6 +282,29 @@
       }
       return RAW_SOCKET_URL;
     })();
+
+    function detectFrontendBase(){
+      const clean = value => (value || '').toString().trim().replace(/\/+$/, '');
+      const meta = document.querySelector('meta[name="snoutiq-frontend-base"]');
+      if (meta?.content) return clean(meta.content);
+      try{
+        const stored = localStorage.getItem('snoutiq_frontend_base') || sessionStorage.getItem('snoutiq_frontend_base');
+        if (stored) return clean(stored);
+      }catch(_){}
+
+      const origin = clean(window.location.origin);
+      const host = (window.location.hostname || '').toLowerCase();
+      const port = window.location.port;
+
+      const isLocalHost = /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(host);
+      if (isLocalHost && port === '8000') return 'http://localhost:5173';
+
+      // backend might be on /backend, but FE should still be root origin
+      return origin;
+    }
+
+    const FRONTEND_BASE = detectFrontendBase();
+    window.__SNOUTIQ_FRONTEND_BASE = FRONTEND_BASE;
 
     function resolveFrontendAsset(path){
       const cleanPath = `/${String(path || '').replace(/^\/+/, '')}`;
@@ -263,35 +403,13 @@
           socket.emit('join-doctor', num);
           joined = true;
           setHeaderStatus('online');
+          sendHeartbeat(true);
         }catch(err){
           console.warn('[snoutiq-call] failed to refresh doctor id', err);
         }
       }
       return currentDoctorId;
     }
-
-    function detectFrontendBase(){
-      const clean = value => (value || '').toString().trim().replace(/\/+$/, '');
-      const meta = document.querySelector('meta[name=\"snoutiq-frontend-base\"]');
-      if (meta?.content) return clean(meta.content);
-      try{
-        const stored = localStorage.getItem('snoutiq_frontend_base') || sessionStorage.getItem('snoutiq_frontend_base');
-        if (stored) return clean(stored);
-      }catch(_){}
-
-      const origin = clean(window.location.origin);
-      const host = (window.location.hostname || '').toLowerCase();
-      const port = window.location.port;
-
-      const isLocalHost = /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(host);
-      if (isLocalHost && port === '8000') return 'http://localhost:5173';
-
-      // For cases where backend is hosted under /backend, we still want the root origin.
-      return origin;
-    }
-
-    const FRONTEND_BASE = detectFrontendBase();
-    window.__SNOUTIQ_FRONTEND_BASE = FRONTEND_BASE;
 
     function callUrlFromPayload(payload){
       const channel = (payload?.channel || '').trim();
@@ -431,7 +549,7 @@
           }
           if (openEl) {
             openEl.removeAttribute('href');
-            openEl.setAttribute('aria-disabled', 'true');
+            openEl.setAttribute('aria-disabled','true');
           }
           if (copyEl) {
             copyEl.disabled = true;
@@ -449,7 +567,7 @@
         }
         if (openEl) {
           openEl.href = url;
-          openEl.setAttribute('aria-disabled', 'false');
+          openEl.setAttribute('aria-disabled','false');
         }
         if (copyEl) {
           copyEl.disabled = false;
@@ -502,7 +620,7 @@
         try {
           populateSwalContent(container, globalCall);
         } catch (_err) {
-          /* swallow re-render issues */
+          /* swallow render issues */
         }
         const doctorRow = container.querySelector('[data-role="doctor-link"]');
         const paymentRow = container.querySelector('[data-role="payment-link"]');
@@ -665,66 +783,380 @@
 
     let summaryFetchToken = 0;
 
+    // UPDATED: dark glass / dropdown styling
     function injectCallStyles(){
       if (document.getElementById('snoutiq-call-styles')) return;
       try {
         const style = document.createElement('style');
         style.id = 'snoutiq-call-styles';
         style.textContent = `
-          .snoutiq-incoming-call{border-radius:28px!important;padding:0!important;background:#fff!important;box-shadow:0 28px 90px -45px rgba(15,23,42,.65)!important;font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;color:#111827!important;overflow:hidden;}
+          .snoutiq-incoming-call{
+            border-radius:24px!important;
+            padding:0!important;
+            background:#0f172a!important;
+            box-shadow:0 40px 120px -20px rgba(0,0,0,.9),0 2px 80px 0 rgba(15,23,42,.8)!important;
+            font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;
+            color:#f8fafc!important;
+            border:1px solid rgba(148,163,184,.2);
+            overflow:hidden;
+          }
           .snoutiq-incoming-call .swal2-title{display:none!important;}
-          .snoutiq-incoming-call .swal2-html-container{margin:0!important;padding:32px 34px 10px!important;}
-          .snoutiq-incoming-call .swal2-actions{margin:0!important;padding:0 34px 30px!important;display:flex!important;gap:16px!important;}
-          .snoutiq-incoming-call .snoutiq-btn{flex:1 1 0%;border-radius:14px;padding:15px 0;font-weight:600;font-size:15px;letter-spacing:.01em;transition:transform .2s ease, box-shadow .2s ease, background .2s ease;}
-          .snoutiq-incoming-call .snoutiq-btn:focus{outline:none!important;box-shadow:0 0 0 3px rgba(59,130,246,.35)!important;}
-          .snoutiq-incoming-call .snoutiq-btn-accept{background:#22c55e;color:#fff;border:none;}
-          .snoutiq-incoming-call .snoutiq-btn-accept:hover{transform:translateY(-1px);box-shadow:0 20px 32px -20px rgba(34,197,94,.9);}
-          .snoutiq-incoming-call .snoutiq-btn-reject{background:#ef4444;color:#fff;border:none;}
-          .snoutiq-incoming-call .snoutiq-btn-reject:hover{transform:translateY(-1px);box-shadow:0 20px 32px -20px rgba(239,68,68,.92);}
-          .snoutiq-call-card{display:flex;flex-direction:column;gap:24px;}
-          .snoutiq-call-header{display:flex;align-items:flex-start;gap:18px;}
-          .snoutiq-call-header-icon{flex-shrink:0;width:60px;height:60px;border-radius:22px;background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);display:flex;align-items:center;justify-content:center;color:#dc2626;box-shadow:inset 0 0 0 1px rgba(254,205,211,.9);}
-          .snoutiq-call-header-icon svg{width:30px;height:30px;}
-          .snoutiq-call-header-main{flex:1 1 auto;display:flex;flex-direction:column;gap:6px;min-width:0;}
-          .snoutiq-call-title{font-size:22px;font-weight:800;color:#111827;letter-spacing:-.015em;white-space:nowrap;}
-          .snoutiq-call-patient{font-size:15px;font-weight:600;color:#1f2937;}
-          .snoutiq-call-patient-sub{font-size:13px;color:#6b7280;}
+          .snoutiq-incoming-call .swal2-html-container{
+            margin:0!important;
+            padding:0!important;
+          }
+          .snoutiq-incoming-call .swal2-actions{
+            margin:0!important;
+            padding:16px 20px 20px!important;
+            display:flex!important;
+            gap:12px!important;
+            background:rgba(15,23,42,.6);
+            border-top:1px solid rgba(148,163,184,.15);
+            backdrop-filter:blur(12px);
+          }
+
+          .snoutiq-call-card{
+            display:flex;
+            flex-direction:column;
+            background:
+              radial-gradient(circle at -20% -10%,rgba(99,102,241,.35) 0%,transparent 60%),
+              radial-gradient(circle at 120% 20%,rgba(16,185,129,.25) 0%,transparent 60%),
+              radial-gradient(circle at 50% 120%,rgba(244,63,94,.2) 0%,transparent 60%),
+              #0f172a;
+            padding:20px 20px 12px;
+            gap:16px;
+          }
+
+          .snoutiq-call-top{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:16px;
+          }
+          .snoutiq-call-left{
+            display:flex;
+            align-items:flex-start;
+            gap:14px;
+            min-width:0;
+          }
+          .snoutiq-avatar{
+            width:52px;
+            height:52px;
+            border-radius:14px;
+            background:radial-gradient(circle at 30% 30%,#1e293b 0%,#0f172a 60%);
+            border:1px solid rgba(226,232,240,.08);
+            box-shadow:0 20px 40px -10px rgba(0,0,0,.9),0 0 20px rgba(16,185,129,.4) inset;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            color:#10b981;
+          }
+          .snoutiq-avatar svg{
+            width:26px;
+            height:26px;
+            stroke-width:1.4;
+          }
+
+          .snoutiq-call-idblock{
+            display:flex;
+            flex-direction:column;
+            min-width:0;
+          }
+          .snoutiq-call-title-row{
+            display:flex;
+            align-items:center;
+            flex-wrap:wrap;
+            gap:8px;
+          }
+          .snoutiq-call-incoming-label{
+            font-size:11px;
+            line-height:1.2;
+            font-weight:600;
+            color:#10b981;
+            background:rgba(16,185,129,.12);
+            border:1px solid rgba(16,185,129,.4);
+            border-radius:9999px;
+            padding:4px 8px;
+            text-transform:uppercase;
+            letter-spacing:.08em;
+          }
+          .snoutiq-call-patient{
+            font-size:16px;
+            line-height:1.3;
+            font-weight:600;
+            color:#f8fafc;
+            letter-spacing:-.03em;
+            min-width:0;
+          }
+          .snoutiq-call-patient-sub{
+            font-size:12px;
+            font-weight:500;
+            color:#94a3b8;
+          }
           .snoutiq-call-patient-sub.is-hidden{display:none;}
-          .snoutiq-call-meta{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;align-items:flex-end;min-width:140px;}
-          .snoutiq-call-meta-label{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#9ca3af;}
-          .snoutiq-call-channel{font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;font-size:12px;color:#111827;word-break:break-all;background:#f9fafb;padding:6px 10px;border-radius:10px;box-shadow:inset 0 -1px 0 rgba(148,163,184,.28);}
-          .snoutiq-call-meta-time{font-size:12px;color:#6b7280;white-space:nowrap;}
-          .snoutiq-call-section{position:relative;border:1px solid #e5e7eb;border-radius:18px;padding:18px;background:#f9fafb;display:flex;flex-direction:column;gap:10px;}
-          .snoutiq-call-section-title{font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#6b7280;}
-          .snoutiq-call-lines{display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.65;color:#374151;}
-          .snoutiq-call-line{position:relative;padding-left:18px;}
-          .snoutiq-call-line::before{content:'';position:absolute;top:8.5px;left:6px;width:5px;height:5px;border-radius:9999px;background:#9ca3af;}
-          .snoutiq-call-line-strong{font-weight:600;color:#111827;}
-          .snoutiq-call-summary{border:1px solid rgba(248,113,113,.45);background:#fff7f7;border-radius:18px;}
-          .snoutiq-call-summary-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-          .snoutiq-call-summary-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.18em;color:#b91c1c;}
-          .snoutiq-call-summary-tag{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:#f43f5e;}
-          .snoutiq-call-summary-status{font-size:13px;color:#b91c1c;}
-          .snoutiq-call-summary-body{font-size:13px;line-height:1.65;color:#7f1d1d;}
-          .snoutiq-call-links{display:flex;flex-direction:column;gap:10px;margin-top:4px;}
-          .snoutiq-call-link-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border-radius:12px;background:#ffffff;border:1px solid #e5e7eb;transition:border-color .2s ease,box-shadow .2s ease;}
-          .snoutiq-call-link-row:not(.is-disabled):hover{border-color:#c7d2fe;box-shadow:0 10px 20px -18px rgba(79,70,229,.4);}
-          .snoutiq-call-link-row.is-disabled{opacity:.55;}
-          .snoutiq-call-link-row.is-disabled .snoutiq-call-link-open,
-          .snoutiq-call-link-row.is-disabled .snoutiq-call-link-copy{pointer-events:none;cursor:not-allowed;}
-          .snoutiq-call-link-main{display:flex;flex-direction:column;gap:4px;}
-          .snoutiq-call-link-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#1f2937;}
-          .snoutiq-call-link-value{font-size:12px;color:#4b5563;font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;word-break:break-all;}
-          .snoutiq-call-link-actions{display:flex;gap:8px;align-items:center;}
-          .snoutiq-call-link-open{display:inline-flex;align-items:center;justify-content:center;padding:6px 14px;border-radius:10px;font-size:12px;font-weight:600;color:#1d4ed8;border:1px solid #c7d2fe;background:#eef2ff;text-decoration:none;transition:background .2s ease,color .2s ease,border-color .2s ease;}
-          .snoutiq-call-link-open:hover{background:#e0e7ff;border-color:#818cf8;}
-          .snoutiq-call-link-open:focus{outline:none;box-shadow:0 0 0 2px rgba(99,102,241,.3);}
-          .snoutiq-call-link-copy{padding:6px 12px;border-radius:10px;border:1px solid #e0e7ff;background:#fff;color:#312e81;font-size:12px;font-weight:600;cursor:pointer;transition:background .2s ease,color .2s ease,border-color .2s ease;}
-          .snoutiq-call-link-copy:hover{border-color:#c7d2fe;background:#eef2ff;}
-          .snoutiq-call-link-copy:focus{outline:none;box-shadow:0 0 0 2px rgba(99,102,241,.25);}
-          .snoutiq-call-link-copy.is-copied{background:#ecfdf5;border-color:#86efac;color:#065f46;}
-          .snoutiq-call-footer{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;}
-          .snoutiq-call-footer-note{font-size:11px;color:#9ca3af;}
+
+          .snoutiq-call-meta{
+            margin-left:auto;
+            text-align:right;
+            flex-shrink:0;
+            display:flex;
+            flex-direction:column;
+            gap:6px;
+            min-width:140px;
+          }
+          .snoutiq-call-meta-label{
+            font-size:10px;
+            font-weight:600;
+            line-height:1.2;
+            color:#64748b;
+            text-transform:uppercase;
+            letter-spacing:.16em;
+          }
+          .snoutiq-call-channel{
+            font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;
+            font-size:12px;
+            line-height:1.4;
+            font-weight:500;
+            color:#f8fafc;
+            background:rgba(30,41,59,.6);
+            border:1px solid rgba(148,163,184,.28);
+            box-shadow:0 12px 32px -8px rgba(0,0,0,.9);
+            padding:6px 10px;
+            border-radius:10px;
+            word-break:break-all;
+          }
+          .snoutiq-call-meta-time{
+            font-size:11px;
+            line-height:1.4;
+            color:#94a3b8;
+            white-space:nowrap;
+          }
+
+          .snoutiq-sections{
+            display:flex;
+            flex-direction:column;
+            gap:12px;
+            width:100%;
+          }
+
+          .snoutiq-section-card{
+            background:rgba(15,23,42,.6);
+            border:1px solid rgba(148,163,184,.18);
+            border-radius:14px;
+            padding:12px 14px 10px;
+            box-shadow:0 30px 80px -20px rgba(0,0,0,.8),0 0 120px rgba(96,165,250,.15) inset;
+            backdrop-filter:blur(10px);
+          }
+          .snoutiq-section-head{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            margin-bottom:8px;
+          }
+          .snoutiq-section-left{
+            display:flex;
+            flex-direction:column;
+            gap:4px;
+          }
+          .snoutiq-section-title{
+            font-size:11px;
+            line-height:1.2;
+            font-weight:600;
+            color:#94a3b8;
+            text-transform:uppercase;
+            letter-spacing:.14em;
+          }
+          .snoutiq-section-subtag{
+            font-size:10px;
+            line-height:1.2;
+            font-weight:500;
+            color:#38bdf8;
+            text-transform:uppercase;
+            letter-spacing:.12em;
+          }
+          .snoutiq-section-status{
+            font-size:12px;
+            line-height:1.5;
+            color:#fda4af;
+            font-weight:500;
+          }
+
+          .snoutiq-lines{
+            display:flex;
+            flex-direction:column;
+            gap:6px;
+            font-size:13px;
+            line-height:1.55;
+            color:#e2e8f0;
+          }
+          .snoutiq-line{
+            position:relative;
+            padding-left:14px;
+            font-weight:400;
+          }
+          .snoutiq-line::before{
+            content:'';
+            position:absolute;
+            top:7px;
+            left:3.5px;
+            width:4px;
+            height:4px;
+            border-radius:9999px;
+            background:#475569;
+          }
+          .snoutiq-strong{
+            font-weight:600;
+            color:#fff;
+          }
+          .snoutiq-lines-empty{
+            font-size:12px;
+            font-weight:400;
+            color:#64748b;
+          }
+
+          .snoutiq-links-wrap{
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+          }
+
+          .snoutiq-link-row{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:12px;
+            background:rgba(15,23,42,.4);
+            border:1px solid rgba(148,163,184,.22);
+            border-radius:12px;
+            padding:10px 12px;
+            transition:all .18s ease;
+          }
+          .snoutiq-link-row:not(.is-disabled):hover{
+            border-color:rgba(129,140,248,.6);
+            box-shadow:0 26px 60px -22px rgba(59,130,246,.8);
+            background:rgba(30,41,59,.6);
+          }
+          .snoutiq-link-row.is-disabled{
+            opacity:.5;
+          }
+
+          .snoutiq-link-main{
+            display:flex;
+            flex-direction:column;
+            gap:3px;
+          }
+          .snoutiq-link-label{
+            font-size:10px;
+            font-weight:600;
+            color:#f8fafc;
+            text-transform:uppercase;
+            letter-spacing:.12em;
+          }
+          .snoutiq-link-value{
+            font-size:12px;
+            line-height:1.4;
+            color:#94a3b8;
+            font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;
+            word-break:break-all;
+            max-width:220px;
+          }
+          .snoutiq-link-actions{
+            display:flex;
+            flex-direction:column;
+            align-items:flex-end;
+            gap:6px;
+            flex-shrink:0;
+          }
+          .snoutiq-link-open{
+            text-decoration:none;
+            font-size:12px;
+            font-weight:600;
+            line-height:1.2;
+            color:#38bdf8;
+            background:rgba(8,51,68,.6);
+            border:1px solid rgba(56,189,248,.4);
+            border-radius:8px;
+            padding:6px 10px;
+            min-width:60px;
+            text-align:center;
+          }
+          .snoutiq-link-open[aria-disabled="true"]{
+            opacity:.4;
+            pointer-events:none;
+          }
+          .snoutiq-link-copy{
+            font-size:11px;
+            font-weight:500;
+            line-height:1.2;
+            color:#1e293b;
+            background:#f8fafc;
+            border:1px solid #cbd5e1;
+            border-radius:8px;
+            padding:5px 8px;
+            cursor:pointer;
+            min-width:60px;
+            text-align:center;
+            transition:all .15s ease;
+          }
+          .snoutiq-link-copy:hover{
+            background:#e2e8f0;
+          }
+          .snoutiq-link-copy.is-copied{
+            background:#ecfdf5;
+            border-color:#86efac;
+            color:#065f46;
+          }
+
+          .snoutiq-footer-note{
+            font-size:11px;
+            line-height:1.4;
+            color:#475569;
+            text-align:center;
+            margin-top:6px;
+          }
+
+          .snoutiq-btn{
+            flex:1 1 0%;
+            border-radius:14px;
+            padding:14px 0;
+            font-weight:600;
+            font-size:15px;
+            line-height:1.2;
+            letter-spacing:.01em;
+            transition:transform .18s ease, box-shadow .18s ease, background .18s ease;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            border:none;
+          }
+          .snoutiq-btn:focus{
+            outline:none!important;
+            box-shadow:0 0 0 3px rgba(59,130,246,.35)!important;
+          }
+          .snoutiq-btn-accept{
+            background:radial-gradient(circle at 0% 0%,#10b981 0%,#047857 70%);
+            color:#fff;
+            box-shadow:0 30px 60px -15px rgba(16,185,129,.8),0 0 60px rgba(16,185,129,.6);
+          }
+          .snoutiq-btn-accept:hover{
+            transform:translateY(-1px);
+            box-shadow:0 40px 70px -10px rgba(16,185,129,.9),0 0 80px rgba(16,185,129,.7);
+          }
+          .snoutiq-btn-reject{
+            background:radial-gradient(circle at 0% 0%,#ef4444 0%,#7f1d1d 70%);
+            color:#fff;
+            box-shadow:0 30px 60px -15px rgba(239,68,68,.8),0 0 60px rgba(239,68,68,.45);
+          }
+          .snoutiq-btn-reject:hover{
+            transform:translateY(-1px);
+            box-shadow:0 40px 70px -10px rgba(239,68,68,.9),0 0 80px rgba(239,68,68,.6);
+          }
+          .snoutiq-btn svg{
+            width:18px;
+            height:18px;
+            stroke-width:1.6;
+          }
         `;
         document.head.appendChild(style);
       } catch (_) {
@@ -823,9 +1255,7 @@
               .filter(Boolean)
               .join('\n');
             if (text.trim()) segments.push(text.trim());
-          } catch (_) {
-            /* ignore */
-          }
+          } catch (_) {}
         }
       });
 
@@ -844,30 +1274,37 @@
       return segments.join('\n').trim();
     }
 
+    // UPDATED renderLines(): matches dark theme classes
     function renderLines(container, lines, opts = {}){
       if (!container) return;
       const {
-        emptyMessage = 'No information available.',
-        emptyColor = '#9ca3af',
-        fontSize = '13px',
-        lineHeight = '1.6',
-        textColor = '#374151',
-        labelColor = '#111827',
+        emptyMessage    = 'No information available.',
+        emptyColor      = '#64748b',
+        fontSize        = '13px',
+        lineHeight      = '1.55',
+        textColor       = '#e2e8f0',
+        labelColor      = '#fff',
         highlightLabels = true,
       } = opts;
 
       container.innerHTML = '';
-      try { container.classList.add('snoutiq-call-lines'); } catch (_) {}
+      try { container.classList.add('snoutiq-lines'); } catch (_) {}
       let hasContent = false;
-      const safeLines = Array.isArray(lines) ? lines : (typeof lines === 'string' ? lines.split(/\n+/) : []);
+
+      const safeLines = Array.isArray(lines)
+        ? lines
+        : (typeof lines === 'string' ? lines.split(/\n+/) : []);
+
       safeLines.forEach(raw => {
         const trimmed = (raw || '').toString().trim();
         if (!trimmed) return;
+
         const line = document.createElement('div');
-        line.className = 'snoutiq-call-line';
-        line.style.fontSize = fontSize;
+        line.className = 'snoutiq-line';
+        line.style.fontSize   = fontSize;
         line.style.lineHeight = lineHeight;
-        line.style.color = textColor;
+        line.style.color      = textColor;
+
         if (highlightLabels) {
           const idx = trimmed.indexOf(':');
           if (idx > 0 && idx < 40) {
@@ -875,10 +1312,8 @@
             const value = trimmed.slice(idx + 1).trim();
             if (label && value) {
               const strong = document.createElement('span');
-              strong.className = 'snoutiq-call-line-strong';
-              if (labelColor) {
-                strong.style.color = labelColor;
-              }
+              strong.className = 'snoutiq-strong';
+              strong.style.color = labelColor;
               strong.style.fontWeight = '600';
               strong.textContent = `${label}:`;
               line.appendChild(strong);
@@ -892,14 +1327,14 @@
         } else {
           line.textContent = trimmed;
         }
+
         container.appendChild(line);
         hasContent = true;
       });
 
       if (!container.childElementCount) {
         const span = document.createElement('span');
-        span.style.display = 'block';
-        span.style.fontSize = '12px';
+        span.className = 'snoutiq-lines-empty';
         span.style.color = emptyColor;
         span.textContent = emptyMessage;
         container.appendChild(span);
@@ -994,7 +1429,7 @@
       if (statusEl) {
         statusEl.style.display = 'block';
         statusEl.style.fontSize = '12px';
-        statusEl.style.color = '#9f1239';
+        statusEl.style.color = '#fda4af';
         statusEl.textContent = patientId ? 'Fetching AI summary…' : 'Patient ID missing.';
       }
 
@@ -1021,11 +1456,11 @@
           const lines = parseAiSummary(summaryText);
           const hasSummary = renderLines(summaryEl, lines, {
             emptyMessage: 'No recent AI chats found.',
-            emptyColor: '#9f1239',
-            fontSize: '13px',
-            lineHeight: '1.6',
-            textColor: '#7f1d1d',
-            labelColor: '#be123c',
+            emptyColor:   '#64748b',
+            fontSize:     '13px',
+            lineHeight:   '1.6',
+            textColor:    '#e2e8f0',
+            labelColor:   '#fff',
           });
           summaryEl.style.display = 'block';
           if (statusEl) {
@@ -1123,13 +1558,14 @@
           channelEl.removeAttribute('title');
         }
       }
+
       if (templateEl) {
         const templateText = extractCallTemplate(payload);
         renderLines(templateEl, templateText, {
           emptyMessage: 'No consultation template shared yet.',
-          emptyColor: '#9ca3af',
-          textColor: '#374151',
-          labelColor: '#1f2937',
+          emptyColor:   '#64748b',
+          textColor:    '#e2e8f0',
+          labelColor:   '#fff',
         });
       }
 
@@ -1141,6 +1577,7 @@
       return patientId;
     }
 
+    // UPDATED modal HTML (dark dropdown style)
     function renderGlobalCallAlert(payload){
       if (window.DOCTOR_PAGE_HANDLE_CALLS) return;
       globalCall = payload;
@@ -1150,64 +1587,115 @@
       if (window.Swal) {
         injectCallStyles();
         globalAlertOpen = true;
+
         const html = `
           <div class="snoutiq-call-card">
-            <div class="snoutiq-call-header">
-              <div class="snoutiq-call-header-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+
+            <div class="snoutiq-call-top">
+              <div class="snoutiq-call-left">
+                <div class="snoutiq-avatar">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+                  </svg>
+                </div>
+                <div class="snoutiq-call-idblock">
+                  <div class="snoutiq-call-title-row">
+                    <div class="snoutiq-call-incoming-label">Incoming Call</div>
+                    <div class="snoutiq-call-patient" data-role="call-patient">Patient…</div>
+                  </div>
+                  <div class="snoutiq-call-patient-sub is-hidden" data-role="call-patient-sub"></div>
+                </div>
               </div>
-              <div class="snoutiq-call-header-main">
-                <div class="snoutiq-call-title">Incoming Call</div>
-                <div class="snoutiq-call-patient" data-role="call-patient"></div>
-                <div class="snoutiq-call-patient-sub is-hidden" data-role="call-patient-sub"></div>
-              </div>
+
               <div class="snoutiq-call-meta">
                 <span class="snoutiq-call-meta-label">Channel</span>
                 <span class="snoutiq-call-channel" data-role="call-channel">—</span>
                 <span class="snoutiq-call-meta-time" data-role="call-time"></span>
               </div>
             </div>
-            <div class="snoutiq-call-section">
-              <div class="snoutiq-call-section-title">Consultation Template</div>
-              <div data-role="template"></div>
-            </div>
-            <div class="snoutiq-call-section snoutiq-call-summary">
-              <div class="snoutiq-call-summary-head">
-                <span class="snoutiq-call-summary-label">AI Chat Summary</span>
-                <span class="snoutiq-call-summary-tag">Latest Chats</span>
-              </div>
-              <div class="snoutiq-call-summary-status" data-role="summary-status">Fetching AI summary…</div>
-              <div class="snoutiq-call-summary-body" data-role="summary" style="display:none;"></div>
-            </div>
-            <div class="snoutiq-call-section snoutiq-call-links">
-              <div class="snoutiq-call-link-row is-disabled" data-role="doctor-link">
-                <div class="snoutiq-call-link-main">
-                  <span class="snoutiq-call-link-label" data-role="link-label">Doctor Join Link</span>
-                  <span class="snoutiq-call-link-value" data-role="link-value">Not available yet</span>
+
+            <div class="snoutiq-sections">
+              <div class="snoutiq-section-card">
+                <div class="snoutiq-section-head">
+                  <div class="snoutiq-section-left">
+                    <div class="snoutiq-section-title">Consultation Details</div>
+                    <div class="snoutiq-section-subtag">Live intake</div>
+                  </div>
                 </div>
-                <div class="snoutiq-call-link-actions">
-                  <a class="snoutiq-call-link-open" data-role="link-open" href="#" target="_blank" rel="noopener noreferrer">Open</a>
-                  <button type="button" class="snoutiq-call-link-copy" data-role="link-copy" disabled>Copy</button>
+                <div class="snoutiq-lines" data-role="template">
+                  <div class="snoutiq-lines-empty">No consultation template shared yet.</div>
                 </div>
               </div>
-              <div class="snoutiq-call-link-row is-disabled" data-role="payment-link">
-                <div class="snoutiq-call-link-main">
-                  <span class="snoutiq-call-link-label" data-role="link-label">Payment Page</span>
-                  <span class="snoutiq-call-link-value" data-role="link-value">Not available yet</span>
+
+              <div class="snoutiq-section-card">
+                <div class="snoutiq-section-head">
+                  <div class="snoutiq-section-left">
+                    <div class="snoutiq-section-title">AI Chat Summary</div>
+                    <div class="snoutiq-section-subtag">Latest Chats</div>
+                  </div>
+                  <div class="snoutiq-section-status" data-role="summary-status">Fetching AI summary…</div>
                 </div>
-                <div class="snoutiq-call-link-actions">
-                  <a class="snoutiq-call-link-open" data-role="link-open" href="#" target="_blank" rel="noopener noreferrer">Open</a>
-                  <button type="button" class="snoutiq-call-link-copy" data-role="link-copy" disabled>Copy</button>
+                <div class="snoutiq-lines" data-role="summary" style="display:none;"></div>
+              </div>
+
+              <div class="snoutiq-section-card">
+                <div class="snoutiq-section-head">
+                  <div class="snoutiq-section-left">
+                    <div class="snoutiq-section-title">Links</div>
+                    <div class="snoutiq-section-subtag">Session Access</div>
+                  </div>
+                </div>
+
+                <div class="snoutiq-links-wrap">
+
+                  <div class="snoutiq-link-row is-disabled" data-role="doctor-link">
+                    <div class="snoutiq-link-main">
+                      <span class="snoutiq-link-label" data-role="link-label">Doctor Join Link</span>
+                      <span class="snoutiq-link-value" data-role="link-value">Not available yet</span>
+                    </div>
+                    <div class="snoutiq-link-actions">
+                      <a class="snoutiq-link-open"
+                         data-role="link-open"
+                         href="#"
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         aria-disabled="true">Open</a>
+                      <button type="button"
+                              class="snoutiq-link-copy"
+                              data-role="link-copy"
+                              disabled>Copy</button>
+                    </div>
+                  </div>
+
+                  <div class="snoutiq-link-row is-disabled" data-role="payment-link">
+                    <div class="snoutiq-link-main">
+                      <span class="snoutiq-link-label" data-role="link-label">Payment Page</span>
+                      <span class="snoutiq-link-value" data-role="link-value">Not available yet</span>
+                    </div>
+                    <div class="snoutiq-link-actions">
+                      <a class="snoutiq-link-open"
+                         data-role="link-open"
+                         href="#"
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         aria-disabled="true">Open</a>
+                      <button type="button"
+                              class="snoutiq-link-copy"
+                              data-role="link-copy"
+                              disabled>Copy</button>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </div>
-            <div class="snoutiq-call-footer">
-              <div class="snoutiq-call-footer-note">Keep this tab open to stay available for video consultations.</div>
+
+            <div class="snoutiq-footer-note">
+              Keep this dashboard open to stay available for video consults.
             </div>
           </div>
         `;
+
         Swal.fire({
           title: '',
           html,
@@ -1247,6 +1735,7 @@
         });
         return;
       }
+
       const accept = window.confirm('Incoming call - join now?');
       stopGlobalTone();
       if (accept) acceptGlobalCall(payload);
@@ -1320,10 +1809,13 @@
       socket.on('connect', ()=>{
         setHeaderStatus('connecting');
         joined = false;
+        clearReconnectTimer();
         if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
+        exitBackgroundHold();
         if (currentDoctorId) {
           socket.emit('join-doctor', Number(currentDoctorId));
         }
+        startHeartbeat();
         ackTimer = setTimeout(()=>{
           if (!joined) setHeaderStatus('online');
         }, 1500);
@@ -1334,22 +1826,62 @@
         const match = Number(payload.doctorId);
         if (currentDoctorId && match === Number(currentDoctorId)) {
           joined = true;
+          exitBackgroundHold();
           if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
           setHeaderStatus('online');
         }
       });
 
-      socket.on('disconnect', ()=>{
+      socket.on('disconnect', (reason)=>{
         joined = false;
+        stopHeartbeat();
         if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
         dismissGlobalCall();
-        setHeaderStatus('offline');
+        if (shouldHoldOnline) {
+          if (isDocumentHidden()) {
+            enterBackgroundHold(reason || 'hidden');
+          } else if (backgroundHoldActive) {
+            enterBackgroundHold(reason || 'hold');
+          } else {
+            setHeaderStatus('offline');
+          }
+          scheduleReconnect({ immediate: !isDocumentHidden() });
+        } else {
+          clearReconnectTimer();
+          setHeaderStatus('offline');
+        }
+      });
+
+      const manager = socket?.io;
+      if (manager && !manager.__SNOUTIQ_RECONNECT_BOUND) {
+        manager.__SNOUTIQ_RECONNECT_BOUND = true;
+        manager.on('reconnect_attempt', ()=>{
+          if (!shouldHoldOnline) return;
+          setHeaderStatus('connecting');
+        });
+        manager.on('reconnect', ()=>{
+          exitBackgroundHold();
+          setHeaderStatus('online');
+          startHeartbeat();
+        });
+        manager.on('reconnect_error', (err)=>{
+          console.warn('[snoutiq-call] reconnect_error', err?.message || err);
+        });
+      }
+
+      socket.on('doctor-grace', (payload)=>{
+        const match = Number(payload?.doctorId);
+        if (!match || match !== Number(currentDoctorId)) return;
+        if (payload?.status === 'background' && shouldHoldOnline && (isDocumentHidden() || backgroundHoldActive)) {
+          enterBackgroundHold('server-grace');
+        }
       });
 
       socket.on('connect_error', (err)=>{
         console.warn('[snoutiq-call] socket connect_error', err?.message || err);
         dismissGlobalCall();
         setHeaderStatus('error');
+        scheduleReconnect({ immediate: false });
       });
 
       socket.on('call-requested', (payload)=>{
@@ -1376,6 +1908,8 @@
 
     function goOnline(opts = {}){
       applyVisibility(true);
+      shouldHoldOnline = true;
+      clearReconnectTimer();
       if (opts.showAlert && window.Swal) {
         Swal.fire({
           icon: 'success',
@@ -1395,9 +1929,12 @@
           sock.connect();
         } else if (currentDoctorId && !joined) {
           sock.emit('join-doctor', Number(currentDoctorId));
+          startHeartbeat();
         } else {
           setHeaderStatus('online');
+          startHeartbeat();
         }
+        scheduleReconnect({ immediate: false });
       }catch(err){
         console.warn('[snoutiq-call] failed to connect socket', err);
         setHeaderStatus('error');
@@ -1406,7 +1943,9 @@
 
     function goOffline(opts = {}){
       applyVisibility(false);
+      shouldHoldOnline = false;
       dismissGlobalCall();
+      clearReconnectTimer();
       if (socket) {
         try{
           socket.io.opts.reconnection = false;
@@ -1415,6 +1954,8 @@
       }
       joined = false;
       if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
+      stopHeartbeat();
+      exitBackgroundHold();
       setHeaderStatus('offline');
       if (opts.showAlert && window.Swal) {
         Swal.fire({
@@ -1426,8 +1967,41 @@
     }
 
     const savedVisible = (localStorage.getItem('clinic_visible') ?? 'on') !== 'off';
+    shouldHoldOnline = savedVisible;
     if (toggle) toggle.checked = savedVisible;
     applyVisibility(savedVisible);
+
+    document.addEventListener('visibilitychange', ()=>{
+      if (!shouldHoldOnline) return;
+      if (!isDocumentHidden()) {
+        clearReconnectTimer();
+        const sock = ensureSocket();
+        exitBackgroundHold();
+        startHeartbeat();
+        sendHeartbeat(true);
+        if (sock && !sock.connected) {
+          setHeaderStatus('connecting');
+          scheduleReconnect({ immediate: true });
+        } else if (sock && joined) {
+          setHeaderStatus('online');
+        }
+      } else {
+        enterBackgroundHold('visibilitychange');
+        scheduleReconnect({ immediate: false });
+      }
+    });
+
+    window.addEventListener('focus', ()=>{
+      if (!shouldHoldOnline) return;
+      const sock = ensureSocket();
+      exitBackgroundHold();
+      startHeartbeat();
+      sendHeartbeat(true);
+      if (sock && !sock.connected) {
+        setHeaderStatus('connecting');
+        scheduleReconnect({ immediate: true });
+      }
+    });
 
     const api = {
       ensureSocket,
