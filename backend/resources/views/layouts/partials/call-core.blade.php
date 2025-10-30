@@ -575,34 +575,71 @@
       const text = (summaryText || '').trim();
       if (!text) return [];
 
-      const lines = [];
+      const diagnosisLines = [];
       let inDiagnosis = false;
+      let seenDiagnosisSection = false;
+
       text.split(/\n+/).forEach(line => {
         const trimmed = line.trim();
         if (!trimmed) return;
+
         if (/^===\s*DIAGNOSIS\s*===/i.test(trimmed)) {
           inDiagnosis = true;
+          seenDiagnosisSection = true;
           return;
         }
-        if (/^===\s*END\s*===/i.test(trimmed)) {
-          inDiagnosis = false;
+
+        if (/^===/i.test(trimmed)) {
+          if (inDiagnosis) {
+            inDiagnosis = false;
+          }
           return;
         }
+
+        if (!inDiagnosis) {
+          return;
+        }
+
         if (/^Q:/i.test(trimmed)) {
-          lines.push(`Q: ${trimmed.replace(/^Q:\s*/i, '').trim()}`);
+          diagnosisLines.push(`Q: ${trimmed.replace(/^Q:\s*/i, '').trim()}`);
+          return;
+        }
+
+        if (/^A:/i.test(trimmed)) {
+          const value = trimmed.replace(/^A:\s*/i, '').trim();
+          diagnosisLines.push(`Diagnosis: ${value}`);
+          return;
+        }
+
+        diagnosisLines.push(trimmed);
+      });
+
+      if (diagnosisLines.length) {
+        return diagnosisLines;
+      }
+
+      if (seenDiagnosisSection) {
+        return [];
+      }
+
+      const fallback = [];
+      text.split(/\n+/).forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        if (/^Q:/i.test(trimmed)) {
+          fallback.push(`Q: ${trimmed.replace(/^Q:\s*/i, '').trim()}`);
           return;
         }
         if (/^A:/i.test(trimmed)) {
-          const label = inDiagnosis ? 'Diagnosis' : 'A';
           const value = trimmed.replace(/^A:\s*/i, '').trim();
-          lines.push(`${label}: ${value}`);
+          fallback.push(`A: ${value}`);
           return;
         }
-        lines.push(trimmed);
+        fallback.push(trimmed);
       });
 
-      if (lines.length) {
-        return lines;
+      if (fallback.length) {
+        return fallback;
       }
 
       return text.split(/\n+/).map(l => l.trim()).filter(Boolean);
