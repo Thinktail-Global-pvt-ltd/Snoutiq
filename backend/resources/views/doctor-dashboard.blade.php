@@ -764,12 +764,53 @@
     console.warn('[doctor] socket connect_error:', err?.message||err);
   });
 
+  function pageHidden(){
+    try { return typeof document !== 'undefined' && document.hidden; }
+    catch (_) { return false; }
+  }
+
+  function wantsOnline(){
+    try {
+      if (window.snoutiqCall?.isVisible) {
+        return window.snoutiqCall.isVisible();
+      }
+    } catch (_) { /* ignore */ }
+    return isVisible();
+  }
+
+  function triggerReconnect(){
+    if (!wantsOnline()) return;
+    if (window.snoutiqCall?.goOnline) {
+      try { window.snoutiqCall.goOnline({ showAlert: false }); } catch (_) {}
+      return;
+    }
+    if (!socket.connected) {
+      try {
+        socket.io.opts.reconnection = true;
+        socket.connect();
+      } catch (_) {}
+    }
+  }
+
   socket.on('disconnect', ()=>{
     setConn(false);
     joined = false;
     addLog('Socket disconnected');
-    setHeaderStatus('offline');
+    if (wantsOnline() && pageHidden()) {
+      setHeaderStatus('connecting');
+      triggerReconnect();
+    } else {
+      setHeaderStatus('offline');
+    }
   });
+
+  document.addEventListener('visibilitychange', ()=>{
+    if (!pageHidden()) {
+      triggerReconnect();
+    }
+  });
+
+  window.addEventListener('focus', triggerReconnect);
 
   socket.on('doctor-online', (data)=>{
     try {

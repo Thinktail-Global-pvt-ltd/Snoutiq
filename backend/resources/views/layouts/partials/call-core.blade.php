@@ -66,12 +66,62 @@
     let socket = null;
     let joined = false;
     let ackTimer = null;
+    let shouldHoldOnline = true;
+    let reconnectTimer = null;
+    const RECONNECT_INTERVAL = 8000;
     let globalCall = null;
     let globalAlertOpen = false;
     let ringAudio = null;
     let ringResumePending = false;
     let ringResumeListener = null;
     const callSessionCache = new Map();
+
+    function isDocumentHidden(){
+      try {
+        return typeof document !== 'undefined' && document.hidden;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function clearReconnectTimer(){
+      if (reconnectTimer) {
+        clearInterval(reconnectTimer);
+        reconnectTimer = null;
+      }
+    }
+
+    function scheduleReconnect(opts = {}){
+      if (!shouldHoldOnline) return;
+      if (!socket || socket.connected) {
+        clearReconnectTimer();
+        return;
+      }
+      if (!reconnectTimer) {
+        reconnectTimer = setInterval(()=>{
+          if (!shouldHoldOnline) {
+            clearReconnectTimer();
+            return;
+          }
+          if (!socket || socket.connected) {
+            clearReconnectTimer();
+            return;
+          }
+          try {
+            socket.connect();
+          } catch (err) {
+            console.warn('[snoutiq-call] reconnect attempt failed', err);
+          }
+        }, RECONNECT_INTERVAL);
+      }
+      if (opts.immediate) {
+        try {
+          socket.connect();
+        } catch (err) {
+          console.warn('[snoutiq-call] reconnect failed', err);
+        }
+      }
+    }
 
     function readAuthFull(){
       try{
@@ -1691,6 +1741,7 @@
       socket.on('connect', ()=>{
         setHeaderStatus('connecting');
         joined = false;
+        clearReconnectTimer();
         if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
         if (currentDoctorId) {
           socket.emit('join-doctor', Number(currentDoctorId));
@@ -1714,13 +1765,24 @@
         joined = false;
         if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
         dismissGlobalCall();
-        setHeaderStatus('offline');
+        if (shouldHoldOnline) {
+          if (isDocumentHidden()) {
+            setHeaderStatus('connecting');
+          } else {
+            setHeaderStatus('offline');
+          }
+          scheduleReconnect({ immediate: !isDocumentHidden() });
+        } else {
+          clearReconnectTimer();
+          setHeaderStatus('offline');
+        }
       });
 
       socket.on('connect_error', (err)=>{
         console.warn('[snoutiq-call] socket connect_error', err?.message || err);
         dismissGlobalCall();
         setHeaderStatus('error');
+        scheduleReconnect({ immediate: false });
       });
 
       socket.on('call-requested', (payload)=>{
@@ -1747,6 +1809,8 @@
 
     function goOnline(opts = {}){
       applyVisibility(true);
+      shouldHoldOnline = true;
+      clearReconnectTimer();
       if (opts.showAlert && window.Swal) {
         Swal.fire({
           icon: 'success',
@@ -1769,6 +1833,7 @@
         } else {
           setHeaderStatus('online');
         }
+        scheduleReconnect({ immediate: false });
       }catch(err){
         console.warn('[snoutiq-call] failed to connect socket', err);
         setHeaderStatus('error');
@@ -1777,7 +1842,9 @@
 
     function goOffline(opts = {}){
       applyVisibility(false);
+      shouldHoldOnline = false;
       dismissGlobalCall();
+      clearReconnectTimer();
       if (socket) {
         try{
           socket.io.opts.reconnection = false;
@@ -1797,8 +1864,34 @@
     }
 
     const savedVisible = (localStorage.getItem('clinic_visible') ?? 'on') !== 'off';
+    shouldHoldOnline = savedVisible;
     if (toggle) toggle.checked = savedVisible;
     applyVisibility(savedVisible);
+
+    document.addEventListener('visibilitychange', ()=>{
+      if (!shouldHoldOnline) return;
+      if (!isDocumentHidden()) {
+        clearReconnectTimer();
+        const sock = ensureSocket();
+        if (sock && !sock.connected) {
+          setHeaderStatus('connecting');
+          scheduleReconnect({ immediate: true });
+        } else if (sock && joined) {
+          setHeaderStatus('online');
+        }
+      } else {
+        scheduleReconnect({ immediate: false });
+      }
+    });
+
+    window.addEventListener('focus', ()=>{
+      if (!shouldHoldOnline) return;
+      const sock = ensureSocket();
+      if (sock && !sock.connected) {
+        setHeaderStatus('connecting');
+        scheduleReconnect({ immediate: true });
+      }
+    });
 
     const api = {
       ensureSocket,
