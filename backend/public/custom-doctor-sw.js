@@ -8,6 +8,12 @@ const PRECACHE_URLS = [
   './custom-doctor-icon-512.png'
 ];
 
+const NETWORK_ONLY_PATTERNS = [
+  /\/socket\.io\//,
+  /\/api\/(?:v[0-9]+\/)?socket/,
+  /\/socket\//
+];
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).then(() => self.skipWaiting())
@@ -27,6 +33,11 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (request.method !== 'GET') {
+    return;
+  }
+
+  if (NETWORK_ONLY_PATTERNS.some((regex) => regex.test(url.pathname))) {
+    event.respondWith(fetch(request));
     return;
   }
 
