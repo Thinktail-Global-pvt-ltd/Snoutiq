@@ -31,6 +31,27 @@ class CallSessionLifecycleTest extends TestCase
         ]);
     }
 
+    public function test_legacy_request_call_endpoint_creates_session_record(): void
+    {
+        $response = $this->postJson('/api/call/request', [
+            'patient_id' => 321,
+            'doctor_id'  => 654,
+        ]);
+
+        $response->assertStatus(200);
+
+        $sessionId = $response->json('data.session_id');
+        $this->assertNotNull($sessionId);
+
+        $this->assertDatabaseHas('call_sessions', [
+            'id'             => $sessionId,
+            'patient_id'     => 321,
+            'doctor_id'      => 654,
+            'status'         => 'pending',
+            'payment_status' => 'unpaid',
+        ]);
+    }
+
     public function test_payment_success_creates_payment_and_updates_session(): void
     {
         $createResponse = $this->postJson('/api/call/create', [

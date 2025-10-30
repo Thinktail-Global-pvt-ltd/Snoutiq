@@ -14,12 +14,14 @@ class CallRequested implements ShouldBroadcast
     public $doctorId;
     public $patientId;
     public $channelName;   // ✅ Add channel name
+    public $sessionId;
 
-    public function __construct($doctorId, $patientId, $channelName)
+    public function __construct($doctorId, $patientId, $channelName, $sessionId = null)
     {
         $this->doctorId = $doctorId;
         $this->patientId = $patientId;
         $this->channelName = $channelName;
+        $this->sessionId = $sessionId;
     }
 
     public function broadcastOn()
@@ -33,6 +35,7 @@ class CallRequested implements ShouldBroadcast
             'doctorId'   => $this->doctorId,
             'patientId'  => $this->patientId,
             'channel'    => $this->channelName, // ✅ send channel
+            'sessionId'  => $this->sessionId,
         ];
     }
 }
