@@ -617,20 +617,18 @@ const HeaderWithSidebar = ({ children }) => {
 
   const goOffline = () => {
     addDebugLog(`⚪ Going offline - Doctor ID: ${doctorId}`);
-    
-    socket.emit("leave-doctor", doctorId);
-    
+
     if (socket.connected) {
-      socket.disconnect();
+      socket.emit("leave-doctor", doctorId);
     }
-    
+
     setIsLive(false);
     setIsOnline(false);
     setIncomingCall(null);
     setIncomingCalls([]);
-    setConnectionStatus("offline");
+    setConnectionStatus("manual-offline");
     localStorage.removeItem("doctorLive");
-    addDebugLog("⚪ Doctor is offline");
+    addDebugLog("⚪ Doctor is offline but will continue receiving alerts");
   };
 
   // Toggle live status button
@@ -814,7 +812,12 @@ const handleCallRequested = (callData) => {
   // Get status color and text for UI
   const getStatusColor = () => {
     if (isOnline) return "#16a34a"; // green
-    if (connectionStatus === "connecting" || connectionStatus === "joining" || connectionStatus === "rejoining") return "#f59e0b"; // yellow
+    if (
+      connectionStatus === "connecting" ||
+      connectionStatus === "joining" ||
+      connectionStatus === "rejoining"
+    )
+      return "#f59e0b"; // yellow
     return "#dc2626"; // red
   };
 
@@ -824,6 +827,7 @@ const handleCallRequested = (callData) => {
     if (connectionStatus === "joining") return "🟡 JOINING ROOM";
     if (connectionStatus === "rejoining") return "🟡 REJOINING";
     if (connectionStatus === "connected") return "🟡 CONNECTED (Not in room)";
+    if (connectionStatus === "manual-offline") return "🔴 OFFLINE (Listening)";
     return "🔴 OFFLINE";
   };
 

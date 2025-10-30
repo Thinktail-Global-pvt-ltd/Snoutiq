@@ -1,14 +1,26 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import { useNavigate, useParams, useLocation, useSearchParams } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
 
 const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
 
 export default function CallPage() {
-  // Mock params for demo
-  const channelName = "demo-channel";
-  const role = "host";
-  const isHost = role === "host";
+  const navigate = useNavigate();
+  const { channelParam } = useParams();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
+  // Get params from query or state
+  const doctorId = searchParams.get('doctorId') || location.state?.doctorId;
+  const patientId = searchParams.get('patientId') || location.state?.patientId;
+  const callId = searchParams.get('callId') || location.state?.callId;
+  const role = searchParams.get('role') || location.state?.role || "host";
+  
+  console.log("✅ Extracted params:", { doctorId, patientId, callId, role });
+  
+  const channelName = channelParam || location.state?.channelName || searchParams.get('channel') || "demo-channel";
+  const isHost = role === "host";
+  
   const safeChannel = useMemo(() => {
     return (channelName || "default_channel")
       .replace(/[^a-zA-Z0-9_]/g, "")
@@ -16,8 +28,9 @@ export default function CallPage() {
   }, [channelName]);
 
   const uid = useMemo(() => {
-    return Math.floor(Math.random() * 1e6);
-  }, []);
+    const uidParam = searchParams.get('uid');
+    return uidParam ? parseInt(uidParam) : Math.floor(Math.random() * 1e6);
+  }, [searchParams]);
 
   // Refs
   const clientRef = useRef(null);
@@ -53,7 +66,6 @@ export default function CallPage() {
     try {
       console.log("📹 Requesting permissions...");
       
-      // Request both permissions together
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: true, 
         audio: true 
@@ -62,23 +74,25 @@ export default function CallPage() {
       console.log("✅ Permissions granted");
       setPermissions({ camera: true, microphone: true });
       
-      // Get available cameras
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       console.log("📷 Found cameras:", videoDevices.length);
       setAvailableCameras(videoDevices);
       
-      // Stop the test stream
       stream.getTracks().forEach(track => track.stop());
       
       setShowPermissionModal(false);
       return true;
     } catch (error) {
       console.error("❌ Permission error:", error);
-      alert("Please allow camera and microphone access to continue");
+      alert("Camera and microphone access is required. Please allow access in your browser settings and refresh the page.");
       return false;
     }
   };
+
+  useEffect(() => {
+    requestPermissions();
+  }, []);
 
   // Join channel and create tracks
   useEffect(() => {
@@ -89,8 +103,14 @@ export default function CallPage() {
 
     async function joinChannel() {
       try {
+        // Check again to prevent race condition
+        if (hasJoinedRef.current || client.connectionState === "CONNECTED" || client.connectionState === "CONNECTING") {
+          console.log("⚠️ Already connected/connecting, skipping join");
+          return;
+        }
+        
         setCallStatus("connecting");
-        console.log(`🔗 Joining channel: ${safeChannel}, uid: ${uid}`);
+        console.log(`🔗 Joining channel: ${safeChannel}, uid: ${uid}, role: ${role}`);
         
         await client.join(APP_ID, safeChannel, null, uid);
         hasJoinedRef.current = true;
@@ -99,15 +119,14 @@ export default function CallPage() {
         setJoined(true);
         setCallStatus("connected");
 
-        // Create and publish tracks
         await createAndPublishTracks();
-
-        // Setup remote user handlers
         setupRemoteUserHandlers();
       } catch (error) {
         console.error("❌ Join channel error:", error);
         setCallStatus("error");
-        alert("Failed to join call: " + error.message);
+        if (error.code !== "INVALID_OPERATION") {
+          alert("Failed to join call: " + error.message);
+        }
       }
     }
 
@@ -115,7 +134,6 @@ export default function CallPage() {
       try {
         const tracks = [];
         
-        // Create audio track
         console.log("🎤 Creating audio track...");
         try {
           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
@@ -125,7 +143,6 @@ export default function CallPage() {
           console.warn("⚠️ Audio track failed:", err);
         }
 
-        // Create video track
         console.log("📹 Creating video track...");
         try {
           const cameraDevice = availableCameras[currentCameraIndex];
@@ -136,7 +153,6 @@ export default function CallPage() {
           tracks.push(videoTrack);
           console.log("✅ Video track created");
 
-          // Play video track locally
           if (localVideoRef.current) {
             videoTrack.play(localVideoRef.current, { fit: "cover" });
             console.log("✅ Local video playing");
@@ -146,7 +162,6 @@ export default function CallPage() {
           setIsCameraOff(true);
         }
 
-        // Publish tracks
         if (tracks.length > 0) {
           await client.publish(tracks);
           console.log("✅ Tracks published:", tracks.length);
@@ -204,7 +219,7 @@ export default function CallPage() {
         cleanup();
       }
     };
-  }, [showPermissionModal, safeChannel, uid, availableCameras, currentCameraIndex]);
+  }, [showPermissionModal, safeChannel, uid, role]);
 
   const cleanup = async () => {
     const client = clientRef.current;
@@ -240,9 +255,9 @@ export default function CallPage() {
   const toggleMute = async () => {
     const audioTrack = localTracksRef.current.find(track => track.trackMediaType === 'audio');
     if (audioTrack) {
-      await audioTrack.setEnabled(!isMuted);
+      await audioTrack.setEnabled(isMuted);
       setIsMuted(!isMuted);
-      console.log(isMuted ? "🎤 Unmuted" : "🔇 Muted");
+      console.log(!isMuted ? "🔇 Muted" : "🎤 Unmuted");
     }
   };
 
@@ -294,13 +309,44 @@ export default function CallPage() {
     }
   };
 
-  const handleEndCall = async () => {
-    console.log("📞 Ending call...");
-    await cleanup();
-    alert("Call ended");
-  };
+ const handleEndCall = async () => {
+  console.log("📞 Ending call...");
+  await cleanup();
 
-  // Permission Modal
+  if (doctorId && patientId) {
+    console.log(`✅ Navigating with doctorId: ${doctorId}, patientId: ${patientId}`);
+    navigate(
+      isHost 
+        ? `/prescription/${doctorId}/${patientId}`
+        : `/rating/${doctorId}/${patientId}`,
+      {
+        state: {
+          doctorId,
+          patientId,
+          callId,
+          fromCall: true
+        }
+      }
+    );
+  } else {
+    console.warn("⚠️ Missing doctorId or patientId, redirecting...");
+    alert("Call ended");
+
+    // Try to go 2 pages back, or fallback to home if not possible
+    try {
+      if (window.history.length > 2) {
+        navigate(-2);
+      } else {
+        navigate("/");
+      }
+    } catch (error) {
+      console.error("❌ Navigation failed:", error);
+      navigate("/");
+    }
+  }
+};
+
+
   const PermissionModal = () => (
     <div style={{
       position: "fixed",
@@ -443,7 +489,6 @@ export default function CallPage() {
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
     }}>
       
-      {/* Permission Modal */}
       {showPermissionModal && <PermissionModal />}
 
       {/* Header */}
@@ -457,7 +502,6 @@ export default function CallPage() {
         alignItems: "center",
         zIndex: 50
       }}>
-        {/* Logo */}
         <div style={{
           display: "flex",
           alignItems: "center",
@@ -491,7 +535,6 @@ export default function CallPage() {
           </span>
         </div>
 
-        {/* Status */}
         <div style={{
           background: "rgba(15, 23, 42, 0.8)",
           padding: "10px 20px",
@@ -603,7 +646,6 @@ export default function CallPage() {
           }}
         />
         
-        {/* Camera Off Overlay */}
         {(isCameraOff || localTracks.length === 0) && (
           <div style={{
             position: "absolute",
@@ -633,7 +675,6 @@ export default function CallPage() {
           </div>
         )}
         
-        {/* User Badge */}
         <div style={{
           position: "absolute",
           bottom: 12,
@@ -649,7 +690,6 @@ export default function CallPage() {
           You • {isHost ? "Doctor" : "Patient"}
         </div>
 
-        {/* Camera Switch Button */}
         {availableCameras.length > 1 && !isCameraOff && (
           <button
             onClick={() => setShowCameraList(!showCameraList)}
@@ -678,7 +718,6 @@ export default function CallPage() {
           </button>
         )}
 
-        {/* Camera List Dropdown */}
         {showCameraList && availableCameras.length > 1 && (
           <div style={{
             position: "absolute",
@@ -763,7 +802,6 @@ export default function CallPage() {
           border: "1px solid rgba(255,255,255,0.1)",
           zIndex: 30
         }}>
-          {/* Mute Button */}
           <button 
             onClick={toggleMute}
             style={{
@@ -790,7 +828,6 @@ export default function CallPage() {
             {isMuted ? "🔇" : "🎤"}
           </button>
 
-          {/* Camera Button */}
           <button 
             onClick={toggleCamera}
             style={{
@@ -812,12 +849,11 @@ export default function CallPage() {
             }}
             onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
             onMouseOut={(e) => e.target.style.transform = "scale(1)"}
-            title={isCameraOff ? "Turn On Camera" : "Turn Off Camera"}
+            title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
           >
             {isCameraOff ? "📷" : "📹"}
           </button>
 
-          {/* End Call Button */}
           <button 
             onClick={handleEndCall}
             style={{
@@ -827,52 +863,42 @@ export default function CallPage() {
               border: "none",
               background: "linear-gradient(135deg, #ef4444, #dc2626)",
               color: "white",
-              fontSize: 20,
+              fontSize: 26,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               transition: "all 0.2s",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+              boxShadow: "0 8px 24px rgba(239, 68, 68, 0.4)"
             }}
-            onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
-            onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+            onMouseOver={(e) => {
+              e.target.style.transform = "scale(1.1)";
+              e.target.style.boxShadow = "0 12px 32px rgba(239, 68, 68, 0.6)";
+            }}
+            onMouseOut={(e) => {
+              e.target.style.transform = "scale(1)";
+              e.target.style.boxShadow = "0 8px 24px rgba(239, 68, 68, 0.4)";
+            }}
+            title="End Call"
           >
             📞
           </button>
         </div>
       )}
 
-      {/* Connection Quality Indicator */}
-      <div style={{
-        position: "absolute",
-        top: 70,
-        right: 24,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        background: "rgba(15, 23, 42, 0.8)",
-        padding: "6px 12px",
-        borderRadius: 8,
-        fontSize: 12,
-        backdropFilter: "blur(10px)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        zIndex: 50
-      }}>
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4
-        }}>
-          <span style={{ opacity: 0.7 }}>Connection:</span>
-          <span style={{ 
-            color: callStatus === "connected" ? "#10b981" : "#f59e0b",
-            fontWeight: 500
-          }}>
-            {callStatus === "connected" ? "Excellent" : "Connecting..."}
-          </span>
-        </div>
-      </div>
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+          }
+        }
+      `}</style>
     </div>
   );
 }

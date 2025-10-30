@@ -3,10 +3,35 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#2563eb"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
   <title>Login | Test Clinic (Vet Only)</title>
   <link rel="icon" href="https://snoutiq.com/favicon.webp" sizes="32x32" type="image/png"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  <script>
+    (function(){
+      const isLocal = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
+      const prefix = isLocal ? '' : '/backend';
+      const manifestHref = `${prefix}/custom-doctor-manifest.webmanifest`;
+      const appleIconHref = `${prefix}/custom-doctor-icon-192.png`;
+
+      const manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = manifestHref;
+      document.head.appendChild(manifestLink);
+
+      const appleTouchIcon = document.createElement('link');
+      appleTouchIcon.rel = 'apple-touch-icon';
+      appleTouchIcon.href = appleIconHref;
+      document.head.appendChild(appleTouchIcon);
+
+      window.__CUSTOM_DOCTOR_PWA__ = { prefix, manifestHref };
+    })();
+  </script>
 
   <style>
     :root{--bg1:#eef4ff;--bg2:#e9eefe;--card:#ffffff;--text:#0f172a;--muted:#64748b;--blue:#2563eb;--blue-d:#1e40af;--border:#e5e7eb;--ring:rgba(37,99,235,.25)}
@@ -219,6 +244,24 @@
       els.loginBtn.disabled = false; els.loginBtn.textContent = 'Login';
     }
   });
+
+  // ---------- PWA service worker registration ----------
+  (function(){
+    if (!('serviceWorker' in navigator)) { return; }
+    const scopePrefix = (window.__CUSTOM_DOCTOR_PWA__?.prefix ?? '') || '';
+    const scopePath = `${scopePrefix}/custom-doctor-login`.replace(/\/$/, '');
+    const swUrl = `${scopePrefix}/custom-doctor-sw.js`;
+    const isLocal = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
+    const isSecure = window.isSecureContext || window.location.protocol === 'https:' || isLocal;
+    if (!isSecure) { return; }
+
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register(swUrl, { scope: `${scopePath}/` })
+        .catch(() => {
+          /* registration errors are intentionally swallowed to keep the login UX silent */
+        });
+    });
+  })();
 </script>
 
 </body>
