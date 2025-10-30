@@ -690,32 +690,25 @@
           .snoutiq-call-patient{font-size:15px;font-weight:600;color:#1f2937;}
           .snoutiq-call-patient-sub{font-size:13px;color:#6b7280;}
           .snoutiq-call-patient-sub.is-hidden{display:none;}
-          .snoutiq-call-meta{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:8px;font-size:12px;color:#6b7280;align-items:flex-end;min-width:160px;}
-          .snoutiq-call-meta-row{display:flex;align-items:center;gap:10px;}
-          .snoutiq-call-meta-row.is-hidden{display:none;}
-          .snoutiq-call-meta-label{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#9ca3af;}
-          .snoutiq-call-meta-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:12px;background:#f3f4f6;box-shadow:inset 0 -1px 0 rgba(148,163,184,.35);max-width:220px;}
-          .snoutiq-call-channel{font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;font-size:12px;color:#111827;word-break:break-all;}
-          .snoutiq-call-meta-copy{border:none;background:transparent;color:#2563eb;font-size:11px;font-weight:600;cursor:pointer;padding:0;transition:color .2s ease,opacity .2s ease;}
-          .snoutiq-call-meta-copy:hover{color:#1d4ed8;}
-          .snoutiq-call-meta-copy:disabled{color:#9ca3af;cursor:default;opacity:.7;}
-          .snoutiq-call-meta-value{font-size:12px;color:#1f2937;font-weight:600;max-width:220px;word-break:break-word;}
+          .snoutiq-call-meta{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;align-items:flex-end;min-width:140px;}
+          .snoutiq-call-meta-label{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#9ca3af;}
+          .snoutiq-call-channel{font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;font-size:12px;color:#111827;word-break:break-all;background:#f9fafb;padding:6px 10px;border-radius:10px;box-shadow:inset 0 -1px 0 rgba(148,163,184,.28);}
           .snoutiq-call-meta-time{font-size:12px;color:#6b7280;white-space:nowrap;}
-          .snoutiq-call-section{position:relative;border:1px solid #e5e7eb;border-radius:20px;padding:20px;background:linear-gradient(180deg,#f9fafb 0%,#f3f4f6 100%);display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.8);}
+          .snoutiq-call-section{position:relative;border:1px solid #e5e7eb;border-radius:18px;padding:18px;background:#f9fafb;display:flex;flex-direction:column;gap:10px;}
           .snoutiq-call-section-title{font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#6b7280;}
           .snoutiq-call-lines{display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.65;color:#374151;}
           .snoutiq-call-line{position:relative;padding-left:18px;}
           .snoutiq-call-line::before{content:'';position:absolute;top:8.5px;left:6px;width:5px;height:5px;border-radius:9999px;background:#9ca3af;}
           .snoutiq-call-line-strong{font-weight:600;color:#111827;}
-          .snoutiq-call-summary{border:1px solid rgba(248,113,113,.55);background:linear-gradient(180deg,#fff5f5 0%,#fee2e2 100%);box-shadow:0 18px 38px -26px rgba(248,113,113,.8);}
+          .snoutiq-call-summary{border:1px solid rgba(248,113,113,.45);background:#fff7f7;border-radius:18px;}
           .snoutiq-call-summary-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
           .snoutiq-call-summary-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.18em;color:#b91c1c;}
           .snoutiq-call-summary-tag{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:#f43f5e;}
           .snoutiq-call-summary-status{font-size:13px;color:#b91c1c;}
           .snoutiq-call-summary-body{font-size:13px;line-height:1.65;color:#7f1d1d;}
           .snoutiq-call-links{display:flex;flex-direction:column;gap:10px;margin-top:4px;}
-          .snoutiq-call-link-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid #e5e7eb;transition:box-shadow .2s ease;}
-          .snoutiq-call-link-row:not(.is-disabled):hover{box-shadow:0 12px 24px -18px rgba(30,64,175,.45);}
+          .snoutiq-call-link-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border-radius:12px;background:#ffffff;border:1px solid #e5e7eb;transition:border-color .2s ease,box-shadow .2s ease;}
+          .snoutiq-call-link-row:not(.is-disabled):hover{border-color:#c7d2fe;box-shadow:0 10px 20px -18px rgba(79,70,229,.4);}
           .snoutiq-call-link-row.is-disabled{opacity:.55;}
           .snoutiq-call-link-row.is-disabled .snoutiq-call-link-open,
           .snoutiq-call-link-row.is-disabled .snoutiq-call-link-copy{pointer-events:none;cursor:not-allowed;}
@@ -723,11 +716,13 @@
           .snoutiq-call-link-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#1f2937;}
           .snoutiq-call-link-value{font-size:12px;color:#4b5563;font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;word-break:break-all;}
           .snoutiq-call-link-actions{display:flex;gap:8px;align-items:center;}
-          .snoutiq-call-link-open{display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;border-radius:10px;font-size:12px;font-weight:600;color:#fff;background:#2563eb;text-decoration:none;transition:background .2s ease,color .2s ease;}
-          .snoutiq-call-link-open:focus{outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.28);}
-          .snoutiq-call-link-copy{padding:6px 12px;border-radius:10px;border:none;background:#e0e7ff;color:#312e81;font-size:12px;font-weight:600;cursor:pointer;transition:background .2s ease,color .2s ease;}
-          .snoutiq-call-link-copy:focus{outline:none;box-shadow:0 0 0 3px rgba(99,102,241,.28);}
-          .snoutiq-call-link-copy.is-copied{background:#d1fae5;color:#065f46;}
+          .snoutiq-call-link-open{display:inline-flex;align-items:center;justify-content:center;padding:6px 14px;border-radius:10px;font-size:12px;font-weight:600;color:#1d4ed8;border:1px solid #c7d2fe;background:#eef2ff;text-decoration:none;transition:background .2s ease,color .2s ease,border-color .2s ease;}
+          .snoutiq-call-link-open:hover{background:#e0e7ff;border-color:#818cf8;}
+          .snoutiq-call-link-open:focus{outline:none;box-shadow:0 0 0 2px rgba(99,102,241,.3);}
+          .snoutiq-call-link-copy{padding:6px 12px;border-radius:10px;border:1px solid #e0e7ff;background:#fff;color:#312e81;font-size:12px;font-weight:600;cursor:pointer;transition:background .2s ease,color .2s ease,border-color .2s ease;}
+          .snoutiq-call-link-copy:hover{border-color:#c7d2fe;background:#eef2ff;}
+          .snoutiq-call-link-copy:focus{outline:none;box-shadow:0 0 0 2px rgba(99,102,241,.25);}
+          .snoutiq-call-link-copy.is-copied{background:#ecfdf5;border-color:#86efac;color:#065f46;}
           .snoutiq-call-footer{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;}
           .snoutiq-call-footer-note{font-size:11px;color:#9ca3af;}
         `;
@@ -771,87 +766,6 @@
       for (const value of candidates) {
         if (typeof value === 'string' && value.trim()) {
           return value.trim();
-        }
-      }
-      return '';
-    }
-
-    function extractCallIdentifier(payload){
-      if (!payload || typeof payload !== 'object') return '';
-      const candidates = [
-        payload.callId,
-        payload.call_id,
-        payload.callIdentifier,
-        payload.call_identifier,
-        payload.sessionId,
-        payload.session_id,
-        payload?.call?.id,
-        payload?.call?.identifier,
-        payload?.context?.callId,
-        payload?.context?.call_id,
-        payload?.context?.callIdentifier,
-        payload?.meta?.callId,
-        payload?.meta?.call_id,
-        payload?.booking?.call_id,
-      ];
-      for (const value of candidates) {
-        if (value == null) continue;
-        const str = String(value).trim();
-        if (str) return str;
-      }
-      return '';
-    }
-
-    function formatMetaTitle(value){
-      const str = String(value ?? '').trim();
-      if (!str) return '';
-      const cleaned = str.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
-      return cleaned
-        .split(' ')
-        .map(segment => {
-          if (!segment) return '';
-          if (segment.length <= 3) return segment.toUpperCase();
-          return segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase();
-        })
-        .join(' ')
-        .trim();
-    }
-
-    function extractCallType(payload){
-      if (!payload || typeof payload !== 'object') return '';
-      const candidates = [
-        payload.consultationType,
-        payload.consultation_type,
-        payload.callType,
-        payload.call_type,
-        payload.consultationMode,
-        payload.consultation_mode,
-        payload.mode,
-        payload.type,
-        payload?.context?.consultation_type,
-        payload?.context?.call_type,
-        payload?.context?.mode,
-        payload?.booking?.consultation_type,
-        payload?.booking?.call_type,
-        payload?.meta?.consultation_type,
-        payload?.meta?.call_type,
-        payload?.meta?.mode,
-        payload?.details?.consultation_type,
-        payload?.details?.mode,
-      ];
-      for (const value of candidates) {
-        if (!value) continue;
-        if (typeof value === 'string' || typeof value === 'number') {
-          const formatted = formatMetaTitle(value);
-          if (formatted) return formatted;
-        }
-        if (typeof value === 'object') {
-          const keys = ['label','name','title','display','type'];
-          for (const key of keys) {
-            if (!value[key]) continue;
-            const formatted = formatMetaTitle(value[key]);
-            if (formatted) return formatted;
-          }
         }
       }
       return '';
@@ -1156,11 +1070,6 @@
       const patientSubEl = container.querySelector('[data-role="call-patient-sub"]');
       const timeEl = container.querySelector('[data-role="call-time"]');
       const channelEl = container.querySelector('[data-role="call-channel"]');
-      const channelCopyEl = container.querySelector('[data-role="call-channel-copy"]');
-      const callIdEl = container.querySelector('[data-role="call-id"]');
-      const callIdRow = container.querySelector('[data-role="call-id-row"]');
-      const callTypeEl = container.querySelector('[data-role="call-type"]');
-      const callTypeRow = container.querySelector('[data-role="call-type-row"]');
       const templateEl = container.querySelector('[data-role="template"]');
 
       const patientId = extractPatientId(payload);
@@ -1214,47 +1123,6 @@
           channelEl.removeAttribute('title');
         }
       }
-      if (channelCopyEl) {
-        if (channel) {
-          channelCopyEl.disabled = false;
-          channelCopyEl.dataset.copyValue = channel;
-          channelCopyEl.classList.remove('is-copied');
-          channelCopyEl.textContent = 'Copy';
-          bindCopyButton(channelCopyEl);
-        } else {
-          channelCopyEl.disabled = true;
-          channelCopyEl.removeAttribute('data-copy-value');
-          channelCopyEl.classList.remove('is-copied');
-          channelCopyEl.textContent = 'Copy';
-        }
-      }
-
-      const callIdentifier = extractCallIdentifier(payload);
-      if (callIdEl && callIdRow) {
-        if (callIdentifier) {
-          callIdEl.textContent = callIdentifier;
-          callIdEl.title = callIdentifier;
-          callIdRow.classList.remove('is-hidden');
-        } else {
-          callIdEl.textContent = '—';
-          callIdEl.removeAttribute('title');
-          callIdRow.classList.add('is-hidden');
-        }
-      }
-
-      const callType = extractCallType(payload);
-      if (callTypeEl && callTypeRow) {
-        if (callType) {
-          callTypeEl.textContent = callType;
-          callTypeEl.title = callType;
-          callTypeRow.classList.remove('is-hidden');
-        } else {
-          callTypeEl.textContent = '—';
-          callTypeEl.removeAttribute('title');
-          callTypeRow.classList.add('is-hidden');
-        }
-      }
-
       if (templateEl) {
         const templateText = extractCallTemplate(payload);
         renderLines(templateEl, templateText, {
@@ -1296,21 +1164,8 @@
                 <div class="snoutiq-call-patient-sub is-hidden" data-role="call-patient-sub"></div>
               </div>
               <div class="snoutiq-call-meta">
-                <div class="snoutiq-call-meta-row">
-                  <span class="snoutiq-call-meta-label">Channel</span>
-                  <div class="snoutiq-call-meta-chip">
-                    <span class="snoutiq-call-channel" data-role="call-channel">—</span>
-                    <button type="button" class="snoutiq-call-meta-copy" data-role="call-channel-copy" aria-label="Copy channel" disabled>Copy</button>
-                  </div>
-                </div>
-                <div class="snoutiq-call-meta-row is-hidden" data-role="call-id-row">
-                  <span class="snoutiq-call-meta-label">Call ID</span>
-                  <span class="snoutiq-call-meta-value" data-role="call-id">—</span>
-                </div>
-                <div class="snoutiq-call-meta-row is-hidden" data-role="call-type-row">
-                  <span class="snoutiq-call-meta-label">Consultation</span>
-                  <span class="snoutiq-call-meta-value" data-role="call-type">—</span>
-                </div>
+                <span class="snoutiq-call-meta-label">Channel</span>
+                <span class="snoutiq-call-channel" data-role="call-channel">—</span>
                 <span class="snoutiq-call-meta-time" data-role="call-time"></span>
               </div>
             </div>
