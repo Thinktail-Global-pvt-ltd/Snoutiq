@@ -1,6 +1,7 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
 
+// -------------------- HTTP SERVER (health + debug APIs) --------------------
 const httpServer = createServer((req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -16,7 +17,7 @@ const httpServer = createServer((req, res) => {
       return;
     }
 
-    // health probe
+    // health check
     if (req.method === "GET" && url.pathname === "/health") {
       res.writeHead(200, {
         "Content-Type": "application/json",
@@ -26,7 +27,7 @@ const httpServer = createServer((req, res) => {
       return;
     }
 
-    // public: list active (available) doctors
+    // list active doctors (not busy)
     if (req.method === "GET" && url.pathname === "/active-doctors") {
       const available = [];
       for (const [doctorId, info] of activeDoctors.entries()) {
@@ -44,12 +45,11 @@ const httpServer = createServer((req, res) => {
         JSON.stringify({
           activeDoctors: available,
           updatedAt: new Date().toISOString(),
-        }),
+        })
       );
       return;
     }
 
-    // default 404
     res.writeHead(404, {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
@@ -65,7 +65,7 @@ const httpServer = createServer((req, res) => {
   }
 });
 
-// Socket.IO server
+// -------------------- SOCKET.IO SETUP --------------------
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
@@ -75,51 +75,28 @@ const io = new Server(httpServer, {
   path: "/socket.io/",
 });
 
-// ===============================
-// State
-// ===============================
-
-// doctorId -> {
-//   socketId,
-//   joinedAt,
-//   lastSeen,
-//   connectionStatus: 'connected' | 'grace',
-//   location,
-//   offlineTimer,
-//   disconnectedAt
+// -------------------- IN-MEMORY STATE --------------------
+// activeDoctors: doctorId -> {
+//   socketId, joinedAt, lastSeen, connectionStatus, location?, offlineTimer?, disconnectedAt?
 // }
 const activeDoctors = new Map();
 
-// callId -> {
-//   callId,
-//   doctorId,
-//   patientId,
-//   channel,
-//   status: 'requested' | 'accepted' | 'payment_completed' | 'rejected' | 'ended' | 'disconnected',
-//   createdAt,
-//   acceptedAt,
-//   paidAt,
-//   endedAt,
-//   rejectedAt,
-//   disconnectedAt,
-//   disconnectedBy,
-//   patientSocketId,
-//   doctorSocketId,
-//   paymentId,
-//   callIdentifier / etc...
+// activeCalls: callId -> {
+//   callId, doctorId, patientId, channel,
+//   status,
+//   createdAt, acceptedAt?, rejectedAt?, endedAt?, paidAt?,
+//   patientSocketId, doctorSocketId,
+//   paymentId?, disconnectedAt?, ...
 // }
 const activeCalls = new Map();
 
+// -------------------- CONSTANTS --------------------
 const DOCTOR_HEARTBEAT_EVENT = "doctor-heartbeat";
 const DOCTOR_GRACE_EVENT = "doctor-grace";
-
 const DOCTOR_HEARTBEAT_INTERVAL_MS = 30_000;
-const DOCTOR_GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 min "grace/hold" window
+const DOCTOR_GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 min grace background
 
-// ===============================
-// Helpers
-// ===============================
-
+// -------------------- HELPERS --------------------
 const clearDoctorTimer = (entry) => {
   if (!entry) return;
   if (entry.offlineTimer) {
@@ -165,13 +142,12 @@ const scheduleDoctorRemoval = (doctorId, socketId) => {
   const entry = activeDoctors.get(doctorId);
   if (!entry) return;
 
-  // if doctor has reconnected with different socket, don't kill the new one
+  // if doctor already reconnected on a new socket, don't kill the new one
   if (socketId && entry.socketId && entry.socketId !== socketId) {
     return;
   }
 
   clearDoctorTimer(entry);
-
   entry.connectionStatus = "grace";
   entry.disconnectedAt = new Date();
 
@@ -179,7 +155,6 @@ const scheduleDoctorRemoval = (doctorId, socketId) => {
     const current = activeDoctors.get(doctorId);
     if (!current) return;
 
-    // same safety: don't delete if doctor came back with diff socket
     if (socketId && current.socketId && current.socketId !== socketId) {
       return;
     }
@@ -191,6 +166,7 @@ const scheduleDoctorRemoval = (doctorId, socketId) => {
   activeDoctors.set(doctorId, entry);
 };
 
+// NOTE: doctor "busy" means there's already a call in requested/accepted/payment_completed with him.
 const isDoctorBusy = (doctorId) => {
   for (const [, call] of activeCalls.entries()) {
     if (
@@ -204,7 +180,7 @@ const isDoctorBusy = (doctorId) => {
   return false;
 };
 
-// broadcast list of FREE doctors (not in call)
+// broadcast list of available doctors (who are not on a live/locked call)
 const emitAvailableDoctors = () => {
   const available = [];
   for (const [doctorId, info] of activeDoctors.entries()) {
@@ -215,26 +191,23 @@ const emitAvailableDoctors = () => {
       available.push(doctorId);
     }
   }
-  console.log(
-    `📤 Broadcasting ${available.length} available doctors:`,
-    available,
-  );
+  console.log(`📤 Broadcasting ${available.length} available doctors:`, available);
   io.emit("active-doctors", available);
 };
 
-// when doctor connects/reconnects, deliver all their pending calls
+// When a doctor connects (join-doctor), replay any open calls for them so they get the popup.
 const deliverPendingSessionsToDoctor = (doctorId, socket) => {
   const roomName = `doctor-${doctorId}`;
 
   for (const [callId, callSession] of activeCalls.entries()) {
     if (callSession.doctorId !== doctorId) continue;
-    if (["ended", "rejected", "disconnected"].includes(callSession.status))
-      continue;
+    if (["ended", "rejected", "disconnected"].includes(callSession.status)) continue;
 
+    // update this session with latest doctor socket
     callSession.doctorSocketId = socket.id;
     activeCalls.set(callId, callSession);
 
-    // still ringing?
+    // re-emit anything relevant so doctor dashboard rings
     if (callSession.status === "requested") {
       io.to(roomName).emit("call-requested", {
         callId,
@@ -242,11 +215,10 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
         patientId: callSession.patientId,
         channel: callSession.channel,
         timestamp: new Date().toISOString(),
-        queued: true, // means this was pending
+        queued: true, // means this call was waiting while you were away
       });
     }
 
-    // already paid?
     if (callSession.status === "payment_completed") {
       io.to(roomName).emit("patient-paid", {
         callId,
@@ -256,31 +228,33 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
         paymentId: callSession.paymentId,
         status: "ready_to_connect",
         message: "Patient payment confirmed!",
-        videoUrl: `/call-page/${callSession.channel}?uid=${callSession.doctorId}&role=host&callId=${callId}&doctorId=${callSession.doctorId}&patientId=${callSession.patientId}`,
+        videoUrl:
+          `/call-page/${callSession.channel}` +
+          `?uid=${callSession.doctorId}` +
+          `&role=host` +
+          `&callId=${callId}` +
+          `&doctorId=${callSession.doctorId}` +
+          `&patientId=${callSession.patientId}`,
         queued: true,
       });
     }
   }
 };
 
-// ===============================
-// Socket.IO events
-// ===============================
-
+// -------------------- CORE SOCKET LOGIC --------------------
 io.on("connection", (socket) => {
   console.log(`⚡ Client connected: ${socket.id}`);
 
-  // ---------------------------------
-  // doctor joins / becomes online
-  // ---------------------------------
-  socket.on("join-doctor", (doctorId) => {
+  // ========== DOCTOR JOINS THEIR "ROOM" ==========
+  socket.on("join-doctor", (doctorIdRaw) => {
+    const doctorId = Number(doctorIdRaw);
     const roomName = `doctor-${doctorId}`;
     socket.join(roomName);
 
     const existing = activeDoctors.get(doctorId);
     if (existing && existing.socketId !== socket.id) {
       console.log(
-        `⚠️ Doctor ${doctorId} reconnecting (old socket: ${existing.socketId})`,
+        `⚠️ Doctor ${doctorId} reconnecting (old socket: ${existing.socketId})`
       );
     }
 
@@ -294,26 +268,22 @@ io.on("connection", (socket) => {
     });
 
     console.log(
-      `✅ Doctor ${doctorId} joined (Total active: ${activeDoctors.size})`,
+      `✅ Doctor ${doctorId} joined (Total active: ${activeDoctors.size})`
     );
 
-    // tell THIS doctor "you are online"
     socket.emit("doctor-online", {
       doctorId,
       status: "online",
       timestamp: new Date().toISOString(),
     });
 
-    // push new available doctors list to everyone
     emitAvailableDoctors();
 
-    // replay queued calls/payments to this doctor
+    // if there were queued calls for this doc, notify them now
     deliverPendingSessionsToDoctor(doctorId, socket);
   });
 
-  // ---------------------------------
-  // heartbeat so we keep doctor "green"
-  // ---------------------------------
+  // ========== HEARTBEAT FROM DOCTOR FRONTEND ==========
   socket.on(DOCTOR_HEARTBEAT_EVENT, (payload = {}) => {
     const doctorId = Number(payload.doctorId || payload.id);
     if (!doctorId) return;
@@ -328,7 +298,7 @@ io.on("connection", (socket) => {
     });
 
     if (entry && wasGrace) {
-      // tell FE: you're fully reconnected
+      // tell FE "you were in grace but now I see you again"
       socket.emit(DOCTOR_GRACE_EVENT, {
         doctorId,
         status: "connected",
@@ -337,45 +307,37 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ---------------------------------
-  // active doctors list pull (on-demand)
-  // ---------------------------------
+  // ========== PATIENT ASKS: WHO'S ACTIVE? ==========
   socket.on("get-active-doctors", () => {
     const available = [];
     const busy = [];
 
     for (const [doctorId] of activeDoctors.entries()) {
-      if (isDoctorBusy(doctorId)) {
-        busy.push(doctorId);
-      } else {
-        available.push(doctorId);
-      }
+      if (isDoctorBusy(doctorId)) busy.push(doctorId);
+      else available.push(doctorId);
     }
 
     console.log(
-      `📊 Active doctors request: ${available.length} available, ${busy.length} busy`,
+      `📊 Active doctors request: ${available.length} available, ${busy.length} busy`
     );
 
     socket.emit("active-doctors", available);
   });
 
-  // ---------------------------------
-  // PATIENT INITIATES CALL  ✅ UPDATED LOGIC
-  // doctor can be online OR offline, we still create call + queue it
-  // ---------------------------------
+  // ========== PATIENT STARTS CALL ==========
+  // IMPORTANT: We DO NOT block if doctor is offline/busy.
   socket.on("call-requested", ({ doctorId, patientId, channel }) => {
     console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
 
-    // OLD (removed):
-    // if (isDoctorBusy(doctorId)) { ... return }
-
-    // always create a call session
+    // make a unique callId
     const callId = `call_${Date.now()}_${Math.random()
       .toString(36)
       .substring(2, 8)}`;
 
-    const doctorEntry = activeDoctors.get(doctorId);
+    // see if doc is currently online
+    const doctorEntry = activeDoctors.get(doctorId) || null;
 
+    // create an in-memory call session
     const callSession = {
       callId,
       doctorId,
@@ -383,41 +345,38 @@ io.on("connection", (socket) => {
       channel,
       status: "requested",
       createdAt: new Date(),
-      patientSocketId: socket.id, // caller
-      doctorSocketId: doctorEntry?.socketId || null, // null if doc offline
+      patientSocketId: socket.id,
+      doctorSocketId: doctorEntry?.socketId || null,
     };
-
     activeCalls.set(callId, callSession);
 
-    // try to ring doctor right now (if connected / or even if grace)
+    // ping doctor room. if doc offline, room may be empty; it's fine.
     io.to(`doctor-${doctorId}`).emit("call-requested", {
       callId,
       doctorId,
       patientId,
       channel,
       timestamp: new Date().toISOString(),
-      queued: !doctorEntry, // true means doctor was offline, so this is queued
+      queued: doctorEntry ? false : true, // true => doctor wasn't actively connected
     });
 
-    // always tell patient "call sent"
+    // tell patient we registered the call no matter what
     socket.emit("call-sent", {
       callId,
       doctorId,
       patientId,
       channel,
       status: "sent",
-      queued: !doctorEntry ? true : false,
+      queued: doctorEntry ? false : true,
       message: doctorEntry
         ? "Ringing the doctor now…"
-        : "Doctor is currently offline. We'll alert them as soon as they come online.",
+        : "Doctor is currently offline. We've queued your call and will alert them when they come online.",
     });
 
     emitAvailableDoctors();
   });
 
-  // ---------------------------------
-  // doctor accepts the call
-  // ---------------------------------
+  // ========== DOCTOR ACCEPTS CALL ==========
   socket.on("call-accepted", (data) => {
     const { callId, doctorId, patientId, channel } = data;
     console.log(`✅ Call ${callId} accepted by doctor ${doctorId}`);
@@ -433,6 +392,7 @@ io.on("connection", (socket) => {
     callSession.doctorSocketId = socket.id;
     activeCalls.set(callId, callSession);
 
+    // notify patient they must pay
     if (callSession.patientSocketId) {
       io.to(callSession.patientSocketId).emit("call-accepted", {
         callId,
@@ -450,14 +410,10 @@ io.on("connection", (socket) => {
     emitAvailableDoctors();
   });
 
-  // ---------------------------------
-  // doctor rejects / doesn't pick
-  // ---------------------------------
+  // ========== DOCTOR REJECTS CALL ==========
   socket.on("call-rejected", (data) => {
     const { callId, reason = "rejected", doctorId, patientId } = data;
-    console.log(
-      `❌ Call ${callId} rejected by doctor ${doctorId}: ${reason}`,
-    );
+    console.log(`❌ Call ${callId} rejected by doctor ${doctorId}: ${reason}`);
 
     const callSession = activeCalls.get(callId);
     if (!callSession) {
@@ -469,7 +425,7 @@ io.on("connection", (socket) => {
     callSession.rejectedAt = new Date();
     callSession.rejectionReason = reason;
 
-    // Notify patient directly if we know who patient socket is
+    // notify patient (best effort)
     if (callSession.patientSocketId) {
       io.to(callSession.patientSocketId).emit("call-rejected", {
         callId,
@@ -483,7 +439,7 @@ io.on("connection", (socket) => {
         timestamp: new Date().toISOString(),
       });
       console.log(
-        `📤 Notified patient via socket: ${callSession.patientSocketId}`,
+        `📤 Notified patient via socket: ${callSession.patientSocketId}`
       );
     }
 
@@ -502,7 +458,7 @@ io.on("connection", (socket) => {
       });
     }
 
-    // broadcast status
+    // broadcast status update
     io.emit("call-status-update", {
       callId,
       status: "rejected",
@@ -511,7 +467,7 @@ io.on("connection", (socket) => {
       timestamp: new Date().toISOString(),
     });
 
-    // cleanup the call after some delay
+    // cleanup that call after 30s
     setTimeout(() => {
       activeCalls.delete(callId);
       emitAvailableDoctors();
@@ -519,9 +475,7 @@ io.on("connection", (socket) => {
     }, 30_000);
   });
 
-  // ---------------------------------
-  // payment done by patient
-  // ---------------------------------
+  // ========== PATIENT PAYMENT COMPLETED ==========
   socket.on("payment-completed", (data) => {
     const { callId, patientId, doctorId, channel, paymentId } = data;
     console.log(`💰 Payment completed for call ${callId}`);
@@ -538,7 +492,7 @@ io.on("connection", (socket) => {
     if (channel) callSession.channel = channel;
     activeCalls.set(callId, callSession);
 
-    // tell patient "ready to connect"
+    // tell patient: you're good, here's your join link (audience role)
     socket.emit("payment-verified", {
       callId,
       channel: callSession.channel,
@@ -546,10 +500,14 @@ io.on("connection", (socket) => {
       doctorId,
       status: "ready_to_connect",
       message: "Payment successful!",
-      videoUrl: `/call-page/${callSession.channel}?uid=${patientId}&role=audience&callId=${callId}`,
+      videoUrl:
+        `/call-page/${callSession.channel}` +
+        `?uid=${patientId}` +
+        `&role=audience` +
+        `&callId=${callId}`,
     });
 
-    // tell doctor "patient paid, join now"
+    // tell doctor: patient has paid, join NOW (host role)
     if (callSession.doctorSocketId) {
       io.to(callSession.doctorSocketId).emit("patient-paid", {
         callId,
@@ -559,10 +517,16 @@ io.on("connection", (socket) => {
         paymentId,
         status: "ready_to_connect",
         message: "Patient payment confirmed!",
-        videoUrl: `/call-page/${callSession.channel}?uid=${doctorId}&role=host&callId=${callId}&doctorId=${doctorId}&patientId=${patientId}`,
+        videoUrl:
+          `/call-page/${callSession.channel}` +
+          `?uid=${doctorId}` +
+          `&role=host` +
+          `&callId=${callId}` +
+          `&doctorId=${doctorId}` +
+          `&patientId=${patientId}`,
       });
     } else {
-      // doctor offline / diff socket -> send to doctor room
+      // doctor was offline → room emit (so when he rejoins we replay anyway)
       io.to(`doctor-${doctorId}`).emit("patient-paid", {
         callId,
         channel: callSession.channel,
@@ -571,7 +535,13 @@ io.on("connection", (socket) => {
         paymentId,
         status: "ready_to_connect",
         message: "Patient payment confirmed!",
-        videoUrl: `/call-page/${callSession.channel}?uid=${doctorId}&role=host&callId=${callId}&doctorId=${doctorId}&patientId=${patientId}`,
+        videoUrl:
+          `/call-page/${callSession.channel}` +
+          `?uid=${doctorId}` +
+          `&role=host` +
+          `&callId=${callId}` +
+          `&doctorId=${doctorId}` +
+          `&patientId=${patientId}`,
         queued: true,
       });
     }
@@ -579,9 +549,7 @@ io.on("connection", (socket) => {
     emitAvailableDoctors();
   });
 
-  // ---------------------------------
-  // call ended (doctor or patient pressed "end")
-  // ---------------------------------
+  // ========== CALL ENDED ==========
   socket.on(
     "call-ended",
     ({ callId, userId, role, doctorId, patientId, channel }) => {
@@ -597,7 +565,7 @@ io.on("connection", (socket) => {
         const isDoctorEnding = role === "host";
         const isPatientEnding = role === "audience";
 
-        // notify the other side via socketId
+        // notify the other party directly if we know their socket
         if (isDoctorEnding && callSession.patientSocketId) {
           io.to(callSession.patientSocketId).emit("call-ended-by-other", {
             callId,
@@ -607,7 +575,7 @@ io.on("connection", (socket) => {
             timestamp: new Date().toISOString(),
           });
           console.log(
-            `📤 Notified patient via socket: ${callSession.patientSocketId}`,
+            `📤 Notified patient via socket: ${callSession.patientSocketId}`
           );
         }
 
@@ -620,13 +588,13 @@ io.on("connection", (socket) => {
             timestamp: new Date().toISOString(),
           });
           console.log(
-            `📤 Notified doctor via socket: ${callSession.doctorSocketId}`,
+            `📤 Notified doctor via socket: ${callSession.doctorSocketId}`
           );
         }
 
-        // backup notify using rooms
+        // backup: notify via rooms
         if (callSession.doctorId) {
-          socket.to(`doctor-${callSession.doctorId}`).emit(
+          io.to(`doctor-${callSession.doctorId}`).emit(
             "call-ended-by-other",
             {
               callId,
@@ -636,12 +604,12 @@ io.on("connection", (socket) => {
                 ? "Doctor has ended the call"
                 : "Patient has ended the call",
               timestamp: new Date().toISOString(),
-            },
+            }
           );
         }
 
         if (callSession.patientId) {
-          socket.to(`patient-${callSession.patientId}`).emit(
+          io.to(`patient-${callSession.patientId}`).emit(
             "call-ended-by-other",
             {
               callId,
@@ -651,12 +619,12 @@ io.on("connection", (socket) => {
                 ? "Doctor has ended the call"
                 : "Patient has ended the call",
               timestamp: new Date().toISOString(),
-            },
+            }
           );
         }
       }
 
-      // broadcast status
+      // broadcast status update
       io.emit("call-status-update", {
         callId,
         status: "ended",
@@ -664,13 +632,13 @@ io.on("connection", (socket) => {
         timestamp: new Date().toISOString(),
       });
 
-      // cleanup after short delay
+      // cleanup call memory shortly after
       setTimeout(() => {
         activeCalls.delete(callId);
         emitAvailableDoctors();
         console.log(`🗑️ Cleaned up ended call ${callId}`);
       }, 10_000);
-    },
+    }
   );
 
   // ---------------------------------
@@ -694,12 +662,10 @@ io.on("connection", (socket) => {
     emitAvailableDoctors();
   });
 
-  // ---------------------------------
-  // doctor updates location radius / GPS
-  // ---------------------------------
+  // ========== DOCTOR LOCATION UPDATE (OPTIONAL FEATURE) ==========
   socket.on("update-doctor-location", ({ doctorId, latitude, longitude }) => {
     console.log(
-      `📍 Updating location for doctor ${doctorId}: ${latitude}, ${longitude}`,
+      `📍 Updating location for doctor ${doctorId}: ${latitude}, ${longitude}`
     );
 
     const doctor = activeDoctors.get(doctorId);
@@ -722,24 +688,22 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ---------------------------------
-  // disconnect cleanup
-  // ---------------------------------
+  // ========== SOCKET DISCONNECT ==========
   socket.on("disconnect", (reason) => {
     console.log(`❌ Disconnected: ${socket.id}, reason: ${reason}`);
 
-    // mark doctor as "grace" instead of insta-offline
+    // mark any doctor with this socket as "grace"
     for (const [doctorId, info] of activeDoctors.entries()) {
       if (info.socketId === socket.id) {
         console.log(
-          `🔌 Doctor ${doctorId} socket disconnected, entering grace period`,
+          `🔌 Doctor ${doctorId} socket disconnected, entering grace period`
         );
         scheduleDoctorRemoval(doctorId, socket.id);
         emitAvailableDoctors();
       }
     }
 
-    // Mark any active calls as disconnected by this side and notify the other
+    // also handle calls where this socket was in the middle
     for (const [callId, callSession] of activeCalls.entries()) {
       if (
         callSession.patientSocketId === socket.id ||
@@ -758,7 +722,7 @@ io.on("connection", (socket) => {
           ? callSession.patientSocketId
           : callSession.doctorSocketId;
 
-        // notify the other party (direct socket)
+        // tell the other side
         if (otherSocketId) {
           io.to(otherSocketId).emit("other-party-disconnected", {
             callId,
@@ -770,35 +734,33 @@ io.on("connection", (socket) => {
           console.log(
             `📤 Sent disconnect notification to ${
               isDoctor ? "patient" : "doctor"
-            } (socket: ${otherSocketId})`,
+            } (socket: ${otherSocketId})`
           );
         }
 
         // backup notify via rooms
         if (callSession.doctorId) {
-          socket.to(`doctor-${callSession.doctorId}`).emit(
-            "call-ended-by-other",
-            {
+          socket
+            .to(`doctor-${callSession.doctorId}`)
+            .emit("call-ended-by-other", {
               callId,
               endedBy: isDoctor ? "doctor" : "patient",
               reason: "disconnect",
               message: "Call ended due to connection loss",
               timestamp: new Date().toISOString(),
-            },
-          );
+            });
         }
 
         if (callSession.patientId) {
-          socket.to(`patient-${callSession.patientId}`).emit(
-            "call-ended-by-other",
-            {
+          socket
+            .to(`patient-${callSession.patientId}`)
+            .emit("call-ended-by-other", {
               callId,
               endedBy: isDoctor ? "doctor" : "patient",
               reason: "disconnect",
               message: "Call ended due to connection loss",
               timestamp: new Date().toISOString(),
-            },
-          );
+            });
         }
 
         // global status broadcast
@@ -809,7 +771,7 @@ io.on("connection", (socket) => {
           timestamp: new Date().toISOString(),
         });
 
-        // cleanup disconnected call after short delay
+        // cleanup after 5s
         setTimeout(() => {
           activeCalls.delete(callId);
           emitAvailableDoctors();
@@ -820,11 +782,9 @@ io.on("connection", (socket) => {
   });
 });
 
-// ===============================
-// Maintenance timers
-// ===============================
+// -------------------- PERIODIC CLEANUPS --------------------
 
-// Kill doctors who fully vanished (no heartbeat for > grace*2)
+// kill stale doctors that never heartbeat back after grace x2
 setInterval(() => {
   const now = Date.now();
   for (const [doctorId, info] of activeDoctors.entries()) {
@@ -832,7 +792,7 @@ setInterval(() => {
     if (!lastSeen) continue;
     if (now - lastSeen > DOCTOR_GRACE_PERIOD_MS * 2) {
       console.log(
-        `⏳ Removing stale doctor ${doctorId} after heartbeat timeout`,
+        `⏳ Removing stale doctor ${doctorId} after heartbeat timeout`
       );
       activeDoctors.delete(doctorId);
       emitAvailableDoctors();
@@ -840,28 +800,26 @@ setInterval(() => {
   }
 }, DOCTOR_HEARTBEAT_INTERVAL_MS);
 
-// Auto-timeout calls older than 5 min if not completed
+// auto time-out calls older than 5 minutes that haven't finished
 setInterval(() => {
   const now = new Date();
-  const threshold = 5 * 60 * 1000; // 5min
-
+  const threshold = 5 * 60 * 1000;
   for (const [callId, callSession] of activeCalls.entries()) {
     const age = now - callSession.createdAt;
-
     if (
       age > threshold &&
       !["payment_completed", "ended"].includes(callSession.status)
     ) {
-      console.log(`⏰ Auto-ending call ${callId} after 5 minutes timeout`);
+      console.log(
+        `⏰ Auto-ending call ${callId} after 5 minutes timeout (no payment / not ended)`
+      );
 
-      // tell patient
       if (callSession.patientSocketId) {
         io.to(callSession.patientSocketId).emit("call-timeout", {
           callId,
           message: "Call timed out after 5 minutes",
         });
       }
-      // tell doctor
       if (callSession.doctorSocketId) {
         io.to(callSession.doctorSocketId).emit("call-timeout", {
           callId,
@@ -875,20 +833,15 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Stats log
+// periodic log of server state
 setInterval(() => {
   console.log(
-    `📊 Stats: Connections: ${io.engine.clientsCount}, Active Doctors: ${activeDoctors.size}, Active Calls: ${activeCalls.size}`,
+    `📊 Stats: Connections: ${io.engine.clientsCount}, Active Doctors: ${activeDoctors.size}, Active Calls: ${activeCalls.size}`
   );
-  console.log(
-    `👨‍⚕️ Active Doctor IDs:`,
-    Array.from(activeDoctors.keys()),
-  );
+  console.log(`👨‍⚕️ Active Doctor IDs:`, Array.from(activeDoctors.keys()));
 }, 30_000);
 
-// ===============================
-// Start server
-// ===============================
+// -------------------- START SERVER --------------------
 const PORT = process.env.PORT || 4000;
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Socket.IO server running on port ${PORT}`);
