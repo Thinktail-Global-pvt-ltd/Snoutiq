@@ -139,6 +139,7 @@
                                     <th>Fee</th>
                                     <th class="text-nowrap">Started</th>
                                     <th class="text-nowrap">Ended</th>
+                                    <th class="text-nowrap">Links</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -158,10 +159,32 @@
                                         </td>
                                         <td class="text-nowrap">{{ optional($call->started_at)->format('d M, H:i') ?? '—' }}</td>
                                         <td class="text-nowrap">{{ optional($call->ended_at)->format('d M, H:i') ?? '—' }}</td>
+                                        <td class="text-nowrap">
+                                            @php
+                                                $joinUrl = $call->doctor_join_url;
+                                                $paymentUrl = $call->patient_payment_url;
+                                            @endphp
+                                            @if ($joinUrl || $paymentUrl)
+                                                <div class="d-flex gap-2">
+                                                    @if ($joinUrl)
+                                                        <a href="{{ $joinUrl }}" target="_blank" rel="noopener noreferrer" class="badge text-bg-primary-subtle text-primary-emphasis text-decoration-none px-2 py-1">
+                                                            Doctor Join
+                                                        </a>
+                                                    @endif
+                                                    @if ($paymentUrl)
+                                                        <a href="{{ $paymentUrl }}" target="_blank" rel="noopener noreferrer" class="badge text-bg-success-subtle text-success-emphasis text-decoration-none px-2 py-1">
+                                                            Payment
+                                                        </a>
+                                                    @endif
+                                                </div>
+                                            @else
+                                                <span class="text-muted small">—</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted py-4">No call sessions recorded yet.</td>
+                                        <td colspan="9" class="text-center text-muted py-4">No call sessions recorded yet.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

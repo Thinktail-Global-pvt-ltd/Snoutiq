@@ -7,6 +7,7 @@ use App\Events\PaymentDone;
 use App\Helpers\RtcTokenBuilder;
 use App\Models\CallSession;
 use App\Models\Payment;
+use App\Support\CallSessionUrlBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -18,27 +19,40 @@ class CallController extends Controller
     public function createSession(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'patient_id' => 'required|integer',
-            'doctor_id'  => 'nullable|integer',
+            'patient_id'   => 'required|integer',
+            'doctor_id'    => 'nullable|integer',
             'channel_name' => 'nullable|string|max:64',
+            'call_id'      => 'nullable|string|max:64',
         ]);
 
+        $callIdentifier = CallSessionUrlBuilder::ensureIdentifier($request->input('call_id'));
         $requestedChannel = $data['channel_name'] ?? null;
-        if (is_string($requestedChannel)) {
-            $requestedChannel = substr(preg_replace('/[^A-Za-z0-9_\-]/', '', $requestedChannel), 0, 63);
-            if ($requestedChannel === '') {
-                $requestedChannel = null;
-            }
-        } else {
-            $requestedChannel = null;
+        $channelName = CallSessionUrlBuilder::ensureChannel($requestedChannel, $callIdentifier);
+
+        $session = CallSession::query()
+            ->where('call_identifier', $callIdentifier)
+            ->orWhere('channel_name', $channelName)
+            ->first();
+
+        if (!$session) {
+            $session = new CallSession();
+            $session->status = 'pending';
+            $session->payment_status = 'unpaid';
         }
 
-        $session = CallSession::create([
-            'patient_id'   => $data['patient_id'],
-            'doctor_id'    => $data['doctor_id'] ?? null,
-            'channel_name' => $requestedChannel ?: 'call_' . Str::random(8),
-            'currency'     => 'INR',
-        ]);
+        $session->patient_id = $data['patient_id'];
+        if (array_key_exists('doctor_id', $data)) {
+            $session->doctor_id = $data['doctor_id'];
+        }
+
+        $session->channel_name = $channelName;
+        $session->call_identifier = $callIdentifier;
+        $session->currency = $session->currency ?? 'INR';
+        $session->status = $session->status ?? 'pending';
+        $session->payment_status = $session->payment_status ?? 'unpaid';
+
+        $session->refreshComputedLinks();
+        $session->save();
 
         return response()->json($this->sessionPayload($session));
     }
@@ -53,6 +67,7 @@ class CallController extends Controller
         $session->doctor_id = $data['doctor_id'];
         $session->status = 'accepted';
         $session->accepted_at ??= Carbon::now();
+        $session->refreshComputedLinks();
         $session->save();
 
         Log::info('Call session accepted', [
@@ -269,6 +284,7 @@ class CallController extends Controller
             'patient_id'      => $session->patient_id,
             'doctor_id'       => $session->doctor_id,
             'channel_name'    => $session->channel_name,
+            'call_identifier' => $session->call_identifier,
             'status'          => $session->status,
             'payment_status'  => $session->payment_status,
             'accepted_at'     => $session->accepted_at?->toIso8601String(),
@@ -277,6 +293,8 @@ class CallController extends Controller
             'duration_seconds'=> $session->duration_seconds,
             'amount_paid'     => $session->amount_paid,
             'currency'        => $session->currency,
+            'doctor_join_url' => $session->doctor_join_url,
+            'patient_payment_url' => $session->patient_payment_url,
             'created_at'      => $session->created_at?->toIso8601String(),
             'updated_at'      => $session->updated_at?->toIso8601String(),
             'session'         => $session,

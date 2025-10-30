@@ -3,9 +3,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;   // 👈 ye add karo
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use App\Events\CallRequested;
 use App\Models\CallSession;
+use App\Support\CallSessionUrlBuilder;
 
 class CallController extends Controller
 {
@@ -15,51 +15,34 @@ class CallController extends Controller
             'doctor_id'    => 'required|integer',
             'patient_id'   => 'required|integer',
             'channel_name' => 'nullable|string|max:64',
+            'call_id'      => 'nullable|string|max:64',
         ]);
 
-        $channelName = $data['channel_name'] ?? null;
-        if (is_string($channelName)) {
-            $channelName = substr(preg_replace('/[^A-Za-z0-9_\-]/', '', $channelName), 0, 63);
-            if ($channelName === '') {
-                $channelName = null;
-            }
-        }
+        $callIdentifier = CallSessionUrlBuilder::ensureIdentifier($data['call_id'] ?? null);
+        $channelName = CallSessionUrlBuilder::ensureChannel($data['channel_name'] ?? null, $callIdentifier);
 
-        if (!$channelName) {
-            $channelName = 'call_' . Str::random(10);
-        }
-
-        $session = CallSession::where('channel_name', $channelName)->first();
+        $session = CallSession::query()
+            ->where('call_identifier', $callIdentifier)
+            ->orWhere('channel_name', $channelName)
+            ->first();
 
         if (!$session) {
-            $session = CallSession::create([
-                'patient_id'     => $data['patient_id'],
-                'doctor_id'      => $data['doctor_id'],
-                'channel_name'   => $channelName,
-                'currency'       => 'INR',
-                'status'         => 'pending',
-                'payment_status' => 'unpaid',
-            ]);
-        } else {
-            $session->fill([
-                'patient_id' => $data['patient_id'],
-                'doctor_id'  => $data['doctor_id'],
-            ]);
-
-            if (!$session->currency) {
-                $session->currency = 'INR';
-            }
-
-            if (!$session->status) {
-                $session->status = 'pending';
-            }
-
-            if (!$session->payment_status) {
-                $session->payment_status = 'unpaid';
-            }
-
-            $session->save();
+            $session = new CallSession();
+            $session->status = 'pending';
+            $session->payment_status = 'unpaid';
+            $session->currency = 'INR';
         }
+
+        $session->patient_id = $data['patient_id'];
+        $session->doctor_id = $data['doctor_id'];
+        $session->channel_name = $channelName;
+        $session->call_identifier = $callIdentifier;
+        $session->currency = $session->currency ?? 'INR';
+        $session->status = $session->status ?? 'pending';
+        $session->payment_status = $session->payment_status ?? 'unpaid';
+
+        $session->refreshComputedLinks();
+        $session->save();
 
         // Event fire
         event(new CallRequested($session->doctor_id, $session->patient_id, $session->channel_name, $session->id));
@@ -71,6 +54,9 @@ class CallController extends Controller
                 'doctor_id'   => $session->doctor_id,
                 'patient_id'  => $session->patient_id,
                 'channel'     => $session->channel_name,
+                'call_id'     => $session->call_identifier,
+                'doctor_join_url' => $session->doctor_join_url,
+                'patient_payment_url' => $session->patient_payment_url,
                 'session_id'  => $session->id,
             ]
         ]);
@@ -86,16 +72,21 @@ class CallController extends Controller
         $doctorId = $validated['doctor_id'];
         $patientId = $validated['patient_id'] ?? 99999;
 
-        $channelName = 'test_call_' . Str::random(10);
+        $callIdentifier = CallSessionUrlBuilder::generateIdentifier();
+        $channelName = CallSessionUrlBuilder::defaultChannel($callIdentifier);
 
-        $session = CallSession::create([
+        $session = new CallSession([
             'doctor_id'     => $doctorId,
             'patient_id'    => $patientId,
             'channel_name'  => $channelName,
+            'call_identifier' => $callIdentifier,
             'currency'      => 'INR',
             'status'        => 'pending',
             'payment_status'=> 'unpaid',
         ]);
+
+        $session->refreshComputedLinks();
+        $session->save();
 
         event(new CallRequested($session->doctor_id, $session->patient_id, $session->channel_name, $session->id));
 
@@ -106,6 +97,9 @@ class CallController extends Controller
                 'doctor_id'  => $session->doctor_id,
                 'patient_id' => $session->patient_id,
                 'channel'    => $session->channel_name,
+                'call_id'    => $session->call_identifier,
+                'doctor_join_url' => $session->doctor_join_url,
+                'patient_payment_url' => $session->patient_payment_url,
                 'session_id' => $session->id,
             ],
         ]);

@@ -40,6 +40,10 @@
     })();
     const API_PREFIX = PATH_PREFIX || PATH_PREFIX_GUESS || '';
     const API_BASE   = `${API_PREFIX || ''}/api`;
+    const API_HEADERS = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
 
     const sessionUser = @json($coreSessionUser);
     const sessionAuth = @json($coreSessionAuth);
@@ -67,6 +71,7 @@
     let ringAudio = null;
     let ringResumePending = false;
     let ringResumeListener = null;
+    const callSessionCache = new Map();
 
     function readAuthFull(){
       try{
@@ -458,15 +463,174 @@
       }
     }
 
-    function acceptGlobalCall(payload){
+    function normaliseCallId(payload){
+      return (payload?.callId || payload?.call_id || payload?.callIdentifier || '').toString().trim();
+    }
+
+    function applySessionInfoToPayload(payload, info){
+      if (!payload || !info) return;
+      if (info.sessionId) payload.sessionId = info.sessionId;
+      if (info.callIdentifier) payload.callIdentifier = info.callIdentifier;
+      if (info.doctorJoinUrl) payload.doctorJoinUrl = info.doctorJoinUrl;
+      if (info.patientPaymentUrl) payload.patientPaymentUrl = info.patientPaymentUrl;
+      if (info.doctorId && !payload.doctorId) payload.doctorId = info.doctorId;
+      if (info.patientId && !payload.patientId) payload.patientId = info.patientId;
+      if (info.channelName && !payload.channel) payload.channel = info.channelName;
+
+      if (globalCall) {
+        const globalId = normaliseCallId(globalCall);
+        if (globalId && globalId === info.callId) {
+          if (info.sessionId) globalCall.sessionId = info.sessionId;
+          if (info.callIdentifier) globalCall.callIdentifier = info.callIdentifier;
+          if (info.doctorJoinUrl) globalCall.doctorJoinUrl = info.doctorJoinUrl;
+          if (info.patientPaymentUrl) globalCall.patientPaymentUrl = info.patientPaymentUrl;
+          if (info.doctorId && !globalCall.doctorId) globalCall.doctorId = info.doctorId;
+          if (info.patientId && !globalCall.patientId) globalCall.patientId = info.patientId;
+          if (info.channelName && !globalCall.channel) globalCall.channel = info.channelName;
+        }
+      }
+    }
+
+    function updateActiveCallLinks(info){
+      if (!info) return;
+      try {
+        if (!globalAlertOpen || !window.Swal) return;
+        const currentCallId = normaliseCallId(globalCall || {});
+        if (!currentCallId || currentCallId !== info.callId) return;
+        const container = window.Swal.getHtmlContainer?.();
+        if (!container) return;
+        try {
+          populateSwalContent(container, globalCall);
+        } catch (_err) {
+          /* swallow re-render issues */
+        }
+        const doctorRow = container.querySelector('[data-role="doctor-link"]');
+        const paymentRow = container.querySelector('[data-role="payment-link"]');
+        populateLinkRow(doctorRow, info.doctorJoinUrl || resolveDoctorJoinUrl(globalCall), 'Doctor Join Link');
+        populateLinkRow(paymentRow, info.patientPaymentUrl || resolvePaymentUrl(globalCall), 'Payment Page');
+      } catch (err) {
+        console.warn('[snoutiq-call] failed to update active call links', err);
+      }
+    }
+
+    async function persistCallSession(payload){
+      const callId = normaliseCallId(payload);
+      const channel = (payload?.channel || payload?.channel_name || '').toString().trim();
+      const doctorIdRaw = payload?.doctorId ?? payload?.doctor_id ?? currentDoctorId ?? null;
+      const patientIdRaw = payload?.patientId ?? payload?.patient_id ?? null;
+      const doctorId = Number(doctorIdRaw);
+      const patientId = Number(patientIdRaw);
+
+      if (!callId || !channel || Number.isNaN(patientId) || !patientId) {
+        return null;
+      }
+
+      if (callSessionCache.has(callId)) {
+        const cached = callSessionCache.get(callId);
+        applySessionInfoToPayload(payload, cached);
+        updateActiveCallLinks(cached);
+        return cached;
+      }
+
+      try {
+        const body = {
+          call_id: callId,
+          channel_name: channel,
+          patient_id: patientId,
+        };
+        if (!Number.isNaN(doctorId) && doctorId) {
+          body.doctor_id = doctorId;
+        }
+        const res = await fetch(`${API_BASE}/call/create`, {
+          method: 'POST',
+          headers: API_HEADERS,
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const session = data?.session ?? {};
+        const info = {
+          callId,
+          sessionId: data?.session_id ?? session?.id ?? null,
+          callIdentifier: data?.call_identifier ?? session?.call_identifier ?? callId,
+          doctorJoinUrl: data?.doctor_join_url ?? session?.doctor_join_url ?? null,
+          patientPaymentUrl: data?.patient_payment_url ?? session?.patient_payment_url ?? null,
+          doctorId: data?.doctor_id ?? session?.doctor_id ?? (!Number.isNaN(doctorId) ? doctorId : null),
+          patientId: data?.patient_id ?? session?.patient_id ?? patientId,
+          channelName: data?.channel_name ?? session?.channel_name ?? channel,
+          accepted: (data?.status ?? session?.status) === 'accepted',
+        };
+        callSessionCache.set(callId, info);
+        applySessionInfoToPayload(payload, info);
+        updateActiveCallLinks(info);
+        emitCallEvent('snoutiq:call-session-synced', { callId, info });
+        return info;
+      } catch (err) {
+        console.warn('[snoutiq-call] persist session failed', err);
+        return null;
+      }
+    }
+
+    async function markSessionAccepted(payload){
+      const callId = normaliseCallId(payload);
+      if (!callId) return null;
+      const doctorIdRaw = payload?.doctorId ?? payload?.doctor_id ?? currentDoctorId ?? null;
+      const doctorId = Number(doctorIdRaw);
+      let info = callSessionCache.get(callId);
+      if (!info) {
+        info = await persistCallSession(payload);
+      }
+      if (!info) return null;
+      if (info.accepted) {
+        applySessionInfoToPayload(payload, info);
+        updateActiveCallLinks(info);
+        return info;
+      }
+      if (!info.sessionId || Number.isNaN(doctorId) || !doctorId) {
+        applySessionInfoToPayload(payload, info);
+        return info;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/call/${encodeURIComponent(info.sessionId)}/accept`, {
+          method: 'POST',
+          headers: API_HEADERS,
+          credentials: 'include',
+          body: JSON.stringify({ doctor_id: doctorId }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const session = data?.session ?? {};
+        info.accepted = true;
+        info.doctorId = session?.doctor_id ?? data?.doctor_id ?? doctorId ?? info.doctorId ?? null;
+        info.doctorJoinUrl = data?.doctor_join_url ?? session?.doctor_join_url ?? info.doctorJoinUrl ?? null;
+        info.patientPaymentUrl = data?.patient_payment_url ?? session?.patient_payment_url ?? info.patientPaymentUrl ?? null;
+        info.callIdentifier = data?.call_identifier ?? session?.call_identifier ?? info.callIdentifier ?? callId;
+        info.channelName = session?.channel_name ?? info.channelName;
+        callSessionCache.set(callId, info);
+        applySessionInfoToPayload(payload, info);
+        updateActiveCallLinks(info);
+        emitCallEvent('snoutiq:call-session-accepted', { callId, info });
+      } catch (err) {
+        console.warn('[snoutiq-call] accept session sync failed', err);
+      }
+      return info;
+    }
+
+    async function acceptGlobalCall(payload){
       if (!payload) return;
-      const callId = (payload.callId || '').toString();
+      const callId = normaliseCallId(payload);
       const channel = (payload.channel || '').toString();
+      try {
+        await markSessionAccepted(payload);
+      } catch (err) {
+        console.warn('[snoutiq-call] mark session accepted failed', err);
+      }
       if (socket && callId) {
         socket.emit('call-accepted', {
           callId,
-          doctorId: Number(currentDoctorId || payload.doctorId || 0),
-          patientId: Number(payload.patientId || 0),
+          doctorId: Number(currentDoctorId || payload.doctorId || payload.doctor_id || 0),
+          patientId: Number(payload.patientId || payload.patient_id || 0),
           channel,
         });
       }
@@ -526,10 +690,16 @@
           .snoutiq-call-patient{font-size:15px;font-weight:600;color:#1f2937;}
           .snoutiq-call-patient-sub{font-size:13px;color:#6b7280;}
           .snoutiq-call-patient-sub.is-hidden{display:none;}
-          .snoutiq-call-meta{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;align-items:flex-end;min-width:130px;}
-          .snoutiq-call-meta-channel{display:flex;align-items:center;gap:8px;}
-          .snoutiq-call-meta-label{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#9ca3af;}
-          .snoutiq-call-meta .snoutiq-call-channel{font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;font-size:12px;color:#111827;background:#f3f4f6;padding:5px 12px;border-radius:10px;display:inline-flex;align-items:center;justify-content:flex-end;box-shadow:inset 0 -1px 0 rgba(148,163,184,.35);}
+          .snoutiq-call-meta{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:8px;font-size:12px;color:#6b7280;align-items:flex-end;min-width:160px;}
+          .snoutiq-call-meta-row{display:flex;align-items:center;gap:10px;}
+          .snoutiq-call-meta-row.is-hidden{display:none;}
+          .snoutiq-call-meta-label{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#9ca3af;}
+          .snoutiq-call-meta-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:12px;background:#f3f4f6;box-shadow:inset 0 -1px 0 rgba(148,163,184,.35);max-width:220px;}
+          .snoutiq-call-channel{font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;font-size:12px;color:#111827;word-break:break-all;}
+          .snoutiq-call-meta-copy{border:none;background:transparent;color:#2563eb;font-size:11px;font-weight:600;cursor:pointer;padding:0;transition:color .2s ease,opacity .2s ease;}
+          .snoutiq-call-meta-copy:hover{color:#1d4ed8;}
+          .snoutiq-call-meta-copy:disabled{color:#9ca3af;cursor:default;opacity:.7;}
+          .snoutiq-call-meta-value{font-size:12px;color:#1f2937;font-weight:600;max-width:220px;word-break:break-word;}
           .snoutiq-call-meta-time{font-size:12px;color:#6b7280;white-space:nowrap;}
           .snoutiq-call-section{position:relative;border:1px solid #e5e7eb;border-radius:20px;padding:20px;background:linear-gradient(180deg,#f9fafb 0%,#f3f4f6 100%);display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.8);}
           .snoutiq-call-section-title{font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#6b7280;}
@@ -601,6 +771,87 @@
       for (const value of candidates) {
         if (typeof value === 'string' && value.trim()) {
           return value.trim();
+        }
+      }
+      return '';
+    }
+
+    function extractCallIdentifier(payload){
+      if (!payload || typeof payload !== 'object') return '';
+      const candidates = [
+        payload.callId,
+        payload.call_id,
+        payload.callIdentifier,
+        payload.call_identifier,
+        payload.sessionId,
+        payload.session_id,
+        payload?.call?.id,
+        payload?.call?.identifier,
+        payload?.context?.callId,
+        payload?.context?.call_id,
+        payload?.context?.callIdentifier,
+        payload?.meta?.callId,
+        payload?.meta?.call_id,
+        payload?.booking?.call_id,
+      ];
+      for (const value of candidates) {
+        if (value == null) continue;
+        const str = String(value).trim();
+        if (str) return str;
+      }
+      return '';
+    }
+
+    function formatMetaTitle(value){
+      const str = String(value ?? '').trim();
+      if (!str) return '';
+      const cleaned = str.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+      return cleaned
+        .split(' ')
+        .map(segment => {
+          if (!segment) return '';
+          if (segment.length <= 3) return segment.toUpperCase();
+          return segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase();
+        })
+        .join(' ')
+        .trim();
+    }
+
+    function extractCallType(payload){
+      if (!payload || typeof payload !== 'object') return '';
+      const candidates = [
+        payload.consultationType,
+        payload.consultation_type,
+        payload.callType,
+        payload.call_type,
+        payload.consultationMode,
+        payload.consultation_mode,
+        payload.mode,
+        payload.type,
+        payload?.context?.consultation_type,
+        payload?.context?.call_type,
+        payload?.context?.mode,
+        payload?.booking?.consultation_type,
+        payload?.booking?.call_type,
+        payload?.meta?.consultation_type,
+        payload?.meta?.call_type,
+        payload?.meta?.mode,
+        payload?.details?.consultation_type,
+        payload?.details?.mode,
+      ];
+      for (const value of candidates) {
+        if (!value) continue;
+        if (typeof value === 'string' || typeof value === 'number') {
+          const formatted = formatMetaTitle(value);
+          if (formatted) return formatted;
+        }
+        if (typeof value === 'object') {
+          const keys = ['label','name','title','display','type'];
+          for (const key of keys) {
+            if (!value[key]) continue;
+            const formatted = formatMetaTitle(value[key]);
+            if (formatted) return formatted;
+          }
         }
       }
       return '';
@@ -905,6 +1156,11 @@
       const patientSubEl = container.querySelector('[data-role="call-patient-sub"]');
       const timeEl = container.querySelector('[data-role="call-time"]');
       const channelEl = container.querySelector('[data-role="call-channel"]');
+      const channelCopyEl = container.querySelector('[data-role="call-channel-copy"]');
+      const callIdEl = container.querySelector('[data-role="call-id"]');
+      const callIdRow = container.querySelector('[data-role="call-id-row"]');
+      const callTypeEl = container.querySelector('[data-role="call-type"]');
+      const callTypeRow = container.querySelector('[data-role="call-type-row"]');
       const templateEl = container.querySelector('[data-role="template"]');
 
       const patientId = extractPatientId(payload);
@@ -935,9 +1191,68 @@
         }
       }
 
+      const channelCandidates = [
+        payload?.channel,
+        payload?.channelName,
+        payload?.channel_name,
+        payload?.call?.channel,
+        payload?.call?.channel_name,
+        payload?.context?.channel,
+        payload?.meta?.channel,
+      ];
+      let channel = '';
+      for (const value of channelCandidates) {
+        if (value == null) continue;
+        const str = String(value).trim();
+        if (str) { channel = str; break; }
+      }
       if (channelEl) {
-        const channel = (payload?.channel || '').toString().trim();
         channelEl.textContent = channel || '—';
+        if (channel) {
+          channelEl.title = channel;
+        } else {
+          channelEl.removeAttribute('title');
+        }
+      }
+      if (channelCopyEl) {
+        if (channel) {
+          channelCopyEl.disabled = false;
+          channelCopyEl.dataset.copyValue = channel;
+          channelCopyEl.classList.remove('is-copied');
+          channelCopyEl.textContent = 'Copy';
+          bindCopyButton(channelCopyEl);
+        } else {
+          channelCopyEl.disabled = true;
+          channelCopyEl.removeAttribute('data-copy-value');
+          channelCopyEl.classList.remove('is-copied');
+          channelCopyEl.textContent = 'Copy';
+        }
+      }
+
+      const callIdentifier = extractCallIdentifier(payload);
+      if (callIdEl && callIdRow) {
+        if (callIdentifier) {
+          callIdEl.textContent = callIdentifier;
+          callIdEl.title = callIdentifier;
+          callIdRow.classList.remove('is-hidden');
+        } else {
+          callIdEl.textContent = '—';
+          callIdEl.removeAttribute('title');
+          callIdRow.classList.add('is-hidden');
+        }
+      }
+
+      const callType = extractCallType(payload);
+      if (callTypeEl && callTypeRow) {
+        if (callType) {
+          callTypeEl.textContent = callType;
+          callTypeEl.title = callType;
+          callTypeRow.classList.remove('is-hidden');
+        } else {
+          callTypeEl.textContent = '—';
+          callTypeEl.removeAttribute('title');
+          callTypeRow.classList.add('is-hidden');
+        }
       }
 
       if (templateEl) {
@@ -981,9 +1296,20 @@
                 <div class="snoutiq-call-patient-sub is-hidden" data-role="call-patient-sub"></div>
               </div>
               <div class="snoutiq-call-meta">
-                <div class="snoutiq-call-meta-channel">
+                <div class="snoutiq-call-meta-row">
                   <span class="snoutiq-call-meta-label">Channel</span>
-                  <span class="snoutiq-call-channel" data-role="call-channel">—</span>
+                  <div class="snoutiq-call-meta-chip">
+                    <span class="snoutiq-call-channel" data-role="call-channel">—</span>
+                    <button type="button" class="snoutiq-call-meta-copy" data-role="call-channel-copy" aria-label="Copy channel" disabled>Copy</button>
+                  </div>
+                </div>
+                <div class="snoutiq-call-meta-row is-hidden" data-role="call-id-row">
+                  <span class="snoutiq-call-meta-label">Call ID</span>
+                  <span class="snoutiq-call-meta-value" data-role="call-id">—</span>
+                </div>
+                <div class="snoutiq-call-meta-row is-hidden" data-role="call-type-row">
+                  <span class="snoutiq-call-meta-label">Consultation</span>
+                  <span class="snoutiq-call-meta-value" data-role="call-type">—</span>
                 </div>
                 <span class="snoutiq-call-meta-time" data-role="call-time"></span>
               </div>
@@ -1173,6 +1499,7 @@
 
       socket.on('call-requested', (payload)=>{
         if (payload?.doctorId) updateDoctorId(payload.doctorId);
+        persistCallSession(payload);
         emitCallEvent('snoutiq:call-requested', payload);
         if (!window.DOCTOR_PAGE_HANDLE_CALLS) {
           renderGlobalCallAlert(payload);

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\CallSession;
 use App\Models\Payment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -18,6 +19,9 @@ class CallSessionLifecycleTest extends TestCase
         ]);
 
         $response->assertStatus(200);
+        $this->assertNotEmpty($response->json('call_identifier'));
+        $this->assertNull($response->json('doctor_join_url'));
+        $this->assertNull($response->json('patient_payment_url'));
 
         $sessionId = $response->json('session_id');
         $this->assertNotNull($sessionId);
@@ -29,6 +33,12 @@ class CallSessionLifecycleTest extends TestCase
             'status'         => 'pending',
             'payment_status' => 'unpaid',
         ]);
+
+        $session = CallSession::find($sessionId);
+        $this->assertNotNull($session);
+        $this->assertNotEmpty($session->call_identifier);
+        $this->assertNull($session->doctor_join_url);
+        $this->assertNull($session->patient_payment_url);
     }
 
     public function test_legacy_request_call_endpoint_creates_session_record(): void
@@ -39,6 +49,9 @@ class CallSessionLifecycleTest extends TestCase
         ]);
 
         $response->assertStatus(200);
+        $this->assertNotEmpty($response->json('data.call_id'));
+        $this->assertNull($response->json('data.doctor_join_url'));
+        $this->assertNull($response->json('data.patient_payment_url'));
 
         $sessionId = $response->json('data.session_id');
         $this->assertNotNull($sessionId);
@@ -50,6 +63,12 @@ class CallSessionLifecycleTest extends TestCase
             'status'         => 'pending',
             'payment_status' => 'unpaid',
         ]);
+
+        $session = CallSession::find($sessionId);
+        $this->assertNotNull($session);
+        $this->assertNotEmpty($session->call_identifier);
+        $this->assertNull($session->doctor_join_url);
+        $this->assertNull($session->patient_payment_url);
     }
 
     public function test_payment_success_creates_payment_and_updates_session(): void
@@ -92,5 +111,9 @@ class CallSessionLifecycleTest extends TestCase
         $payment = Payment::where('razorpay_payment_id', 'pay_test_123')->first();
         $this->assertNotNull($payment);
         $this->assertEquals((string) $sessionId, data_get($payment->notes, 'call_session_id'));
+
+        $session = CallSession::find($sessionId);
+        $this->assertNotNull($session);
+        $this->assertNotEmpty($session->call_identifier);
     }
 }

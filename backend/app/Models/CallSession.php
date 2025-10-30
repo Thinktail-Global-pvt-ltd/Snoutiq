@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CallSessionUrlBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -11,6 +12,9 @@ class CallSession extends Model
         'patient_id',
         'doctor_id',
         'channel_name',
+        'call_identifier',
+        'doctor_join_url',
+        'patient_payment_url',
         'status',
         'payment_status',
         'accepted_at',
@@ -30,6 +34,39 @@ class CallSession extends Model
         'amount_paid'       => 'integer',
     ];
 
+    public function refreshComputedLinks(?string $frontendBase = null): self
+    {
+        $doctorId = $this->doctor_id !== null ? (int) $this->doctor_id : null;
+        if ($doctorId === 0 && $this->doctor_id !== 0) {
+            $doctorId = null;
+        }
+
+        $patientId = $this->patient_id !== null ? (int) $this->patient_id : null;
+        if ($patientId === 0 && $this->patient_id !== 0) {
+            $patientId = null;
+        }
+
+        $base = $frontendBase ?? CallSessionUrlBuilder::frontendBase();
+
+        $this->doctor_join_url = CallSessionUrlBuilder::doctorJoinUrl(
+            $this->channel_name,
+            $this->call_identifier,
+            $doctorId,
+            $patientId,
+            $base
+        );
+
+        $this->patient_payment_url = CallSessionUrlBuilder::patientPaymentUrl(
+            $this->channel_name,
+            $this->call_identifier,
+            $doctorId,
+            $patientId,
+            $base
+        );
+
+        return $this;
+    }
+
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class);
@@ -45,4 +82,3 @@ class CallSession extends Model
         return $this->belongsTo(Doctor::class, 'doctor_id');
     }
 }
-
