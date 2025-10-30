@@ -574,47 +574,37 @@
     function parseAiSummary(summaryText){
       const text = (summaryText || '').trim();
       if (!text) return [];
-      const entries = [];
-      let current = null;
+
+      const lines = [];
+      let inDiagnosis = false;
       text.split(/\n+/).forEach(line => {
         const trimmed = line.trim();
         if (!trimmed) return;
-        if (/^Q:/i.test(trimmed)) {
-          current = { question: trimmed.replace(/^Q:\s*/i, '').trim(), diagnosis: [], inDiagnosis: false };
-          entries.push(current);
-          return;
-        }
         if (/^===\s*DIAGNOSIS\s*===/i.test(trimmed)) {
-          if (!current) {
-            current = { question: '', diagnosis: [], inDiagnosis: true };
-            entries.push(current);
-          } else {
-            current.inDiagnosis = true;
-          }
+          inDiagnosis = true;
           return;
         }
         if (/^===\s*END\s*===/i.test(trimmed)) {
-          if (current) current.inDiagnosis = false;
+          inDiagnosis = false;
           return;
         }
-        if (current?.inDiagnosis) {
-          current.diagnosis.push(trimmed.replace(/^A:\s*/i, '').trim());
+        if (/^Q:/i.test(trimmed)) {
+          lines.push(`Q: ${trimmed.replace(/^Q:\s*/i, '').trim()}`);
           return;
         }
-        if (!current) {
-          current = { question: '', diagnosis: [], inDiagnosis: false };
-          entries.push(current);
+        if (/^A:/i.test(trimmed)) {
+          const label = inDiagnosis ? 'Diagnosis' : 'A';
+          const value = trimmed.replace(/^A:\s*/i, '').trim();
+          lines.push(`${label}: ${value}`);
+          return;
         }
-        current.diagnosis.push(trimmed);
+        lines.push(trimmed);
       });
 
-      const primary = entries.find(entry => entry.question || entry.diagnosis.length);
-      if (primary) {
-        const lines = [];
-        if (primary.question) lines.push(`Q: ${primary.question}`);
-        if (primary.diagnosis.length) lines.push(`Diagnosis: ${primary.diagnosis[0]}`);
-        if (lines.length) return lines;
+      if (lines.length) {
+        return lines;
       }
+
       return text.split(/\n+/).map(l => l.trim()).filter(Boolean);
     }
 
