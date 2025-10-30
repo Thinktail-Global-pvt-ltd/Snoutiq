@@ -78,7 +78,7 @@
 
     const HEARTBEAT_EVENT = 'doctor-heartbeat';
     const HEARTBEAT_INTERVAL = 25000;
-    const BACKGROUND_HOLD_MS = 60000;
+    const BACKGROUND_HOLD_MS = 5 * 60 * 1000; // keep UI online for up to 5 minutes while suspended
 
     let heartbeatTimer = null;
     let backgroundHoldTimer = null;

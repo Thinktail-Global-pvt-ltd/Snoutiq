@@ -56,8 +56,59 @@ const io = new Server(httpServer, {
 });
 
 // Active doctors and call sessions
-const activeDoctors = new Map(); // doctorId -> { socketId, joinedAt, location }
+const activeDoctors = new Map(); // doctorId -> { socketId, joinedAt, lastSeen, connectionStatus, location, offlineTimer }
 const activeCalls = new Map();   // callId -> { callId, doctorId, patientId, channel, status, ... }
+
+const DOCTOR_HEARTBEAT_EVENT = "doctor-heartbeat";
+const DOCTOR_GRACE_EVENT = "doctor-grace";
+const DOCTOR_HEARTBEAT_INTERVAL_MS = 30_000;
+const DOCTOR_GRACE_PERIOD_MS = 5 * 60 * 1000; // keep doctors available for up to 5 minutes while backgrounded
+
+const clearDoctorTimer = (entry) => {
+  if (!entry) return;
+  if (entry.offlineTimer) {
+    clearTimeout(entry.offlineTimer);
+    entry.offlineTimer = null;
+  }
+};
+
+const upsertDoctorEntry = (doctorId, values = {}) => {
+  if (!doctorId) return null;
+  const existing = activeDoctors.get(doctorId) || {};
+  clearDoctorTimer(existing);
+  const entry = {
+    ...existing,
+    ...values,
+    lastSeen: values.lastSeen || existing.lastSeen || new Date(),
+    joinedAt: values.joinedAt || existing.joinedAt || new Date(),
+  };
+  if (!entry.connectionStatus) {
+    entry.connectionStatus = "connected";
+  }
+  activeDoctors.set(doctorId, entry);
+  return entry;
+};
+
+const scheduleDoctorRemoval = (doctorId, socketId) => {
+  const entry = activeDoctors.get(doctorId);
+  if (!entry) return;
+  if (socketId && entry.socketId && entry.socketId !== socketId) {
+    return;
+  }
+  clearDoctorTimer(entry);
+  entry.connectionStatus = "grace";
+  entry.disconnectedAt = new Date();
+  entry.offlineTimer = setTimeout(() => {
+    const current = activeDoctors.get(doctorId);
+    if (!current) return;
+    if (socketId && current.socketId && current.socketId !== socketId) {
+      return;
+    }
+    activeDoctors.delete(doctorId);
+    emitAvailableDoctors();
+  }, DOCTOR_GRACE_PERIOD_MS);
+  activeDoctors.set(doctorId, entry);
+};
 
 const isDoctorBusy = (doctorId) => {
   for (const [, call] of activeCalls.entries()) {
@@ -74,7 +125,9 @@ const isDoctorBusy = (doctorId) => {
 
 const emitAvailableDoctors = () => {
   const available = [];
-  for (const [doctorId] of activeDoctors.entries()) {
+  for (const [doctorId, info] of activeDoctors.entries()) {
+    const status = info.connectionStatus || "connected";
+    if (!["connected", "grace"].includes(status)) continue;
     if (!isDoctorBusy(doctorId)) available.push(doctorId);
   }
   console.log(`📤 Broadcasting ${available.length} available doctors:`, available);
@@ -88,21 +141,49 @@ io.on("connection", (socket) => {
   socket.on("join-doctor", (doctorId) => {
     const roomName = `doctor-${doctorId}`;
     socket.join(roomName);
-    
-    if (activeDoctors.has(doctorId)) {
-      console.log(`⚠️ Doctor ${doctorId} reconnecting (old socket: ${activeDoctors.get(doctorId).socketId})`);
+
+    const existing = activeDoctors.get(doctorId);
+    if (existing && existing.socketId !== socket.id) {
+      console.log(`⚠️ Doctor ${doctorId} reconnecting (old socket: ${existing.socketId})`);
     }
-    
-    activeDoctors.set(doctorId, { socketId: socket.id, joinedAt: new Date() });
+
+    upsertDoctorEntry(doctorId, {
+      socketId: socket.id,
+      joinedAt: new Date(),
+      lastSeen: new Date(),
+      connectionStatus: "connected",
+    });
+
     console.log(`✅ Doctor ${doctorId} joined (Total active: ${activeDoctors.size})`);
-    
+
     socket.emit("doctor-online", { 
       doctorId, 
       status: "online", 
       timestamp: new Date().toISOString() 
     });
-    
+
     emitAvailableDoctors();
+  });
+
+  socket.on(DOCTOR_HEARTBEAT_EVENT, (payload = {}) => {
+    const doctorId = Number(payload.doctorId || payload.id);
+    if (!doctorId) return;
+
+    const existing = activeDoctors.get(doctorId);
+    const wasGrace = existing?.connectionStatus === "grace";
+    const entry = upsertDoctorEntry(doctorId, {
+      socketId: socket.id,
+      lastSeen: new Date(),
+      connectionStatus: "connected",
+    });
+
+    if (entry && wasGrace) {
+      socket.emit(DOCTOR_GRACE_EVENT, {
+        doctorId,
+        status: "connected",
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
 
   // Get active doctors
@@ -409,8 +490,8 @@ io.on("connection", (socket) => {
     // Clean up doctor
     for (const [doctorId, info] of activeDoctors.entries()) {
       if (info.socketId === socket.id) {
-        console.log(`🔌 Removing disconnected doctor ${doctorId}`);
-        activeDoctors.delete(doctorId);
+        console.log(`🔌 Doctor ${doctorId} socket disconnected, entering grace period`);
+        scheduleDoctorRemoval(doctorId, socket.id);
         emitAvailableDoctors();
       }
     }
@@ -485,6 +566,19 @@ io.on("connection", (socket) => {
     }
   });
 });
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [doctorId, info] of activeDoctors.entries()) {
+    const lastSeen = info.lastSeen ? new Date(info.lastSeen).getTime() : 0;
+    if (!lastSeen) continue;
+    if (now - lastSeen > DOCTOR_GRACE_PERIOD_MS * 2) {
+      console.log(`⏳ Removing stale doctor ${doctorId} after heartbeat timeout`);
+      activeDoctors.delete(doctorId);
+      emitAvailableDoctors();
+    }
+  }
+}, DOCTOR_HEARTBEAT_INTERVAL_MS);
 
 // Periodic cleanup - 5 minute timeout
 setInterval(() => {
