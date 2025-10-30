@@ -1,23 +1,26 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams, useLocation, useSearchParams } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
 
 const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
 
 export default function CallPage() {
   const navigate = useNavigate();
-  const { doctorId, patientId } = useParams();
+  const { channelParam } = useParams();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // Get params from query or state
+  const doctorId = searchParams.get('doctorId') || location.state?.doctorId;
+  const patientId = searchParams.get('patientId') || location.state?.patientId;
+  const callId = searchParams.get('callId') || location.state?.callId;
+  const role = searchParams.get('role') || location.state?.role || "host";
   
-  // Get data from route state or params
-  const channelName = location.state?.channelName || "demo-channel";
-  const role = location.state?.role || "host";
-  const callId = location.state?.callId;
+  console.log("✅ Extracted params:", { doctorId, patientId, callId, role });
+  
+  const channelName = channelParam || location.state?.channelName || searchParams.get('channel') || "demo-channel";
   const isHost = role === "host";
   
-  const targetDoctorId = doctorId || location.state?.doctorId;
-  const targetPatientId = patientId || location.state?.patientId;
-
   const safeChannel = useMemo(() => {
     return (channelName || "default_channel")
       .replace(/[^a-zA-Z0-9_]/g, "")
@@ -25,8 +28,9 @@ export default function CallPage() {
   }, [channelName]);
 
   const uid = useMemo(() => {
-    return Math.floor(Math.random() * 1e6);
-  }, []);
+    const uidParam = searchParams.get('uid');
+    return uidParam ? parseInt(uidParam) : Math.floor(Math.random() * 1e6);
+  }, [searchParams]);
 
   // Refs
   const clientRef = useRef(null);
@@ -57,12 +61,11 @@ export default function CallPage() {
     console.log("✅ Agora client initialized");
   }, []);
 
-  // Request permissions and get cameras - Auto-trigger on mount
+  // Request permissions and get cameras
   const requestPermissions = async () => {
     try {
       console.log("📹 Requesting permissions...");
       
-      // Request both permissions together
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: true, 
         audio: true 
@@ -71,13 +74,11 @@ export default function CallPage() {
       console.log("✅ Permissions granted");
       setPermissions({ camera: true, microphone: true });
       
-      // Get available cameras
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       console.log("📷 Found cameras:", videoDevices.length);
       setAvailableCameras(videoDevices);
       
-      // Stop the test stream
       stream.getTracks().forEach(track => track.stop());
       
       setShowPermissionModal(false);
@@ -89,7 +90,6 @@ export default function CallPage() {
     }
   };
 
-  // Auto-request permissions on component mount
   useEffect(() => {
     requestPermissions();
   }, []);
@@ -103,8 +103,14 @@ export default function CallPage() {
 
     async function joinChannel() {
       try {
+        // Check again to prevent race condition
+        if (hasJoinedRef.current || client.connectionState === "CONNECTED" || client.connectionState === "CONNECTING") {
+          console.log("⚠️ Already connected/connecting, skipping join");
+          return;
+        }
+        
         setCallStatus("connecting");
-        console.log(`🔗 Joining channel: ${safeChannel}, uid: ${uid}`);
+        console.log(`🔗 Joining channel: ${safeChannel}, uid: ${uid}, role: ${role}`);
         
         await client.join(APP_ID, safeChannel, null, uid);
         hasJoinedRef.current = true;
@@ -113,15 +119,14 @@ export default function CallPage() {
         setJoined(true);
         setCallStatus("connected");
 
-        // Create and publish tracks
         await createAndPublishTracks();
-
-        // Setup remote user handlers
         setupRemoteUserHandlers();
       } catch (error) {
         console.error("❌ Join channel error:", error);
         setCallStatus("error");
-        alert("Failed to join call: " + error.message);
+        if (error.code !== "INVALID_OPERATION") {
+          alert("Failed to join call: " + error.message);
+        }
       }
     }
 
@@ -129,7 +134,6 @@ export default function CallPage() {
       try {
         const tracks = [];
         
-        // Create audio track
         console.log("🎤 Creating audio track...");
         try {
           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
@@ -139,7 +143,6 @@ export default function CallPage() {
           console.warn("⚠️ Audio track failed:", err);
         }
 
-        // Create video track
         console.log("📹 Creating video track...");
         try {
           const cameraDevice = availableCameras[currentCameraIndex];
@@ -150,7 +153,6 @@ export default function CallPage() {
           tracks.push(videoTrack);
           console.log("✅ Video track created");
 
-          // Play video track locally
           if (localVideoRef.current) {
             videoTrack.play(localVideoRef.current, { fit: "cover" });
             console.log("✅ Local video playing");
@@ -160,7 +162,6 @@ export default function CallPage() {
           setIsCameraOff(true);
         }
 
-        // Publish tracks
         if (tracks.length > 0) {
           await client.publish(tracks);
           console.log("✅ Tracks published:", tracks.length);
@@ -218,7 +219,7 @@ export default function CallPage() {
         cleanup();
       }
     };
-  }, [showPermissionModal, safeChannel, uid, availableCameras, currentCameraIndex]);
+  }, [showPermissionModal, safeChannel, uid, role]);
 
   const cleanup = async () => {
     const client = clientRef.current;
@@ -254,9 +255,9 @@ export default function CallPage() {
   const toggleMute = async () => {
     const audioTrack = localTracksRef.current.find(track => track.trackMediaType === 'audio');
     if (audioTrack) {
-      await audioTrack.setEnabled(!isMuted);
+      await audioTrack.setEnabled(isMuted);
       setIsMuted(!isMuted);
-      console.log(isMuted ? "🎤 Unmuted" : "🔇 Muted");
+      console.log(!isMuted ? "🔇 Muted" : "🎤 Unmuted");
     }
   };
 
@@ -308,32 +309,44 @@ export default function CallPage() {
     }
   };
 
-  const handleEndCall = async () => {
-    console.log("📞 Ending call...");
-    await cleanup();
-    
-    // Navigate based on role
-    if (targetDoctorId && targetPatientId) {
-      navigate(
-        isHost 
-          ? `/prescription/${targetDoctorId}/${targetPatientId}`
-          : `/rating/${targetDoctorId}/${targetPatientId}`,
-        {
-          state: {
-            doctorId: targetDoctorId,
-            patientId: targetPatientId,
-            callId: callId,
-            fromCall: true
-          }
+ const handleEndCall = async () => {
+  console.log("📞 Ending call...");
+  await cleanup();
+
+  if (doctorId && patientId) {
+    console.log(`✅ Navigating with doctorId: ${doctorId}, patientId: ${patientId}`);
+    navigate(
+      isHost 
+        ? `/prescription/${doctorId}/${patientId}`
+        : `/rating/${doctorId}/${patientId}`,
+      {
+        state: {
+          doctorId,
+          patientId,
+          callId,
+          fromCall: true
         }
-      );
-    } else {
-      alert("Call ended");
+      }
+    );
+  } else {
+    console.warn("⚠️ Missing doctorId or patientId, redirecting...");
+    alert("Call ended");
+
+    // Try to go 2 pages back, or fallback to home if not possible
+    try {
+      if (window.history.length > 2) {
+        navigate(-2);
+      } else {
+        navigate("/");
+      }
+    } catch (error) {
+      console.error("❌ Navigation failed:", error);
       navigate("/");
     }
-  };
+  }
+};
 
-  // Permission Modal
+
   const PermissionModal = () => (
     <div style={{
       position: "fixed",
@@ -476,7 +489,6 @@ export default function CallPage() {
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
     }}>
       
-      {/* Permission Modal */}
       {showPermissionModal && <PermissionModal />}
 
       {/* Header */}
@@ -490,7 +502,6 @@ export default function CallPage() {
         alignItems: "center",
         zIndex: 50
       }}>
-        {/* Logo */}
         <div style={{
           display: "flex",
           alignItems: "center",
@@ -524,7 +535,6 @@ export default function CallPage() {
           </span>
         </div>
 
-        {/* Status */}
         <div style={{
           background: "rgba(15, 23, 42, 0.8)",
           padding: "10px 20px",
@@ -636,7 +646,6 @@ export default function CallPage() {
           }}
         />
         
-        {/* Camera Off Overlay */}
         {(isCameraOff || localTracks.length === 0) && (
           <div style={{
             position: "absolute",
@@ -666,7 +675,6 @@ export default function CallPage() {
           </div>
         )}
         
-        {/* User Badge */}
         <div style={{
           position: "absolute",
           bottom: 12,
@@ -682,7 +690,6 @@ export default function CallPage() {
           You • {isHost ? "Doctor" : "Patient"}
         </div>
 
-        {/* Camera Switch Button */}
         {availableCameras.length > 1 && !isCameraOff && (
           <button
             onClick={() => setShowCameraList(!showCameraList)}
@@ -711,7 +718,6 @@ export default function CallPage() {
           </button>
         )}
 
-        {/* Camera List Dropdown */}
         {showCameraList && availableCameras.length > 1 && (
           <div style={{
             position: "absolute",
@@ -796,7 +802,6 @@ export default function CallPage() {
           border: "1px solid rgba(255,255,255,0.1)",
           zIndex: 30
         }}>
-          {/* Mute Button */}
           <button 
             onClick={toggleMute}
             style={{
@@ -823,7 +828,6 @@ export default function CallPage() {
             {isMuted ? "🔇" : "🎤"}
           </button>
 
-          {/* Camera Button */}
           <button 
             onClick={toggleCamera}
             style={{
@@ -850,7 +854,6 @@ export default function CallPage() {
             {isCameraOff ? "📷" : "📹"}
           </button>
 
-          {/* End Call Button */}
           <button 
             onClick={handleEndCall}
             style={{
