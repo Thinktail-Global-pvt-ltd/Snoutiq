@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\CallSession;
+use App\Models\Doctor;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -49,6 +51,265 @@ class CallAnalyticsService
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get();
+    }
+
+    public function lifecycleOverview(): array
+    {
+        $totalUsers = User::count();
+        $activeDoctors = Doctor::where('toggle_availability', 1)->count();
+
+        $totalSessions = CallSession::count();
+        $completedSessions = CallSession::where('status', 'ended')->count();
+
+        return [
+            'users' => [
+                'total' => $totalUsers,
+            ],
+            'doctors' => [
+                'active' => $activeDoctors,
+            ],
+            'video_sessions' => [
+                'total' => $totalSessions,
+                'completed' => $completedSessions,
+            ],
+            'meta' => [
+                'refreshed_at' => Carbon::now()->format('d M Y H:i'),
+                'window_label' => 'Last 30 days',
+            ],
+        ];
+    }
+
+    public function userLifecycleSteps(): array
+    {
+        $accountUsers = User::count();
+        $consultUsers = CallSession::distinct('patient_id')->count('patient_id');
+        $paymentUsers = CallSession::where('payment_status', 'paid')->distinct('patient_id')->count('patient_id');
+        $startedUsers = CallSession::whereNotNull('started_at')->distinct('patient_id')->count('patient_id');
+        $completedUsers = CallSession::whereNotNull('ended_at')->distinct('patient_id')->count('patient_id');
+
+        $steps = [
+            [
+                'label' => 'Account Created',
+                'users' => $accountUsers,
+            ],
+            [
+                'label' => 'Consultation Scheduled',
+                'users' => $consultUsers,
+                'top_reason' => 'Users who have scheduled at least one call.',
+            ],
+            [
+                'label' => 'Payment Completed',
+                'users' => $paymentUsers,
+                'top_reason' => 'Completed Razorpay flow for a session.',
+            ],
+            [
+                'label' => 'Call Started',
+                'users' => $startedUsers,
+            ],
+            [
+                'label' => 'Call Completed',
+                'users' => $completedUsers,
+            ],
+        ];
+
+        return $this->applyLifecycleConversions($steps);
+    }
+
+    public function doctorLifecycleSteps(): array
+    {
+        $registeredDoctors = Doctor::count();
+        $videoReadyDoctors = Doctor::where('toggle_availability', 1)->count();
+        $acceptedDoctors = CallSession::whereNotNull('accepted_at')->distinct('doctor_id')->count('doctor_id');
+        $startedDoctors = CallSession::whereNotNull('started_at')->distinct('doctor_id')->count('doctor_id');
+        $completedDoctors = CallSession::whereNotNull('ended_at')->distinct('doctor_id')->count('doctor_id');
+
+        $steps = [
+            [
+                'label' => 'Registered',
+                'doctors' => $registeredDoctors,
+                'note' => 'Total doctors onboarded to the platform.',
+            ],
+            [
+                'label' => 'Went Live',
+                'doctors' => $videoReadyDoctors,
+                'note' => 'Availability toggled on for video consults.',
+            ],
+            [
+                'label' => 'Accepted a Call',
+                'doctors' => $acceptedDoctors,
+                'note' => 'Accepted at least one session request.',
+            ],
+            [
+                'label' => 'Started a Consultation',
+                'doctors' => $startedDoctors,
+            ],
+            [
+                'label' => 'Completed a Consultation',
+                'doctors' => $completedDoctors,
+            ],
+        ];
+
+        return $this->applyLifecycleConversions($steps, 'doctors');
+    }
+
+    public function conversionBenchmarks(): array
+    {
+        $userSteps = $this->userLifecycleSteps();
+        $doctorSteps = $this->doctorLifecycleSteps();
+
+        $lookupStepPercent = static function (array $steps, string $label): ?float {
+            foreach ($steps as $step) {
+                if (data_get($step, 'label') === $label) {
+                    return data_get($step, 'conversion_total');
+                }
+            }
+
+            return null;
+        };
+
+        return [
+            [
+                'label' => 'User Payment Completion',
+                'current' => $lookupStepPercent($userSteps, 'Payment Completed'),
+                'target' => 65.0,
+            ],
+            [
+                'label' => 'User Consultation Completion',
+                'current' => $lookupStepPercent($userSteps, 'Call Completed'),
+                'target' => 55.0,
+            ],
+            [
+                'label' => 'Doctor Activation',
+                'current' => $lookupStepPercent($doctorSteps, 'Went Live'),
+                'target' => 70.0,
+            ],
+            [
+                'label' => 'Doctor Consultation Completion',
+                'current' => $lookupStepPercent($doctorSteps, 'Completed a Consultation'),
+                'target' => 50.0,
+            ],
+        ];
+    }
+
+    public function dropOffBreakdown(): array
+    {
+        $steps = $this->userLifecycleSteps();
+
+        $breakdown = [];
+        for ($i = 1; $i < count($steps); $i++) {
+            $previous = $steps[$i - 1];
+            $current = $steps[$i];
+
+            $prevCount = (int) data_get($previous, 'users', 0);
+            $currentCount = (int) data_get($current, 'users', 0);
+            $lost = max($prevCount - $currentCount, 0);
+
+            if ($lost === 0 || $prevCount === 0) {
+                continue;
+            }
+
+            $breakdown[] = [
+                'label' => sprintf('%s → %s', data_get($previous, 'label'), data_get($current, 'label')),
+                'users' => $lost,
+                'share' => ($lost / $prevCount) * 100,
+                'reason' => data_get($current, 'top_reason', 'Follow-up required'),
+            ];
+        }
+
+        return $breakdown;
+    }
+
+    public function recentUserTimeline(int $limit = 8): array
+    {
+        return $this->recentSessions($limit)
+            ->map(function (CallSession $session) {
+                $patient = $session->patient;
+
+                return [
+                    'id' => $patient?->id,
+                    'name' => $patient?->name,
+                    'description' => $this->describeUserEvent($session),
+                    'step' => ucfirst($session->status ?? 'pending'),
+                    'time' => optional($session->updated_at)->format('d M Y H:i'),
+                ];
+            })
+            ->all();
+    }
+
+    public function recentDoctorTimeline(int $limit = 8): array
+    {
+        return $this->recentSessions($limit)
+            ->filter(fn (CallSession $session) => $session->doctor)
+            ->map(function (CallSession $session) {
+                $doctor = $session->doctor;
+
+                return [
+                    'id' => $doctor?->id,
+                    'name' => $doctor?->doctor_name,
+                    'description' => $this->describeDoctorEvent($session),
+                    'stage' => ucfirst($session->status ?? 'pending'),
+                    'time' => optional($session->updated_at)->format('d M Y H:i'),
+                ];
+            })
+            ->all();
+    }
+
+    private function applyLifecycleConversions(array $steps, string $countKey = 'users'): array
+    {
+        $baseline = (float) max(data_get($steps[0] ?? [], $countKey, 0), 0.0);
+
+        foreach ($steps as $index => &$step) {
+            $currentCount = (float) max(data_get($step, $countKey, 0), 0.0);
+            $previousCount = $index === 0
+                ? $currentCount
+                : (float) max(data_get($steps[$index - 1], $countKey, 0), 0.0);
+
+            $step['conversion_step'] = $previousCount > 0
+                ? round(($currentCount / $previousCount) * 100, 1)
+                : null;
+
+            $step['conversion_total'] = $baseline > 0
+                ? round(($currentCount / $baseline) * 100, 1)
+                : null;
+
+            $step['avg_time_minutes'] = null;
+
+            if (!isset($step['top_reason'])) {
+                $step['top_reason'] = null;
+            }
+
+            if (!isset($step['quality_score']) && $countKey === 'doctors') {
+                $step['quality_score'] = null;
+            }
+        }
+
+        unset($step);
+
+        return $steps;
+    }
+
+    private function describeUserEvent(CallSession $session): string
+    {
+        return match ($session->status) {
+            'accepted' => 'Doctor accepted the consultation request.',
+            'ended' => $session->payment_status === 'paid'
+                ? 'Consultation completed and payment captured.'
+                : 'Consultation ended without payment.',
+            default => $session->payment_status === 'paid'
+                ? 'Payment received. Awaiting call start.'
+                : 'Call session created.',
+        };
+    }
+
+    private function describeDoctorEvent(CallSession $session): string
+    {
+        return match ($session->status) {
+            'accepted' => 'Accepted an incoming video consult.',
+            'ended' => 'Marked the session as completed.',
+            default => $session->payment_status === 'paid'
+                ? 'Awaiting doctor to join the paid session.'
+                : 'New session pending assignment.',
+        };
     }
 
     protected function formatDuration(int $seconds): string

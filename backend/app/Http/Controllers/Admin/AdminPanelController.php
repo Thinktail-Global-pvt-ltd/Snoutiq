@@ -96,6 +96,27 @@ class AdminPanelController extends Controller
         return view('admin.vet-registrations', compact('clinics'));
     }
 
+    public function videoAnalytics(): View
+    {
+        $overviewMetrics = $this->callAnalyticsService->lifecycleOverview();
+        $userLifecycleSteps = $this->callAnalyticsService->userLifecycleSteps();
+        $doctorLifecycleSteps = $this->callAnalyticsService->doctorLifecycleSteps();
+        $conversionBenchmarks = $this->callAnalyticsService->conversionBenchmarks();
+        $dropOffBreakdown = $this->callAnalyticsService->dropOffBreakdown();
+        $recentUserTimeline = $this->callAnalyticsService->recentUserTimeline();
+        $recentDoctorTimeline = $this->callAnalyticsService->recentDoctorTimeline();
+
+        return view('admin.video-analytics', compact(
+            'overviewMetrics',
+            'userLifecycleSteps',
+            'doctorLifecycleSteps',
+            'conversionBenchmarks',
+            'dropOffBreakdown',
+            'recentUserTimeline',
+            'recentDoctorTimeline'
+        ));
+    }
+
     private function getOnlineClinics(?Collection $activeClinicIds = null): Collection
     {
         $activeClinicIds = $activeClinicIds ?? $this->doctorAvailabilityService->getActiveClinicIds();

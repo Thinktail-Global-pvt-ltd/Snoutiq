@@ -353,16 +353,41 @@
         const style = document.createElement('style');
         style.id = 'snoutiq-call-styles';
         style.textContent = `
-          .snoutiq-incoming-call{border-radius:28px!important;padding:0!important;background:#fff!important;box-shadow:0 30px 70px -40px rgba(15,23,42,.55)!important;}
+          .snoutiq-incoming-call{border-radius:28px!important;padding:0!important;background:#fff!important;box-shadow:0 30px 70px -40px rgba(15,23,42,.55)!important;font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;color:#111827!important;}
           .snoutiq-incoming-call .swal2-title{display:none!important;}
-          .snoutiq-incoming-call .swal2-html-container{margin:0!important;padding:28px 28px 4px!important;}
-          .snoutiq-incoming-call .swal2-actions{margin:0!important;padding:0 28px 24px!important;display:flex!important;gap:14px!important;}
-          .snoutiq-incoming-call .snoutiq-btn{flex:1 1 0%;border-radius:14px;padding:14px 0;font-weight:600;font-size:15px;letter-spacing:.01em;transition:transform .2s ease, box-shadow .2s ease;}
+          .snoutiq-incoming-call .swal2-html-container{margin:0!important;padding:30px 32px 8px!important;}
+          .snoutiq-incoming-call .swal2-actions{margin:0!important;padding:0 32px 28px!important;display:flex!important;gap:16px!important;}
+          .snoutiq-incoming-call .snoutiq-btn{flex:1 1 0%;border-radius:14px;padding:15px 0;font-weight:600;font-size:15px;letter-spacing:.01em;transition:transform .2s ease, box-shadow .2s ease;}
           .snoutiq-incoming-call .snoutiq-btn:focus{outline:none!important;box-shadow:0 0 0 3px rgba(59,130,246,.35)!important;}
-          .snoutiq-incoming-call .snoutiq-btn-accept{background:#16a34a;color:#fff;border:none;}
-          .snoutiq-incoming-call .snoutiq-btn-accept:hover{transform:translateY(-1px);box-shadow:0 15px 25px -15px rgba(22,163,74,.9);}
-          .snoutiq-incoming-call .snoutiq-btn-reject{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}
-          .snoutiq-incoming-call .snoutiq-btn-reject:hover{transform:translateY(-1px);box-shadow:0 12px 20px -18px rgba(248,113,113,.9);}
+          .snoutiq-incoming-call .snoutiq-btn-accept{background:#22c55e;color:#fff;border:none;}
+          .snoutiq-incoming-call .snoutiq-btn-accept:hover{transform:translateY(-1px);box-shadow:0 18px 26px -18px rgba(34,197,94,.85);}
+          .snoutiq-incoming-call .snoutiq-btn-reject{background:#ef4444;color:#fff;border:none;}
+          .snoutiq-incoming-call .snoutiq-btn-reject:hover{transform:translateY(-1px);box-shadow:0 18px 26px -18px rgba(239,68,68,.85);}
+          .snoutiq-call-card{display:flex;flex-direction:column;gap:22px;}
+          .snoutiq-call-header{display:flex;align-items:center;gap:18px;}
+          .snoutiq-call-header-icon{flex-shrink:0;width:56px;height:56px;border-radius:20px;background:#fee2e2;display:flex;align-items:center;justify-content:center;color:#dc2626;box-shadow:inset 0 0 0 1px rgba(254,205,211,.8);}
+          .snoutiq-call-header-icon svg{width:28px;height:28px;}
+          .snoutiq-call-title{font-size:20px;font-weight:700;color:#111827;}
+          .snoutiq-call-patient{margin-top:6px;font-size:15px;font-weight:600;color:#374151;}
+          .snoutiq-call-meta{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;align-items:flex-end;}
+          .snoutiq-call-meta-channel{display:flex;align-items:center;gap:8px;}
+          .snoutiq-call-meta-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;}
+          .snoutiq-call-meta .snoutiq-call-channel{font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;font-size:12px;color:#111827;background:#f3f4f6;padding:4px 10px;border-radius:8px;display:inline-flex;align-items:center;justify-content:flex-end;}
+          .snoutiq-call-meta-time{font-size:12px;color:#6b7280;}
+          .snoutiq-call-section{border:1px solid #e5e7eb;border-radius:18px;padding:18px;background:#f9fafb;display:flex;flex-direction:column;gap:10px;}
+          .snoutiq-call-section-title{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;}
+          .snoutiq-call-lines{display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.6;color:#374151;}
+          .snoutiq-call-line{position:relative;padding-left:16px;}
+          .snoutiq-call-line::before{content:'';position:absolute;top:9px;left:4px;width:4px;height:4px;border-radius:9999px;background:#9ca3af;}
+          .snoutiq-call-line-strong{font-weight:600;color:#111827;}
+          .snoutiq-call-summary{border-color:rgba(248,113,113,.45);background:#fef2f2;}
+          .snoutiq-call-summary-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+          .snoutiq-call-summary-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#b91c1c;}
+          .snoutiq-call-summary-tag{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:#f43f5e;}
+          .snoutiq-call-summary-status{font-size:13px;color:#b91c1c;}
+          .snoutiq-call-summary-body{font-size:13px;line-height:1.6;color:#7f1d1d;}
+          .snoutiq-call-footer{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;}
+          .snoutiq-call-footer-note{font-size:11px;color:#9ca3af;}
         `;
         document.head.appendChild(style);
       } catch (_) {
@@ -385,6 +410,28 @@
         if (!Number.isNaN(num) && num) return num;
       }
       return null;
+    }
+
+    function extractPatientName(payload){
+      if (!payload || typeof payload !== 'object') return '';
+      const candidates = [
+        payload.patientName,
+        payload.patient_name,
+        payload?.patient?.name,
+        payload?.patient?.full_name,
+        payload?.patient?.display_name,
+        payload?.booking?.patient_name,
+        payload?.user?.name,
+        payload?.user?.full_name,
+        payload?.user?.display_name,
+        payload?.meta?.patient_name,
+      ];
+      for (const value of candidates) {
+        if (typeof value === 'string' && value.trim()) {
+          return value.trim();
+        }
+      }
+      return '';
     }
 
     function extractCallTemplate(payload){
@@ -473,36 +520,42 @@
       } = opts;
 
       container.innerHTML = '';
+      try { container.classList.add('snoutiq-call-lines'); } catch (_) {}
       let hasContent = false;
       const safeLines = Array.isArray(lines) ? lines : (typeof lines === 'string' ? lines.split(/\n+/) : []);
       safeLines.forEach(raw => {
         const trimmed = (raw || '').toString().trim();
         if (!trimmed) return;
-        const p = document.createElement('p');
-        p.style.margin = '0 0 6px';
-        p.style.fontSize = fontSize;
-        p.style.lineHeight = lineHeight;
-        p.style.color = textColor;
+        const line = document.createElement('div');
+        line.className = 'snoutiq-call-line';
+        line.style.fontSize = fontSize;
+        line.style.lineHeight = lineHeight;
+        line.style.color = textColor;
         if (highlightLabels) {
           const idx = trimmed.indexOf(':');
           if (idx > 0 && idx < 40) {
             const label = trimmed.slice(0, idx).trim();
-            const rest = trimmed.slice(idx + 1).trim();
-            if (label && rest) {
+            const value = trimmed.slice(idx + 1).trim();
+            if (label && value) {
               const strong = document.createElement('span');
+              strong.className = 'snoutiq-call-line-strong';
+              if (labelColor) {
+                strong.style.color = labelColor;
+              }
               strong.style.fontWeight = '600';
-              strong.style.color = labelColor;
-              strong.textContent = `${label}: `;
-              p.appendChild(strong);
-              p.appendChild(document.createTextNode(rest));
-              container.appendChild(p);
-              hasContent = true;
-              return;
+              strong.textContent = `${label}:`;
+              line.appendChild(strong);
+              line.appendChild(document.createTextNode(` ${value}`));
+            } else {
+              line.textContent = trimmed;
             }
+          } else {
+            line.textContent = trimmed;
           }
+        } else {
+          line.textContent = trimmed;
         }
-        p.textContent = trimmed;
-        container.appendChild(p);
+        container.appendChild(line);
         hasContent = true;
       });
 
@@ -635,7 +688,13 @@
         if (!value) return '';
         const date = value instanceof Date ? value : new Date(value);
         if (Number.isNaN(date.getTime())) return '';
-        return date.toLocaleString(undefined, { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleString(undefined, {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
       } catch (_) {
         return '';
       }
@@ -649,25 +708,29 @@
       const templateEl = container.querySelector('[data-role="template"]');
 
       const patientId = extractPatientId(payload);
+      const patientName = extractPatientName(payload);
       if (patientEl) {
-        if (patientId) {
-          patientEl.textContent = `Patient #${patientId}`;
-          patientEl.style.fontSize = '14px';
-          patientEl.style.fontWeight = '600';
-          patientEl.style.color = '#1f2937';
+        if (patientName && patientId) {
+          patientEl.textContent = `${patientName} (Patient ID #${patientId})`;
+        } else if (patientName) {
+          patientEl.textContent = patientName;
+        } else if (patientId) {
+          patientEl.textContent = `Patient ID #${patientId}`;
         } else {
           patientEl.textContent = 'Incoming video consultation';
-          patientEl.style.fontSize = '14px';
-          patientEl.style.fontWeight = '600';
-          patientEl.style.color = '#1f2937';
         }
       }
 
       if (timeEl) {
         const ts = payload?.timestamp || payload?.createdAt || payload?.created_at || Date.now();
         const formatted = formatCallTime(ts);
-        timeEl.textContent = formatted ? `Requested at ${formatted}` : '';
-        timeEl.style.color = '#6b7280';
+        if (formatted) {
+          timeEl.textContent = `Since ${formatted}`;
+          timeEl.style.display = '';
+        } else {
+          timeEl.textContent = '';
+          timeEl.style.display = 'none';
+        }
       }
 
       if (channelEl) {
@@ -698,36 +761,39 @@
         injectCallStyles();
         globalAlertOpen = true;
         const html = `
-          <div class="snoutiq-call-card" style="font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827;">
-            <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px;">
-              <div style="flex-shrink:0;width:52px;height:52px;border-radius:18px;background:#fef2f2;display:flex;align-items:center;justify-content:center;color:#dc2626;box-shadow:inset 0 0 0 1px rgba(248,113,113,.35);">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" style="width:28px;height:28px;">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a 1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <div class="snoutiq-call-card">
+            <div class="snoutiq-call-header">
+              <div class="snoutiq-call-header-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </div>
-              <div style="flex:1;">
-                <div style="font-size:18px;font-weight:700;color:#111827;">Incoming Call</div>
-                <div data-role="call-patient" style="margin-top:4px;"></div>
-                <div data-role="call-time" style="margin-top:4px;font-size:12px;color:#6b7280;"></div>
+              <div>
+                <div class="snoutiq-call-title">Incoming Call</div>
+                <div class="snoutiq-call-patient" data-role="call-patient"></div>
+              </div>
+              <div class="snoutiq-call-meta">
+                <div class="snoutiq-call-meta-channel">
+                  <span class="snoutiq-call-meta-label">Channel</span>
+                  <span class="snoutiq-call-channel" data-role="call-channel">—</span>
+                </div>
+                <span class="snoutiq-call-meta-time" data-role="call-time"></span>
               </div>
             </div>
-            <div style="display:flex;flex-direction:column;gap:14px;">
-              <div style="border:1px solid #e5e7eb;border-radius:16px;padding:14px;background:#f9fafb;">
-                <div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;margin-bottom:6px;">Consultation Template</div>
-                <div data-role="template" style="font-size:13px;line-height:1.6;color:#374151;"></div>
+            <div class="snoutiq-call-section">
+              <div class="snoutiq-call-section-title">Consultation Template</div>
+              <div data-role="template"></div>
+            </div>
+            <div class="snoutiq-call-section snoutiq-call-summary">
+              <div class="snoutiq-call-summary-head">
+                <span class="snoutiq-call-summary-label">AI Chat Summary</span>
+                <span class="snoutiq-call-summary-tag">Latest Chats</span>
               </div>
-              <div style="border:1px solid rgba(254,205,211,.8);border-radius:16px;padding:14px;background:#fff1f2;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                  <span style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#be123c;">AI Chat Summary</span>
-                  <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:#f43f5e;">Latest chats</span>
-                </div>
-                <div data-role="summary-status" style="font-size:12px;color:#9f1239;">Fetching AI summary…</div>
-                <div data-role="summary" style="margin-top:6px;font-size:13px;line-height:1.6;color:#7f1d1d;display:none;"></div>
-              </div>
-              <div style="border:1px dashed #e5e7eb;border-radius:14px;padding:10px 12px;background:#fff;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#6b7280;">
-                <div>Channel: <code data-role="call-channel" style="font-size:12px;color:#111827;background:#f3f4f6;padding:2px 6px;border-radius:6px;">—</code></div>
-                <div style="color:#9ca3af;font-size:11px;">Keep this tab open to stay available.</div>
-              </div>
+              <div class="snoutiq-call-summary-status" data-role="summary-status">Fetching AI summary…</div>
+              <div class="snoutiq-call-summary-body" data-role="summary" style="display:none;"></div>
+            </div>
+            <div class="snoutiq-call-footer">
+              <div class="snoutiq-call-footer-note">Keep this tab open to stay available for video consultations.</div>
             </div>
           </div>
         `;

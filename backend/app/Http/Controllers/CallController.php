@@ -71,8 +71,18 @@ class CallController extends Controller
             'payment_db_id'        => 'nullable|integer',
             'payment_id'           => 'nullable|string',
             'razorpay_payment_id'  => 'nullable|string',
+            'razorpay_order_id'    => 'nullable|string|max:191',
+            'order_id'             => 'nullable|string|max:191',
+            'razorpay_signature'   => 'nullable|string|max:191',
+            'signature'            => 'nullable|string|max:191',
             'amount'               => 'nullable|integer|min:0',
             'currency'             => 'nullable|string|max:10',
+            'status'               => 'nullable|string|max:50',
+            'method'               => 'nullable|string|max:50',
+            'email'                => 'nullable|string|max:191',
+            'contact'              => 'nullable|string|max:30',
+            'notes'                => 'nullable|array',
+            'raw_response'         => 'nullable|array',
         ]);
 
         $session = CallSession::findOrFail($sessionId);
@@ -87,6 +97,52 @@ class CallController extends Controller
             $payment = Payment::where('razorpay_payment_id', $paymentIdentifier)->first();
         }
 
+        $currency = strtoupper($data['currency'] ?? $session->currency ?? 'INR');
+        $orderId = $data['razorpay_order_id'] ?? $data['order_id'] ?? null;
+        $signature = $data['razorpay_signature'] ?? $data['signature'] ?? null;
+
+        $paymentPayload = [];
+        if (array_key_exists('amount', $data) && $data['amount'] !== null) {
+            $paymentPayload['amount'] = $data['amount'];
+        }
+        $paymentPayload['currency'] = $currency;
+
+        foreach (['status', 'method', 'email', 'contact'] as $field) {
+            if (!empty($data[$field])) {
+                $paymentPayload[$field] = $data[$field];
+            }
+        }
+
+        $notes = [];
+        if (!empty($data['notes']) && is_array($data['notes'])) {
+            $notes = $data['notes'];
+        }
+        $notes['call_session_id'] = (string) $session->id;
+        $paymentPayload['notes'] = $notes;
+
+        if (!empty($data['raw_response']) && is_array($data['raw_response'])) {
+            $paymentPayload['raw_response'] = $data['raw_response'];
+        }
+
+        if ($payment) {
+            $payment->fill($paymentPayload);
+            if ($orderId) {
+                $payment->razorpay_order_id = $orderId;
+            }
+            if ($signature) {
+                $payment->razorpay_signature = $signature;
+            }
+            $payment->save();
+        } elseif ($paymentIdentifier && $orderId && $signature) {
+            $payment = Payment::updateOrCreate(
+                ['razorpay_payment_id' => $paymentIdentifier],
+                array_merge($paymentPayload, [
+                    'razorpay_order_id'  => $orderId,
+                    'razorpay_signature' => $signature,
+                ])
+            );
+        }
+
         if ($payment) {
             $session->payment_id = $payment->id;
             $session->amount_paid = $payment->amount;
@@ -98,7 +154,7 @@ class CallController extends Controller
         }
 
         if (!empty($data['currency'])) {
-            $session->currency = strtoupper($data['currency']);
+            $session->currency = $currency;
         }
 
         $session->payment_status = 'paid';

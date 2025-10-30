@@ -43,6 +43,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/online-doctors', [AdminPanelController::class, 'onlineDoctors'])->name('admin.online-doctors');
         Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
         Route::get('/bookings', [AdminPanelController::class, 'bookings'])->name('admin.bookings');
+        Route::get('/analytics/video', [AdminPanelController::class, 'videoAnalytics'])->name('admin.analytics.video');
         Route::get('/supports', [AdminPanelController::class, 'supports'])->name('admin.supports');
         Route::get('/sp/{user}', [AdminPanelController::class, 'serviceProviderProfile'])->name('admin.sp.profile');
 
