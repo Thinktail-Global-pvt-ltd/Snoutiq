@@ -304,6 +304,160 @@
       return `${base}/call-page/${encodeURIComponent(channel)}?${search.toString()}`;
     }
 
+    function paymentUrlFromPayload(payload){
+      try {
+        const callId = (payload?.callId || payload?.call_id || payload?.callIdentifier || '').toString().trim();
+        const channel = (payload?.channel || '').toString().trim();
+        const doctorValueRaw = payload?.doctorId ?? payload?.doctor_id ?? currentDoctorId ?? null;
+        const patientValueRaw = payload?.patientId ?? payload?.patient_id ?? null;
+        const doctorValue = Number(doctorValueRaw);
+        const patientValue = Number(patientValueRaw);
+        if (!callId || !channel || Number.isNaN(doctorValue) || Number.isNaN(patientValue) || !doctorValue || !patientValue) {
+          return null;
+        }
+        const baseCandidate = (FRONTEND_BASE || '').toString().trim();
+        const base = baseCandidate || (window.location?.origin || '');
+        if (!base) return null;
+        const params = new URLSearchParams({
+          callId,
+          doctorId: String(doctorValue),
+          channel,
+          patientId: String(patientValue),
+        });
+        return `${base.replace(/\/+$/, '')}/payment/${encodeURIComponent(callId)}?${params.toString()}`;
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    function resolveDoctorJoinUrl(payload){
+      const directCandidates = [
+        payload?.doctorJoinUrl,
+        payload?.doctor_join_url,
+        payload?.videoUrl,
+        payload?.video_url,
+      ];
+      for (const candidate of directCandidates) {
+        if (typeof candidate === 'string' && candidate.trim()) {
+          return candidate.trim();
+        }
+      }
+      return callUrlFromPayload(payload);
+    }
+
+    function resolvePaymentUrl(payload){
+      const directCandidates = [
+        payload?.patientPaymentUrl,
+        payload?.patient_payment_url,
+        payload?.paymentUrl,
+        payload?.payment_url,
+      ];
+      for (const candidate of directCandidates) {
+        if (typeof candidate === 'string' && candidate.trim()) {
+          return candidate.trim();
+        }
+      }
+      return paymentUrlFromPayload(payload);
+    }
+
+    function formatLinkDisplay(url){
+      if (!url) return '';
+      try {
+        const parsed = new URL(url, window.location?.origin || undefined);
+        const displayValue = `${parsed.pathname}${parsed.search}`;
+        if (displayValue.length > 58) {
+          return `${displayValue.slice(0, 55)}…`;
+        }
+        return displayValue || parsed.href;
+      } catch (_err) {
+        return url.length > 58 ? `${url.slice(0,55)}…` : url;
+      }
+    }
+
+    function bindCopyButton(button){
+      if (!button || button.dataset.copyBound === '1') return;
+      button.addEventListener('click', async (event) => {
+        event.preventDefault();
+        const value = button.dataset.copyValue;
+        if (!value) return;
+        try {
+          if (navigator?.clipboard?.writeText) {
+            await navigator.clipboard.writeText(value);
+          } else {
+            const tmp = document.createElement('textarea');
+            tmp.value = value;
+            tmp.setAttribute('readonly', '');
+            tmp.style.position = 'absolute';
+            tmp.style.left = '-9999px';
+            document.body.appendChild(tmp);
+            tmp.select();
+            document.execCommand('copy');
+            document.body.removeChild(tmp);
+          }
+          button.classList.add('is-copied');
+          button.textContent = 'Copied!';
+          setTimeout(() => {
+            button.classList.remove('is-copied');
+            button.textContent = 'Copy';
+          }, 1500);
+        } catch (err) {
+          console.warn('[snoutiq-call] copy failed', err);
+        }
+      });
+      button.dataset.copyBound = '1';
+    }
+
+    function populateLinkRow(rowEl, url, label){
+      if (!rowEl) return;
+      try {
+        if (label) {
+          const labelEl = rowEl.querySelector('[data-role="link-label"]');
+          if (labelEl) labelEl.textContent = label;
+        }
+        const valueEl = rowEl.querySelector('[data-role="link-value"]');
+        const openEl = rowEl.querySelector('[data-role="link-open"]');
+        const copyEl = rowEl.querySelector('[data-role="link-copy"]');
+
+        if (!url) {
+          rowEl.classList.add('is-disabled');
+          if (valueEl) {
+            valueEl.textContent = 'Not available yet';
+            valueEl.removeAttribute('title');
+          }
+          if (openEl) {
+            openEl.removeAttribute('href');
+            openEl.setAttribute('aria-disabled', 'true');
+          }
+          if (copyEl) {
+            copyEl.disabled = true;
+            copyEl.removeAttribute('data-copy-value');
+            copyEl.classList.remove('is-copied');
+            copyEl.textContent = 'Copy';
+          }
+          return;
+        }
+
+        rowEl.classList.remove('is-disabled');
+        if (valueEl) {
+          valueEl.textContent = formatLinkDisplay(url);
+          valueEl.title = url;
+        }
+        if (openEl) {
+          openEl.href = url;
+          openEl.setAttribute('aria-disabled', 'false');
+        }
+        if (copyEl) {
+          copyEl.disabled = false;
+          copyEl.dataset.copyValue = url;
+          copyEl.classList.remove('is-copied');
+          copyEl.textContent = 'Copy';
+          bindCopyButton(copyEl);
+        }
+      } catch (err) {
+        console.warn('[snoutiq-call] failed to populate link row', err);
+      }
+    }
+
     function acceptGlobalCall(payload){
       if (!payload) return;
       const callId = (payload.callId || '').toString();
@@ -316,7 +470,7 @@
           channel,
         });
       }
-      const target = callUrlFromPayload(payload);
+      const target = resolveDoctorJoinUrl(payload);
       if (target) window.location.href = target;
       globalCall = null;
     }
@@ -389,6 +543,21 @@
           .snoutiq-call-summary-tag{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:#f43f5e;}
           .snoutiq-call-summary-status{font-size:13px;color:#b91c1c;}
           .snoutiq-call-summary-body{font-size:13px;line-height:1.65;color:#7f1d1d;}
+          .snoutiq-call-links{display:flex;flex-direction:column;gap:10px;margin-top:4px;}
+          .snoutiq-call-link-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid #e5e7eb;transition:box-shadow .2s ease;}
+          .snoutiq-call-link-row:not(.is-disabled):hover{box-shadow:0 12px 24px -18px rgba(30,64,175,.45);}
+          .snoutiq-call-link-row.is-disabled{opacity:.55;}
+          .snoutiq-call-link-row.is-disabled .snoutiq-call-link-open,
+          .snoutiq-call-link-row.is-disabled .snoutiq-call-link-copy{pointer-events:none;cursor:not-allowed;}
+          .snoutiq-call-link-main{display:flex;flex-direction:column;gap:4px;}
+          .snoutiq-call-link-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#1f2937;}
+          .snoutiq-call-link-value{font-size:12px;color:#4b5563;font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;word-break:break-all;}
+          .snoutiq-call-link-actions{display:flex;gap:8px;align-items:center;}
+          .snoutiq-call-link-open{display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;border-radius:10px;font-size:12px;font-weight:600;color:#fff;background:#2563eb;text-decoration:none;transition:background .2s ease,color .2s ease;}
+          .snoutiq-call-link-open:focus{outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.28);}
+          .snoutiq-call-link-copy{padding:6px 12px;border-radius:10px;border:none;background:#e0e7ff;color:#312e81;font-size:12px;font-weight:600;cursor:pointer;transition:background .2s ease,color .2s ease;}
+          .snoutiq-call-link-copy:focus{outline:none;box-shadow:0 0 0 3px rgba(99,102,241,.28);}
+          .snoutiq-call-link-copy.is-copied{background:#d1fae5;color:#065f46;}
           .snoutiq-call-footer{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#6b7280;}
           .snoutiq-call-footer-note{font-size:11px;color:#9ca3af;}
         `;
@@ -781,6 +950,11 @@
         });
       }
 
+      const doctorLinkRow = container.querySelector('[data-role="doctor-link"]');
+      const paymentLinkRow = container.querySelector('[data-role="payment-link"]');
+      populateLinkRow(doctorLinkRow, resolveDoctorJoinUrl(payload), 'Doctor Join Link');
+      populateLinkRow(paymentLinkRow, resolvePaymentUrl(payload), 'Payment Page');
+
       return patientId;
     }
 
@@ -825,6 +999,28 @@
               </div>
               <div class="snoutiq-call-summary-status" data-role="summary-status">Fetching AI summary…</div>
               <div class="snoutiq-call-summary-body" data-role="summary" style="display:none;"></div>
+            </div>
+            <div class="snoutiq-call-section snoutiq-call-links">
+              <div class="snoutiq-call-link-row is-disabled" data-role="doctor-link">
+                <div class="snoutiq-call-link-main">
+                  <span class="snoutiq-call-link-label" data-role="link-label">Doctor Join Link</span>
+                  <span class="snoutiq-call-link-value" data-role="link-value">Not available yet</span>
+                </div>
+                <div class="snoutiq-call-link-actions">
+                  <a class="snoutiq-call-link-open" data-role="link-open" href="#" target="_blank" rel="noopener noreferrer">Open</a>
+                  <button type="button" class="snoutiq-call-link-copy" data-role="link-copy" disabled>Copy</button>
+                </div>
+              </div>
+              <div class="snoutiq-call-link-row is-disabled" data-role="payment-link">
+                <div class="snoutiq-call-link-main">
+                  <span class="snoutiq-call-link-label" data-role="link-label">Payment Page</span>
+                  <span class="snoutiq-call-link-value" data-role="link-value">Not available yet</span>
+                </div>
+                <div class="snoutiq-call-link-actions">
+                  <a class="snoutiq-call-link-open" data-role="link-open" href="#" target="_blank" rel="noopener noreferrer">Open</a>
+                  <button type="button" class="snoutiq-call-link-copy" data-role="link-copy" disabled>Copy</button>
+                </div>
+              </div>
             </div>
             <div class="snoutiq-call-footer">
               <div class="snoutiq-call-footer-note">Keep this tab open to stay available for video consultations.</div>
