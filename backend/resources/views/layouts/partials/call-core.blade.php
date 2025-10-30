@@ -76,6 +76,14 @@
     let ringResumeListener = null;
     const callSessionCache = new Map();
 
+    const HEARTBEAT_EVENT = 'doctor-heartbeat';
+    const HEARTBEAT_INTERVAL = 25000;
+    const BACKGROUND_HOLD_MS = 60000;
+
+    let heartbeatTimer = null;
+    let backgroundHoldTimer = null;
+    let backgroundHoldActive = false;
+
     function isDocumentHidden(){
       try {
         return typeof document !== 'undefined' && document.hidden;
@@ -120,6 +128,65 @@
         } catch (err) {
           console.warn('[snoutiq-call] reconnect failed', err);
         }
+      }
+    }
+
+    function sendHeartbeat(immediate){
+      if (!currentDoctorId) return;
+      const sock = socket && socket.connected ? socket : null;
+      if (!sock) return;
+      try {
+        sock.emit(HEARTBEAT_EVENT, {
+          doctorId: Number(currentDoctorId),
+          at: Date.now(),
+          immediate: immediate ? 1 : 0,
+        });
+      } catch (err) {
+        console.warn('[snoutiq-call] heartbeat send failed', err);
+      }
+    }
+
+    function startHeartbeat(){
+      if (!shouldHoldOnline) return;
+      stopHeartbeat();
+      sendHeartbeat(true);
+      heartbeatTimer = setInterval(()=>{
+        if (!shouldHoldOnline) return;
+        sendHeartbeat(false);
+      }, HEARTBEAT_INTERVAL);
+    }
+
+    function stopHeartbeat(){
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+    }
+
+    function enterBackgroundHold(reason){
+      if (!shouldHoldOnline) return;
+      backgroundHoldActive = true;
+      if (backgroundHoldTimer) {
+        clearTimeout(backgroundHoldTimer);
+        backgroundHoldTimer = null;
+      }
+      backgroundHoldTimer = setTimeout(()=>{
+        backgroundHoldActive = false;
+        if (!socket || !socket.connected) {
+          setHeaderStatus('connecting');
+        }
+      }, BACKGROUND_HOLD_MS);
+      if (reason) {
+        try { console.debug('[snoutiq-call] entering background hold due to', reason); } catch(_){ }
+      }
+      setHeaderStatus('online');
+    }
+
+    function exitBackgroundHold(){
+      backgroundHoldActive = false;
+      if (backgroundHoldTimer) {
+        clearTimeout(backgroundHoldTimer);
+        backgroundHoldTimer = null;
       }
     }
 
@@ -336,6 +403,7 @@
           socket.emit('join-doctor', num);
           joined = true;
           setHeaderStatus('online');
+          sendHeartbeat(true);
         }catch(err){
           console.warn('[snoutiq-call] failed to refresh doctor id', err);
         }
@@ -1743,9 +1811,11 @@
         joined = false;
         clearReconnectTimer();
         if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
+        exitBackgroundHold();
         if (currentDoctorId) {
           socket.emit('join-doctor', Number(currentDoctorId));
         }
+        startHeartbeat();
         ackTimer = setTimeout(()=>{
           if (!joined) setHeaderStatus('online');
         }, 1500);
@@ -1756,18 +1826,22 @@
         const match = Number(payload.doctorId);
         if (currentDoctorId && match === Number(currentDoctorId)) {
           joined = true;
+          exitBackgroundHold();
           if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
           setHeaderStatus('online');
         }
       });
 
-      socket.on('disconnect', ()=>{
+      socket.on('disconnect', (reason)=>{
         joined = false;
+        stopHeartbeat();
         if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
         dismissGlobalCall();
         if (shouldHoldOnline) {
           if (isDocumentHidden()) {
-            setHeaderStatus('connecting');
+            enterBackgroundHold(reason || 'hidden');
+          } else if (backgroundHoldActive) {
+            enterBackgroundHold(reason || 'hold');
           } else {
             setHeaderStatus('offline');
           }
@@ -1775,6 +1849,31 @@
         } else {
           clearReconnectTimer();
           setHeaderStatus('offline');
+        }
+      });
+
+      const manager = socket?.io;
+      if (manager && !manager.__SNOUTIQ_RECONNECT_BOUND) {
+        manager.__SNOUTIQ_RECONNECT_BOUND = true;
+        manager.on('reconnect_attempt', ()=>{
+          if (!shouldHoldOnline) return;
+          setHeaderStatus('connecting');
+        });
+        manager.on('reconnect', ()=>{
+          exitBackgroundHold();
+          setHeaderStatus('online');
+          startHeartbeat();
+        });
+        manager.on('reconnect_error', (err)=>{
+          console.warn('[snoutiq-call] reconnect_error', err?.message || err);
+        });
+      }
+
+      socket.on('doctor-grace', (payload)=>{
+        const match = Number(payload?.doctorId);
+        if (!match || match !== Number(currentDoctorId)) return;
+        if (payload?.status === 'background' && shouldHoldOnline && (isDocumentHidden() || backgroundHoldActive)) {
+          enterBackgroundHold('server-grace');
         }
       });
 
@@ -1830,8 +1929,10 @@
           sock.connect();
         } else if (currentDoctorId && !joined) {
           sock.emit('join-doctor', Number(currentDoctorId));
+          startHeartbeat();
         } else {
           setHeaderStatus('online');
+          startHeartbeat();
         }
         scheduleReconnect({ immediate: false });
       }catch(err){
@@ -1853,6 +1954,8 @@
       }
       joined = false;
       if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
+      stopHeartbeat();
+      exitBackgroundHold();
       setHeaderStatus('offline');
       if (opts.showAlert && window.Swal) {
         Swal.fire({
@@ -1873,6 +1976,9 @@
       if (!isDocumentHidden()) {
         clearReconnectTimer();
         const sock = ensureSocket();
+        exitBackgroundHold();
+        startHeartbeat();
+        sendHeartbeat(true);
         if (sock && !sock.connected) {
           setHeaderStatus('connecting');
           scheduleReconnect({ immediate: true });
@@ -1880,6 +1986,7 @@
           setHeaderStatus('online');
         }
       } else {
+        enterBackgroundHold('visibilitychange');
         scheduleReconnect({ immediate: false });
       }
     });
@@ -1887,6 +1994,9 @@
     window.addEventListener('focus', ()=>{
       if (!shouldHoldOnline) return;
       const sock = ensureSocket();
+      exitBackgroundHold();
+      startHeartbeat();
+      sendHeartbeat(true);
       if (sock && !sock.connected) {
         setHeaderStatus('connecting');
         scheduleReconnect({ immediate: true });
