@@ -134,6 +134,42 @@ const emitAvailableDoctors = () => {
   io.emit("active-doctors", available);
 };
 
+const deliverPendingSessionsToDoctor = (doctorId, socket) => {
+  const roomName = `doctor-${doctorId}`;
+  for (const [callId, callSession] of activeCalls.entries()) {
+    if (callSession.doctorId !== doctorId) continue;
+    if (["ended", "rejected", "disconnected"].includes(callSession.status)) continue;
+
+    callSession.doctorSocketId = socket.id;
+    activeCalls.set(callId, callSession);
+
+    if (callSession.status === "requested") {
+      io.to(roomName).emit("call-requested", {
+        callId,
+        doctorId: callSession.doctorId,
+        patientId: callSession.patientId,
+        channel: callSession.channel,
+        timestamp: new Date().toISOString(),
+        queued: true,
+      });
+    }
+
+    if (callSession.status === "payment_completed") {
+      io.to(roomName).emit("patient-paid", {
+        callId,
+        channel: callSession.channel,
+        patientId: callSession.patientId,
+        doctorId: callSession.doctorId,
+        paymentId: callSession.paymentId,
+        status: 'ready_to_connect',
+        message: 'Patient payment confirmed!',
+        videoUrl: `/call-page/${callSession.channel}?uid=${callSession.doctorId}&role=host&callId=${callId}&doctorId=${callSession.doctorId}&patientId=${callSession.patientId}`,
+        queued: true,
+      });
+    }
+  }
+};
+
 io.on("connection", (socket) => {
   console.log(`⚡ Client connected: ${socket.id}`);
 
@@ -163,6 +199,8 @@ io.on("connection", (socket) => {
     });
 
     emitAvailableDoctors();
+
+    deliverPendingSessionsToDoctor(doctorId, socket);
   });
 
   socket.on(DOCTOR_HEARTBEAT_EVENT, (payload = {}) => {
@@ -206,20 +244,16 @@ io.on("connection", (socket) => {
   // Call request
   socket.on("call-requested", ({ doctorId, patientId, channel }) => {
     console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
-    
-    if (!activeDoctors.has(doctorId)) {
-      console.log(`❌ Doctor ${doctorId} not available`);
-      socket.emit("call-failed", { error: "Doctor not available", doctorId, patientId });
-      return;
-    }
+
     if (isDoctorBusy(doctorId)) {
       console.log(`⏳ Doctor ${doctorId} is busy`);
       socket.emit("doctor-busy", { error: "Doctor is currently on another call", doctorId, patientId });
       return;
     }
 
-    
+
     const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const doctorEntry = activeDoctors.get(doctorId);
     const callSession = { 
       callId, 
       doctorId, 
@@ -228,7 +262,7 @@ io.on("connection", (socket) => {
       status: 'requested', 
       createdAt: new Date(), 
       patientSocketId: socket.id, 
-      doctorSocketId: null 
+      doctorSocketId: doctorEntry?.socketId || null, 
     };
     activeCalls.set(callId, callSession);
 
@@ -333,7 +367,7 @@ io.on("connection", (socket) => {
   socket.on("payment-completed", (data) => {
     const { callId, patientId, doctorId, channel, paymentId } = data;
     console.log(`💰 Payment completed for call ${callId}`);
-    
+
     const callSession = activeCalls.get(callId);
     if (!callSession) {
       console.log(`❌ Call session ${callId} not found`);
@@ -366,6 +400,18 @@ io.on("connection", (socket) => {
         status: 'ready_to_connect', 
         message: 'Patient payment confirmed!', 
         videoUrl: `/call-page/${callSession.channel}?uid=${doctorId}&role=host&callId=${callId}&doctorId=${doctorId}&patientId=${patientId}` 
+      });
+    } else {
+      io.to(`doctor-${doctorId}`).emit("patient-paid", {
+        callId,
+        channel: callSession.channel,
+        patientId,
+        doctorId,
+        paymentId,
+        status: 'ready_to_connect',
+        message: 'Patient payment confirmed!',
+        videoUrl: `/call-page/${callSession.channel}?uid=${doctorId}&role=host&callId=${callId}&doctorId=${doctorId}&patientId=${patientId}`,
+        queued: true,
       });
     }
     emitAvailableDoctors();
