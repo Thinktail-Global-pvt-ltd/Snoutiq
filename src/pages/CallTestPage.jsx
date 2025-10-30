@@ -1,13 +1,22 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
 
 const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
 
 export default function CallPage() {
-  // Mock params for demo
-  const channelName = "demo-channel";
-  const role = "host";
+  const navigate = useNavigate();
+  const { doctorId, patientId } = useParams();
+  const location = useLocation();
+  
+  // Get data from route state or params
+  const channelName = location.state?.channelName || "demo-channel";
+  const role = location.state?.role || "host";
+  const callId = location.state?.callId;
   const isHost = role === "host";
+  
+  const targetDoctorId = doctorId || location.state?.doctorId;
+  const targetPatientId = patientId || location.state?.patientId;
 
   const safeChannel = useMemo(() => {
     return (channelName || "default_channel")
@@ -48,7 +57,7 @@ export default function CallPage() {
     console.log("✅ Agora client initialized");
   }, []);
 
-  // Request permissions and get cameras
+  // Request permissions and get cameras - Auto-trigger on mount
   const requestPermissions = async () => {
     try {
       console.log("📹 Requesting permissions...");
@@ -75,10 +84,15 @@ export default function CallPage() {
       return true;
     } catch (error) {
       console.error("❌ Permission error:", error);
-      alert("Please allow camera and microphone access to continue");
+      alert("Camera and microphone access is required. Please allow access in your browser settings and refresh the page.");
       return false;
     }
   };
+
+  // Auto-request permissions on component mount
+  useEffect(() => {
+    requestPermissions();
+  }, []);
 
   // Join channel and create tracks
   useEffect(() => {
@@ -297,7 +311,26 @@ export default function CallPage() {
   const handleEndCall = async () => {
     console.log("📞 Ending call...");
     await cleanup();
-    alert("Call ended");
+    
+    // Navigate based on role
+    if (targetDoctorId && targetPatientId) {
+      navigate(
+        isHost 
+          ? `/prescription/${targetDoctorId}/${targetPatientId}`
+          : `/rating/${targetDoctorId}/${targetPatientId}`,
+        {
+          state: {
+            doctorId: targetDoctorId,
+            patientId: targetPatientId,
+            callId: callId,
+            fromCall: true
+          }
+        }
+      );
+    } else {
+      alert("Call ended");
+      navigate("/");
+    }
   };
 
   // Permission Modal
@@ -812,7 +845,7 @@ export default function CallPage() {
             }}
             onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
             onMouseOut={(e) => e.target.style.transform = "scale(1)"}
-            title={isCameraOff ? "Turn On Camera" : "Turn Off Camera"}
+            title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
           >
             {isCameraOff ? "📷" : "📹"}
           </button>
@@ -827,52 +860,42 @@ export default function CallPage() {
               border: "none",
               background: "linear-gradient(135deg, #ef4444, #dc2626)",
               color: "white",
-              fontSize: 20,
+              fontSize: 26,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               transition: "all 0.2s",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+              boxShadow: "0 8px 24px rgba(239, 68, 68, 0.4)"
             }}
-            onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
-            onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+            onMouseOver={(e) => {
+              e.target.style.transform = "scale(1.1)";
+              e.target.style.boxShadow = "0 12px 32px rgba(239, 68, 68, 0.6)";
+            }}
+            onMouseOut={(e) => {
+              e.target.style.transform = "scale(1)";
+              e.target.style.boxShadow = "0 8px 24px rgba(239, 68, 68, 0.4)";
+            }}
+            title="End Call"
           >
             📞
           </button>
         </div>
       )}
 
-      {/* Connection Quality Indicator */}
-      <div style={{
-        position: "absolute",
-        top: 70,
-        right: 24,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        background: "rgba(15, 23, 42, 0.8)",
-        padding: "6px 12px",
-        borderRadius: 8,
-        fontSize: 12,
-        backdropFilter: "blur(10px)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        zIndex: 50
-      }}>
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4
-        }}>
-          <span style={{ opacity: 0.7 }}>Connection:</span>
-          <span style={{ 
-            color: callStatus === "connected" ? "#10b981" : "#f59e0b",
-            fontWeight: 500
-          }}>
-            {callStatus === "connected" ? "Excellent" : "Connecting..."}
-          </span>
-        </div>
-      </div>
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+          }
+        }
+      `}</style>
     </div>
   );
 }
