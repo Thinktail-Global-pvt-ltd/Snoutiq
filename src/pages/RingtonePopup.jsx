@@ -857,7 +857,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { socket } from "./socket";
 import axios from "axios";
-import { toast } from 'react-hot-toast'; // or whatever toast library you're using
+import { toast } from "react-hot-toast"; // or whatever toast library you're using
 export default function RingtonePopup({
   call,
   doctorId,
@@ -869,40 +869,77 @@ export default function RingtonePopup({
   const [isProcessing, setIsProcessing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [waitingStatus, setWaitingStatus] = useState("");
-  const [summary, setSummary] = useState(null);
+  const [summaryText, setSummaryText] = useState("");
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
   const navigate = useNavigate();
   const cleanupRef = useRef(false);
 
-  console.log("Patient ID:", patientId);
-
   // Fetch patient summary
   useEffect(() => {
+    if (!patientId) {
+      setSummaryText("");
+      setSummaryError("");
+      setIsSummaryLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+
     const fetchSummary = async () => {
+      setIsSummaryLoading(true);
+      setSummaryText("");
+      setSummaryError("");
+
       try {
-        const response = await axios.post(
+        const { data } = await axios.post(
           "https://snoutiq.com/backend/api/summary",
           { user_id: patientId }
         );
-        console.log("Summary response:", response);
-        setSummary(response.data);
+
+        if (isCancelled) return;
+
+        const resolvedSummary =
+          (typeof data === "string" ? data : data?.summary) ??
+          data?.data?.summary ??
+          "";
+
+        setSummaryText(
+          typeof resolvedSummary === "string"
+            ? resolvedSummary.trim()
+            : ""
+        );
       } catch (error) {
+        if (isCancelled) return;
+
         console.error("Error fetching summary:", error);
+        setSummaryError("Unable to load patient summary right now.");
+      } finally {
+        if (!isCancelled) {
+          setIsSummaryLoading(false);
+        }
       }
     };
 
-    if (patientId) {
-      fetchSummary();
-    }
-  }, [patientId]);
+    fetchSummary();
 
-  console.log("Summary data:", summary);
+    return () => {
+      isCancelled = true;
+    };
+  }, [patientId]);
 
   // Play ringtone and setup timers
   useEffect(() => {
+    if (!call) return;
+
+    setCallDuration(0);
+    setRequiresInteraction(false);
+
     const playRingtone = async () => {
       try {
         if (audioRef.current) {
           audioRef.current.volume = 0.8;
+          audioRef.current.currentTime = 0;
           await audioRef.current.play();
         }
       } catch (err) {
@@ -934,7 +971,7 @@ export default function RingtonePopup({
       clearInterval(timer);
       clearTimeout(autoRejectTimer);
     };
-  }, [isProcessing]);
+  }, [isProcessing, call?.id]);
 
   // ✅ ENHANCED: Setup disconnect listeners
   // In RingtonePopup component, enhance the disconnect useEffect:
@@ -946,9 +983,10 @@ useEffect(() => {
     
     if (data.callId === call.id && !cleanupRef.current) {
       cleanupRef.current = true;
-      
+
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.currentTime = 0;
       }
 
       const message = data.message || "The other party disconnected unexpectedly";
@@ -969,6 +1007,7 @@ useEffect(() => {
   const enableAudio = async () => {
     try {
       if (audioRef.current) {
+        audioRef.current.currentTime = 0;
         await audioRef.current.play();
         setRequiresInteraction(false);
       }
@@ -985,6 +1024,7 @@ useEffect(() => {
 
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
     console.log("Doctor accepting call:", call.id);
@@ -1037,6 +1077,7 @@ useEffect(() => {
     // Stop ringtone or processing audio
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
     // Optional feedback message
@@ -1073,6 +1114,7 @@ useEffect(() => {
 
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
 
     console.log("Doctor rejecting call:", call.id, "reason:", reason);
@@ -1178,7 +1220,13 @@ useEffect(() => {
             <p>• Payment: ₹499 (after acceptance)</p>
             <p>• Emergency veterinary care</p> */}
             <p className="text-sm text-blue-700 whitespace-pre-line">
-              {/* {summary ? summary.summary : "Loading summary..."} */}
+              {isSummaryLoading
+                ? "Loading patient summary..."
+                : summaryError
+                ? summaryError
+                : summaryText
+                ? summaryText
+                : "No patient summary available."}
             </p>
           </div>
         </div>
