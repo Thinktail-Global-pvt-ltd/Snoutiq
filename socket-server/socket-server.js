@@ -23,13 +23,17 @@ const httpServer = createServer((req, res) => {
 
     if (req.method === "GET" && url.pathname === "/active-doctors") {
       purgeInactiveDoctors("http-active-doctors");
-      const available = getAvailableDoctors();
+      const { available, background } = splitDoctorAvailability();
 
       res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
-      res.end(JSON.stringify({
-        activeDoctors: available,
-        updatedAt: new Date().toISOString(),
-      }));
+      res.end(
+        JSON.stringify({
+          activeDoctors: [...available, ...background],
+          visibleDoctors: available,
+          backgroundDoctors: background,
+          updatedAt: new Date().toISOString(),
+        })
+      );
       return;
     }
 
@@ -86,20 +90,33 @@ const isDoctorBusy = (doctorId) => {
   return false;
 };
 
-const getAvailableDoctors = () => {
+function splitDoctorAvailability() {
   const available = [];
-  for (const [doctorId] of activeDoctors.entries()) {
-    if (!isDoctorBusy(doctorId)) available.push(doctorId);
+  const background = [];
+
+  for (const [doctorId, info] of activeDoctors.entries()) {
+    if (isDoctorBusy(doctorId)) {
+      continue;
+    }
+
+    if (info?.lastHeartbeatVisible) {
+      available.push(doctorId);
+    } else {
+      background.push(doctorId);
+    }
   }
-  return available;
-};
+  return { available, background };
+}
 
 const emitAvailableDoctors = (reason = "broadcast", { skipPurge = false } = {}) => {
   if (!skipPurge) {
     purgeInactiveDoctors(reason);
   }
-  const available = getAvailableDoctors();
-  console.log(`📤 Broadcasting ${available.length} available doctors:`, available);
+  const { available, background } = splitDoctorAvailability();
+  console.log(
+    `📤 Broadcasting ${available.length} visible doctors (${background.length} hidden):`,
+    available
+  );
   io.emit("active-doctors", available);
 };
 
@@ -148,11 +165,15 @@ io.on("connection", (socket) => {
     const existing = activeDoctors.get(doctorId) || {
       socketId: socket.id,
       joinedAt: new Date(),
+      lastHeartbeatVisible: true,
     };
 
     existing.socketId = socket.id;
     existing.lastHeartbeatAt = heartbeatDate;
-    existing.lastHeartbeatVisible = Boolean(payload.visible ?? payload.isVisible ?? payload.visibility);
+    const visibilityFlag = payload.visible ?? payload.isVisible ?? payload.visibility;
+    if (visibilityFlag !== undefined) {
+      existing.lastHeartbeatVisible = Boolean(visibilityFlag);
+    }
     existing.lastHeartbeatSource = payload.page || payload.pageTag || payload.source || existing.lastHeartbeatSource || null;
 
     const lastLoggedAt = existing.lastHeartbeatLoggedAt ? new Date(existing.lastHeartbeatLoggedAt).getTime() : 0;
@@ -166,26 +187,19 @@ io.on("connection", (socket) => {
 
   // Get active doctors
   socket.on("get-active-doctors", () => {
-    const available = [];
-    const busy = [];
-    
-    for (const [doctorId] of activeDoctors.entries()) {
-      if (isDoctorBusy(doctorId)) {
-        busy.push(doctorId);
-      } else {
-        available.push(doctorId);
-      }
-    }
-    
-    console.log(`📊 Active doctors request: ${available.length} available, ${busy.length} busy`);
+    const { available, background } = splitDoctorAvailability();
+    console.log(
+      `📊 Active doctors request: ${available.length} visible, ${background.length} hidden`
+    );
     socket.emit("active-doctors", available);
   });
 
   // Call request
   socket.on("call-requested", ({ doctorId, patientId, channel }) => {
     console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
-    
-    if (!activeDoctors.has(doctorId)) {
+
+    const doctorInfo = activeDoctors.get(doctorId);
+    if (!doctorInfo) {
       console.log(`❌ Doctor ${doctorId} not available`);
       socket.emit("call-failed", { error: "Doctor not available", doctorId, patientId });
       return;
