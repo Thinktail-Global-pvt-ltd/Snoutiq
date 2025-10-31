@@ -815,7 +815,6 @@
     async function showCallNotification(payload){
       try {
         if (!navigator.serviceWorker || typeof Notification === 'undefined') return;
-        if (!isDocumentHidden()) return;
 
         const realCallId = normaliseCallId(payload);
         const dedupeKey = realCallId || `call_${Date.now()}`;
@@ -2121,6 +2120,33 @@
       }
     }
 
+    function promptNotificationPermission(){
+      if (typeof Notification === 'undefined') return;
+      if (Notification.permission === 'granted') {
+        ensurePushSubscription().catch(()=>{});
+        return;
+      }
+      const request = () => ensureNotificationPermission(true).catch(()=>{});
+      if (window.Swal && typeof window.Swal.fire === 'function') {
+        window.Swal.fire({
+          icon: 'info',
+          title: 'Enable Doctor Call Alerts',
+          text: 'Allow notifications so we can ring you even when the app is in the background.',
+          showCancelButton: true,
+          confirmButtonText: 'Allow',
+          cancelButtonText: 'Later',
+          reverseButtons: true,
+          allowOutsideClick: false,
+        }).then(result => {
+          if (result.isConfirmed) {
+            request();
+          }
+        });
+      } else {
+        request();
+      }
+    }
+
     function syncDoctorVisibility(){
       if (!socket || !socket.connected) return;
       if (!currentDoctorId) return;
@@ -2452,8 +2478,12 @@
 
     if (SERVICE_WORKER_CONFIG) {
       ensureServiceWorkerRegistration();
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        ensurePushSubscription().catch(()=>{});
+      if (typeof Notification !== 'undefined') {
+        if (Notification.permission === 'granted') {
+          ensurePushSubscription().catch(()=>{});
+        } else {
+          promptNotificationPermission();
+        }
       }
     }
 
