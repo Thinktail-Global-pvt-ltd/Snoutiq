@@ -108,6 +108,152 @@ const DOCTOR_ALERT_TIMEOUT_MS = Number(
   process.env.DOCTOR_ALERT_TIMEOUT_MS || 3000
 );
 
+const parseDoctorWhatsAppMap = (raw) => {
+  const map = new Map();
+  if (!raw) return map;
+
+  const pairs = raw.split(/[,;]/);
+  for (const entry of pairs) {
+    if (!entry) continue;
+    const [id, number] = entry.split(/[:=]/).map((part) => part?.trim());
+    if (!id || !number) continue;
+    map.set(String(id), number);
+  }
+
+  return map;
+};
+
+const cloneJson = (value) => {
+  if (value == null) return value;
+  return JSON.parse(JSON.stringify(value));
+};
+
+const interpolatePlaceholders = (value, variables) => {
+  if (typeof value === "string") {
+    return value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+      const resolved = variables[key];
+      return resolved === undefined || resolved === null ? "" : String(resolved);
+    });
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => interpolatePlaceholders(item, variables));
+  }
+
+  if (value && typeof value === "object") {
+    const result = {};
+    for (const [key, val] of Object.entries(value)) {
+      result[key] = interpolatePlaceholders(val, variables);
+    }
+    return result;
+  }
+
+  return value;
+};
+
+const parseTemplateComponents = (raw) => {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn("⚠️ Failed to parse WhatsApp template components JSON:", error);
+    return null;
+  }
+};
+
+const DOCTOR_WHATSAPP_DEFAULT =
+  process.env.DOCTOR_ALERT_DEFAULT_WHATSAPP ||
+  process.env.WHATSAPP_ALERT_DEFAULT_TO ||
+  null;
+const DOCTOR_WHATSAPP_MAP = parseDoctorWhatsAppMap(
+  process.env.DOCTOR_WHATSAPP_MAP ||
+    process.env.DOCTOR_ALERT_WHATSAPP_MAP ||
+    ""
+);
+const WHATSAPP_ALERT_TEMPLATE_COMPONENTS_CONFIG = parseTemplateComponents(
+  process.env.WHATSAPP_ALERT_TEMPLATE_COMPONENTS ||
+    process.env.WHATSAPP_TEMPLATE_COMPONENTS ||
+    ""
+);
+const WHATSAPP_BRAND_NAME =
+  process.env.WHATSAPP_BRAND_NAME || process.env.APP_NAME || "SnoutIQ";
+const DEFAULT_WHATSAPP_TEXT_TEMPLATE = [
+  "{{brandName}} call alert!",
+  "Patient {{patientId}} is requesting a {{channel}} consult.",
+  "Call ID: {{callId}}",
+  "Sent at {{timestamp}}",
+].join("\n");
+const WHATSAPP_ALERT_TEXT_TEMPLATE =
+  process.env.WHATSAPP_ALERT_TEXT_TEMPLATE || DEFAULT_WHATSAPP_TEXT_TEMPLATE;
+const resolveWhatsAppAlertMode = () => {
+  const mode = (process.env.WHATSAPP_ALERT_MODE || "").trim().toLowerCase();
+  if (mode === "text" || mode === "template") {
+    return mode;
+  }
+  if (
+    isWhatsAppConfigured() &&
+    (process.env.WHATSAPP_ALERT_TEMPLATE_NAME ||
+      process.env.WHATSAPP_TEMPLATE_NAME ||
+      process.env.WHATSAPP_TEMPLATE)
+  ) {
+    return "template";
+  }
+  return "text";
+};
+const WHATSAPP_ALERT_MODE = resolveWhatsAppAlertMode();
+const WHATSAPP_ALERT_TEMPLATE_NAME =
+  process.env.WHATSAPP_ALERT_TEMPLATE_NAME ||
+  process.env.WHATSAPP_TEMPLATE_NAME ||
+  process.env.WHATSAPP_TEMPLATE ||
+  "hello_world";
+
+const WHATSAPP_ALERT_HAS_RECIPIENTS =
+  DOCTOR_WHATSAPP_MAP.size > 0 || Boolean(DOCTOR_WHATSAPP_DEFAULT);
+
+if (isWhatsAppConfigured()) {
+  if (WHATSAPP_ALERT_HAS_RECIPIENTS) {
+    const config = getWhatsAppConfig();
+    console.log(
+      `✅ WhatsApp alerts enabled (${WHATSAPP_ALERT_MODE}) via phone number ${
+        config?.phoneNumberId || "[hidden]"
+      }`
+    );
+  } else {
+    console.log(
+      "ℹ️ WhatsApp credentials detected but no recipients configured. Set DOCTOR_WHATSAPP_MAP or DOCTOR_ALERT_DEFAULT_WHATSAPP."
+    );
+  }
+}
+
+const getDoctorWhatsAppRecipient = (doctorId) => {
+  if (!doctorId && DOCTOR_WHATSAPP_DEFAULT) {
+    return DOCTOR_WHATSAPP_DEFAULT;
+  }
+
+  const key = String(doctorId ?? "");
+  if (key && DOCTOR_WHATSAPP_MAP.has(key)) {
+    return DOCTOR_WHATSAPP_MAP.get(key);
+  }
+
+  return DOCTOR_WHATSAPP_DEFAULT;
+};
+
+const buildWhatsAppTextMessage = (context) => {
+  return interpolatePlaceholders(WHATSAPP_ALERT_TEXT_TEMPLATE, {
+    ...context,
+    brandName: WHATSAPP_BRAND_NAME,
+  });
+};
+
+const buildTemplateComponents = (context) => {
+  if (!WHATSAPP_ALERT_TEMPLATE_COMPONENTS_CONFIG) return undefined;
+  const base = cloneJson(WHATSAPP_ALERT_TEMPLATE_COMPONENTS_CONFIG);
+  return interpolatePlaceholders(base, {
+    ...context,
+    brandName: WHATSAPP_BRAND_NAME,
+  });
+};
+
 // -------------------- CONSTANTS --------------------
 const DOCTOR_HEARTBEAT_EVENT = "doctor-heartbeat";
 const DOCTOR_GRACE_EVENT = "doctor-grace";
@@ -233,16 +379,7 @@ const expirePendingCall = (doctorId, callId, reason = "timeout") => {
   deliverNextPendingCall(doctorId);
 };
 
-const notifyDoctorPendingCall = async (callSession) => {
-  if (!DOCTOR_ALERT_ENDPOINT) {
-    return;
-  }
-
-  if (typeof fetch !== "function") {
-    console.warn("⚠️ Global fetch unavailable; cannot send doctor notification");
-    return;
-  }
-
+const sendDoctorPendingCallWebhook = async (callSession) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DOCTOR_ALERT_TIMEOUT_MS);
 
@@ -271,6 +408,10 @@ const notifyDoctorPendingCall = async (callSession) => {
         response.status,
         body
       );
+    } else {
+      console.log(
+        `✅ Doctor webhook alert sent for call ${callSession.callId} → doctor ${callSession.doctorId}`
+      );
     }
   } catch (error) {
     if (error?.name === "AbortError") {
@@ -284,6 +425,77 @@ const notifyDoctorPendingCall = async (callSession) => {
   } finally {
     clearTimeout(timer);
   }
+};
+
+const sendDoctorPendingCallWhatsApp = async (callSession) => {
+  const recipient = getDoctorWhatsAppRecipient(callSession.doctorId);
+  if (!recipient) {
+    console.warn(
+      "⚠️ No WhatsApp recipient configured for doctor",
+      callSession.doctorId
+    );
+    return;
+  }
+
+  const context = {
+    doctorId: callSession.doctorId,
+    patientId: callSession.patientId ?? "a patient",
+    callId: callSession.callId,
+    channel: callSession.channel || "video consult",
+    timestamp: new Date().toISOString(),
+  };
+
+  try {
+    if (WHATSAPP_ALERT_MODE === "template") {
+      const components = buildTemplateComponents(context);
+      await sendWhatsAppTemplate(recipient, WHATSAPP_ALERT_TEMPLATE_NAME, {
+        components,
+      });
+      console.log(
+        `✅ WhatsApp template alert sent for call ${callSession.callId} → doctor ${callSession.doctorId}`
+      );
+    } else {
+      const message = buildWhatsAppTextMessage(context);
+      await sendWhatsAppText(recipient, message);
+      console.log(
+        `✅ WhatsApp text alert sent for call ${callSession.callId} → doctor ${callSession.doctorId}`
+      );
+    }
+  } catch (error) {
+    const errorDetails =
+      error?.details ||
+      error?.message ||
+      (typeof error === "string" ? error : "unknown error");
+    console.warn("⚠️ WhatsApp alert failed", {
+      doctorId: callSession.doctorId,
+      callId: callSession.callId,
+      error: errorDetails,
+    });
+  }
+};
+
+const notifyDoctorPendingCall = async (callSession) => {
+  const tasks = [];
+
+  if (DOCTOR_ALERT_ENDPOINT) {
+    if (typeof fetch !== "function") {
+      console.warn(
+        "⚠️ Global fetch unavailable; cannot send doctor notification webhook"
+      );
+    } else {
+      tasks.push(sendDoctorPendingCallWebhook(callSession));
+    }
+  }
+
+  if (isWhatsAppConfigured()) {
+    tasks.push(sendDoctorPendingCallWhatsApp(callSession));
+  }
+
+  if (!tasks.length) {
+    return;
+  }
+
+  await Promise.allSettled(tasks);
 };
 
 const enqueuePendingCall = (callSession) => {
