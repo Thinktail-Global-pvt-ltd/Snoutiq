@@ -298,12 +298,22 @@
       if (!PATH_PREFIX || PATH_PREFIX === '/') return '';
       return PATH_PREFIX.replace(/\/+$/, '');
     })();
+    const SERVICE_WORKER_URL = (() => {
+      if (!SERVICE_WORKER_SUPPORT || !SERVICE_WORKER_SECURE) return null;
+      const base = SERVICE_WORKER_PREFIX ? `${SERVICE_WORKER_PREFIX}/service-worker.js` : '/service-worker.js';
+      const prefixParam = encodeURIComponent(SERVICE_WORKER_PREFIX || '');
+      return prefixParam ? `${base}?prefix=${prefixParam}` : base;
+    })();
     const SERVICE_WORKER_CONFIG = SERVICE_WORKER_SUPPORT && SERVICE_WORKER_SECURE ? {
-      url: SERVICE_WORKER_PREFIX ? `${SERVICE_WORKER_PREFIX}/service-worker.js` : '/service-worker.js',
+      url: SERVICE_WORKER_URL,
       scope: SERVICE_WORKER_PREFIX ? `${SERVICE_WORKER_PREFIX}/` : '/',
     } : null;
     const SERVICE_WORKER_FALLBACK_CONFIG = SERVICE_WORKER_SUPPORT && SERVICE_WORKER_SECURE ? {
-      url: '/service-worker.js',
+      url: (() => {
+        if (!SERVICE_WORKER_PREFIX) return '/service-worker.js';
+        const prefixParam = encodeURIComponent(SERVICE_WORKER_PREFIX);
+        return `/service-worker.js?prefix=${prefixParam}`;
+      })(),
       scope: '/',
     } : null;
     let serviceWorkerRegistrationPromise = null;
