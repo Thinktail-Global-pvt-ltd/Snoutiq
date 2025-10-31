@@ -13,17 +13,17 @@
 
 @section('content')
 @php $isDebugView = request()->boolean('debug'); @endphp
-<div class="max-w-5xl mx-auto space-y-6">
+<div class="max-w-5xl mx-auto space-y-6 px-4 sm:px-6 lg:px-0">
   @if(request()->get('onboarding')==='1')
     @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 2))])
   @endif
 
-  <div class="flex items-center justify-between">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
       <h2 class="text-lg font-semibold tracking-tight">Doctor Weekly Availability (Video)</h2>
-      <p class="text-sm text-gray-600">This view uses a separate storage and API. Existing flows remain unchanged.</p>
+      <p class="text-sm text-gray-600 mt-1">This view uses a separate storage and API. Existing flows remain unchanged.</p>
     </div>
-    <div class="hidden md:flex items-center gap-2 text-xs">
+    <div class="flex items-center gap-2 text-xs">
       <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">IST only</span>
       @if($readonly)
         <span class="px-2 py-1 rounded-full bg-gray-50 text-gray-700 border border-gray-200">Read-only</span>
@@ -32,9 +32,9 @@
   </div>
 
   {{-- =================== Doctor & Settings =================== --}}
-  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4">
-    <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-      <div class="md:col-span-2" @unless($isDebugView) style="display:none" @endunless>
+  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4 sm:p-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+      <div class="lg:col-span-2" @unless($isDebugView) style="display:none" @endunless>
         <label class="block text-sm font-medium text-gray-700">Doctor</label>
         <select id="doctor_id" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
           @if(isset($doctors) && $doctors->count())
@@ -64,7 +64,7 @@
 
       {{-- 24/7 toggle (debug only) --}}
       @if(request()->get('debug')==='1')
-        <div class="md:col-span-2">
+        <div class="sm:col-span-2 lg:col-span-2">
           <label class="block text-sm font-medium text-gray-700 mb-1">Enable 24/7</label>
           <div id="enable247Wrap"
                class="flex items-center justify-between gap-3 rounded-xl border bg-white p-2.5 transition-all duration-200 @if($readonly) opacity-60 cursor-not-allowed @endif">
@@ -102,7 +102,7 @@
   @endphp
 
   <div id="videoSlotBuilder"
-       class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-6 space-y-6"
+       class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4 sm:p-6 space-y-6"
        data-readonly="{{ $readonly ? 'true' : 'false' }}">
     <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4"
          @unless($isDebugView) style="display:none" @endunless>
@@ -125,7 +125,7 @@
     <section>
       <h4 class="text-lg font-semibold text-gray-900">Day Hours (6 AM - 6 PM)</h4>
       <p class="text-sm text-gray-500 mt-1 mb-4">Select at least 2 hours (each slot is 2 hours).</p>
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-2" id="daySlotsGrid">
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="daySlotsGrid">
         @foreach($videoDaySlots as $slot)
           <button type="button"
                   class="slot-chip"
@@ -142,14 +142,14 @@
       </div>
     </section>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
       <div>
         <label for="dayRate" class="block text-sm font-medium text-gray-700 mb-1">
           Day Consultation Rate (per session)
         </label>
         <input type="number"
                id="dayRate"
-               class="w-full md:max-w-xs rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                placeholder="500"
                {{ $readonly ? 'disabled' : '' }}>
       </div>
@@ -159,7 +159,7 @@
         </label>
         <input type="number"
                id="nightRate"
-               class="w-full md:max-w-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+               class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
                placeholder="750"
                {{ $readonly ? 'disabled' : '' }}>
       </div>
@@ -169,7 +169,7 @@
     <section>
       <h4 class="text-lg font-semibold text-gray-900">Night Hours (6 PM - 6 AM)</h4>
       <p class="text-sm text-gray-500 mt-1 mb-4">Select at least 2 hours (each slot is 2 hours).</p>
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-2" id="nightSlotsGrid">
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="nightSlotsGrid">
         @foreach($videoNightSlots as $slot)
           <button type="button"
                   class="slot-chip"
@@ -220,14 +220,14 @@
 
   {{-- ====== CTA highlight styles (for the night-hours button) ====== --}}
   <style>
-    .slot-chip{padding:.75rem; border:1px solid #d1d5db; border-radius:.75rem; font-size:.875rem; font-weight:600; color:#374151; background:#fff; transition:all .2s ease; box-shadow:0 1px 2px rgba(15,23,42,.05);}
+    .slot-chip{padding:.75rem; border:1px solid #d1d5db; border-radius:.75rem; font-size:.875rem; font-weight:600; color:#374151; background:#fff; transition:all .2s ease; box-shadow:0 1px 2px rgba(15,23,42,.05); cursor:pointer;}
     .slot-chip:hover{border-color:#4f46e5; color:#312e81;}
     .slot-chip.is-active{background:#2563eb; color:#fff; border-color:#2563eb; box-shadow:0 4px 10px rgba(37,99,235,.25);}
     .slot-chip.is-night{background:#4338ca; color:#fff; border-color:#4338ca;}
     .slot-chip.is-night:not(.is-active){background:#fff; color:#374151; border-color:#d1d5db;}
     .slot-chip.is-night:hover{border-color:#6366f1; color:#312e81;}
     .slot-chip[disabled]{opacity:.5; cursor:not-allowed;}
-    .day-chip{padding:.5rem .95rem; border-radius:9999px; border:1px solid #d1d5db; font-size:.75rem; font-weight:600; color:#4b5563; background:#fff; transition:all .2s ease;}
+    .day-chip{padding:.5rem .95rem; border-radius:9999px; border:1px solid #d1d5db; font-size:.75rem; font-weight:600; color:#4b5563; background:#fff; transition:all .2s ease; cursor:pointer;}
     .day-chip.is-active{background:#059669; border-color:#059669; color:#fff; box-shadow:0 3px 8px rgba(5,150,105,.25);}
     .day-chip[disabled]{opacity:.45; cursor:not-allowed;}
     .ctaGlow{position:absolute; inset:-8px; border-radius:14px;
@@ -243,10 +243,38 @@
     .ctaBounce{display:inline-block; animation:bounce 1.2s infinite;}
     @keyframes bounce{0%,100%{transform:translateY(-10%); animation-timing-function:cubic-bezier(.8,0,1,1)}
                       50%{transform:translateY(0);   animation-timing-function:cubic-bezier(0,0,.2,1)}}
+    
+    /* Responsive table styles */
+    .schedule-table-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    @media (max-width: 1024px) {
+      .schedule-table {
+        min-width: 800px;
+      }
+    }
+    
+    @media (max-width: 640px) {
+      .schedule-table {
+        min-width: 700px;
+      }
+      
+      .slot-chip {
+        padding: 0.6rem 0.5rem;
+        font-size: 0.8rem;
+      }
+      
+      .day-chip {
+        padding: 0.4rem 0.7rem;
+        font-size: 0.7rem;
+      }
+    }
   </style>
 
   {{-- =================== Near Me (PINCODE only) -- Title & date hidden =================== --}}
-  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4">
+  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4 sm:p-6">
     <div class="flex items-center justify-end mb-2">
       <div class="relative inline-block" id="nightCtaWrap" @unless($isDebugView) style="display:none" @endunless>
         <span class="ctaGlow" id="nightGlow" aria-hidden="true"></span>
@@ -266,56 +294,59 @@
   </div>
 
   {{-- =================== Weekly Schedule Form =================== --}}
-  <fieldset class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4">
+  <fieldset class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4 sm:p-6">
     <legend class="sr-only">Weekly Schedule</legend>
-    <div class="flex items-center justify-between mb-3">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3">
       <h3 class="text-sm font-semibold text-gray-800">Weekly Schedule</h3>
       <button id="btnEditNightSlots"
-              class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300">
+              class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300 w-full sm:w-auto">
         Edit Night Slots
       </button>
     </div>
-    <table class="w-full border border-gray-200 rounded-lg overflow-hidden">
-      <thead>
-        <tr class="bg-gray-50 text-left text-sm text-gray-700">
-          <th class="p-3" style="width:120px">Day</th>
-          <th class="p-3">Active</th>
-          <th class="p-3">Start</th>
-          <th class="p-3">End</th>
-          <th class="p-3">Break Start</th>
-          <th class="p-3">Break End</th>
-          <th class="p-3">Night Slots (IST)</th>
-        </tr>
-      </thead>
-      <tbody class="text-sm">
-        @php
-          $days = [
-            ['idx'=>0,'name'=>'Sunday'],
-            ['idx'=>1,'name'=>'Monday'],
-            ['idx'=>2,'name'=>'Tuesday'],
-            ['idx'=>3,'name'=>'Wednesday'],
-            ['idx'=>4,'name'=>'Thursday'],
-            ['idx'=>5,'name'=>'Friday'],
-            ['idx'=>6,'name'=>'Saturday'],
-          ];
-        @endphp
-        @foreach($days as $d)
-          <tr data-dow="{{ $d['idx'] }}" class="border-t hover:bg-gray-50/50">
-            <td class="p-3 font-medium text-gray-800">{{ $d['name'] }}</td>
-            <td class="p-3 text-center"><input type="checkbox" class="active rounded border-gray-300" checked @if($readonly) disabled @endif></td>
-            <td class="p-3"><input type="time" class="start w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" value="09:00" @if($readonly) disabled @endif></td>
-            <td class="p-3"><input type="time" class="end w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" value="18:00" @if($readonly) disabled @endif></td>
-            <td class="p-3"><input type="time" class="break_start w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" @if($readonly) disabled @endif></td>
-            <td class="p-3"><input type="time" class="break_end w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" @if($readonly) disabled @endif></td>
-            <td class="p-3 align-top text-xs text-gray-600 night-slots"></td>
+    
+    <div class="schedule-table-container">
+      <table class="w-full border border-gray-200 rounded-lg overflow-hidden schedule-table">
+        <thead>
+          <tr class="bg-gray-50 text-left text-sm text-gray-700">
+            <th class="p-3" style="width:120px">Day</th>
+            <th class="p-3">Active</th>
+            <th class="p-3">Start</th>
+            <th class="p-3">End</th>
+            <th class="p-3">Break Start</th>
+            <th class="p-3">Break End</th>
+            <th class="p-3">Night Slots (IST)</th>
           </tr>
-        @endforeach
-      </tbody>
-    </table>
+        </thead>
+        <tbody class="text-sm">
+          @php
+            $days = [
+              ['idx'=>0,'name'=>'Sunday'],
+              ['idx'=>1,'name'=>'Monday'],
+              ['idx'=>2,'name'=>'Tuesday'],
+              ['idx'=>3,'name'=>'Wednesday'],
+              ['idx'=>4,'name'=>'Thursday'],
+              ['idx'=>5,'name'=>'Friday'],
+              ['idx'=>6,'name'=>'Saturday'],
+            ];
+          @endphp
+          @foreach($days as $d)
+            <tr data-dow="{{ $d['idx'] }}" class="border-t hover:bg-gray-50/50">
+              <td class="p-3 font-medium text-gray-800">{{ $d['name'] }}</td>
+              <td class="p-3 text-center"><input type="checkbox" class="active rounded border-gray-300" checked @if($readonly) disabled @endif></td>
+              <td class="p-3"><input type="time" class="start w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" value="09:00" @if($readonly) disabled @endif></td>
+              <td class="p-3"><input type="time" class="end w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" value="18:00" @if($readonly) disabled @endif></td>
+              <td class="p-3"><input type="time" class="break_start w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" @if($readonly) disabled @endif></td>
+              <td class="p-3"><input type="time" class="break_end w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" @if($readonly) disabled @endif></td>
+              <td class="p-3 align-top text-xs text-gray-600 night-slots"></td>
+            </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
 
     <div class="mt-2 text-xs text-gray-500" id="metaNote"></div>
     @if(!$readonly)
-      <button id="btnSave" class="mt-3 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Save Weekly Availability</button>
+      <button id="btnSave" class="mt-3 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 w-full sm:w-auto">Save Weekly Availability</button>
     @endif
     <div id="saveOut" class="mt-2 text-sm"></div>
   </fieldset>
@@ -339,8 +370,8 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4" @unless($isDebugView) style="display:none" @endunless>
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+  <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4 sm:p-6" @unless($isDebugView) style="display:none" @endunless>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div>
         <label class="block text-sm font-medium text-gray-700">Date</label>
         <input type="date" id="sched_date" value="{{ date('Y-m-d') }}" class="mt-1 w-full rounded-lg border-gray-300">
@@ -350,7 +381,7 @@
         <input type="number" id="sched_days" min="1" max="60" value="7" class="mt-1 w-full rounded-lg border-gray-300" title="How many days to preview using weekly pattern">
       </div>
       <div class="flex items-end">
-        <button id="btnLoadSlots" class="w-full md:w-auto px-4 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900">Load Free Slots</button>
+        <button id="btnLoadSlots" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900">Load Free Slots</button>
       </div>
       <div class="text-sm text-gray-500 flex items-center">Shows free slots from new table</div>
     </div>

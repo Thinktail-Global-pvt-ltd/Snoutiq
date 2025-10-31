@@ -98,7 +98,7 @@
 <!-- Mobile menu button (to be placed in header) -->
 <div
   id="mobile-menu-button"
-  class="fixed top-3 left-3 z-50
+  class="flex top-3 left-3 z-50
          p-3 sm:p-4 md:p-5
          rounded-xl
          text-gray-700

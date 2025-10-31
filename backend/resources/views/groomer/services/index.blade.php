@@ -8,14 +8,135 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
-  <style>
-    #client-logger{font-family:ui-monospace,Menlo,Consolas,monospace}
-    /* Hide debug/auth controls in header */
-    #btn-auth, #toggle-diag { display: none !important; }
-    /* Hide role label and avatar so only clinic/name remains */
-    header .text-right .text-xs { display: none !important; }
-    header .w-9.h-9.rounded-full.bg-gradient-to-br.from-indigo-500.to-purple-500 { display: none !important; }
-  </style>
+<style>
+  /* ===============================
+     Global / Utility Styles
+  =============================== */
+  #client-logger {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+
+  /* Hide debug/auth controls in header */
+  #btn-auth,
+  #toggle-diag {
+    display: none !important;
+  }
+
+  /* Hide role label and avatar in header */
+  header .text-right .text-xs,
+  header .w-9.h-9.rounded-full.bg-gradient-to-br.from-indigo-500.to-purple-500 {
+    display: none !important;
+  }
+
+  /* ===============================
+     Responsive Table Wrapper
+  =============================== */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ===============================
+     Modal Overlay & Content
+  =============================== */
+  .modal-overlay {
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-content {
+    max-height: 95vh;
+    overflow-y: auto;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  @media (min-width: 640px) {
+    .modal-content {
+      max-width: 42rem; /* ≈672px, comfortable for forms */
+    }
+  }
+
+  @media (max-width: 640px) {
+    .modal-content {
+      margin: 1rem;
+      padding: 1rem !important;
+      border-radius: 1rem;
+    }
+
+    .modal-content .grid {
+      grid-template-columns: 1fr !important;
+    }
+
+
+    .search-input {
+      width: 100% !important;
+    }
+  }
+
+  /* ===============================
+     Mobile Table Card Layout
+  =============================== */
+  @media (max-width: 768px) {
+    .table-container table {
+      min-width: 700px;
+    }
+
+    .mobile-card {
+      display: block;
+      background: #fff;
+      border-radius: 0.75rem;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      margin-bottom: 1rem;
+      padding: 1rem;
+    }
+
+    .mobile-card .card-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .mobile-card .card-row:last-child {
+      border-bottom: none;
+    }
+
+    .mobile-card .card-label {
+      font-weight: 600;
+      color: #4b5563;
+      min-width: 100px;
+    }
+
+    .mobile-card .card-value {
+      flex: 1;
+      text-align: right;
+      color: #374151;
+    }
+  }
+
+  /* ===============================
+     Modal Scrollbar Styling
+  =============================== */
+  .modal-content::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .modal-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+
+  .modal-content::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 10px;
+  }
+
+  .modal-content::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+</style>
+
 </head>
 <body class="h-screen bg-gray-50">
 
@@ -32,19 +153,20 @@
 <div class="flex h-full">
   {{-- Shared sidebar --}}
   @include('layouts.partials.sidebar')
+  
   <!-- Main -->
-  <main class="flex-1 flex flex-col">
-    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-around px-6">
-      <div class="flex items-center gap-3">
+  <main class="flex-1 flex flex-col overflow-hidden">
+    <header class="h-auto sm:h-16 bg-white border-b border-gray-200 flex items-center justify-around px-4 sm:px-6 py-3 sm:py-0">
+      <div class="header-content flex items-center gap-3">
         <h1 class="text-lg font-semibold text-gray-800">Services</h1>
-        <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Connectingâ€¦"></span>
-        <span id="status-pill" class="hidden px-3 py-1 rounded-full text-xs font-bold">â€¦</span>
+        <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Connecting…"></span>
+        <span id="status-pill" class="hidden px-3 py-1 rounded-full text-xs font-bold">…</span>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="header-buttons flex items-center gap-2">
         <button id="btn-auth"
                 class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">
-          ðŸ” Auth
+          🔐 Auth
         </button>
 
         <button id="toggle-diag"
@@ -57,11 +179,11 @@
           + Add Service
         </button>
 
-        <div class="text-right">
+        <div class="text-right hidden sm:block">
           <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? 'Doctor' }}</div>
           <div class="text-xs text-gray-500">{{ auth()->user()->role ?? 'doctor' }}</div>
         </div>
-        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold hidden sm:flex">
           {{ strtoupper(substr(auth()->user()->name ?? 'D',0,1)) }}
         </div>
       </div>
@@ -69,26 +191,28 @@
 
     <!-- Onboarding steps ribbon -->
     @if(request()->get('onboarding')==='1')
-      <div class="px-6 pt-4">
+      <div class="px-4 sm:px-6 pt-4">
         @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 1))])
       </div>
     @endif
 
     <!-- Page Content -->
-    <section class="flex-1 p-6">
+    <section class="flex-1 p-4 sm:p-6 overflow-auto">
       <div class="max-w-6xl mx-auto">
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           <div class="p-3 border-b">
             <input id="search" type="text" placeholder="Search by name..."
-                   class="w-full md:w-80 bg-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 border-0">
+                   class="search-input w-full md:w-80 bg-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 border-0">
           </div>
-          <div class="overflow-x-auto">
+          
+          <!-- Desktop Table View -->
+          <div class="table-container hidden md:block">
             <table class="min-w-full text-sm">
               <thead class="bg-gray-100 text-gray-700">
                 <tr>
                   <th class="text-left px-4 py-3">Name</th>
                   <th class="text-left px-4 py-3">Pet</th>
-                  <th class="text-left px-4 py-3">Price (&#8377;)</th>
+                  <th class="text-left px-4 py-3">Price (₹)</th>
                   <th class="text-left px-4 py-3">Duration (m)</th>
                   <th class="text-left px-4 py-3">Category</th>
                   <th class="text-left px-4 py-3">Status</th>
@@ -98,6 +222,10 @@
               <tbody id="rows"></tbody>
             </table>
           </div>
+          
+          <!-- Mobile Card View -->
+          <div id="mobile-rows" class="md:hidden p-4 space-y-4"></div>
+          
           <div id="empty" class="hidden p-8 text-center text-gray-500">No services found.</div>
         </div>
       </div>
@@ -106,20 +234,24 @@
 </div>
 
 <!-- Create Modal -->
-<div id="create-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-  <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-3xl p-6 relative">
-    <button type="button" aria-label="Close" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd"/></svg></button>
+<div id="create-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 scroll-m-0">
+  <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-4 sm:p-6 relative">
+    <button type="button" aria-label="Close" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+        <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
+    </button>
     <h3 class="text-xl font-semibold text-gray-800 mb-1">Add New Service</h3>
     <p class="text-sm text-gray-500 mb-4">Fill details to create service</p>
 
     <form id="create-form" class="space-y-4">
-      <div class="grid md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-semibold mb-1">Service Name</label>
           <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
-          <label class="block text-sm font-semibold mb-1">Price (&#8377;)</label>
+          <label class="block text-sm font-semibold mb-1">Price (₹)</label>
           <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         @unless($isOnboarding)
@@ -170,30 +302,34 @@
         <textarea name="description" rows="3" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm"></textarea>
       </div>
 
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" class="btn-close px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold">Cancel</button>
-        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">Create</button>
+      <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+        <button type="button" class="btn-close px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold w-full sm:w-auto">Cancel</button>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold w-full sm:w-auto">Create</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- Edit Modal -->
-<div id="edit-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-  <div class="bg-white rounded-2xl shadow-2xl w-[96%] max-w-3xl p-6 relative">
-    <button type="button" aria-label="Close" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd"/></svg></button>
+<div id="edit-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-4 sm:p-6 relative">
+    <button type="button" aria-label="Close" class="btn-close absolute top-3 right-3 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+        <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+      </svg>
+    </button>
     <h3 class="text-xl font-semibold text-gray-800 mb-1">Edit Service</h3>
     <p class="text-sm text-gray-500 mb-4">Update details</p>
 
     <form id="edit-form" class="space-y-4">
       <input type="hidden" name="id">
-      <div class="grid md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-semibold mb-1">Service Name</label>
           <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
-          <label class="block text-sm font-semibold mb-1">Price (&#8377;)</label>
+          <label class="block text-sm font-semibold mb-1">Price (₹)</label>
           <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
         <div>
@@ -235,30 +371,30 @@
         <textarea name="description" rows="3" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm"></textarea>
       </div>
 
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" class="btn-close px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold">Cancel</button>
-        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">Update</button>
+      <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+        <button type="button" class="btn-close px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold w-full sm:w-auto">Cancel</button>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold w-full sm:w-auto">Update</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- ===== Frontend Logger + Auth Panel ===== -->
-<div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[460px] max-h-[72vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
-  <div class="flex items-center justify-between px-3 py-2 border-b">
+<div id="client-logger" class="hidden fixed bottom-20 right-4 z-[100] w-[90vw] sm:w-[460px] max-h-[72vh] bg-white border border-gray-200 rounded-xl shadow-2xl">
+  <div class="flex flex-col sm:flex-row items-center justify-between px-3 py-2 border-b gap-2">
     <div class="text-xs font-bold text-gray-700">Frontend Logger</div>
-    <div class="flex items-center gap-2">
-      <input id="log-token" placeholder="paste Bearer tokenâ€¦" class="px-2 py-1 rounded bg-gray-100 text-xs w-44">
+    <div class="flex items-center gap-2 flex-wrap justify-center">
+      <input id="log-token" placeholder="paste Bearer token…" class="px-2 py-1 rounded bg-gray-100 text-xs w-32 sm:w-44">
       <button id="log-token-save" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs">Save</button>
       <button id="log-dump" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Download</button>
       <button id="log-clear" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">Clear</button>
-      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">âœ•</button>
+      <button id="log-close" class="px-2 py-1 rounded bg-gray-100 text-xs hover:bg-gray-200">✕</button>
     </div>
   </div>
   <div id="log-body" class="text-[11px] leading-4 text-gray-800 px-3 py-2 overflow-y-auto whitespace-pre-wrap"></div>
 </div>
 <button id="log-toggle" class="fixed bottom-4 right-4 z-[90] px-3 py-2 rounded-full bg-black text-white text-xs shadow-lg">
-  ðŸªµ Logs (<span id="log-count">0</span>)
+  🪶 Logs (<span id="log-count">0</span>)
 </button>
 
 <script>
@@ -396,7 +532,7 @@
   (function(){
     const ui={panel:document.getElementById('client-logger'),body:document.getElementById('log-body'),toggle:document.getElementById('log-toggle'),count:document.getElementById('log-count'),close:document.getElementById('log-close'),clear:document.getElementById('log-clear'),dump:document.getElementById('log-dump'),tokenI:document.getElementById('log-token'),tokenS:document.getElementById('log-token-save')};
     const MAX=600,buf=[];
-    const trunc=(s,n)=>{ if(typeof s!=='string'){ try{s=JSON.stringify(s)}catch(_){s=String(s)} } return s.length>n?s.slice(0,n)+'â€¦':s; };
+    const trunc=(s,n)=>{ if(typeof s!=='string'){ try{s=JSON.stringify(s)}catch(_){s=String(s)} } return s.length>n?s.slice(0,n)+'…':s; };
     const stamp=()=>new Date().toISOString();
     function push(level,msg,meta){ const row={t:stamp(),level,msg,meta}; buf.push(row); if(buf.length>MAX) buf.shift(); const div=document.createElement('div'); div.textContent=`[${row.t}] ${level.toUpperCase()} ${msg}${meta?' '+trunc(meta,1800):''}`; ui.body.appendChild(div); ui.body.scrollTop=ui.body.scrollHeight; ui.count.textContent=String(buf.length); }
     const Log={info:(m,d)=>push('info',m,d? (typeof d==='string'?d:JSON.stringify(d)):''),warn:(m,d)=>push('warn',m,d? (typeof d==='string'?d:JSON.stringify(d)):''),error:(m,d)=>push('error',m,d? (typeof d==='string'?d:JSON.stringify(d)):''),open:()=>ui.panel.classList.remove('hidden'),close:()=>ui.panel.classList.add('hidden'),clear:()=>{ui.body.innerHTML='';buf.length=0;ui.count.textContent='0'},dump:()=>({env:{api:API,login_api:CONFIG.LOGIN_API,token_present:!!(localStorage.getItem('token')||sessionStorage.getItem('token'))},logs:buf})};
@@ -496,6 +632,7 @@
   const $ = (s, r=document)=> r.querySelector(s);
   const $$ = (s, r=document)=> Array.from(r.querySelectorAll(s));
   const rows = $('#rows');
+  const mobileRows = $('#mobile-rows');
   const empty = $('#empty');
   const search = $('#search');
   const createModal = $('#create-modal');
@@ -511,9 +648,11 @@
       const helpUrl = `${CONFIG.SESSION_LOGIN}?user_id=YOUR_ID`;
       const extra = 'If you are using a clinic slug, append ?vet_slug=YOUR-SLUG to the page URL.';
       rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">user_id missing (add ?userId=... in URL or visit <a class="text-blue-600 underline" target="_blank" rel="noreferrer" href="${esc(helpUrl)}">${esc(CONFIG.SESSION_LOGIN)}?user_id=YOUR_ID</a> then reload). ${esc(extra)}</td></tr>`;
+      mobileRows.innerHTML = `<div class="text-center text-rose-600 p-4">user_id missing. Add ?userId=... in URL or visit the login page.</div>`;
       return;
     }
-    rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-gray-500" colspan="7">Loadingâ€¦</td></tr>`;
+    rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-gray-500" colspan="7">Loading…</td></tr>`;
+    mobileRows.innerHTML = `<div class="text-center text-gray-500 p-4">Loading…</div>`;
     try{
       await Auth.bootstrap();
       const res = await apiFetch(API.list(), {
@@ -524,6 +663,7 @@
       render(ALL);
     }catch(e){
       rows.innerHTML = `<tr><td class="px-4 py-6 text-center text-rose-600" colspan="7">Failed to load (${esc(e.message||e)})</td></tr>`;
+      mobileRows.innerHTML = `<div class="text-center text-rose-600 p-4">Failed to load (${esc(e.message||e)})</div>`;
       ClientLog?.error('services.load.failed', e.message||String(e));
       ClientLog?.open();
     }
@@ -531,9 +671,15 @@
 
   function render(list){
     rows.innerHTML = '';
-    if(!list.length){ empty.classList.remove('hidden'); return; }
+    mobileRows.innerHTML = '';
+    
+    if(!list.length){ 
+      empty.classList.remove('hidden'); 
+      return; 
+    }
     empty.classList.add('hidden');
 
+    // Desktop table view
     for(const it of list){
       const tr = document.createElement('tr');
       tr.className = 'border-t';
@@ -554,6 +700,50 @@
         </td>
       `;
       rows.appendChild(tr);
+    }
+
+    // Mobile card view
+    for(const it of list){
+      const card = document.createElement('div');
+      card.className = 'mobile-card bg-white border border-gray-200 rounded-lg p-4 shadow-sm';
+      card.innerHTML = `
+        <div class="card-row">
+          <span class="card-label">Name:</span>
+          <span class="card-value font-medium">${esc(it.name)}</span>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Pet:</span>
+          <span class="card-value">${esc(it.pet_type || it.petType || '')}</span>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Price:</span>
+          <span class="card-value">₹${Number(it.price).toFixed(2)}</span>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Duration:</span>
+          <span class="card-value">${it.duration} mins</span>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Category:</span>
+          <span class="card-value">${esc(it.main_service || '')}</span>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Status:</span>
+          <span class="card-value">
+            <span class="px-2 py-0.5 rounded-full text-xs ${it.status==='Active'?'bg-emerald-100 text-emerald-700':'bg-gray-200 text-gray-700'}">
+              ${esc(it.status || '')}
+            </span>
+          </span>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Actions:</span>
+          <span class="card-value">
+            <button class="text-blue-600 hover:underline mr-3" data-act="edit" data-id="${it.id}">Edit</button>
+            <button class="text-rose-600 hover:underline" data-act="delete" data-id="${it.id}">Delete</button>
+          </span>
+        </div>
+      `;
+      mobileRows.appendChild(card);
     }
   }
 
@@ -581,7 +771,7 @@
     payload.append('duration',     fd.get('duration'));
     payload.append('main_service', fd.get('main_service'));
     payload.append('status',       fd.get('status'));
-    // â­ send user_id from frontend (or vet_slug when available)
+    // ✅ send user_id from frontend (or vet_slug when available)
     appendTarget(payload);
 
     try{
@@ -613,7 +803,14 @@
   });
 
   // ===== Edit/Delete actions =====
-  rows.addEventListener('click', async (e)=>{
+  function attachActionListeners(){
+    // Desktop table
+    rows.addEventListener('click', handleActionClick);
+    // Mobile cards
+    mobileRows.addEventListener('click', handleActionClick);
+  }
+
+  async function handleActionClick(e){
     const btn = e.target.closest('button[data-act]');
     if(!btn) return;
     const {act, id} = btn.dataset;
@@ -670,7 +867,7 @@
         }
       }
     }
-  });
+  }
 
   function fillEdit(s){
     const f = document.getElementById('edit-form');
@@ -700,7 +897,7 @@
     payload.append('duration',     f.elements['duration'].value);
     payload.append('main_service', f.elements['main_service'].value);
     payload.append('status',       f.elements['status'].value);
-    // â­ send user_id from frontend (or vet_slug when available)
+    // ✅ send user_id from frontend (or vet_slug when available)
     appendTarget(payload);
 
     try{
@@ -737,6 +934,8 @@
   // ===== Init =====
   document.addEventListener('DOMContentLoaded', async ()=>{
     await fetchServices();
+    attachActionListeners();
+    
     try{
       const url = new URL(location.href);
       const openParam = (url.searchParams.get('open') || '').toLowerCase();
@@ -789,7 +988,7 @@
           var a = document.createElement('a');
           a.href = '{{ route('logout') }}';
           a.setAttribute('data-role','logout-link');
-          a.className = 'px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50 text-gray-700';
+          a.className = 'px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50 text-gray-700 hidden sm:inline-block';
           a.textContent = 'Logout';
           rightGroup.appendChild(a);
         }
@@ -805,8 +1004,3 @@
 
 </body>
 </html>
-
-
-
-
-
