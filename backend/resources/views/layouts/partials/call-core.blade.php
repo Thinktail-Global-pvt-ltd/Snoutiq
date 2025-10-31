@@ -144,6 +144,7 @@
           doctorId: Number(currentDoctorId),
           at: Date.now(),
           visible: clinicVisible,
+          hidden: isDocumentHidden() ? 1 : 0,
           immediate: immediate ? 1 : 0,
         });
       } catch (err) {
@@ -2164,6 +2165,7 @@
         socket.emit(VISIBILITY_EVENT, {
           doctorId: Number(currentDoctorId),
           visible: clinicVisible,
+          hidden: isDocumentHidden() ? 1 : 0,
         });
       }catch(err){
         console.warn('[snoutiq-call] failed to sync doctor visibility', err);

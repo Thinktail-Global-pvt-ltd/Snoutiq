@@ -7,15 +7,44 @@ use Illuminate\Support\Facades\Log;
 
 class DoctorPresenceService
 {
+    private ?array $cachedDoctorLists = null;
+
     public function __construct(private readonly ?string $socketServerBaseUrl = null)
     {
     }
 
     public function isDoctorAvailable(int $doctorId): bool
     {
+        $lists = $this->fetchDoctorLists();
+        $visible = $lists['visible'] ?? [];
+        $active = $lists['active'] ?? [];
+
+        $doctorPool = !empty($visible) ? $visible : $active;
+
+        return in_array($doctorId, $doctorPool, false);
+    }
+
+    public function isDoctorHidden(int $doctorId): bool
+    {
+        $lists = $this->fetchDoctorLists();
+        $hidden = $lists['hidden'] ?? [];
+
+        return in_array($doctorId, $hidden, false);
+    }
+
+    private function fetchDoctorLists(): array
+    {
+        if ($this->cachedDoctorLists !== null) {
+            return $this->cachedDoctorLists;
+        }
+
         $baseUrl = $this->socketServerBaseUrl ?? config('services.socket_server.base_url');
         if (!$baseUrl) {
-            return false;
+            return $this->cachedDoctorLists = [
+                'visible' => [],
+                'active' => [],
+                'hidden' => [],
+            ];
         }
 
         try {
@@ -25,22 +54,34 @@ class DoctorPresenceService
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
-                return false;
+                return $this->cachedDoctorLists = [
+                    'visible' => [],
+                    'active' => [],
+                    'hidden' => [],
+                ];
             }
 
             $payload = $response->json();
             $visible = $payload['visibleDoctors'] ?? null;
             $active = $payload['activeDoctors'] ?? [];
+            $hidden = $payload['hiddenDoctors'] ?? [];
 
-            // Prefer visible doctors; treat hidden/background doctors as offline so push fallback fires.
-            $doctorPool = is_array($visible) && !empty($visible) ? $visible : $active;
+            $lists = [
+                'visible' => is_array($visible) ? $visible : [],
+                'active' => is_array($active) ? $active : [],
+                'hidden' => is_array($hidden) ? $hidden : [],
+            ];
 
-            return in_array($doctorId, $doctorPool, false);
+            return $this->cachedDoctorLists = $lists;
         } catch (\Throwable $exception) {
             Log::debug('doctor-presence: failed to query socket server', [
                 'message' => $exception->getMessage(),
             ]);
-            return false;
+            return $this->cachedDoctorLists = [
+                'visible' => [],
+                'active' => [],
+                'hidden' => [],
+            ];
         }
     }
 }

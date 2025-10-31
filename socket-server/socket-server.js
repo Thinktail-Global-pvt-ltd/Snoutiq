@@ -23,7 +23,7 @@ const httpServer = createServer((req, res) => {
 
     if (req.method === "GET" && url.pathname === "/active-doctors") {
       purgeInactiveDoctors("http-active-doctors");
-      const { available, background } = splitDoctorAvailability();
+      const { available, background, hidden } = splitDoctorAvailability();
 
       res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
       res.end(
@@ -31,6 +31,7 @@ const httpServer = createServer((req, res) => {
           activeDoctors: [...available, ...background],
           visibleDoctors: available,
           backgroundDoctors: background,
+          hiddenDoctors: hidden,
           updatedAt: new Date().toISOString(),
         })
       );
@@ -60,7 +61,7 @@ const DOCTOR_HEARTBEAT_GRACE_MS = 5 * 60 * 1000;
 const DOCTOR_HEARTBEAT_LOG_THROTTLE_MS = 60 * 1000;
 
 // Active doctors and call sessions
-const activeDoctors = new Map(); // doctorId -> { socketId, joinedAt, location, lastHeartbeatAt, lastHeartbeatVisible, lastHeartbeatSource, lastHeartbeatLoggedAt }
+const activeDoctors = new Map(); // doctorId -> { socketId, joinedAt, location, lastHeartbeatAt, lastHeartbeatVisible, lastHeartbeatHidden, lastHeartbeatSource, lastHeartbeatLoggedAt }
 const activeCalls = new Map();   // callId -> { callId, doctorId, patientId, channel, status, ... }
 
 const purgeInactiveDoctors = (reason = "periodic") => {
@@ -93,10 +94,15 @@ const isDoctorBusy = (doctorId) => {
 function splitDoctorAvailability() {
   const available = [];
   const background = [];
+  const hidden = [];
 
   for (const [doctorId, info] of activeDoctors.entries()) {
     if (isDoctorBusy(doctorId)) {
       continue;
+    }
+
+    if (info?.lastHeartbeatHidden) {
+      hidden.push(doctorId);
     }
 
     if (info?.lastHeartbeatVisible) {
@@ -105,16 +111,16 @@ function splitDoctorAvailability() {
       background.push(doctorId);
     }
   }
-  return { available, background };
+  return { available, background, hidden };
 }
 
 const emitAvailableDoctors = (reason = "broadcast", { skipPurge = false } = {}) => {
   if (!skipPurge) {
     purgeInactiveDoctors(reason);
   }
-  const { available, background } = splitDoctorAvailability();
+  const { available, background, hidden } = splitDoctorAvailability();
   console.log(
-    `📤 Broadcasting ${available.length} visible doctors (${background.length} hidden):`,
+    `📤 Broadcasting ${available.length} visible doctors (${background.length} background, ${hidden.length} hidden tabs):`,
     available
   );
   io.emit("active-doctors", available);
@@ -138,6 +144,7 @@ io.on("connection", (socket) => {
       joinedAt: now,
       lastHeartbeatAt: now,
       lastHeartbeatVisible: true,
+      lastHeartbeatHidden: false,
       lastHeartbeatSource: "join-doctor",
       lastHeartbeatLoggedAt: now,
     });
@@ -166,6 +173,7 @@ io.on("connection", (socket) => {
       socketId: socket.id,
       joinedAt: new Date(),
       lastHeartbeatVisible: true,
+      lastHeartbeatHidden: false,
     };
 
     existing.socketId = socket.id;
@@ -174,11 +182,14 @@ io.on("connection", (socket) => {
     if (visibilityFlag !== undefined) {
       existing.lastHeartbeatVisible = Boolean(visibilityFlag);
     }
+    if (payload.hidden !== undefined) {
+      existing.lastHeartbeatHidden = Boolean(payload.hidden);
+    }
     existing.lastHeartbeatSource = payload.page || payload.pageTag || payload.source || existing.lastHeartbeatSource || null;
 
     const lastLoggedAt = existing.lastHeartbeatLoggedAt ? new Date(existing.lastHeartbeatLoggedAt).getTime() : 0;
     if (!lastLoggedAt || timestamp - lastLoggedAt >= DOCTOR_HEARTBEAT_LOG_THROTTLE_MS || payload.immediate) {
-      console.log(`❤️‍🔥 Heartbeat from doctor ${doctorId} (visible: ${existing.lastHeartbeatVisible ? "yes" : "no"}${existing.lastHeartbeatSource ? `, source: ${existing.lastHeartbeatSource}` : ""})`);
+      console.log(`❤️‍🔥 Heartbeat from doctor ${doctorId} (visible: ${existing.lastHeartbeatVisible ? "yes" : "no"}, hidden: ${existing.lastHeartbeatHidden ? "yes" : "no"}${existing.lastHeartbeatSource ? `, source: ${existing.lastHeartbeatSource}` : ""})`);
       existing.lastHeartbeatLoggedAt = new Date(timestamp);
     }
 

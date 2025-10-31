@@ -22,9 +22,13 @@ class SendIncomingCallPushNotification
             return;
         }
 
-        if ($this->presenceService->isDoctorAvailable((int) $event->doctorId)) {
+        $doctorId = (int) $event->doctorId;
+        $doctorAvailable = $this->presenceService->isDoctorAvailable($doctorId);
+        $doctorHidden = $this->presenceService->isDoctorHidden($doctorId);
+
+        if ($doctorAvailable && !$doctorHidden) {
             Log::info('incoming-call-listener: doctor is online, skipping push', [
-                'doctor_id' => $event->doctorId,
+                'doctor_id' => $doctorId,
             ]);
             return;
         }
