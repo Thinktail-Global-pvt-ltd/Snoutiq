@@ -307,6 +307,12 @@
       scope: '/',
     } : null;
     let serviceWorkerRegistrationPromise = null;
+    const STATIC_WEBPUSH_PUBLIC_KEY = @json(config('webpush.public_key'));
+    let webPushPublicKeyCache = typeof STATIC_WEBPUSH_PUBLIC_KEY === 'string' && STATIC_WEBPUSH_PUBLIC_KEY.length
+      ? STATIC_WEBPUSH_PUBLIC_KEY
+      : null;
+    let pushSubscriptionEndpoint = null;
+    let pushSubscriptionPromise = null;
 
     async function ensureServiceWorkerRegistration(){
       if (!SERVICE_WORKER_CONFIG) return null;
@@ -366,6 +372,114 @@
         return ready || registration;
       } catch (_) {
         return registration;
+      }
+    }
+
+    function urlBase64ToUint8Array(base64String){
+      try {
+        const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      } catch (err) {
+        console.warn('[snoutiq-call] failed to convert vapid key', err);
+        return null;
+      }
+    }
+
+    async function fetchWebPushPublicKey(){
+      if (webPushPublicKeyCache) return webPushPublicKeyCache;
+      try {
+        const res = await fetch(`${API_BASE}/config/webpush`, { credentials: 'include' });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const key = data?.publicKey;
+        if (typeof key === 'string' && key.length) {
+          webPushPublicKeyCache = key;
+          return key;
+        }
+      } catch (err) {
+        console.warn('[snoutiq-call] failed to fetch webpush key', err);
+      }
+      return null;
+    }
+
+    async function upsertPushSubscription(subscription){
+      if (!subscription) return null;
+      const doctorId = Number(currentDoctorId || 0);
+      if (!doctorId) return null;
+      const payload = typeof subscription.toJSON === 'function' ? subscription.toJSON() : subscription;
+      if (!payload || !payload.endpoint) return null;
+      try {
+        await fetch(`${API_BASE}/doctor/push-subscriptions`, {
+          method: 'POST',
+          headers: API_HEADERS,
+          credentials: 'include',
+          body: JSON.stringify({
+            doctor_id: doctorId,
+            subscription: payload,
+            user_agent: navigator.userAgent || null,
+            platform: navigator.platform || null,
+          }),
+        });
+        pushSubscriptionEndpoint = payload.endpoint;
+        return subscription;
+      } catch (err) {
+        console.warn('[snoutiq-call] failed to store push subscription', err);
+        throw err;
+      }
+    }
+
+    async function ensurePushSubscription(options = {}){
+      if (!SERVICE_WORKER_CONFIG || !SERVICE_WORKER_SUPPORT) return null;
+      if (Notification.permission !== 'granted') return null;
+      const doctorId = Number(currentDoctorId || 0);
+      if (!doctorId) return null;
+      if (pushSubscriptionPromise) {
+        try { await pushSubscriptionPromise; } catch (_) { /* ignore */ }
+      }
+      const registration = await ensureServiceWorkerReady();
+      if (!registration) return null;
+      const force = !!options.force;
+      let subscription = null;
+      if (!force) {
+        try {
+          subscription = await registration.pushManager.getSubscription();
+        } catch (err) {
+          console.warn('[snoutiq-call] failed to read push subscription', err);
+        }
+      }
+      if (!subscription || force) {
+        const key = await fetchWebPushPublicKey();
+        if (!key) return null;
+        const convertedKey = urlBase64ToUint8Array(key);
+        if (!convertedKey) return null;
+        try {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: convertedKey,
+          });
+        } catch (err) {
+          console.warn('[snoutiq-call] push subscribe failed', err);
+          return null;
+        }
+      }
+      if (!subscription) return null;
+      if (subscription.endpoint && !pushSubscriptionEndpoint) {
+        pushSubscriptionEndpoint = subscription.endpoint;
+      }
+      if (!force && subscription.endpoint && subscription.endpoint === pushSubscriptionEndpoint) {
+        return subscription;
+      }
+      pushSubscriptionPromise = upsertPushSubscription(subscription);
+      try {
+        return await pushSubscriptionPromise;
+      } finally {
+        pushSubscriptionPromise = null;
       }
     }
 
@@ -494,6 +608,9 @@
         }catch(err){
           console.warn('[snoutiq-call] failed to refresh doctor id', err);
         }
+      }
+      if (Notification.permission === 'granted') {
+        ensurePushSubscription().catch(()=>{});
       }
       return currentDoctorId;
     }
@@ -1972,24 +2089,34 @@
         notificationsEnabled = false;
         return false;
       }
-      await ensureServiceWorkerRegistration();
+      const registrationPromise = ensureServiceWorkerRegistration();
       if (Notification.permission === 'granted') {
         notificationsEnabled = true;
+        ensurePushSubscription().catch(()=>{});
+        await registrationPromise;
         return true;
       }
       if (Notification.permission === 'denied') {
         notificationsEnabled = false;
+        await registrationPromise;
         return false;
       }
       if (!interactive) {
+        notificationsEnabled = false;
+        await registrationPromise;
         return false;
       }
       try {
         const result = await Notification.requestPermission();
         notificationsEnabled = result === 'granted';
+        if (notificationsEnabled) {
+          ensurePushSubscription({ force: true }).catch(()=>{});
+        }
+        await registrationPromise;
         return notificationsEnabled;
       } catch (_err) {
         notificationsEnabled = false;
+        await registrationPromise;
         return false;
       }
     }
@@ -2137,9 +2264,8 @@
       if (SERVICE_WORKER_CONFIG) {
         ensureServiceWorkerRegistration();
       }
-      if (opts.userTriggered) {
-        ensureNotificationPermission(true);
-      }
+      const interactivePermission = opts.userTriggered || (typeof Notification !== 'undefined' && Notification.permission !== 'granted');
+      ensureNotificationPermission(interactivePermission).catch(()=>{});
       if (opts.showAlert && window.Swal) {
         Swal.fire({
           icon: 'success',
@@ -2221,6 +2347,7 @@
         exitBackgroundHold();
         startHeartbeat();
         sendHeartbeat(true);
+        ensurePushSubscription().catch(()=>{});
         if (sock && !sock.connected) {
           setHeaderStatus('connecting');
           scheduleReconnect({ immediate: true });
@@ -2239,6 +2366,7 @@
       exitBackgroundHold();
       startHeartbeat();
       sendHeartbeat(true);
+      ensurePushSubscription().catch(()=>{});
       if (sock && !sock.connected) {
         setHeaderStatus('connecting');
         scheduleReconnect({ immediate: true });
@@ -2289,6 +2417,14 @@
         return;
       }
 
+      if (type === 'pushsubscriptionchange') {
+        if (data.subscription?.endpoint) {
+          pushSubscriptionEndpoint = data.subscription.endpoint;
+        }
+        ensurePushSubscription({ force: true }).catch(()=>{});
+        return;
+      }
+
       if (type !== 'snoutiq-notification') return;
 
       const action = data.action || 'default';
@@ -2316,6 +2452,9 @@
 
     if (SERVICE_WORKER_CONFIG) {
       ensureServiceWorkerRegistration();
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        ensurePushSubscription().catch(()=>{});
+      }
     }
 
     const api = {

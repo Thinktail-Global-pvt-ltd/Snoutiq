@@ -16,6 +16,24 @@ use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Middleware\EnsureAdminAuthenticated;
 
+$serveServiceWorker = static function () {
+    $path = public_path('service-worker.js');
+    if (!is_file($path)) {
+        abort(404);
+    }
+
+    return response()->file($path, [
+        'Content-Type' => 'application/javascript',
+        'Service-Worker-Allowed' => '/',
+    ]);
+};
+
+Route::get('/service-worker.js', $serveServiceWorker)->name('service-worker');
+
+if ($pathPrefix = trim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/')) {
+    Route::get("/{$pathPrefix}/service-worker.js", $serveServiceWorker)->name('service-worker.prefixed');
+}
+
 
 // Public routes
 
