@@ -96,6 +96,10 @@
       }
     }
 
+    function isEffectivelyVisible(){
+      return clinicVisible && !isDocumentHidden();
+    }
+
     function clearReconnectTimer(){
       if (reconnectTimer) {
         clearInterval(reconnectTimer);
@@ -143,7 +147,8 @@
         sock.emit(HEARTBEAT_EVENT, {
           doctorId: Number(currentDoctorId),
           at: Date.now(),
-          visible: clinicVisible,
+          visible: isEffectivelyVisible(),
+          hidden: isDocumentHidden() ? 1 : 0,
           immediate: immediate ? 1 : 0,
         });
       } catch (err) {
@@ -2163,7 +2168,8 @@
       try{
         socket.emit(VISIBILITY_EVENT, {
           doctorId: Number(currentDoctorId),
-          visible: clinicVisible,
+          visible: isEffectivelyVisible(),
+          hidden: isDocumentHidden() ? 1 : 0,
         });
       }catch(err){
         console.warn('[snoutiq-call] failed to sync doctor visibility', err);
@@ -2377,6 +2383,7 @@
 
     document.addEventListener('visibilitychange', ()=>{
       if (!shouldHoldOnline) return;
+      syncDoctorVisibility();
       if (!isDocumentHidden()) {
         clearReconnectTimer();
         const sock = ensureSocket();
@@ -2392,6 +2399,7 @@
         }
       } else {
         enterBackgroundHold('visibilitychange');
+        sendHeartbeat(true);
         scheduleReconnect({ immediate: false });
       }
     });
@@ -2403,6 +2411,7 @@
       startHeartbeat();
       sendHeartbeat(true);
       ensurePushSubscription().catch(()=>{});
+      syncDoctorVisibility();
       if (sock && !sock.connected) {
         setHeaderStatus('connecting');
         scheduleReconnect({ immediate: true });
