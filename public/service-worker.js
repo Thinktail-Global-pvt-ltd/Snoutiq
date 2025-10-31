@@ -66,6 +66,8 @@ async function handlePushEvent() {
         sessionId: call.session_id,
         expiresAt: call.expires_at,
         ringtoneUrl: call.ringtone_url,
+        callId: call.session_id || call.call_id || call.callId || null,
+        call,
       },
       actions: [
         { action: 'answer', title: 'Answer' },
@@ -74,6 +76,7 @@ async function handlePushEvent() {
     };
 
     await cacheRingtone(call.ringtone_url);
+    await broadcastIncomingCall(call);
     await self.registration.showNotification('Incoming video consultation', notificationOptions);
   } catch (error) {
     console.error('Service worker push handling error', error);
@@ -95,27 +98,44 @@ async function cacheRingtone(url) {
 }
 
 self.addEventListener('notificationclick', (event) => {
-  const action = event.action;
-  const { callUrl } = event.notification.data || {};
+  const data = event.notification.data || {};
+  const rawAction = event.action || 'default';
+  const action = normaliseAction(rawAction);
   event.notification.close();
 
-  if (!callUrl) {
-    return;
-  }
-
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        const url = new URL(client.url);
-        if (client.focus && callUrl && url.pathname === new URL(callUrl, self.location.origin).pathname) {
-          return client.focus();
+    (async () => {
+      const message = {
+        type: 'snoutiq-notification',
+        action,
+        call: data.call || null,
+        url: resolveAbsoluteUrl(data.callUrl || data.url || null),
+        callId: data.callId || data.sessionId || data.call?.call_id || data.call?.callId || null,
+      };
+
+      const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      let delivered = false;
+
+      for (const client of windows) {
+        try {
+          client.postMessage(message);
+          if (action !== 'dismiss' && typeof client.focus === 'function') {
+            await client.focus();
+          }
+          delivered = true;
+        } catch (error) {
+          console.warn('Service worker notification postMessage failed', error);
         }
       }
 
-      const targetUrl = action === 'decline' ? `${callUrl}&action=decline` : callUrl;
-      const absoluteUrl = new URL(targetUrl, self.location.origin).toString();
-      return clients.openWindow(absoluteUrl);
-    })
+      if (!delivered && message.url && action !== 'dismiss') {
+        try {
+          await clients.openWindow(message.url);
+        } catch (error) {
+          console.warn('Service worker notification openWindow failed', error);
+        }
+      }
+    })()
   );
 });
 
@@ -159,6 +179,48 @@ async function getApplicationServerKey() {
     return outputArray;
   } catch (error) {
     console.warn('Failed to refresh application server key', error);
+    return null;
+  }
+}
+
+async function broadcastIncomingCall(call) {
+  try {
+    const message = {
+      type: 'snoutiq-incoming-call',
+      call: call || null,
+      sentAt: new Date().toISOString(),
+      ringtoneUrl: call?.ringtone_url || null,
+    };
+    const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of windows) {
+      try {
+        client.postMessage(message);
+      } catch (error) {
+        console.warn('Service worker push broadcast failed', error);
+      }
+    }
+  } catch (error) {
+    console.warn('Service worker push broadcast error', error);
+  }
+}
+
+function normaliseAction(action) {
+  switch (action) {
+    case 'answer':
+      return 'accept';
+    case 'decline':
+      return 'dismiss';
+    case 'default':
+    default:
+      return action || 'default';
+  }
+}
+
+function resolveAbsoluteUrl(url) {
+  if (!url) return null;
+  try {
+    return new URL(url, self.location.origin).toString();
+  } catch (_error) {
     return null;
   }
 }

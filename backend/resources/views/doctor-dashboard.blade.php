@@ -824,17 +824,17 @@
     } catch {}
   });
 
-  socket.on('call-requested', (payload)=>{
+  function handleIncomingCall(payload, origin = 'socket'){
     lastCall = payload || null;
     try{
       if (!modal) return;
-      const patientId = payload?.patientId ?? '';
+      const patientId = payload?.patientId ?? payload?.call?.patientId ?? payload?.call?.patient_id ?? '';
       if (elMPatient) {
         const numericId = Number(patientId);
         const displayId = Number.isFinite(numericId) && numericId > 0 ? `#${numericId}` : String(patientId || 'Unknown');
         elMPatient.textContent = displayId;
       }
-      if (elMChannel) elMChannel.textContent = String(payload?.channel ?? '');
+      if (elMChannel) elMChannel.textContent = String(payload?.channel ?? payload?.call?.channel ?? '');
       if (elMTime)    elMTime.textContent    = new Date().toLocaleString();
       if (elMSummaryStatus) {
         elMSummaryStatus.textContent = 'Fetching AI summary…';
@@ -847,8 +847,20 @@
       startIncomingTone();
       loadAiSummary(patientId);
       modal.classList.remove('hidden');
-      addLog('Incoming call for doctor ' + doctorId + ' ch=' + (payload?.channel||''));
+      addLog(
+        `Incoming call (${origin}) for doctor ${doctorId} ch=${payload?.channel || payload?.call?.channel || ''}`
+      );
     }catch(e){ console.warn('[doctor] call-requested render failed', e); }
+  }
+
+  socket.on('call-requested', (payload)=>{
+    handleIncomingCall(payload, 'socket');
+  });
+
+  window.addEventListener('snoutiq:call-requested', (event)=>{
+    const payload = event?.detail;
+    if (!payload || (payload.__source && payload.__source !== 'push')) return;
+    handleIncomingCall(payload, 'push');
   });
 
   document.getElementById('m-accept')?.addEventListener('click', ()=>{

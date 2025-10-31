@@ -2022,10 +2022,11 @@
       socket.on('call-requested', (payload)=>{
         if (payload?.doctorId) updateDoctorId(payload.doctorId);
         persistCallSession(payload);
-        emitCallEvent('snoutiq:call-requested', payload);
+        const eventPayload = { ...payload, __source: 'socket' };
+        emitCallEvent('snoutiq:call-requested', eventPayload);
         showCallNotification(payload);
         if (!window.DOCTOR_PAGE_HANDLE_CALLS) {
-          renderGlobalCallAlert(payload);
+          renderGlobalCallAlert(eventPayload);
         }
       });
 
@@ -2167,7 +2168,40 @@
 
     function handleServiceWorkerMessage(event){
       const data = event?.data || {};
-      if (data.type !== 'snoutiq-notification') return;
+      const type = typeof data?.type === 'string' ? data.type : null;
+      if (!type) return;
+
+      if (type === 'snoutiq-incoming-call') {
+        const payload = hydrateNotificationPayload(data.call);
+        if (!payload) return;
+        if (typeof persistCallSession === 'function') {
+          persistCallSession(payload).catch(err => {
+            console.warn('[snoutiq-call] failed to persist push session', err);
+          });
+        }
+        const eventPayload = {
+          ...payload,
+          __source: 'push',
+        };
+        if (data.sentAt && !eventPayload.__broadcastAt) {
+          eventPayload.__broadcastAt = data.sentAt;
+        }
+        if (data.ringtoneUrl && !eventPayload.ringtoneUrl) {
+          eventPayload.ringtoneUrl = data.ringtoneUrl;
+        }
+        emitCallEvent('snoutiq:call-requested', eventPayload);
+        if (!window.DOCTOR_PAGE_HANDLE_CALLS) {
+          try {
+            renderGlobalCallAlert(eventPayload);
+          } catch (err) {
+            console.warn('[snoutiq-call] failed to render push call alert', err);
+          }
+        }
+        return;
+      }
+
+      if (type !== 'snoutiq-notification') return;
+
       const action = data.action || 'default';
       const payload = hydrateNotificationPayload(data.call);
       if (action === 'accept' && payload) {
@@ -2175,6 +2209,9 @@
         return;
       }
       if (action === 'dismiss') {
+        if (payload) {
+          rejectGlobalCall(payload, 'dismissed');
+        }
         dismissGlobalCall();
         return;
       }
