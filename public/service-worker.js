@@ -1,6 +1,38 @@
 const CACHE_NAME = 'snoutiq-pwa-cache-v1';
 const PRECACHE_URLS = ['/ringtone.mp3'];
-const API_BASE_PATH = '/public/api';
+const SCRIPT_URL = (() => {
+  try {
+    return new URL(self.location.href);
+  } catch (_) {
+    return null;
+  }
+})();
+const EXPLICIT_PREFIX = (() => {
+  try {
+    return SCRIPT_URL?.searchParams?.get('prefix') || '';
+  } catch (_) {
+    return '';
+  }
+})();
+const SCOPE_PATH = (() => {
+  try {
+    const scopeUrl = self.registration?.scope ? new URL(self.registration.scope) : null;
+    const path = scopeUrl ? scopeUrl.pathname : self.location.pathname;
+    return (path || '/').replace(/\/?$/, '/');
+  } catch (_) {
+    return '/';
+  }
+})();
+const PATH_PREFIX = (() => {
+  if (EXPLICIT_PREFIX) return EXPLICIT_PREFIX.replace(/\/+$/, '');
+  try {
+    const path = SCOPE_PATH.replace(/\/$/, '');
+    return path && path !== '' && path !== '/' ? path : '';
+  } catch (_) {
+    return '';
+  }
+})();
+const API_BASE_PATH = `${PATH_PREFIX}/api`;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
