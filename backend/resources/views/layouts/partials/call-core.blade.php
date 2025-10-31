@@ -288,6 +288,87 @@
       return RAW_SOCKET_URL;
     })();
 
+    const SERVICE_WORKER_SUPPORT = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
+    const SERVICE_WORKER_SECURE = SERVICE_WORKER_SUPPORT && (
+      window.isSecureContext ||
+      window.location.protocol === 'https:' ||
+      /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname)
+    );
+    const SERVICE_WORKER_PREFIX = (() => {
+      if (!PATH_PREFIX || PATH_PREFIX === '/') return '';
+      return PATH_PREFIX.replace(/\/+$/, '');
+    })();
+    const SERVICE_WORKER_CONFIG = SERVICE_WORKER_SUPPORT && SERVICE_WORKER_SECURE ? {
+      url: SERVICE_WORKER_PREFIX ? `${SERVICE_WORKER_PREFIX}/service-worker.js` : '/service-worker.js',
+      scope: SERVICE_WORKER_PREFIX ? `${SERVICE_WORKER_PREFIX}/` : '/',
+    } : null;
+    const SERVICE_WORKER_FALLBACK_CONFIG = SERVICE_WORKER_SUPPORT && SERVICE_WORKER_SECURE ? {
+      url: '/service-worker.js',
+      scope: '/',
+    } : null;
+    let serviceWorkerRegistrationPromise = null;
+
+    async function ensureServiceWorkerRegistration(){
+      if (!SERVICE_WORKER_CONFIG) return null;
+      if (serviceWorkerRegistrationPromise) return serviceWorkerRegistrationPromise;
+      serviceWorkerRegistrationPromise = (async () => {
+        if (typeof navigator.serviceWorker.getRegistration === 'function') {
+          try {
+            const existing = await navigator.serviceWorker.getRegistration(SERVICE_WORKER_CONFIG.scope);
+            if (existing) {
+              return existing;
+            }
+          } catch (_) { /* ignore lookup errors */ }
+          try {
+            const anyExisting = await navigator.serviceWorker.getRegistration();
+            if (anyExisting) {
+              return anyExisting;
+            }
+          } catch (_) { /* ignore lookup errors */ }
+          if (SERVICE_WORKER_PREFIX && SERVICE_WORKER_FALLBACK_CONFIG) {
+            try {
+              const fallbackExisting = await navigator.serviceWorker.getRegistration(SERVICE_WORKER_FALLBACK_CONFIG.scope);
+              if (fallbackExisting) {
+                return fallbackExisting;
+              }
+            } catch (_) { /* ignore lookup errors */ }
+          }
+        }
+        try {
+          return await navigator.serviceWorker.register(
+            SERVICE_WORKER_CONFIG.url,
+            { scope: SERVICE_WORKER_CONFIG.scope }
+          );
+        } catch (err) {
+          console.warn('[snoutiq-call] service worker registration failed', err);
+          if (SERVICE_WORKER_PREFIX && SERVICE_WORKER_FALLBACK_CONFIG) {
+            try {
+              return await navigator.serviceWorker.register(
+                SERVICE_WORKER_FALLBACK_CONFIG.url,
+                { scope: SERVICE_WORKER_FALLBACK_CONFIG.scope }
+              );
+            } catch (fallbackError) {
+              console.warn('[snoutiq-call] fallback service worker registration failed', fallbackError);
+            }
+          }
+          return null;
+        }
+      })();
+      return serviceWorkerRegistrationPromise;
+    }
+
+    async function ensureServiceWorkerReady(){
+      if (!SERVICE_WORKER_CONFIG) return null;
+      const registration = await ensureServiceWorkerRegistration();
+      if (!registration) return null;
+      try {
+        const ready = await navigator.serviceWorker.ready;
+        return ready || registration;
+      } catch (_) {
+        return registration;
+      }
+    }
+
     function detectFrontendBase(){
       const clean = value => (value || '').toString().trim().replace(/\/+$/, '');
       const meta = document.querySelector('meta[name="snoutiq-frontend-base"]');
@@ -628,7 +709,8 @@
           if (!granted) return;
         }
 
-        const registration = await navigator.serviceWorker.ready;
+        const registration = await ensureServiceWorkerReady();
+        if (!registration) return;
         const callUrl = resolveDoctorJoinUrl(payload) || window.location.href;
         const patientName = extractPatientName(payload) || '';
         const patientId = extractPatientId(payload);
@@ -1890,6 +1972,7 @@
         notificationsEnabled = false;
         return false;
       }
+      await ensureServiceWorkerRegistration();
       if (Notification.permission === 'granted') {
         notificationsEnabled = true;
         return true;
@@ -2051,6 +2134,9 @@
       applyVisibility(true);
       shouldHoldOnline = true;
       clearReconnectTimer();
+      if (SERVICE_WORKER_CONFIG) {
+        ensureServiceWorkerRegistration();
+      }
       if (opts.userTriggered) {
         ensureNotificationPermission(true);
       }
@@ -2089,6 +2175,9 @@
     function goOffline(opts = {}){
       if (opts.userTriggered) {
         ensureNotificationPermission(true);
+      }
+      if (SERVICE_WORKER_CONFIG) {
+        ensureServiceWorkerRegistration();
       }
       shouldHoldOnline = true;
       applyVisibility(false);
@@ -2223,6 +2312,10 @@
 
     if (navigator.serviceWorker && typeof navigator.serviceWorker.addEventListener === 'function') {
       navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    }
+
+    if (SERVICE_WORKER_CONFIG) {
+      ensureServiceWorkerRegistration();
     }
 
     const api = {
