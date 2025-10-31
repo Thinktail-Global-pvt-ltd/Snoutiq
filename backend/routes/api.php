@@ -76,6 +76,7 @@ Route::post('/call/{id}/accept', [CoreCallController::class, 'acceptCall']);
 Route::post('/call/{id}/payment-success', [CoreCallController::class, 'paymentSuccess']);
 Route::post('/call/{id}/start', [CoreCallController::class, 'markStarted']);
 Route::post('/call/{id}/end', [CoreCallController::class, 'markEnded']);
+Route::post('/internal/doctor-call-alert', [\App\Http\Controllers\Api\DoctorNotificationController::class, 'pendingCall']);
 
 Route::get('/users', [AdminController::class, 'getUsers']);
 // Route::get('/vets', [AdminController::class, 'getVets']);

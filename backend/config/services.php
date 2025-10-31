@@ -40,4 +40,8 @@ return [
         'secret' => env('RAZORPAY_SECRET', 'WypJ2plLEmScSrVjrLzixWyN'),
     ],
 
+    'notifications' => [
+        'secret' => env('DOCTOR_NOTIFICATION_SECRET'),
+    ],
+
 ];

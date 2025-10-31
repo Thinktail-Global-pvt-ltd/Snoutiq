@@ -1,5 +1,11 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
+import {
+  getWhatsAppConfig,
+  isWhatsAppConfigured,
+  sendWhatsAppTemplate,
+  sendWhatsAppText,
+} from "./whatsapp-client.js";
 
 // -------------------- HTTP SERVER (health + debug APIs) --------------------
 const httpServer = createServer((req, res) => {
@@ -88,12 +94,172 @@ const activeDoctors = new Map();
 //   paymentId?, disconnectedAt?, ...
 // }
 const activeCalls = new Map();
+const pendingCalls = new Map();
+
+const DOCTOR_ALERT_ENDPOINT =
+  process.env.DOCTOR_ALERT_ENDPOINT ||
+  process.env.DOCTOR_NOTIFICATION_URL ||
+  null;
+const DOCTOR_ALERT_SECRET =
+  process.env.DOCTOR_ALERT_SECRET ||
+  process.env.DOCTOR_NOTIFICATION_SECRET ||
+  null;
+const DOCTOR_ALERT_TIMEOUT_MS = Number(
+  process.env.DOCTOR_ALERT_TIMEOUT_MS || 3000
+);
+
+const parseDoctorWhatsAppMap = (raw) => {
+  const map = new Map();
+  if (!raw) return map;
+
+  const pairs = raw.split(/[,;]/);
+  for (const entry of pairs) {
+    if (!entry) continue;
+    const [id, number] = entry.split(/[:=]/).map((part) => part?.trim());
+    if (!id || !number) continue;
+    map.set(String(id), number);
+  }
+
+  return map;
+};
+
+const cloneJson = (value) => {
+  if (value == null) return value;
+  return JSON.parse(JSON.stringify(value));
+};
+
+const interpolatePlaceholders = (value, variables) => {
+  if (typeof value === "string") {
+    return value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+      const resolved = variables[key];
+      return resolved === undefined || resolved === null ? "" : String(resolved);
+    });
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => interpolatePlaceholders(item, variables));
+  }
+
+  if (value && typeof value === "object") {
+    const result = {};
+    for (const [key, val] of Object.entries(value)) {
+      result[key] = interpolatePlaceholders(val, variables);
+    }
+    return result;
+  }
+
+  return value;
+};
+
+const parseTemplateComponents = (raw) => {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn("⚠️ Failed to parse WhatsApp template components JSON:", error);
+    return null;
+  }
+};
+
+const DOCTOR_WHATSAPP_DEFAULT =
+  process.env.DOCTOR_ALERT_DEFAULT_WHATSAPP ||
+  process.env.WHATSAPP_ALERT_DEFAULT_TO ||
+  null;
+const DOCTOR_WHATSAPP_MAP = parseDoctorWhatsAppMap(
+  process.env.DOCTOR_WHATSAPP_MAP ||
+    process.env.DOCTOR_ALERT_WHATSAPP_MAP ||
+    ""
+);
+const WHATSAPP_ALERT_TEMPLATE_COMPONENTS_CONFIG = parseTemplateComponents(
+  process.env.WHATSAPP_ALERT_TEMPLATE_COMPONENTS ||
+    process.env.WHATSAPP_TEMPLATE_COMPONENTS ||
+    ""
+);
+const WHATSAPP_BRAND_NAME =
+  process.env.WHATSAPP_BRAND_NAME || process.env.APP_NAME || "SnoutIQ";
+const DEFAULT_WHATSAPP_TEXT_TEMPLATE = [
+  "{{brandName}} call alert!",
+  "Patient {{patientId}} is requesting a {{channel}} consult.",
+  "Call ID: {{callId}}",
+  "Sent at {{timestamp}}",
+].join("\n");
+const WHATSAPP_ALERT_TEXT_TEMPLATE =
+  process.env.WHATSAPP_ALERT_TEXT_TEMPLATE || DEFAULT_WHATSAPP_TEXT_TEMPLATE;
+const resolveWhatsAppAlertMode = () => {
+  const mode = (process.env.WHATSAPP_ALERT_MODE || "").trim().toLowerCase();
+  if (mode === "text" || mode === "template") {
+    return mode;
+  }
+  if (
+    isWhatsAppConfigured() &&
+    (process.env.WHATSAPP_ALERT_TEMPLATE_NAME ||
+      process.env.WHATSAPP_TEMPLATE_NAME ||
+      process.env.WHATSAPP_TEMPLATE)
+  ) {
+    return "template";
+  }
+  return "text";
+};
+const WHATSAPP_ALERT_MODE = resolveWhatsAppAlertMode();
+const WHATSAPP_ALERT_TEMPLATE_NAME =
+  process.env.WHATSAPP_ALERT_TEMPLATE_NAME ||
+  process.env.WHATSAPP_TEMPLATE_NAME ||
+  process.env.WHATSAPP_TEMPLATE ||
+  "hello_world";
+
+const WHATSAPP_ALERT_HAS_RECIPIENTS =
+  DOCTOR_WHATSAPP_MAP.size > 0 || Boolean(DOCTOR_WHATSAPP_DEFAULT);
+
+if (isWhatsAppConfigured()) {
+  if (WHATSAPP_ALERT_HAS_RECIPIENTS) {
+    const config = getWhatsAppConfig();
+    console.log(
+      `✅ WhatsApp alerts enabled (${WHATSAPP_ALERT_MODE}) via phone number ${
+        config?.phoneNumberId || "[hidden]"
+      }`
+    );
+  } else {
+    console.log(
+      "ℹ️ WhatsApp credentials detected but no recipients configured. Set DOCTOR_WHATSAPP_MAP or DOCTOR_ALERT_DEFAULT_WHATSAPP."
+    );
+  }
+}
+
+const getDoctorWhatsAppRecipient = (doctorId) => {
+  if (!doctorId && DOCTOR_WHATSAPP_DEFAULT) {
+    return DOCTOR_WHATSAPP_DEFAULT;
+  }
+
+  const key = String(doctorId ?? "");
+  if (key && DOCTOR_WHATSAPP_MAP.has(key)) {
+    return DOCTOR_WHATSAPP_MAP.get(key);
+  }
+
+  return DOCTOR_WHATSAPP_DEFAULT;
+};
+
+const buildWhatsAppTextMessage = (context) => {
+  return interpolatePlaceholders(WHATSAPP_ALERT_TEXT_TEMPLATE, {
+    ...context,
+    brandName: WHATSAPP_BRAND_NAME,
+  });
+};
+
+const buildTemplateComponents = (context) => {
+  if (!WHATSAPP_ALERT_TEMPLATE_COMPONENTS_CONFIG) return undefined;
+  const base = cloneJson(WHATSAPP_ALERT_TEMPLATE_COMPONENTS_CONFIG);
+  return interpolatePlaceholders(base, {
+    ...context,
+    brandName: WHATSAPP_BRAND_NAME,
+  });
+};
 
 // -------------------- CONSTANTS --------------------
 const DOCTOR_HEARTBEAT_EVENT = "doctor-heartbeat";
 const DOCTOR_GRACE_EVENT = "doctor-grace";
 const DOCTOR_HEARTBEAT_INTERVAL_MS = 30_000;
 const DOCTOR_GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 min grace background
+const PENDING_CALL_TIMEOUT_MS = 60_000;
 
 // -------------------- HELPERS --------------------
 const clearDoctorTimer = (entry) => {
@@ -166,6 +332,284 @@ const isDoctorBusy = (doctorId) => {
   return false;
 };
 
+const expirePendingCall = (doctorId, callId, reason = "timeout") => {
+  const queue = pendingCalls.get(doctorId);
+  if (queue) {
+    const index = queue.findIndex((entry) => entry.callId === callId);
+    if (index >= 0) {
+      const [entry] = queue.splice(index, 1);
+      if (entry?.timer) {
+        clearTimeout(entry.timer);
+      }
+    }
+    if (queue.length) {
+      pendingCalls.set(doctorId, queue);
+    } else {
+      pendingCalls.delete(doctorId);
+    }
+  }
+
+  const session = activeCalls.get(callId);
+  if (!session) {
+    return;
+  }
+
+  activeCalls.delete(callId);
+
+  if (session.patientSocketId) {
+    io.to(session.patientSocketId).emit("call-failed", {
+      callId,
+      doctorId,
+      patientId: session.patientId,
+      reason,
+      message: "Doctor is unavailable right now. Please try another doctor.",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  io.emit("call-status-update", {
+    callId,
+    doctorId,
+    status: "expired",
+    reason,
+    timestamp: new Date().toISOString(),
+  });
+
+  emitAvailableDoctors();
+  deliverNextPendingCall(doctorId);
+};
+
+const sendDoctorPendingCallWebhook = async (callSession) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DOCTOR_ALERT_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(DOCTOR_ALERT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(DOCTOR_ALERT_SECRET
+          ? { "X-Notification-Key": DOCTOR_ALERT_SECRET }
+          : {}),
+      },
+      body: JSON.stringify({
+        doctor_id: callSession.doctorId,
+        patient_id: callSession.patientId,
+        call_id: callSession.callId,
+        channel: callSession.channel,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      console.warn(
+        "⚠️ Doctor notification webhook failed",
+        response.status,
+        body
+      );
+    } else {
+      console.log(
+        `✅ Doctor webhook alert sent for call ${callSession.callId} → doctor ${callSession.doctorId}`
+      );
+    }
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      console.warn("⚠️ Doctor notification webhook timed out");
+    } else {
+      console.warn(
+        "⚠️ Doctor notification webhook error",
+        error?.message || error
+      );
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const sendDoctorPendingCallWhatsApp = async (callSession) => {
+  const recipient = getDoctorWhatsAppRecipient(callSession.doctorId);
+  if (!recipient) {
+    console.warn(
+      "⚠️ No WhatsApp recipient configured for doctor",
+      callSession.doctorId
+    );
+    return;
+  }
+
+  const context = {
+    doctorId: callSession.doctorId,
+    patientId: callSession.patientId ?? "a patient",
+    callId: callSession.callId,
+    channel: callSession.channel || "video consult",
+    timestamp: new Date().toISOString(),
+  };
+
+  try {
+    if (WHATSAPP_ALERT_MODE === "template") {
+      const components = buildTemplateComponents(context);
+      await sendWhatsAppTemplate(recipient, WHATSAPP_ALERT_TEMPLATE_NAME, {
+        components,
+      });
+      console.log(
+        `✅ WhatsApp template alert sent for call ${callSession.callId} → doctor ${callSession.doctorId}`
+      );
+    } else {
+      const message = buildWhatsAppTextMessage(context);
+      await sendWhatsAppText(recipient, message);
+      console.log(
+        `✅ WhatsApp text alert sent for call ${callSession.callId} → doctor ${callSession.doctorId}`
+      );
+    }
+  } catch (error) {
+    const errorDetails =
+      error?.details ||
+      error?.message ||
+      (typeof error === "string" ? error : "unknown error");
+    console.warn("⚠️ WhatsApp alert failed", {
+      doctorId: callSession.doctorId,
+      callId: callSession.callId,
+      error: errorDetails,
+    });
+  }
+};
+
+const notifyDoctorPendingCall = async (callSession) => {
+  const tasks = [];
+
+  if (DOCTOR_ALERT_ENDPOINT) {
+    if (typeof fetch !== "function") {
+      console.warn(
+        "⚠️ Global fetch unavailable; cannot send doctor notification webhook"
+      );
+    } else {
+      tasks.push(sendDoctorPendingCallWebhook(callSession));
+    }
+  }
+
+  if (isWhatsAppConfigured()) {
+    tasks.push(sendDoctorPendingCallWhatsApp(callSession));
+  }
+
+  if (!tasks.length) {
+    return;
+  }
+
+  await Promise.allSettled(tasks);
+};
+
+const enqueuePendingCall = (callSession) => {
+  const doctorId = callSession.doctorId;
+  if (!doctorId) return;
+
+  const queue = pendingCalls.get(doctorId) || [];
+  if (queue.some((entry) => entry.callId === callSession.callId)) {
+    console.log(
+      `ℹ️ Call ${callSession.callId} already queued for doctor ${doctorId}, skipping duplicate`
+    );
+    return;
+  }
+
+  const entry = {
+    callId: callSession.callId,
+    doctorId,
+    patientSocketId: callSession.patientSocketId,
+    queuedAt: Date.now(),
+    timer: setTimeout(() => {
+      console.log(
+        `⌛ Pending call ${callSession.callId} for doctor ${doctorId} expired`
+      );
+      expirePendingCall(doctorId, callSession.callId, "timeout");
+    }, PENDING_CALL_TIMEOUT_MS),
+  };
+
+  queue.push(entry);
+  pendingCalls.set(doctorId, queue);
+
+  console.log(
+    `🕒 Queued call ${callSession.callId} for doctor ${doctorId}. Pending count: ${queue.length}`
+  );
+
+  notifyDoctorPendingCall(callSession).catch((error) => {
+    console.warn(
+      "⚠️ Failed to send doctor notification",
+      error?.message || error
+    );
+  });
+};
+
+const deliverNextPendingCall = (doctorId) => {
+  const queue = pendingCalls.get(doctorId);
+  if (!queue || queue.length === 0) {
+    return;
+  }
+
+  const doctorEntry = activeDoctors.get(doctorId);
+  if (!doctorEntry || !doctorEntry.socketId) {
+    return;
+  }
+  const status = doctorEntry.connectionStatus || "disconnected";
+  if (!["connected", "grace"].includes(status)) {
+    return;
+  }
+  if (isDoctorBusy(doctorId)) {
+    console.log(
+      `⛔ Doctor ${doctorId} still busy. Pending calls remain queued.`
+    );
+    return;
+  }
+
+  const entry = queue.shift();
+  if (entry?.timer) {
+    clearTimeout(entry.timer);
+  }
+
+  if (queue.length) {
+    pendingCalls.set(doctorId, queue);
+  } else {
+    pendingCalls.delete(doctorId);
+  }
+
+  if (!entry) return;
+
+  const session = activeCalls.get(entry.callId);
+  if (!session) {
+    console.log(
+      `⚠️ Pending call ${entry.callId} missing from activeCalls. Skipping.`
+    );
+    deliverNextPendingCall(doctorId);
+    return;
+  }
+
+  session.status = "requested";
+  session.requestedAt = new Date();
+  session.doctorSocketId = doctorEntry.socketId;
+  activeCalls.set(session.callId, session);
+
+  io.to(`doctor-${doctorId}`).emit("call-requested", {
+    callId: session.callId,
+    doctorId: session.doctorId,
+    patientId: session.patientId,
+    channel: session.channel,
+    queued: true,
+    timestamp: new Date().toISOString(),
+  });
+
+  if (session.patientSocketId) {
+    io.to(session.patientSocketId).emit("call-queued", {
+      callId: session.callId,
+      doctorId: session.doctorId,
+      status: "delivered",
+      message: "Doctor is now online. Alerting them to join your call.",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  console.log(
+    `📨 Delivered pending call ${session.callId} to doctor ${doctorId}. Remaining queue length: ${queue.length}`
+  );
+};
+
 // broadcast list of available doctors (who are not on a live/locked call)
 const emitAvailableDoctors = () => {
   const available = [];
@@ -224,6 +668,8 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
       });
     }
   }
+
+  deliverNextPendingCall(doctorId);
 };
 
 // -------------------- CORE SOCKET LOGIC --------------------
@@ -317,43 +763,74 @@ io.on("connection", (socket) => {
       .toString(36)
       .substring(2, 8)}`;
 
-    // see if doc is currently online
     const doctorEntry = activeDoctors.get(doctorId) || null;
+    const connectionStatus = doctorEntry?.connectionStatus || "disconnected";
+    const doctorHasSocket = Boolean(doctorEntry?.socketId);
+    const doctorConnected =
+      doctorHasSocket && ["connected", "grace"].includes(connectionStatus);
+    const doctorBusy = isDoctorBusy(doctorId);
+    const shouldQueue = !doctorConnected || doctorBusy;
 
-    // create an in-memory call session
     const callSession = {
       callId,
       doctorId,
       patientId,
       channel,
-      status: "requested",
+      status: shouldQueue ? "queued" : "requested",
       createdAt: new Date(),
+      queuedAt: shouldQueue ? new Date() : null,
       patientSocketId: socket.id,
       doctorSocketId: doctorEntry?.socketId || null,
     };
+
     activeCalls.set(callId, callSession);
 
-    // ping doctor room. if doc offline, room may be empty; it's fine.
+    if (shouldQueue) {
+      enqueuePendingCall(callSession);
+
+      socket.emit("call-status-update", {
+        callId,
+        doctorId,
+        patientId,
+        status: "pending",
+        queued: true,
+        timestamp: new Date().toISOString(),
+      });
+
+      socket.emit("call-sent", {
+        callId,
+        doctorId,
+        patientId,
+        channel,
+        status: "pending",
+        queued: true,
+        message:
+          doctorBusy && doctorConnected
+            ? "Doctor is finishing another call. We've queued yours and will alert them immediately."
+            : "Doctor is currently offline. We've queued your call and will alert them as soon as they come online.",
+      });
+
+      emitAvailableDoctors();
+      return;
+    }
+
     io.to(`doctor-${doctorId}`).emit("call-requested", {
       callId,
       doctorId,
       patientId,
       channel,
       timestamp: new Date().toISOString(),
-      queued: doctorEntry ? false : true, // true => doctor wasn't actively connected
+      queued: false,
     });
 
-    // tell patient we registered the call no matter what
     socket.emit("call-sent", {
       callId,
       doctorId,
       patientId,
       channel,
       status: "sent",
-      queued: doctorEntry ? false : true,
-      message: doctorEntry
-        ? "Ringing the doctor now…"
-        : "Doctor is currently offline. We've queued your call and will alert them when they come online.",
+      queued: false,
+      message: "Ringing the doctor now…",
     });
 
     emitAvailableDoctors();
