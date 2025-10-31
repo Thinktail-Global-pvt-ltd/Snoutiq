@@ -10,7 +10,7 @@
 //   XCircleIcon
 // } from "@heroicons/react/24/outline";
 
-// const RAZORPAY_KEY_ID = "rzp_live_RGBIfjaGxq1Ma4";
+// const RAZORPAY_KEY_ID = "rzp_test_1nhE9190sR3rkP";
 // const API_BASE = "https://snoutiq.com/backend";
 
 // const PaymentPage = () => {
@@ -290,7 +290,7 @@ import {
   VideoCameraIcon,
 } from "@heroicons/react/24/outline";
 
-const RAZORPAY_KEY_ID = "rzp_live_RGBIfjaGxq1Ma4";
+const RAZORPAY_KEY_ID = "rzp_test_1nhE9190sR3rkP";
 const API_BASE = "https://snoutiq.com/backend";
 
 const Payment = () => {
