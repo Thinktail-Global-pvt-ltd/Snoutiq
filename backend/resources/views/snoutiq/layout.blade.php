@@ -41,8 +41,12 @@
     <header>
         <h1>SnoutIQ Dev Tools</h1>
         <nav>
-            <a href="{{ route('snoutiq.dev.index') }}">Home</a>
-            <a href="{{ route('snoutiq.dev.booking') }}">Booking Tester</a>
+            @if(\Illuminate\Support\Facades\Route::has('snoutiq.dev.index'))
+                <a href="{{ route('snoutiq.dev.index') }}">Home</a>
+            @endif
+            @if(\Illuminate\Support\Facades\Route::has('snoutiq.dev.booking'))
+                <a href="{{ route('snoutiq.dev.booking') }}">Booking Tester</a>
+            @endif
         </nav>
         <div class="muted">Base: http://127.0.0.1:8000</div>
     </header>
@@ -50,4 +54,3 @@
 </div>
 </body>
 </html>
-

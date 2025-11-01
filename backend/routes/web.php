@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Request;
 use App\Http\Controllers\VetLandingController;
 use App\Http\Controllers\Admin\AdminOnboardingStatusPageController;
 use App\Http\Controllers\Admin\AdminVideoSlotOverviewController;
@@ -79,6 +81,52 @@ Route::get('/payment/{callId}', function (string $callId) {
     $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
     return view('payment', compact('callId','socketUrl'));
 })->name('video.payment');
+
+Route::match(['get', 'post'], '/rag-snoutic-symptom-checker', function (Request $request) {
+    $apiUrl = 'http://82.25.104.75:5050/query';
+    $defaultPayload = [
+        'name' => 'Bruno',
+        'species' => 'Dog',
+        'breed' => 'Labrador',
+        'age' => '3 years',
+        'weight' => '28 kg',
+        'sex' => 'Male',
+        'vaccination_summary' => 'All core vaccines up to date',
+        'medical_history' => 'No known issues',
+        'query' => 'He is vomiting yellow foam and not eating since morning, kind of weak',
+    ];
+
+    $formValues = $defaultPayload;
+    $responseData = null;
+    $requestPayload = null;
+    $error = null;
+
+    if ($request->isMethod('post')) {
+        $formValues = array_merge($defaultPayload, $request->only(array_keys($defaultPayload)));
+        $requestPayload = array_map(function ($value) {
+            return is_string($value) ? trim($value) : $value;
+        }, $formValues);
+
+        try {
+            $response = Http::timeout(10)->post($apiUrl, $requestPayload);
+
+            $responseData = $response->json();
+
+            if (! $response->successful()) {
+                $error = 'Unable to fetch symptom checker data right now.';
+            }
+        } catch (\Throwable $th) {
+            $error = 'Failed to contact the symptom checker service.';
+        }
+    }
+
+    return view('snoutiq.rag-snoutic-symptom-checker', [
+        'responseData' => $responseData,
+        'requestPayload' => $requestPayload,
+        'formValues' => $formValues,
+        'error' => $error,
+    ]);
+})->name('snoutiq.rag-snoutic-symptom-checker');
 
 // Protected application routes (requires session user)
 Route::middleware([EnsureSessionUser::class])->group(function(){
