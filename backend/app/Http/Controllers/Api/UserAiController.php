@@ -13,6 +13,7 @@ use App\Models\UserPet;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use App\Support\GeminiConfig;
 
 class UserAiController extends Controller
 {
@@ -121,12 +122,12 @@ User System Registered Pets:
   
     public function ask_ai($uid, $chat_id, $message)
     {
-        $apiKey = config('services.gemini.api_key');
+        $apiKey = GeminiConfig::apiKey();
         if (empty($apiKey)) {
             throw new \RuntimeException('AI service is not configured.');
         }
 
-        $model = config('services.gemini.chat_model', 'gemini-2.0-flash');
+        $model = GeminiConfig::chatModel();
         $apiUrl = sprintf(
             'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
             $model,

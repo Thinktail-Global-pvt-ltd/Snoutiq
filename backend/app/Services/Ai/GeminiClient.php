@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai;
 
+use App\Support\GeminiConfig;
 use Illuminate\Support\Facades\Http;
 
 class GeminiClient
@@ -11,8 +12,11 @@ class GeminiClient
 
     public function __construct(?string $apiKey = null, ?string $model = null)
     {
-        $this->apiKey = ($apiKey ?? config('services.gemini.api_key')) ?? '';
-        $this->model  = $model ?? config('services.gemini.model', 'gemini-1.5-flash');
+        $configuredKey = $apiKey ?? GeminiConfig::apiKey();
+        $configuredModel = $model ?? GeminiConfig::defaultModel();
+
+        $this->apiKey = trim($configuredKey ?? '');
+        $this->model  = trim($configuredModel ?? 'gemini-1.5-flash');
     }
 
     public function summarizeTranscript(string $transcript): ?string

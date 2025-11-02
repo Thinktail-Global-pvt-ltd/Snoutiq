@@ -22,6 +22,7 @@ use App\Models\Pet;
 
 
 use Illuminate\Support\Facades\Http;
+use App\Support\GeminiConfig;
 
 class AuthController extends Controller
 {
@@ -29,11 +30,11 @@ class AuthController extends Controller
     public function describePetImage()
     {
         // Gemini API key (direct use)
-        $apiKey = config('services.gemini.api_key');
+        $apiKey = GeminiConfig::apiKey();
         if (empty($apiKey)) {
             return response()->json(['error' => 'Gemini API key is not configured.'], 503);
         }
-        $model = config('services.gemini.model', 'gemini-1.5-flash');
+        $model = GeminiConfig::defaultModel();
 
         // Static image ka path
         $imagePath = public_path('pet_pics/pet_1_1753728813.png');
@@ -498,11 +499,11 @@ public function register_latest_backup(Request $request)
  */
 private function describePetImageDynamic($imagePath)
 {
-    $apiKey = config('services.gemini.api_key');
+    $apiKey = GeminiConfig::apiKey();
     if (empty($apiKey)) {
         return null;
     }
-    $model = config('services.gemini.model', 'gemini-1.5-flash');
+    $model = GeminiConfig::defaultModel();
 
     if (!file_exists($imagePath)) {
         return null;

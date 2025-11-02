@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\Chat;
 use App\Models\ChatRoom;
 use Illuminate\Support\Str;
+use App\Support\GeminiConfig;
 
 class GeminiChatController extends Controller
 {
@@ -811,11 +812,11 @@ PROMPT;
 
     private function callGeminiApi_curl(string $prompt): string
     {
-        $apiKey = config('services.gemini.api_key');
+        $apiKey = GeminiConfig::apiKey();
         if (empty($apiKey)) {
             return "AI error: Gemini API key is not configured.";
         }
-        $model  = config('services.gemini.chat_model', 'gemini-2.0-flash');
+        $model  = GeminiConfig::chatModel();
 
         $url = sprintf(
             'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
