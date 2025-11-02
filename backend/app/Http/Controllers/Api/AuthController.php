@@ -29,7 +29,11 @@ class AuthController extends Controller
     public function describePetImage()
     {
         // Gemini API key (direct use)
-        $apiKey = "AIzaSyALZDZm-pEK3mtcK9PG9ftz6xyGemEHQ3k";
+        $apiKey = config('services.gemini.api_key');
+        if (empty($apiKey)) {
+            return response()->json(['error' => 'Gemini API key is not configured.'], 503);
+        }
+        $model = config('services.gemini.model', 'gemini-1.5-flash');
 
         // Static image ka path
         $imagePath = public_path('pet_pics/pet_1_1753728813.png');
@@ -45,7 +49,7 @@ class AuthController extends Controller
         $response = Http::withHeaders([
             'Content-Type'   => 'application/json',
             'X-goog-api-key' => $apiKey,
-        ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", [
+        ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
             'contents' => [[
                 'parts' => [
                     [
@@ -494,7 +498,11 @@ public function register_latest_backup(Request $request)
  */
 private function describePetImageDynamic($imagePath)
 {
-    $apiKey = "AIzaSyALZDZm-pEK3mtcK9PG9ftz6xyGemEHQ3k";
+    $apiKey = config('services.gemini.api_key');
+    if (empty($apiKey)) {
+        return null;
+    }
+    $model = config('services.gemini.model', 'gemini-1.5-flash');
 
     if (!file_exists($imagePath)) {
         return null;
@@ -505,7 +513,7 @@ private function describePetImageDynamic($imagePath)
     $response = Http::withHeaders([
         'Content-Type'   => 'application/json',
         'X-goog-api-key' => $apiKey,
-    ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", [
+    ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
         'contents' => [[
             'parts' => [
                 [

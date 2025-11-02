@@ -6,20 +6,18 @@ use Illuminate\Support\Facades\Http;
 
 class GeminiClient
 {
-    private const DEFAULT_API_KEY = 'AIzaSyCIB0yfzSQGGwpVUruqy_sd2WqujTLa1Rk';
     private string $apiKey;
     private string $model;
 
     public function __construct(?string $apiKey = null, ?string $model = null)
     {
-        // Hard-coded key fallback (no .env required)
-        $this->apiKey = $apiKey ?? self::DEFAULT_API_KEY;
-        $this->model  = $model  ?? 'gemini-1.5-flash';
+        $this->apiKey = ($apiKey ?? config('services.gemini.api_key')) ?? '';
+        $this->model  = $model ?? config('services.gemini.model', 'gemini-1.5-flash');
     }
 
     public function summarizeTranscript(string $transcript): ?string
     {
-        if (!$this->apiKey) {
+        if (trim($this->apiKey) === '') {
             // No key: return raw transcript as fallback
             return trim($transcript);
         }

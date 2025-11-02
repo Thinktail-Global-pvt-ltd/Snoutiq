@@ -811,8 +811,11 @@ PROMPT;
 
     private function callGeminiApi_curl(string $prompt): string
     {
-        $apiKey = 'AIzaSyB4VexpIoEsOrcNEytgf-RS3cG764A9Xvk';
-        $model  = 'gemini-2.0-flash';
+        $apiKey = config('services.gemini.api_key');
+        if (empty($apiKey)) {
+            return "AI error: Gemini API key is not configured.";
+        }
+        $model  = config('services.gemini.chat_model', 'gemini-2.0-flash');
 
         $url = sprintf(
             'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',

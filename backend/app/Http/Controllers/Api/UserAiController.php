@@ -95,57 +95,88 @@ User System Registered Pets:
             'message'=>'Not found!'
         ],404);
     }
-      $res=      self::ask_ai($request->user()->id,$user_ai_chat->id,$request->message);
+    try {
+        $res = self::ask_ai($request->user()->id, $user_ai_chat->id, $request->message);
+    } catch (\RuntimeException $e) {
+        return response()->json(['message' => $e->getMessage()], 503);
+    }
+
+    $latestEntry = UserAiChatHistory::where('user_ai_chat_id', $user_ai_chat->id)
+        ->where('user_id', $request->user()->id)
+        ->where('type', 'Assistant')
+        ->orderBy('id', 'desc')
+        ->first();
+
+    if (!$latestEntry) {
+        return response()->json(['message' => 'AI did not return a response.'], 502);
+    }
 
     return response()->json(
         [
-           
-            'response'=>$res,
-            'id'=>UserAiChatHistory::where('user_ai_chat_id',$user_ai_chat->id)->where('user_id',$request->user()->id)->orderBy('id','desc')->first()->id
+            'response' => $res,
+            'id' => $latestEntry->id,
         ]
-        );
+    );
   }
   
-    public function ask_ai($uid,$chat_id,$message){
-        $api_key = env('GEMINI_API_KEY');
-        $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={$api_key}";
-$parts=[];
-$parts[]=["text"=>"System: ".self::system_prompt($uid)];
-foreach(UserAiChatHistory::where('user_ai_chat_id',$chat_id)->get() as $oldMessages){
-    $parts[]=["text"=>$oldMessages->type.":".$oldMessages->message];
-}
-$parts[]=["text"=>"User:".$message];
- $response = Http::withHeaders([
-        'Content-Type' => 'application/json'
-    ])->post($apiUrl, [
-        'contents' => [
-            [
-                'parts' => $parts
-            ]
-        ]
-    ]);
+    public function ask_ai($uid, $chat_id, $message)
+    {
+        $apiKey = config('services.gemini.api_key');
+        if (empty($apiKey)) {
+            throw new \RuntimeException('AI service is not configured.');
+        }
 
-    if ($response->successful()) {
-        UserAiChatHistory::create(
-            [
-                'type'=>'User',
-'message'=>$message,
-'user_id'=>$uid,
-'user_ai_chat_id'=>$chat_id
+        $model = config('services.gemini.chat_model', 'gemini-2.0-flash');
+        $apiUrl = sprintf(
+            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
+            $model,
+            urlencode($apiKey)
+        );
 
-            ]
-            );
-               UserAiChatHistory::create(
-            [
-                'type'=>'Assistant',
-'message'=>$response->json()['candidates'][0]['content']['parts'][0]['text'] ?? null,
-'user_id'=>$uid,
-'user_ai_chat_id'=>$chat_id
+        $parts = [
+            ['text' => 'System: ' . self::system_prompt($uid)],
+        ];
 
-            ]
-            );
-        return $response->json()['candidates'][0]['content']['parts'][0]['text'] ?? null;
-    }
+        foreach (UserAiChatHistory::where('user_ai_chat_id', $chat_id)->get() as $oldMessage) {
+            $parts[] = ['text' => $oldMessage->type . ':' . $oldMessage->message];
+        }
 
+        $parts[] = ['text' => 'User:' . $message];
+
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+        ])->post($apiUrl, [
+            'contents' => [
+                [
+                    'parts' => $parts,
+                ],
+            ],
+        ]);
+
+        if ($response->failed()) {
+            $errorMessage = data_get($response->json(), 'error.message', 'Gemini API error.');
+            throw new \RuntimeException($errorMessage);
+        }
+
+        $assistantMessage = data_get($response->json(), 'candidates.0.content.parts.0.text');
+        if ($assistantMessage === null) {
+            throw new \RuntimeException('Gemini API returned an empty response.');
+        }
+
+        UserAiChatHistory::create([
+            'type' => 'User',
+            'message' => $message,
+            'user_id' => $uid,
+            'user_ai_chat_id' => $chat_id,
+        ]);
+
+        UserAiChatHistory::create([
+            'type' => 'Assistant',
+            'message' => $assistantMessage,
+            'user_id' => $uid,
+            'user_ai_chat_id' => $chat_id,
+        ]);
+
+        return $assistantMessage;
     }
 }
