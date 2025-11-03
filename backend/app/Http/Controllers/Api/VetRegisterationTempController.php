@@ -53,10 +53,12 @@ class VetRegisterationTempController extends Controller
                 'name'             => 'required|string|max:255',
                 'city'             => 'required|string|max:255',
                 'pincode'          => 'required|string|max:20',
+                'license_no'       => 'required|string|max:255',
                 'coordinates'      => 'nullable|array',
                 'address'          => 'nullable|string',
                 'chat_price'       => 'nullable|numeric',
                 'bio'              => 'nullable|string',
+                'license_document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
 
                 // Image fields
                 'hospital_profile' => 'nullable',
@@ -69,6 +71,7 @@ class VetRegisterationTempController extends Controller
                 'doctors.*.doctor_mobile'  => 'nullable|string|max:15',
                 'doctors.*.doctor_license' => 'nullable|string|max:255',
                 'doctors.*.doctor_image'   => 'nullable',
+                'doctors.*.doctor_document'=> 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
 
                 // Google place fields
                 'business_status'      => 'nullable|string|max:255',
@@ -110,6 +113,14 @@ class VetRegisterationTempController extends Controller
                 }
             }
 
+            if ($request->hasFile('license_document')) {
+                File::ensureDirectoryExists(public_path('documents'));
+                $file = $request->file('license_document');
+                $fileName = 'license_' . time() . '_' . Str::random(6) . '.' . $file->extension();
+                $file->move(public_path('documents'), $fileName);
+                $data['license_document'] = 'documents/' . $fileName;
+            }
+
             // ✅ Convert arrays to JSON
             if (isset($data['coordinates'])) $data['coordinates'] = json_encode($data['coordinates']);
             if (isset($data['photos']))      $data['photos']      = json_encode($data['photos']);
@@ -141,6 +152,14 @@ class VetRegisterationTempController extends Controller
                             File::put(public_path('photo/') . $fileName, base64_decode($img));
                             $doctorData['doctor_image'] = 'photo/' . $fileName;
                         }
+                    }
+
+                    if (isset($doc['doctor_document']) && $doc['doctor_document'] instanceof \Illuminate\Http\UploadedFile) {
+                        File::ensureDirectoryExists(public_path('documents/doctors'));
+                        $docFile = $doc['doctor_document'];
+                        $documentName = 'doctor_document_' . $vet->id . '_' . $index . '_' . time() . '.' . $docFile->extension();
+                        $docFile->move(public_path('documents/doctors'), $documentName);
+                        $doctorData['doctor_document'] = 'documents/doctors/' . $documentName;
                     }
 
                     Doctor::create($doctorData);

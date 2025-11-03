@@ -20,6 +20,7 @@
         'video' => 'Video Calling',
         'clinic_hours' => 'Clinic Hours',
         'emergency' => 'Emergency Cover',
+        'documents' => 'Documents & Compliance',
     ];
 
     $sections = [
@@ -91,6 +92,23 @@
             'statusLabels' => ['Ready', 'Missing'],
             'statusClasses' => ['badge-soft-danger', 'badge-soft-warning']
         ],
+        'documents' => [
+            'title' => 'License & Documents',
+            'description' => 'Compliance checklist for clinic licenses and doctor credentials.',
+            'stats' => $stats['documents'],
+            'rows' => $documents,
+            'columns' => [
+                ['label' => 'Clinic', 'width' => '22%'],
+                ['label' => 'Location', 'width' => '15%'],
+                ['label' => 'Doctors', 'class' => 'text-center'],
+                ['label' => 'Verified Docs', 'class' => 'text-center'],
+                ['label' => 'Status']
+            ],
+            'doctorKey' => 'documents',
+            'statusField' => 'documents_complete',
+            'statusLabels' => ['Verified', 'Pending'],
+            'statusClasses' => ['badge-soft-primary', 'badge-soft-warning']
+        ],
     ];
 @endphp
 
@@ -131,6 +149,12 @@
                         <div class="stat-chip text-center">
                             <strong>{{ number_format($summary['emergency_ready']) }}</strong>
                             <span>Emergency Ready</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="stat-chip text-center">
+                            <strong>{{ number_format($summary['documents_ready']) }}</strong>
+                            <span>Docs Uploaded</span>
                         </div>
                     </div>
                 </div>
@@ -197,6 +221,8 @@
                                                             {{ $clinic['doctors_with_video'] }}
                                                         @elseif($key === 'clinicHours')
                                                             {{ $clinic['doctors_with_clinic_hours'] }}
+                                                        @elseif($key === 'documents')
+                                                            {{ $clinic['doctors_with_documents'] }}
                                                         @else
                                                             {{ $clinic['doctors_in_emergency'] }}
                                                         @endif
@@ -212,7 +238,7 @@
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td colspan="5" class="bg-body-tertiary">
+                                                    <td colspan="{{ count($section['columns']) }}" class="bg-body-tertiary">
                                                         <div class="row g-3 py-3">
                                                             <div class="col-lg-3 col-sm-6">
                                                                 <div class="small text-uppercase text-muted mb-1">Contact</div>
@@ -231,18 +257,44 @@
                                                                     ];
                                                                     $completedDoctors = data_get($clinicProgress, 'totals.all_steps_complete', 0);
                                                                     $totalDoctors = data_get($clinicProgress, 'totals.total_doctors', $clinic['doctor_count']);
+                                                                    $clinicLicenseNo = $clinic['clinic_license_no'] ?? null;
+                                                                    $clinicLicenseDoc = $clinic['clinic_license_document'] ?? null;
+                                                                    $documentsComplete = $clinic['documents_complete'] ?? false;
                                                                 @endphp
-                                                                @if(!is_null($consultationPrice))
-                                                                    <div class="small text-muted mt-2">Emergency Fee: ₹{{ number_format($consultationPrice, 2) }}</div>
-                                                                @endif
-                                                                @if($clinicServiceCount > 0)
-                                                                    <div class="small text-muted">Clinic Services: {{ $clinicServiceCount }}</div>
-                                                                @endif
-                                                                @if($totalDoctors > 0)
-                                                                    <div class="small text-muted">All Steps Complete: {{ $completedDoctors }} / {{ $totalDoctors }}</div>
-                                                                @endif
-                                                                @if(!empty($clinic['night_slots']))
-                                                                    <div class="small text-muted">Night Slots: {{ implode(', ', $clinic['night_slots']) }}</div>
+                                                                @if($key === 'documents')
+                                                                    <div class="small text-muted mt-2">
+                                                                        Clinic License:
+                                                                        <span class="{{ $clinicLicenseNo ? 'text-success fw-semibold' : 'text-warning' }}">
+                                                                            {{ $clinicLicenseNo ?? 'Pending' }}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div class="small text-muted">
+                                                                        Compliance File:
+                                                                        @if($clinicLicenseDoc)
+                                                                            <a href="{{ asset($clinicLicenseDoc) }}" target="_blank" rel="noopener noreferrer">View document</a>
+                                                                        @else
+                                                                            Pending upload
+                                                                        @endif
+                                                                    </div>
+                                                                    <div class="small text-muted">
+                                                                        Doctors Verified: {{ $clinic['doctors_with_documents'] }} / {{ $clinic['doctor_count'] }}
+                                                                    </div>
+                                                                    <div class="small text-muted">
+                                                                        Clinic Status: {{ $documentsComplete ? 'Complete' : 'Pending' }}
+                                                                    </div>
+                                                                @else
+                                                                    @if(!is_null($consultationPrice))
+                                                                        <div class="small text-muted mt-2">Emergency Fee: ₹{{ number_format($consultationPrice, 2) }}</div>
+                                                                    @endif
+                                                                    @if($clinicServiceCount > 0)
+                                                                        <div class="small text-muted">Clinic Services: {{ $clinicServiceCount }}</div>
+                                                                    @endif
+                                                                    @if($totalDoctors > 0)
+                                                                        <div class="small text-muted">All Steps Complete: {{ $completedDoctors }} / {{ $totalDoctors }}</div>
+                                                                    @endif
+                                                                    @if(!empty($clinic['night_slots']))
+                                                                        <div class="small text-muted">Night Slots: {{ implode(', ', $clinic['night_slots']) }}</div>
+                                                                    @endif
                                                                 @endif
                                                             </div>
                                                             <div class="col-lg-9">
@@ -311,11 +363,28 @@
                                                                                                 $notes = $doctorStatus
                                                                                                     ? ($doctor['clinic_hours']['slot_count'] . ' slots')
                                                                                                     : 'No schedule configured';
-                                                                                            } else {
+                                                                                            } elseif ($key === 'emergency') {
                                                                                                 $doctorStatus = data_get($doctor, 'emergency.is_listed', false);
                                                                                                 $notes = $doctorStatus
                                                                                                     ? 'Listed for emergency cover'
                                                                                                     : 'Not participating yet';
+                                                                                            } else {
+                                                                                                $docMeta = $doctor['documents'] ?? [];
+                                                                                                $doctorStatus = (bool) data_get($docMeta, 'completed', false);
+                                                                                                $hasLicense = (bool) data_get($docMeta, 'has_license', false);
+                                                                                                $hasDocument = (bool) data_get($docMeta, 'has_document', false);
+                                                                                                if ($doctorStatus) {
+                                                                                                    $notes = 'License & credential verified';
+                                                                                                } else {
+                                                                                                    $missing = [];
+                                                                                                    if (!$hasLicense) {
+                                                                                                        $missing[] = 'license';
+                                                                                                    }
+                                                                                                    if (!$hasDocument) {
+                                                                                                        $missing[] = 'document';
+                                                                                                    }
+                                                                                                    $notes = 'Missing ' . implode(' & ', $missing);
+                                                                                                }
                                                                                             }
                                                                                             $onboardingNote = empty($pendingStepLabels)
                                                                                                 ? 'All onboarding steps completed'
@@ -354,7 +423,7 @@
                                                 </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="5" class="text-center py-5 text-muted">No clinics found.</td>
+                                                    <td colspan="{{ count($section['columns']) }}" class="text-center py-5 text-muted">No clinics found.</td>
                                                 </tr>
                                             @endforelse
                                         </tbody>

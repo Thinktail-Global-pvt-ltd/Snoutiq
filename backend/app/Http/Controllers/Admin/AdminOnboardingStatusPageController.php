@@ -80,12 +80,14 @@ class AdminOnboardingStatusPageController extends Controller
         $video = collect($this->statusService->getVideoData());
         $clinicHours = collect($this->statusService->getClinicHoursData());
         $emergency = collect($this->statusService->getEmergencyData());
+        $documents = collect($this->statusService->getDocumentsData());
 
         $summary = [
             'clinics' => $services->count(),
             'doctors' => $services->sum('doctor_count'),
             'video_ready' => $video->sum('doctors_with_video'),
             'emergency_ready' => $emergency->sum('doctors_in_emergency'),
+            'documents_ready' => $documents->sum('doctors_with_documents'),
         ];
 
         $stepLabels = [
@@ -93,6 +95,7 @@ class AdminOnboardingStatusPageController extends Controller
             'video' => 'Video Calling',
             'clinic_hours' => 'Clinic Hours',
             'emergency' => 'Emergency Cover',
+            'documents' => 'Documents & Compliance',
         ];
 
         $doctorProgress = [];
@@ -101,6 +104,7 @@ class AdminOnboardingStatusPageController extends Controller
             'video' => $video,
             'clinic_hours' => $clinicHours,
             'emergency' => $emergency,
+            'documents' => $documents,
         ];
 
         foreach ($datasets as $type => $clinicCollection) {
@@ -130,6 +134,7 @@ class AdminOnboardingStatusPageController extends Controller
                                 'video' => false,
                                 'clinic_hours' => false,
                                 'emergency' => false,
+                                'documents' => false,
                             ],
                         ];
                     }
@@ -147,6 +152,8 @@ class AdminOnboardingStatusPageController extends Controller
                         $doctorProgress[$clinicId]['doctors'][$doctorId]['steps']['clinic_hours'] = (bool) data_get($doctor, 'clinic_hours.has_data', false);
                     } elseif ($type === 'emergency') {
                         $doctorProgress[$clinicId]['doctors'][$doctorId]['steps']['emergency'] = (bool) data_get($doctor, 'emergency.is_listed', false);
+                    } elseif ($type === 'documents') {
+                        $doctorProgress[$clinicId]['doctors'][$doctorId]['steps']['documents'] = (bool) data_get($doctor, 'documents.completed', false);
                     }
                 }
             }
@@ -211,6 +218,12 @@ class AdminOnboardingStatusPageController extends Controller
                 'total_doctors' => $emergency->sum('doctor_count'),
                 'doctors_ready' => $emergency->sum('doctors_in_emergency'),
             ],
+            'documents' => [
+                'total_clinics' => $documents->count(),
+                'with_documents' => $documents->where('documents_complete', true)->count(),
+                'total_doctors' => $documents->sum('doctor_count'),
+                'doctors_ready' => $documents->sum('doctors_with_documents'),
+            ],
         ];
 
         $recentUsers = User::select(['id', 'name', 'email', 'phone', 'created_at'])
@@ -241,6 +254,7 @@ class AdminOnboardingStatusPageController extends Controller
             'video',
             'clinicHours',
             'emergency',
+            'documents',
             'summary',
             'stats',
             'doctorProgress',

@@ -14,6 +14,7 @@ use App\Http\Controllers\VideoSchedulePageController;
 use App\Http\Controllers\VideoScheduleTestPageController;
 use App\Http\Controllers\EmergencyHoursPageController;
 use App\Http\Controllers\Api\ClinicEmergencyHoursController;
+use App\Http\Controllers\VetDocumentsPageController;
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Middleware\EnsureAdminAuthenticated;
@@ -54,6 +55,7 @@ Route::prefix('admin')->group(function () {
             Route::redirect('/video', '/admin/onboarding#video')->name('admin.onboarding.video');
             Route::redirect('/clinic-hours', '/admin/onboarding#clinicHours')->name('admin.onboarding.clinic-hours');
             Route::redirect('/emergency', '/admin/onboarding#emergency')->name('admin.onboarding.emergency');
+            Route::redirect('/documents', '/admin/onboarding#documents')->name('admin.onboarding.documents');
         });
     });
 });
@@ -179,6 +181,9 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     })->name('doctor.schedule');
 
     Route::get('/doctor/emergency-hours', [EmergencyHoursPageController::class, 'editor'])->name('doctor.emergency-hours');
+    Route::get('/doctor/documents', [VetDocumentsPageController::class, 'index'])->name('doctor.documents');
+    Route::post('/doctor/documents', [VetDocumentsPageController::class, 'updateClinic'])->name('doctor.documents.update');
+    Route::post('/doctor/documents/doctors/{doctor}', [VetDocumentsPageController::class, 'updateDoctor'])->name('doctor.documents.doctor');
 
     Route::get('/api/clinic/emergency-hours', [ClinicEmergencyHoursController::class, 'show'])->name('api.clinic.emergency-hours.show');
     Route::post('/api/clinic/emergency-hours', [ClinicEmergencyHoursController::class, 'upsert'])->name('api.clinic.emergency-hours.upsert');

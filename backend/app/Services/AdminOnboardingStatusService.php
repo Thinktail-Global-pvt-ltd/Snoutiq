@@ -28,6 +28,8 @@ class AdminOnboardingStatusService
                 'v.hospital_profile',
                 'v.business_status',
                 'v.address',
+                'v.license_no',
+                'v.license_document',
                 'v.created_at',
                 'v.updated_at'
             )
@@ -47,6 +49,7 @@ class AdminOnboardingStatusService
                 'doctor_email',
                 'doctor_mobile',
                 'doctor_license',
+                'doctor_document',
                 'vet_registeration_id'
             )
             ->orderBy('doctor_name')
@@ -352,6 +355,71 @@ class AdminOnboardingStatusService
                 'updated_at'            => $emergencyUpdatedAt,
                 'created_at'            => $emergencyCreatedAt,
                 'doctors'               => $doctorEntries,
+            ];
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Documents and compliance data per clinic.
+     */
+    public function getDocumentsData(): array
+    {
+        $clinics = $this->fetchClinics();
+        $doctorsByClinic = $this->fetchDoctorsByClinic();
+
+        $payload = [];
+        foreach ($clinics as $clinic) {
+            $clinicDoctors = $doctorsByClinic->get($clinic->id) ?? collect();
+            $doctorEntries = [];
+            $completedCount = 0;
+
+            foreach ($clinicDoctors as $doctor) {
+                $hasLicense = trim((string) ($doctor->doctor_license ?? '')) !== '';
+                $hasDocument = !empty($doctor->doctor_document);
+                $isComplete = $hasLicense && $hasDocument;
+
+                if ($isComplete) {
+                    $completedCount++;
+                }
+
+                $doctorEntries[] = [
+                    'doctor_id'      => (int) $doctor->id,
+                    'doctor_name'    => $doctor->doctor_name,
+                    'doctor_email'   => $doctor->doctor_email,
+                    'doctor_mobile'  => $doctor->doctor_mobile,
+                    'doctor_license' => $doctor->doctor_license,
+                    'documents'      => [
+                        'has_license'   => $hasLicense,
+                        'has_document'  => $hasDocument,
+                        'document_path' => $doctor->doctor_document,
+                        'completed'     => $isComplete,
+                    ],
+                ];
+            }
+
+            $clinicHasLicense = trim((string) ($clinic->license_no ?? '')) !== '';
+            $clinicHasDocument = !empty($clinic->license_document);
+            $doctorCount = $clinicDoctors->count();
+
+            $payload[] = [
+                'clinic_id'               => (int) $clinic->id,
+                'clinic_name'             => $clinic->display_name,
+                'slug'                    => $clinic->slug,
+                'city'                    => $clinic->city,
+                'pincode'                 => $clinic->pincode,
+                'email'                   => $clinic->email,
+                'mobile'                  => $clinic->mobile,
+                'address'                 => $clinic->address,
+                'doctor_count'            => $doctorCount,
+                'doctors_with_documents'  => $completedCount,
+                'clinic_license_no'       => $clinic->license_no,
+                'clinic_license_document' => $clinic->license_document,
+                'clinic_has_license'      => $clinicHasLicense,
+                'clinic_has_document'     => $clinicHasDocument,
+                'documents_complete'      => $clinicHasLicense && $clinicHasDocument && ($doctorCount === 0 ? true : $completedCount === $doctorCount),
+                'doctors'                 => $doctorEntries,
             ];
         }
 

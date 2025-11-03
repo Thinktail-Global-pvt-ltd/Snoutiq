@@ -15,6 +15,7 @@ class Doctor extends Model
         'doctor_email',
         'doctor_mobile',
         'doctor_license',
+        'doctor_document',
         'doctor_image',
         'toggle_availability',
     ];

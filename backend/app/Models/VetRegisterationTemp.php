@@ -77,6 +77,7 @@ class VetRegisterationTemp extends Model
         'city',
         'pincode',
         'license_no',
+        'license_document',
         'coordinates',
         'address',
         'chat_price',
@@ -130,4 +131,3 @@ class VetRegisterationTemp extends Model
         });
     }
 }
-
