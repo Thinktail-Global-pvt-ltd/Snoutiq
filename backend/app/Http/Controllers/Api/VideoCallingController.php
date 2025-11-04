@@ -5,11 +5,22 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class VideoCallingController extends Controller
 {
     public function nearbyVets(Request $request)
+    {
+        return $this->buildNearbyResponse($request, 'vet');
+    }
+
+    public function nearbyDoctors(Request $request)
+    {
+        return $this->buildNearbyResponse($request, 'doctor');
+    }
+
+    private function buildNearbyResponse(Request $request, string $mode)
     {
         $userId = $request->query('user_id');
         $dateParam = $request->query('date');
@@ -90,7 +101,17 @@ class VideoCallingController extends Controller
         $vetIds = $vets->pluck('id')->all();
 
         $doctors = DB::table('doctors')
-            ->select('id', 'vet_registeration_id')
+            ->select(
+                'id',
+                'vet_registeration_id',
+                'doctor_name',
+                'doctor_email',
+                'doctor_mobile',
+                'doctor_license',
+                'doctor_document',
+                'doctor_image',
+                'toggle_availability'
+            )
             ->whereIn('vet_registeration_id', $vetIds)
             ->get();
 
@@ -178,11 +199,17 @@ class VideoCallingController extends Controller
             return true;
         });
 
+        $dataPayload = $filteredVets->values();
+
+        if ($mode === 'doctor') {
+            $dataPayload = $this->transformToDoctorPayload($filteredVets, $availableDoctorsByVet, $doctors);
+        }
+
         return response()->json([
             'status' => 'success',
             'date'   => $date === '' ? null : $date,
             'day'    => $normalizedDay,
-            'data'   => $filteredVets->values(),
+            'data'   => $dataPayload,
             'available_doctors_by_vet' => (object) $availableDoctorsByVet,
         ]);
     }
@@ -195,5 +222,49 @@ class VideoCallingController extends Controller
         ];
 
         return in_array($normalized, $valid, true) ? $normalized : null;
+    }
+
+    private function transformToDoctorPayload(Collection $vets, array $availableDoctorsByVet, Collection $doctors): Collection
+    {
+        $vetIndex = $vets->keyBy('id');
+        $doctorIndex = $doctors->keyBy('id');
+
+        $payload = collect();
+
+        foreach ($availableDoctorsByVet as $vetId => $doctorIds) {
+            $vet = $vetIndex->get($vetId);
+            if (!$vet) {
+                continue;
+            }
+
+            $vetArray = json_decode(json_encode($vet), true);
+            $clinicId = $vetArray['id'] ?? null;
+
+            foreach ($doctorIds as $doctorId) {
+                $doctor = $doctorIndex->get($doctorId);
+                if (!$doctor) {
+                    continue;
+                }
+
+                $entry = $vetArray;
+                $entry['clinic_id'] = $clinicId;
+                $entry['id'] = $doctor->id;
+                $entry['doctor'] = [
+                    'id' => $doctor->id,
+                    'name' => $doctor->doctor_name,
+                    'email' => $doctor->doctor_email,
+                    'mobile' => $doctor->doctor_mobile,
+                    'license' => $doctor->doctor_license,
+                    'document' => $doctor->doctor_document,
+                    'image' => $doctor->doctor_image,
+                    'toggle_availability' => $doctor->toggle_availability,
+                    'clinic_id' => $doctor->vet_registeration_id,
+                ];
+
+                $payload->push($entry);
+            }
+        }
+
+        return $payload->values();
     }
 }

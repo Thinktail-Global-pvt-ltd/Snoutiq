@@ -12,8 +12,42 @@ class VetDocumentsPageController extends Controller
 {
     private function clinicId(Request $request): ?int
     {
-        return $request->session()->get('user_id')
-            ?? data_get($request->session()->get('user'), 'id');
+        $session = $request->session();
+
+        $role = $session->get('role')
+            ?? data_get($session->get('auth_full'), 'role')
+            ?? data_get($session->get('user'), 'role');
+
+        $candidates = [
+            $session->get('clinic_id'),
+            $session->get('vet_registerations_temp_id'),
+            $session->get('vet_registeration_id'),
+            $session->get('vet_id'),
+            data_get($session->get('user'), 'clinic_id'),
+            data_get($session->get('user'), 'vet_registeration_id'),
+            data_get($session->get('auth_full'), 'clinic_id'),
+            data_get($session->get('auth_full'), 'user.clinic_id'),
+        ];
+
+        if ($role !== 'doctor') {
+            array_unshift(
+                $candidates,
+                $session->get('user_id'),
+                data_get($session->get('user'), 'id')
+            );
+        }
+
+        foreach ($candidates as $candidate) {
+            if ($candidate === null || $candidate === '') {
+                continue;
+            }
+            $num = (int) $candidate;
+            if ($num > 0) {
+                return $num;
+            }
+        }
+
+        return null;
     }
 
     public function index(Request $request)

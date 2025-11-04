@@ -6,11 +6,41 @@
 
 @section('content')
 @php
-  $resolvedClinicId = session('user_id')
-      ?? data_get(session('user'), 'id')
-      ?? session('vet_registerations_temp_id')
-      ?? session('vet_registeration_id')
-      ?? session('vet_id');
+  $sessionRole = session('role')
+      ?? data_get(session('auth_full'), 'role')
+      ?? data_get(session('user'), 'role');
+
+  $candidates = [
+      session('clinic_id'),
+      session('vet_registerations_temp_id'),
+      session('vet_registeration_id'),
+      session('vet_id'),
+      data_get(session('user'), 'clinic_id'),
+      data_get(session('user'), 'vet_registeration_id'),
+      data_get(session('auth_full'), 'clinic_id'),
+      data_get(session('auth_full'), 'user.clinic_id'),
+      data_get(session('auth_full'), 'user.vet_registeration_id'),
+  ];
+
+  if ($sessionRole !== 'doctor') {
+      array_unshift(
+          $candidates,
+          session('user_id'),
+          data_get(session('user'), 'id')
+      );
+  }
+
+  $resolvedClinicId = null;
+  foreach ($candidates as $candidate) {
+      if ($candidate === null || $candidate === '') {
+          continue;
+      }
+      $num = (int) $candidate;
+      if ($num > 0) {
+          $resolvedClinicId = $num;
+          break;
+      }
+  }
 @endphp
 
 <div class="max-w-6xl mx-auto">
@@ -178,4 +208,3 @@
   </script>
 </div>
 @endsection
-

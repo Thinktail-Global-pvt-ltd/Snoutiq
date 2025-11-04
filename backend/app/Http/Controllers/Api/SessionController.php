@@ -20,9 +20,10 @@ class SessionController extends Controller
         session(['user_id' => $uid]);
         // Normalize role if provided
         if (isset($validated['role'])) {
-            $raw = strtolower(trim((string)$validated['role']));
-            $role = in_array($raw, ['vet','doctor','clinic']) ? 'vet' : 'pet';
-            session(['role' => $role]);
+            $role = $this->normalizeRole($validated['role']);
+            if ($role !== null) {
+                session(['role' => $role]);
+            }
         }
 
         return response()->json([
@@ -47,9 +48,10 @@ class SessionController extends Controller
         session(['user_id' => $userId]);
         $roleParam = $request->query('role');
         if ($roleParam !== null) {
-            $raw = strtolower(trim((string)$roleParam));
-            $role = in_array($raw, ['vet','doctor','clinic']) ? 'vet' : 'pet';
-            session(['role' => $role]);
+            $role = $this->normalizeRole($roleParam);
+            if ($role !== null) {
+                session(['role' => $role]);
+            }
         }
         return response()->json([
             'success'    => true,
@@ -95,7 +97,7 @@ class SessionController extends Controller
         }
 
         // Return a safe subset of the session
-        $whitelist = ['auth_full', 'user', 'user_id', 'role', 'token', 'chat_room'];
+        $whitelist = ['auth_full', 'user', 'user_id', 'role', 'token', 'chat_room', 'clinic_id', 'doctor_id'];
         $payload = [];
         foreach ($whitelist as $k) {
             if (session()->has($k)) {
@@ -119,5 +121,30 @@ class SessionController extends Controller
         }
         $request->session()->flush();
         return response()->json(['success' => true, 'message' => 'Session cleared']);
+    }
+    private function normalizeRole(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $raw = strtolower(trim($value));
+        if ($raw === '') {
+            return null;
+        }
+
+        $map = [
+            'vet'            => 'clinic_admin',
+            'clinic'         => 'clinic_admin',
+            'clinic_admin'   => 'clinic_admin',
+            'doctor'         => 'doctor',
+            'doc'            => 'doctor',
+            'admin'          => 'admin',
+            'pet'            => 'pet',
+            'patient'        => 'pet',
+            'user'           => 'pet',
+        ];
+
+        return $map[$raw] ?? 'pet';
     }
 }

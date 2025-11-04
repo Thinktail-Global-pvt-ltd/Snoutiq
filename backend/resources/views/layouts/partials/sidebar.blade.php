@@ -2,7 +2,10 @@
 @php
   $sessionAuth = session('auth_full');
   $sessionUser = session('user');
-  $sessionRole = session('role') ?? data_get($sessionUser, 'role');
+  $sessionRole = session('role')
+    ?? data_get($sessionAuth, 'role')
+    ?? data_get($sessionUser, 'role')
+    ?? optional(auth()->user())->role;
   $clinicName = data_get($sessionAuth, 'user.clinic_profile')
     ?? data_get($sessionAuth, 'user.clinic_name')
     ?? data_get($sessionAuth, 'user.name')
@@ -17,16 +20,36 @@
     ?? data_get($sessionUser, 'email')
     ?? optional(auth()->user())->email
     ?? null;
-  $clinicId = data_get($sessionAuth, 'user.id')
-    ?? data_get($sessionUser, 'id')
-    ?? optional(auth()->user())->id
-    ?? session('user_id');
+  $clinicId = data_get($sessionAuth, 'clinic_id')
+    ?? data_get($sessionAuth, 'user.clinic_id')
+    ?? data_get($sessionAuth, 'user.vet_registeration_id')
+    ?? data_get($sessionAuth, 'user.id')
+    ?? data_get($sessionUser, 'clinic_id')
+    ?? data_get($sessionUser, 'vet_registeration_id');
+
+  if ($sessionRole === 'doctor') {
+    $clinicId = $clinicId
+      ?? session('clinic_id')
+      ?? session('vet_registerations_temp_id')
+      ?? session('vet_registeration_id')
+      ?? session('vet_id');
+  } else {
+    $clinicId = $clinicId
+      ?? data_get($sessionUser, 'id')
+      ?? optional(auth()->user())->id
+      ?? session('user_id')
+      ?? session('clinic_id')
+      ?? session('vet_registerations_temp_id')
+      ?? session('vet_registeration_id')
+      ?? session('vet_id');
+  }
 
   // If nothing in session resolved, fall back to clinic record for vets/doctors
   if ((!$clinicName || !$clinicEmail) && ($sessionVetId = session('vet_id')
       ?? session('vet_registeration_id')
       ?? session('vet_registerations_temp_id')
-      ?? session('user_id'))) {
+      ?? session('clinic_id')
+      ?? ($sessionRole === 'doctor' ? null : session('user_id')))) {
     $clinic = \App\Models\VetRegisterationTemp::query()
       ->select('id', 'clinic_profile', 'name', 'email')
       ->find($sessionVetId);

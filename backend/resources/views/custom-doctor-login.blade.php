@@ -133,7 +133,15 @@
     return v;
   }
   function extractUserId(obj) {
-    const cands = [obj?.user?.id, obj?.user_id, obj?.vet_registerations_temp_id, obj?.vet_registration_temp_id, obj?.vet_registeration_id, obj?.vet_id];
+    const cands = [
+      obj?.user?.id,
+      obj?.user_id,
+      obj?.doctor_id,
+      obj?.vet_registerations_temp_id,
+      obj?.vet_registration_temp_id,
+      obj?.vet_registeration_id,
+      obj?.vet_id,
+    ];
     for (const c of cands) {
       if (c === null || c === undefined || String(c).trim() === '') continue;
       const n = Number(c);
@@ -164,11 +172,12 @@
       localStorage.setItem('auth_full', json);
     }catch(e){}
   }
-  async function syncSessionWithBackend(userId){
+  async function syncSessionWithBackend(userId, role){
     if(!userId){ return { ok:false, error:'missing user_id' }; }
+    const roleToSend = role || 'clinic_admin';
     try{
       const { data } = await axios.get(ROUTES.sessionLogin, {
-        params: { user_id: userId, role: 'vet' },
+        params: { user_id: userId, role: roleToSend },
         withCredentials: true
       });
       return { ok:true, response:data };
@@ -216,21 +225,33 @@
       }
 
       const computedUserId = extractUserId(loginDataParsed);
+      const resolvedRole = loginDataParsed?.role || 'clinic_admin';
+      const resolvedClinicId = loginDataParsed?.clinic_id
+        ?? loginDataParsed?.vet_id
+        ?? loginDataParsed?.vet_registerations_temp_id
+        ?? loginDataParsed?.vet_registeration_id
+        ?? loginDataParsed?.user?.clinic_id
+        ?? null;
+      const resolvedDoctorId = loginDataParsed?.doctor_id
+        ?? loginDataParsed?.user?.doctor_id
+        ?? (resolvedRole === 'doctor' ? computedUserId : null);
 
       const payload = {
         success: true,
         message: loginDataParsed?.message || 'Login success',
-        role: 'vet',
+        role: resolvedRole,
         email:  loginDataParsed?.email ?? loginDataParsed?.user?.email ?? null,
         token:  loginDataParsed?.token,
         token_type: loginDataParsed?.token_type || 'Bearer',
         chat_room: loginDataParsed?.chat_room || null,
         user: loginDataParsed?.user || null,
         user_id: computedUserId,
+        clinic_id: resolvedClinicId,
+        doctor_id: resolvedDoctorId,
       };
       saveAuthFull(payload);
 
-      const sessionSync = await syncSessionWithBackend(payload.user_id);
+      const sessionSync = await syncSessionWithBackend(payload.user_id, resolvedRole);
       dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Vet Login + Session');
 
       if (sessionSync.ok) {

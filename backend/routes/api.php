@@ -97,6 +97,7 @@ use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\DoctorStatusController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\ClinicsController;
+use App\Http\Controllers\Api\DraftClinicController;
 
 
 Route::get('/weather/latest', [WeatherLogController::class, 'latest']);
@@ -110,6 +111,7 @@ Route::get('/weather/hourly-schedule', [WeatherController::class, 'hourlySchedul
 
 // routes/api.php
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
+Route::get('/nearby-doctors', [VideoCallingController::class, 'nearbyDoctors']);
 
 // ---- Prescriptions ----
 Route::get('/prescriptions', [PrescriptionController::class, 'index']);
@@ -133,6 +135,8 @@ Route::post('/chat/send', [GeminiChatController::class, 'sendMessage']);
 Route::get('/chat/listRooms', [GeminiChatController::class, 'listRooms']);
 // routes/api.php
 Route::get('/chat-rooms/{chat_room_token}/chats', [\App\Http\Controllers\Api\GeminiChatController::class, 'history']);
+
+Route::post('/clinics/drafts', [DraftClinicController::class, 'store']);
 
 // Summarize a chat room and save to chat_rooms.summary
 Route::post('/chat-rooms/{chat_room_token}/summarize', [GeminiChatController::class, 'summarizeRoom']);

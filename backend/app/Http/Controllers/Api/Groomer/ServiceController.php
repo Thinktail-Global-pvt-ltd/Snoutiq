@@ -48,6 +48,24 @@ class ServiceController extends Controller
         }
 
         // 4) last resort: session
+        $role = session('role')
+            ?? data_get(session('user'), 'role')
+            ?? data_get(session('auth_full'), 'role');
+
+        if ($role === 'doctor') {
+            $clinicId = session('clinic_id')
+                ?? session('vet_registerations_temp_id')
+                ?? session('vet_registeration_id')
+                ?? session('vet_id')
+                ?? data_get(session('user'), 'clinic_id')
+                ?? data_get(session('auth_full'), 'clinic_id')
+                ?? data_get(session('auth_full'), 'user.clinic_id');
+
+            if ($clinicId) {
+                return (int) $clinicId;
+            }
+        }
+
         $sid = session('user_id') ?? data_get(session('user'), 'id');
         return $sid ? (int) $sid : null;
     }

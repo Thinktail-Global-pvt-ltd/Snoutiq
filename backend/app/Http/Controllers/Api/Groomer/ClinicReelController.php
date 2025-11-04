@@ -20,6 +20,24 @@ class ClinicReelController extends Controller
         }
 
         // 2) session fallback (if any)
+        $role = session('role')
+            ?? data_get(session('user'), 'role')
+            ?? data_get(session('auth_full'), 'role');
+
+        if ($role === 'doctor') {
+            $clinicId = session('clinic_id')
+                ?? session('vet_registerations_temp_id')
+                ?? session('vet_registeration_id')
+                ?? session('vet_id')
+                ?? data_get(session('user'), 'clinic_id')
+                ?? data_get(session('auth_full'), 'clinic_id')
+                ?? data_get(session('auth_full'), 'user.clinic_id');
+
+            if ($clinicId) {
+                return (int) $clinicId;
+            }
+        }
+
         if (session()->has('user_id')) {
             return (int) session('user_id');
         }

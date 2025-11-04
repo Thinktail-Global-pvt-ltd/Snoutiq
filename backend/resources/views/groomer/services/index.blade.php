@@ -22,12 +22,6 @@
     display: none !important;
   }
 
-  /* Hide role label and avatar in header */
-  header .text-right .text-xs,
-  header .w-9.h-9.rounded-full.bg-gradient-to-br.from-indigo-500.to-purple-500 {
-    display: none !important;
-  }
-
   /* ===============================
      Responsive Table Wrapper
   =============================== */
@@ -148,6 +142,35 @@
     'main_service' => 'vet',
     'status' => 'Active',
   ];
+
+  $sessionRole = session('role')
+      ?? data_get(session('auth_full'), 'role')
+      ?? data_get(session('user'), 'role');
+
+  $doctorId = null;
+  if ($sessionRole === 'doctor') {
+      $doctorId = session('doctor_id')
+          ?? data_get(session('auth_full'), 'doctor_id')
+          ?? data_get(session('auth_full'), 'user.doctor_id')
+          ?? session('user_id')
+          ?? data_get(session('user'), 'id');
+  }
+
+  $sessionClinicId = session('clinic_id')
+      ?? session('vet_registerations_temp_id')
+      ?? session('vet_registeration_id')
+      ?? session('vet_id')
+      ?? data_get(session('user'), 'clinic_id')
+      ?? data_get(session('auth_full'), 'clinic_id')
+      ?? data_get(session('auth_full'), 'user.clinic_id')
+      ?? null;
+
+  $doctorRecord = null;
+  if ($sessionRole === 'doctor' && $doctorId) {
+      $doctorRecord = \App\Models\Doctor::query()
+          ->select('id', 'doctor_name', 'vet_registeration_id')
+          ->find($doctorId);
+  }
 @endphp
 
 <div class="flex h-full">
@@ -179,12 +202,29 @@
           + Add Service
         </button>
 
-        <div class="text-right hidden sm:block">
-          <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? 'Doctor' }}</div>
-          <div class="text-xs text-gray-500">{{ auth()->user()->role ?? 'doctor' }}</div>
+        @if($sessionRole === 'doctor')
+          <span class="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
+            <span class="uppercase tracking-wide text-[11px] text-indigo-500">Role</span>
+            Doctor · #{{ $doctorRecord?->id ?? ($doctorId ?? '—') }}
+          </span>
+        @else
+          <span class="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span class="uppercase tracking-wide text-[11px] text-emerald-500">Role</span>
+            {{ ucfirst($sessionRole ?? (auth()->user()->role ?? 'clinic')) }}
+          </span>
+        @endif
+
+        <div class="text-right sm:block">
+          <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? ($doctorRecord?->doctor_name ?? 'Doctor') }}</div>
+          <div class="text-xs text-gray-500">
+            {{ ucfirst($sessionRole ?? (auth()->user()->role ?? 'doctor')) }}
+            @if($sessionRole === 'doctor' && ($doctorRecord?->vet_registeration_id ?? $sessionClinicId))
+              · Clinic #{{ $doctorRecord?->vet_registeration_id ?? $sessionClinicId }}
+            @endif
+          </div>
         </div>
-        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold hidden sm:flex">
-          {{ strtoupper(substr(auth()->user()->name ?? 'D',0,1)) }}
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+          {{ strtoupper(substr(auth()->user()->name ?? $doctorRecord?->doctor_name ?? 'D',0,1)) }}
         </div>
       </div>
     </header>
@@ -199,6 +239,21 @@
     <!-- Page Content -->
     <section class="flex-1 p-4 sm:p-6 overflow-auto">
       <div class="max-w-6xl mx-auto">
+        @if($sessionRole === 'doctor')
+          <div class="mb-4 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm text-indigo-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <div class="font-semibold text-indigo-950">Logged in as Doctor</div>
+              <div>{{ $doctorRecord?->doctor_name ?? 'Doctor' }}</div>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-indigo-700">
+              <span class="px-2 py-1 rounded-lg bg-white border border-indigo-200 font-mono">Doctor ID: {{ $doctorRecord?->id ?? ($doctorId ?? '—') }}</span>
+              @if($doctorRecord?->vet_registeration_id)
+                <span class="px-2 py-1 rounded-lg bg-white border border-indigo-200 font-mono">Clinic ID: {{ $doctorRecord->vet_registeration_id }}</span>
+              @endif
+            </div>
+          </div>
+        @endif
+
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           <div class="p-3 border-b">
             <input id="search" type="text" placeholder="Search by name..."
@@ -399,8 +454,19 @@
 
 <script>
   const SESSION_LOGIN_URL = @json(url('/api/session/login'));
+  const SESSION_ROLE = @json($sessionRole);
+  const SESSION_DOCTOR_ID = @json($doctorRecord?->id ?? ($doctorId ?? null));
+  const SESSION_CLINIC_ID = (() => {
+    const raw = @json($sessionClinicId);
+    if (raw === null || raw === undefined) return null;
+    const num = Number(raw);
+    return Number.isFinite(num) && num > 0 ? num : null;
+  })();
   const SERVER_USER_ID = (() => {
-    const raw = @json(auth()->id() ?? session('user_id'));
+    if (SESSION_ROLE === 'doctor' && SESSION_CLINIC_ID) {
+      return SESSION_CLINIC_ID;
+    }
+    const raw = @json(auth()->id() ?? session('user_id') ?? data_get(session('user'), 'id'));
     if (raw === null || raw === undefined) return null;
     const num = Number(raw);
     return Number.isFinite(num) && num > 0 ? num : null;
@@ -444,6 +510,9 @@
     } catch (_) { return null; }
   })();
   console.log('[services] CURRENT_USER_ID:', CURRENT_USER_ID);
+  console.log('[services] SESSION_ROLE:', SESSION_ROLE);
+  console.log('[services] SESSION_DOCTOR_ID:', SESSION_DOCTOR_ID);
+  console.log('[services] SESSION_CLINIC_ID:', SESSION_CLINIC_ID);
 
   const CLINIC_SLUG = (() => {
     try {

@@ -8,12 +8,48 @@
     $debug = request()->query('debug') === '1';
     // Restrict doctors list to the logged-in vet (session user)
     // Fall back to existing clinic session keys if needed
-    $resolvedClinicId = session('user_id')
-        ?? data_get(session('user'), 'id')
-        ?? session('vet_registerations_temp_id')
-        ?? session('vet_registeration_id')
-        ?? session('vet_id');
+    $sessionRole = session('role')
+        ?? data_get(session('auth_full'), 'role')
+        ?? data_get(session('user'), 'role');
+
+    $clinicCandidates = [
+        session('clinic_id'),
+        session('vet_registerations_temp_id'),
+        session('vet_registeration_id'),
+        session('vet_id'),
+        data_get(session('user'), 'clinic_id'),
+        data_get(session('user'), 'vet_registeration_id'),
+        data_get(session('auth_full'), 'clinic_id'),
+        data_get(session('auth_full'), 'user.clinic_id'),
+        data_get(session('auth_full'), 'user.vet_registeration_id'),
+    ];
+
+    if ($sessionRole !== 'doctor') {
+        array_unshift(
+            $clinicCandidates,
+            session('user_id'),
+            data_get(session('user'), 'id')
+        );
+    }
+
+    $resolvedClinicId = null;
+    foreach ($clinicCandidates as $candidate) {
+        if ($candidate === null || $candidate === '') {
+            continue;
+        }
+        $num = (int) $candidate;
+        if ($num > 0) {
+            $resolvedClinicId = $num;
+            break;
+        }
+    }
+
     $resolvedClinic = $resolvedClinicId ? \App\Models\VetRegisterationTemp::find($resolvedClinicId) : null;
+    $resolvedDoctorId = session('doctor_id')
+        ?? data_get(session('auth_full'), 'doctor_id')
+        ?? data_get(session('auth_full'), 'user.doctor_id')
+        ?? data_get(session('user'), 'doctor_id')
+        ?? ($sessionRole === 'doctor' ? (session('user_id') ?? data_get(session('user'), 'id')) : null);
   @endphp
   <div class="max-w-5xl mx-auto bg-white rounded-xl shadow p-4">
     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
@@ -94,7 +130,7 @@
   }
 
   // Session-derived IDs
-  const SESSION_DOCTOR_ID = Number(@json(session('user_id') ?? data_get(session('user'), 'id') ?? null)) || null;
+  const SESSION_DOCTOR_ID = Number(@json($resolvedDoctorId ?? null)) || null;
   const SESSION_USER_ID   = Number(@json(session('user_id') ?? data_get(session('user'), 'id') ?? null)) || null;
   const SESSION_CLINIC_ID = Number(@json($resolvedClinicId ?? null)) || null;
   const calendarEl = document.getElementById('calendar');
