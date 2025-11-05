@@ -18,11 +18,25 @@ use App\Http\Controllers\VetDocumentsPageController;
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Middleware\EnsureAdminAuthenticated;
+use App\Http\Controllers\BlogController;
+use App\Http\Controllers\Admin\PostController;
+use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\TagController;
+use App\Http\Controllers\SalesDraftClinicPageController;
+use App\Http\Controllers\Admin\LegacyQrRedirectAdminController;
+use App\Http\Controllers\LegacyQrRedirectController;
+use App\Http\Controllers\SalesCrmController;
 
 
 // Public routes
 
 Route::redirect('/', '/admin/login');
+
+Route::get('/clinics/drafts/create', SalesDraftClinicPageController::class)->name('backend.clinics.drafts.create');
+Route::get('/legacy-qr/{code}', LegacyQrRedirectController::class)->name('legacy-qr.redirect');
+Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
+Route::post('/sales/legacy-qr', [SalesCrmController::class, 'storeLegacyQr'])->name('sales.legacy-qr.store');
+Route::delete('/sales/legacy-qr/{legacyQrRedirect}', [SalesCrmController::class, 'destroyLegacyQr'])->name('sales.legacy-qr.destroy');
 
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');
 Route::get('/logout', function (\Illuminate\Http\Request $request) {
@@ -57,9 +71,47 @@ Route::prefix('admin')->group(function () {
             Route::redirect('/emergency', '/admin/onboarding#emergency')->name('admin.onboarding.emergency');
             Route::redirect('/documents', '/admin/onboarding#documents')->name('admin.onboarding.documents');
         });
+
+        Route::get('/legacy-qr', [LegacyQrRedirectAdminController::class, 'index'])->name('admin.legacy-qr.index');
+        Route::post('/legacy-qr', [LegacyQrRedirectAdminController::class, 'store'])->name('admin.legacy-qr.store');
+        Route::delete('/legacy-qr/{legacyQrRedirect}', [LegacyQrRedirectAdminController::class, 'destroy'])->name('admin.legacy-qr.destroy');
     });
 });
+Route::get('/c/{publicId}', [VetLandingController::class, 'redirectByPublicId'])->name('clinics.shortlink');
 Route::get('/vets/{slug}', [VetLandingController::class, 'show']);
+
+Route::prefix('blog')->name('blog.')->group(function () {
+    Route::get('/', [BlogController::class, 'index'])->name('index');
+    Route::get('/category/{category}', [BlogController::class, 'category'])->name('category');
+    Route::get('/tag/{tag}', [BlogController::class, 'tag'])->name('tag');
+    Route::get('/feed', [BlogController::class, 'feed'])->name('feed');
+    Route::get('/feed.xml', [BlogController::class, 'feed']);
+    Route::get('/sitemap.xml', [BlogController::class, 'sitemap'])->name('sitemap');
+    Route::get('/{post}', [BlogController::class, 'show'])->name('post');
+});
+
+Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
+    Route::get('/admin/posts', [PostController::class, 'index'])->name('admin.posts.index');
+    Route::get('/admin/posts/create', [PostController::class, 'create'])->name('admin.posts.create');
+    Route::post('/admin/posts', [PostController::class, 'store'])->name('admin.posts.store');
+    Route::get('/admin/posts/{post}/edit', [PostController::class, 'edit'])->name('admin.posts.edit');
+    Route::match(['put', 'patch'], '/admin/posts/{post}', [PostController::class, 'update'])->name('admin.posts.update');
+    Route::delete('/admin/posts/{post}', [PostController::class, 'destroy'])->name('admin.posts.destroy');
+
+    Route::get('/admin/categories', [CategoryController::class, 'index'])->name('admin.categories.index');
+    Route::get('/admin/categories/create', [CategoryController::class, 'create'])->name('admin.categories.create');
+    Route::post('/admin/categories', [CategoryController::class, 'store'])->name('admin.categories.store');
+    Route::get('/admin/categories/{category}/edit', [CategoryController::class, 'edit'])->name('admin.categories.edit');
+    Route::match(['put', 'patch'], '/admin/categories/{category}', [CategoryController::class, 'update'])->name('admin.categories.update');
+    Route::delete('/admin/categories/{category}', [CategoryController::class, 'destroy'])->name('admin.categories.destroy');
+
+    Route::get('/admin/tags', [TagController::class, 'index'])->name('admin.tags.index');
+    Route::get('/admin/tags/create', [TagController::class, 'create'])->name('admin.tags.create');
+    Route::post('/admin/tags', [TagController::class, 'store'])->name('admin.tags.store');
+    Route::get('/admin/tags/{tag}/edit', [TagController::class, 'edit'])->name('admin.tags.edit');
+    Route::match(['put', 'patch'], '/admin/tags/{tag}', [TagController::class, 'update'])->name('admin.tags.update');
+    Route::delete('/admin/tags/{tag}', [TagController::class, 'destroy'])->name('admin.tags.destroy');
+});
 
 // Video consult entry points (public views)
 // Patient-facing lobby to pick a doctor and place a call
@@ -170,7 +222,42 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
 
     // Weekly schedule (existing, secure)
     Route::get('/doctor/schedule', function () {
-        $vetId = session('user_id') ?? data_get(session('user'), 'id');
+        $sessionRole = session('role')
+            ?? data_get(session('auth_full'), 'role')
+            ?? data_get(session('user'), 'role');
+
+        $candidates = [
+            session('clinic_id'),
+            session('vet_registerations_temp_id'),
+            session('vet_registeration_id'),
+            session('vet_id'),
+            data_get(session('user'), 'clinic_id'),
+            data_get(session('user'), 'vet_registeration_id'),
+            data_get(session('auth_full'), 'clinic_id'),
+            data_get(session('auth_full'), 'user.clinic_id'),
+            data_get(session('auth_full'), 'user.vet_registeration_id'),
+        ];
+
+        if ($sessionRole !== 'doctor') {
+            array_unshift(
+                $candidates,
+                session('user_id'),
+                data_get(session('user'), 'id')
+            );
+        }
+
+        $vetId = null;
+        foreach ($candidates as $candidate) {
+            if ($candidate === null || $candidate === '') {
+                continue;
+            }
+            $num = (int) $candidate;
+            if ($num > 0) {
+                $vetId = $num;
+                break;
+            }
+        }
+
         $doctors = collect();
         if ($vetId) {
             $doctors = Doctor::where('vet_registeration_id', $vetId)
@@ -205,7 +292,42 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     Route::view('/clinic/orders', 'clinic.order-history')->name('clinic.orders');
     // Clinic payments view (lists Razorpay payments linked via vet_slug in notes)
     Route::get('/clinic/payments', function () {
-        $vetId = session('user_id') ?? data_get(session('user'), 'id');
+        $sessionRole = session('role')
+            ?? data_get(session('auth_full'), 'role')
+            ?? data_get(session('user'), 'role');
+
+        $candidates = [
+            session('clinic_id'),
+            session('vet_registerations_temp_id'),
+            session('vet_registeration_id'),
+            session('vet_id'),
+            data_get(session('user'), 'clinic_id'),
+            data_get(session('user'), 'vet_registeration_id'),
+            data_get(session('auth_full'), 'clinic_id'),
+            data_get(session('auth_full'), 'user.clinic_id'),
+            data_get(session('auth_full'), 'user.vet_registeration_id'),
+        ];
+
+        if ($sessionRole !== 'doctor') {
+            array_unshift(
+                $candidates,
+                session('user_id'),
+                data_get(session('user'), 'id')
+            );
+        }
+
+        $vetId = null;
+        foreach ($candidates as $candidate) {
+            if ($candidate === null || $candidate === '') {
+                continue;
+            }
+            $num = (int) $candidate;
+            if ($num > 0) {
+                $vetId = $num;
+                break;
+            }
+        }
+
         $vet   = null; $slug = null;
         if ($vetId) {
             $vet = VetRegisterationTemp::find($vetId);
@@ -272,9 +394,46 @@ use Illuminate\Support\Facades\DB;
 
   Route::middleware(['web'])->get('/api/geo/nearest-pincode', function (\Illuminate\Http\Request $request) {
     // Prefer frontend-provided user_id (query/header), fallback to PHP session
+    $session = $request->session();
+    $sessionRole = $session->get('role')
+        ?? data_get($session->get('auth_full'), 'role')
+        ?? data_get($session->get('user'), 'role');
+
+    $sessionCandidates = [
+        $session->get('clinic_id'),
+        $session->get('vet_registerations_temp_id'),
+        $session->get('vet_registeration_id'),
+        $session->get('vet_id'),
+        data_get($session->get('user'), 'clinic_id'),
+        data_get($session->get('user'), 'vet_registeration_id'),
+        data_get($session->get('auth_full'), 'clinic_id'),
+        data_get($session->get('auth_full'), 'user.clinic_id'),
+        data_get($session->get('auth_full'), 'user.vet_registeration_id'),
+    ];
+
+    if ($sessionRole !== 'doctor') {
+        array_unshift(
+            $sessionCandidates,
+            $session->get('user_id'),
+            data_get($session->get('user'), 'id')
+        );
+    }
+
+    $sessionClinicId = null;
+    foreach ($sessionCandidates as $candidate) {
+        if ($candidate === null || $candidate === '') {
+            continue;
+        }
+        $num = (int) $candidate;
+        if ($num > 0) {
+            $sessionClinicId = $num;
+            break;
+        }
+    }
+
     $userId = $request->query('user_id')
         ?: $request->header('X-User-Id')
-        ?: $request->session()->get('user_id');
+        ?: $sessionClinicId;
     if (!$userId) {
         return response()->json(['error' => 'No session user_id found'], 401);
     }

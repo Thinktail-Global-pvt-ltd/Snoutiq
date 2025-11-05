@@ -86,6 +86,15 @@ class GeminiChatController extends Controller
         $prompt = $this->buildPrompt($decision, $data['question'], $state['pet_profile'], $state['conversation_history'], $symptomAnalysis);
         $aiText = $this->callGeminiApi_curl($prompt);
 
+        if (str_starts_with($aiText, 'AI error')) {
+            Log::warning('Gemini fallback response triggered', [
+                'decision' => $decision,
+                'error'    => $aiText,
+                'user_id'  => $data['user_id'] ?? null,
+            ]);
+            $aiText = $this->buildFallbackResponse($decision, $state, $symptomAnalysis, $data['question']);
+        }
+
         // try to extract diagnosis (only present for IN_CLINIC / VIDEO_CONSULT)
         $diagnosis = $this->parseDiagnosis($aiText);
 
@@ -810,7 +819,7 @@ PROMPT;
         return null;
     }
 
-    private function callGeminiApi_curl(string $prompt): string
+    private function callGeminiApi_curl(string $prompt, int $attempt = 1): string
     {
         $apiKey = GeminiConfig::apiKey();
         if (empty($apiKey)) {
@@ -863,6 +872,11 @@ PROMPT;
         if ($http < 200 || $http >= 300) {
             Log::error('Gemini HTTP non-2xx', ['status' => $http, 'body' => $resp]);
             $message = $this->extractGeminiErrorMessage($resp, $http);
+            $shouldRetry = $attempt < 3 && ($http === 429 || str_contains(strtolower($message), 'resource exhausted'));
+            if ($shouldRetry) {
+                usleep(200000 * $attempt);
+                return $this->callGeminiApi_curl($prompt, $attempt + 1);
+            }
             return "AI error: {$message}";
         }
 
@@ -878,6 +892,145 @@ PROMPT;
         }
 
         return "HTTP {$status}";
+    }
+
+    private function buildFallbackResponse(string $decision, array $state, array $analysis, string $userMessage): string
+    {
+        $petProfile = $state['pet_profile'] ?? [];
+
+        switch ($decision) {
+            case 'EMERGENCY':
+                return $this->fallbackEmergency($petProfile);
+            case 'IN_CLINIC':
+                return $this->fallbackInClinic($petProfile, $analysis);
+            case 'VIDEO_CONSULT':
+                return $this->fallbackVideoConsult($petProfile, $analysis);
+            default:
+                return $this->fallbackGatherInfo($petProfile, $userMessage, $analysis);
+        }
+    }
+
+    private function fallbackEmergency(array $pet): string
+    {
+        $petName = $this->resolvePetName($pet);
+
+        return "🚨 EMERGENCY RECOMMENDATION:\n\n".
+               "Our AI assistant temporarily hit its limit, so I'm sharing the immediate guidance you need right away.\n\n".
+               "**{$petName} needs emergency veterinary care NOW.**\n\n".
+               "Immediate actions:\n".
+               "• Head to the nearest 24-hour emergency veterinarian immediately\n".
+               "• Call ahead so the staff are ready for {$petName}\n".
+               "• Keep {$petName} warm, calm, and supported during travel\n\n".
+               "While travelling:\n".
+               "• Monitor breathing and responsiveness\n".
+               "• Do not offer food, water, or medication unless a vet has instructed you to\n".
+               "• Note any changes you see\n\n".
+               "Please leave right away—speed matters in emergencies.\n\n".
+               "=== DIAGNOSIS ===\n".
+               "Emergency presentation — immediate hands-on veterinary care required.\n".
+               "=== END ===";
+    }
+
+    private function fallbackInClinic(array $pet, array $analysis): string
+    {
+        $petName = $this->resolvePetName($pet);
+        $diagnosisLine = $this->diagnosisLine($analysis, 'In-clinic examination needed to confirm the underlying cause.');
+
+        return "🏥 IN-CLINIC APPOINTMENT RECOMMENDATION:\n\n".
+               "I'm experiencing heavier than usual traffic, but here's the next step without waiting on the AI model.\n\n".
+               "Please schedule an in-person veterinary visit for {$petName} within the next 24–48 hours so a doctor can examine them directly.\n\n".
+               "What the clinic can do:\n".
+               "• Perform a full physical examination\n".
+               "• Run diagnostics like x-rays, blood work, or cultures if required\n".
+               "• Start a tailored treatment plan and outline follow-up care\n\n".
+               "Before the appointment:\n".
+               "• Note when symptoms started and how they've changed\n".
+               "• Bring photos, medications, or anything else that might help\n".
+               "• List any new behaviours, appetite changes, or accidents at home\n\n".
+               "Call your local veterinarian and mention the symptoms so they can prioritise {$petName}.\n\n".
+               "=== DIAGNOSIS ===\n".
+               "{$diagnosisLine}\n".
+               "=== END ===";
+    }
+
+    private function fallbackVideoConsult(array $pet, array $analysis): string
+    {
+        $petName = $this->resolvePetName($pet);
+        $symptoms = $this->summariseSymptoms($analysis);
+        $diagnosisLine = $this->diagnosisLine($analysis, 'Video assessment recommended to clarify the likely cause and next steps.');
+
+        $symptomLine = $symptoms !== '' ? "We'll focus on {$symptoms} during the session so the veterinarian can see everything first-hand.\n\n" : "";
+
+        return "💻 VIDEO CONSULTATION RECOMMENDATION:\n\n".
+               "Quick heads-up: our AI model is at capacity, but you still get immediate guidance.\n\n".
+               "Connecting with a SnoutIQ veterinarian over a secure video call is the best next step for {$petName} based on what you've described.\n\n".
+               $symptomLine .
+               "During the consultation the vet will:\n".
+               "• Observe {$petName}'s behaviour and movement in real time\n".
+               "• Coach you through comfort and home-care steps\n".
+               "• Decide if an in-clinic visit is required afterward\n\n".
+               "How to prepare:\n".
+               "• Choose a quiet, well-lit spot for the call\n".
+               "• Keep {$petName} close by and comfortable\n".
+               "• Have recent photos, medications, or notes ready\n".
+               "• Jot down when the symptoms began and any appetite or bathroom changes\n\n".
+               "Tap the video consultation button when you're ready—we'll connect you instantly with a licensed veterinarian.\n\n".
+               "=== DIAGNOSIS ===\n".
+               "{$diagnosisLine}\n".
+               "=== END ===";
+    }
+
+    private function fallbackGatherInfo(array $pet, string $userMessage, array $analysis): string
+    {
+        $petName = $this->resolvePetName($pet);
+        $promptedTopics = $this->summariseSymptoms($analysis);
+
+        $detailLine = $promptedTopics !== ''
+            ? "Any details you can share about {$promptedTopics} will help me guide you faster."
+            : "Knowing when the concern started, whether it's getting better or worse, and any changes in energy, appetite, or bathroom habits will really help.";
+
+        return "Thanks for the update about {$petName}. I'm seeing high demand right now, so let me keep things moving without delay.\n\n".
+               "Could you tell me a bit more about what you're seeing? Specifically:\n".
+               "• When did you first notice the change?\n".
+               "• Has anything made it better or worse?\n".
+               "• Are there any other symptoms or behaviour changes?\n\n".
+               "{$detailLine}\n\n".
+               "Once I have that, I'll map out the safest next step for {$petName}.";
+    }
+
+    private function resolvePetName(array $pet): string
+    {
+        $name = trim((string) ($pet['name'] ?? 'your pet'));
+        return $name !== '' ? $name : 'your pet';
+    }
+
+    private function diagnosisLine(array $analysis, string $fallback): string
+    {
+        $line = trim((string) ($analysis['reason'] ?? ''));
+        if ($line === '') {
+            $symptoms = $this->summariseSymptoms($analysis);
+            if ($symptoms !== '') {
+                $line = "Likely related to {$symptoms}; veterinarian confirmation recommended.";
+            }
+        }
+
+        $line = $line !== '' ? $line : $fallback;
+        return preg_replace('/\s+/', ' ', $line);
+    }
+
+    private function summariseSymptoms(array $analysis): string
+    {
+        if (!isset($analysis['symptoms']) || !is_array($analysis['symptoms'])) {
+            return '';
+        }
+
+        $symptoms = array_values(array_filter(array_map('trim', $analysis['symptoms'])));
+        if (empty($symptoms)) {
+            return '';
+        }
+
+        $snippet = implode(', ', array_slice($symptoms, 0, 3));
+        return preg_replace('/\s+/', ' ', $snippet);
     }
 
     /* ---------- Rooms ---------- */

@@ -440,7 +440,7 @@ class UnifiedIntelligenceController extends Controller
         return implode("", $out);
     }
 
-    private function callGeminiApi_curl(string $prompt, ?string $imagePath): string
+    private function callGeminiApi_curl(string $prompt, ?string $imagePath, int $attempt = 1): string
     {
         $apiKey = GeminiConfig::apiKey();
         if (empty($apiKey)) {
@@ -495,6 +495,11 @@ class UnifiedIntelligenceController extends Controller
         if ($http < 200 || $http >= 300) {
             Log::error('Gemini HTTP non-2xx', ['status' => $http, 'body' => $resp]);
             $message = $this->extractGeminiErrorMessage($resp, $http);
+            $shouldRetry = $attempt < 3 && ($http === 429 || str_contains(strtolower($message), 'resource exhausted'));
+            if ($shouldRetry) {
+                usleep(200000 * $attempt);
+                return $this->callGeminiApi_curl($prompt, $imagePath, $attempt + 1);
+            }
             return "AI error: {$message}";
         }
 
