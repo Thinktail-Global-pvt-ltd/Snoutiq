@@ -121,7 +121,7 @@ label{font-size:.9rem;color:#334155}
 
       <div class="card" style="padding:1rem;margin-bottom:1.25rem">
         <p class="muted" style="font-size:.9rem;margin-bottom:.35rem">Permanent short link</p>
-        <a href="{{ $publicUrl }}" style="font-weight:700;color:var(--accent)">{{ $publicUrl }}</a>
+        <a href="{{ $publicUrl }}" data-permanent-short-link style="font-weight:700;color:var(--accent)">{{ $publicUrl }}</a>
       </div>
 
       @if($canClaim)
@@ -382,6 +382,40 @@ label{font-size:.9rem;color:#334155}
       <div class="muted" style="margin-top:1rem;font-size:.9rem">© 2024 SnoutIQ. All rights reserved.</div>
     </div>
   </footer>
+
+  @if(! empty($publicUrl))
+  <script>
+  (function() {
+    if (window.__snoutiqPermanentShortLinkPinged) {
+      return;
+    }
+    var link = document.querySelector('[data-permanent-short-link]');
+    if (!link) {
+      return;
+    }
+    var url = link.getAttribute('href');
+    if (!url) {
+      return;
+    }
+    window.__snoutiqPermanentShortLinkPinged = true;
+    try {
+      fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store'
+      }).catch(function(err) {
+        if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+          console.debug('short-link ping failed', err);
+        }
+      });
+    } catch (err) {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+        console.debug('short-link ping error', err);
+      }
+    }
+  })();
+  </script>
+  @endif
 
   <!-- JSON-LD -->
   <script type="application/ld+json">
