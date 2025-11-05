@@ -51,15 +51,19 @@ Route::post('/sales/login', function (Request $request) {
         'password' => 'required|string',
     ]);
 
+    $email = strtolower(trim($credentials['email']));
+    $password = trim($credentials['password']);
+
     $expectedEmail = 'sales@admin.com';
     $expectedPassword = 'Sales@12345';
 
-    if ($credentials['email'] !== $expectedEmail || ! hash_equals($expectedPassword, $credentials['password'])) {
+    if ($email !== $expectedEmail || ! hash_equals($expectedPassword, $password)) {
         return back()
             ->withErrors(['email' => 'Invalid sales credentials.'])
-            ->withInput(['email' => $credentials['email']]);
+            ->withInput(['email' => $email]);
     }
 
+    $request->session()->regenerate();
     $request->session()->put('sales_authenticated', true);
 
     return redirect()->route('sales.crm');
