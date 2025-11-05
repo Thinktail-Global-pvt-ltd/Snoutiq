@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\LegacyQrRedirect;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 class VetLandingController extends Controller
 {
@@ -46,7 +45,18 @@ class VetLandingController extends Controller
     public function redirectByPublicId(Request $request, string $publicId)
     {
         if ($request->query('via') !== 'legacy-qr') {
-            $this->recordLegacyScan($request, $publicId);
+            $legacyScanner = LegacyQrRedirect::where('public_id', $publicId)->first();
+
+            if ($legacyScanner) {
+                $query = collect($request->query())
+                    ->except('via')
+                    ->toArray();
+
+                return redirect()->route('legacy-qr.redirect', array_merge(
+                    ['code' => $legacyScanner->code],
+                    $query
+                ));
+            }
         }
 
         $vet = VetRegisterationTemp::where('public_id', $publicId)->firstOrFail();
@@ -59,34 +69,5 @@ class VetLandingController extends Controller
         }
 
         return redirect()->to($target, 301);
-    }
-
-    private function recordLegacyScan(Request $request, string $publicId): void
-    {
-        $redirect = LegacyQrRedirect::where('public_id', $publicId)->first();
-
-        if (! $redirect) {
-            return;
-        }
-
-        try {
-            $response = Http::timeout(4)
-                ->connectTimeout(2)
-                ->withoutRedirecting()
-                ->withHeaders([
-                    'User-Agent' => 'SnoutIQ Legacy QR Bridge',
-                    'X-Legacy-QR-Bridge' => '1',
-                ])
-                ->get('https://snoutiq.com/backend/legacy-qr/'.rawurlencode($redirect->code), [
-                    'via' => 'bridge',
-                ]);
-
-            if ($response->successful()) {
-                return;
-            }
-        } catch (\Throwable $exception) {
-        }
-
-        $redirect->recordScan();
     }
 }
