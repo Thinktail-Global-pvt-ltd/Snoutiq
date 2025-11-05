@@ -52,14 +52,10 @@ class VetLandingController extends Controller
             }
 
             if ($legacyScanner) {
-                $query = collect($request->query())
-                    ->except('via')
-                    ->toArray();
-
-                return redirect()->route('legacy-qr.redirect', array_merge(
-                    ['code' => $legacyScanner->code],
-                    $query
-                ));
+                return app(LegacyQrRedirectController::class)->handleRedirect(
+                    $request,
+                    $legacyScanner
+                );
             }
         }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LegacyQrRedirect;
 use App\Models\VetRegisterationTemp;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class LegacyQrRedirectController extends Controller
@@ -16,6 +17,11 @@ class LegacyQrRedirectController extends Controller
             abort(404);
         }
 
+        return $this->handleRedirect($request, $redirect);
+    }
+
+    public function handleRedirect(Request $request, LegacyQrRedirect $redirect): RedirectResponse
+    {
         $redirect->recordScan();
 
         if (! empty($redirect->target_url)) {
@@ -39,7 +45,16 @@ class LegacyQrRedirectController extends Controller
             abort(404);
         }
 
-        $targetUrl = route('clinics.shortlink', ['publicId' => $publicId, 'via' => 'legacy-qr']);
+        $query = collect($request->query())
+            ->except('via')
+            ->toArray();
+
+        $query['via'] = 'legacy-qr';
+
+        $targetUrl = route('clinics.shortlink', array_merge(
+            ['publicId' => $publicId],
+            $query
+        ));
 
         return redirect()->to($targetUrl);
     }
