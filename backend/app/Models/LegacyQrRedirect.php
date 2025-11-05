@@ -49,19 +49,42 @@ class LegacyQrRedirect extends Model
     public function recordScan(): void
     {
         $now = Carbon::now();
-        $attributes = [
-            'last_scanned_at' => $now,
-        ];
 
-        if ($this->status !== 'active') {
-            $attributes['status'] = 'active';
+        // Use COALESCE to handle legacy NULL values correctly.
+        // Also make the status active on first scan and update timestamps.
+        try {
+            $updated = static::whereKey($this->getKey())
+                ->update([
+                    'scan_count' => \Illuminate\Support\Facades\DB::raw('COALESCE(scan_count, 0) + 1'),
+                    'last_scanned_at' => $now,
+                    'status' => $this->status === 'active'
+                        ? \Illuminate\Support\Facades\DB::raw("status")
+                        : 'active',
+                    'updated_at' => $now,
+                ]);
+
+            if ($updated === 0) {
+                // Fallback to increment API (rare)
+                $this->increment('scan_count', 1, [
+                    'last_scanned_at' => $now,
+                    'status' => 'active',
+                ]);
+            }
+
+            // Sync in-memory model for consistency in this request
+            $this->scan_count = (int) (($this->scan_count ?? 0) + 1);
+            $this->last_scanned_at = $now;
+            if ($this->status !== 'active') {
+                $this->status = 'active';
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('LegacyQrRedirect recordScan failed', [
+                'id' => $this->id,
+                'code' => $this->code,
+                'public_id' => $this->public_id,
+                'error' => $e->getMessage(),
+            ]);
         }
-
-        $this->increment('scan_count', 1, $attributes);
-        $this->forceFill(array_merge(
-            ['scan_count' => (int) $this->scan_count],
-            $attributes
-        ));
     }
 
     public function getScanUrlAttribute(): string
