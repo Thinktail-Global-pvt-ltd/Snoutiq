@@ -43,21 +43,21 @@ class SalesCrmController extends Controller
 
         if ($request->hasFile('qr_image')) {
             $uploaded = $request->file('qr_image');
-            $qrImagePath = $uploaded->store('legacy-qr', 'public');
+            $qrImagePath = $uploaded->store('legacy-qr', 'local');
 
             try {
-                $reader = new QrReader(Storage::disk('public')->path($qrImagePath));
+                $reader = new QrReader(Storage::disk('local')->path($qrImagePath));
                 $rawDecodedValue = trim((string) $reader->text());
                 $decodedValue = $rawDecodedValue;
             } catch (\Throwable $th) {
-                Storage::disk('public')->delete($qrImagePath);
+                Storage::disk('local')->delete($qrImagePath);
                 return redirect()->back()->withInput()->withErrors([
                     'qr_image' => 'Could not decode QR image. Please ensure it is clear and try again.',
                 ]);
             }
 
             if (! $decodedValue) {
-                Storage::disk('public')->delete($qrImagePath);
+                Storage::disk('local')->delete($qrImagePath);
                 return redirect()->back()->withInput()->withErrors([
                     'qr_image' => 'QR image uploaded but no data was detected. Please try another image.',
                 ]);
@@ -69,7 +69,7 @@ class SalesCrmController extends Controller
                 ->first();
 
             if ($duplicateQr) {
-                Storage::disk('public')->delete($qrImagePath);
+                Storage::disk('local')->delete($qrImagePath);
 
                 return redirect()->back()->withInput()->withErrors([
                     'qr_image' => 'This QR code has already been registered for '.$duplicateQr->code.'.',
@@ -155,7 +155,7 @@ class SalesCrmController extends Controller
     public function destroyLegacyQr(LegacyQrRedirect $legacyQrRedirect)
     {
         if ($legacyQrRedirect->qr_image_path) {
-            Storage::disk('public')->delete($legacyQrRedirect->qr_image_path);
+            Storage::disk('local')->delete($legacyQrRedirect->qr_image_path);
         }
 
         $legacyQrRedirect->delete();

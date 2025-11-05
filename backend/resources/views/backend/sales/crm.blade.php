@@ -191,15 +191,34 @@
                                             Draft short link
                                         </a>
                                     @endif
-                                    @if($redirect->qr_image_path)
+                                    @php
+                                        $qrDataUri = null;
+                                        $qrDownloadName = $redirect->code ? $redirect->code.'.png' : 'legacy-qr.png';
+                                        if ($redirect->qr_image_path) {
+                                            $qrDisk = Storage::disk('local');
+                                            if (! $qrDisk->exists($redirect->qr_image_path) && Storage::disk('public')->exists($redirect->qr_image_path)) {
+                                                $publicDisk = Storage::disk('public');
+                                                $fileContents = $publicDisk->get($redirect->qr_image_path);
+                                                $qrDisk->put($redirect->qr_image_path, $fileContents);
+                                                $publicDisk->delete($redirect->qr_image_path);
+                                            }
+
+                                            if ($qrDisk->exists($redirect->qr_image_path)) {
+                                                $mime = $qrDisk->mimeType($redirect->qr_image_path) ?: 'image/png';
+                                                $contents = base64_encode($qrDisk->get($redirect->qr_image_path));
+                                                $qrDataUri = 'data:'.$mime.';base64,'.$contents;
+                                            }
+                                        }
+                                    @endphp
+                                    @if($qrDataUri)
                                         <div class="qr-preview" style="margin-top:.8rem;">
                                             <span style="display:block;font-size:.78rem;color:#64748b;margin-bottom:.35rem;">QR image</span>
                                             <div class="qr-thumbnail">
-                                                <img src="{{ Storage::disk('public')->url($redirect->qr_image_path) }}" alt="QR image for {{ $redirect->code }}">
+                                                <img src="{{ $qrDataUri }}" alt="QR image for {{ $redirect->code }}">
                                             </div>
                                             <div class="qr-actions">
-                                                <a href="{{ Storage::disk('public')->url($redirect->qr_image_path) }}" download>Download</a>
-                                                <a href="{{ Storage::disk('public')->url($redirect->qr_image_path) }}" target="_blank" rel="noopener noreferrer">Open</a>
+                                                <a href="{{ $qrDataUri }}" download="{{ $qrDownloadName }}">Download</a>
+                                                <a href="{{ $qrDataUri }}" target="_blank" rel="noopener noreferrer">Open</a>
                                             </div>
                                         </div>
                                     @endif
