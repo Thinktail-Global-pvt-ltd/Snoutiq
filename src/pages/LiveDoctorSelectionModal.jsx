@@ -25,9 +25,19 @@ const LiveDoctorSelectionModal = React.memo(
     const [sortBy, setSortBy] = useState("online-first");
 
     // Check if a doctor is online
-    const isDoctorOnline = useCallback((doctorId) => {
-      return allActiveDoctors && allActiveDoctors.includes(doctorId);
-    }, [allActiveDoctors]);
+    const isDoctorOnline = useCallback(
+      (doctorId) => {
+        if (!Array.isArray(allActiveDoctors) || allActiveDoctors.length === 0) {
+          return false;
+        }
+        const numericId = Number(doctorId);
+        if (!Number.isFinite(numericId)) {
+          return false;
+        }
+        return allActiveDoctors.includes(numericId);
+      },
+      [allActiveDoctors]
+    );
 
     const activeNearbyDoctors = useMemo(() => {
       if (!Array.isArray(nearbyDoctors) || nearbyDoctors.length === 0) {
@@ -36,8 +46,12 @@ const LiveDoctorSelectionModal = React.memo(
       if (!Array.isArray(allActiveDoctors) || allActiveDoctors.length === 0) {
         return [];
       }
-      const activeSet = new Set(allActiveDoctors);
-      return nearbyDoctors.filter((doctor) => activeSet.has(doctor.id));
+      const activeSet = new Set(
+        allActiveDoctors.map((id) => Number(id)).filter((id) => Number.isFinite(id))
+      );
+      return nearbyDoctors.filter((doctor) =>
+        activeSet.has(Number(doctor.id))
+      );
     }, [nearbyDoctors, allActiveDoctors]);
 
     // Only show currently active doctors in the modal

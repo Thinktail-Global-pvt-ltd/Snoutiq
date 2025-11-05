@@ -43,7 +43,16 @@ export const AuthProvider = ({ children }) => {
       if (savedToken) setToken(savedToken);
       if (savedUser) setUser(JSON.parse(savedUser));
       if (savedChatRoomToken) setChatRoomToken(savedChatRoomToken);
-      if (savedDoctors) setNearbyDoctors(JSON.parse(savedDoctors));
+      if (savedDoctors) {
+        const parsed = JSON.parse(savedDoctors);
+        setNearbyDoctors(
+          Array.isArray(parsed)
+            ? parsed
+                .map(normalizeDoctorEntry)
+                .filter((doctor) => doctor !== null)
+            : []
+        );
+      }
       if (savedLiveDoctors) setLiveDoctors(JSON.parse(savedLiveDoctors));
     } catch (error) {
       console.error("Error loading auth data:", error);
@@ -310,8 +319,9 @@ const login = async (userData, jwtToken, initialChatToken = null) => {
     try {
       const uniqueMap = new Map();
       (Array.isArray(doctors) ? doctors : []).forEach((doctor) => {
-        if (doctor && Number.isFinite(doctor.id)) {
-          uniqueMap.set(doctor.id, doctor);
+        const normalized = normalizeDoctorEntry(doctor);
+        if (normalized) {
+          uniqueMap.set(normalized.id, normalized);
         }
       });
 
@@ -407,6 +417,85 @@ export const useAuth = () => {
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
+
+function normalizeDoctorEntry(entry = {}) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  const rawDoctor =
+    entry.doctor && typeof entry.doctor === "object" ? entry.doctor : {};
+
+  const doctorId = Number(
+    entry.id ?? entry.doctor_id ?? rawDoctor.id ?? null
+  );
+  if (!Number.isFinite(doctorId) || doctorId <= 0) {
+    return null;
+  }
+
+  const clinicId = Number(
+    entry.clinic_id ??
+      entry.vet_registeration_id ??
+      rawDoctor.clinic_id ??
+      rawDoctor.vet_registeration_id ??
+      null
+  );
+
+  const clinicName =
+    entry.clinic_name ??
+    entry.business_status ??
+    entry.hospital_profile ??
+    rawDoctor.clinic_name ??
+    "Veterinary Clinic";
+
+  const doctorName =
+    rawDoctor.doctor_name ??
+    rawDoctor.name ??
+    rawDoctor.full_name ??
+    entry.doctor_name ??
+    entry.name ??
+    `Veterinarian ${doctorId}`;
+
+  const profileImage =
+    entry.profile_image ??
+    entry.doctor_image ??
+    rawDoctor.image ??
+    null;
+
+  return {
+    id: doctorId,
+    clinic_id: Number.isFinite(clinicId) ? clinicId : null,
+    name: doctorName,
+    clinic_name: clinicName,
+    profile_image: profileImage,
+    rating:
+      entry.rating !== undefined && entry.rating !== null
+        ? Number(entry.rating)
+        : null,
+    distance:
+      entry.distance !== undefined && entry.distance !== null
+        ? Number(entry.distance)
+        : null,
+    chat_price:
+      entry.chat_price !== undefined && entry.chat_price !== null
+        ? Number(entry.chat_price)
+        : null,
+    slug:
+      entry.slug ??
+      rawDoctor.slug ??
+      `doctor-${doctorId}`,
+    business_status: entry.business_status ?? rawDoctor.business_status ?? null,
+    doctor: {
+      id: doctorId,
+      name: doctorName,
+      email: rawDoctor.email ?? entry.email ?? null,
+      mobile: rawDoctor.mobile ?? entry.mobile ?? null,
+      license: rawDoctor.license ?? entry.license ?? null,
+      image: profileImage,
+      clinic_id: Number.isFinite(clinicId) ? clinicId : null,
+    },
+  };
+}
 
 function ensureDoctorsForActiveIds(list, doctorIds) {
   if (!Array.isArray(doctorIds) || doctorIds.length === 0) {
