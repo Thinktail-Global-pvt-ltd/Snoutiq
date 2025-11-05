@@ -88,6 +88,10 @@ class SalesDashboardController extends Controller
         $totalScanners = LegacyQrRedirect::count();
         $activeScanners = LegacyQrRedirect::where('status', 'active')->count();
         $inactiveScanners = $totalScanners - $activeScanners;
+        $totalScanCount = (int) LegacyQrRedirect::sum('scan_count');
+        $recentlyScannedCodes = LegacyQrRedirect::whereNotNull('last_scanned_at')
+            ->where('last_scanned_at', '>=', $recentCutoff)
+            ->count();
 
         $totalClinics = VetRegisterationTemp::count();
         $activeClinics = VetRegisterationTemp::where('status', 'active')->count();
@@ -121,6 +125,10 @@ class SalesDashboardController extends Controller
             'transactions' => [
                 'total' => $transactionsViaScanner,
                 'recent' => $transactionsRecent,
+            ],
+            'scanner_scans' => [
+                'total' => $totalScanCount,
+                'recent_codes' => $recentlyScannedCodes,
             ],
             'recent_days_window' => $recentDays,
         ];

@@ -105,6 +105,11 @@
                 <span>{{ number_format($summary['scanners']['active']) }} active • {{ number_format($summary['scanners']['inactive']) }} inactive</span>
             </article>
             <article class="card">
+                <h3>QR Scans</h3>
+                <strong>{{ number_format($summary['scanner_scans']['total']) }}</strong>
+                <span>{{ number_format($summary['scanner_scans']['recent_codes']) }} codes scanned in past {{ $summary['recent_days_window'] }} days</span>
+            </article>
+            <article class="card">
                 <h3>Clinics</h3>
                 <strong>{{ number_format($summary['clinics']['total']) }}</strong>
                 <span>{{ number_format($summary['clinics']['active']) }} active • {{ number_format($summary['clinics']['recent']) }} new in {{ $summary['recent_days_window'] }}d</span>
@@ -306,4 +311,3 @@
     </footer>
 </body>
 </html>
-
