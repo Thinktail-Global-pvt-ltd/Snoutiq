@@ -72,11 +72,44 @@
             font-weight: 600;
         }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: .65rem .8rem; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: .95rem; }
+        th, td { padding: .65rem .8rem; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: .95rem; vertical-align: middle; }
         th { background: #f8fafc; font-weight: 700; }
         form.inline { display: inline; }
         .qr-preview { display: block; margin-top: .5rem; color: #475569; }
         .table-wrapper { overflow-x: auto; }
+        .qr-thumbnail {
+            display: inline-block;
+            width: 110px;
+            height: 110px;
+            border-radius: .85rem;
+            border: 1px solid rgba(148,163,184,.3);
+            padding: .35rem;
+            background: #fff;
+            box-shadow: 0 10px 28px -22px rgba(15,23,42,.6);
+        }
+        .qr-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: .45rem;
+        }
+        .qr-actions {
+            display: flex;
+            gap: .6rem;
+            margin-top: .5rem;
+        }
+        .qr-actions a {
+            font-size: .78rem;
+            color: #1d4ed8;
+            text-decoration: none;
+            padding: .3rem .55rem;
+            border-radius: .65rem;
+            background: rgba(59,130,246,.12);
+            font-weight: 600;
+        }
+        .qr-actions a:hover {
+            background: rgba(59,130,246,.18);
+        }
         @media (max-width: 720px) {
             header { padding: 1.5rem 1.25rem; }
             main { padding: 2rem 1.25rem 3rem; }
@@ -157,6 +190,18 @@
                                         <a class="qr-preview" href="{{ url('/c/'.$redirect->public_id) }}" target="_blank" rel="noopener noreferrer">
                                             Draft short link
                                         </a>
+                                    @endif
+                                    @if($redirect->qr_image_path)
+                                        <div class="qr-preview" style="margin-top:.8rem;">
+                                            <span style="display:block;font-size:.78rem;color:#64748b;margin-bottom:.35rem;">QR image</span>
+                                            <div class="qr-thumbnail">
+                                                <img src="{{ Storage::disk('public')->url($redirect->qr_image_path) }}" alt="QR image for {{ $redirect->code }}">
+                                            </div>
+                                            <div class="qr-actions">
+                                                <a href="{{ Storage::disk('public')->url($redirect->qr_image_path) }}" download>Download</a>
+                                                <a href="{{ Storage::disk('public')->url($redirect->qr_image_path) }}" target="_blank" rel="noopener noreferrer">Open</a>
+                                            </div>
+                                        </div>
                                     @endif
                                 </td>
                                 <td>
