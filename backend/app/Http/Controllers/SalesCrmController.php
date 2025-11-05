@@ -135,7 +135,10 @@ class SalesCrmController extends Controller
             $data['qr_image_hash'] = hash('sha256', $rawDecodedValue);
         }
 
-        $mapping = LegacyQrRedirect::create($data);
+        $mapping = LegacyQrRedirect::create(array_merge([
+            'status' => 'inactive',
+            'scan_count' => 0,
+        ], $data));
 
         if (! empty($mapping->clinic_id)) {
             $this->prepareClinicDraft((int) $mapping->clinic_id, $mapping->public_id);

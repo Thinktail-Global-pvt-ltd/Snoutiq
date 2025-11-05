@@ -37,8 +37,8 @@ Route::redirect('/', '/admin/login');
 
 Route::get('/clinics/drafts/create', SalesDraftClinicPageController::class)->name('backend.clinics.drafts.create');
 Route::get('/backend/legacy-qr/{code}', LegacyQrRedirectController::class)->name('legacy-qr.redirect');
-Route::get('/legacy-qr/{code}', function (string $code) {
-    return redirect()->route('legacy-qr.redirect', ['code' => $code]);
+Route::get('/legacy-qr/{code}', function (Request $request, string $code) {
+    return redirect()->route('legacy-qr.redirect', ['code' => $code] + $request->query());
 });
 Route::get('/sales/login', function (Request $request) {
     if ($request->session()->get('sales_authenticated')) {
@@ -126,6 +126,9 @@ Route::prefix('admin')->group(function () {
     });
 });
 Route::get('/c/{publicId}', [VetLandingController::class, 'redirectByPublicId'])->name('clinics.shortlink');
+Route::get('/backend/c/{publicId}', function (Request $request, string $publicId) {
+    return app(VetLandingController::class)->redirectByPublicId($request, $publicId);
+});
 Route::get('/vets/{slug}', [VetLandingController::class, 'show']);
 
 Route::prefix('blog')->name('blog.')->group(function () {
