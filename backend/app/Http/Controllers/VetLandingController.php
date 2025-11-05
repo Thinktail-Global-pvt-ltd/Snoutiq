@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LegacyQrRedirect;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
 
@@ -43,6 +44,10 @@ class VetLandingController extends Controller
 
     public function redirectByPublicId(Request $request, string $publicId)
     {
+        if ($request->query('via') !== 'legacy-qr') {
+            $this->recordLegacyScan($publicId);
+        }
+
         $vet = VetRegisterationTemp::where('public_id', $publicId)->firstOrFail();
 
         $target = url('/vets/'.$vet->slug);
@@ -53,5 +58,16 @@ class VetLandingController extends Controller
         }
 
         return redirect()->to($target, 301);
+    }
+
+    private function recordLegacyScan(string $publicId): void
+    {
+        $redirect = LegacyQrRedirect::where('public_id', $publicId)->first();
+
+        if (! $redirect) {
+            return;
+        }
+
+        $redirect->recordScan();
     }
 }

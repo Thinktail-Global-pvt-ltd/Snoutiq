@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class LegacyQrRedirect extends Model
 {
@@ -43,5 +44,23 @@ class LegacyQrRedirect extends Model
     public function callSessions(): HasMany
     {
         return $this->hasMany(CallSession::class, 'qr_scanner_id');
+    }
+
+    public function recordScan(): void
+    {
+        $now = Carbon::now();
+        $attributes = [
+            'last_scanned_at' => $now,
+        ];
+
+        if ($this->status !== 'active') {
+            $attributes['status'] = 'active';
+        }
+
+        $this->increment('scan_count', 1, $attributes);
+        $this->forceFill(array_merge(
+            ['scan_count' => (int) $this->scan_count],
+            $attributes
+        ));
     }
 }

@@ -16,20 +16,7 @@ class LegacyQrRedirectController extends Controller
             abort(404);
         }
 
-        $now = now();
-        $attributesToUpdate = [
-            'last_scanned_at' => $now,
-        ];
-
-        if ($redirect->status !== 'active') {
-            $attributesToUpdate['status'] = 'active';
-        }
-
-        $redirect->increment('scan_count', 1, $attributesToUpdate);
-        $redirect->forceFill(array_merge(
-            ['scan_count' => (int) $redirect->scan_count],
-            $attributesToUpdate
-        ));
+        $redirect->recordScan();
 
         if (! empty($redirect->target_url)) {
             return redirect()->away($redirect->target_url);
@@ -52,6 +39,8 @@ class LegacyQrRedirectController extends Controller
             abort(404);
         }
 
-        return redirect()->to(url('c/'.$publicId));
+        $targetUrl = route('clinics.shortlink', ['publicId' => $publicId, 'via' => 'legacy-qr']);
+
+        return redirect()->to($targetUrl);
     }
 }
