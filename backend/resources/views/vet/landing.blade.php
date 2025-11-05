@@ -389,17 +389,39 @@ label{font-size:.9rem;color:#334155}
     if (window.__snoutiqPermanentShortLinkPinged) {
       return;
     }
-    var link = document.querySelector('[data-permanent-short-link]');
-    if (!link) {
-      return;
-    }
-    var url = link.getAttribute('href');
-    if (!url) {
-      return;
-    }
-    window.__snoutiqPermanentShortLinkPinged = true;
+
+    var fetchUrl = null;
+
     try {
-      fetch(url, {
+      var params = new URLSearchParams(window.location.search);
+      var slugParam = params.get('slug');
+      if (slugParam) {
+        fetchUrl = new URL(
+          '/backend/legacy-qr/' + encodeURIComponent(slugParam),
+          window.location.origin
+        ).toString();
+      }
+    } catch (err) {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+        console.debug('short-link slug parse failed', err);
+      }
+    }
+
+    if (!fetchUrl) {
+      var link = document.querySelector('[data-permanent-short-link]');
+      if (link) {
+        fetchUrl = link.getAttribute('href');
+      }
+    }
+
+    if (!fetchUrl) {
+      return;
+    }
+
+    window.__snoutiqPermanentShortLinkPinged = true;
+
+    try {
+      fetch(fetchUrl, {
         method: 'GET',
         credentials: 'include',
         cache: 'no-store'
