@@ -52,12 +52,15 @@ class VetLandingController extends Controller
 
         $vet = VetRegisterationTemp::where('public_id', $publicId)->firstOrFail();
 
-        $target = url('/vets/'.$vet->slug);
-        $query = $request->getQueryString();
-
-        if ($query) {
-            $target .= '?'.$query;
+        // Preserve incoming query and add tracking information.
+        $params = $request->query();
+        $params['qr_i'] = $params['qr_i'] ?? $publicId;
+        // Mark as counted only if this shortlink route already incremented.
+        if ($request->query('via') !== 'legacy-qr') {
+            $params['qr_counted'] = '1';
         }
+
+        $target = url('/vets/'.$vet->slug).($params ? ('?'.http_build_query($params)) : '');
 
         return redirect()->to($target, 301);
     }

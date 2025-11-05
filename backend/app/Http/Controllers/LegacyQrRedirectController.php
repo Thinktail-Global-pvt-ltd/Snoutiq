@@ -54,6 +54,10 @@ class LegacyQrRedirectController extends Controller
             ->toArray();
 
         $query['via'] = 'legacy-qr';
+        // include pixel tracking identifier so the clinic page can fire a beacon
+        if (! isset($query['qr_i'])) {
+            $query['qr_i'] = $publicId;
+        }
 
         $targetUrl = route('clinics.shortlink', array_merge(
             ['publicId' => $publicId],

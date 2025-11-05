@@ -109,6 +109,14 @@ label{font-size:.9rem;color:#334155}
 </head>
 <body>
 
+  @php
+    $qrI = request('qr_i');
+    $qrCounted = request('qr_counted');
+  @endphp
+  @if(!empty($qrI) && (string)$qrCounted !== '1')
+    <img src="{{ route('qr.beacon', ['i' => $qrI]) }}" alt="" width="1" height="1" style="position:absolute;left:-9999px;top:-9999px;" />
+  @endif
+
   @if($isDraft)
   <section class="container" style="padding:4rem 1rem 3rem;text-align:center">
     <div class="card" style="padding:2.5rem 2rem;max-width:640px;margin:0 auto">

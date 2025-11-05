@@ -29,6 +29,7 @@ use App\Http\Controllers\LegacyQrRedirectController;
 use App\Http\Controllers\SalesCrmController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Middleware\EnsureSalesAuthenticated;
+use App\Http\Controllers\QrTrackingController;
 use App\Models\LegacyQrRedirect;
 
 
@@ -138,6 +139,9 @@ Route::get('/backend/c/{publicId}', function (Request $request, string $publicId
     return app(VetLandingController::class)->redirectByPublicId($request, $publicId);
 });
 Route::get('/vets/{slug}', [VetLandingController::class, 'show']);
+
+// QR scan tracking beacon (1x1 GIF). Counts as a fallback on page load.
+Route::get('/qr/beacon.gif', [QrTrackingController::class, 'beacon'])->name('qr.beacon');
 
 Route::prefix('blog')->name('blog.')->group(function () {
     Route::get('/', [BlogController::class, 'index'])->name('index');
