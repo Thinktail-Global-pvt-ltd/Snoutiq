@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LegacyQrRedirect;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
+use Illuminate\Support\Facades\Http;
 
 class VetLandingController extends Controller
 {
@@ -69,22 +69,24 @@ class VetLandingController extends Controller
             return;
         }
 
-        $bridgeRequest = SymfonyRequest::create(
-            '/backend/legacy-qr/'.$redirect->code,
-            'GET',
-            ['via' => 'bridge'],
-            [],
-            [],
-            [
-                'HTTP_HOST' => $request->getHttpHost(),
-                'HTTPS' => $request->isSecure() ? 'on' : 'off',
-            ]
-        );
-
         try {
-            app(LegacyQrRedirectController::class)->__invoke(Request::createFromBase($bridgeRequest), $redirect->code);
+            $response = Http::timeout(4)
+                ->connectTimeout(2)
+                ->withoutRedirecting()
+                ->withHeaders([
+                    'User-Agent' => 'SnoutIQ Legacy QR Bridge',
+                    'X-Legacy-QR-Bridge' => '1',
+                ])
+                ->get('https://snoutiq.com/backend/legacy-qr/'.rawurlencode($redirect->code), [
+                    'via' => 'bridge',
+                ]);
+
+            if ($response->successful()) {
+                return;
+            }
         } catch (\Throwable $exception) {
-            $redirect->recordScan();
         }
+
+        $redirect->recordScan();
     }
 }
