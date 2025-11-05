@@ -16,12 +16,20 @@ class LegacyQrRedirectController extends Controller
             abort(404);
         }
 
-        $redirect->increment('scan_count');
-        $redirect->last_scanned_at = now();
+        $now = now();
+        $attributesToUpdate = [
+            'last_scanned_at' => $now,
+        ];
+
         if ($redirect->status !== 'active') {
-            $redirect->status = 'active';
+            $attributesToUpdate['status'] = 'active';
         }
-        $redirect->save();
+
+        $redirect->increment('scan_count', 1, $attributesToUpdate);
+        $redirect->forceFill(array_merge(
+            ['scan_count' => (int) $redirect->scan_count],
+            $attributesToUpdate
+        ));
 
         if (! empty($redirect->target_url)) {
             return redirect()->away($redirect->target_url);
