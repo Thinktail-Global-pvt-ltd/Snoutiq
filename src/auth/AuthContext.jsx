@@ -8,9 +8,13 @@ import React, {
   useRef,
 } from "react";
 import axios from "axios";
+import { mergeNearbyDoctors } from "../utils/nearbyDoctors";
 import { socket } from "../pages/socket";
 
 export const AuthContext = createContext();
+
+const CLINIC_NEARBY_API = "https://snoutiq.com/backend/api/nearby-vets";
+const DOCTOR_NEARBY_API = "https://snoutiq.com/backend/api/nearby-doctors";
 
 export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
@@ -58,19 +62,30 @@ export const AuthProvider = ({ children }) => {
 
     const handleActiveDoctors = (doctorIds) => {
       console.log("📡 Received ALL active-doctors from socket:", doctorIds);
-      console.log("📋 Current nearbyDoctors:", nearbyDoctors.map(d => `${d.id} (${d.name})`));
-      
-      // ✅ Store all active doctor IDs
-      setAllActiveDoctors(doctorIds);
-      
-      // ✅ Filter nearby doctors to find which ones are currently online
-      const liveNearbyDoctors = nearbyDoctors.filter((doctor) => 
-        doctorIds.includes(doctor.id)
+
+      const numericIds = Array.isArray(doctorIds)
+        ? doctorIds
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        : [];
+
+      setAllActiveDoctors(numericIds);
+
+      const updatedNearby = ensureDoctorsForActiveIds(nearbyDoctors, numericIds);
+      if (updatedNearby !== nearbyDoctors) {
+        setNearbyDoctors(updatedNearby);
+        localStorage.setItem("nearby_doctors", JSON.stringify(updatedNearby));
+      }
+
+      const liveNearbyDoctors = updatedNearby.filter((doctor) =>
+        numericIds.includes(doctor.id)
       );
-      
-      console.log(`✅ ${liveNearbyDoctors.length} live doctors found from ${nearbyDoctors.length} nearby:`, 
-        liveNearbyDoctors.map(d => `${d.name} (${d.id})`));
-      
+
+      console.log(
+        `✅ ${liveNearbyDoctors.length} live doctors found from ${updatedNearby.length} nearby:`,
+        liveNearbyDoctors.map((d) => `${d.name} (${d.id})`)
+      );
+
       setLiveDoctors(liveNearbyDoctors);
       localStorage.setItem("live_doctors", JSON.stringify(liveNearbyDoctors));
     };
@@ -155,32 +170,41 @@ export const AuthProvider = ({ children }) => {
 
     try {
       console.log("🔍 Fetching nearby doctors...");
-      
-      const response = await axios.get(
-        `${DOCTOR_NEARBY_API}?user_id=${user.id}`,
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          signal: controller.signal
-        }
-      );
+
+      const requestConfig = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+      };
+
+      const [clinicResult, doctorResult] = await Promise.allSettled([
+        axios.get(`${CLINIC_NEARBY_API}?user_id=${user.id}`, requestConfig),
+        axios.get(`${DOCTOR_NEARBY_API}?user_id=${user.id}`, requestConfig),
+      ]);
 
       clearTimeout(timeoutId);
 
-      if (response.data && Array.isArray(response.data.data)) {
-        console.log(`✅ Found ${response.data.data.length} doctors`);
-        updateNearbyDoctors(response.data.data);
-        
-        // ✅ Request updated active doctors after fetching nearby doctors
+      const clinicPayload =
+        clinicResult.status === "fulfilled" ? clinicResult.value.data : null;
+      const doctorPayload =
+        doctorResult.status === "fulfilled" ? doctorResult.value.data : null;
+
+      const combined = mergeNearbyDoctors(clinicPayload, doctorPayload);
+
+      if (combined.length) {
+        console.log(`✅ Found ${combined.length} doctors (merged)`);
+        updateNearbyDoctors(combined);
+
         if (socket) {
           setTimeout(() => {
             socket.emit("get-active-doctors");
           }, 1000);
         }
       } else {
-        console.warn("⚠️ No doctor data received");
+        console.warn("⚠️ No doctor data available after merge");
+        updateNearbyDoctors([]);
       }
     } catch (error) {
       clearTimeout(timeoutId);
@@ -282,18 +306,13 @@ const login = async (userData, jwtToken, initialChatToken = null) => {
 
 
   // 🟢 Update nearby doctors and merge new ones
-  const updateNearbyDoctors = useCallback((newDoctors) => {
+  const updateNearbyDoctors = useCallback((doctors) => {
     try {
-      const normalized = Array.isArray(newDoctors)
-        ? newDoctors
-            .map(normalizeDoctorEntry)
-            .filter((doctor) => doctor !== null)
-        : [];
-
-      // Deduplicate by doctor ID
       const uniqueMap = new Map();
-      normalized.forEach((doctor) => {
-        uniqueMap.set(doctor.id, doctor);
+      (Array.isArray(doctors) ? doctors : []).forEach((doctor) => {
+        if (doctor && Number.isFinite(doctor.id)) {
+          uniqueMap.set(doctor.id, doctor);
+        }
       });
 
       const uniqueDoctors = Array.from(uniqueMap.values());
@@ -382,83 +401,52 @@ const login = async (userData, jwtToken, initialChatToken = null) => {
   );
 };
 
-function normalizeDoctorEntry(entry = {}) {
-  const rawDoctor =
-    entry.doctor && typeof entry.doctor === "object" ? entry.doctor : {};
-
-  const doctorId = Number(
-    entry.id ?? entry.doctor_id ?? rawDoctor.id ?? null
-  );
-  if (!Number.isFinite(doctorId) || doctorId <= 0) {
-    return null;
-  }
-
-  const clinicId = Number(
-    entry.clinic_id ??
-      entry.vet_registeration_id ??
-      rawDoctor.clinic_id ??
-      rawDoctor.vet_registeration_id ??
-      null
-  );
-
-  const clinicName =
-    entry.clinic_name ??
-    entry.business_status ??
-    entry.hospital_profile ??
-    rawDoctor.clinic_name ??
-    "Veterinary Clinic";
-
-  const doctorName =
-    entry.name ??
-    entry.doctor_name ??
-    rawDoctor.name ??
-    rawDoctor.full_name ??
-    "Veterinarian";
-
-  const profileImage =
-    entry.profile_image ??
-    entry.doctor_image ??
-    rawDoctor.image ??
-    null;
-
-  return {
-    id: doctorId,
-    clinic_id: clinicId,
-    name: doctorName,
-    clinic_name: clinicName,
-    profile_image: profileImage,
-    rating:
-      entry.rating !== undefined && entry.rating !== null
-        ? Number(entry.rating)
-        : null,
-    distance:
-      entry.distance !== undefined && entry.distance !== null
-        ? Number(entry.distance)
-        : null,
-    chat_price:
-      entry.chat_price !== undefined && entry.chat_price !== null
-        ? Number(entry.chat_price)
-        : null,
-    slug:
-      entry.slug ??
-      rawDoctor.slug ??
-      String(doctorId),
-    business_status: entry.business_status ?? rawDoctor.business_status ?? null,
-    doctor: {
-      id: doctorId,
-      name: doctorName,
-      email: rawDoctor.email ?? entry.email ?? null,
-      mobile: rawDoctor.mobile ?? entry.mobile ?? null,
-      license: rawDoctor.license ?? entry.license ?? null,
-      image: profileImage,
-      clinic_id: clinicId,
-    },
-  };
-}
-
 // 🧩 Custom hook for consuming AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
+
+function ensureDoctorsForActiveIds(list, doctorIds) {
+  if (!Array.isArray(doctorIds) || doctorIds.length === 0) {
+    return list;
+  }
+
+  const map = new Map((Array.isArray(list) ? list : []).map((d) => [d.id, d]));
+  let changed = false;
+
+  doctorIds.forEach((id) => {
+    if (!map.has(id)) {
+      map.set(id, createPlaceholderDoctor(id));
+      changed = true;
+    }
+  });
+
+  return changed ? Array.from(map.values()) : list;
+}
+
+function createPlaceholderDoctor(id) {
+  const name = `Veterinarian ${id}`;
+  return {
+    id,
+    clinic_id: null,
+    name,
+    clinic_name: "Veterinary Clinic",
+    profile_image: null,
+    rating: null,
+    distance: null,
+    chat_price: null,
+    slug: `doctor-${id}`,
+    business_status: "ONLINE",
+    doctor: {
+      id,
+      name,
+      clinic_id: null,
+      image: null,
+      email: null,
+      mobile: null,
+      license: null,
+    },
+  };
+}

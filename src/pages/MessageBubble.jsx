@@ -801,7 +801,6 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       <LiveDoctorSelectionModal
         visible={showLiveDoctorsModal}
         onClose={() => setShowLiveDoctorsModal(false)}
-        liveDoctors={liveDoctors}
         nearbyDoctors={nearbyDoctors}
         allActiveDoctors={authContext?.allActiveDoctors || []}
         onCallDoctor={handleCallDoctor}

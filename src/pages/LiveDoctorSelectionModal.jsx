@@ -15,7 +15,7 @@ const useResponsive = () => {
 };
 
 const LiveDoctorSelectionModal = React.memo(
-  ({ visible, onClose, liveDoctors, onCallDoctor, loading, nearbyDoctors = [], allActiveDoctors = [] }) => {
+  ({ visible, onClose, onCallDoctor, loading, nearbyDoctors = [], allActiveDoctors = [] }) => {
     const { moderateScale } = useResponsive();
     const [selectedDoctor, setSelectedDoctor] = useState(null);
     const [showProfile, setShowProfile] = useState(false);
@@ -24,25 +24,29 @@ const LiveDoctorSelectionModal = React.memo(
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("online-first");
 
-    console.log("Live Doctors:", liveDoctors);
-    console.log("All Active Doctors:", allActiveDoctors);
-    console.log("Nearby Doctors:", nearbyDoctors);
-
     // Check if a doctor is online
     const isDoctorOnline = useCallback((doctorId) => {
       return allActiveDoctors && allActiveDoctors.includes(doctorId);
     }, [allActiveDoctors]);
 
-    // ✅ FIXED: Always show doctors regardless of online status
+    const activeNearbyDoctors = useMemo(() => {
+      if (!Array.isArray(nearbyDoctors) || nearbyDoctors.length === 0) {
+        return [];
+      }
+      if (!Array.isArray(allActiveDoctors) || allActiveDoctors.length === 0) {
+        return [];
+      }
+      const activeSet = new Set(allActiveDoctors);
+      return nearbyDoctors.filter((doctor) => activeSet.has(doctor.id));
+    }, [nearbyDoctors, allActiveDoctors]);
+
+    // Only show currently active doctors in the modal
     const filteredDoctors = useMemo(() => {
-      // Always use nearbyDoctors, even if no one is online
-      if (!nearbyDoctors || nearbyDoctors.length === 0) {
-        console.log("⚠️ No nearby doctors available");
+      if (!activeNearbyDoctors || activeNearbyDoctors.length === 0) {
         return [];
       }
 
-      // Start with all nearby doctors
-      let doctors = [...nearbyDoctors];
+      let doctors = [...activeNearbyDoctors];
 
       // Filter by search term
       if (searchTerm) {
@@ -82,9 +86,8 @@ const LiveDoctorSelectionModal = React.memo(
         }
       });
 
-      console.log(`✅ Filtered ${doctors.length} doctors (${doctors.filter(d => isDoctorOnline(d.id)).length} online)`);
       return doctors;
-    }, [nearbyDoctors, searchTerm, sortBy, isDoctorOnline]);
+    }, [activeNearbyDoctors, searchTerm, sortBy, isDoctorOnline]);
 
     useEffect(() => {
       if (!visible || !loading) {
@@ -106,16 +109,16 @@ const LiveDoctorSelectionModal = React.memo(
 
     const doctorCountText = useMemo(() => {
       const count = filteredDoctors.length;
-      const onlineCount = filteredDoctors.filter(d => isDoctorOnline(d.id)).length;
-      const offlineCount = count - onlineCount;
-      return `${count} doctor${count !== 1 ? "s" : ""} (${onlineCount} online${offlineCount > 0 ? `, ${offlineCount} offline` : ""})`;
-    }, [filteredDoctors, isDoctorOnline]);
+      if (count === 0) {
+        return "No doctors currently online.";
+      }
+      return `${count} doctor${count !== 1 ? "s" : ""} online`;
+    }, [filteredDoctors]);
 
     const handleCallDoctor = useCallback(
       (doctor) => {
         // Check if doctor is online
         if (!isDoctorOnline(doctor.id)) {
-          console.log(`❌ Doctor ${doctor.id} is offline, cannot call`);
           alert("This doctor is currently offline. Please select an online doctor.");
           return;
         }
@@ -217,7 +220,7 @@ const LiveDoctorSelectionModal = React.memo(
               {item.name || "Veterinarian"}
             </h3>
             <p className="text-gray-500 text-sm truncate">
-              {item.clinic_name || "Veterinary Clinic"}
+                      {item.clinic_name || "Veterinary Clinic"}
             </p>
           </div>
 
