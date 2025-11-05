@@ -69,6 +69,34 @@ class LegacyQrRedirect extends Model
         return route('legacy-qr.redirect', ['code' => $this->code]);
     }
 
+    /**
+     * Robust fallback: increment scan for a given identifier (public_id or code).
+     * If no mapping exists yet, create a minimal one and mark it active.
+     */
+    public static function recordScanForIdentifier(string $identifier): void
+    {
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            return;
+        }
+
+        $redirect = static::query()
+            ->where('public_id', $identifier)
+            ->orWhere('code', $identifier)
+            ->first();
+
+        if (! $redirect) {
+            $redirect = static::create([
+                'code' => $identifier,
+                'public_id' => $identifier,
+                'status' => 'inactive',
+                'scan_count' => 0,
+            ]);
+        }
+
+        $redirect->recordScan();
+    }
+
     public static function findByPublicId(?string $publicId): ?self
     {
         if (! $publicId) {

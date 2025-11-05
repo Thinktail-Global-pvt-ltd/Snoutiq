@@ -44,16 +44,10 @@ class VetLandingController extends Controller
 
     public function redirectByPublicId(Request $request, string $publicId)
     {
+        // Always attempt to record a scan when arriving via the shortlink,
+        // except when already coming from the legacy-qr controller (to avoid double counts).
         if ($request->query('via') !== 'legacy-qr') {
-            $legacyScanner = LegacyQrRedirect::findByPublicId($publicId);
-
-            if (! $legacyScanner) {
-                $legacyScanner = LegacyQrRedirect::where('code', $publicId)->first();
-            }
-
-            if ($legacyScanner) {
-                return app(LegacyQrRedirectController::class)->handleRedirect($request, $legacyScanner);
-            }
+            LegacyQrRedirect::recordScanForIdentifier($publicId);
         }
 
         $vet = VetRegisterationTemp::where('public_id', $publicId)->firstOrFail();
