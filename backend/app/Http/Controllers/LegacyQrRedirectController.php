@@ -28,10 +28,6 @@ class LegacyQrRedirectController extends Controller
     {
         $redirect->recordScan();
 
-        if (! empty($redirect->target_url)) {
-            return redirect()->away($redirect->target_url);
-        }
-
         $publicId = $redirect->public_id;
 
         if (! $publicId && $redirect->clinic_id) {
@@ -57,6 +53,13 @@ class LegacyQrRedirectController extends Controller
         // include pixel tracking identifier so the clinic page can fire a beacon
         if (! isset($query['qr_i'])) {
             $query['qr_i'] = $publicId;
+        }
+
+        // If a custom target URL is configured, append our tracking query and exit.
+        if (! empty($redirect->target_url)) {
+            $glue = str_contains($redirect->target_url, '?') ? '&' : '?';
+            $url = $redirect->target_url.$glue.http_build_query($query);
+            return redirect()->away($url);
         }
 
         $targetUrl = route('clinics.shortlink', array_merge(
