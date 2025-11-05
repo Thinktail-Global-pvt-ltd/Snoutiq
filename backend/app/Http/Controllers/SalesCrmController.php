@@ -63,6 +63,19 @@ class SalesCrmController extends Controller
                 ]);
             }
 
+            $duplicateQr = LegacyQrRedirect::query()
+                ->where('qr_image_hash', hash('sha256', $rawDecodedValue))
+                ->orWhere('legacy_url', $decodedValue)
+                ->first();
+
+            if ($duplicateQr) {
+                Storage::disk('public')->delete($qrImagePath);
+
+                return redirect()->back()->withInput()->withErrors([
+                    'qr_image' => 'This QR code has already been registered for '.$duplicateQr->code.'.',
+                ]);
+            }
+
             if (empty($data['legacy_url']) && filter_var($decodedValue, FILTER_VALIDATE_URL)) {
                 $data['legacy_url'] = $decodedValue;
             }
@@ -117,6 +130,10 @@ class SalesCrmController extends Controller
         $data['public_id'] = $clinic->public_id;
 
         unset($data['clinic_name'], $data['clinic_slug']);
+
+        if ($rawDecodedValue) {
+            $data['qr_image_hash'] = hash('sha256', $rawDecodedValue);
+        }
 
         $mapping = LegacyQrRedirect::create($data);
 

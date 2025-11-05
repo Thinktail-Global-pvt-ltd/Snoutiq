@@ -21,6 +21,7 @@ class LegacyQrRedirect extends Model
         'last_scanned_at',
         'last_registration_at',
         'last_transaction_at',
+        'qr_image_hash',
     ];
 
     protected $casts = [
