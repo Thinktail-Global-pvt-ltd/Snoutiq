@@ -115,13 +115,13 @@
                         <tr>
                             <td>{{ $redirect->code }}</td>
                             <td>{{ $redirect->public_id }}</td>
-                            <td>
-                                @if($redirect->target_url)
-                                    <a href="{{ $redirect->target_url }}" target="_blank" rel="noopener">custom</a>
-                                @else
-                                    <a href="{{ url('c/'.$redirect->public_id) }}" target="_blank" rel="noopener">/c/{{ $redirect->public_id }}</a>
-                                @endif
-                            </td>
+                                <td>
+                                    @if($redirect->target_url)
+                                        <a href="{{ $redirect->target_url }}" target="_blank" rel="noopener">custom</a>
+                                    @else
+                                        <a href="{{ $redirect->scan_url }}" target="_blank" rel="noopener">{{ $redirect->scan_url }}</a>
+                                    @endif
+                                </td>
                             <td>
                                 @if($redirect->legacy_url)
                                     <a href="{{ $redirect->legacy_url }}" target="_blank" rel="noopener">legacy</a>

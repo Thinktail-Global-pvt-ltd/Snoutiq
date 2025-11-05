@@ -63,4 +63,33 @@ class LegacyQrRedirect extends Model
             $attributes
         ));
     }
+
+    public function getScanUrlAttribute(): string
+    {
+        return route('legacy-qr.redirect', ['code' => $this->code]);
+    }
+
+    public static function findByPublicId(?string $publicId): ?self
+    {
+        if (! $publicId) {
+            return null;
+        }
+
+        return static::where('public_id', $publicId)->first();
+    }
+
+    public static function scanUrlForPublicId(?string $publicId): string
+    {
+        if (! $publicId) {
+            return url('/backend/legacy-qr');
+        }
+
+        $redirect = static::findByPublicId($publicId);
+
+        if ($redirect) {
+            return $redirect->scan_url;
+        }
+
+        return route('legacy-qr.redirect', ['code' => $publicId]);
+    }
 }

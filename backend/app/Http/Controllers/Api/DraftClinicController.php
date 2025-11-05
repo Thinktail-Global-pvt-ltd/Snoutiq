@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\LegacyQrRedirect;
 use App\Models\VetRegisterationTemp;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
@@ -209,7 +210,7 @@ class DraftClinicController extends Controller
 
     private function publicUrl(VetRegisterationTemp $clinic): string
     {
-        return url('c/'.$clinic->public_id);
+        return LegacyQrRedirect::scanUrlForPublicId($clinic->public_id);
     }
 
     private function formatClinic(VetRegisterationTemp $clinic): array

@@ -37,7 +37,7 @@ class VetLandingController extends Controller
             'mapQuery' => $mapQuery,
             'isDraft' => $isDraft,
             'canClaim' => $canClaim,
-            'publicUrl' => url('c/'.$vet->public_id),
+            'publicUrl' => LegacyQrRedirect::scanUrlForPublicId($vet->public_id),
             'mapsEmbedKey' => config('services.google_maps.embed_key'),
         ]);
     }
@@ -45,7 +45,7 @@ class VetLandingController extends Controller
     public function redirectByPublicId(Request $request, string $publicId)
     {
         if ($request->query('via') !== 'legacy-qr') {
-            $legacyScanner = LegacyQrRedirect::where('public_id', $publicId)->first();
+            $legacyScanner = LegacyQrRedirect::findByPublicId($publicId);
 
             if (! $legacyScanner) {
                 $legacyScanner = LegacyQrRedirect::where('code', $publicId)->first();

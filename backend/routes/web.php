@@ -29,6 +29,7 @@ use App\Http\Controllers\LegacyQrRedirectController;
 use App\Http\Controllers\SalesCrmController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Middleware\EnsureSalesAuthenticated;
+use App\Models\LegacyQrRedirect;
 
 
 // Public routes
@@ -127,6 +128,16 @@ Route::prefix('admin')->group(function () {
 });
 Route::get('/c/{publicId}', [VetLandingController::class, 'redirectByPublicId'])->name('clinics.shortlink');
 Route::get('/backend/c/{publicId}', function (Request $request, string $publicId) {
+    $legacyScanner = LegacyQrRedirect::findByPublicId($publicId)
+        ?? LegacyQrRedirect::where('code', $publicId)->first();
+
+    if ($legacyScanner) {
+        return app(LegacyQrRedirectController::class)->handleRedirect(
+            $request,
+            $legacyScanner
+        );
+    }
+
     return app(VetLandingController::class)->redirectByPublicId($request, $publicId);
 });
 Route::get('/vets/{slug}', [VetLandingController::class, 'show']);

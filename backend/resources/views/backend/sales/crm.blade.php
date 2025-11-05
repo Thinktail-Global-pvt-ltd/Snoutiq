@@ -187,8 +187,8 @@
                                 <td>
                                     <div>{{ $redirect->code }}</div>
                                     @if($redirect->public_id)
-                                        <a class="qr-preview" href="{{ url('c/'.$redirect->public_id) }}" target="_blank" rel="noopener noreferrer">
-                                            Draft short link
+                                        <a class="qr-preview" href="{{ $redirect->scan_url }}" target="_blank" rel="noopener noreferrer">
+                                            Legacy QR link
                                         </a>
                                     @endif
                                     @php
