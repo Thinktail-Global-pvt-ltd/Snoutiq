@@ -14,6 +14,10 @@ class LegacyQrRedirectController extends Controller
         $redirect = LegacyQrRedirect::where('code', $code)->first();
 
         if (! $redirect) {
+            $redirect = LegacyQrRedirect::findByPublicId($code);
+        }
+
+        if (! $redirect) {
             abort(404);
         }
 
