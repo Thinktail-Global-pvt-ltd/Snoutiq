@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\RazorpayController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
+use App\Http\Controllers\Api\SalesDashboardController;
 use App\Models\User;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
@@ -137,6 +138,7 @@ Route::get('/chat/listRooms', [GeminiChatController::class, 'listRooms']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [\App\Http\Controllers\Api\GeminiChatController::class, 'history']);
 
 Route::post('/clinics/drafts', [DraftClinicController::class, 'store']);
+Route::get('/clinics/drafts', [DraftClinicController::class, 'index']);
 
 // Summarize a chat room and save to chat_rooms.summary
 Route::post('/chat-rooms/{chat_room_token}/summarize', [GeminiChatController::class, 'summarizeRoom']);
@@ -196,6 +198,14 @@ Route::get('/auth/me',          [AuthController::class, 'me']);     // session c
 Route::post('/auth/logout',     [AuthController::class, 'logout']); // invalidate
 
 Route::get('/fetchNearbyPlaces', [PublicController::class, 'fetchNearbyPlaces']);
+
+Route::prefix('sales')->group(function () {
+    Route::get('/dashboard', [SalesDashboardController::class, 'dashboard']);
+    Route::get('/qr-scanners', [SalesDashboardController::class, 'qrScanners']);
+    Route::get('/qr-scanners/{scanner}', [SalesDashboardController::class, 'scannerMetrics']);
+    Route::post('/qr-scanners/{scanner}/notify', [SalesDashboardController::class, 'notifyDormantPetParents']);
+    Route::get('/vet-registrations', [SalesDashboardController::class, 'vetRegistrations']);
+});
 
 
 // using Query Builder

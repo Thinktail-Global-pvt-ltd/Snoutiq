@@ -13,7 +13,8 @@ class User extends Authenticatable
     protected $fillable = [
         'name','email','phone','role','password',
         'pet_name','pet_gender','pet_age','pet_doc1','pet_doc2',
-        'api_token_hash','summary','google_token','breed','latitude','longitude'
+        'api_token_hash','summary','google_token','breed','latitude','longitude',
+        'qr_scanner_id',
     ];
 
     protected $hidden = ['password','remember_token','api_token_hash'];
@@ -25,4 +26,14 @@ class User extends Authenticatable
     // {
     //     if ($value) $this->attributes['password'] = Hash::make($value);
     // }
+
+    public function qrScanner()
+    {
+        return $this->belongsTo(LegacyQrRedirect::class, 'qr_scanner_id');
+    }
+
+    public function callSessions()
+    {
+        return $this->hasMany(CallSession::class, 'patient_id');
+    }
 }

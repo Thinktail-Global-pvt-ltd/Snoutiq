@@ -109,6 +109,80 @@ label{font-size:.9rem;color:#334155}
 </head>
 <body>
 
+  @if($isDraft)
+  <section class="container" style="padding:4rem 1rem 3rem;text-align:center">
+    <div class="card" style="padding:2.5rem 2rem;max-width:640px;margin:0 auto">
+      <span class="pill" style="margin-bottom:1rem">🚧 Clinic Profile In Draft</span>
+      <h1 class="heading" style="font-size:2.2rem;margin-bottom:.75rem">{{ $vet->name ?? 'SnoutIQ Clinic' }}</h1>
+      <p class="muted" style="margin:0 auto 1.5rem;max-width:480px">
+        This clinic page is being set up with SnoutIQ. Share the QR or short link below so the clinic owner can claim
+        the profile and complete onboarding. Until then, we only show safe placeholder details to the public.
+      </p>
+
+      <div class="card" style="padding:1rem;margin-bottom:1.25rem">
+        <p class="muted" style="font-size:.9rem;margin-bottom:.35rem">Permanent short link</p>
+        <a href="{{ $publicUrl }}" style="font-weight:700;color:var(--accent)">{{ $publicUrl }}</a>
+      </div>
+
+      @if($canClaim)
+        @php $claimToken = request('claim_token'); @endphp
+        <p style="margin-bottom:1rem">Looks like you have the invite link. Claim this clinic to unlock full editing.</p>
+        <a class="btn btn-primary" style="justify-content:center"
+           href="https://snoutiq.com/backend/custom-doctor-register?claim_token={{ urlencode($claimToken) }}&public_id={{ $vet->public_id }}">
+          Claim This Clinic
+        </a>
+      @else
+        <div style="display:flex;flex-wrap:wrap;gap:.75rem;justify-content:center">
+          <a class="btn btn-outline" style="justify-content:center" href="https://snoutiq.com/contact?topic=clinic">
+            Notify Me
+          </a>
+          <a class="btn btn-primary" style="justify-content:center" href="https://snoutiq.com/contact">
+            Talk To SnoutIQ Sales
+          </a>
+        </div>
+      @endif
+    </div>
+  </section>
+
+  @php
+    $draftMapQuery = trim((string)($mapQuery ?? ''));
+    $draftMapSrc = null;
+    if ($draftMapQuery !== '') {
+        $encodedQuery = urlencode($draftMapQuery);
+        if (!empty($mapsEmbedKey)) {
+            $draftMapSrc = 'https://www.google.com/maps/embed/v1/place?key='.urlencode($mapsEmbedKey).'&q='.$encodedQuery;
+        } else {
+            $draftMapSrc = 'https://maps.google.com/maps?q='.$encodedQuery.'&t=&z=13&ie=UTF8&iwloc=&output=embed';
+        }
+    }
+  @endphp
+
+  @if($draftMapSrc)
+  <section class="container" style="padding:0 1rem 3rem">
+    <div class="card" style="padding:1.5rem;max-width:720px;margin:0 auto">
+      <div style="display:flex;flex-direction:column;gap:.65rem;align-items:center;text-align:center">
+        <span class="pill" style="margin-bottom:.25rem">📍 Location Preview</span>
+        <div class="muted" style="max-width:520px">
+          {{ $vet->formatted_address ?? $vet->address ?? $vet->city ?? 'Location coming soon' }}
+        </div>
+        <div style="width:100%;border-radius:1rem;overflow:hidden;border:1px solid var(--border);box-shadow:0 15px 35px -25px rgba(15,23,42,.4)">
+          <iframe
+            src="{{ $draftMapSrc }}"
+            width="100%"
+            height="320"
+            style="border:0"
+            allowfullscreen
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+      </div>
+    </div>
+  </section>
+  @endif
+  @endif
+
+  @unless($isDraft)
+
   <!-- Nav -->
   <nav>
     <div class="container nav-wrap">
@@ -545,5 +619,6 @@ label{font-size:.9rem;color:#334155}
     <img height="1" width="1" style="display:none"
          src="https://www.facebook.com/tr?id=1909812439872823&ev=PageView&noscript=1"/>
   </noscript>
+  @endunless
 </body>
 </html>

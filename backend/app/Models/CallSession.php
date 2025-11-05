@@ -24,6 +24,7 @@ class CallSession extends Model
         'payment_id',
         'amount_paid',
         'currency',
+        'qr_scanner_id',
     ];
 
     protected $casts = [
@@ -80,5 +81,10 @@ class CallSession extends Model
     public function doctor(): BelongsTo
     {
         return $this->belongsTo(Doctor::class, 'doctor_id');
+    }
+
+    public function qrScanner(): BelongsTo
+    {
+        return $this->belongsTo(LegacyQrRedirect::class, 'qr_scanner_id');
     }
 }

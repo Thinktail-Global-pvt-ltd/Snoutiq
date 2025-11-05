@@ -105,7 +105,7 @@
     <section id="legacy-qr" class="card">
         <h2>Legacy QR Redirects</h2>
         <p class="lead">Save or update a QR code and link it to the clinic it belongs to.</p>
-        <form method="POST" action="{{ $legacyStoreRoute }}">
+        <form method="POST" action="{{ $legacyStoreRoute }}" enctype="multipart/form-data">
             @csrf
             <div class="grid">
                 <div>
@@ -114,16 +114,22 @@
                     @error('code')<div class="error">{{ $message }}</div>@enderror
                 </div>
                 <div>
-                    <label for="clinic_id">Clinic Name</label>
-                    <select id="clinic_id" name="clinic_id">
-                        <option value="">— pick clinic —</option>
-                        @foreach($clinics as $clinic)
-                            <option value="{{ $clinic->id }}" @selected(old('clinic_id') == $clinic->id)>
-                                {{ $clinic->name ?? ('Clinic #'.$clinic->id) }} ({{ $clinic->public_id }})
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('clinic_id')<div class="error">{{ $message }}</div>@enderror
+                    <label for="clinic_name">Clinic Name</label>
+                    <input id="clinic_name" name="clinic_name" value="{{ old('clinic_name') }}" placeholder="e.g. Happy Tails Clinic">
+                    <span class="note">We create/update the clinic draft using this name and slug.</span>
+                    @error('clinic_name')<div class="error">{{ $message }}</div>@enderror
+                </div>
+                <div>
+                    <label for="clinic_slug">Clinic Slug</label>
+                    <input id="clinic_slug" name="clinic_slug" value="{{ old('clinic_slug') }}" placeholder="happy-tails-clinic">
+                    <span class="note">Leave blank to auto-generate from the clinic name.</span>
+                    @error('clinic_slug')<div class="error">{{ $message }}</div>@enderror
+                </div>
+                <div>
+                    <label for="qr_image">Upload QR Image</label>
+                    <input id="qr_image" name="qr_image" type="file" accept="image/png,image/jpeg,image/webp">
+                    <span class="note">PNG / JPG / WEBP (max 4 MB). We auto-link the draft clinic page.</span>
+                    @error('qr_image')<div class="error">{{ $message }}</div>@enderror
                 </div>
             </div>
             <div class="actions">
@@ -138,15 +144,29 @@
                     <thead>
                         <tr>
                             <th>QR Code</th>
-                            <th>Clinic Name</th>
+                            <th>Clinic</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($redirects as $redirect)
                             <tr>
-                                <td>{{ $redirect->code }}</td>
-                                <td>{{ optional($redirect->clinic)->name ?? '—' }}</td>
+                                <td>
+                                    <div>{{ $redirect->code }}</div>
+                                    @if($redirect->public_id)
+                                        <a class="qr-preview" href="{{ url('/c/'.$redirect->public_id) }}" target="_blank" rel="noopener noreferrer">
+                                            Draft short link
+                                        </a>
+                                    @endif
+                                </td>
+                                <td>
+                                    <div>{{ optional($redirect->clinic)->name ?? '—' }}</div>
+                                    @if(optional($redirect->clinic)->slug)
+                                        <a class="qr-preview" href="{{ url('/vets/'.optional($redirect->clinic)->slug) }}" target="_blank" rel="noopener noreferrer">
+                                            View draft site
+                                        </a>
+                                    @endif
+                                </td>
                                 <td>
                                     <form class="inline" method="POST" action="{{ route($legacyDestroyRouteName, $redirect) }}" onsubmit="return confirm('Remove this mapping?');">
                                         @csrf

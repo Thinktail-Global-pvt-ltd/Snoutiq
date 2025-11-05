@@ -38,6 +38,9 @@ const DoctorRegistration = () => {
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [chatPrice, setChatPrice] = useState("");
+  const [draftClinics, setDraftClinics] = useState([]);
+  const [selectedDraftSlug, setSelectedDraftSlug] = useState("");
+  const [isLoadingDraftClinics, setIsLoadingDraftClinics] = useState(false);
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [pinCode, setPinCode] = useState("");
@@ -495,6 +498,46 @@ const DoctorRegistration = () => {
     });
   };
 
+  useEffect(() => {
+    const fetchDraftClinics = async () => {
+      try {
+        setIsLoadingDraftClinics(true);
+        const res = await axios.get(
+          "https://snoutiq.com/backend/api/clinics/drafts"
+        );
+        setDraftClinics(res?.data?.clinics ?? []);
+      } catch (error) {
+        console.error("Failed to load draft clinics", error);
+      } finally {
+        setIsLoadingDraftClinics(false);
+      }
+    };
+
+    fetchDraftClinics();
+  }, []);
+
+  const handleDraftClinicSelect = (e) => {
+    const slug = e.target.value;
+    setSelectedDraftSlug(slug);
+
+    if (!slug) {
+      return;
+    }
+
+    const selected = draftClinics.find((clinic) => clinic.slug === slug);
+    if (selected) {
+      if (selected.name) {
+        setName(selected.name);
+      }
+      if (selected.city) {
+        setCity(selected.city);
+      }
+      if (selected.pincode) {
+        setPinCode(selected.pincode);
+      }
+    }
+  };
+
   // Functions to handle multiple doctors
   const handleAddDoctor = () => {
     setDoctors([
@@ -818,6 +861,10 @@ const DoctorRegistration = () => {
       formData.append("bio", bio);
       formData.append("inhome_grooming_services", inhome_grooming_services);
       formData.append("acceptedTerms", acceptedTerms);
+
+      if (selectedDraftSlug) {
+        formData.append("draft_slug", selectedDraftSlug);
+      }
 
       // Add all the Google Places data if available
       if (businessDetails) {
@@ -1838,6 +1885,32 @@ const DoctorRegistration = () => {
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Claim Draft Clinic (optional)
+                  </label>
+                  <select
+                    value={selectedDraftSlug}
+                    onChange={handleDraftClinicSelect}
+                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isLoadingDraftClinics}
+                  >
+                    <option value="">
+                      {isLoadingDraftClinics
+                        ? "Loading draft clinics..."
+                        : "Select an existing draft to claim"}
+                    </option>
+                    {draftClinics.map((clinic) => (
+                      <option key={clinic.slug} value={clinic.slug}>
+                        {clinic.name || "Unnamed Clinic"} ({clinic.slug})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-gray-500 text-xs mt-2">
+                    Choosing a draft ensures this submission updates the
+                    pre-created clinic page shared by sales.
+                  </p>
+                </div>
                 {/* Business Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -45,8 +45,63 @@ class VetRegisterationTempController extends Controller
         DB::beginTransaction();
 
         try {
+            $claimToken = $request->input('claim_token');
+            $draftSlugInput = trim((string) $request->input('draft_slug'));
+            $isClaim = filled($claimToken);
+            $draftClinic = null;
+
+            if ($isClaim) {
+                $draftClinic = VetRegisterationTemp::where('claim_token', $claimToken)->first();
+
+                if (! $draftClinic) {
+                    return response()->json([
+                        'message' => 'Draft clinic not found for the supplied claim token.',
+                    ], 404);
+                }
+
+                if ($draftClinic->status !== 'draft') {
+                    return response()->json([
+                        'message' => 'This clinic has already been claimed.',
+                    ], 409);
+                }
+
+                if ($draftClinic->draft_expires_at && $draftClinic->draft_expires_at->isPast()) {
+                    return response()->json([
+                        'message' => 'This draft clinic has expired. Please contact sales for a fresh invite.',
+                    ], 410);
+                }
+            }
+
+            if (! $isClaim && $draftSlugInput !== '') {
+                $draftClinic = VetRegisterationTemp::where('slug', $draftSlugInput)->first();
+
+                if (! $draftClinic) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Draft clinic not found for the supplied slug.',
+                    ], 404);
+                }
+
+                if ($draftClinic->status !== 'draft') {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'This clinic slug is not available for claiming.',
+                    ], 409);
+                }
+
+                if ($draftClinic->draft_expires_at && $draftClinic->draft_expires_at->isPast()) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'This draft clinic has expired. Please contact sales for a fresh invite.',
+                    ], 410);
+                }
+
+                $isClaim = true;
+            }
+
             // ✅ Validation
             $data = $request->validate([
+                'draft_slug'       => 'nullable|string|max:255',
                 'email'            => 'nullable|email|max:255',
                 'mobile'           => 'nullable|string|max:15',
                 'employee_id'      => 'nullable|string|max:255',
@@ -59,6 +114,7 @@ class VetRegisterationTempController extends Controller
                 'chat_price'       => 'nullable|numeric',
                 'bio'              => 'nullable|string',
                 'license_document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+                'password'         => 'nullable|string|min:6',
 
                 // Image fields
                 'hospital_profile' => 'nullable',
@@ -94,9 +150,14 @@ class VetRegisterationTempController extends Controller
                 'user_ratings_total'   => 'nullable|integer',
             ]);
 
-            // 🔤 Auto-generate slug from name
-            $data['password'] ='123456';
-            $data['slug'] = $this->makeUniqueSlug($data['name']);
+            $data['password'] = $data['password'] ?? '123456';
+
+            $draftSlug = $data['draft_slug'] ?? null;
+            unset($data['draft_slug']);
+
+            if (! $isClaim && empty($draftSlug)) {
+                $data['slug'] = $this->makeUniqueSlug($data['name']);
+            }
 
             // ✅ Handle clinic/hospital profile image upload
             foreach (['hospital_profile', 'clinic_profile'] as $field) {
@@ -126,8 +187,33 @@ class VetRegisterationTempController extends Controller
             if (isset($data['photos']))      $data['photos']      = json_encode($data['photos']);
             if (isset($data['types']))       $data['types']       = json_encode($data['types']);
 
+            if (! $isClaim) {
+                $data['status'] = 'active';
+                $data['claim_token'] = null;
+                $data['draft_expires_at'] = null;
+                $data['claimed_at'] = now();
+            }
+
             // ✅ Save clinic data
-            $vet = VetRegisterationTemp::create($data);
+            if ($isClaim) {
+                $vet = $draftClinic;
+                $vet->fill($data);
+                $vet->status = 'active';
+                $vet->claimed_at = now();
+                $vet->owner_user_id = $vet->owner_user_id ?? $vet->id;
+                $vet->claim_token = null;
+                $vet->draft_expires_at = null;
+                $vet->save();
+
+                // clear stale doctors before replacing
+                $vet->doctors()->delete();
+            } else {
+                $vet = VetRegisterationTemp::create($data);
+                if (! $vet->owner_user_id) {
+                    $vet->owner_user_id = $vet->id;
+                    $vet->save();
+                }
+            }
 
             // ✅ Save doctors
             if ($request->has('doctors')) {
@@ -169,15 +255,16 @@ class VetRegisterationTempController extends Controller
             DB::commit();
 
             // If this is a browser (non-JSON) request, redirect to landing page by slug
-          if (!$request->wantsJson()) {
-    return redirect()->away('https://snoutiq.com/backend/vet/' . $vet->slug);
-}
-
+            if (! $request->wantsJson()) {
+                return redirect()->away('https://snoutiq.com/backend/vet/' . $vet->slug);
+            }
 
             return response()->json([
-                'message' => 'Vet registration stored successfully!',
+                'message' => $isClaim
+                    ? 'Draft clinic claimed successfully!'
+                    : 'Vet registration stored successfully!',
                 'data'    => $vet->load('doctors')
-            ], 201);
+            ], $isClaim ? 200 : 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             DB::rollBack();

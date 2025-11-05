@@ -11,6 +11,53 @@ use Illuminate\Support\Facades\Storage;
 
 class DraftClinicController extends Controller
 {
+    public function index(Request $request)
+    {
+        $query = VetRegisterationTemp::query()
+            ->where('status', 'draft');
+
+        $search = trim((string) $request->input('search', ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', '%'.$search.'%')
+                    ->orWhere('slug', 'LIKE', '%'.$search.'%')
+                    ->orWhere('public_id', 'LIKE', '%'.$search.'%');
+            });
+        }
+
+        $limit = (int) $request->input('limit', 200);
+        $limit = max(1, min($limit, 500));
+
+        $clinics = $query
+            ->orderByDesc('updated_at')
+            ->limit($limit)
+            ->get([
+                'id',
+                'name',
+                'slug',
+                'public_id',
+                'city',
+                'pincode',
+                'draft_expires_at',
+                'created_at',
+            ]);
+
+        return response()->json([
+            'clinics' => $clinics->map(function (VetRegisterationTemp $clinic) {
+                return [
+                    'id' => $clinic->id,
+                    'name' => $clinic->name,
+                    'slug' => $clinic->slug,
+                    'public_id' => $clinic->public_id,
+                    'city' => $clinic->city,
+                    'pincode' => $clinic->pincode,
+                    'draft_expires_at' => optional($clinic->draft_expires_at)->toIso8601String(),
+                    'created_at' => optional($clinic->created_at)->toIso8601String(),
+                ];
+            }),
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([

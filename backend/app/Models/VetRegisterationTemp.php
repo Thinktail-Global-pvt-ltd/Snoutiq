@@ -106,6 +106,19 @@ class VetRegisterationTemp extends Model
         'rating',
         'user_ratings_total',
         'slug', // ✅ new
+        'public_id',
+        'claim_token',
+        'status',
+        'owner_user_id',
+        'draft_created_by_user_id',
+        'draft_expires_at',
+        'claimed_at',
+        'qr_code_path',
+    ];
+
+    protected $casts = [
+        'draft_expires_at' => 'datetime',
+        'claimed_at' => 'datetime',
     ];
 
     public function doctors()
@@ -117,16 +130,49 @@ class VetRegisterationTemp extends Model
     {
         parent::boot();
 
-        static::saving(function ($vet) {
-            if (empty($vet->slug) && !empty($vet->name)) {
-                $vet->slug = Str::slug($vet->name);
+        static::creating(function (self $vet) {
+            if (empty($vet->public_id)) {
+                $vet->public_id = Str::ulid()->toBase32();
+            }
 
-                // ensure uniqueness
-                $original = $vet->slug;
-                $i = 1;
-                while (static::where('slug', $vet->slug)->where('id', '!=', $vet->id)->exists()) {
-                    $vet->slug = $original.'-'.$i++;
-                }
+            if (empty($vet->status)) {
+                $vet->status = 'draft';
+            }
+
+            if ($vet->status === 'draft' && empty($vet->claim_token)) {
+                $vet->claim_token = Str::random(32);
+            }
+
+            if ($vet->status === 'draft' && empty($vet->draft_expires_at)) {
+                $vet->draft_expires_at = now()->addDays(60);
+            }
+        });
+
+        static::saving(function (self $vet) {
+            if (empty($vet->public_id)) {
+                $vet->public_id = Str::ulid()->toBase32();
+            }
+
+            if ($vet->status !== 'draft') {
+                $vet->draft_expires_at = null;
+            } elseif (empty($vet->draft_expires_at)) {
+                $vet->draft_expires_at = now()->addDays(60);
+            }
+
+            $slugSource = $vet->name ?: ('clinic-'.$vet->public_id);
+            if (empty($vet->slug)) {
+                $vet->slug = Str::slug($slugSource);
+            }
+
+            // ensure slug uniqueness
+            $original = $vet->slug;
+            $suffix = 1;
+            while (
+                static::where('slug', $vet->slug)
+                    ->where('id', '!=', $vet->id)
+                    ->exists()
+            ) {
+                $vet->slug = $original.'-'.$suffix++;
             }
         });
     }

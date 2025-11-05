@@ -26,6 +26,7 @@ use App\Http\Controllers\SalesDraftClinicPageController;
 use App\Http\Controllers\Admin\LegacyQrRedirectAdminController;
 use App\Http\Controllers\LegacyQrRedirectController;
 use App\Http\Controllers\SalesCrmController;
+use App\Http\Controllers\Api\SalesDashboardController;
 
 
 // Public routes
@@ -35,6 +36,7 @@ Route::redirect('/', '/admin/login');
 Route::get('/clinics/drafts/create', SalesDraftClinicPageController::class)->name('backend.clinics.drafts.create');
 Route::get('/legacy-qr/{code}', LegacyQrRedirectController::class)->name('legacy-qr.redirect');
 Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
+Route::get('/sales/dashboard', [SalesDashboardController::class, 'page'])->name('sales.dashboard');
 Route::post('/sales/legacy-qr', [SalesCrmController::class, 'storeLegacyQr'])->name('sales.legacy-qr.store');
 Route::delete('/sales/legacy-qr/{legacyQrRedirect}', [SalesCrmController::class, 'destroyLegacyQr'])->name('sales.legacy-qr.destroy');
 
