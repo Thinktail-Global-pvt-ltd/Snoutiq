@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\LegacyQrRedirectAdminController;
 use App\Http\Controllers\LegacyQrRedirectController;
 use App\Http\Controllers\SalesCrmController;
 use App\Http\Controllers\Api\SalesDashboardController;
+use App\Http\Middleware\EnsureSalesAuthenticated;
 
 
 // Public routes
@@ -36,10 +37,47 @@ Route::redirect('/', '/admin/login');
 
 Route::get('/clinics/drafts/create', SalesDraftClinicPageController::class)->name('backend.clinics.drafts.create');
 Route::get('/legacy-qr/{code}', LegacyQrRedirectController::class)->name('legacy-qr.redirect');
-Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
-Route::get('/sales/dashboard', [SalesDashboardController::class, 'page'])->name('sales.dashboard');
-Route::post('/sales/legacy-qr', [SalesCrmController::class, 'storeLegacyQr'])->name('sales.legacy-qr.store');
-Route::delete('/sales/legacy-qr/{legacyQrRedirect}', [SalesCrmController::class, 'destroyLegacyQr'])->name('sales.legacy-qr.destroy');
+Route::get('/sales/login', function (Request $request) {
+    if ($request->session()->get('sales_authenticated')) {
+        return redirect()->route('sales.crm');
+    }
+
+    return view('backend.sales.login');
+})->name('sales.login');
+
+Route::post('/sales/login', function (Request $request) {
+    $credentials = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required|string',
+    ]);
+
+    $expectedEmail = config('services.sales.email');
+    $expectedPassword = config('services.sales.password');
+
+    if ($credentials['email'] !== $expectedEmail || ! hash_equals($expectedPassword, $credentials['password'])) {
+        return back()
+            ->withErrors(['email' => 'Invalid sales credentials.'])
+            ->withInput(['email' => $credentials['email']]);
+    }
+
+    $request->session()->put('sales_authenticated', true);
+
+    return redirect()->route('sales.crm');
+})->name('sales.login.attempt');
+
+Route::post('/sales/logout', function (Request $request) {
+    $request->session()->forget('sales_authenticated');
+    $request->session()->regenerateToken();
+
+    return redirect()->route('sales.login')->with('status', 'Logged out successfully.');
+})->name('sales.logout');
+
+Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
+    Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
+    Route::get('/sales/dashboard', [SalesDashboardController::class, 'page'])->name('sales.dashboard');
+    Route::post('/sales/legacy-qr', [SalesCrmController::class, 'storeLegacyQr'])->name('sales.legacy-qr.store');
+    Route::delete('/sales/legacy-qr/{legacyQrRedirect}', [SalesCrmController::class, 'destroyLegacyQr'])->name('sales.legacy-qr.destroy');
+});
 
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');
 Route::get('/logout', function (\Illuminate\Http\Request $request) {
