@@ -154,10 +154,10 @@ export const AuthProvider = ({ children }) => {
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      console.log("🔍 Fetching nearby veterinarians...");
+      console.log("🔍 Fetching nearby doctors...");
       
       const response = await axios.get(
-        `https://snoutiq.com/backend/api/nearby-vets?user_id=${user.id}`,
+        `${DOCTOR_NEARBY_API}?user_id=${user.id}`,
         { 
           headers: { 
             Authorization: `Bearer ${token}`,
@@ -170,7 +170,7 @@ export const AuthProvider = ({ children }) => {
       clearTimeout(timeoutId);
 
       if (response.data && Array.isArray(response.data.data)) {
-        console.log(`✅ Found ${response.data.data.length} veterinarians`);
+        console.log(`✅ Found ${response.data.data.length} doctors`);
         updateNearbyDoctors(response.data.data);
         
         // ✅ Request updated active doctors after fetching nearby doctors
@@ -180,7 +180,7 @@ export const AuthProvider = ({ children }) => {
           }, 1000);
         }
       } else {
-        console.warn("⚠️ No veterinarians data received");
+        console.warn("⚠️ No doctor data received");
       }
     } catch (error) {
       clearTimeout(timeoutId);
@@ -191,7 +191,7 @@ export const AuthProvider = ({ children }) => {
         if (error.response?.status !== 404) {
           console.error("❌ Failed to fetch nearby doctors:", error.message);
         } else {
-          console.log("ℹ️ No nearby veterinarians found (404) - this is normal for doctors");
+          console.log("ℹ️ No nearby doctors found (404) - this is normal for doctors");
         }
       } else {
         console.log("🚫 Fetch cancelled");
@@ -284,15 +284,21 @@ const login = async (userData, jwtToken, initialChatToken = null) => {
   // 🟢 Update nearby doctors and merge new ones
   const updateNearbyDoctors = useCallback((newDoctors) => {
     try {
-      setNearbyDoctors((prev) => {
-        const existingIds = new Set(prev.map((d) => d.id));
-        const merged = [
-          ...prev,
-          ...newDoctors.filter((d) => !existingIds.has(d.id)),
-        ];
-        localStorage.setItem("nearby_doctors", JSON.stringify(merged));
-        return merged;
+      const normalized = Array.isArray(newDoctors)
+        ? newDoctors
+            .map(normalizeDoctorEntry)
+            .filter((doctor) => doctor !== null)
+        : [];
+
+      // Deduplicate by doctor ID
+      const uniqueMap = new Map();
+      normalized.forEach((doctor) => {
+        uniqueMap.set(doctor.id, doctor);
       });
+
+      const uniqueDoctors = Array.from(uniqueMap.values());
+      setNearbyDoctors(uniqueDoctors);
+      localStorage.setItem("nearby_doctors", JSON.stringify(uniqueDoctors));
     } catch (error) {
       console.error("Error updating nearby doctors:", error);
     }
@@ -375,6 +381,80 @@ const login = async (userData, jwtToken, initialChatToken = null) => {
     <AuthContext.Provider value={authValue}>{children}</AuthContext.Provider>
   );
 };
+
+function normalizeDoctorEntry(entry = {}) {
+  const rawDoctor =
+    entry.doctor && typeof entry.doctor === "object" ? entry.doctor : {};
+
+  const doctorId = Number(
+    entry.id ?? entry.doctor_id ?? rawDoctor.id ?? null
+  );
+  if (!Number.isFinite(doctorId) || doctorId <= 0) {
+    return null;
+  }
+
+  const clinicId = Number(
+    entry.clinic_id ??
+      entry.vet_registeration_id ??
+      rawDoctor.clinic_id ??
+      rawDoctor.vet_registeration_id ??
+      null
+  );
+
+  const clinicName =
+    entry.clinic_name ??
+    entry.business_status ??
+    entry.hospital_profile ??
+    rawDoctor.clinic_name ??
+    "Veterinary Clinic";
+
+  const doctorName =
+    entry.name ??
+    entry.doctor_name ??
+    rawDoctor.name ??
+    rawDoctor.full_name ??
+    "Veterinarian";
+
+  const profileImage =
+    entry.profile_image ??
+    entry.doctor_image ??
+    rawDoctor.image ??
+    null;
+
+  return {
+    id: doctorId,
+    clinic_id: clinicId,
+    name: doctorName,
+    clinic_name: clinicName,
+    profile_image: profileImage,
+    rating:
+      entry.rating !== undefined && entry.rating !== null
+        ? Number(entry.rating)
+        : null,
+    distance:
+      entry.distance !== undefined && entry.distance !== null
+        ? Number(entry.distance)
+        : null,
+    chat_price:
+      entry.chat_price !== undefined && entry.chat_price !== null
+        ? Number(entry.chat_price)
+        : null,
+    slug:
+      entry.slug ??
+      rawDoctor.slug ??
+      String(doctorId),
+    business_status: entry.business_status ?? rawDoctor.business_status ?? null,
+    doctor: {
+      id: doctorId,
+      name: doctorName,
+      email: rawDoctor.email ?? entry.email ?? null,
+      mobile: rawDoctor.mobile ?? entry.mobile ?? null,
+      license: rawDoctor.license ?? entry.license ?? null,
+      image: profileImage,
+      clinic_id: clinicId,
+    },
+  };
+}
 
 // 🧩 Custom hook for consuming AuthContext
 export const useAuth = () => {
