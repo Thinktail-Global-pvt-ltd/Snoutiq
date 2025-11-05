@@ -51,8 +51,8 @@ Route::post('/sales/login', function (Request $request) {
         'password' => 'required|string',
     ]);
 
-    $expectedEmail = config('services.sales.email');
-    $expectedPassword = config('services.sales.password');
+    $expectedEmail = 'sales@admin.com';
+    $expectedPassword = 'Sales@12345';
 
     if ($credentials['email'] !== $expectedEmail || ! hash_equals($expectedPassword, $credentials['password'])) {
         return back()
