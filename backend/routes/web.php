@@ -36,7 +36,10 @@ use App\Http\Middleware\EnsureSalesAuthenticated;
 Route::redirect('/', '/admin/login');
 
 Route::get('/clinics/drafts/create', SalesDraftClinicPageController::class)->name('backend.clinics.drafts.create');
-Route::get('/legacy-qr/{code}', LegacyQrRedirectController::class)->name('legacy-qr.redirect');
+Route::get('/backend/legacy-qr/{code}', LegacyQrRedirectController::class)->name('legacy-qr.redirect');
+Route::get('/legacy-qr/{code}', function (string $code) {
+    return redirect()->route('legacy-qr.redirect', ['code' => $code]);
+});
 Route::get('/sales/login', function (Request $request) {
     if ($request->session()->get('sales_authenticated')) {
         return redirect()->route('sales.crm');
