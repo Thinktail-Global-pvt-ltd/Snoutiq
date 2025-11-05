@@ -12,6 +12,35 @@ class VetLandingController extends Controller
     {
         $vet = VetRegisterationTemp::where('slug', $slug)->firstOrFail();
 
+        // Fallback counting: if no qr_counted flag, try to increment based on
+        // explicit qr_i, or by matching target_url/clinic public_id.
+        try {
+            if ((string) $request->query('qr_counted') !== '1') {
+                $qrI = trim((string) $request->query('qr_i', ''));
+                if ($qrI !== '') {
+                    LegacyQrRedirect::recordScanForIdentifier($qrI);
+                } else {
+                    $url = rtrim($request->url(), '/');
+                    $redirect = LegacyQrRedirect::where('target_url', $url)
+                        ->orWhere('target_url', $request->url())
+                        ->first();
+                    if ($redirect) {
+                        $redirect->recordScan();
+                    } else {
+                        // As a last resort, bump using clinic public_id so QR scans still register.
+                        if (! empty($vet->public_id)) {
+                            LegacyQrRedirect::recordScanForIdentifier($vet->public_id);
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('QR fallback count failed on landing', [
+                'slug' => $slug,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         $isDraft = $vet->status !== 'active';
         $hasClaimToken = $request->query('claim_token');
         $canClaim = $isDraft && $vet->claim_token && $hasClaimToken && hash_equals($vet->claim_token, (string) $hasClaimToken);

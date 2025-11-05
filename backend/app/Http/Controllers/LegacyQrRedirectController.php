@@ -54,6 +54,8 @@ class LegacyQrRedirectController extends Controller
         if (! isset($query['qr_i'])) {
             $query['qr_i'] = $publicId;
         }
+        // We've already counted in this controller; mark so landing page doesn't double count
+        $query['qr_counted'] = '1';
 
         // If a custom target URL is configured, append our tracking query and exit.
         if (! empty($redirect->target_url)) {
