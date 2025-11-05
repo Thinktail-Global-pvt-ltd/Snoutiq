@@ -44,6 +44,6 @@ class LegacyQrRedirectController extends Controller
             abort(404);
         }
 
-        return redirect()->to(url('/c/'.$publicId));
+        return redirect()->to(url('c/'.$publicId));
     }
 }

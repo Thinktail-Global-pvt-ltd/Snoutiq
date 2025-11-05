@@ -36,7 +36,7 @@ class VetLandingController extends Controller
             'mapQuery' => $mapQuery,
             'isDraft' => $isDraft,
             'canClaim' => $canClaim,
-            'publicUrl' => url('/c/'.$vet->public_id),
+            'publicUrl' => url('c/'.$vet->public_id),
             'mapsEmbedKey' => config('services.google_maps.embed_key'),
         ]);
     }

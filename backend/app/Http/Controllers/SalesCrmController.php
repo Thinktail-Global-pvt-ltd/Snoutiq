@@ -235,7 +235,7 @@ class SalesCrmController extends Controller
 
     private function claimUrlForClinic(VetRegisterationTemp $clinic): string
     {
-        $url = url('/c/'.$clinic->public_id);
+        $url = url('c/'.$clinic->public_id);
 
         if ($clinic->status === 'draft' && $clinic->claim_token) {
             $separator = str_contains($url, '?') ? '&' : '?';

@@ -119,7 +119,7 @@
                                 @if($redirect->target_url)
                                     <a href="{{ $redirect->target_url }}" target="_blank" rel="noopener">custom</a>
                                 @else
-                                    <a href="{{ url('/c/'.$redirect->public_id) }}" target="_blank" rel="noopener">/c/{{ $redirect->public_id }}</a>
+                                    <a href="{{ url('c/'.$redirect->public_id) }}" target="_blank" rel="noopener">/c/{{ $redirect->public_id }}</a>
                                 @endif
                             </td>
                             <td>

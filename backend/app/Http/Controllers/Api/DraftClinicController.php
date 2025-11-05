@@ -209,7 +209,7 @@ class DraftClinicController extends Controller
 
     private function publicUrl(VetRegisterationTemp $clinic): string
     {
-        return url('/c/'.$clinic->public_id);
+        return url('c/'.$clinic->public_id);
     }
 
     private function formatClinic(VetRegisterationTemp $clinic): array
