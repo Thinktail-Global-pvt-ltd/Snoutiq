@@ -131,11 +131,8 @@ Route::get('/backend/c/{publicId}', function (Request $request, string $publicId
     $legacyScanner = LegacyQrRedirect::findByPublicId($publicId)
         ?? LegacyQrRedirect::where('code', $publicId)->first();
 
-    if ($legacyScanner) {
-        return app(LegacyQrRedirectController::class)->handleRedirect(
-            $request,
-            $legacyScanner
-        );
+    if ($legacyScanner && $request->query('via') !== 'legacy-qr') {
+        return redirect()->to($legacyScanner->scan_url);
     }
 
     return app(VetLandingController::class)->redirectByPublicId($request, $publicId);
