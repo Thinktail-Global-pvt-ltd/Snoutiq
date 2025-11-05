@@ -47,6 +47,10 @@ class VetLandingController extends Controller
         if ($request->query('via') !== 'legacy-qr') {
             $legacyScanner = LegacyQrRedirect::where('public_id', $publicId)->first();
 
+            if (! $legacyScanner) {
+                $legacyScanner = LegacyQrRedirect::where('code', $publicId)->first();
+            }
+
             if ($legacyScanner) {
                 $query = collect($request->query())
                     ->except('via')
