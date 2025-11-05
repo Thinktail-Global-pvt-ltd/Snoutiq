@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LegacyQrRedirect;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 class VetLandingController extends Controller
 {
@@ -68,6 +69,29 @@ class VetLandingController extends Controller
             return;
         }
 
-        $redirect->recordScan();
+        $shouldFallback = false;
+
+        try {
+            $response = Http::timeout(3)
+                ->connectTimeout(2)
+                ->withoutRedirecting()
+                ->withHeaders([
+                    'User-Agent' => 'SnoutIQ Legacy QR Bridge',
+                    'X-Legacy-QR-Bridge' => '1',
+                ])
+                ->get(url('/backend/legacy-qr/'.$redirect->code), [
+                    'via' => 'bridge',
+                ]);
+
+            if ($response->status() >= 400) {
+                $shouldFallback = true;
+            }
+        } catch (\Throwable $exception) {
+            $shouldFallback = true;
+        }
+
+        if ($shouldFallback) {
+            $redirect->recordScan();
+        }
     }
 }
