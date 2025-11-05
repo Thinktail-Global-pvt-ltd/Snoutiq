@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LegacyQrRedirect;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
+use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 
 class VetLandingController extends Controller
 {
@@ -46,7 +46,7 @@ class VetLandingController extends Controller
     public function redirectByPublicId(Request $request, string $publicId)
     {
         if ($request->query('via') !== 'legacy-qr') {
-            $this->recordLegacyScan($publicId);
+            $this->recordLegacyScan($request, $publicId);
         }
 
         $vet = VetRegisterationTemp::where('public_id', $publicId)->firstOrFail();
@@ -61,7 +61,7 @@ class VetLandingController extends Controller
         return redirect()->to($target, 301);
     }
 
-    private function recordLegacyScan(string $publicId): void
+    private function recordLegacyScan(Request $request, string $publicId): void
     {
         $redirect = LegacyQrRedirect::where('public_id', $publicId)->first();
 
@@ -69,28 +69,21 @@ class VetLandingController extends Controller
             return;
         }
 
-        $shouldFallback = false;
+        $bridgeRequest = SymfonyRequest::create(
+            '/backend/legacy-qr/'.$redirect->code,
+            'GET',
+            ['via' => 'bridge'],
+            [],
+            [],
+            [
+                'HTTP_HOST' => $request->getHttpHost(),
+                'HTTPS' => $request->isSecure() ? 'on' : 'off',
+            ]
+        );
 
         try {
-            $response = Http::timeout(3)
-                ->connectTimeout(2)
-                ->withoutRedirecting()
-                ->withHeaders([
-                    'User-Agent' => 'SnoutIQ Legacy QR Bridge',
-                    'X-Legacy-QR-Bridge' => '1',
-                ])
-                ->get(url('/backend/legacy-qr/'.$redirect->code), [
-                    'via' => 'bridge',
-                ]);
-
-            if ($response->status() >= 400) {
-                $shouldFallback = true;
-            }
+            app(LegacyQrRedirectController::class)->__invoke(Request::createFromBase($bridgeRequest), $redirect->code);
         } catch (\Throwable $exception) {
-            $shouldFallback = true;
-        }
-
-        if ($shouldFallback) {
             $redirect->recordScan();
         }
     }
