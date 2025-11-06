@@ -6,6 +6,9 @@ use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 use App\Models\DeviceToken;
+use Kreait\Firebase\Exception\FirebaseException;
+use Kreait\Firebase\Exception\MessagingException;
+use Throwable;
 
 class FcmService
 {
@@ -24,7 +27,7 @@ class FcmService
             ->withNotification(Notification::create($title, $body))
             ->withData($data);
 
-        $this->messaging->send($message);
+        $this->sendMessage($message, $token);
     }
 
     /**
@@ -43,7 +46,7 @@ class FcmService
             ->withNotification(Notification::create($title, $body))
             ->withData($data);
 
-        $this->messaging->sendMulticast($message, $tokens);
+        $this->sendMulticastMessage($message, $tokens);
     }
 
     /**
@@ -73,6 +76,35 @@ class FcmService
             ->withNotification(Notification::create($title, $body))
             ->withData($data);
 
-        $this->messaging->send($message);
+        $this->sendMessage($message, $topic);
+    }
+
+    private function sendMessage(CloudMessage $message, string $target): void
+    {
+        try {
+            $this->messaging->send($message);
+        } catch (MessagingException | FirebaseException | Throwable $e) {
+            \Log::error('FCM send failed', [
+                'target' => $target,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * @param array<int,string> $tokens
+     */
+    private function sendMulticastMessage(CloudMessage $message, array $tokens): void
+    {
+        try {
+            $this->messaging->sendMulticast($message, $tokens);
+        } catch (MessagingException | FirebaseException | Throwable $e) {
+            \Log::error('FCM multicast send failed', [
+                'tokens' => $tokens,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 }
