@@ -14,5 +14,12 @@ class Prescription extends Model
         'user_id',
         'content_html',
         'image_path',
+        'next_medicine_day',
+        'next_visit_day',
+    ];
+
+    protected $casts = [
+        'next_medicine_day' => 'date',
+        'next_visit_day' => 'date',
     ];
 }

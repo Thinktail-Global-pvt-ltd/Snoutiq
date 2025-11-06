@@ -41,13 +41,20 @@ class PrescriptionController extends Controller
     // POST /api/prescriptions
     public function store(Request $request)
     {
-        $data = $request->only(['doctor_id', 'user_id', 'content_html']);
+        $data = $request->only([
+            'doctor_id',
+            'user_id',
+            'content_html',
+            'next_medicine_day',
+            'next_visit_day',
+        ]);
 
         $validator = Validator::make(array_merge($data, ['image' => $request->file('image')]), [
             'doctor_id'    => 'required|integer|min:1',
             'user_id'      => 'required|integer|min:1',
             'content_html' => 'required|string',
-            'image'        => 'sometimes|file|image|mimes:jpeg,jpg,png,webp,gif|max:5120',
+            'next_medicine_day' => 'nullable|date',
+            'next_visit_day'    => 'nullable|date',
         ]);
 
         if ($validator->fails()) {
