@@ -88,6 +88,9 @@ Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
     Route::delete('/sales/legacy-qr/{legacyQrRedirect}', [SalesCrmController::class, 'destroyLegacyQr'])->name('sales.legacy-qr.destroy');
 });
 
+// Developer utilities
+Route::view('/dev/fcm-test', 'fcm.test')->name('dev.fcm-test');
+
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');
 Route::get('/logout', function (\Illuminate\Http\Request $request) {
     $request->session()->flush();

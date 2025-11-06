@@ -178,6 +178,14 @@ if(App\Models\UserProfile::where('user_id', $Request->user()->id)->count() == 0)
     return response()->json(['data' =>array_merge($Request->user()->toArray(),['onboarding' => $onboarding])]);
 });
 
+// Push Notifications using FCM
+use App\Http\Controllers\Api\PushController; // late import is okay in routes
+Route::prefix('push')->group(function () {
+    Route::post('/register-token', [PushController::class, 'registerToken']);
+    Route::delete('/register-token', [PushController::class, 'unregisterToken']);
+    Route::post('/test', [PushController::class, 'testToToken']);
+});
+
 // Route::post('/send-otp', [AuthController::class, 'send_otp']);
 // Route::post('/forgot-password', [ForgotPasswordSimpleController::class, 'sendNewPassword']);
 
