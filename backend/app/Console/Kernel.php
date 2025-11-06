@@ -65,9 +65,8 @@ class Kernel extends ConsoleKernel
         })->timezone('Asia/Kolkata')->dailyAt('06:59');
 
         $schedule->command('push:process-scheduled')
-            ->everySecond()
-            ->withoutOverlapping()
-            ->runInBackground();
+            ->everyMinute()
+            ->withoutOverlapping();
     }
 
     protected function commands(): void
