@@ -58,6 +58,14 @@
 
 <script>
     const swUrl = '{{ asset('firebase-messaging-sw.js') }}';
+    let swScope = new URL(swUrl, window.location.href).pathname;
+    if (!swScope.endsWith('/')) {
+        swScope = swScope.substring(0, swScope.lastIndexOf('/') + 1);
+    }
+    if (!swScope) {
+        swScope = '/';
+    }
+    const swScopeUrl = new URL(swScope, window.location.origin).href;
     const DEFAULT_CONFIG = {
         apiKey: "AIzaSyDBTE0IA1xtFdtnMmM-EX-o0LWdNGV5F4g",
         authDomain: "snoutiqapp.firebaseapp.com",
@@ -108,7 +116,7 @@
 
     document.getElementById('btn-sw').onclick = async () => {
         try {
-            const reg = await navigator.serviceWorker.register(swUrl, { scope: '/' });
+            const reg = await navigator.serviceWorker.register(swUrl, { scope: swScope });
             display({ ok: true, serviceWorker: 'registered', scope: reg.scope });
         } catch (e) {
             display({ error: String(e) });
@@ -130,7 +138,7 @@
             const messaging = firebase.messaging(app);
             messagingInstance = messaging;
 
-            const registration = await navigator.serviceWorker.getRegistration('/') || await navigator.serviceWorker.register(swUrl, { scope: '/' });
+            const registration = await navigator.serviceWorker.getRegistration(swScopeUrl) || await navigator.serviceWorker.register(swUrl, { scope: swScope });
             const token = await messaging.getToken({ vapidKey: getVapid(), serviceWorkerRegistration: registration });
             document.getElementById('token').value = token || '';
             display({ token });
