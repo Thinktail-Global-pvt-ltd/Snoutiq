@@ -22,21 +22,34 @@ class PushController extends Controller
             'meta' => ['nullable', 'array'],
         ]);
 
-        $token = DeviceToken::updateOrCreate(
-            ['token' => $validated['token']],
-            [
-                'user_id' => Auth::id(),
-                'platform' => $validated['platform'] ?? null,
-                'device_id' => $validated['device_id'] ?? null,
-                'meta' => $validated['meta'] ?? null,
-                'last_seen_at' => now(),
-            ]
-        );
+        try {
+            $token = DeviceToken::updateOrCreate(
+                ['token' => $validated['token']],
+                [
+                    'user_id' => Auth::id(),
+                    'platform' => $validated['platform'] ?? null,
+                    'device_id' => $validated['device_id'] ?? null,
+                    'meta' => $validated['meta'] ?? null,
+                    'last_seen_at' => now(),
+                ]
+            );
 
-        return response()->json([
-            'ok' => true,
-            'id' => $token->id,
-        ]);
+            return response()->json([
+                'ok' => true,
+                'id' => $token->id,
+            ]);
+        } catch (Throwable $e) {
+            \Log::error('Failed to register FCM token', [
+                'token' => $validated['token'],
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to register token',
+                'details' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function unregisterToken(Request $request)
@@ -45,9 +58,22 @@ class PushController extends Controller
             'token' => ['required', 'string'],
         ]);
 
-        DeviceToken::where('token', $validated['token'])->delete();
+        try {
+            DeviceToken::where('token', $validated['token'])->delete();
 
-        return response()->json(['ok' => true]);
+            return response()->json(['ok' => true]);
+        } catch (Throwable $e) {
+            \Log::error('Failed to unregister FCM token', [
+                'token' => $validated['token'],
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to unregister token',
+                'details' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function testToToken(Request $request, FcmService $push)
