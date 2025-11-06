@@ -20,13 +20,13 @@
         In-clinic services are pre-selected for this setup
       </div>
     </div>
-    <div class="grid gap-6 p-6 md:grid-cols-2 lg:grid-cols-4 md:p-8">
+    <div class="grid gap-6 p-6 md:grid-cols-2 lg:grid-cols-5 md:p-8">
       <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
         <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="doctor_id">Doctor</label>
         <select id="doctor_id" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
           @if(isset($doctors) && $doctors->count())
             @foreach($doctors as $doc)
-              <option value="{{ $doc->id }}">{{ $doc->doctor_name }} (ID: {{ $doc->id }})</option>
+              <option value="{{ $doc->id }}" data-price="{{ $doc->doctors_price ?? '' }}">{{ $doc->doctor_name }} (ID: {{ $doc->id }})</option>
             @endforeach
           @else
             <option value="">No doctors found for your account</option>
@@ -57,6 +57,12 @@
         <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="max_bph">Max bookings / hour</label>
         <input type="number" id="max_bph" value="3" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
         <p class="mt-2 text-xs text-slate-500">Keep this aligned with table capacity or staff strength.</p>
+      </div>
+
+      <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
+        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="doctor_price">Consultation price (₹)</label>
+        <input type="number" id="doctor_price" step="0.01" min="0" placeholder="0.00" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+        <p class="mt-2 text-xs text-slate-500">Auto-saves when you leave the field for the selected doctor.</p>
       </div>
     </div>
   </section>
@@ -347,6 +353,70 @@
     return Number.isFinite(v) && v > 0 ? v : null;
   };
   const timeLt = (a, b) => a && b && a < b;
+  const priceInput = el('#doctor_price');
+
+  const getSelectedDoctorOption = () => {
+    const select = el('#doctor_id');
+    if (!select) return null;
+    const opts = select.selectedOptions;
+    return opts && opts.length ? opts[0] : null;
+  };
+
+  const syncDoctorPriceField = () => {
+    if (!priceInput) return;
+    const opt = getSelectedDoctorOption();
+    const val = opt ? opt.getAttribute('data-price') : '';
+    priceInput.value = val ? String(val) : '';
+  };
+
+  async function persistDoctorPrice() {
+    if (!priceInput) return;
+    const doctorId = getSelectedDoctorId();
+    if (!doctorId) {
+      toast('Select a doctor first', false);
+      return;
+    }
+
+    const raw = priceInput.value.trim();
+    if (!raw.length) {
+      toast('Enter a consultation price before saving.', false);
+      syncDoctorPriceField();
+      return;
+    }
+
+    if (!/^\d*(\.\d{0,2})?$/.test(raw)) {
+      toast('Price must be a valid number (max 2 decimals).', false);
+      syncDoctorPriceField();
+      return;
+    }
+
+    try {
+      const res  = await fetch(`${apiBase}/doctors/${doctorId}/price`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ price: raw })
+      });
+      const text = await res.text();
+      let json = null; try { json = JSON.parse(text); } catch {}
+
+      if (!res.ok || !json?.success) {
+        const message = json?.message || json?.error || text || 'Failed to save doctor price.';
+        toast(message, false);
+        syncDoctorPriceField();
+        return;
+      }
+
+      const newValue = json?.doctor_price ?? raw;
+      priceInput.value = String(newValue);
+      const opt = getSelectedDoctorOption();
+      if (opt) opt.setAttribute('data-price', String(newValue));
+      toast(json?.message || 'Doctor price saved.');
+    } catch (err) {
+      console.error('[schedule] persistDoctorPrice error', err);
+      toast(`Price save failed: ${err?.message || err}`, false);
+      syncDoctorPriceField();
+    }
+  }
 
   document.addEventListener('DOMContentLoaded', function(){
     try{
@@ -595,9 +665,32 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     const dd = el('#doctor_id');
-    if (dd && dd.options.length && dd.value) loadExistingAvailability();
+    syncDoctorPriceField();
+    if (dd && dd.options.length && dd.value) {
+      loadExistingAvailability();
+    }
 
-    dd?.addEventListener('change', loadExistingAvailability);
+    dd?.addEventListener('change', () => {
+      syncDoctorPriceField();
+      loadExistingAvailability();
+    });
+
+    priceInput?.addEventListener('blur', () => {
+      if (!priceInput.value.trim()) {
+        syncDoctorPriceField();
+        return;
+      }
+      persistDoctorPrice();
+    });
+
+    priceInput?.addEventListener('keydown', (evt) => {
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        persistDoctorPrice();
+        priceInput.blur();
+      }
+    });
+
     el('#service_type')?.addEventListener('change', loadExistingAvailability);
 
     els('.js-day-card').forEach(wireDayCard);

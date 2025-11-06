@@ -504,6 +504,7 @@ Route::get('/ml/demand-prediction', [\App\Http\Controllers\Api\MLController::cla
 Route::put('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updateAvailability']);
 Route::get('/doctors/{id}/free-slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'freeSlots']);
 Route::post('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slots']);
+Route::post('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updatePrice']);
 
 // Clinics
 Route::get('/clinics', [\App\Http\Controllers\Api\ClinicsController::class, 'index']);

@@ -332,7 +332,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         if ($vetId) {
             $doctors = Doctor::where('vet_registeration_id', $vetId)
                 ->orderBy('doctor_name')
-                ->get(['id','doctor_name']);
+                ->get(['id','doctor_name','doctors_price']);
         }
         return view('snoutiq.provider-schedule', compact('doctors', 'vetId'));
     })->name('doctor.schedule');

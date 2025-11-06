@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Doctor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,8 +61,16 @@ class DoctorScheduleController extends Controller
             return response()->json(['success' => false, 'message' => 'date is required (YYYY-MM-DD)'], 422);
         }
 
+        $doctor = Doctor::select('id', 'doctors_price')->find((int) $id);
+        if (!$doctor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor not found',
+            ], 404);
+        }
+
         try {
-            $free = $this->buildFreeSlotsForDate((int) $id, $date, $serviceType);
+            $free = $this->buildFreeSlotsForDate((int) $doctor->id, $date, $serviceType);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,
@@ -75,6 +84,7 @@ class DoctorScheduleController extends Controller
             'date' => $date,
             'service_type' => $serviceType,
             'free_slots' => $free,
+            'doctor_price' => $doctor->doctors_price !== null ? (float) $doctor->doctors_price : null,
         ]);
     }
 
@@ -115,8 +125,8 @@ class DoctorScheduleController extends Controller
         $date = $payload['date'] ?? Carbon::now($tz)->toDateString();
         $serviceType = $payload['service_type'] ?? 'in_clinic';
 
-        $exists = DB::table('doctors')->where('id', $doctorId)->exists();
-        if (!$exists) {
+        $doctor = Doctor::select('id', 'doctors_price')->find($doctorId);
+        if (!$doctor) {
             return response()->json([
                 'success' => false,
                 'message' => 'Doctor not found',
@@ -138,6 +148,32 @@ class DoctorScheduleController extends Controller
             'date' => $date,
             'service_type' => $serviceType,
             'free_slots' => $freeSlots,
+            'doctor_price' => $doctor->doctors_price !== null ? (float) $doctor->doctors_price : null,
+        ]);
+    }
+
+    public function updatePrice(Request $request, string $id)
+    {
+        $doctor = Doctor::find((int) $id);
+        if (!$doctor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor not found',
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'price' => 'required|numeric|min:0',
+        ]);
+
+        $doctor->doctors_price = $payload['price'];
+        $doctor->save();
+
+        return response()->json([
+            'success' => true,
+            'doctor_id' => (int) $doctor->id,
+            'doctor_price' => (float) $doctor->doctors_price,
+            'message' => 'Doctor price updated.',
         ]);
     }
 

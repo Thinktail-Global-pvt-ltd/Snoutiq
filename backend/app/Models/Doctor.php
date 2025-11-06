@@ -18,6 +18,7 @@ class Doctor extends Model
         'doctor_document',
         'doctor_image',
         'toggle_availability',
+        'doctors_price',
     ];
 
     /**
