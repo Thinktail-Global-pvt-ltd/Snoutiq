@@ -30,6 +30,7 @@ use App\Http\Controllers\SalesCrmController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Middleware\EnsureSalesAuthenticated;
 use App\Http\Controllers\QrTrackingController;
+use App\Http\Controllers\PushSchedulerController;
 use App\Models\LegacyQrRedirect;
 
 
@@ -90,6 +91,9 @@ Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
 
 // Developer utilities
 Route::view('/dev/fcm-test', 'fcm.test')->name('dev.fcm-test');
+Route::get('/dev/push-scheduler', [PushSchedulerController::class, 'index'])->name('dev.push-scheduler');
+Route::post('/dev/push-scheduler', [PushSchedulerController::class, 'store'])->name('dev.push-scheduler.store');
+Route::post('/dev/push-scheduler/{notification}', [PushSchedulerController::class, 'update'])->name('dev.push-scheduler.update');
 
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');
 Route::get('/logout', function (\Illuminate\Http\Request $request) {

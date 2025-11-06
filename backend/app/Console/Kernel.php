@@ -63,6 +63,11 @@ class Kernel extends ConsoleKernel
         $schedule->call(function () {
             // Aggregations can be added if needed
         })->timezone('Asia/Kolkata')->dailyAt('06:59');
+
+        $schedule->command('push:process-scheduled')
+            ->everySecond()
+            ->withoutOverlapping()
+            ->runInBackground();
     }
 
     protected function commands(): void
