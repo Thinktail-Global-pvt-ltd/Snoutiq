@@ -66,6 +66,7 @@
         swScope = '/';
     }
     const swScopeUrl = new URL(swScope, window.location.origin).href;
+    const apiBase = swScope === '/' ? '' : swScope.replace(/\/$/, '');
     const DEFAULT_CONFIG = {
         apiKey: "AIzaSyDBTE0IA1xtFdtnMmM-EX-o0LWdNGV5F4g",
         authDomain: "snoutiqapp.firebaseapp.com",
@@ -161,7 +162,9 @@
         const headers = { 'Content-Type': 'application/json' };
         const bearer = getBearer();
         if (bearer) headers['Authorization'] = 'Bearer ' + bearer;
-        const response = await fetch(path, {
+        const urlPath = path.startsWith('/') ? path : '/' + path;
+        const url = apiBase + urlPath;
+        const response = await fetch(url, {
             method,
             headers,
             body: body ? JSON.stringify(body) : undefined,
