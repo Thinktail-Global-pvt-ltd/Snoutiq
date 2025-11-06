@@ -20,13 +20,16 @@ class PushController extends Controller
             'platform' => ['nullable', 'string', Rule::in(['android', 'ios', 'web'])],
             'device_id' => ['nullable', 'string', 'max:128'],
             'meta' => ['nullable', 'array'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
+
+        $resolvedUserId = Auth::id() ?? ($validated['user_id'] ?? null);
 
         try {
             $token = DeviceToken::updateOrCreate(
                 ['token' => $validated['token']],
                 [
-                    'user_id' => Auth::id(),
+                    'user_id' => $resolvedUserId,
                     'platform' => $validated['platform'] ?? null,
                     'device_id' => $validated['device_id'] ?? null,
                     'meta' => $validated['meta'] ?? null,
@@ -37,6 +40,7 @@ class PushController extends Controller
             return response()->json([
                 'ok' => true,
                 'id' => $token->id,
+                'user_id' => $token->user_id,
             ]);
         } catch (Throwable $e) {
             \Log::error('Failed to register FCM token', [
