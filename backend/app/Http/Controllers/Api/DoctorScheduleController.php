@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -59,10 +60,99 @@ class DoctorScheduleController extends Controller
             return response()->json(['success' => false, 'message' => 'date is required (YYYY-MM-DD)'], 422);
         }
 
-        $dow = (int) date('w', strtotime($date));
+        try {
+            $free = $this->buildFreeSlotsForDate((int) $id, $date, $serviceType);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
 
-        $rows = \Illuminate\Support\Facades\DB::table('doctor_availability')
+        return response()->json([
+            'success' => true,
+            'doctor_id' => (int) $id,
+            'date' => $date,
+            'service_type' => $serviceType,
+            'free_slots' => $free,
+        ]);
+    }
+
+    public function getAvailability(Request $request, string $id)
+    {
+        $serviceType = $request->query('service_type'); // optional filter
+
+        $q = DB::table('doctor_availability')
             ->where('doctor_id', (int) $id)
+            ->where('is_active', 1)
+            ->orderBy('day_of_week')
+            ->orderBy('start_time');
+
+        if ($serviceType) {
+            $q->where('service_type', $serviceType);
+        }
+
+        $rows = $q->get();
+
+        return response()->json([
+            'success' => true,
+            'doctor_id' => (int) $id,
+            'service_type' => $serviceType,
+            'availability' => $rows,
+        ]);
+    }
+
+    public function slots(Request $request)
+    {
+        $payload = $request->validate([
+            'doctor_id' => 'required|integer',
+            'date' => 'nullable|date_format:Y-m-d',
+            'service_type' => 'nullable|string|in:video,in_clinic,home_visit',
+        ]);
+
+        $doctorId = (int) $payload['doctor_id'];
+        $tz = config('app.timezone') ?? 'UTC';
+        $date = $payload['date'] ?? Carbon::now($tz)->toDateString();
+        $serviceType = $payload['service_type'] ?? 'in_clinic';
+
+        $exists = DB::table('doctors')->where('id', $doctorId)->exists();
+        if (!$exists) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor not found',
+            ], 404);
+        }
+
+        try {
+            $freeSlots = $this->buildFreeSlotsForDate($doctorId, $date, $serviceType);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'doctor_id' => $doctorId,
+            'date' => $date,
+            'service_type' => $serviceType,
+            'free_slots' => $freeSlots,
+        ]);
+    }
+
+    private function buildFreeSlotsForDate(int $doctorId, string $date, string $serviceType): array
+    {
+        try {
+            $parsed = Carbon::parse($date, config('app.timezone'));
+        } catch (\Exception $e) {
+            throw new \InvalidArgumentException('Invalid date provided. Use YYYY-MM-DD.');
+        }
+
+        $dow = (int) $parsed->dayOfWeek;
+
+        $rows = DB::table('doctor_availability')
+            ->where('doctor_id', $doctorId)
             ->where('service_type', $serviceType)
             ->where('day_of_week', $dow)
             ->where('is_active', 1)
@@ -77,55 +167,26 @@ class DoctorScheduleController extends Controller
             $bStart = $r->break_start ? ((int) substr($r->break_start, 0, 2) * 60 + (int) substr($r->break_start, 3, 2)) : null;
             $bEnd   = $r->break_end   ? ((int) substr($r->break_end, 0, 2) * 60 + (int) substr($r->break_end, 3, 2))   : null;
             for ($t = $start; $t + $step <= $end; $t += $step) {
-                if ($bStart !== null && $bEnd !== null && $t >= $bStart && $t < $bEnd) continue;
+                if ($bStart !== null && $bEnd !== null && $t >= $bStart && $t < $bEnd) {
+                    continue;
+                }
                 $hh = str_pad((int) floor($t / 60), 2, '0', STR_PAD_LEFT);
                 $mm = str_pad($t % 60, 2, '0', STR_PAD_LEFT);
                 $allSlots[] = "$hh:$mm:00";
             }
         }
 
-        // Fetch existing bookings for that date
-        $booked = \Illuminate\Support\Facades\DB::table('bookings')
-            ->where('assigned_doctor_id', (int) $id)
-            ->whereDate('scheduled_for', $date)
-            ->whereNotIn('status', ['cancelled','failed'])
+        $booked = DB::table('bookings')
+            ->where('assigned_doctor_id', $doctorId)
+            ->whereDate('scheduled_for', $parsed->toDateString())
+            ->whereNotIn('status', ['cancelled', 'failed'])
             ->pluck('scheduled_for')
-            ->map(function($dt){ return date('H:i:00', strtotime($dt)); })
+            ->map(function ($dt) {
+                return date('H:i:00', strtotime($dt));
+            })
             ->all();
 
-        $free = array_values(array_diff($allSlots, $booked));
-
-        return response()->json([
-            'success' => true,
-            'doctor_id' => (int) $id,
-            'date' => $date,
-            'service_type' => $serviceType,
-            'free_slots' => $free,
-        ]);
+        return array_values(array_diff($allSlots, $booked));
     }
-
-    public function getAvailability(Request $request, string $id)
-{
-    $serviceType = $request->query('service_type'); // optional filter
-
-    $q = DB::table('doctor_availability')
-        ->where('doctor_id', (int)$id)
-        ->where('is_active', 1)
-        ->orderBy('day_of_week')
-        ->orderBy('start_time');
-
-    if ($serviceType) {
-        $q->where('service_type', $serviceType);
-    }
-
-    $rows = $q->get();
-
-    return response()->json([
-        'success' => true,
-        'doctor_id' => (int)$id,
-        'service_type' => $serviceType,
-        'availability' => $rows,
-    ]);
-}
 
 }
