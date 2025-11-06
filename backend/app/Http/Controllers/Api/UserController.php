@@ -235,6 +235,25 @@ $response['rating']=UserRating::where('servicer_id', $booking->user_id)->avg('ra
         'profile' => $profileData
     ]);
 }
+
+    public function updatePhone(Request $request)
+    {
+        $payload = $request->validate([
+            'user_id' => 'required|integer|exists:users,id',
+            'phone' => 'required|string|max:20',
+        ]);
+
+        $user = User::find($payload['user_id']);
+        $user->phone = $payload['phone'];
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Phone number updated successfully.',
+            'user_id' => $user->id,
+            'phone' => $user->phone,
+        ]);
+    }
 public function add_pet(Request $request)
 {
     $request->validate([
@@ -391,6 +410,5 @@ public function pet_update(Request $request, $id)
     ]);
 } 
 }
-
 
 

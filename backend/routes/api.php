@@ -463,6 +463,7 @@ Route::delete('/pets/{petId}',      [AdminController::class, 'deletePet']);
 
 Route::post('/doctor/availability', [GroomerCalenderController::class,'doctor_availability_store']);
 Route::get('/doctor/availability/suggestions', [GroomerCalenderController::class,'doctor_availability_suggestions']);
+Route::post('/users/phone', [UserController::class, 'updatePhone']);
 
 // --- Snoutiq Healthcare API (scaffold) ---
 
