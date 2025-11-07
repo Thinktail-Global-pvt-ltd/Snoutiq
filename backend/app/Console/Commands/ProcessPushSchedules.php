@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use App\Models\ScheduledPushNotification;
-use App\Jobs\BroadcastScheduledNotification;
+use App\Jobs\SendScheduledPush;
 
 class ProcessPushSchedules extends Command
 {
@@ -28,7 +28,7 @@ class ProcessPushSchedules extends Command
             ->orderBy('next_run_at')
             ->chunkById(200, function ($rows) use ($now) {
                 foreach ($rows as $s) {
-                    BroadcastScheduledNotification::dispatch($s->getKey());
+                    SendScheduledPush::dispatch($s->getKey());
 
                     $s->last_run_at = $now;
                     $s->next_run_at = $s->computeNextRun($now);
@@ -40,4 +40,3 @@ class ProcessPushSchedules extends Command
         return self::SUCCESS;
     }
 }
-

@@ -103,6 +103,11 @@
         .actions button.danger {
             background: #b91c1c;
         }
+        .actions button.disabled {
+            background: #cbd5f5;
+            color: #475569;
+            cursor: not-allowed;
+        }
         .logs-table td.token {
             font-family: ui-monospace, SFMono-Regular, SFMono, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
             font-size: 12px;
@@ -110,6 +115,75 @@
         }
         .logs-table tbody tr:nth-child(even) {
             background: #f8fafc;
+        }
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .filters .field {
+            display: flex;
+            flex-direction: column;
+            min-width: 180px;
+        }
+        .filters .actions {
+            margin-top: 4px;
+        }
+        .button-link {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #cbd5f5;
+            text-decoration: none;
+            color: #0f172a;
+            font-size: 14px;
+        }
+        .pagination {
+            margin-top: 16px;
+        }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+        .modal.open {
+            display: flex;
+        }
+        .modal-content {
+            background: #fff;
+            color: #0f172a;
+            border-radius: 12px;
+            padding: 24px;
+            width: min(480px, 92%);
+            box-shadow: 0 25px 50px rgba(15, 23, 42, 0.25);
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            border: none;
+            background: transparent;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .modal-section ul {
+            padding-left: 18px;
+        }
+        .modal-log-link {
+            display: inline-flex;
+            margin-top: 12px;
+            color: #2563eb;
+        }
+        .modal-log-link.disabled {
+            pointer-events: none;
+            opacity: 0.5;
         }
     </style>
 </head>
@@ -184,11 +258,15 @@
                             </td>
                             <td>
                                 <div class="actions">
-                                    <form method="POST" action="{{ route('dev.push-scheduler.update', $notification) }}">
-                                        @csrf
-                                        <input type="hidden" name="action" value="run_now" />
-                                        <button type="submit">Run now</button>
-                                    </form>
+                                    @if ($notification && $notification->is_active)
+                                        <form method="POST" action="{{ route('dev.push-scheduler.run-now') }}">
+                                            @csrf
+                                            <input type="hidden" name="schedule_id" value="{{ $notification->id }}" />
+                                            <button type="submit">Run now</button>
+                                        </form>
+                                    @else
+                                        <button type="button" class="disabled" disabled>Run now</button>
+                                    @endif
                                     @if ($notification->is_active)
                                         <form method="POST" action="{{ route('dev.push-scheduler.update', $notification) }}">
                                             @csrf
@@ -215,6 +293,87 @@
                 @endforeach
             </tbody>
         </table>
+    </div>
+
+    <div class="card">
+        <h2>Push run history</h2>
+        <form method="GET" action="{{ route('dev.push-scheduler') }}" class="filters">
+            <div class="field">
+                <label for="filter_trigger">Trigger</label>
+                <select id="filter_trigger" name="filter_trigger">
+                    <option value="">All triggers</option>
+                    <option value="scheduled" @selected(($filters['trigger'] ?? null) === 'scheduled')>Scheduled</option>
+                    <option value="run_now" @selected(($filters['trigger'] ?? null) === 'run_now')>Run now</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="filter_status">Status</label>
+                <select id="filter_status" name="filter_status">
+                    <option value="">All</option>
+                    <option value="success_only" @selected(($filters['status'] ?? null) === 'success_only')>Success only</option>
+                    <option value="has_failures" @selected(($filters['status'] ?? null) === 'has_failures')>Has failures</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="filter_date">Date</label>
+                <input type="date" id="filter_date" name="filter_date" value="{{ $filters['date'] ?? '' }}" />
+            </div>
+            <div class="field actions-inline">
+                <label>&nbsp;</label>
+                <div class="actions">
+                    <button type="submit" class="secondary">Apply filters</button>
+                    <a href="{{ route('dev.push-scheduler') }}" class="button-link">Reset</a>
+                </div>
+            </div>
+        </form>
+        @if ($pushRuns->count())
+            <table class="logs-table">
+                <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Trigger</th>
+                    <th>Title</th>
+                    <th>Targeted</th>
+                    <th>Success</th>
+                    <th>Fail</th>
+                    <th>Duration (ms)</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach ($pushRuns as $run)
+                    <tr>
+                        <td>{{ $run->started_at?->toDayDateTimeString() ?? '—' }}</td>
+                        <td>{{ ucfirst(str_replace('_', ' ', $run->trigger)) }}</td>
+                        <td>{{ $run->title }}</td>
+                        <td>{{ number_format($run->targeted_count) }}</td>
+                        <td class="{{ $run->failure_count > 0 ? 'status-inactive' : 'status-active' }}">{{ number_format($run->success_count) }}</td>
+                        <td class="{{ $run->failure_count > 0 ? 'status-inactive' : '' }}">{{ number_format($run->failure_count) }}</td>
+                        <td>{{ $run->duration_ms ?? '—' }}</td>
+                        <td>
+                            <div class="actions">
+                                <button
+                                    type="button"
+                                    class="secondary view-details"
+                                    data-run-id="{{ $run->id }}"
+                                    data-devices='@json($run->sample_device_ids ?? [])'
+                                    data-errors='@json($run->sample_errors ?? [])'
+                                    data-log="{{ $run->log_file ? route('dev.push-scheduler.log', $run) : '' }}"
+                                >
+                                    View details
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+            <div class="pagination">
+                {{ $pushRuns->links() }}
+            </div>
+        @else
+            <p>No runs recorded yet.</p>
+        @endif
     </div>
 
     <div class="card">
@@ -247,38 +406,84 @@
         </table>
     </div>
 
-    <div class="card">
-        <h2>Recent dispatch log</h2>
-        <table class="logs-table">
-            <thead>
-            <tr>
-                <th>Sent at</th>
-                <th>Frequency</th>
-                <th>Title</th>
-                <th>Body</th>
-                <th>User ID</th>
-                <th>Device token ID</th>
-                <th>FCM token</th>
-            </tr>
-            </thead>
-            <tbody>
-            @forelse ($logs as $log)
-                <tr>
-                    <td>{{ $log->dispatched_at?->toDayDateTimeString() }}</td>
-                    <td>{{ $log->notification?->frequency ? ($frequencies[$log->notification->frequency] ?? $log->notification->frequency) : '—' }}</td>
-                    <td>{{ $log->notification?->title ?? '—' }}</td>
-                    <td>{{ $log->notification?->body ?? '—' }}</td>
-                    <td>{{ $log->user_id ?? 'N/A' }}</td>
-                    <td>{{ $log->device_token_id ?? 'N/A' }}</td>
-                    <td class="token">{{ $log->token }}</td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="7">No dispatches recorded yet.</td>
-                </tr>
-            @endforelse
-            </tbody>
-        </table>
+    <div id="run-details-modal" class="modal" aria-hidden="true">
+        <div class="modal-content">
+            <button type="button" class="close-modal" data-close-modal>&times;</button>
+            <h3>Push run details</h3>
+            <p class="modal-run-id"></p>
+            <div class="modal-section">
+                <strong>Sample device IDs</strong>
+                <ul class="modal-devices"></ul>
+            </div>
+            <div class="modal-section">
+                <strong>Sample errors</strong>
+                <ul class="modal-errors"></ul>
+            </div>
+            <a href="#" target="_blank" rel="noopener" class="modal-log-link">Open log file</a>
+        </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('run-details-modal');
+            if (!modal) {
+                return;
+            }
+            const runText = modal.querySelector('.modal-run-id');
+            const deviceList = modal.querySelector('.modal-devices');
+            const errorList = modal.querySelector('.modal-errors');
+            const logLink = modal.querySelector('.modal-log-link');
+            const closeButtons = modal.querySelectorAll('[data-close-modal]');
+
+            document.querySelectorAll('.view-details').forEach(button => {
+                button.addEventListener('click', () => {
+                    const devices = JSON.parse(button.getAttribute('data-devices') || '[]');
+                    const errors = JSON.parse(button.getAttribute('data-errors') || '[]');
+                    const logUrl = button.getAttribute('data-log') || '#';
+                    const runId = button.getAttribute('data-run-id');
+
+                    runText.textContent = `Run ${runId}`;
+                    const renderList = (target, items, fallback) => {
+                        target.innerHTML = '';
+                        if (!items.length) {
+                            const li = document.createElement('li');
+                            li.textContent = fallback;
+                            target.appendChild(li);
+                            return;
+                        }
+                        items.forEach(item => {
+                            const li = document.createElement('li');
+                            li.textContent = item;
+                            target.appendChild(li);
+                        });
+                    };
+                    renderList(deviceList, devices, 'No samples available.');
+                    renderList(errorList, errors, 'No errors recorded.');
+                    logLink.href = logUrl;
+                    logLink.classList.toggle('disabled', !logUrl);
+
+                    modal.setAttribute('aria-hidden', 'false');
+                    modal.classList.add('open');
+                });
+            });
+
+            const closeModal = () => {
+                modal.setAttribute('aria-hidden', 'true');
+                modal.classList.remove('open');
+            };
+
+            closeButtons.forEach(button => button.addEventListener('click', closeModal));
+            modal.addEventListener('click', event => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && modal.classList.contains('open')) {
+                    closeModal();
+                }
+            });
+        });
+    </script>
 </body>
 </html>

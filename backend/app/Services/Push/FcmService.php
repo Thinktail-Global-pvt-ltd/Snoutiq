@@ -8,6 +8,7 @@ use Kreait\Firebase\Messaging\Notification;
 use App\Models\DeviceToken;
 use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Firebase\Exception\MessagingException;
+use Kreait\Firebase\Messaging\MulticastSendReport;
 use Throwable;
 
 class FcmService
@@ -36,17 +37,21 @@ class FcmService
      * @param array<int,string> $tokens
      * @param array<string,string> $data
      */
-    public function sendMulticast(array $tokens, string $title, string $body, array $data = []): void
+    public function sendMulticast(array $tokens, string $title, string $body, array $data = []): array
     {
         if (empty($tokens)) {
-            return;
+            return [
+                'success' => 0,
+                'failure' => 0,
+                'results' => [],
+            ];
         }
 
         $message = CloudMessage::new()
             ->withNotification(Notification::create($title, $body))
             ->withData($data);
 
-        $this->sendMulticastMessage($message, $tokens);
+        return $this->sendMulticastMessage($message, $tokens);
     }
 
     /**
@@ -95,10 +100,10 @@ class FcmService
     /**
      * @param array<int,string> $tokens
      */
-    private function sendMulticastMessage(CloudMessage $message, array $tokens): void
+    private function sendMulticastMessage(CloudMessage $message, array $tokens): array
     {
         try {
-            $this->messaging->sendMulticast($message, $tokens);
+            $report = $this->messaging->sendMulticast($message, $tokens);
         } catch (MessagingException | FirebaseException | Throwable $e) {
             \Log::error('FCM multicast send failed', [
                 'tokens' => $tokens,
@@ -106,5 +111,36 @@ class FcmService
             ]);
             throw $e;
         }
+
+        return [
+            'success' => $report->successes()->count(),
+            'failure' => $report->failures()->count(),
+            'results' => $this->mapMulticastResults($report),
+        ];
+    }
+
+    /**
+     * @return array<string,array<string,mixed>>
+     */
+    private function mapMulticastResults(MulticastSendReport $report): array
+    {
+        $results = [];
+        foreach ($report->getItems() as $sendReport) {
+            $token = $sendReport->target()->value();
+
+            if ($sendReport->isSuccess()) {
+                $results[$token] = ['ok' => true];
+                continue;
+            }
+
+            $error = $sendReport->error();
+            $results[$token] = [
+                'ok' => false,
+                'code' => $error?->getCode(),
+                'error' => $error?->getMessage(),
+            ];
+        }
+
+        return $results;
     }
 }

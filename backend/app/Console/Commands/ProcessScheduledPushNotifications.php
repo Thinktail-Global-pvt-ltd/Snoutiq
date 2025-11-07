@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\BroadcastScheduledNotification;
+use App\Jobs\SendScheduledPush;
 use App\Models\ScheduledPushNotification;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -50,7 +50,7 @@ class ProcessScheduledPushNotifications extends Command
             $notification->next_run_at = $notification->computeNextRun($now);
             $notification->save();
 
-            BroadcastScheduledNotification::dispatchSync($notification->getKey());
+            SendScheduledPush::dispatch($notification->getKey());
         }
 
         $this->info("Dispatched {$due->count()} scheduled push notifications.");

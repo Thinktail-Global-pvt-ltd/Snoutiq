@@ -93,6 +93,8 @@ Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
 Route::view('/dev/fcm-test', 'fcm.test')->name('dev.fcm-test');
 Route::get('/dev/push-scheduler', [PushSchedulerController::class, 'index'])->name('dev.push-scheduler');
 Route::post('/dev/push-scheduler', [PushSchedulerController::class, 'store'])->name('dev.push-scheduler.store');
+Route::post('/dev/push-scheduler/run-now', [PushSchedulerController::class, 'runNow'])->name('dev.push-scheduler.run-now');
+Route::get('/dev/push-scheduler/logs/{run}', [PushSchedulerController::class, 'showLog'])->name('dev.push-scheduler.log');
 Route::post('/dev/push-scheduler/{notification}', [PushSchedulerController::class, 'update'])->name('dev.push-scheduler.update');
 
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');

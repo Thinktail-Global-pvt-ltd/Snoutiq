@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ScheduledPushNotification as S;
+use App\Services\PushService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -34,7 +35,7 @@ class SendFcmEvery10Seconds implements ShouldQueue, ShouldBeUnique
         return 'fcm10:' . $this->scheduleId;
     }
 
-    public function handle(): void
+    public function handle(PushService $pushService): void
     {
         $lock = null;
         $store = Cache::getStore();
@@ -51,15 +52,45 @@ class SendFcmEvery10Seconds implements ShouldQueue, ShouldBeUnique
                 return;
             }
 
-            BroadcastScheduledNotification::dispatchSync($schedule->getKey());
+            $jobId = $this->job?->getJobId();
+            $pushService->broadcast(
+                $schedule,
+                $schedule->title,
+                $schedule->body ?? '',
+                'scheduled',
+                'SendFcmEvery10Seconds@handle → PushService@broadcast',
+                $jobId
+            );
             $schedule->forceFill(['last_run_at' => now()])->save();
 
-            // keep the loop alive with a 10s delay
-            self::dispatch($schedule->getKey())->delay(now()->addSeconds(10));
+            $this->dispatchNext();
         } finally {
             if ($lock) {
                 $lock->release();
             }
         }
+    }
+
+    protected function dispatchNext(): void
+    {
+        $pending = static::dispatch($this->scheduleId);
+
+        if ($connection = static::preferredConnection()) {
+            $pending->onConnection($connection);
+        }
+
+        $pending->delay(10);
+    }
+
+    public static function preferredConnection(): ?string
+    {
+        $default = config('queue.default');
+        $databaseConfigured = ! empty(config('queue.connections.database'));
+
+        if ($default === 'sync' && $databaseConfigured) {
+            return 'database';
+        }
+
+        return null;
     }
 }
