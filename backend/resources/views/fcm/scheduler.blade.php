@@ -177,10 +177,10 @@
                             </td>
                             <td>{{ $notification->title }}</td>
                             <td>
-                                {{ optional($notification->next_run_at)->toDayDateTimeString() ?? 'Not scheduled' }}
+                                {{ $notification->next_run_at?->toDayDateTimeString() ?? '—' }}
                             </td>
                             <td>
-                                {{ optional($notification->last_run_at)->toDayDateTimeString() ?? 'Never' }}
+                                {{ $notification->last_run_at?->toDayDateTimeString() ?? '—' }}
                             </td>
                             <td>
                                 <div class="actions">

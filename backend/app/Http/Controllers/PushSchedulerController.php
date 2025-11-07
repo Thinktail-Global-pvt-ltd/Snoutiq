@@ -98,7 +98,7 @@ class PushSchedulerController extends Controller
                 optional($notification->next_run_at)->toDayDateTimeString()
             );
         } elseif ($action === 'run_now') {
-            BroadcastScheduledNotification::dispatchSync($notification->getKey());
+            BroadcastScheduledNotification::dispatch($notification->getKey());
             $notification->last_run_at = $now;
             $notification->next_run_at = $notification->computeNextRun($now);
             $notification->save();

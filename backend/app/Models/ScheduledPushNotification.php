@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 
 class ScheduledPushNotification extends Model
 {
@@ -42,6 +41,11 @@ class ScheduledPushNotification extends Model
         'last_run_at' => 'datetime',
     ];
 
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
     public static function frequencyLabels(): array
     {
         return [
@@ -52,14 +56,16 @@ class ScheduledPushNotification extends Model
         ];
     }
 
-    public function computeNextRun(Carbon $reference): Carbon
+    /**
+     * Compute the next run from a reference time for minute+ cadences.
+     */
+    public function computeNextRun(\Illuminate\Support\Carbon $ref): \Illuminate\Support\Carbon
     {
         return match ($this->frequency) {
-            self::FREQUENCY_TEN_SECONDS => $reference->copy()->addSeconds(10),
-            self::FREQUENCY_DAILY => $reference->copy()->addDay(),
-            self::FREQUENCY_WEEKLY => $reference->copy()->addWeek(),
-            self::FREQUENCY_MONTHLY => $reference->copy()->addMonth(),
-            default => $reference->copy()->addMinute(),
+            self::FREQUENCY_DAILY => $ref->copy()->addDay(),
+            self::FREQUENCY_WEEKLY => $ref->copy()->addWeek(),
+            self::FREQUENCY_MONTHLY => $ref->copy()->addMonth(),
+            default => $ref->copy()->addMinute(),
         };
     }
 }
