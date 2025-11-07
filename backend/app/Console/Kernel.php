@@ -64,7 +64,7 @@ class Kernel extends ConsoleKernel
             // Aggregations can be added if needed
         })->timezone('Asia/Kolkata')->dailyAt('06:59');
 
-        $schedule->command('push:process-schedules')
+        $schedule->command('push:process-scheduled')
             ->everyMinute()
             ->withoutOverlapping();
     }
