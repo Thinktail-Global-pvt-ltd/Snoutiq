@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\File;
 
 use Illuminate\Support\Facades\DB;
 
+use Illuminate\Validation\Rule;
+
+use App\Services\WhatsAppService;
+
 use App\Models\ChatRoom;
 use App\Models\Pet;
 use App\Models\Doctor;
@@ -27,6 +31,9 @@ use App\Support\GeminiConfig;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly WhatsAppService $whatsApp)
+    {
+    }
     
     public function describePetImage()
     {
@@ -91,6 +98,48 @@ class AuthController extends Controller
         return User::where('api_token_hash', $hash)->first();
     }
 
+    private function shouldCheckUniqueness(Request $request): bool
+    {
+        $flag = $request->input('unique');
+
+        if (is_bool($flag)) {
+            return $flag;
+        }
+
+        if (is_numeric($flag)) {
+            return (bool) $flag;
+        }
+
+        if (is_string($flag)) {
+            return in_array(strtolower($flag), ['1', 'true', 'yes'], true);
+        }
+
+        return false;
+    }
+
+    private function normalizePhone(?string $raw): ?string
+    {
+        if (!$raw) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $raw);
+
+        if (!$digits) {
+            return null;
+        }
+
+        if (str_starts_with($digits, '91') && strlen($digits) >= 12) {
+            return substr($digits, 0, 12);
+        }
+
+        if (strlen($digits) === 10) {
+            return '91' . $digits;
+        }
+
+        return $digits;
+    }
+
     // -------------------------- OTP SEND -----------------------------------
     // public function send_otp(Request $request){
     //     $request->validate([
@@ -144,52 +193,87 @@ class AuthController extends Controller
 
 
     public function send_otp(Request $request)
-{
-    try {
-        $request->validate([
-            'value' => 'required|email'
-        ]);
+    {
+        try {
+            $request->validate([
+                'type' => ['nullable', Rule::in(['email', 'whatsapp'])],
+                'value' => 'required|string',
+            ]);
 
-        $value     = $request->input('value');   // email address
-        $otp       = rand(1000, 9999);
-        $token     = Str::uuid(); // track request
-        $expiresAt = Carbon::now()->addMinutes(10);
+            $type = $request->input('type', 'email');
+            $rawValue = trim((string) $request->input('value'));
+            $otp = random_int(1000, 9999);
+            $token = (string) Str::uuid();
+            $expiresAt = Carbon::now()->addMinutes(10);
+            $normalizedPhone = null;
 
-        if ($request->input("unique") === "yes") {
-            $user = User::where('email', $value)->first();
-            if ($user) {
-                return response()->json([
-                    'message' => 'Email is already registered with us',
-                ], 401);
+            if ($type === 'email') {
+                $request->merge(['value' => $rawValue]);
+                $request->validate(['value' => 'email']);
+            } else {
+                $normalizedPhone = $this->normalizePhone($rawValue);
+
+                if (! $normalizedPhone) {
+                    return response()->json([
+                        'message' => 'Invalid phone number for WhatsApp verification',
+                    ], 422);
+                }
+
+                if (! $this->whatsApp->isConfigured()) {
+                    return response()->json([
+                        'message' => 'WhatsApp channel is temporarily unavailable',
+                    ], 503);
+                }
             }
+
+            if ($this->shouldCheckUniqueness($request)) {
+                $column = $type === 'email' ? 'email' : 'phone';
+                $valueToCheck = $type === 'email' ? $rawValue : $normalizedPhone;
+
+                $exists = User::query()
+                    ->where($column, $valueToCheck)
+                    ->when($type === 'whatsapp' && $normalizedPhone !== $rawValue, function ($query) use ($column, $rawValue) {
+                        $query->orWhere($column, $rawValue);
+                    })
+                    ->exists();
+
+                if ($exists) {
+                    return response()->json([
+                        'message' => ucfirst($column).' is already registered with us',
+                    ], 401);
+                }
+            }
+
+            if ($type === 'email') {
+                Mail::to($rawValue)->send(new OtpMail($otp));
+            } else {
+                $message = "Your SnoutIQ verification code is {$otp}. It expires in 10 minutes.";
+                $this->whatsApp->sendText($normalizedPhone, $message);
+            }
+
+            Otp::create([
+                'token'       => $token,
+                'type'        => $type,
+                'value'       => $type === 'email' ? $rawValue : $normalizedPhone,
+                'otp'         => $otp,
+                'expires_at'  => $expiresAt,
+                'is_verified' => 0,
+            ]);
+
+            return response()->json([
+                'message' => 'OTP sent successfully',
+                'channel' => $type,
+                'otp'     => config('app.debug') ? $otp : 'hidden',
+                'token'   => $token,
+            ], 200);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'Something went wrong while sending OTP',
+            ], 500);
         }
-
-        // Send OTP via Email
-        Mail::to($value)->send(new OtpMail($otp));
-
-        // Save OTP record in DB
-        Otp::create([
-            'token'       => $token,
-            'type'        => 'email',
-            'value'       => $value,
-            'otp'         => $otp,
-            'expires_at'  => $expiresAt,
-            'is_verified' => 0,
-        ]);
-
-        return response()->json([
-            'message' => 'OTP sent successfully',
-            'otp'     => 'hidden', // ⚠️ Debug ke liye rakh sakte ho, prod me hata do
-            'token'   => $token
-        ], 200);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'message' => 'Something went wrong while sending OTP',
-            'error'   => $e->getMessage(), // ⚠️ Prod me isko hata dena, sirf dev me rakhna
-        ], 500);
     }
-}
 
 //     public function send_otp(Request $request)
 // {

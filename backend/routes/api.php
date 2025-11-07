@@ -186,10 +186,10 @@ Route::prefix('push')->group(function () {
     Route::post('/test', [PushController::class, 'testToToken']);
 });
 
-// Route::post('/send-otp', [AuthController::class, 'send_otp']);
+Route::post('/send-otp', [AuthController::class, 'send_otp']);
 // Route::post('/forgot-password', [ForgotPasswordSimpleController::class, 'sendNewPassword']);
 
-// Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
+Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
 // Route::post('/login', [AuthController::class , 'login']);
 // Route::post('/register', [AuthController::class, 'register']);
 
