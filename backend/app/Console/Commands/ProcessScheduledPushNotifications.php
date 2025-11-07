@@ -32,6 +32,7 @@ class ProcessScheduledPushNotifications extends Command
 
         $due = ScheduledPushNotification::query()
             ->where('is_active', true)
+            ->where('frequency', '!=', ScheduledPushNotification::FREQUENCY_TEN_SECONDS)
             ->where(function ($query) use ($now) {
                 $query->whereNull('next_run_at')
                     ->orWhere('next_run_at', '<=', $now);

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\DeviceToken;
 use App\Models\ScheduledPushNotification;
 use App\Models\ScheduledPushDispatchLog;
+use App\Models\User;
 use App\Services\Push\FcmService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -66,10 +67,15 @@ class BroadcastScheduledNotification implements ShouldQueue
                 $payloadJson = empty($data) ? null : json_encode($data);
 
                 $logRows = $tokens->map(function (DeviceToken $token) use ($notification, $payloadJson, $timestamp) {
+                    $userId = $token->user_id ?: null;
+                    if ($userId && ! User::whereKey($userId)->exists()) {
+                        $userId = null;
+                    }
+
                     return [
                         'scheduled_push_notification_id' => $notification->getKey(),
                         'device_token_id' => $token->id,
-                        'user_id' => $token->user_id,
+                        'user_id' => $userId,
                         'token' => $token->token,
                         'payload' => $payloadJson,
                         'dispatched_at' => $timestamp,

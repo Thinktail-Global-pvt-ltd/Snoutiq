@@ -10,6 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Contracts\Cache\LockProvider;
+use App\Jobs\SendFcmEvery10Seconds;
 use Illuminate\Validation\Rule;
 
 class PushSchedulerController extends Controller
@@ -98,11 +101,35 @@ class PushSchedulerController extends Controller
                 optional($notification->next_run_at)->toDayDateTimeString()
             );
         } elseif ($action === 'run_now') {
-            BroadcastScheduledNotification::dispatch($notification->getKey());
-            $notification->last_run_at = $now;
-            $notification->next_run_at = $notification->computeNextRun($now);
-            $notification->save();
-            $message = sprintf('Queued immediate push for %s schedule.', ScheduledPushNotification::frequencyLabels()[$notification->frequency] ?? $notification->frequency);
+            if ($notification->frequency === ScheduledPushNotification::FREQUENCY_TEN_SECONDS) {
+                $store   = Cache::getStore();
+                $proceed = true;
+
+                if ($store instanceof LockProvider) {
+                    $starter = Cache::lock('fcm10:start:' . $notification->getKey(), 9);
+                    $proceed = $starter->get();
+                }
+
+                if ($proceed) {
+                    SendFcmEvery10Seconds::dispatch($notification->getKey());
+                    $notification->last_run_at = $now;
+                    $notification->save();
+
+                    if (isset($starter)) {
+                        $starter->release();
+                    }
+                }
+            } else {
+                BroadcastScheduledNotification::dispatch($notification->getKey());
+                $notification->last_run_at = $now;
+                $notification->next_run_at = $notification->computeNextRun($now);
+                $notification->save();
+            }
+
+            $message = sprintf(
+                'Queued immediate push for %s schedule.',
+                ScheduledPushNotification::frequencyLabels()[$notification->frequency] ?? $notification->frequency
+            );
         }
 
         return redirect()
