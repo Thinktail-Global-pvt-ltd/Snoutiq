@@ -80,6 +80,12 @@ return [
             'days' => 14,
         ],
 
+        'founder' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/founder_dashboard.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

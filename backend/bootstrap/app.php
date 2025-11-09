@@ -1,7 +1,8 @@
 <?php
 
-use Illuminate\Foundation\Application;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -11,7 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
-    ->withMiddleware()
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->appendToGroup('api', [
+            \App\Http\Middleware\FormatJsonResponse::class,
+        ]);
+    })
     ->withSchedule(function (Schedule $schedule) {
         // ✅ Har minute test ke liye
         $schedule->command('weather:fetch 28.6139 77.2090')->everyFourHours();
