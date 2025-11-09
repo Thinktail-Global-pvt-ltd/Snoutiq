@@ -99,6 +99,13 @@ use App\Http\Controllers\Api\DoctorStatusController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\ClinicsController;
 use App\Http\Controllers\Api\DraftClinicController;
+use App\Http\Controllers\Api\Founder\AlertController as FounderAlertController;
+use App\Http\Controllers\Api\Founder\ClinicController as FounderClinicController;
+use App\Http\Controllers\Api\Founder\DashboardController as FounderDashboardController;
+use App\Http\Controllers\Api\Founder\RevenueController as FounderRevenueController;
+use App\Http\Controllers\Api\Founder\SalesController as FounderSalesController;
+use App\Http\Controllers\Api\Founder\SettingController as FounderSettingController;
+
 
 
 Route::get('/weather/latest', [WeatherLogController::class, 'latest']);
@@ -659,4 +666,17 @@ Route::get('/video/slots/doctor-test', function (\Illuminate\Http\Request $reque
         'count'     => $mapped->count(),
         'slots'     => $mapped,
     ]);
+});
+
+Route::middleware([\App\Http\Middleware\FounderRequestLogger::class])->prefix('founder')->group(function () {
+    Route::get('dashboard', [FounderDashboardController::class, 'index']);
+    Route::get('clinics', [FounderClinicController::class, 'index']);
+    Route::get('clinics/{clinic}', [FounderClinicController::class, 'show']);
+    Route::get('sales', [FounderSalesController::class, 'index']);
+    Route::get('revenue', [FounderRevenueController::class, 'index']);
+    Route::get('alerts', [FounderAlertController::class, 'index']);
+    Route::patch('alerts/{alert}/read', [FounderAlertController::class, 'markRead']);
+    Route::patch('alerts/read-all', [FounderAlertController::class, 'markAllRead']);
+    Route::get('settings', [FounderSettingController::class, 'show']);
+    Route::patch('settings', [FounderSettingController::class, 'update']);
 });

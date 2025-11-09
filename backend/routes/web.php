@@ -4,6 +4,9 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 use App\Http\Controllers\VetLandingController;
 use App\Http\Controllers\Admin\AdminOnboardingStatusPageController;
 use App\Http\Controllers\Admin\AdminVideoSlotOverviewController;
@@ -91,6 +94,27 @@ Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
 
 // Developer utilities
 Route::view('/dev/fcm-test', 'fcm.test')->name('dev.fcm-test');
+Route::get('/dev/api-documentation', function () {
+    $docPath = resource_path('docs/api_documentation.md');
+
+    if (! File::exists($docPath)) {
+        abort(404, 'API documentation file not found.');
+    }
+
+    $markdown = File::get($docPath);
+    $documentationHtml = Str::markdown($markdown, [
+        'html_input' => 'allow',
+        'allow_unsafe_links' => false,
+    ]);
+    $lastUpdated = Carbon::createFromTimestamp(File::lastModified($docPath));
+
+    return view('documentation.api', [
+        'documentationHtml' => $documentationHtml,
+        'lastUpdatedHuman' => $lastUpdated->copy()->timezone('Asia/Kolkata')->toDayDateTimeString(),
+        'lastUpdatedIso' => $lastUpdated->toIso8601String(),
+        'docSourcePath' => 'resources/docs/api_documentation.md',
+    ]);
+})->name('dev.api-documentation');
 Route::get('/dev/push-scheduler', [PushSchedulerController::class, 'index'])->name('dev.push-scheduler');
 Route::post('/dev/push-scheduler', [PushSchedulerController::class, 'store'])->name('dev.push-scheduler.store');
 Route::post('/dev/push-scheduler/run-now', [PushSchedulerController::class, 'runNow'])->name('dev.push-scheduler.run-now');
@@ -184,6 +208,10 @@ Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
     Route::match(['put', 'patch'], '/admin/tags/{tag}', [TagController::class, 'update'])->name('admin.tags.update');
     Route::delete('/admin/tags/{tag}', [TagController::class, 'destroy'])->name('admin.tags.destroy');
 });
+
+Route::middleware([EnsureAdminAuthenticated::class])->get('/founder/dashboard', function () {
+    return view('founder.dashboard');
+})->name('founder.dashboard');
 
 // Video consult entry points (public views)
 // Patient-facing lobby to pick a doctor and place a call

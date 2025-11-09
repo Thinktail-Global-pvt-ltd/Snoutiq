@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Razorpay\Api\Api;
 use Razorpay\Api\Errors\Error as RazorpayError;
 use App\Models\Payment;
+use App\Models\Transaction;
+use App\Models\Clinic;
 
 class PaymentController extends Controller
 {
@@ -137,6 +139,18 @@ class PaymentController extends Controller
                 ]
             );
 
+            $this->recordTransaction(
+                request: $request,
+                payment: $record,
+                amount: $amount,
+                status: $status,
+                method: $method,
+                notes: $notes,
+                currency: $currency,
+                email: $email,
+                contact: $contact
+            );
+
             return response()->json([
                 'success'  => true,
                 'verified' => true,
@@ -162,5 +176,59 @@ class PaymentController extends Controller
                 'error'   => $e->getMessage(),
             ], 500);
         }
+    }
+
+    protected function recordTransaction(Request $request, Payment $payment, ?int $amount, ?string $status, ?string $method, array $notes, ?string $currency, ?string $email, ?string $contact): void
+    {
+        try {
+            $clinicId = $this->resolveClinicId($request, $notes);
+            if (! $clinicId) {
+                return;
+            }
+
+            Transaction::create([
+                'clinic_id' => $clinicId,
+                'amount_paise' => (int) ($amount ?? 0),
+                'status' => $status ?? 'pending',
+                'type' => $notes['service_id'] ?? 'payment',
+                'payment_method' => $method,
+                'reference' => $payment->razorpay_payment_id,
+                'metadata' => [
+                    'order_id' => $payment->razorpay_order_id,
+                    'currency' => $currency,
+                    'email' => $email,
+                    'contact' => $contact,
+                    'notes' => $notes,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    protected function resolveClinicId(Request $request, array $notes): ?int
+    {
+        $directId = $request->input('clinic_id') ?? $notes['clinic_id'] ?? null;
+        if ($directId) {
+            $clinic = Clinic::find($directId);
+            if ($clinic) {
+                return $clinic->id;
+            }
+        }
+
+        $clinic = Clinic::query()->first();
+        if ($clinic) {
+            return $clinic->id;
+        }
+
+        $clinic = Clinic::create([
+            'name' => 'General Clinic',
+            'status' => 'active',
+            'city' => 'Unknown',
+            'state' => 'Unknown',
+            'country' => 'India',
+        ]);
+
+        return $clinic->id;
     }
 }

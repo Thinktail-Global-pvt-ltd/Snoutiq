@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\ScheduledPushNotification;
 use App\Models\DeviceToken;
 use App\Models\PushRun;
+use App\Services\Logging\FounderAudit;
 use App\Services\PushService;
+use App\Support\QueryTracker;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -159,6 +161,15 @@ class PushSchedulerController extends Controller
             'schedule_id' => ['nullable', 'integer', 'exists:scheduled_push_notifications,id'],
         ]);
 
+        $handler = 'PushSchedulerController@runNow';
+        $tracker = new QueryTracker();
+        $tracker->start();
+        $startedAt = microtime(true);
+        $run = null;
+        $response = null;
+
+        FounderAudit::info('run_now.start', ['handler' => $handler]);
+
         $schedule = null;
 
         if (! empty($validated['schedule_id'])) {
@@ -176,30 +187,54 @@ class PushSchedulerController extends Controller
         }
 
         if (! $schedule) {
-            return redirect()
+            $response = redirect()
                 ->route('dev.push-scheduler')
                 ->withErrors(['schedule_id' => 'No active schedule found to run immediately.']);
+        } else {
+            try {
+                $run = $this->pushService->broadcast(
+                    $schedule,
+                    $schedule->title,
+                    $schedule->body ?? 'Snoutiq scheduled notification',
+                    'run_now',
+                    'PushSchedulerController@runNow → PushService@broadcast'
+                );
+
+                $response = redirect()
+                    ->route('dev.push-scheduler')
+                    ->with('status', sprintf('Queued immediate push (run %s).', $run->id));
+            } catch (Throwable $e) {
+                report($e);
+                FounderAudit::error('run_now.exception', $e, ['handler' => $handler]);
+
+                $response = redirect()
+                    ->route('dev.push-scheduler')
+                    ->withErrors(['run_now' => 'Failed to queue push: '.$e->getMessage()]);
+            }
         }
 
-        try {
-            $run = $this->pushService->broadcast(
-                $schedule,
-                $schedule->title,
-                $schedule->body ?? 'Snoutiq scheduled notification',
-                'run_now',
-                'PushSchedulerController@runNow → PushService@broadcast'
-            );
-        } catch (Throwable $e) {
-            report($e);
+        $dbMetrics = $tracker->finish();
+        FounderAudit::info('run_now.db', $dbMetrics + ['handler' => $handler]);
 
-            return redirect()
+        if ($run) {
+            FounderAudit::info('run_now.fcm', [
+                'handler' => $handler,
+                'run_id' => $run->id,
+                'targeted' => $run->targeted_count,
+                'success' => $run->success_count,
+                'failed' => $run->failure_count,
+            ]);
+        }
+
+        FounderAudit::info('run_now.end', [
+            'handler' => $handler,
+            'durationMs' => (int) ((microtime(true) - $startedAt) * 1000),
+        ]);
+
+        return $response
+            ?? redirect()
                 ->route('dev.push-scheduler')
-                ->withErrors(['run_now' => 'Failed to queue push: '.$e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('dev.push-scheduler')
-            ->with('status', sprintf('Queued immediate push (run %s).', $run->id));
+                ->withErrors(['schedule_id' => 'Unable to run push notification.']);
     }
 
     public function showLog(PushRun $run): BinaryFileResponse
