@@ -139,6 +139,9 @@
     <p id="error" class="error" hidden></p>
 
     <script>
+        const inBackend = window.location.pathname.startsWith('/backend');
+        const apiBase = inBackend ? '/backend/api' : '/api';
+
         const state = {
             alerts: [],
             alertFilter: 'all',
@@ -217,7 +220,7 @@
 
         async function loadDashboard() {
             try {
-                const response = await fetch('/api/founder/dashboard', {
+                const response = await fetch(`${apiBase}/founder/dashboard`, {
                     headers: { 'Accept': 'application/json' },
                     credentials: 'same-origin',
                 });
