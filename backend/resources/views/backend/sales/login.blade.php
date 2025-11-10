@@ -119,8 +119,8 @@
                 <input id="email" name="email" type="email" value="{{ old('email', 'sales@admin.com') }}" required>
             </div>
             <div>
-                <label for="passcode">Passcode</label>
-                <input id="passcode" name="passcode" type="password" placeholder="Enter passcode" required>
+                <label for="password">Passcode</label>
+                <input id="password" name="password" type="password" placeholder="Enter passcode" required>
                 <p class="note">Need access? Ping SnoutIQ admin to get the passcode.</p>
             </div>
             <button type="submit">Sign in</button>

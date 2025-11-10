@@ -13,7 +13,15 @@ class DoctorController extends Controller
     public function index(Request $request)
     {
         $query = DB::table('doctors')
-            ->select('id', 'doctor_name', 'doctor_email', 'doctor_mobile', 'doctor_license', 'vet_registeration_id')
+            ->select(
+                'id',
+                'doctor_name',
+                'doctor_email',
+                'doctor_mobile',
+                'doctor_license',
+                'vet_registeration_id',
+                'doctors_price'
+            )
             ->orderBy('doctor_name');
 
         $vetId = $request->input('vet_id');
@@ -38,14 +46,30 @@ class DoctorController extends Controller
     public function show(int $id)
     {
         $doctor = DB::table('doctors')
-            ->select('id', 'doctor_name', 'doctor_email', 'doctor_mobile', 'doctor_license', 'vet_registeration_id')
+            ->select(
+                'id',
+                'doctor_name',
+                'doctor_email',
+                'doctor_mobile',
+                'doctor_license',
+                'vet_registeration_id',
+                'doctors_price'
+            )
             ->where('id', $id)
             ->first();
 
         // If not found by doctor primary key, treat the id as vet_registeration_id (legacy behaviour)
         if (!$doctor) {
             $doctor = DB::table('doctors')
-                ->select('id', 'doctor_name', 'doctor_email', 'doctor_mobile', 'doctor_license', 'vet_registeration_id')
+                ->select(
+                    'id',
+                    'doctor_name',
+                    'doctor_email',
+                    'doctor_mobile',
+                    'doctor_license',
+                    'vet_registeration_id',
+                    'doctors_price'
+                )
                 ->where('vet_registeration_id', $id)
                 ->orderBy('id')
                 ->first();
