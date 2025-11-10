@@ -7,6 +7,7 @@ use App\Models\Doctor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DoctorScheduleController extends Controller
 {
@@ -152,6 +153,68 @@ class DoctorScheduleController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/doctors/{id}/slots
+     *
+     * Wrapper around slots() so consumers can hit a RESTful doctor-specific URL.
+     */
+    public function slotsByDoctor(Request $request, string $id)
+    {
+        $request->merge(['doctor_id' => (int) $id]);
+        return $this->slots($request);
+    }
+
+    /**
+     * GET /api/doctors/{id}/slots/summary
+     *
+     * Returns both free slots (derived from availability) and the booked slots
+     * stored via appointments/legacy bookings for a given doctor & date.
+     */
+    public function slotsSummary(Request $request, string $id)
+    {
+        $payload = $request->validate([
+            'date' => 'nullable|date_format:Y-m-d',
+            'service_type' => 'nullable|string|in:video,in_clinic,home_visit',
+        ]);
+
+        $doctorId = (int) $id;
+        $tz = config('app.timezone') ?? 'UTC';
+        $date = $payload['date'] ?? Carbon::now($tz)->toDateString();
+        $serviceType = $payload['service_type'] ?? 'in_clinic';
+
+        $doctor = Doctor::select('id', 'doctor_name', 'doctors_price')->find($doctorId);
+        if (!$doctor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor not found',
+            ], 404);
+        }
+
+        try {
+            $freeSlots = $this->buildFreeSlotsForDate($doctorId, $date, $serviceType);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        $bookedSlots = $this->getBookedSlotDetails($doctorId, $date);
+
+        return response()->json([
+            'success' => true,
+            'doctor' => [
+                'id' => (int) $doctor->id,
+                'name' => $doctor->doctor_name,
+                'price' => $doctor->doctors_price !== null ? (float) $doctor->doctors_price : null,
+            ],
+            'date' => $date,
+            'service_type' => $serviceType,
+            'free_slots' => $freeSlots,
+            'booked_slots' => $bookedSlots,
+        ]);
+    }
+
     public function updatePrice(Request $request, string $id)
     {
         $doctor = Doctor::find((int) $id);
@@ -212,17 +275,142 @@ class DoctorScheduleController extends Controller
             }
         }
 
-        $booked = DB::table('bookings')
-            ->where('assigned_doctor_id', $doctorId)
-            ->whereDate('scheduled_for', $parsed->toDateString())
-            ->whereNotIn('status', ['cancelled', 'failed'])
-            ->pluck('scheduled_for')
-            ->map(function ($dt) {
-                return date('H:i:00', strtotime($dt));
-            })
-            ->all();
+        $booked = $this->getBookedTimesForDate($doctorId, $parsed);
 
         return array_values(array_diff($allSlots, $booked));
     }
 
+    private function getBookedTimesForDate(int $doctorId, Carbon $parsed): array
+    {
+        $times = [];
+
+        if (Schema::hasTable('bookings')) {
+            $times = array_merge($times, DB::table('bookings')
+                ->where('assigned_doctor_id', $doctorId)
+                ->whereDate('scheduled_for', $parsed->toDateString())
+                ->whereNotNull('scheduled_for')
+                ->whereNotIn('status', ['cancelled', 'failed'])
+                ->pluck('scheduled_for')
+                ->map(function ($dt) {
+                    return date('H:i:00', strtotime($dt));
+                })
+                ->all());
+        }
+
+        if (Schema::hasTable('appointments')) {
+            $times = array_merge($times, DB::table('appointments')
+                ->where('doctor_id', $doctorId)
+                ->whereDate('appointment_date', $parsed->toDateString())
+                ->whereNotIn('status', ['cancelled'])
+                ->pluck('appointment_time')
+                ->map(function ($time) {
+                    return $this->normalizeSlotTime($time);
+                })
+                ->filter()
+                ->all());
+        }
+
+        return array_values(array_unique(array_filter($times)));
+    }
+
+    private function getBookedSlotDetails(int $doctorId, string $date): array
+    {
+        $slots = [];
+
+        if (Schema::hasTable('appointments')) {
+            $appointments = DB::table('appointments as a')
+                ->leftJoin('vet_registerations_temp as v', 'a.vet_registeration_id', '=', 'v.id')
+                ->select(
+                    'a.id',
+                    'a.appointment_date',
+                    'a.appointment_time',
+                    'a.status',
+                    'a.name',
+                    'a.mobile',
+                    'a.pet_name',
+                    'a.notes',
+                    'a.vet_registeration_id',
+                    'v.name as clinic_name'
+                )
+                ->where('a.doctor_id', $doctorId)
+                ->whereDate('a.appointment_date', $date)
+                ->whereNotIn('a.status', ['cancelled'])
+                ->orderBy('a.appointment_time')
+                ->get();
+
+            foreach ($appointments as $appt) {
+                $slots[] = [
+                    'source' => 'appointment',
+                    'reference_id' => (int) $appt->id,
+                    'date' => $appt->appointment_date,
+                    'time' => $this->normalizeSlotTime($appt->appointment_time),
+                    'status' => $appt->status,
+                    'patient_name' => $appt->name,
+                    'patient_phone' => $appt->mobile,
+                    'pet_name' => $appt->pet_name,
+                    'clinic_id' => $appt->vet_registeration_id ? (int) $appt->vet_registeration_id : null,
+                    'clinic_name' => $appt->clinic_name,
+                    'notes' => $appt->notes,
+                    'service_type' => 'in_clinic',
+                ];
+            }
+        }
+
+        if (Schema::hasTable('bookings')) {
+            $bookings = DB::table('bookings')
+                ->select(
+                    'id',
+                    'scheduled_for',
+                    'status',
+                    'service_type',
+                    'user_id',
+                    'pet_id',
+                    'clinic_id'
+                )
+                ->where('assigned_doctor_id', $doctorId)
+                ->whereDate('scheduled_for', $date)
+                ->whereNotNull('scheduled_for')
+                ->whereNotIn('status', ['cancelled', 'failed'])
+                ->orderBy('scheduled_for')
+                ->get();
+
+            foreach ($bookings as $booking) {
+                $slots[] = [
+                    'source' => 'booking',
+                    'reference_id' => (int) $booking->id,
+                    'date' => $booking->scheduled_for ? date('Y-m-d', strtotime($booking->scheduled_for)) : $date,
+                    'time' => $booking->scheduled_for ? date('H:i:00', strtotime($booking->scheduled_for)) : null,
+                    'status' => $booking->status,
+                    'service_type' => $booking->service_type,
+                    'user_id' => $booking->user_id ? (int) $booking->user_id : null,
+                    'pet_id' => $booking->pet_id ? (int) $booking->pet_id : null,
+                    'clinic_id' => $booking->clinic_id ? (int) $booking->clinic_id : null,
+                ];
+            }
+        }
+
+        usort($slots, function ($a, $b) {
+            return strcmp($a['time'] ?? '', $b['time'] ?? '');
+        });
+
+        return $slots;
+    }
+
+    private function normalizeSlotTime(?string $time): ?string
+    {
+        if (!$time) {
+            return null;
+        }
+
+        if (preg_match('/^\d{2}:\d{2}:\d{2}$/', $time)) {
+            return $time;
+        }
+
+        if (preg_match('/^\d{2}:\d{2}$/', $time)) {
+            return $time . ':00';
+        }
+
+        $ts = strtotime($time);
+        return $ts ? date('H:i:00', $ts) : null;
+    }
 }

@@ -566,6 +566,7 @@ Route::put('/bookings/{id}/status', [\App\Http\Controllers\Api\BookingsControlle
 Route::post('/bookings/{id}/rate', [\App\Http\Controllers\Api\BookingsController::class, 'rate']);
 Route::post('/bookings/{id}/verify-payment', [\App\Http\Controllers\Api\BookingsController::class, 'verifyPayment']);
 Route::get('/doctors', [DoctorController::class, 'index']);
+Route::get('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slots']);
 Route::get('/doctors/{id}', [DoctorController::class, 'show']);
 Route::get('/doctors/{id}/bookings', [\App\Http\Controllers\Api\BookingsController::class, 'doctorBookings']);
 Route::get('/socket/doctors/{doctor}', [\App\Http\Controllers\Api\SocketDoctorController::class, 'show']);
@@ -590,6 +591,7 @@ Route::get('/ml/demand-prediction', [\App\Http\Controllers\Api\MLController::cla
 Route::put('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updateAvailability']);
 Route::get('/doctors/{id}/free-slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'freeSlots']);
 Route::get('/doctors/{id}/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slotsByDoctor']);
+Route::get('/doctors/{id}/slots/summary', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slotsSummary']);
 Route::post('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slots']);
 Route::post('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updatePrice']);
 
