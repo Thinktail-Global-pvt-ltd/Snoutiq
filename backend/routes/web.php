@@ -134,8 +134,9 @@ Route::prefix('admin')->group(function () {
     Route::post('/login', [AdminAuthController::class, 'login'])->name('admin.login.attempt');
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
+    Route::get('/onboarding', [AdminOnboardingStatusPageController::class, 'panel'])->name('admin.onboarding.panel');
+
     Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
-        Route::get('/onboarding', [AdminOnboardingStatusPageController::class, 'panel'])->name('admin.onboarding.panel');
         Route::get('/dashboard', [AdminPanelController::class, 'index'])->name('admin.dashboard');
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
         Route::get('/pets', [AdminPanelController::class, 'pets'])->name('admin.pets');

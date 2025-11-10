@@ -51,6 +51,9 @@
             <span>Signed in as {{ session('admin_email', config('admin.email')) }}</span>
         </div>
         <nav class="admin-nav mb-4">
+            <a href="{{ route('founder.dashboard') }}" target="_blank" rel="noopener" class="{{ request()->is('founder/dashboard') ? 'active' : '' }}">
+                Founder Dashboard
+            </a>
             <a href="{{ route('admin.onboarding.panel') }}" class="{{ request()->routeIs('admin.onboarding.panel') ? 'active' : '' }}">Onboarding Panel</a>
             <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">Dashboard</a>
             <a href="{{ route('admin.users') }}" class="{{ request()->routeIs('admin.users') ? 'active' : '' }}">Users</a>
