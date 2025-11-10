@@ -199,7 +199,7 @@ class DoctorScheduleController extends Controller
             ], 422);
         }
 
-        $bookedSlots = $this->getBookedSlotDetails($doctorId, $date);
+        $bookedSlots = $this->getBookedSlotDetails($doctorId, $date, $serviceType);
 
         return response()->json([
             'success' => true,
@@ -275,21 +275,27 @@ class DoctorScheduleController extends Controller
             }
         }
 
-        $booked = $this->getBookedTimesForDate($doctorId, $parsed);
+        $booked = $this->getBookedTimesForDate($doctorId, $parsed, $serviceType);
 
         return array_values(array_diff($allSlots, $booked));
     }
 
-    private function getBookedTimesForDate(int $doctorId, Carbon $parsed): array
+    private function getBookedTimesForDate(int $doctorId, Carbon $parsed, string $serviceType): array
     {
         $times = [];
 
         if (Schema::hasTable('bookings')) {
-            $times = array_merge($times, DB::table('bookings')
+            $bookingsQuery = DB::table('bookings')
                 ->where('assigned_doctor_id', $doctorId)
                 ->whereDate('scheduled_for', $parsed->toDateString())
                 ->whereNotNull('scheduled_for')
-                ->whereNotIn('status', ['cancelled', 'failed'])
+                ->whereNotIn('status', ['cancelled', 'failed']);
+
+            if ($serviceType) {
+                $bookingsQuery->where('service_type', $serviceType);
+            }
+
+            $times = array_merge($times, $bookingsQuery
                 ->pluck('scheduled_for')
                 ->map(function ($dt) {
                     return date('H:i:00', strtotime($dt));
@@ -297,7 +303,7 @@ class DoctorScheduleController extends Controller
                 ->all());
         }
 
-        if (Schema::hasTable('appointments')) {
+        if ($serviceType === 'in_clinic' && Schema::hasTable('appointments')) {
             $times = array_merge($times, DB::table('appointments')
                 ->where('doctor_id', $doctorId)
                 ->whereDate('appointment_date', $parsed->toDateString())
@@ -313,11 +319,11 @@ class DoctorScheduleController extends Controller
         return array_values(array_unique(array_filter($times)));
     }
 
-    private function getBookedSlotDetails(int $doctorId, string $date): array
+    private function getBookedSlotDetails(int $doctorId, string $date, string $serviceType): array
     {
         $slots = [];
 
-        if (Schema::hasTable('appointments')) {
+        if ($serviceType === 'in_clinic' && Schema::hasTable('appointments')) {
             $appointments = DB::table('appointments as a')
                 ->leftJoin('vet_registerations_temp as v', 'a.vet_registeration_id', '=', 'v.id')
                 ->select(
@@ -357,7 +363,7 @@ class DoctorScheduleController extends Controller
         }
 
         if (Schema::hasTable('bookings')) {
-            $bookings = DB::table('bookings')
+            $bookingsQuery = DB::table('bookings')
                 ->select(
                     'id',
                     'scheduled_for',
@@ -370,9 +376,13 @@ class DoctorScheduleController extends Controller
                 ->where('assigned_doctor_id', $doctorId)
                 ->whereDate('scheduled_for', $date)
                 ->whereNotNull('scheduled_for')
-                ->whereNotIn('status', ['cancelled', 'failed'])
-                ->orderBy('scheduled_for')
-                ->get();
+                ->whereNotIn('status', ['cancelled', 'failed']);
+
+            if ($serviceType) {
+                $bookingsQuery->where('service_type', $serviceType);
+            }
+
+            $bookings = $bookingsQuery->orderBy('scheduled_for')->get();
 
             foreach ($bookings as $booking) {
                 $slots[] = [
