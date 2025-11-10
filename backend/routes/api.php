@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Models\User;
 use App\Models\DeviceToken;
+use App\Models\Doctor;
 use App\Support\DeviceTokenOwnerResolver;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
@@ -115,6 +116,22 @@ Route::post('/device-tokens/issue', function (Request $request) {
         ],
     ], 201);
 })->name('api.device-tokens.issue');
+
+Route::get('/doctors/featured', function () {
+    $doctor = Doctor::find(77);
+
+    if (!$doctor) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Doctor with ID 77 not found',
+        ], 404);
+    }
+
+    return response()->json([
+        'success' => true,
+        'data' => $doctor,
+    ]);
+});
 
 Route::post('/appointments/submit', [AppointmentSubmissionController::class, 'store'])
     ->name('api.appointments.submit');
@@ -572,6 +589,7 @@ Route::get('/ml/demand-prediction', [\App\Http\Controllers\Api\MLController::cla
 // Doctor availability (schedule)
 Route::put('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updateAvailability']);
 Route::get('/doctors/{id}/free-slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'freeSlots']);
+Route::get('/doctors/{id}/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slotsByDoctor']);
 Route::post('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slots']);
 Route::post('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updatePrice']);
 
