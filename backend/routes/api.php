@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\RazorpayController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
 use App\Http\Controllers\Api\SalesDashboardController;
+use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Models\User;
 use App\Models\DeviceToken;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
@@ -93,6 +94,9 @@ Route::post('/device-tokens/issue', function (Request $request) {
         ],
     ], 201);
 })->name('api.device-tokens.issue');
+
+Route::post('/appointments/submit', [AppointmentSubmissionController::class, 'store'])
+    ->name('api.appointments.submit');
 // Call session info (patient/doctor polling)
 Route::get('/call/{id}', [CoreCallController::class, 'show']);
 // routes/web.php (ya api.php)

@@ -1,274 +1,3 @@
-// import React, { useState, useEffect } from "react";
-// import { useParams } from "react-router-dom";
-// import axios from "axios";
-// import {
-//   CreditCardIcon,
-//   LockClosedIcon,
-//   ShieldCheckIcon,
-//   ClockIcon,
-//   CheckCircleIcon,
-//   XCircleIcon
-// } from "@heroicons/react/24/outline";
-
-// const RAZORPAY_KEY_ID = "rzp_test_1nhE9190sR3rkP";
-// const API_BASE = "https://snoutiq.com/backend";
-
-// const PaymentPage = () => {
-//   const { sessionId } = useParams();
-//   const [loading, setLoading] = useState(false);
-//   const [paymentStatus, setPaymentStatus] = useState(null);
-//   const [doctorInfo, setDoctorInfo] = useState(null);
-//   const [selectedMethod, setSelectedMethod] = useState("card");
-
-//   useEffect(() => {
-//     // Fetch doctor information for the session
-//     const fetchDoctorInfo = async () => {
-//       try {
-//         const response = await axios.get(`${API_BASE}/api/call/${sessionId}`);
-//         setDoctorInfo(response.data.doctor);
-//       } catch (error) {
-//         console.error("Error fetching doctor info:", error);
-//       }
-//     };
-
-//     fetchDoctorInfo();
-//   }, [sessionId]);
-
-//   const handlePayment = async () => {
-//     setLoading(true);
-//     setPaymentStatus(null);
-
-//     try {
-//       const orderRes = await axios.post(`${API_BASE}/api/create-order`);
-//       const options = {
-//         key: RAZORPAY_KEY_ID,
-//         amount: orderRes.data.amount,
-//         currency: orderRes.data.currency,
-//         order_id: orderRes.data.id,
-//         name: "Snoutiq Veterinary Consultation",
-//         description: "Video consultation with certified veterinarian",
-//         image: "https://snoutiq.com/logo.webp",
-//         theme: {
-//           color: "#4F46E5"
-//         },
-//         handler: async (response) => {
-//           await axios.post(`${API_BASE}/api/call/${sessionId}/payment-success`, {
-//             payment_id: response.razorpay_payment_id,
-//             order_id: response.razorpay_order_id,
-//             signature: response.razorpay_signature,
-//           });
-//           setPaymentStatus("success");
-//           setTimeout(() => {
-//             window.location.href = `/video-call/${sessionId}`;
-//           }, 2000);
-//         },
-//         modal: {
-//           ondismiss: function() {
-//             setLoading(false);
-//             setPaymentStatus("cancelled");
-//           }
-//         }
-//       };
-
-//       const rzp = new window.Razorpay(options);
-//       rzp.open();
-//     } catch (error) {
-//       console.error("Payment error:", error);
-//       setPaymentStatus("error");
-//       setLoading(false);
-//     }
-//   };
-
-//   const paymentMethods = [
-//     { id: "card", name: "Credit/Debit Card", icon: "💳", description: "Pay securely with your card" },
-//     { id: "upi", name: "UPI", icon: "📱", description: "Pay using UPI apps" },
-//     { id: "netbanking", name: "Net Banking", icon: "🏦", description: "Pay using net banking" },
-//     { id: "wallet", name: "Wallet", icon: "💰", description: "Pay using wallet" }
-//   ];
-
-//   const packageDetails = {
-//     duration: "30 minutes",
-//     price: "₹499",
-//     features: [
-//       "One-on-one video consultation",
-//       "Professional veterinary advice",
-//       "Post-consultation summary",
-//       "Prescription if needed"
-//     ]
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-//       <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden">
-//         {/* Header */}
-//         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white text-center">
-//           <div className="flex items-center justify-center mb-3">
-//             <ShieldCheckIcon className="w-8 h-8 mr-2" />
-//             <h1 className="text-2xl font-bold">Secure Payment</h1>
-//           </div>
-//           <p className="opacity-90">Complete your payment to start the video consultation</p>
-//         </div>
-
-//         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
-//           {/* Left Column - Consultation Details */}
-//           <div className="space-y-6">
-//             <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
-//               <h2 className="text-lg font-semibold text-gray-800 mb-4">Consultation Details</h2>
-
-//               {doctorInfo && (
-//                 <div className="flex items-center mb-4">
-//                   <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
-//                     <span className="text-indigo-600 font-semibold">
-//                       {doctorInfo.name.split(" ").map(n => n[0]).join("")}
-//                     </span>
-//                   </div>
-//                   <div>
-//                     <h3 className="font-medium text-gray-900">{doctorInfo.name}</h3>
-//                     <p className="text-sm text-gray-600">{doctorInfo.specialty}</p>
-//                   </div>
-//                 </div>
-//               )}
-
-//               <div className="space-y-3">
-//                 <div className="flex justify-between">
-//                   <span className="text-gray-600">Duration:</span>
-//                   <span className="font-medium">{packageDetails.duration}</span>
-//                 </div>
-//                 <div className="flex justify-between">
-//                   <span className="text-gray-600">Session ID:</span>
-//                   <span className="font-mono text-sm">{sessionId}</span>
-//                 </div>
-//                 <div className="flex justify-between text-lg font-semibold mt-4 pt-4 border-t border-gray-200">
-//                   <span>Total Amount:</span>
-//                   <span className="text-indigo-600">{packageDetails.price}</span>
-//                 </div>
-//               </div>
-//             </div>
-
-//             <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
-//               <h3 className="font-semibold text-blue-800 mb-3">What's Included</h3>
-//               <ul className="space-y-2">
-//                 {packageDetails.features.map((feature, index) => (
-//                   <li key={index} className="flex items-center text-sm text-blue-700">
-//                     <CheckCircleIcon className="w-4 h-4 mr-2 text-green-500" />
-//                     {feature}
-//                   </li>
-//                 ))}
-//               </ul>
-//             </div>
-//           </div>
-
-//           {/* Right Column - Payment Options */}
-//           <div className="space-y-6">
-//             <div className="bg-white rounded-xl p-5 border border-gray-200">
-//               <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Payment Method</h2>
-
-//               <div className="grid grid-cols-2 gap-3 mb-6">
-//                 {paymentMethods.map((method) => (
-//                   <div
-//                     key={method.id}
-//                     onClick={() => setSelectedMethod(method.id)}
-//                     className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
-//                       selectedMethod === method.id
-//                         ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100'
-//                         : 'border-gray-300 hover:border-indigo-300'
-//                     }`}
-//                   >
-//                     <div className="flex items-center">
-//                       <span className="text-2xl mr-2">{method.icon}</span>
-//                       <div>
-//                         <p className="font-medium text-gray-900 text-sm">{method.name}</p>
-//                         <p className="text-xs text-gray-500">{method.description}</p>
-//                       </div>
-//                     </div>
-//                   </div>
-//                 ))}
-//               </div>
-
-//               {/* Security Badge */}
-//               <div className="flex items-center justify-center p-3 bg-gray-50 rounded-lg border border-gray-200">
-//                 <LockClosedIcon className="w-5 h-5 text-green-600 mr-2" />
-//                 <span className="text-sm text-gray-600">Secure & encrypted payment processing</span>
-//               </div>
-//             </div>
-
-//             {/* Payment Button */}
-//             <button
-//               onClick={handlePayment}
-//               disabled={loading}
-//               className="w-full py-4 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-//             >
-//               {loading ? (
-//                 <>
-//                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-//                   Processing...
-//                 </>
-//               ) : (
-//                 <>
-//                   <CreditCardIcon className="w-5 h-5 mr-2" />
-//                   Pay {packageDetails.price} Now
-//                 </>
-//               )}
-//             </button>
-
-//             {/* Payment Status */}
-//             {paymentStatus === "success" && (
-//               <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-center">
-//                 <CheckCircleIcon className="w-6 h-6 text-green-600 mr-2" />
-//                 <span className="text-green-800">Payment successful! Redirecting to consultation...</span>
-//               </div>
-//             )}
-
-//             {paymentStatus === "error" && (
-//               <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-center">
-//                 <XCircleIcon className="w-6 h-6 text-red-600 mr-2" />
-//                 <span className="text-red-800">Payment failed. Please try again.</span>
-//               </div>
-//             )}
-
-//             {paymentStatus === "cancelled" && (
-//               <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center">
-//                 <ClockIcon className="w-6 h-6 text-yellow-600 mr-2" />
-//                 <span className="text-yellow-800">Payment cancelled. You can try again.</span>
-//               </div>
-//             )}
-
-//             {/* Security Features */}
-//             <div className="text-center">
-//               <div className="flex items-center justify-center space-x-6 mb-2">
-//                 <div className="flex items-center">
-//                   <ShieldCheckIcon className="w-4 h-4 text-green-600 mr-1" />
-//                   <span className="text-xs text-gray-600">SSL Secure</span>
-//                 </div>
-//                 <div className="flex items-center">
-//                   <LockClosedIcon className="w-4 h-4 text-green-600 mr-1" />
-//                   <span className="text-xs text-gray-600">Encrypted</span>
-//                 </div>
-//                 <div className="flex items-center">
-//                   <CreditCardIcon className="w-4 h-4 text-green-600 mr-1" />
-//                   <span className="text-xs text-gray-600">PCI DSS Compliant</span>
-//                 </div>
-//               </div>
-//               <p className="text-xs text-gray-500">
-//                 Your payment information is secure and encrypted
-//               </p>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Footer */}
-//         <div className="bg-gray-50 p-4 border-t border-gray-200 text-center">
-//           <p className="text-sm text-gray-600">
-//             Need help? Contact support at <span className="text-indigo-600">support@snoutiq.com</span>
-//           </p>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default PaymentPage;
-
 import React, { useState, useEffect, useContext, useMemo, useRef } from "react";
 import {
   useParams,
@@ -297,9 +26,13 @@ const Payment = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { nearbyDoctors, liveDoctors, user } = useContext(AuthContext);
+  
+console.log(nearbyDoctors,"ankit");
+
 
   const [loading, setLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
+  // Holds the selected doctor's resolved details, including chat_price
   const [doctorInfo, setDoctorInfo] = useState(null);
   const [selectedMethod, setSelectedMethod] = useState("card");
   const [timeLeft, setTimeLeft] = useState(5 * 60);
@@ -317,18 +50,16 @@ const Payment = () => {
   const callId = callIdFromState || callIdFromParams;
   const doctorId = doctor?.id || searchParams.get("doctorId");
 
-  // ✅ NEW: Refs to track cleanup state
   const hasCleanedUp = useRef(false);
   const countdownInterval = useRef(null);
   const paymentWindowActive = useRef(false);
 
-  // Resolve from URL when state missing
   const channelFromParams = searchParams.get("channel");
   const patientIdFromParams = searchParams.get("patientId");
   const channelValue = channel || channelFromParams || "";
   const patientIdValue = patientId || patientIdFromParams || user?.id || "";
 
-  // Resolve doctor from context if not in state
+  // ✅ FIXED: Proper doctor finding logic
   const doctorFromContext = useMemo(() => {
     if (!doctorId) return null;
     const idStr = String(doctorId);
@@ -336,7 +67,6 @@ const Payment = () => {
     return all.find((d) => String(d.id) === idStr) || null;
   }, [doctorId, nearbyDoctors, liveDoctors]);
 
-  // ✅ ENHANCED: Centralized cleanup function
   const performCleanup = (reason = "unknown") => {
     if (hasCleanedUp.current) {
       console.log("⚠️ Cleanup already performed, skipping...");
@@ -346,13 +76,11 @@ const Payment = () => {
     console.log(`🧹 Performing cleanup - Reason: ${reason}`);
     hasCleanedUp.current = true;
 
-    // Clear countdown timer
     if (countdownInterval.current) {
       clearInterval(countdownInterval.current);
       countdownInterval.current = null;
     }
 
-    // Emit cancellation to socket if payment was never completed
     if (paymentStatus !== "success" && socket) {
       socket.emit("payment-cancelled", {
         callId: callId,
@@ -364,11 +92,9 @@ const Payment = () => {
       console.log(`📤 Emitted payment-cancelled: ${reason}`);
     }
 
-    // Mark payment window as inactive
     paymentWindowActive.current = false;
   };
 
-  // Load Razorpay script dynamically
   useEffect(() => {
     const loadRazorpayScript = () => {
       return new Promise((resolve) => {
@@ -397,36 +123,96 @@ const Payment = () => {
     loadRazorpayScript();
   }, []);
 
+  // Resolve the selected doctor from navigation state or context
   useEffect(() => {
     const src = doctor || doctorFromContext;
+console.log(src,"ankit12");
+
     if (src) {
+      const actualDoctor = src.doctor || src;
+      // Prefer chat_price from either nested doctor or top-level normalized object
+      const priceValueRaw =
+        actualDoctor?.chat_price ?? src?.chat_price ?? null;
+      const priceValue = Number(priceValueRaw);
+
+      console.log(
+        `💰 Selected Doctor Price: ₹${Number.isFinite(priceValue) ? priceValue : 'N/A'} for Dr. ${
+          actualDoctor.name || src.name
+        }`
+      );
+
       setDoctorInfo({
-        id: src.id,
-        name: src.name || src.email?.split("@")[0] || `Doctor ${src.id}`,
-        specialty: src.specialty || "Veterinarian",
-        experience: src.experience || "5+ years",
-        rating: src.rating || "5.0",
-        price: src.chat_price ? `₹${src.chat_price}` : "₹500",
-        chat_price: src.chat_price || 500,
-        address: src.formatted_address || src.address || "Not available",
-        photo:
-          src.image ||
-          (src.photos
-            ? (() => {
-                try {
-                  return JSON.parse(src.photos)[0]?.photo_reference;
-                } catch {
-                  return null;
-                }
-              })()
-            : null),
+        id: actualDoctor.id || src.id,
+        name: actualDoctor.name || src.name || src.email?.split("@")[0] || `Doctor ${src.id}`,
+        specialty: actualDoctor.specialty || src.specialty || "Veterinarian",
+        experience: actualDoctor.experience || src.experience || "5+ years",
+        rating: actualDoctor.rating || src.rating || 4.5,
+        price: Number.isFinite(priceValue) ? `₹${priceValue}` : undefined,
+        chat_price: Number.isFinite(priceValue) ? priceValue : undefined,
+        clinic_name: actualDoctor.clinic_name || src.clinic_name || "Veterinary Clinic",
+        business_status: actualDoctor.business_status || src.business_status,
+        distance: actualDoctor.distance || src.distance,
+        address: actualDoctor.formatted_address || src.formatted_address || "Not available",
+        photo: actualDoctor.profile_image || src.profile_image || actualDoctor.image || src.image || null,
       });
     } else {
       setDoctorInfo(null);
     }
   }, [doctor, doctorFromContext]);
+// console.log(doctorInfo,"ankit123");
 
-  // ✅ ENHANCED: 5-minute countdown with auto-cleanup
+  // If doctorId is not provided in URL/state, fetch call-session to infer doctor and price
+  useEffect(() => {
+    if (!callId) return;
+    // If we already have a valid price, skip
+    if (doctorInfo?.chat_price !== undefined && doctorInfo?.chat_price !== null) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/api/call/${callId}`);
+        const s = res?.data?.session ?? res?.data ?? {};
+
+        const resolvedDoctorId =
+          s.doctorId ?? s.doctor_id ?? s.assigned_doctor_id ?? s.accepted_doctor_id ?? s.vet_doctor_id ?? s?.doctor?.id ?? null;
+        const resolvedPriceRaw = s.chat_price ?? s.price ?? s.amount ?? null;
+        const resolvedPrice = Number(resolvedPriceRaw);
+
+        // Try to enrich with context list
+        const candidate =
+          [...(nearbyDoctors || []), ...(liveDoctors || [])].find(
+            (d) => (resolvedDoctorId ? String(d.id) === String(resolvedDoctorId) : false)
+          ) || doctorFromContext || doctor || null;
+
+        if (cancelled) return;
+        setDoctorInfo((prev) => {
+          const priceToUse = Number.isFinite(resolvedPrice)
+            ? resolvedPrice
+            : Number(candidate?.chat_price);
+
+          return {
+            ...(prev || {}),
+            id: candidate?.id || resolvedDoctorId || prev?.id,
+            name: candidate?.name || prev?.name || s?.doctor?.name || 'Doctor',
+            clinic_name: candidate?.clinic_name || prev?.clinic_name || s?.clinic_name,
+            rating: candidate?.rating || prev?.rating,
+            chat_price: Number.isFinite(priceToUse) ? priceToUse : undefined,
+            price: Number.isFinite(priceToUse) ? `₹${priceToUse}` : prev?.price,
+            distance: candidate?.distance ?? prev?.distance,
+            photo: candidate?.profile_image || candidate?.image || prev?.photo || null,
+          };
+        });
+      } catch (e) {
+        // ignore fetch errors, UI will fallback
+        console.warn('Call session lookup failed, using fallback price.');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [callId, doctorInfo?.chat_price, nearbyDoctors, liveDoctors, doctorFromContext, doctor]);
+
   useEffect(() => {
     countdownInterval.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -447,7 +233,6 @@ const Payment = () => {
     };
   }, []);
 
-  // ✅ NEW: Socket event listeners for doctor-side cancellations
   useEffect(() => {
     if (!socket) return;
 
@@ -486,22 +271,18 @@ const Payment = () => {
     };
   }, [callId]);
 
-  // ✅ ENHANCED: Component unmount cleanup
   useEffect(() => {
     return () => {
-      // Only cleanup if payment wasn't successful
       if (paymentStatus !== "success") {
         performCleanup("component-unmount");
       }
     };
   }, [paymentStatus]);
 
-  // ✅ ENHANCED: Browser tab close/navigation cleanup
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (paymentStatus !== "success" && paymentWindowActive.current) {
         performCleanup("browser-close");
-        // Show confirmation dialog
         e.preventDefault();
         e.returnValue = "Payment in progress. Are you sure you want to leave?";
       }
@@ -527,14 +308,13 @@ const Payment = () => {
     paymentWindowActive.current = true;
 
     try {
-      // 1. Create order on backend
+      // ✅ FIXED: Use the correct doctor's price
+      let amount = Number(doctorInfo?.chat_price);
+      if (!Number.isFinite(amount) || amount < 1) amount = 500;
+      console.log(`💳 Initiating payment for ₹${amount}`);
+
       const orderRes = await axios.post(`${API_BASE}/api/create-order`, {
-        amount: Number(
-          doctorInfo?.chat_price ||
-            doctor?.chat_price ||
-            doctorFromContext?.chat_price ||
-            500
-        ),
+        amount: Number(amount),
         callId: callId,
         doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
         patientId: patientIdValue,
@@ -553,7 +333,6 @@ const Payment = () => {
 
       const { order_id, key } = orderRes.data;
 
-      // 2. Razorpay options
       const options = {
         key,
         order_id,
@@ -566,7 +345,6 @@ const Payment = () => {
           paymentWindowActive.current = false;
 
           try {
-            // 3. Verify payment with backend
             const verifyRes = await axios.post(`${API_BASE}/api/rzp/verify`, {
               callId: callId,
               doctorId: doctorInfo?.id || doctorFromContext?.id || doctorId,
@@ -579,7 +357,6 @@ const Payment = () => {
 
             console.log("Verify API Response:", verifyRes.data);
 
-            // 4. Notify via socket
             socket.emit("payment-completed", {
               callId: callId,
               patientId: patientIdValue,
@@ -591,7 +368,6 @@ const Payment = () => {
             setPaymentStatus("success");
             setLoading(false);
 
-            // 5. Redirect with complete query parameters
             setTimeout(() => {
               const query = new URLSearchParams({
                 uid: String(patientIdValue || ""),
@@ -620,15 +396,12 @@ const Payment = () => {
             paymentWindowActive.current = false;
             performCleanup("user-cancelled");
           },
-          // ✅ NEW: Handle Razorpay errors
-          escape: false, // Prevent accidental ESC key dismissal
+          escape: false,
         },
       };
 
-      // 6. Open Razorpay
       const rzp = new window.Razorpay(options);
       
-      // ✅ NEW: Error handler for Razorpay failures
       rzp.on('payment.failed', function (response) {
         console.error("💳 Payment failed:", response.error);
         setPaymentStatus("error");
@@ -653,10 +426,10 @@ const Payment = () => {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Always use doctorInfo.chat_price for accurate price display
   const getDisplayPrice = () => {
-    if (doctorInfo?.price) return doctorInfo.price;
-    if (doctor?.chat_price) return `₹${doctor.chat_price}`;
-    return "₹500";
+    const p = Number(doctorInfo?.chat_price);
+    return Number.isFinite(p) ? `₹${p}` : "₹500";
   };
 
   const paymentMethods = [
@@ -691,7 +464,6 @@ const Payment = () => {
     ],
   };
 
-  // Show loading while Razorpay script is loading
   if (!razorpayLoaded) {
     return (
       <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
@@ -708,7 +480,6 @@ const Payment = () => {
     );
   }
 
-  // Handle various payment statuses
   if (paymentStatus === "timeout") {
     return (
       <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
@@ -756,7 +527,6 @@ const Payment = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden">
-        {/* Header with Countdown */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -776,7 +546,6 @@ const Payment = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
-          {/* Left Column - Call Details */}
           <div className="space-y-6">
             <div className="bg-green-50 border border-green-200 rounded-xl p-5">
               <div className="flex items-center mb-4">
@@ -798,21 +567,22 @@ const Payment = () => {
 
               {doctorInfo && (
                 <div className="flex items-center mb-4">
-                  <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-indigo-600 font-semibold">
-                      {doctorInfo.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </span>
-                  </div>
+                  {doctorInfo.photo ? (
+                    <img
+                      src={doctorInfo.photo}
+                      alt={doctorInfo.name}
+                      className="w-12 h-12 rounded-full object-cover mr-3 border-2 border-indigo-100"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
+                      <span className="text-indigo-600 font-semibold">
+                        {doctorInfo.name.split(" ").map(n => n[0]).join("")}
+                      </span>
+                    </div>
+                  )}
                   <div>
-                    <h3 className="font-medium text-gray-900">
-                      {doctorInfo.name}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {doctorInfo.specialty}
-                    </p>
+                    <h3 className="font-medium text-gray-900">{doctorInfo.name}</h3>
+                    <p className="text-sm text-gray-600">{doctorInfo.clinic_name}</p>
                     {doctorInfo.rating && (
                       <div className="flex items-center mt-1">
                         <span className="text-yellow-400 mr-1">⭐</span>
@@ -830,13 +600,15 @@ const Payment = () => {
                   <span className="text-gray-600">Duration:</span>
                   <span className="font-medium">{packageDetails.duration}</span>
                 </div>
+                {doctorInfo?.distance && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Distance:</span>
+                    <span className="font-medium">{doctorInfo.distance.toFixed(1)} km away</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Call ID:</span>
                   <span className="font-mono text-sm">{callId}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Patient ID:</span>
-                  <span className="font-mono text-sm">{patientId}</span>
                 </div>
                 <div className="flex justify-between text-lg font-semibold mt-4 pt-4 border-t border-gray-200">
                   <span>Total Amount:</span>
@@ -863,7 +635,6 @@ const Payment = () => {
             </div>
           </div>
 
-          {/* Right Column - Payment Options */}
           <div className="space-y-6">
             <div className="bg-white rounded-xl p-5 border border-gray-200">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">
@@ -896,7 +667,6 @@ const Payment = () => {
                 ))}
               </div>
 
-              {/* Security Badge */}
               <div className="flex items-center justify-center p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <LockClosedIcon className="w-5 h-5 text-green-600 mr-2" />
                 <span className="text-sm text-gray-600">
@@ -917,7 +687,6 @@ const Payment = () => {
               </span>
             </div>
 
-            {/* Payment Button */}
             <button
               onClick={handlePayment}
               disabled={loading || timeLeft <= 0 || !razorpayLoaded}
@@ -941,7 +710,6 @@ const Payment = () => {
               )}
             </button>
 
-            {/* Payment Status Messages */}
             {paymentStatus === "success" && (
               <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-center">
                 <CheckCircleIcon className="w-6 h-6 text-green-600 mr-2" />
@@ -978,7 +746,6 @@ const Payment = () => {
               </div>
             )}
 
-            {/* Security Features */}
             <div className="text-center">
               <div className="flex items-center justify-center space-x-6 mb-2">
                 <div className="flex items-center">
@@ -1001,7 +768,6 @@ const Payment = () => {
               </p>
             </div>
 
-            {/* Warning */}
             {timeLeft < 60 && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center">
@@ -1015,7 +781,6 @@ const Payment = () => {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="bg-gray-50 p-4 border-t border-gray-200 text-center">
           <p className="text-sm text-gray-600">
             Need help? Contact support at{" "}
