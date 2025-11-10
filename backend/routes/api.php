@@ -62,7 +62,7 @@ Route::get('/agora/appid', function () {
 
 Route::post('/device-tokens/issue', function (Request $request) {
     $data = $request->validate([
-        'user_id' => ['required', 'integer', 'exists:users,id'],
+        'user_id' => ['required', 'integer'],
         'platform' => ['nullable', 'string', 'max:50'],
         'device_id' => ['nullable', 'string', 'max:255'],
         'meta' => ['nullable', 'array'],
