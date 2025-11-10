@@ -36,11 +36,10 @@ class SalesDashboardController extends Controller
 
         $clinicStatus = $request->input('clinic_status', 'all');
         $clinicSearch = trim((string) $request->input('clinic_search', ''));
-        $clinicPage = max(1, (int) $request->input('clinic_page', 1));
 
         $summary = $this->buildSummary($recentDays);
         $scannerListing = $this->buildScannerListing($scannerStatus, $scannerSearch, 10, $scannerPage, $recentDays);
-        $clinicListing = $this->buildClinicListing($clinicStatus, $clinicSearch, 10, $clinicPage);
+        $clinicListing = $this->buildClinicListing($clinicStatus, $clinicSearch, 1000, 1);
 
         return view('backend.sales.dashboard', [
             'summary' => $summary,
