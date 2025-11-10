@@ -10,10 +10,7 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('clinic_id')
-                ->nullable()
-                ->constrained('clinics')
-                ->nullOnDelete();
+            $table->unsignedBigInteger('clinic_id')->nullable()->index();
             $table->unsignedBigInteger('amount_paise')->default(0);
             $table->string('status')->default('pending')->index();
             $table->string('type')->nullable();
