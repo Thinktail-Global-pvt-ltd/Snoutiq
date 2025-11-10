@@ -2,6 +2,10 @@
 
 @section('page-title', 'Onboarding Overview')
 
+@php
+    use Illuminate\Support\Str;
+@endphp
+
 @section('sidebar-secondary')
     <div class="text-uppercase text-white-50 small fw-semibold mb-3">Onboarding Console</div>
     <nav class="admin-secondary-nav" data-panel-nav>
@@ -13,6 +17,77 @@
     </nav>
     <small class="text-white-50 d-block mt-3">Jump to detailed lists without leaving this overview.</small>
 @endsection
+
+@push('styles')
+<style>
+    .onboarding-search-wrap {
+        max-width: 420px;
+    }
+    .onboarding-search-wrap .form-control {
+        border-radius: 999px;
+        padding: 0.65rem 1.1rem;
+    }
+    .onboarding-search-wrap .input-group-text {
+        border-radius: 999px;
+        background: transparent;
+        border-right: none;
+    }
+    .onboarding-search-wrap .form-control:focus {
+        box-shadow: 0 0 0 0.2rem rgba(15,23,42,0.08);
+    }
+    .clinic-progress-bar {
+        height: 10px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        overflow: hidden;
+    }
+    .clinic-progress-bar span {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg,#34d399,#1d4ed8);
+    }
+    .clinic-progress-legend {
+        font-size: 0.82rem;
+        color: #475569;
+    }
+    .step-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+    }
+    .step-chip {
+        border-radius: 999px;
+        padding: 0.15rem 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border: 1px solid transparent;
+    }
+    .step-chip.complete {
+        background: rgba(34,197,94,0.12);
+        color: #0f8a4c;
+        border-color: rgba(34,197,94,0.3);
+    }
+    .step-chip.pending {
+        background: rgba(251,191,36,0.15);
+        color: #92400e;
+        border-color: rgba(251,191,36,0.3);
+    }
+    .doctor-progress {
+        min-width: 120px;
+    }
+    .doctor-progress small {
+        font-size: 0.75rem;
+        color: #475569;
+    }
+    [data-clinic-block].d-none + [data-clinic-block] {
+        display: none;
+    }
+    .search-summary {
+        font-size: 0.85rem;
+        color: #475569;
+    }
+</style>
+@endpush
 
 @php
     $stepLabels = $stepLabels ?? [
@@ -122,6 +197,21 @@
             Updated {{ now()->format('d M Y') }}
         </div>
     </div>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div class="onboarding-search-wrap flex-grow-1 flex-md-grow-0">
+            <div class="input-group">
+                <span class="input-group-text border-end-0">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="search"
+                       class="form-control border-start-0"
+                       placeholder="Search clinics or doctors"
+                       aria-label="Search clinics or doctors"
+                       data-onboarding-search>
+            </div>
+        </div>
+        <div class="search-summary" data-search-summary></div>
+    </div>
 
     <section id="overview" class="mb-5">
         <div class="card admin-card mb-4">
@@ -203,7 +293,15 @@
                                         </thead>
                                         <tbody>
                                             @forelse($section['rows'] as $clinic)
-                                                <tr>
+                                                @php
+                                                    $blockId = $key.'-clinic-'.$loop->index;
+                                                    $searchTokens = Str::lower(trim(
+                                                        ($clinic['clinic_name'] ?? $clinic['clinic'] ?? '') . ' ' .
+                                                        ($clinic['slug'] ?? '') . ' ' .
+                                                        collect($clinic['doctors'] ?? [])->pluck('doctor_name')->implode(' ')
+                                                    ));
+                                                @endphp
+                                                <tr data-clinic-block="{{ $blockId }}" data-search-text="{{ $searchTokens }}">
                                                     <td>
                                                         <div class="fw-semibold">{{ $clinic['clinic_name'] }}</div>
                                                         <div class="small text-muted">Slug: {{ $clinic['slug'] ?? '—' }}</div>
@@ -237,7 +335,7 @@
                                                         <span class="badge {{ $badgeClass }}">{{ $badgeLabel }}</span>
                                                     </td>
                                                 </tr>
-                                                <tr>
+                                                <tr data-clinic-block="{{ $blockId }}" data-search-text="{{ $searchTokens }}">
                                                     <td colspan="{{ count($section['columns']) }}" class="bg-body-tertiary">
                                                         <div class="row g-3 py-3">
                                                             <div class="col-lg-3 col-sm-6">
@@ -260,6 +358,9 @@
                                                                     $clinicLicenseNo = $clinic['clinic_license_no'] ?? null;
                                                                     $clinicLicenseDoc = $clinic['clinic_license_document'] ?? null;
                                                                     $documentsComplete = $clinic['documents_complete'] ?? false;
+                                                                    $stepCompletionPercent = $totalDoctors > 0
+                                                                        ? round(($completedDoctors / max($totalDoctors, 1)) * 100)
+                                                                        : 0;
                                                                 @endphp
                                                                 @if($key === 'documents')
                                                                     <div class="small text-muted mt-2">
@@ -308,6 +409,7 @@
                                                                                 <th>Mobile</th>
                                                                                 <th>License</th>
                                                                                 <th class="text-center">Status</th>
+                                                                                <th class="text-center">Progress</th>
                                                                                 <th>Onboarding Steps</th>
                                                                                 <th>Notes</th>
                                                                             </tr>
@@ -394,20 +496,44 @@
                                                                                                 : $onboardingNote;
                                                                                             $badgeClass = $allStepsComplete ? 'badge-soft-success' : ($doctorStatus ? 'badge-soft-info' : 'badge-soft-warning');
                                                                                             $badgeLabel = $allStepsComplete ? 'All Steps Ready' : ($doctorStatus ? 'Ready' : 'Missing');
+                                                                                            $totalStepCount = count($stepLabels);
+                                                                                            $completedStepCount = 0;
+                                                                                            foreach ($stepLabels as $stepKey => $_label) {
+                                                                                                if (!empty($doctorSteps[$stepKey])) {
+                                                                                                    $completedStepCount++;
+                                                                                                }
+                                                                                            }
+                                                                                            $doctorPercent = $totalStepCount > 0
+                                                                                                ? round(($completedStepCount / $totalStepCount) * 100)
+                                                                                                : 0;
                                                                                         @endphp
                                                                                         <span class="badge {{ $badgeClass }}">{{ $badgeLabel }}</span>
                                                                                     </td>
+                                                                                    <td class="doctor-progress">
+                                                                                        <div class="clinic-progress-bar mb-1">
+                                                                                            <span style="width: {{ $doctorPercent }}%;"></span>
+                                                                                        </div>
+                                                                                        <small>{{ $completedStepCount }} / {{ $totalStepCount }} steps</small>
+                                                                                    </td>
                                                                                     <td>
-                                                                                        <div class="d-flex flex-wrap gap-1">
+                                                                                        <div class="step-chips">
                                                                                             @foreach($stepLabels as $stepKey => $stepLabel)
                                                                                                 @php
                                                                                                     $stepDone = (bool) ($doctorSteps[$stepKey] ?? false);
                                                                                                 @endphp
-                                                                                                <span class="badge {{ $stepDone ? 'badge-soft-success' : 'badge-soft-warning' }}">{{ $stepLabel }} {{ $stepDone ? 'Done' : 'Pending' }}</span>
+                                                                                                <span class="step-chip {{ $stepDone ? 'complete' : 'pending' }}">{{ $stepLabel }}</span>
                                                                                             @endforeach
                                                                                         </div>
                                                                                     </td>
-                                                                                    <td class="small text-muted">{{ $notes }}</td>
+                                                                                    <td>
+                                                                                        @php
+                                                                                            $notesText = $notes ?? '';
+                                                                                            if ($notesText === '' && !empty($pendingStepLabels)) {
+                                                                                                $notesText = 'Pending: ' . implode(', ', $pendingStepLabels);
+                                                                                            }
+                                                                                        @endphp
+                                                                                        <span class="small text-muted">{{ $notesText !== '' ? $notesText : '—' }}</span>
+                                                                                    </td>
                                                                                 </tr>
                                                                             @empty
                                                                                 <tr>
@@ -642,6 +768,45 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const searchInput = document.querySelector('[data-onboarding-search]');
+        const searchSummary = document.querySelector('[data-search-summary]');
+        const blockMap = new Map();
+        document.querySelectorAll('[data-clinic-block]').forEach(row => {
+            const blockId = row.getAttribute('data-clinic-block');
+            if (!blockId) {
+                return;
+            }
+            if (!blockMap.has(blockId)) {
+                blockMap.set(blockId, []);
+            }
+            blockMap.get(blockId).push(row);
+        });
+
+        const applySearch = () => {
+            if (!searchInput) {
+                return;
+            }
+            const term = searchInput.value.trim().toLowerCase();
+            let visibleBlocks = 0;
+            blockMap.forEach(rows => {
+                const matches = term === '' || rows.some(row => (row.dataset.searchText || '').includes(term));
+                rows.forEach(row => row.classList.toggle('d-none', !matches));
+                if (matches) {
+                    visibleBlocks++;
+                }
+            });
+            if (searchSummary) {
+                searchSummary.textContent = term
+                    ? `${visibleBlocks} clinic${visibleBlocks === 1 ? '' : 's'} match "${term}"`
+                    : '';
+            }
+        };
+
+        if (searchInput) {
+            searchInput.addEventListener('input', applySearch);
+            applySearch();
+        }
+
         const sidebarNav = document.querySelector('[data-panel-nav]');
         const sidebarLinks = sidebarNav ? Array.from(sidebarNav.querySelectorAll('a[href^="#"]')) : [];
         const observedSections = sidebarLinks
