@@ -279,26 +279,29 @@ class PaymentController extends Controller
     {
         $directId = $request->input('clinic_id') ?? $notes['clinic_id'] ?? null;
         if ($directId) {
-            $clinic = Clinic::find($directId);
+            return (int) $directId;
+        }
+
+        try {
+            $clinic = Clinic::query()->first();
             if ($clinic) {
                 return $clinic->id;
             }
-        }
 
-        $clinic = Clinic::query()->first();
-        if ($clinic) {
+            $clinic = Clinic::create([
+                'name' => 'General Clinic',
+                'status' => 'active',
+                'city' => 'Unknown',
+                'state' => 'Unknown',
+                'country' => 'India',
+            ]);
+
             return $clinic->id;
+        } catch (\Throwable $e) {
+            report($e);
         }
 
-        $clinic = Clinic::create([
-            'name' => 'General Clinic',
-            'status' => 'active',
-            'city' => 'Unknown',
-            'state' => 'Unknown',
-            'country' => 'India',
-        ]);
-
-        return $clinic->id;
+        return null;
     }
 
     protected function mergeClientNotes(Request $request, array $notes = []): array
