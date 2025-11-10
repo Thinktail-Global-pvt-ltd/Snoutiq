@@ -33,9 +33,16 @@ class PaymentController extends Controller
     {
         $request->validate([
             'amount' => 'nullable|integer|min:1',
+            'clinic_id' => 'nullable|integer',
+            'service_id' => 'nullable|string',
+            'vet_slug' => 'nullable|string',
+            'call_session_id' => 'nullable|string',
         ]);
 
         $amountInInr = (int) ($request->input('amount', 500));
+        $notes = $this->mergeClientNotes($request, [
+            'via' => 'snoutiq',
+        ]);
 
         try {
             $api = new Api($this->key, $this->secret);
@@ -44,14 +51,21 @@ class PaymentController extends Controller
                 'receipt'  => 'rcpt_' . bin2hex(random_bytes(6)),
                 'amount'   => $amountInInr * 100, // paisa
                 'currency' => 'INR',
-                'notes'    => ['via' => 'snoutiq'],
+                'notes'    => $notes,
             ]);
+            $orderArr = $order->toArray();
+
+            $this->recordPendingTransaction(
+                request: $request,
+                order: $orderArr,
+                notes: $notes
+            );
 
             return response()->json([
                 'success'  => true,
                 'key'      => $this->key,
-                'order'    => $order->toArray(),
-                'order_id' => $order['id'],
+                'order'    => $orderArr,
+                'order_id' => $orderArr['id'],
             ]);
         } catch (RazorpayError $e) {
             return response()->json([
@@ -112,15 +126,7 @@ class PaymentController extends Controller
             }
 
             // Merge client-provided tags to ensure clinic linkage even if fetch fails
-            if ($request->filled('vet_slug')) {
-                $notes['vet_slug'] = (string) $request->input('vet_slug');
-            }
-            if ($request->filled('service_id')) {
-                $notes['service_id'] = (string) $request->input('service_id');
-            }
-            if ($request->filled('call_session_id')) {
-                $notes['call_session_id'] = (string) $request->input('call_session_id');
-            }
+            $notes = $this->mergeClientNotes($request, $notes);
 
             // Upsert into DB (idempotent on payment_id)
             $record = Payment::updateOrCreate(
@@ -178,6 +184,43 @@ class PaymentController extends Controller
         }
     }
 
+    protected function recordPendingTransaction(Request $request, array $order, array $notes): void
+    {
+        $orderId = $order['id'] ?? null;
+        if (! $orderId) {
+            return;
+        }
+
+        $clinicId = null;
+
+        try {
+            $clinicId = $this->resolveClinicId($request, $notes);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        try {
+            Transaction::updateOrCreate(
+                ['reference' => $orderId],
+                [
+                    'clinic_id' => $clinicId,
+                    'amount_paise' => (int) ($order['amount'] ?? 0),
+                    'status' => 'pending',
+                    'type' => $notes['service_id'] ?? 'payment',
+                    'payment_method' => null,
+                    'metadata' => [
+                        'order_id' => $orderId,
+                        'currency' => $order['currency'] ?? 'INR',
+                        'notes' => $notes,
+                        'receipt' => $order['receipt'] ?? null,
+                    ],
+                ]
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     protected function recordTransaction(Request $request, Payment $payment, ?int $amount, ?string $status, ?string $method, array $notes, ?string $currency, ?string $email, ?string $contact): void
     {
         $clinicId = null;
@@ -189,23 +232,44 @@ class PaymentController extends Controller
         }
 
         try {
-            Transaction::updateOrCreate(
-                ['reference' => $payment->razorpay_payment_id],
-                [
-                    'clinic_id' => $clinicId,
-                    'amount_paise' => (int) ($amount ?? 0),
-                    'status' => $status ?? 'pending',
-                    'type' => $notes['service_id'] ?? 'payment',
-                    'payment_method' => $method,
-                    'metadata' => [
-                        'order_id' => $payment->razorpay_order_id,
-                        'currency' => $currency,
-                        'email' => $email,
-                        'contact' => $contact,
-                        'notes' => $notes,
-                    ],
-                ]
-            );
+            $reference = $payment->razorpay_payment_id ?? $payment->razorpay_order_id;
+            if (! $reference) {
+                return;
+            }
+
+            $payload = [
+                'clinic_id' => $clinicId,
+                'amount_paise' => (int) ($amount ?? 0),
+                'status' => $status ?? 'pending',
+                'type' => $notes['service_id'] ?? 'payment',
+                'payment_method' => $method,
+                'reference' => $reference,
+                'metadata' => [
+                    'order_id' => $payment->razorpay_order_id,
+                    'payment_id' => $payment->razorpay_payment_id,
+                    'currency' => $currency,
+                    'email' => $email,
+                    'contact' => $contact,
+                    'notes' => $notes,
+                ],
+            ];
+
+            $transaction = null;
+
+            if ($payment->razorpay_payment_id) {
+                $transaction = Transaction::where('reference', $payment->razorpay_payment_id)->first();
+            }
+
+            if (! $transaction && $payment->razorpay_order_id) {
+                $transaction = Transaction::where('reference', $payment->razorpay_order_id)->first();
+            }
+
+            if ($transaction) {
+                $transaction->fill($payload);
+                $transaction->save();
+            } else {
+                Transaction::create($payload);
+            }
         } catch (\Throwable $e) {
             report($e);
         }
@@ -235,5 +299,16 @@ class PaymentController extends Controller
         ]);
 
         return $clinic->id;
+    }
+
+    protected function mergeClientNotes(Request $request, array $notes = []): array
+    {
+        foreach (['vet_slug', 'service_id', 'call_session_id', 'clinic_id'] as $key) {
+            if ($request->filled($key)) {
+                $notes[$key] = (string) $request->input($key);
+            }
+        }
+
+        return $notes;
     }
 }
