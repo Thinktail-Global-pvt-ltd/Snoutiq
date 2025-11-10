@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Models\User;
 use App\Models\DeviceToken;
+use App\Support\DeviceTokenOwnerResolver;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
 use App\Http\Controllers\AdminController;
@@ -63,22 +64,41 @@ Route::get('/agora/appid', function () {
 Route::post('/device-tokens/issue', function (Request $request) {
     $data = $request->validate([
         'user_id' => ['required', 'integer'],
+        'owner_model' => ['nullable', 'string'],
         'platform' => ['nullable', 'string', 'max:50'],
         'device_id' => ['nullable', 'string', 'max:255'],
         'meta' => ['nullable', 'array'],
     ]);
 
+    try {
+        $ownerModel = DeviceTokenOwnerResolver::resolve($data['owner_model'] ?? null);
+    } catch (\InvalidArgumentException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage(),
+        ], 422);
+    }
+
+    if ($ownerModel::query()->whereKey($data['user_id'])->doesntExist()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Owner record not found for the provided user_id.',
+        ], 422);
+    }
+
     $token = Str::random(64);
+    $metaPayload = $data['meta'] ?? [
+        'app' => 'snoutiq',
+        'env' => app()->environment(),
+    ];
+    $metaPayload['owner_model'] = $ownerModel;
 
     $record = DeviceToken::create([
         'user_id' => $data['user_id'],
         'token' => $token,
         'platform' => $data['platform'] ?? 'web',
         'device_id' => $data['device_id'] ?? null,
-        'meta' => $data['meta'] ?? [
-            'app' => 'snoutiq',
-            'env' => app()->environment(),
-        ],
+        'meta' => $metaPayload,
         'last_seen_at' => now(),
     ]);
 
@@ -87,6 +107,7 @@ Route::post('/device-tokens/issue', function (Request $request) {
         'data' => [
             'token' => $record->token,
             'user_id' => $record->user_id,
+            'owner_model' => $ownerModel,
             'platform' => $record->platform,
             'device_id' => $record->device_id,
             'meta' => $record->meta,
