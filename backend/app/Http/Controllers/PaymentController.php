@@ -8,12 +8,15 @@ use Razorpay\Api\Errors\Error as RazorpayError;
 use App\Models\Payment;
 use App\Models\Transaction;
 use App\Models\Clinic;
+use App\Models\Doctor;
+use App\Models\CallSession;
 
 class PaymentController extends Controller
 {
     // Prefer env/config keys; fallback to test keys in dev
     private string $key;
     private string $secret;
+    private array $doctorClinicCache = [];
 
     public function __construct()
     {
@@ -43,6 +46,7 @@ class PaymentController extends Controller
         $notes = $this->mergeClientNotes($request, [
             'via' => 'snoutiq',
         ]);
+        $context = $this->resolveTransactionContext($request, $notes);
 
         try {
             $api = new Api($this->key, $this->secret);
@@ -58,7 +62,8 @@ class PaymentController extends Controller
             $this->recordPendingTransaction(
                 request: $request,
                 order: $orderArr,
-                notes: $notes
+                notes: $notes,
+                context: $context
             );
 
             return response()->json([
@@ -127,6 +132,7 @@ class PaymentController extends Controller
 
             // Merge client-provided tags to ensure clinic linkage even if fetch fails
             $notes = $this->mergeClientNotes($request, $notes);
+            $context = $this->resolveTransactionContext($request, $notes);
 
             // Upsert into DB (idempotent on payment_id)
             $record = Payment::updateOrCreate(
@@ -154,7 +160,8 @@ class PaymentController extends Controller
                 notes: $notes,
                 currency: $currency,
                 email: $email,
-                contact: $contact
+                contact: $contact,
+                context: $context
             );
 
             return response()->json([
@@ -184,35 +191,46 @@ class PaymentController extends Controller
         }
     }
 
-    protected function recordPendingTransaction(Request $request, array $order, array $notes): void
+    protected function recordPendingTransaction(Request $request, array $order, array $notes, array $context): void
     {
         $orderId = $order['id'] ?? null;
         if (! $orderId) {
             return;
         }
 
-        $clinicId = null;
+        $clinicId = $context['clinic_id'] ?? null;
 
         try {
-            $clinicId = $this->resolveClinicId($request, $notes);
+            $clinicId = $this->resolveClinicId($request, $notes, $context);
         } catch (\Throwable $e) {
             report($e);
         }
+
+        $context['clinic_id'] = $clinicId;
+        $doctorId = $context['doctor_id'] ?? null;
+        $userId = $context['user_id'] ?? null;
 
         try {
             Transaction::updateOrCreate(
                 ['reference' => $orderId],
                 [
                     'clinic_id' => $clinicId,
+                    'doctor_id' => $doctorId,
+                    'user_id' => $userId,
                     'amount_paise' => (int) ($order['amount'] ?? 0),
                     'status' => 'pending',
                     'type' => $notes['service_id'] ?? 'payment',
                     'payment_method' => null,
+                    'reference' => $orderId,
                     'metadata' => [
                         'order_id' => $orderId,
                         'currency' => $order['currency'] ?? 'INR',
                         'notes' => $notes,
                         'receipt' => $order['receipt'] ?? null,
+                        'call_id' => $context['call_identifier'] ?? null,
+                        'doctor_id' => $doctorId,
+                        'clinic_id' => $clinicId,
+                        'user_id' => $userId,
                     ],
                 ]
             );
@@ -221,15 +239,20 @@ class PaymentController extends Controller
         }
     }
 
-    protected function recordTransaction(Request $request, Payment $payment, ?int $amount, ?string $status, ?string $method, array $notes, ?string $currency, ?string $email, ?string $contact): void
+    protected function recordTransaction(Request $request, Payment $payment, ?int $amount, ?string $status, ?string $method, array $notes, ?string $currency, ?string $email, ?string $contact, array $context = []): void
     {
-        $clinicId = null;
+        $clinicId = $context['clinic_id'] ?? null;
 
         try {
-            $clinicId = $this->resolveClinicId($request, $notes);
+            $clinicId = $this->resolveClinicId($request, $notes, $context);
         } catch (\Throwable $e) {
             report($e);
         }
+
+        $context['clinic_id'] = $clinicId;
+        $doctorId = $context['doctor_id'] ?? null;
+        $userId = $context['user_id'] ?? null;
+        $callId = $context['call_identifier'] ?? null;
 
         try {
             $reference = $payment->razorpay_payment_id ?? $payment->razorpay_order_id;
@@ -239,6 +262,8 @@ class PaymentController extends Controller
 
             $payload = [
                 'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
+                'user_id' => $userId,
                 'amount_paise' => (int) ($amount ?? 0),
                 'status' => $status ?? 'pending',
                 'type' => $notes['service_id'] ?? 'payment',
@@ -251,6 +276,10 @@ class PaymentController extends Controller
                     'email' => $email,
                     'contact' => $contact,
                     'notes' => $notes,
+                    'call_id' => $callId,
+                    'doctor_id' => $doctorId,
+                    'clinic_id' => $clinicId,
+                    'user_id' => $userId,
                 ],
             ];
 
@@ -275,11 +304,31 @@ class PaymentController extends Controller
         }
     }
 
-    protected function resolveClinicId(Request $request, array $notes): ?int
+    protected function resolveClinicId(Request $request, array $notes, array $context = []): ?int
     {
-        $directId = $request->input('clinic_id') ?? $notes['clinic_id'] ?? null;
-        if ($directId) {
+        $directId = $context['clinic_id']
+            ?? $request->input('clinic_id')
+            ?? $request->input('clinicId')
+            ?? ($notes['clinic_id'] ?? null);
+
+        if ($directId !== null && $directId !== '') {
             return (int) $directId;
+        }
+
+        $doctorId = $context['doctor_id'] ?? null;
+        if (! $doctorId && $request->filled('doctor_id')) {
+            $doctorId = (int) $request->input('doctor_id');
+        } elseif (! $doctorId && $request->filled('doctorId')) {
+            $doctorId = (int) $request->input('doctorId');
+        } elseif (! $doctorId && isset($notes['doctor_id'])) {
+            $doctorId = (int) $notes['doctor_id'];
+        }
+
+        if ($doctorId) {
+            $clinicFromDoctor = $this->lookupDoctorClinicId($doctorId);
+            if ($clinicFromDoctor) {
+                return $clinicFromDoctor;
+            }
         }
 
         try {
@@ -306,12 +355,132 @@ class PaymentController extends Controller
 
     protected function mergeClientNotes(Request $request, array $notes = []): array
     {
-        foreach (['vet_slug', 'service_id', 'call_session_id', 'clinic_id'] as $key) {
-            if ($request->filled($key)) {
-                $notes[$key] = (string) $request->input($key);
+        $mapping = [
+            'vet_slug' => ['vet_slug'],
+            'service_id' => ['service_id'],
+            'call_session_id' => ['call_session_id', 'callSessionId', 'call_id', 'callId'],
+            'clinic_id' => ['clinic_id', 'clinicId'],
+            'doctor_id' => ['doctor_id', 'doctorId'],
+            'user_id' => ['user_id', 'userId', 'patient_id', 'patientId'],
+        ];
+
+        foreach ($mapping as $noteKey => $keys) {
+            foreach ($keys as $key) {
+                if ($request->filled($key)) {
+                    $notes[$noteKey] = (string) $request->input($key);
+                    break;
+                }
             }
         }
 
         return $notes;
+    }
+
+    protected function resolveTransactionContext(Request $request, array $notes = []): array
+    {
+        $context = [
+            'call_identifier' => $this->firstFilled($request, ['call_session_id', 'callSessionId', 'call_id', 'callId'], $notes),
+            'clinic_id' => $this->toNullableInt($this->firstFilled($request, ['clinic_id', 'clinicId'], $notes)),
+            'doctor_id' => $this->toNullableInt($this->firstFilled($request, ['doctor_id', 'doctorId'], $notes)),
+            'user_id' => $this->toNullableInt($this->firstFilled($request, ['user_id', 'userId', 'patient_id', 'patientId'], $notes)),
+        ];
+
+        if (! $context['user_id'] && $request->user()) {
+            $context['user_id'] = (int) $request->user()->getAuthIdentifier();
+        }
+
+        $session = $this->findCallSession($context['call_identifier']);
+
+        if ($session) {
+            $context['doctor_id'] ??= $session->doctor_id ? (int) $session->doctor_id : null;
+            $context['user_id'] ??= $session->patient_id ? (int) $session->patient_id : null;
+
+            if ($session->relationLoaded('doctor') && $session->doctor) {
+                $context['clinic_id'] ??= $session->doctor->vet_registeration_id
+                    ? (int) $session->doctor->vet_registeration_id
+                    : null;
+            }
+        }
+
+        if (! $context['clinic_id'] && $context['doctor_id']) {
+            $context['clinic_id'] = $this->lookupDoctorClinicId($context['doctor_id']);
+        }
+
+        return $context;
+    }
+
+    protected function firstFilled(Request $request, array $keys, array $notes = [])
+    {
+        foreach ($keys as $key) {
+            if ($request->filled($key)) {
+                return $request->input($key);
+            }
+
+            if (array_key_exists($key, $notes) && $notes[$key] !== null && $notes[$key] !== '') {
+                return $notes[$key];
+            }
+        }
+
+        return null;
+    }
+
+    protected function toNullableInt($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return null;
+    }
+
+    protected function lookupDoctorClinicId(?int $doctorId): ?int
+    {
+        if (! $doctorId) {
+            return null;
+        }
+
+        if (array_key_exists($doctorId, $this->doctorClinicCache)) {
+            return $this->doctorClinicCache[$doctorId];
+        }
+
+        try {
+            $doctor = Doctor::find($doctorId);
+            $clinicId = $doctor && $doctor->vet_registeration_id
+                ? (int) $doctor->vet_registeration_id
+                : null;
+        } catch (\Throwable $e) {
+            report($e);
+            $clinicId = null;
+        }
+
+        return $this->doctorClinicCache[$doctorId] = $clinicId;
+    }
+
+    protected function findCallSession($identifier): ?CallSession
+    {
+        if ($identifier === null || $identifier === '') {
+            return null;
+        }
+
+        try {
+            return CallSession::query()
+                ->with('doctor')
+                ->where(function ($query) use ($identifier) {
+                    $query->where('call_identifier', $identifier);
+                    if (is_numeric($identifier)) {
+                        $query->orWhere('id', (int) $identifier);
+                    }
+                })
+                ->latest('id')
+                ->first();
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return null;
     }
 }

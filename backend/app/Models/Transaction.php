@@ -12,6 +12,8 @@ class Transaction extends Model
 
     protected $fillable = [
         'clinic_id',
+        'doctor_id',
+        'user_id',
         'amount_paise',
         'status',
         'type',
@@ -29,6 +31,16 @@ class Transaction extends Model
     public function clinic(): BelongsTo
     {
         return $this->belongsTo(Clinic::class);
+    }
+
+    public function doctor(): BelongsTo
+    {
+        return $this->belongsTo(Doctor::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function scopeCompleted($query)
