@@ -180,27 +180,32 @@ class PaymentController extends Controller
 
     protected function recordTransaction(Request $request, Payment $payment, ?int $amount, ?string $status, ?string $method, array $notes, ?string $currency, ?string $email, ?string $contact): void
     {
+        $clinicId = null;
+
         try {
             $clinicId = $this->resolveClinicId($request, $notes);
-            if (! $clinicId) {
-                return;
-            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-            Transaction::create([
-                'clinic_id' => $clinicId,
-                'amount_paise' => (int) ($amount ?? 0),
-                'status' => $status ?? 'pending',
-                'type' => $notes['service_id'] ?? 'payment',
-                'payment_method' => $method,
-                'reference' => $payment->razorpay_payment_id,
-                'metadata' => [
-                    'order_id' => $payment->razorpay_order_id,
-                    'currency' => $currency,
-                    'email' => $email,
-                    'contact' => $contact,
-                    'notes' => $notes,
-                ],
-            ]);
+        try {
+            Transaction::updateOrCreate(
+                ['reference' => $payment->razorpay_payment_id],
+                [
+                    'clinic_id' => $clinicId,
+                    'amount_paise' => (int) ($amount ?? 0),
+                    'status' => $status ?? 'pending',
+                    'type' => $notes['service_id'] ?? 'payment',
+                    'payment_method' => $method,
+                    'metadata' => [
+                        'order_id' => $payment->razorpay_order_id,
+                        'currency' => $currency,
+                        'email' => $email,
+                        'contact' => $contact,
+                        'notes' => $notes,
+                    ],
+                ]
+            );
         } catch (\Throwable $e) {
             report($e);
         }
