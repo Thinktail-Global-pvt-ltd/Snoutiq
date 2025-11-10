@@ -1,6 +1,7 @@
 <?php 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 // use App
 use App\Http\Controllers\Api\UnifiedIntelligenceController;
 use App\Http\Controllers\Api\AuthController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Models\User;
+use App\Models\DeviceToken;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
 use App\Http\Controllers\AdminController;
@@ -56,6 +58,41 @@ Route::get('/agora/appid', function () {
         'appId' => trim(env('AGORA_APP_ID')),
     ]);
 });
+
+Route::post('/device-tokens/issue', function (Request $request) {
+    $data = $request->validate([
+        'user_id' => ['required', 'integer', 'exists:users,id'],
+        'platform' => ['nullable', 'string', 'max:50'],
+        'device_id' => ['nullable', 'string', 'max:255'],
+        'meta' => ['nullable', 'array'],
+    ]);
+
+    $token = Str::random(64);
+
+    $record = DeviceToken::create([
+        'user_id' => $data['user_id'],
+        'token' => $token,
+        'platform' => $data['platform'] ?? 'web',
+        'device_id' => $data['device_id'] ?? null,
+        'meta' => $data['meta'] ?? [
+            'app' => 'snoutiq',
+            'env' => app()->environment(),
+        ],
+        'last_seen_at' => now(),
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'token' => $record->token,
+            'user_id' => $record->user_id,
+            'platform' => $record->platform,
+            'device_id' => $record->device_id,
+            'meta' => $record->meta,
+            'last_seen_at' => $record->last_seen_at?->toIso8601String(),
+        ],
+    ], 201);
+})->name('api.device-tokens.issue');
 // Call session info (patient/doctor polling)
 Route::get('/call/{id}', [CoreCallController::class, 'show']);
 // routes/web.php (ya api.php)
