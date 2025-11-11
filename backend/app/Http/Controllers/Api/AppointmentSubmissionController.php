@@ -58,31 +58,159 @@ class AppointmentSubmissionController extends Controller
             'notes' => json_encode($notesPayload),
         ]);
 
+        return $this->respondWithAppointment($appointment->fresh(), 201);
+    }
+
+    public function edit(Appointment $appointment): JsonResponse
+    {
+        return $this->respondWithAppointment($appointment);
+    }
+
+    public function show(Appointment $appointment): JsonResponse
+    {
+        return $this->respondWithAppointment($appointment);
+    }
+
+    public function update(Request $request, Appointment $appointment): JsonResponse
+    {
+        $validated = $request->validate([
+            'user_id' => ['sometimes', 'required', 'integer', 'exists:users,id'],
+            'clinic_id' => ['sometimes', 'required', 'integer', 'exists:vet_registerations_temp,id'],
+            'doctor_id' => ['sometimes', 'required', 'integer', 'exists:doctors,id'],
+            'patient_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'patient_phone' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'pet_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'date' => ['sometimes', 'required', 'date'],
+            'time_slot' => ['sometimes', 'required', 'string', 'max:50'],
+            'status' => ['sometimes', 'required', 'string', 'max:24'],
+            'amount' => ['sometimes', 'nullable', 'integer'],
+            'currency' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'razorpay_payment_id' => ['sometimes', 'nullable', 'string', 'max:191'],
+            'razorpay_order_id' => ['sometimes', 'nullable', 'string', 'max:191'],
+            'razorpay_signature' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        if (empty($validated)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'At least one field must be provided to update the appointment.',
+            ], 422);
+        }
+
+        $clinic = $appointment->clinic;
+        if (array_key_exists('clinic_id', $validated)) {
+            $clinic = VetRegisterationTemp::findOrFail($validated['clinic_id']);
+            $appointment->vet_registeration_id = $clinic->id;
+        }
+
+        $doctor = $appointment->doctor;
+        if (array_key_exists('doctor_id', $validated)) {
+            $doctor = Doctor::findOrFail($validated['doctor_id']);
+            $appointment->doctor_id = $doctor->id;
+        }
+
+        $user = null;
+        if (array_key_exists('user_id', $validated)) {
+            $user = User::findOrFail($validated['user_id']);
+        }
+
+        if (array_key_exists('patient_name', $validated)) {
+            $appointment->name = $validated['patient_name'];
+        }
+
+        if (array_key_exists('patient_phone', $validated)) {
+            $appointment->mobile = $validated['patient_phone'];
+        }
+
+        if (array_key_exists('pet_name', $validated)) {
+            $appointment->pet_name = $validated['pet_name'];
+        }
+
+        if (array_key_exists('date', $validated)) {
+            $appointment->appointment_date = $validated['date'];
+        }
+
+        if (array_key_exists('time_slot', $validated)) {
+            $appointment->appointment_time = $validated['time_slot'];
+        }
+
+        if (array_key_exists('status', $validated)) {
+            $appointment->status = $validated['status'];
+        }
+
+        $notesPayload = $this->decodeNotes($appointment->notes);
+
+        if ($clinic) {
+            $notesPayload['clinic_name'] = $clinic->name;
+        }
+
+        if ($doctor) {
+            $notesPayload['doctor_name'] = $doctor->doctor_name ?? $doctor->name ?? null;
+        }
+
+        if ($user) {
+            $notesPayload['patient_user_id'] = $user->id;
+            $notesPayload['patient_email'] = $user->email;
+            if (!array_key_exists('patient_phone', $validated) && $user->phone) {
+                $appointment->mobile = $appointment->mobile ?? $user->phone;
+            }
+        }
+
+        foreach (['amount' => 'amount_paise', 'currency' => 'currency', 'razorpay_payment_id' => 'razorpay_payment_id', 'razorpay_order_id' => 'razorpay_order_id', 'razorpay_signature' => 'razorpay_signature'] as $inputKey => $noteKey) {
+            if (array_key_exists($inputKey, $validated)) {
+                $notesPayload[$noteKey] = $validated[$inputKey];
+            }
+        }
+
+        $appointment->notes = json_encode($notesPayload);
+        $appointment->save();
+
+        return $this->respondWithAppointment($appointment->fresh());
+    }
+
+    private function respondWithAppointment(Appointment $appointment, int $status = 200): JsonResponse
+    {
         return response()->json([
             'success' => true,
             'data' => [
-                'appointment' => [
-                    'id' => $appointment->id,
-                    'clinic' => [
-                        'id' => $clinic->id,
-                        'name' => $clinic->name,
-                    ],
-                    'doctor' => [
-                        'id' => $doctor->id,
-                        'name' => $doctor->doctor_name ?? $doctor->name ?? null,
-                    ],
-                    'patient' => [
-                        'user_id' => $user->id,
-                        'name' => $appointment->name,
-                        'phone' => $appointment->mobile,
-                    ],
-                    'date' => $appointment->appointment_date,
-                    'time_slot' => $appointment->appointment_time,
-                    'status' => $appointment->status,
-                    'amount' => $validated['amount'] ?? null,
-                    'currency' => $validated['currency'] ?? 'INR',
-                ],
+                'appointment' => $this->formatAppointment($appointment),
             ],
-        ], 201);
+        ], $status);
+    }
+
+    private function formatAppointment(Appointment $appointment): array
+    {
+        $appointment->loadMissing(['clinic', 'doctor']);
+        $notes = $this->decodeNotes($appointment->notes);
+
+        return [
+            'id' => $appointment->id,
+            'clinic' => [
+                'id' => $appointment->clinic?->id ?? $appointment->vet_registeration_id,
+                'name' => $appointment->clinic?->name ?? ($notes['clinic_name'] ?? null),
+            ],
+            'doctor' => [
+                'id' => $appointment->doctor?->id ?? $appointment->doctor_id,
+                'name' => $appointment->doctor?->doctor_name ?? $appointment->doctor?->name ?? ($notes['doctor_name'] ?? null),
+            ],
+            'patient' => [
+                'user_id' => $notes['patient_user_id'] ?? null,
+                'name' => $appointment->name,
+                'phone' => $appointment->mobile,
+                'email' => $notes['patient_email'] ?? null,
+            ],
+            'date' => $appointment->appointment_date,
+            'time_slot' => $appointment->appointment_time,
+            'status' => $appointment->status,
+            'amount' => $notes['amount_paise'] ?? null,
+            'currency' => $notes['currency'] ?? 'INR',
+        ];
+    }
+
+    private function decodeNotes(?string $notes): array
+    {
+        $decoded = json_decode($notes ?? '{}', true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 }
