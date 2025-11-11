@@ -107,16 +107,68 @@
     </header>
 
     <section class="flex-1 p-6">
-      <div class="max-w-4xl mx-auto">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-base font-semibold text-gray-800">Incoming Calls (<span id="calls-count">0</span>)</h2>
-            <div class="text-xs text-gray-500">Keep this page open to receive calls</div>
+      <div class="max-w-5xl mx-auto">
+        <div class="grid gap-6 lg:grid-cols-3">
+          <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-semibold text-gray-800">Incoming Calls (<span id="calls-count">0</span>)</h2>
+                <div class="text-xs text-gray-500">Keep this page open to receive calls</div>
+              </div>
+              <div id="calls" class="space-y-3">
+                <div id="no-calls" class="bg-gray-50 text-gray-600 rounded-lg p-6 text-center border border-dashed border-gray-200">
+                  <p>No incoming calls at the moment</p>
+                  <p class="text-xs mt-1" id="no-calls-sub">Connect to receive calls</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div id="calls" class="space-y-3">
-            <div id="no-calls" class="bg-gray-50 text-gray-600 rounded-lg p-6 text-center border border-dashed border-gray-200">
-              <p>No incoming calls at the moment</p>
-              <p class="text-xs mt-1" id="no-calls-sub">Connect to receive calls</p>
+
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">Pet Owner Preview</p>
+                <h3 class="text-base font-semibold text-gray-900 mt-1">Demo Call Sandbox</h3>
+              </div>
+              <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                <span class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                Live
+              </span>
+            </div>
+            <p class="text-sm text-gray-600">
+              Launch the same React journey that pet parents see. We create a safe dummy call so this dashboard rings instantly while a phone-sized window shows the patient flow.
+            </p>
+            <ul class="mt-4 space-y-2 text-xs text-gray-600">
+              <li class="flex gap-2">
+                <span class="text-indigo-500 mt-0.5">•</span>
+                <span>Generates a one-time call session mapped to your doctor ID.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-indigo-500 mt-0.5">•</span>
+                <span>Opens a mobile frame with the real pet-owner React experience.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-indigo-500 mt-0.5">•</span>
+                <span>Use it in demos so vets can hear/see the ring without extra devices.</span>
+              </li>
+            </ul>
+            <div class="mt-5 text-xs text-gray-500">
+              Target doctor ID
+              <span data-role="demo-doctor-id" class="ml-1 font-semibold text-gray-800">—</span>
+            </div>
+            <div class="mt-4 flex flex-col gap-2">
+              <button id="btn-demo-call" class="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600" type="button">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.5a2.121 2.121 0 0 1 3 3l-1.4 1.4a2 2 0 0 1-2.46.24c-.86-.54-1.86-.9-2.9-1.04a8.06 8.06 0 0 0-5.62 1.64l-.2.16a2 2 0 0 0-.22 3.06l1.23 1.23a2 2 0 0 1 .25 2.49l-1.42 2.37a2 2 0 0 1-2.41.84 12.04 12.04 0 0 1-4.11-2.7A12 12 0 0 1 3 7.5c.03-1.28.24-2.54.62-3.76a2 2 0 0 1 1.97-1.47h.41a2 2 0 0 1 1.78 1.07l.91 1.82" />
+                </svg>
+                Launch Demo Call
+              </button>
+              <div id="demo-call-card-status" class="text-xs text-gray-500">
+                Ready for a test run.
+              </div>
+            </div>
+            <div id="demo-call-last" class="mt-3 rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+              No demo calls triggered yet.
             </div>
           </div>
         </div>
@@ -277,6 +329,129 @@
   </div>
 </div>
 
+<!-- Demo Call Overlay -->
+<div id="demo-call-overlay" class="hidden fixed inset-0 z-[80] overflow-y-auto bg-slate-900/70 px-4 py-8 backdrop-blur">
+  <div class="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+    <button type="button" data-demo-close class="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:scale-105 hover:text-slate-900">
+      <span class="sr-only">Close demo</span>
+      ✕
+    </button>
+    <div class="grid gap-0 lg:grid-cols-[320px_1fr]">
+      <div class="border-b border-slate-100 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 p-6 text-white lg:border-b-0 lg:border-r">
+        <div class="flex flex-col items-center">
+          <div class="relative w-full max-w-xs">
+            <div class="absolute left-1/2 top-4 z-10 h-4 w-24 -translate-x-1/2 rounded-b-2xl bg-black/60"></div>
+            <div class="rounded-[36px] border-[6px] border-black/80 bg-black/60 p-3 shadow-2xl">
+              <div class="relative aspect-[9/19] overflow-hidden rounded-[24px] bg-slate-950">
+                <div id="demo-call-placeholder" class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center text-slate-200">
+                  <div class="text-base font-semibold">Pet Owner Preview</div>
+                  <p class="text-xs text-slate-300">We will stream the real React payment journey here once the dummy call link is ready.</p>
+                  <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-100">
+                    React Demo
+                  </div>
+                </div>
+                <iframe id="demo-call-frame" title="Pet owner demo" loading="lazy" class="hidden h-full w-full bg-white" referrerpolicy="no-referrer"></iframe>
+                <div id="demo-call-phone-loader" class="pointer-events-none absolute inset-0 hidden items-center justify-center bg-slate-950/70">
+                  <div class="flex flex-col items-center gap-2 text-slate-100">
+                    <span class="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white"></span>
+                    <span class="text-[11px] font-semibold tracking-wide uppercase">Loading</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="mt-4 text-center text-xs text-slate-300">
+            Scroll/tap inside the phone to feel the pet-side flow.
+          </p>
+        </div>
+      </div>
+      <div class="p-6 lg:p-10">
+        <div class="space-y-5">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.25em] text-indigo-600">Sales demo</p>
+            <h3 class="mt-1 text-2xl font-semibold text-slate-900">Mobile experience</h3>
+            <p class="mt-2 text-sm text-slate-600">
+              We spin up a dummy call targeted to
+              <span data-role="demo-doctor-id" class="font-semibold text-slate-900">—</span>,
+              so this page rings while the phone view loads the React payment flow.
+            </p>
+          </div>
+
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-xs text-slate-500">
+            Keep this dashboard visible so you can watch the incoming call banner flip from “No calls” to ringing in realtime.
+          </div>
+
+          <div>
+            <div class="text-sm font-semibold text-slate-900">Status</div>
+            <p id="demo-call-status" class="mt-1 text-sm text-slate-700">Ready to run demo.</p>
+            <p id="demo-call-detail" class="mt-1 text-xs text-slate-500">Click start and we will generate a fresh test call.</p>
+          </div>
+
+          <div class="flex flex-wrap gap-3">
+            <button id="demo-call-trigger" type="button" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+              Start Demo Call
+            </button>
+            <button id="demo-call-replay" type="button" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled>
+              Run Again
+            </button>
+            <button id="demo-call-open-link" type="button" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled>
+              Open Pet View
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition" data-demo-step="request">
+              <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700" data-role="step-icon">1</div>
+              <div>
+                <div class="text-sm font-semibold text-slate-900">Create dummy call</div>
+                <div class="text-xs text-slate-500" data-role="step-desc">Ready</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition" data-demo-step="ring">
+              <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700" data-role="step-icon">2</div>
+              <div>
+                <div class="text-sm font-semibold text-slate-900">Doctor incoming banner</div>
+                <div class="text-xs text-slate-500" data-role="step-desc">Waiting</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition" data-demo-step="pet">
+              <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700" data-role="step-icon">3</div>
+              <div>
+                <div class="text-sm font-semibold text-slate-900">Pet owner React view</div>
+                <div class="text-xs text-slate-500" data-role="step-desc">Loads after link</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="demo-call-info" class="hidden rounded-2xl border border-slate-100 bg-white/70 p-4">
+            <div class="text-sm font-semibold text-slate-900">Latest session</div>
+            <dl class="mt-3 space-y-2 text-xs text-slate-600">
+              <div class="flex items-center justify-between gap-4">
+                <dt class="uppercase tracking-wide text-[10px] text-slate-500">Call ID</dt>
+                <dd class="font-semibold text-slate-900" data-role="demo-call-id">—</dd>
+              </div>
+              <div class="flex items-center justify-between gap-4">
+                <dt class="uppercase tracking-wide text-[10px] text-slate-500">Channel</dt>
+                <dd class="font-mono text-[11px] text-slate-900" data-role="demo-channel">—</dd>
+              </div>
+              <div class="flex items-center justify-between gap-4">
+                <dt class="uppercase tracking-wide text-[10px] text-slate-500">Patient</dt>
+                <dd class="font-semibold text-slate-900" data-role="demo-patient">—</dd>
+              </div>
+              <div class="flex items-center justify-between gap-4">
+                <dt class="uppercase tracking-wide text-[10px] text-slate-500">Payment link</dt>
+                <dd class="text-right">
+                  <a href="#" data-role="demo-payment-link" target="_blank" rel="noopener" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-semibold">Open</a>
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* =========================
    Add Service â€” sends user_id = CURRENT_USER_ID
@@ -430,6 +605,264 @@
   els.form?.addEventListener('submit', createService);
   els.close?.addEventListener('click', ()=>hide(els.modal));
   els.cancel?.addEventListener('click', ()=>hide(els.modal));
+})();
+</script>
+
+<script>
+(function(){
+  const openBtn = document.getElementById('btn-demo-call');
+  const overlay = document.getElementById('demo-call-overlay');
+  if (!openBtn || !overlay) return;
+
+  const closeBtn = overlay.querySelector('[data-demo-close]');
+  const triggerBtn = document.getElementById('demo-call-trigger');
+  const replayBtn = document.getElementById('demo-call-replay');
+  const openLinkBtn = document.getElementById('demo-call-open-link');
+  const statusEl = document.getElementById('demo-call-status');
+  const detailEl = document.getElementById('demo-call-detail');
+  const frameEl = document.getElementById('demo-call-frame');
+  const placeholderEl = document.getElementById('demo-call-placeholder');
+  const loaderEl = document.getElementById('demo-call-phone-loader');
+  const infoPanel = document.getElementById('demo-call-info');
+  const infoCall = infoPanel?.querySelector('[data-role="demo-call-id"]');
+  const infoChannel = infoPanel?.querySelector('[data-role="demo-channel"]');
+  const infoPatient = infoPanel?.querySelector('[data-role="demo-patient"]');
+  const infoPayment = infoPanel?.querySelector('[data-role="demo-payment-link"]');
+  const cardStatus = document.getElementById('demo-call-card-status');
+  const lastSummary = document.getElementById('demo-call-last');
+  const doctorBadges = document.querySelectorAll('[data-role="demo-doctor-id"]');
+  const steps = overlay.querySelectorAll('[data-demo-step]');
+  const apiBase = (typeof API_BASE !== 'undefined' ? API_BASE : ((typeof PATH_PREFIX !== 'undefined' ? PATH_PREFIX : '') + '/api'));
+  const DEMO_ENDPOINT = apiBase + '/call/test';
+
+  let currentSession = null;
+  let requesting = false;
+
+  function resolveDoctorId(){
+    const socketDoctor = Number(window.snoutiqCall?.doctorId || 0);
+    if (socketDoctor) return socketDoctor;
+    const current = Number(window.CURRENT_USER_ID || 0);
+    if (current) return current;
+    const fallback = Number(typeof DEFAULT_DOCTOR_ID !== 'undefined' ? DEFAULT_DOCTOR_ID : 0);
+    return fallback || null;
+  }
+
+  function updateDoctorBadges(){
+    const id = resolveDoctorId();
+    doctorBadges.forEach(el => {
+      if (!el) return;
+      el.textContent = id ? `#${id}` : '—';
+    });
+  }
+
+  function setStatus(primary, secondary){
+    if (statusEl) statusEl.textContent = primary || '';
+    if (detailEl) detailEl.textContent = secondary || '';
+    if (cardStatus) cardStatus.textContent = primary || '';
+  }
+
+  function setFrame(url){
+    if (!frameEl || !placeholderEl) return;
+    if (url) {
+      placeholderEl.classList.add('hidden');
+      frameEl.classList.remove('hidden');
+      loaderEl?.classList.remove('hidden');
+      frameEl.src = url;
+    } else {
+      placeholderEl.classList.remove('hidden');
+      frameEl.classList.add('hidden');
+      loaderEl?.classList.add('hidden');
+      frameEl.removeAttribute('src');
+    }
+  }
+
+  frameEl?.addEventListener('load', ()=>{
+    if (!frameEl.src) return;
+    loaderEl?.classList.add('hidden');
+    setStepState('pet', 'done', 'Pet view loaded');
+  });
+
+  function setStepState(stepId, state, desc){
+    const el = overlay.querySelector(`[data-demo-step=\"${stepId}\"]`);
+    if (!el) return;
+    const descEl = el.querySelector('[data-role="step-desc"]');
+    const iconEl = el.querySelector('[data-role="step-icon"]');
+    el.classList.remove('border-slate-200','border-indigo-200','border-emerald-200','border-rose-200','bg-white','bg-indigo-50','bg-emerald-50','bg-rose-50');
+    if (state === 'active') el.classList.add('border-indigo-200','bg-indigo-50');
+    else if (state === 'done') el.classList.add('border-emerald-200','bg-emerald-50');
+    else if (state === 'error') el.classList.add('border-rose-200','bg-rose-50');
+    else el.classList.add('border-slate-200','bg-white');
+    if (descEl) {
+      const map = {
+        pending: 'Ready',
+        active: 'Working…',
+        done: 'Complete',
+        error: 'Needs attention'
+      };
+      descEl.textContent = desc || map[state] || map.pending;
+      descEl.className = 'text-xs ' + (state === 'active'
+        ? 'text-indigo-700'
+        : state === 'done'
+          ? 'text-emerald-700'
+          : state === 'error'
+            ? 'text-rose-700'
+            : 'text-slate-500');
+    }
+    if (iconEl) {
+      iconEl.classList.remove('bg-slate-100','bg-indigo-600','bg-emerald-600','bg-rose-600','text-slate-700','text-white');
+      if (state === 'active') iconEl.classList.add('bg-indigo-600','text-white');
+      else if (state === 'done') iconEl.classList.add('bg-emerald-600','text-white');
+      else if (state === 'error') iconEl.classList.add('bg-rose-600','text-white');
+      else iconEl.classList.add('bg-slate-100','text-slate-700');
+    }
+  }
+
+  function resetSteps(){
+    setStepState('request','pending','Ready');
+    setStepState('ring','pending','Waiting');
+    setStepState('pet','pending','Loads after link');
+  }
+
+  function resetPanel(){
+    currentSession = null;
+    requesting = false;
+    setStatus('Ready to run demo.', 'Click start to trigger the experience.');
+    setFrame(null);
+    openLinkBtn.disabled = true;
+    replayBtn.disabled = true;
+    if (infoPanel) infoPanel.classList.add('hidden');
+    resetSteps();
+  }
+
+  function openOverlay(autoStart){
+    overlay.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    updateDoctorBadges();
+    resetPanel();
+    if (autoStart) requestDemoCall();
+  }
+
+  function closeOverlay(){
+    overlay.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+  }
+
+  openBtn.addEventListener('click', ()=> openOverlay(true));
+  overlay.addEventListener('click', (evt)=> {
+    if (evt.target === overlay) closeOverlay();
+  });
+  document.addEventListener('keydown', (evt)=> {
+    if (evt.key === 'Escape' && !overlay.classList.contains('hidden')) closeOverlay();
+  });
+  closeBtn?.addEventListener('click', closeOverlay);
+
+  replayBtn?.addEventListener('click', ()=> requestDemoCall());
+  triggerBtn?.addEventListener('click', ()=> requestDemoCall());
+  openLinkBtn?.addEventListener('click', ()=>{
+    if (currentSession?.patient_payment_url) {
+      window.open(currentSession.patient_payment_url, '_blank', 'noopener');
+    }
+  });
+
+  function readCookie(name){
+    return document.cookie.split('; ').find(r => r.startsWith(name + '='))?.split('=')[1] || '';
+  }
+
+  async function requestDemoCall(){
+    if (requesting) return;
+    const doctorId = resolveDoctorId();
+    if (!doctorId) {
+      setStatus('Doctor ID missing', 'We could not resolve doctor_id from this session.');
+      return;
+    }
+    currentSession = null;
+    if (infoPanel) infoPanel.classList.add('hidden');
+    setFrame(null);
+    requesting = true;
+    const patientId = Math.floor(90000 + Math.random() * 90000);
+    const headers = {
+      'Content-Type':'application/json',
+      'Accept':'application/json'
+    };
+    const xsrf = readCookie('XSRF-TOKEN');
+    if (xsrf) {
+      headers['X-Requested-With'] = 'XMLHttpRequest';
+      headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrf);
+    }
+    setStatus('Requesting demo call…', `Sending dummy request with patient #${patientId}`);
+    setStepState('request','active','Contacting server…');
+    setStepState('ring','pending','Waiting for socket');
+    setStepState('pet','pending','Loads after link');
+
+    try{
+      const res = await fetch(DEMO_ENDPOINT, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ doctor_id: doctorId, patient_id: patientId })
+      });
+      const raw = await res.text();
+      let payload = {};
+      try { payload = raw ? JSON.parse(raw) : {}; } catch (_) { payload = { raw }; }
+      if (!res.ok || payload.success === false) {
+        const msg = payload?.message || payload?.error || 'Unable to create test session.';
+        throw new Error(msg);
+      }
+      const data = payload.data || payload.session || payload;
+      currentSession = {
+        call_id: data.call_id || data.callId || data.id || null,
+        channel: data.channel || data.channel_name || null,
+        doctor_id: data.doctor_id || doctorId,
+        patient_id: data.patient_id || patientId,
+        patient_payment_url: data.patient_payment_url || '',
+        created_at: Date.now()
+      };
+      setStatus('Demo call created', 'Doctor banner should ring now.');
+      setStepState('request','done', currentSession.call_id ? `Call ${currentSession.call_id} created` : 'Call created');
+      setStepState('ring','active','Listening for incoming event…');
+      replayBtn?.removeAttribute('disabled');
+      openLinkBtn.disabled = !currentSession.patient_payment_url;
+
+      if (currentSession.patient_payment_url) {
+        setStepState('pet','active','Loading React payment page…');
+        setFrame(currentSession.patient_payment_url);
+        if (infoPayment) infoPayment.href = currentSession.patient_payment_url;
+      } else {
+        setFrame(null);
+      }
+
+      if (infoPanel) infoPanel.classList.remove('hidden');
+      if (infoCall) infoCall.textContent = currentSession.call_id || '—';
+      if (infoChannel) infoChannel.textContent = currentSession.channel || '—';
+      if (infoPatient) infoPatient.textContent = '#' + (currentSession.patient_id || patientId);
+      if (lastSummary) {
+        const ts = new Date().toLocaleTimeString();
+        lastSummary.textContent = `Call ${currentSession.call_id || '—'} • Channel ${currentSession.channel || '—'} • ${ts}`;
+        lastSummary.classList.remove('text-gray-500');
+      }
+    } catch (err) {
+      setStatus('Demo call failed', err?.message || 'Unexpected error while creating demo call.');
+      setStepState('request','error', err?.message || 'Server error');
+      replayBtn?.removeAttribute('disabled');
+      console.warn('[demo-call] request failed', err);
+    } finally {
+      requesting = false;
+    }
+  }
+
+  window.addEventListener('snoutiq:call-requested', (evt)=>{
+    const payload = evt?.detail || {};
+    const callId = payload.callId || payload.call_id || payload.id;
+    if (!currentSession || !callId) return;
+    if (currentSession.call_id && currentSession.call_id !== callId) return;
+    setStepState('ring','done','Doctor alert received');
+    setStatus('Incoming call ringing', 'Accept/reject from the banner above when ready.');
+  });
+
+  updateDoctorBadges();
+  if (!document.body.classList.contains('overflow-hidden')) {
+    setStatus('Ready for a test run.', 'Click the demo button to open the mobile preview.');
+  }
 })();
 </script>
 
