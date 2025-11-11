@@ -22,13 +22,11 @@ const parseAIResponse = (text) => {
     diagnosis: null,
   };
 
-  // Extract diagnosis section
   const diagnosisMatch = text.match(/=== DIAGNOSIS ===([\s\S]*?)=== END ===/);
   if (diagnosisMatch) {
     sections.diagnosis = diagnosisMatch[1].trim();
   }
 
-  // Extract main recommendation
   const recMatch = text.match(/\*\*([^*]+)\*\*/);
   if (recMatch) {
     const recText = recMatch[1].trim();
@@ -49,7 +47,6 @@ const parseAIResponse = (text) => {
     }
   }
 
-  // Extract WHY VIDEO IS APPROPRIATE
   const whyMatch = text.match(
     /\*\*WHY VIDEO IS APPROPRIATE:\*\*([\s\S]*?)(?=\*\*HOW TO PREPARE:|\*\*NEXT STEPS:|=== DIAGNOSIS|$)/
   );
@@ -60,7 +57,6 @@ const parseAIResponse = (text) => {
     }
   }
 
-  // Extract HOW TO PREPARE
   const prepMatch = text.match(
     /\*\*HOW TO PREPARE:\*\*([\s\S]*?)(?=\*\*NEXT STEPS:|=== DIAGNOSIS|$)/
   );
@@ -71,7 +67,6 @@ const parseAIResponse = (text) => {
     }
   }
 
-  // Extract NEXT STEPS
   const stepsMatch = text.match(
     /\*\*NEXT STEPS:\*\*([\s\S]*?)(?==== DIAGNOSIS|$)/
   );
@@ -91,7 +86,6 @@ const FormattedAIResponse = ({ text }) => {
 
   return (
     <div className="bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl lg:rounded-2xl p-4 sm:p-5 lg:p-6 border-2 border-purple-200 shadow-lg max-w-full">
-      {/* Header with Main Recommendation */}
       {sections.recommendation && (
         <div className="mb-4 lg:mb-5">
           <div className="flex items-start gap-2 sm:gap-3 mb-3 lg:mb-4">
@@ -107,7 +101,6 @@ const FormattedAIResponse = ({ text }) => {
         </div>
       )}
 
-      {/* Divider */}
       {sections.recommendation &&
         (sections.whyAppropriate.length > 0 ||
           sections.howToPrepare.length > 0 ||
@@ -116,9 +109,7 @@ const FormattedAIResponse = ({ text }) => {
           <div className="h-px bg-gradient-to-r from-transparent via-purple-300 to-transparent mb-4 lg:mb-5"></div>
         )}
 
-      {/* Content Sections */}
       <div className="space-y-3 sm:space-y-4">
-        {/* Why Video is Appropriate */}
         {sections.whyAppropriate.length > 0 && (
           <div>
             <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2 text-xs sm:text-sm">
@@ -140,7 +131,6 @@ const FormattedAIResponse = ({ text }) => {
           </div>
         )}
 
-        {/* How to Prepare */}
         {sections.howToPrepare.length > 0 && (
           <div>
             <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2 text-xs sm:text-sm">
@@ -162,7 +152,6 @@ const FormattedAIResponse = ({ text }) => {
           </div>
         )}
 
-        {/* Next Steps */}
         {sections.nextSteps.length > 0 && (
           <div>
             <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2 text-xs sm:text-sm">
@@ -184,7 +173,6 @@ const FormattedAIResponse = ({ text }) => {
           </div>
         )}
 
-        {/* Diagnosis */}
         {sections.diagnosis && (
           <div className="bg-blue-50 rounded-lg lg:rounded-xl p-3 sm:p-4 border border-blue-200 mt-3 sm:mt-4">
             <h4 className="font-bold text-blue-900 mb-2 flex items-center gap-2 text-xs sm:text-sm">
@@ -246,17 +234,14 @@ const DoctorSearchModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-3 sm:p-4">
       <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 lg:p-8 w-full max-w-sm sm:max-w-md shadow-2xl relative overflow-hidden">
-        {/* Ripple Effects */}
         <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-28 h-28 sm:w-36 sm:h-36 bg-blue-500 rounded-full animate-ping opacity-20"></div>
 
-        {/* Call Icon */}
         <div className="relative z-10 mb-4 sm:mb-5 flex justify-center">
           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30 animate-pulse">
             <span className="text-2xl sm:text-3xl text-white">📞</span>
           </div>
         </div>
 
-        {/* Title */}
         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 text-center mb-2">
           Connecting to Doctor{dots}
         </h2>
@@ -264,7 +249,6 @@ const DoctorSearchModal = ({
           Please wait while we connect your call
         </p>
 
-        {/* Time Indicator */}
         <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4 px-3 sm:px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
           <span className="text-blue-600">⏱️</span>
           <span className="text-xs sm:text-sm font-semibold text-blue-600">
@@ -272,7 +256,6 @@ const DoctorSearchModal = ({
           </span>
         </div>
 
-        {/* Progress Bar */}
         <div className="w-full h-2 bg-gray-200 rounded-full mb-6 sm:mb-8 overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-blue-500 to-blue-700 rounded-full transition-all duration-300"
@@ -285,7 +268,6 @@ const DoctorSearchModal = ({
           ></div>
         </div>
 
-        {/* Status Messages */}
         <div className="text-center mb-4 sm:mb-6">
           <div className="text-xs sm:text-sm text-gray-500 space-y-1">
             <p>✓ Doctor selected successfully</p>
@@ -293,34 +275,11 @@ const DoctorSearchModal = ({
             <p>● Waiting for call acceptance</p>
           </div>
         </div>
-
-        {/* Buttons */}
-        {/* <div className="flex gap-2 sm:gap-3">
-          <button
-            onClick={() => {
-              onClose();
-              setElapsedTime(0);
-            }}
-            className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base"
-          >
-            Cancel Call
-          </button>
-          <button
-            onClick={() => {
-              onClose();
-              setElapsedTime(0);
-              onFailure?.();
-            }}
-            className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base"
-          >
-            Try Another Doctor
-          </button>
-        </div> */}
       </div>
     </div>
   );
 };
-// ------------------- StartCallButton Component -------------------
+
 // ------------------- StartCallButton Component - FIXED -------------------
 const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const [loading, setLoading] = useState(false);
@@ -333,6 +292,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     token = null,
     nearbyDoctors = [],
     liveDoctors = [],
+    allActiveDoctors = [],
   } = authContext || {};
 
   const patientId = user?.id || "temp_user";
@@ -340,6 +300,9 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const [showLiveDoctorsModal, setShowLiveDoctorsModal] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("idle");
   const activeToastIds = useRef(new Set());
+  
+  // ✅ CRITICAL FIX: Store selected doctor to preserve complete data
+  const selectedDoctorRef = useRef(null);
 
   const clearAllToasts = useCallback(() => {
     activeToastIds.current.forEach((id) => {
@@ -437,9 +400,25 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setShowSearchModal(false);
       setConnectionStatus("connected");
 
-      const doctor =
-        (nearbyDoctors || []).find((d) => d.id == data.doctorId) ||
-        (liveDoctors || []).find((d) => d.id == data.doctorId);
+      // ✅ CRITICAL FIX: Use stored doctor from ref (guaranteed complete data)
+      // Fallback to context search only if ref is empty
+      const doctor = 
+        selectedDoctorRef.current ||
+        (nearbyDoctors || []).find((d) => String(d.id) === String(data.doctorId)) ||
+        (liveDoctors || []).find((d) => String(d.id) === String(data.doctorId));
+
+      if (!doctor) {
+        console.error("❌ No doctor found for ID:", data.doctorId);
+        const errorToastId = toast.error("Doctor information not found. Please try again.");
+        activeToastIds.current.add(errorToastId);
+        return;
+      }
+
+      console.log("✅ Using doctor for payment:", {
+        id: doctor.id,
+        name: doctor.name,
+        chat_price: doctor.chat_price
+      });
 
       const patientIdLocal = user?.id || "temp_user";
 
@@ -454,21 +433,25 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
           if (data.requiresPayment) {
             const query = new URLSearchParams({
               callId: String(data.callId || ""),
-              doctorId: String(doctor?.id || data.doctorId || ""),
+              doctorId: String(doctor.id || ""),
               channel: String(data.channel || ""),
               patientId: String(patientIdLocal || ""),
             }).toString();
 
+            console.log("📤 Navigating to payment with complete doctor:", doctor);
+
             if (typeof navigation === "function") {
               navigation(`/payment/${data.callId}?${query}`, {
                 state: {
-                  doctor: doctor,
+                  doctor: doctor, // ✅ Complete doctor object with chat_price
                   channel: data.channel,
                   patientId: patientIdLocal,
                   callId: data.callId,
                 },
               });
             } else {
+              // ✅ Fallback: Store doctor in sessionStorage for page reload scenarios
+              sessionStorage.setItem('payment_doctor', JSON.stringify(doctor));
               window.location.href = `/payment/${data.callId}?${query}`;
             }
           } else {
@@ -476,7 +459,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
               uid: String(patientIdLocal || ""),
               role: "audience",
               callId: String(data.callId || ""),
-              doctorId: String(doctor?.id || data.doctorId || ""),
+              doctorId: String(doctor.id || ""),
               patientId: String(patientIdLocal || ""),
             }).toString();
 
@@ -634,6 +617,13 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const channel = `channel_${callId}`;
 
+      // ✅ CRITICAL FIX: Store complete doctor object before making call
+      selectedDoctorRef.current = doctor;
+      
+      console.log("📞 Starting call with doctor:", doctor);
+      console.log("💰 Doctor chat_price:", doctor.chat_price || "NOT SET");
+      console.log("🔍 Full doctor object:", JSON.stringify(doctor, null, 2));
+
       clearAllToasts();
       setCallStatus(null);
       setLoading(true);
@@ -668,12 +658,23 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     [patientId, loading, showSearchModal, handleNoResponse, clearAllToasts]
   );
 
-  // ✅ FIXED: Only check nearbyDoctors, not online status
+  // ✅ Cleanup stored doctor on unmount
+  useEffect(() => {
+    return () => {
+      selectedDoctorRef.current = null;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      clearAllToasts();
+    };
+  }, [clearAllToasts]);
+
   const getButtonState = () => {
     if (loading) return "loading";
     if (connectionStatus === "failed") return "unavailable";
-    if (!nearbyDoctors?.length) return "unavailable"; // Only check if ANY doctors exist
-    return "available"; // Available if we have nearby doctors (online or offline)
+    if (!nearbyDoctors?.length) return "unavailable";
+    return "available";
   };
 
   const buttonState = getButtonState();
@@ -717,11 +718,12 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
             ${buttonState === "loading" ? "opacity-80" : ""}
           `}
           onClick={() => {
-            // ✅ FIXED: Always show modal if we have ANY nearby doctors
-            if (nearbyDoctors && nearbyDoctors.length) {
+            if (nearbyDoctors && nearbyDoctors.length > 0) {
+              console.log(`🔵 Opening doctor selection modal with ${nearbyDoctors.length} doctors`);
+              console.log(`📊 ${allActiveDoctors.length} doctors currently online`);
               setShowLiveDoctorsModal(true);
             } else {
-              // Only show error if NO doctors exist at all
+              console.warn("❌ No nearby doctors available at all");
               clearAllToasts();
               const toastId = toast.error(
                 "🐾 No veterinarians available nearby. Please try again later.",
@@ -764,7 +766,10 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
           <div className="flex items-center justify-center gap-2 mt-2 sm:mt-3">
             <span className="text-green-500 text-xs sm:text-sm">✅</span>
             <span className="text-[10px] sm:text-xs font-semibold text-green-600 break-words text-center">
-              Licensed veterinarians • Instant connection • Secure call
+              {allActiveDoctors.length > 0 
+                ? `${allActiveDoctors.length} veterinarian${allActiveDoctors.length !== 1 ? 's' : ''} online • Instant connection • Secure call`
+                : 'Licensed veterinarians • Book appointment or wait for online doctors'
+              }
             </span>
           </div>
         )}
@@ -797,12 +802,11 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         )}
       </div>
 
-      {/* ✅ Pass all required props to LiveDoctorSelectionModal */}
       <LiveDoctorSelectionModal
         visible={showLiveDoctorsModal}
         onClose={() => setShowLiveDoctorsModal(false)}
         nearbyDoctors={nearbyDoctors}
-        allActiveDoctors={authContext?.allActiveDoctors || []}
+        allActiveDoctors={allActiveDoctors}
         onCallDoctor={handleCallDoctor}
         loading={loading}
       />
@@ -836,8 +840,6 @@ const EmergencyStatusBox = ({
 }) => {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-
-  // Track if we've already shown the toast for this message
   const hasShownToast = useRef(false);
 
   useEffect(() => {
@@ -852,7 +854,6 @@ const EmergencyStatusBox = ({
 
   if (!decision || !isTypingComplete || !isVisible) return null;
 
-  // Common container styles for all emergency boxes
   const Container = ({
     children,
     gradientFrom,
@@ -926,7 +927,6 @@ const EmergencyStatusBox = ({
           nearbyDoctors={nearbyDoctors}
           onBook={(appointment) => {
             console.log("Appointment booked:", appointment);
-            // Only show success toast once
             if (!hasShownToast.current) {
               toast.success(
                 `🎉 Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`,
@@ -1049,7 +1049,6 @@ const EmergencyStatusBox = ({
           nearbyDoctors={nearbyDoctors}
           onBook={(appointment) => {
             console.log("Appointment booked:", appointment);
-            // Only show success toast once
             if (!hasShownToast.current) {
               toast.success(
                 `🎉 Appointment with ${appointment.doctor.name} on ${appointment.date} at ${appointment.time} booked!`,

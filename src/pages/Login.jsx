@@ -123,6 +123,11 @@ const Login = () => {
     );
   };
 
+  const handleCustom = () => {
+  window.location.assign('https://snoutiq.com/backend/custom-doctor-login');
+};
+
+
   const handleLocationRequest = () => {
     if (locationStatus === "denied") {
       toast.error(
@@ -517,7 +522,8 @@ const Login = () => {
                   🐾 Pet Owner
                 </button>
                 <button
-                  onClick={() => handleUserTypeChange("vet")}
+                  // onClick={() => handleUserTypeChange("vet")}
+                  onClick={handleCustom}
                   className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all duration-200 ${
                     userType === "vet"
                       ? "bg-white text-blue-600 shadow-sm shadow-blue-100 border border-blue-100"

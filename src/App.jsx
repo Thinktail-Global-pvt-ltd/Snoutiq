@@ -453,6 +453,7 @@ import AuthenticatedUserRedirect from "./auth/AuthenticatedUserRedirect";
 import DoctorWaitingRoom from "./VetDashboard/DoctorWaitingRoom";
 import PrescriptionPage from "./VetDashboard/PrescriptionPage";
 import HealthRecordsScreen from "./PetDashboard/HealthRecordsScreen";
+import Blog from "./blog/Blog";
 const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
@@ -793,6 +794,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/blog" element={<Blog/>}/>
           </Routes>
         </Suspense>
       </div>

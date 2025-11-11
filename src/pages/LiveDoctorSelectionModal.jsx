@@ -49,9 +49,21 @@ const LiveDoctorSelectionModal = React.memo(
       const activeSet = new Set(
         allActiveDoctors.map((id) => Number(id)).filter((id) => Number.isFinite(id))
       );
-      return nearbyDoctors.filter((doctor) =>
-        activeSet.has(Number(doctor.id))
-      );
+      
+      // ✅ FIX: Filter and return COMPLETE doctor objects with all data
+      return nearbyDoctors.filter((doctor) => {
+        const doctorId = Number(doctor.id);
+        const isActive = activeSet.has(doctorId);
+        
+        // Log to verify we have complete data
+        if (isActive && doctor.chat_price) {
+          console.log(`✅ Active doctor ${doctor.name} (${doctorId}) has chat_price: ${doctor.chat_price}`);
+        } else if (isActive && !doctor.chat_price) {
+          console.warn(`⚠️ Active doctor ${doctor.name} (${doctorId}) missing chat_price!`);
+        }
+        
+        return isActive;
+      });
     }, [nearbyDoctors, allActiveDoctors]);
 
     // Only show currently active doctors in the modal
@@ -140,13 +152,21 @@ const LiveDoctorSelectionModal = React.memo(
         if (loading) return;
 
         setSelectedDoctor(doctor.id);
-        console.log(`📞 Calling Dr. ${doctor.name}...`);
+        
+        // ✅ FIX: Send COMPLETE doctor object with all properties
+        console.log(`📞 Calling Dr. ${doctor.name} (ID: ${doctor.id})`);
+        console.log(`💰 Doctor chat_price: ${doctor.chat_price || 'NOT SET'}`);
+        console.log('Full doctor object being sent:', doctor);
+        
+        // Ensure we're passing the complete doctor object
         onCallDoctor(doctor);
       },
       [onCallDoctor, loading, isDoctorOnline]
     );
 
     const handleViewProfile = useCallback((doctor) => {
+      // ✅ FIX: Set complete doctor object for profile view
+      console.log('Setting profile doctor:', doctor);
       setProfileDoctor(doctor);
       setShowProfile(true);
     }, []);
@@ -191,156 +211,156 @@ const LiveDoctorSelectionModal = React.memo(
         const avatarError = imageLoadErrors[`avatar-${item.id}`];
         const isOnline = isDoctorOnline(item.id);
 
-   return (
-  <div
-    className={`relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 mb-4 overflow-hidden group ${
-      !isOnline ? "opacity-70" : "hover:border-blue-300"
-    }`}
-  >
-    <div className="p-5 flex items-start gap-5">
-      {/* Doctor Avatar */}
-      <div className="relative flex-shrink-0">
-        {item.profile_image && !avatarError ? (
-          <img
-            src={item.profile_image}
-            alt={`Dr. ${item.name || "Veterinarian"}`}
-            className="w-16 h-16 rounded-2xl object-cover border border-gray-200 group-hover:scale-105 transition-transform duration-300 shadow-sm"
-            onError={() => handleImageError(`avatar-${item.id}`)}
-          />
-        ) : (
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-inner">
-            <span className="text-white font-bold text-lg">
-              {item.slug?.charAt(0)?.toUpperCase() || "D"}
-            </span>
-          </div>
-        )}
+        // ✅ Get the actual price
+        const actualPrice = item.chat_price || item.price || 500;
 
-        {/* Online Indicator */}
-        <div className="absolute -bottom-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-white flex items-center justify-center shadow-md">
+        return (
           <div
-            className={`w-2.5 h-2.5 rounded-full ${
-              isOnline ? "bg-green-500 animate-pulse" : "bg-gray-400"
+            className={`relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 mb-4 overflow-hidden group ${
+              !isOnline ? "opacity-70" : "hover:border-blue-300"
             }`}
-          ></div>
-        </div>
-      </div>
+          >
+            <div className="p-5 flex items-start gap-5">
+              {/* Doctor Avatar */}
+              <div className="relative flex-shrink-0">
+                {item.profile_image && !avatarError ? (
+                  <img
+                    src={item.profile_image}
+                    alt={`Dr. ${item.name || "Veterinarian"}`}
+                    className="w-16 h-16 rounded-2xl object-cover border border-gray-200 group-hover:scale-105 transition-transform duration-300 shadow-sm"
+                    onError={() => handleImageError(`avatar-${item.id}`)}
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-inner">
+                    <span className="text-white font-bold text-lg">
+                      {item.slug?.charAt(0)?.toUpperCase() || "D"}
+                    </span>
+                  </div>
+                )}
 
-      {/* Doctor Info */}
-      <div className="flex-1 min-w-0">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-3">
-          <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 truncate">
-              {item.name || "Veterinarian"}
-            </h3>
-            <p className="text-gray-500 text-sm truncate">
+                {/* Online Indicator */}
+                <div className="absolute -bottom-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-white flex items-center justify-center shadow-md">
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      isOnline ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                    }`}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Doctor Info */}
+              <div className="flex-1 min-w-0">
+                {/* Header */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      {item.name || "Veterinarian"}
+                    </h3>
+                    <p className="text-gray-500 text-sm truncate">
                       {item.clinic_name || "Veterinary Clinic"}
-            </p>
-          </div>
+                    </p>
+                  </div>
 
-          {/* Price */}
-          {item.chat_price && (
-            <div className="text-right">
-              <div className="flex items-baseline gap-1">
-                <span className="text-xl font-bold text-green-700">
-                  ₹{item.chat_price}
-                </span>
-                <span className="text-xs text-gray-500 font-medium">
-                  /session
-                </span>
+                  {/* Price - Show actual price */}
+                  <div className="text-right">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xl font-bold text-green-700">
+                        ₹{actualPrice}
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium">
+                        /session
+                      </span>
+                    </div>
+                    <div className="mt-1 inline-block bg-green-50 border border-green-200 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-md tracking-wide">
+                      ₹100 OFF Today
+                    </div>
+                  </div>
+                </div>
+
+                {/* Badges Row */}
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  {/* Online Status */}
+                  <div
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+                      isOnline
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : "bg-gray-50 text-gray-600 border border-gray-200"
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isOnline ? "bg-green-500" : "bg-gray-400"
+                      }`}
+                    ></span>
+                    {isOnline ? "Online Now" : "Offline"}
+                  </div>
+
+                  {/* Rating */}
+                  {item.rating && (
+                    <div className="flex items-center gap-1 bg-yellow-50 border border-yellow-200 px-2 py-1 rounded-full text-xs font-semibold text-yellow-700">
+                      ⭐ {item.rating}
+                    </div>
+                  )}
+
+                  {/* Distance */}
+                  {item.distance && (
+                    <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-1 rounded-full text-xs font-semibold text-blue-700">
+                      📍 {item.distance.toFixed(1)} km
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewProfile(item);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg font-medium text-sm transition-all duration-200"
+                  >
+                    👁️ View Profile
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCallDoctor(item);
+                    }}
+                    disabled={isLoading || !isOnline}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
+                      isLoading || !isOnline
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                        : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-indigo-600 shadow-md hover:shadow-lg"
+                    }`}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Connecting...
+                      </>
+                    ) : !isOnline ? (
+                      <>
+                        <svg
+                          className="w-4 h-4"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                        </svg>
+                        Offline
+                      </>
+                    ) : (
+                      <>
+                        📞 Start Call
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-              <div className="mt-1 inline-block bg-green-50 border border-green-200 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-md tracking-wide">
-                ₹100 OFF Today
-              </div>
             </div>
-          )}
-        </div>
-
-        {/* Badges Row */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          {/* Online Status */}
-          <div
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
-              isOnline
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-gray-50 text-gray-600 border border-gray-200"
-            }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isOnline ? "bg-green-500" : "bg-gray-400"
-              }`}
-            ></span>
-            {isOnline ? "Online Now" : "Offline"}
           </div>
-
-          {/* Rating */}
-          {item.rating && (
-            <div className="flex items-center gap-1 bg-yellow-50 border border-yellow-200 px-2 py-1 rounded-full text-xs font-semibold text-yellow-700">
-              ⭐ {item.rating}
-            </div>
-          )}
-
-          {/* Distance */}
-          {item.distance && (
-            <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-1 rounded-full text-xs font-semibold text-blue-700">
-              📍 {item.distance.toFixed(1)} km
-            </div>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleViewProfile(item);
-            }}
-            className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg font-medium text-sm transition-all duration-200"
-          >
-            👁️ View Profile
-          </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCallDoctor(item);
-            }}
-            disabled={isLoading || !isOnline}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 ${
-              isLoading || !isOnline
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
-                : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-indigo-600 shadow-md hover:shadow-lg"
-            }`}
-          >
-            {isLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Connecting...
-              </>
-            ) : !isOnline ? (
-              <>
-                <svg
-                  className="w-4 h-4"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                </svg>
-                Offline
-              </>
-            ) : (
-              <>
-                📞 Start Call
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
+        );
       },
       [
         handleViewProfile,
@@ -400,6 +420,9 @@ const LiveDoctorSelectionModal = React.memo(
       const isCallingThisDoctor =
         selectedDoctor === profileDoctor.id && loading;
       const isOnline = isDoctorOnline(profileDoctor.id);
+      
+      // ✅ Get actual price for profile view
+      const actualPrice = profileDoctor.chat_price || profileDoctor.price || 500;
 
       return (
         <div
@@ -604,7 +627,7 @@ const LiveDoctorSelectionModal = React.memo(
                   </div>
                 </div>
 
-                {/* Consultation Fee */}
+                {/* Consultation Fee - Use actual price */}
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
                   <div className="flex items-center justify-between">
                     <div>
@@ -617,7 +640,7 @@ const LiveDoctorSelectionModal = React.memo(
                     </div>
                     <div className="text-right">
                       <p className="text-xl font-bold text-blue-600">
-                        ₹{(profileDoctor.chat_price || 500)}
+                        ₹{actualPrice}
                       </p>
                       <p className="text-gray-500 text-xs">after coupon</p>
                     </div>
@@ -702,7 +725,7 @@ const LiveDoctorSelectionModal = React.memo(
                   >
                     <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                   </svg>
-                  Start Video Call - ₹{profileDoctor.chat_price || "500"}
+                  Start Video Call - ₹{actualPrice}
                 </button>
               )}
             </div>
