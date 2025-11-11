@@ -13,6 +13,25 @@
   <style>
     @keyframes ring{0%{transform:rotate(0)}10%{transform:rotate(15deg)}20%{transform:rotate(-15deg)}30%{transform:rotate(10deg)}40%{transform:rotate(-10deg)}50%{transform:rotate(5deg)}60%{transform:rotate(-5deg)}100%{transform:rotate(0)}}
     .ringing{animation:ring 1s infinite}
+    body.demo-overlay-open {
+      overflow: hidden;
+    }
+    body.demo-overlay-open #incoming-modal {
+      position: fixed;
+      inset: auto 2rem 2rem auto;
+      background: transparent;
+      backdrop-filter: none;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      z-index: 90;
+      padding: 0;
+    }
+    body.demo-overlay-open #incoming-modal .incoming-modal-card {
+      width: 360px;
+      max-width: calc(100vw - 4rem);
+      box-shadow: 0 20px 45px rgba(15,23,42,0.35);
+    }
   </style>
 </head>
 <body class="h-screen bg-gray-50">
@@ -179,7 +198,7 @@
 
 {{-- Incoming Call Modal --}}
 <div id="incoming-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-  <div class="bg-white rounded-2xl shadow-2xl w-[92%] max-w-md p-6">
+  <div class="incoming-modal-card bg-white rounded-2xl shadow-2xl w-[92%] max-w-md p-6">
     <div class="flex items-center gap-3 mb-4">
       <svg class="w-9 h-9 text-rose-600 ringing" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -337,29 +356,32 @@
       ✕
     </button>
     <div class="grid gap-0 lg:grid-cols-[500px_1fr]">
-      <div class="border-b border-slate-100 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 p-6 text-white lg:border-b-0 lg:border-r">
-        <div class="flex flex-col items-center">
-          <div class="relative w-full max-w-xl">
-            <div class="absolute left-1/2 top-4 z-10 h-4 w-24 -translate-x-1/2 rounded-b-2xl bg-black/60"></div>
-            <div class="rounded-[36px] border-[6px] border-black/80 bg-black/60 p-3 shadow-2xl">
-              <div class="relative aspect-[9/18] overflow-hidden rounded-[24px] bg-slate-950">
-                <div id="demo-call-placeholder" class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center text-slate-200">
-                  <div class="text-base font-semibold">Pet Owner Preview</div>
-                  <p class="text-xs text-slate-300">We will stream the real React payment journey here once the dummy call link is ready.</p>
-                  <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-100">
-                    React Demo
+              <div class="border-b border-slate-100 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 p-6 text-white lg:border-b-0 lg:border-r">
+                <div class="flex flex-col items-center">
+                  <div class="relative w-full max-w-xl">
+                    <div class="absolute left-1/2 top-4 z-10 h-4 w-24 -translate-x-1/2 rounded-b-2xl bg-black/60"></div>
+                    <div class="rounded-[36px] border-[6px] border-black/80 bg-black/60 p-3 shadow-2xl">
+                      <div class="relative aspect-[9/18] overflow-hidden rounded-[24px] bg-slate-950">
+                        <div id="demo-call-placeholder" class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center text-slate-200">
+                          <div class="text-base font-semibold">Pet Owner Preview</div>
+                          <p class="text-xs text-slate-300">We will stream the real React payment journey here once the dummy call link is ready.</p>
+                          <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-100">
+                            React Demo
+                          </div>
+                        </div>
+                        <iframe id="demo-call-frame" title="Pet owner demo" loading="lazy" class="hidden h-full w-full bg-white" referrerpolicy="no-referrer"></iframe>
+                        <div id="demo-call-phone-loader" class="pointer-events-none absolute inset-0 hidden items-center justify-center bg-slate-950/70">
+                          <div class="flex flex-col items-center gap-2 text-slate-100">
+                            <span class="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white"></span>
+                            <span class="text-[11px] font-semibold tracking-wide uppercase">Loading</span>
+                          </div>
+                        </div>
+                        <button id="demo-call-phone-ring" type="button" class="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-lg shadow-emerald-700/40 hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500">
+                          Tap to ring doctor
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <iframe id="demo-call-frame" title="Pet owner demo" loading="lazy" class="hidden h-full w-full bg-white" referrerpolicy="no-referrer"></iframe>
-                <div id="demo-call-phone-loader" class="pointer-events-none absolute inset-0 hidden items-center justify-center bg-slate-950/70">
-                  <div class="flex flex-col items-center gap-2 text-slate-100">
-                    <span class="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white"></span>
-                    <span class="text-[11px] font-semibold tracking-wide uppercase">Loading</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
           <p class="mt-4 text-center text-xs text-slate-300">
             Scroll/tap inside the phone to feel the pet-side flow.
           </p>
@@ -618,6 +640,7 @@
   const triggerBtn = document.getElementById('demo-call-trigger');
   const replayBtn = document.getElementById('demo-call-replay');
   const openLinkBtn = document.getElementById('demo-call-open-link');
+  const phoneRingBtn = document.getElementById('demo-call-phone-ring');
   const statusEl = document.getElementById('demo-call-status');
   const detailEl = document.getElementById('demo-call-detail');
   const frameEl = document.getElementById('demo-call-frame');
@@ -681,6 +704,23 @@
     }
   }
 
+  function setPhoneButtonState(state){
+    if (!phoneRingBtn) return;
+    phoneRingBtn.classList.remove('opacity-60','pointer-events-none','hidden');
+    phoneRingBtn.disabled = false;
+    if (state === 'hidden') {
+      phoneRingBtn.classList.add('hidden');
+      return;
+    }
+    if (state === 'busy') {
+      phoneRingBtn.disabled = true;
+      phoneRingBtn.classList.add('opacity-60','pointer-events-none');
+      phoneRingBtn.textContent = 'Connecting…';
+      return;
+    }
+    phoneRingBtn.textContent = 'Tap to ring doctor';
+  }
+
   frameEl?.addEventListener('load', ()=>{
     if (!frameEl.src) return;
     loaderEl?.classList.add('hidden');
@@ -737,11 +777,12 @@
     replayBtn.disabled = true;
     if (infoPanel) infoPanel.classList.add('hidden');
     resetSteps();
+    setPhoneButtonState('ready');
   }
 
   function openOverlay(autoStart){
     overlay.classList.remove('hidden');
-    document.body.classList.add('overflow-hidden');
+    document.body.classList.add('overflow-hidden','demo-overlay-open');
     updateDoctorBadges();
     resetPanel();
     if (autoStart) requestDemoCall();
@@ -749,10 +790,10 @@
 
   function closeOverlay(){
     overlay.classList.add('hidden');
-    document.body.classList.remove('overflow-hidden');
+    document.body.classList.remove('overflow-hidden','demo-overlay-open');
   }
 
-  openBtn.addEventListener('click', ()=> openOverlay(true));
+  openBtn.addEventListener('click', ()=> openOverlay(false));
   overlay.addEventListener('click', (evt)=> {
     if (evt.target === overlay) closeOverlay();
   });
@@ -761,6 +802,7 @@
   });
   closeBtn?.addEventListener('click', closeOverlay);
 
+  phoneRingBtn?.addEventListener('click', ()=> requestDemoCall());
   replayBtn?.addEventListener('click', ()=> requestDemoCall());
   triggerBtn?.addEventListener('click', ()=> requestDemoCall());
   openLinkBtn?.addEventListener('click', ()=>{
@@ -785,6 +827,7 @@
     if (infoPanel) infoPanel.classList.add('hidden');
     setFrame(null);
     requesting = true;
+    setPhoneButtonState('busy');
     const patientId = Math.floor(90000 + Math.random() * 90000);
     const headers = {
       'Content-Type':'application/json',
@@ -825,6 +868,7 @@
         created_at: Date.now()
       };
       currentSession.demo_entry_url = buildDemoEntryUrl(currentSession, doctorId);
+      setPhoneButtonState('hidden');
       setStatus('Demo call created', 'Doctor banner should ring now.');
       setStepState('request','done', currentSession.call_id ? `Call ${currentSession.call_id} created` : 'Call created');
       setStepState('ring','active','Listening for incoming event…');
@@ -854,6 +898,7 @@
       setStepState('request','error', err?.message || 'Server error');
       replayBtn?.removeAttribute('disabled');
       console.warn('[demo-call] request failed', err);
+      setPhoneButtonState('ready');
     } finally {
       requesting = false;
     }
