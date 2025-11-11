@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Support\CallSessionUrlBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class CallSession extends Model
 {
@@ -35,7 +37,96 @@ class CallSession extends Model
         'amount_paid'       => 'integer',
     ];
 
+    protected static array $columnSupportCache = [];
+    protected ?string $pendingCallIdentifier = null;
+
+    public static function supportsColumn(string $column): bool
+    {
+        if (!array_key_exists($column, self::$columnSupportCache)) {
+            $table = (new self())->getTable();
+            self::$columnSupportCache[$column] = Schema::hasColumn($table, $column);
+        }
+
+        return self::$columnSupportCache[$column];
+    }
+
+    public function useCallIdentifier(string $identifier): self
+    {
+        $this->pendingCallIdentifier = $identifier;
+
+        if (self::supportsColumn('call_identifier')) {
+            $this->setAttribute('call_identifier', $identifier);
+        }
+
+        return $this;
+    }
+
+    public function resolveIdentifier(): string
+    {
+        if (!empty($this->pendingCallIdentifier)) {
+            return $this->pendingCallIdentifier;
+        }
+
+        $stored = $this->getAttribute('call_identifier');
+        if (is_string($stored) && $stored !== '') {
+            return $stored;
+        }
+
+        $channel = (string) ($this->channel_name ?? '');
+        if ($channel !== '' && Str::startsWith($channel, 'channel_')) {
+            return substr($channel, strlen('channel_'));
+        }
+
+        if ($this->getAttribute('id')) {
+            return 'call_' . $this->getAttribute('id');
+        }
+
+        return CallSessionUrlBuilder::generateIdentifier();
+    }
+
     public function refreshComputedLinks(?string $frontendBase = null): self
+    {
+        $doctorUrl = $this->buildDoctorJoinUrl($frontendBase);
+        $paymentUrl = $this->buildPatientPaymentUrl($frontendBase);
+
+        if (self::supportsColumn('doctor_join_url')) {
+            $this->setAttribute('doctor_join_url', $doctorUrl);
+        }
+
+        if (self::supportsColumn('patient_payment_url')) {
+            $this->setAttribute('patient_payment_url', $paymentUrl);
+        }
+
+        return $this;
+    }
+
+    protected function buildDoctorJoinUrl(?string $frontendBase = null): ?string
+    {
+        $ids = $this->normalizedParticipantIds();
+
+        return CallSessionUrlBuilder::doctorJoinUrl(
+            $this->channel_name,
+            $this->resolveIdentifier(),
+            $ids['doctor'],
+            $ids['patient'],
+            $frontendBase
+        );
+    }
+
+    protected function buildPatientPaymentUrl(?string $frontendBase = null): ?string
+    {
+        $ids = $this->normalizedParticipantIds();
+
+        return CallSessionUrlBuilder::patientPaymentUrl(
+            $this->channel_name,
+            $this->resolveIdentifier(),
+            $ids['doctor'],
+            $ids['patient'],
+            $frontendBase
+        );
+    }
+
+    protected function normalizedParticipantIds(): array
     {
         $doctorId = $this->doctor_id !== null ? (int) $this->doctor_id : null;
         if ($doctorId === 0 && $this->doctor_id !== 0) {
@@ -47,25 +138,31 @@ class CallSession extends Model
             $patientId = null;
         }
 
-        $base = $frontendBase ?? CallSessionUrlBuilder::frontendBase();
+        return ['doctor' => $doctorId, 'patient' => $patientId];
+    }
 
-        $this->doctor_join_url = CallSessionUrlBuilder::doctorJoinUrl(
-            $this->channel_name,
-            $this->call_identifier,
-            $doctorId,
-            $patientId,
-            $base
-        );
+    public function resolvedDoctorJoinUrl(?string $frontendBase = null): ?string
+    {
+        if (self::supportsColumn('doctor_join_url')) {
+            $stored = $this->getAttribute('doctor_join_url');
+            if (!empty($stored)) {
+                return $stored;
+            }
+        }
 
-        $this->patient_payment_url = CallSessionUrlBuilder::patientPaymentUrl(
-            $this->channel_name,
-            $this->call_identifier,
-            $doctorId,
-            $patientId,
-            $base
-        );
+        return $this->buildDoctorJoinUrl($frontendBase ?? CallSessionUrlBuilder::frontendBase());
+    }
 
-        return $this;
+    public function resolvedPatientPaymentUrl(?string $frontendBase = null): ?string
+    {
+        if (self::supportsColumn('patient_payment_url')) {
+            $stored = $this->getAttribute('patient_payment_url');
+            if (!empty($stored)) {
+                return $stored;
+            }
+        }
+
+        return $this->buildPatientPaymentUrl($frontendBase ?? CallSessionUrlBuilder::frontendBase());
     }
 
     public function payment(): BelongsTo

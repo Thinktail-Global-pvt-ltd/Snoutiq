@@ -29,10 +29,14 @@ class CallController extends Controller
         $requestedChannel = $data['channel_name'] ?? null;
         $channelName = CallSessionUrlBuilder::ensureChannel($requestedChannel, $callIdentifier);
 
-        $session = CallSession::query()
-            ->where('call_identifier', $callIdentifier)
-            ->orWhere('channel_name', $channelName)
-            ->first();
+        $sessionQuery = CallSession::query()
+            ->where('channel_name', $channelName);
+
+        if (CallSession::supportsColumn('call_identifier')) {
+            $sessionQuery->orWhere('call_identifier', $callIdentifier);
+        }
+
+        $session = $sessionQuery->first();
 
         if (!$session) {
             $session = new CallSession();
@@ -46,7 +50,7 @@ class CallController extends Controller
         }
 
         $session->channel_name = $channelName;
-        $session->call_identifier = $callIdentifier;
+        $session->useCallIdentifier($callIdentifier);
         $session->currency = $session->currency ?? 'INR';
         $session->status = $session->status ?? 'pending';
         $session->payment_status = $session->payment_status ?? 'unpaid';
@@ -284,7 +288,7 @@ class CallController extends Controller
             'patient_id'      => $session->patient_id,
             'doctor_id'       => $session->doctor_id,
             'channel_name'    => $session->channel_name,
-            'call_identifier' => $session->call_identifier,
+            'call_identifier' => $session->resolveIdentifier(),
             'status'          => $session->status,
             'payment_status'  => $session->payment_status,
             'accepted_at'     => $session->accepted_at?->toIso8601String(),
@@ -293,8 +297,8 @@ class CallController extends Controller
             'duration_seconds'=> $session->duration_seconds,
             'amount_paid'     => $session->amount_paid,
             'currency'        => $session->currency,
-            'doctor_join_url' => $session->doctor_join_url,
-            'patient_payment_url' => $session->patient_payment_url,
+            'doctor_join_url' => $session->resolvedDoctorJoinUrl(),
+            'patient_payment_url' => $session->resolvedPatientPaymentUrl(),
             'created_at'      => $session->created_at?->toIso8601String(),
             'updated_at'      => $session->updated_at?->toIso8601String(),
             'session'         => $session,

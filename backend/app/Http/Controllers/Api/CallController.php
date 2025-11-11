@@ -21,10 +21,14 @@ class CallController extends Controller
         $callIdentifier = CallSessionUrlBuilder::ensureIdentifier($data['call_id'] ?? null);
         $channelName = CallSessionUrlBuilder::ensureChannel($data['channel_name'] ?? null, $callIdentifier);
 
-        $session = CallSession::query()
-            ->where('call_identifier', $callIdentifier)
-            ->orWhere('channel_name', $channelName)
-            ->first();
+        $sessionQuery = CallSession::query()
+            ->where('channel_name', $channelName);
+
+        if (CallSession::supportsColumn('call_identifier')) {
+            $sessionQuery->orWhere('call_identifier', $callIdentifier);
+        }
+
+        $session = $sessionQuery->first();
 
         if (!$session) {
             $session = new CallSession();
@@ -36,7 +40,7 @@ class CallController extends Controller
         $session->patient_id = $data['patient_id'];
         $session->doctor_id = $data['doctor_id'];
         $session->channel_name = $channelName;
-        $session->call_identifier = $callIdentifier;
+        $session->useCallIdentifier($callIdentifier);
         $session->currency = $session->currency ?? 'INR';
         $session->status = $session->status ?? 'pending';
         $session->payment_status = $session->payment_status ?? 'unpaid';
@@ -54,9 +58,9 @@ class CallController extends Controller
                 'doctor_id'   => $session->doctor_id,
                 'patient_id'  => $session->patient_id,
                 'channel'     => $session->channel_name,
-                'call_id'     => $session->call_identifier,
-                'doctor_join_url' => $session->doctor_join_url,
-                'patient_payment_url' => $session->patient_payment_url,
+                'call_id'     => $session->resolveIdentifier(),
+                'doctor_join_url' => $session->resolvedDoctorJoinUrl(),
+                'patient_payment_url' => $session->resolvedPatientPaymentUrl(),
                 'session_id'  => $session->id,
             ]
         ]);
@@ -79,11 +83,12 @@ class CallController extends Controller
             'doctor_id'     => $doctorId,
             'patient_id'    => $patientId,
             'channel_name'  => $channelName,
-            'call_identifier' => $callIdentifier,
             'currency'      => 'INR',
             'status'        => 'pending',
             'payment_status'=> 'unpaid',
         ]);
+
+        $session->useCallIdentifier($callIdentifier);
 
         $session->refreshComputedLinks();
         $session->save();
@@ -97,9 +102,9 @@ class CallController extends Controller
                 'doctor_id'  => $session->doctor_id,
                 'patient_id' => $session->patient_id,
                 'channel'    => $session->channel_name,
-                'call_id'    => $session->call_identifier,
-                'doctor_join_url' => $session->doctor_join_url,
-                'patient_payment_url' => $session->patient_payment_url,
+                'call_id'    => $session->resolveIdentifier(),
+                'doctor_join_url' => $session->resolvedDoctorJoinUrl(),
+                'patient_payment_url' => $session->resolvedPatientPaymentUrl(),
                 'session_id' => $session->id,
             ],
         ]);

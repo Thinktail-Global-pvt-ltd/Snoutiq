@@ -467,16 +467,23 @@ class PaymentController extends Controller
         }
 
         try {
-            return CallSession::query()
-                ->with('doctor')
-                ->where(function ($query) use ($identifier) {
-                    $query->where('call_identifier', $identifier);
-                    if (is_numeric($identifier)) {
-                        $query->orWhere('id', (int) $identifier);
-                    }
-                })
-                ->latest('id')
-                ->first();
+            $query = CallSession::query()->with('doctor');
+
+            $query->where(function ($inner) use ($identifier) {
+                if (CallSession::supportsColumn('call_identifier')) {
+                    $inner->where('call_identifier', $identifier);
+                }
+
+                if (is_numeric($identifier)) {
+                    $inner->orWhere('id', (int) $identifier);
+                }
+
+                if (!is_numeric($identifier)) {
+                    $inner->orWhere('channel_name', $identifier);
+                }
+            });
+
+            return $query->latest('id')->first();
         } catch (\Throwable $e) {
             report($e);
         }
