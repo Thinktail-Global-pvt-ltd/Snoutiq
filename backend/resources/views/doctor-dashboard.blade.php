@@ -331,18 +331,18 @@
 
 <!-- Demo Call Overlay -->
 <div id="demo-call-overlay" class="hidden fixed inset-0 z-[80] overflow-y-auto bg-slate-900/70 px-4 py-8 backdrop-blur">
-  <div class="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+  <div class="relative mx-auto max-w-6xl lg:max-w-7xl overflow-hidden rounded-3xl bg-white shadow-2xl">
     <button type="button" data-demo-close class="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:scale-105 hover:text-slate-900">
       <span class="sr-only">Close demo</span>
       ✕
     </button>
-    <div class="grid gap-0 lg:grid-cols-[320px_1fr]">
+    <div class="grid gap-0 lg:grid-cols-[500px_1fr]">
       <div class="border-b border-slate-100 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 p-6 text-white lg:border-b-0 lg:border-r">
         <div class="flex flex-col items-center">
-          <div class="relative w-full max-w-xs">
+          <div class="relative w-full max-w-xl">
             <div class="absolute left-1/2 top-4 z-10 h-4 w-24 -translate-x-1/2 rounded-b-2xl bg-black/60"></div>
             <div class="rounded-[36px] border-[6px] border-black/80 bg-black/60 p-3 shadow-2xl">
-              <div class="relative aspect-[9/19] overflow-hidden rounded-[24px] bg-slate-950">
+              <div class="relative aspect-[9/18] overflow-hidden rounded-[24px] bg-slate-950">
                 <div id="demo-call-placeholder" class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center text-slate-200">
                   <div class="text-base font-semibold">Pet Owner Preview</div>
                   <p class="text-xs text-slate-300">We will stream the real React payment journey here once the dummy call link is ready.</p>
@@ -634,6 +634,11 @@
   const steps = overlay.querySelectorAll('[data-demo-step]');
   const apiBase = (typeof API_BASE !== 'undefined' ? API_BASE : ((typeof PATH_PREFIX !== 'undefined' ? PATH_PREFIX : '') + '/api'));
   const DEMO_ENDPOINT = apiBase + '/call/test';
+  const FRONTEND_BASE_FOR_DEMO = detectFrontendBase();
+  const DEMO_PET_ENTRY = (() => {
+    const base = (FRONTEND_BASE_FOR_DEMO || 'https://snoutiq.com').replace(/\/+$/, '');
+    return base ? `${base}/dashboard` : 'https://snoutiq.com/dashboard';
+  })();
 
   let currentSession = null;
   let requesting = false;
@@ -759,8 +764,9 @@
   replayBtn?.addEventListener('click', ()=> requestDemoCall());
   triggerBtn?.addEventListener('click', ()=> requestDemoCall());
   openLinkBtn?.addEventListener('click', ()=>{
-    if (currentSession?.patient_payment_url) {
-      window.open(currentSession.patient_payment_url, '_blank', 'noopener');
+    const target = currentSession?.demo_entry_url || currentSession?.patient_payment_url;
+    if (target) {
+      window.open(target, '_blank', 'noopener');
     }
   });
 
@@ -814,18 +820,21 @@
         channel: data.channel || data.channel_name || null,
         doctor_id: data.doctor_id || doctorId,
         patient_id: data.patient_id || patientId,
+        session_id: data.session_id || data.id || null,
         patient_payment_url: data.patient_payment_url || '',
         created_at: Date.now()
       };
+      currentSession.demo_entry_url = buildDemoEntryUrl(currentSession, doctorId);
       setStatus('Demo call created', 'Doctor banner should ring now.');
       setStepState('request','done', currentSession.call_id ? `Call ${currentSession.call_id} created` : 'Call created');
       setStepState('ring','active','Listening for incoming event…');
       replayBtn?.removeAttribute('disabled');
-      openLinkBtn.disabled = !currentSession.patient_payment_url;
+      openLinkBtn.disabled = !(currentSession.demo_entry_url || currentSession.patient_payment_url);
 
-      if (currentSession.patient_payment_url) {
-        setStepState('pet','active','Loading React payment page…');
-        setFrame(currentSession.patient_payment_url);
+      const petTarget = currentSession.demo_entry_url || currentSession.patient_payment_url;
+      if (petTarget) {
+        setStepState('pet','active','Loading pet dashboard…');
+        setFrame(petTarget);
         if (infoPayment) infoPayment.href = currentSession.patient_payment_url;
       } else {
         setFrame(null);
@@ -862,6 +871,65 @@
   updateDoctorBadges();
   if (!document.body.classList.contains('overflow-hidden')) {
     setStatus('Ready for a test run.', 'Click the demo button to open the mobile preview.');
+  }
+
+  function detectFrontendBase(){
+    const clean = (value) => value ? String(value).trim().replace(/\/+$/, '') : '';
+    const candidates = [];
+    const seen = new Set();
+    const addCandidate = (value) => {
+      const cleaned = clean(value);
+      if (!cleaned || seen.has(cleaned)) return;
+      candidates.push(cleaned);
+      seen.add(cleaned);
+    };
+
+    try {
+      if (window.__SNOUTIQ_FRONTEND_BASE) addCandidate(window.__SNOUTIQ_FRONTEND_BASE);
+    } catch (_) {}
+    try {
+      const ls = localStorage.getItem('snoutiq_frontend_base');
+      if (ls) addCandidate(ls);
+    } catch (_) {}
+    try {
+      const ss = sessionStorage.getItem('snoutiq_frontend_base');
+      if (ss) addCandidate(ss);
+    } catch (_) {}
+
+    addCandidate('https://snoutiq.com');
+
+    if (typeof window !== 'undefined') {
+      const host = (window.location.hostname || '').toLowerCase();
+      if (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(host)) {
+        addCandidate('http://localhost:5173');
+      }
+
+      const origin = window.location.origin || '';
+      const pathName = window.location.pathname || '';
+      const sanitizedOrigin = origin.replace(/\/backend$/, '');
+      if (origin && !/^\/backend\b/.test(pathName)) {
+        addCandidate(sanitizedOrigin);
+      }
+    }
+
+    return candidates[0] || '';
+  }
+
+  function buildDemoEntryUrl(session, doctorId){
+    if (!DEMO_PET_ENTRY) return null;
+    try{
+      const target = new URL(DEMO_PET_ENTRY, window.location.origin);
+      target.searchParams.set('demo', '1');
+      if (session?.call_id) target.searchParams.set('callId', session.call_id);
+      if (session?.channel) target.searchParams.set('channel', session.channel);
+      if (session?.session_id) target.searchParams.set('sessionId', session.session_id);
+      if (doctorId) target.searchParams.set('doctorId', doctorId);
+      if (session?.patient_id) target.searchParams.set('patientId', session.patient_id);
+      return target.toString();
+    }catch(err){
+      console.warn('[demo-call] unable to build pet dashboard url', err);
+      return DEMO_PET_ENTRY;
+    }
   }
 })();
 </script>
