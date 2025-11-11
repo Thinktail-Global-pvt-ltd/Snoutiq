@@ -34,31 +34,223 @@
   </script>
 
   <style>
-    :root{--bg1:#eef4ff;--bg2:#e9eefe;--card:#ffffff;--text:#0f172a;--muted:#64748b;--blue:#2563eb;--blue-d:#1e40af;--border:#e5e7eb;--ring:rgba(37,99,235,.25)}
-    *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text)}
-    .wrap{min-height:100dvh;display:grid;place-items:center;padding:32px}
-    .card{width:100%;max-width:480px;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.08);padding:24px 22px}
-
-    h1{font-size:24px;margin:0 0 6px;text-align:center}
-    .sub{color:var(--muted);text-align:center;margin:0 0 16px}
-    label{display:block;font-size:13px;font-weight:600;color:#334155;margin:0 0 6px}
-    .input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#fff;outline:none}
-    .input:focus{border-color:transparent;box-shadow:0 0 0 3px var(--ring)}
-    .row{margin-bottom:14px}
-    .btn{width:100%;padding:12px 14px;border-radius:10px;border:0;font-weight:700;cursor:pointer}
-    .btn-primary{background:var(--blue);color:#fff}
-    .btn-primary:hover{background:var(--blue-d)}
-    .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;cursor:pointer}
-    .debug{display:none!important}
-    .debug h3{margin:0 0 8px;font-size:14px}
-    .debug pre{max-height:360px;overflow:auto;background:#0b1020;color:#d1e7ff;padding:12px;border-radius:10px;font-size:12px;line-height:1.45}
+    :root {
+      --bg1: rgba(248, 250, 255, 0.9);
+      --bg2: rgba(226, 232, 240, 0.7);
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --blue: #2563eb;
+      --blue-d: #1e40af;
+      --border: rgba(15, 23, 42, 0.08);
+      --ring: rgba(37, 99, 235, 0.3);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, "Segoe UI", Roboto, Ubuntu, sans-serif;
+      color: #0b1a4d;
+      background-color: #f9fbff;
+      background-image:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.95), #f0f4ff 60%, #e2e8ff),
+        url('https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1800&q=80');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      min-height: 100vh;
+      position: relative;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 5% 20%, rgba(56, 189, 248, 0.35), transparent 40%),
+        radial-gradient(circle at 85% 70%, rgba(59, 130, 246, 0.4), transparent 50%),
+        radial-gradient(circle at 30% 90%, rgba(248, 113, 113, 0.35), transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .wrap {
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 44px;
+      position: relative;
+      z-index: 1;
+    }
+    .card {
+      width: 100%;
+      max-width: 540px;
+      min-height: 640px;
+      background: linear-gradient(180deg, rgba(59, 130, 246, 0.98), rgba(37, 99, 235, 0.96));
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      box-shadow: 0 45px 90px rgba(9, 30, 66, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      padding: 48px 44px 50px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(18px);
+    }
+    .card::after {
+      content: '';
+      position: absolute;
+      inset: -20px;
+      background: radial-gradient(circle at 25% 20%, rgba(255, 255, 255, 0.45), transparent 40%);
+      pointer-events: none;
+      opacity: 0.8;
+    }
+    .badge {
+      display: inline-flex;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #e0f2ff;
+      background: rgba(14, 165, 233, 0.3);
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 32px;
+      margin: 0;
+      font-weight: 700;
+      color: white;
+      line-height: 1.2;
+    }
+    .sub {
+      color: rgba(226, 232, 240, 0.9);
+      text-align: left;
+      margin: 8px 0 28px;
+      line-height: 1.5;
+      z-index: 1;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .card-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.2);
+      display: grid;
+      place-items: center;
+      font-size: 26px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+    .pretitle {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: rgba(226, 232, 240, 0.7);
+      margin-bottom: 4px;
+    }
+    .note {
+      text-align: center;
+      font-size: 13px;
+      color: rgba(226, 232, 240, 0.9);
+      margin-top: 12px;
+      z-index: 1;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.85);
+      margin: 0 0 6px;
+    }
+    .input {
+      width: 100%;
+      padding: 14px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.95);
+      outline: none;
+      font-size: 15px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .input:focus {
+      border-color: rgba(14, 165, 233, 0.9);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+      background: #fff;
+    }
+    .row {
+      margin-bottom: 16px;
+    }
+    .btn {
+      width: 100%;
+      padding: 16px 18px;
+      border: 0;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 15px;
+      letter-spacing: 0.04em;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 15px 45px rgba(15, 23, 42, 0.35);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.35);
+    }
+    .pw-toggle {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      font-size: 18px;
+    }
+    .debug {
+      display: none !important;
+    }
+    .debug h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+    .debug pre {
+      max-height: 360px;
+      overflow: auto;
+      background: #0b1020;
+      color: #d1e7ff;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .foot {
+      font-size: 14px;
+      color: #475569;
+    }
+    .right {
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
 <div class="wrap">
-  <main class="card"><h1>Welcome Back!</h1>
-    <p class="sub">Sign in to continue to your Test Clinic account</p>
+  <main class="card">
+    <span class="badge">Vet Dashboard</span>
+    <div class="card-header">
+      <span class="card-icon">🐾</span>
+      <div>
+        <p class="pretitle">SnoutIQ Vet Control</p>
+        <h1>Vet Dashboard Login</h1>
+      </div>
+    </div>
+    <p class="sub">Sign in to continue to your SnoutIQ veterinarian dashboard and manage pet care with confidence.</p>
 
     <!-- Vet form only -->
     <form id="vetForm">
@@ -69,9 +261,7 @@
 
       <div class="row" style="position:relative">
         <div>
-          <label for="password">Password
-            <a class="right" style="float:right;color:#2563eb;text-decoration:none;font-weight:600" href="/forgot-password">Forgot Password?</a>
-          </label>
+          <label for="password">Password</label>
         </div>
         <input id="password" type="password" class="input" placeholder="Enter your password" autocomplete="current-password"/>
         <button id="pwBtn" class="pw-toggle" type="button" aria-label="Show password">👁️</button>
@@ -86,11 +276,7 @@
       <pre id="dump">Waiting for login…</pre>
     </div>
 
-    <div class="foot" style="margin-top:16px;text-align:center">
-      <p style="color:#64748b">Don't have an account?
-        <a class="link" style="color:#2563eb;text-decoration:none;font-weight:600" href="/register">Create an account</a>
-      </p>
-    </div>
+    <div class="note">Only verified veterinarians can access the dashboard. Reach out if you need help with your credentials.</div>
   </main>
 </div>
 
