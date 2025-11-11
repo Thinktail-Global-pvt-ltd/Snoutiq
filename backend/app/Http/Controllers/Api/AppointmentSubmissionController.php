@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class AppointmentSubmissionController extends Controller
 {
@@ -168,6 +169,54 @@ class AppointmentSubmissionController extends Controller
         return $this->respondWithAppointment($appointment->fresh());
     }
 
+    public function listByDoctor(Doctor $doctor): JsonResponse
+    {
+        $appointments = Appointment::query()
+            ->with(['clinic', 'doctor'])
+            ->where('doctor_id', $doctor->id)
+            ->orderByDesc('appointment_date')
+            ->orderByDesc('appointment_time')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'doctor' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->doctor_name ?? $doctor->name ?? null,
+                ],
+                'count' => $appointments->count(),
+                'appointments' => $this->formatAppointments($appointments),
+            ],
+        ]);
+    }
+
+    public function listByUser(User $user): JsonResponse
+    {
+        $appointments = Appointment::query()
+            ->with(['clinic', 'doctor'])
+            ->where(function ($query) use ($user) {
+                $jsonPath = 'notes->patient_user_id';
+                $query->whereJsonContains($jsonPath, $user->id)
+                    ->orWhere('notes', 'like', '%"patient_user_id":'.$user->id.'%');
+            })
+            ->orderByDesc('appointment_date')
+            ->orderByDesc('appointment_time')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                ],
+                'count' => $appointments->count(),
+                'appointments' => $this->formatAppointments($appointments),
+            ],
+        ]);
+    }
+
     private function respondWithAppointment(Appointment $appointment, int $status = 200): JsonResponse
     {
         return response()->json([
@@ -205,6 +254,16 @@ class AppointmentSubmissionController extends Controller
             'amount' => $notes['amount_paise'] ?? null,
             'currency' => $notes['currency'] ?? 'INR',
         ];
+    }
+
+    /**
+     * @param  Collection<int, Appointment>  $appointments
+     */
+    private function formatAppointments(Collection $appointments): array
+    {
+        return $appointments->map(function (Appointment $appointment) {
+            return $this->formatAppointment($appointment);
+        })->all();
     }
 
     private function decodeNotes(?string $notes): array

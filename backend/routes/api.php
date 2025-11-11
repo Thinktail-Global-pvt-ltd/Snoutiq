@@ -135,6 +135,10 @@ Route::get('/doctors/featured', function () {
 
 Route::post('/appointments/submit', [AppointmentSubmissionController::class, 'store'])
     ->name('api.appointments.submit');
+Route::get('/appointments/by-doctor/{doctor}', [AppointmentSubmissionController::class, 'listByDoctor'])
+    ->name('api.appointments.by-doctor');
+Route::get('/appointments/by-user/{user}', [AppointmentSubmissionController::class, 'listByUser'])
+    ->name('api.appointments.by-user');
 Route::get('/appointments/{appointment}', [AppointmentSubmissionController::class, 'show'])
     ->name('api.appointments.show');
 Route::get('/appointments/{appointment}/edit', [AppointmentSubmissionController::class, 'edit'])
