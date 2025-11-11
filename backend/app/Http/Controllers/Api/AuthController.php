@@ -13,6 +13,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\OtpMail;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 
 use Illuminate\Support\Facades\DB;
@@ -37,51 +38,19 @@ class AuthController extends Controller
     
     public function describePetImage()
     {
-        // Gemini API key (direct use)
-        $apiKey = GeminiConfig::apiKey();
-        if (empty($apiKey)) {
-            return response()->json(['error' => 'Gemini API key is not configured.'], 503);
-        }
-        $model = GeminiConfig::defaultModel();
-
-        // Static image ka path
         $imagePath = public_path('pet_pics/pet_1_1753728813.png');
 
         if (!file_exists($imagePath)) {
             return response()->json(['error' => 'Image not found at '.$imagePath], 404);
         }
 
-        // Image ko base64 encode karna
-        $imageData = base64_encode(file_get_contents($imagePath));
+        $summary = $this->summarizeImageFile($imagePath);
 
-        // Gemini API call
-        $response = Http::withHeaders([
-            'Content-Type'   => 'application/json',
-            'X-goog-api-key' => $apiKey,
-        ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
-            'contents' => [[
-                'parts' => [
-                    [
-                        'inline_data' => [
-                            'mime_type' => 'image/png',
-                            'data' => $imageData,
-                        ]
-                    ],
-                    [
-                        'text' => 'Describe this pet image in detail: breed, color, facial expression, mood, and any other details you can observe.'
-                    ]
-                ]
-            ]]
-        ]);
-
-        if (!$response->successful()) {
+        if (!$summary) {
             return response()->json([
-                'error' => 'Gemini API call failed',
-                'details' => $response->json()
-            ], 500);
+                'error' => 'Unable to generate summary for the provided image.',
+            ], 502);
         }
-
-        $summary = $response->json('candidates.0.content.parts.0.text');
 
         return response()->json([
             'message' => 'Pet image description generated successfully',
@@ -406,34 +375,30 @@ public function register(Request $request)
         ], 404);
     }
 
+    $existingDoc1 = $user->pet_doc1;
+    $existingDoc2 = $user->pet_doc2;
+    $existingSummary = $user->summary;
+
     $doc1Path = null;
     $doc2Path = null;
     $summaryText = null;
+    $doc1AbsolutePath = null;
+    $doc2AbsolutePath = null;
 
-    // ✅ ensure directory exists
-    $uploadPath = public_path('uploads/pet_docs');
-    if (!File::exists($uploadPath)) {
-        File::makeDirectory($uploadPath, 0777, true, true);
-    }
+    // ✅ persist uploads and keep both DB + absolute paths handy
+    [$doc1Path, $doc1AbsolutePath] = $this->storePetDocument($request, 'pet_doc1');
+    [$doc2Path, $doc2AbsolutePath] = $this->storePetDocument($request, 'pet_doc2');
 
-    // ✅ file upload
-    if ($request->hasFile('pet_doc1')) {
-        $doc1Name = time().'_'.uniqid().'_'.$request->file('pet_doc1')->getClientOriginalName();
-        File::put($uploadPath.'/'.$doc1Name, file_get_contents($request->file('pet_doc1')->getRealPath()));
-        $doc1Path = $uploadPath.'/'.$doc1Name;
-    }
+    // ✅ fallback to previous uploads if new files not provided
+    $doc1Path = $doc1Path ?? $existingDoc1;
+    $doc2Path = $doc2Path ?? $existingDoc2;
 
-    if ($request->hasFile('pet_doc2')) {
-        $doc2Name = time().'_'.uniqid().'_'.$request->file('pet_doc2')->getClientOriginalName();
-        File::put($uploadPath.'/'.$doc2Name, file_get_contents($request->file('pet_doc2')->getRealPath()));
-        $doc2Path = $uploadPath.'/'.$doc2Name;
-    }
-
-    // ✅ Gemini summary
-    if ($doc1Path || $doc2Path) {
-        $imagePath = $doc1Path ?? $doc2Path;
+    // ✅ Gemini summary only when fresh image arrives, else preserve old summary
+    $imagePath = $doc1AbsolutePath ?? $doc2AbsolutePath;
+    if ($imagePath) {
         $summaryText = $this->describePetImageDynamic($imagePath);
     }
+    $summaryText = $summaryText ?? $existingSummary;
 
     $plainToken = bin2hex(random_bytes(32));
 
@@ -493,11 +458,11 @@ public function register(Request $request)
 }
 
 
-public function register_latest_backup(Request $request)
-{
-    
-    // check email
-    $emailExists = DB::table('users')
+    public function register_latest_backup(Request $request)
+    {
+        
+        // check email
+        $emailExists = DB::table('users')
         ->where('email', $request->email)
         ->exists();
 
@@ -513,37 +478,18 @@ public function register_latest_backup(Request $request)
         ], 422);
     }
 
-
-
-
     $doc1Path = null;
     $doc2Path = null;
     $summaryText = null;
+    $doc1AbsolutePath = null;
+    $doc2AbsolutePath = null;
 
-    // ✅ ensure directory exists
-    $uploadPath = public_path('uploads/pet_docs');
-    if (!File::exists($uploadPath)) {
-        File::makeDirectory($uploadPath, 0777, true, true);
-    }
-
-    // ✅ file upload using File::put
-    if ($request->hasFile('pet_doc1')) {
-        $doc1Name = time().'_'.uniqid().'_'.$request->file('pet_doc1')->getClientOriginalName();
-        $fileContent = file_get_contents($request->file('pet_doc1')->getRealPath());
-        File::put($uploadPath.'/'.$doc1Name, $fileContent);
-        $doc1Path = $uploadPath.'/'.$doc1Name;
-    }
-
-    if ($request->hasFile('pet_doc2')) {
-        $doc2Name = time().'_'.uniqid().'_'.$request->file('pet_doc2')->getClientOriginalName();
-        $fileContent = file_get_contents($request->file('pet_doc2')->getRealPath());
-        File::put($uploadPath.'/'.$doc2Name, $fileContent);
-        $doc2Path = $uploadPath.'/'.$doc2Name;
-    }
+    [$doc1Path, $doc1AbsolutePath] = $this->storePetDocument($request, 'pet_doc1');
+    [$doc2Path, $doc2AbsolutePath] = $this->storePetDocument($request, 'pet_doc2');
 
     // ✅ Gemini call agar koi image upload hui hai
-    if ($doc1Path || $doc2Path) {
-        $imagePath = $doc1Path ?? $doc2Path; // agar dono hain to pehle doc1 lo
+    $imagePath = $doc1AbsolutePath ?? $doc2AbsolutePath; // agar dono hain to pehle doc1 lo
+    if ($imagePath) {
         $summaryText = $this->describePetImageDynamic($imagePath);
     }
 
@@ -579,47 +525,226 @@ public function register_latest_backup(Request $request)
     ], 201);
 }
 
+    public function generatePetSummary(Request $request)
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $user = User::find($data['user_id']);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found.',
+            ], 404);
+        }
+
+        $docPaths = array_values(array_filter([
+            $user->pet_doc1,
+            $user->pet_doc2,
+        ]));
+
+        if (empty($docPaths)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No pet documents found for this user.',
+            ], 422);
+        }
+
+        $summaries = [];
+        foreach ($docPaths as $path) {
+            $summary = $this->describePetImageDynamic($path);
+            if ($summary) {
+                $summaries[] = trim($summary);
+            }
+        }
+
+        if (empty($summaries)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to generate summary from the uploaded images.',
+            ], 502);
+        }
+
+        $finalSummary = trim(implode("\n\n", $summaries));
+        $user->summary = $finalSummary;
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'user_id' => $user->id,
+            'summary' => $finalSummary,
+            'sources' => $docPaths,
+        ]);
+    }
+
+/**
+ * Store uploaded pet document and return [relativePath, absolutePath]
+ */
+private function storePetDocument(Request $request, string $field): array
+{
+    if (!$request->hasFile($field)) {
+        return [null, null];
+    }
+
+    $uploadPath = public_path('uploads/pet_docs');
+    if (!File::exists($uploadPath)) {
+        File::makeDirectory($uploadPath, 0777, true, true);
+    }
+
+    $file = $request->file($field);
+    $docName = time().'_'.uniqid().'_'.$file->getClientOriginalName();
+    $file->move($uploadPath, $docName);
+
+    $relativePath = 'backend/uploads/pet_docs/'.$docName;
+
+    return [$relativePath, $uploadPath.'/'.$docName];
+}
+
 /**
  * Gemini se image ka description nikalna (dynamic image path ke liye)
  */
 private function describePetImageDynamic($imagePath)
 {
+    if (empty($imagePath)) {
+        return null;
+    }
+
+    return $this->summarizeImageFile($imagePath);
+}
+
+private function summarizeImageFile(string $imagePath): ?string
+{
+    $resolvedPath = $this->resolveImagePath($imagePath);
+
+    if (!$resolvedPath || !file_exists($resolvedPath)) {
+        Log::warning('Gemini summary skipped: file not found', ['path' => $imagePath]);
+        return null;
+    }
+
+    $mimeType = mime_content_type($resolvedPath) ?: null;
+    if (!$mimeType || !str_starts_with($mimeType, 'image/')) {
+        Log::info('Gemini summary skipped: unsupported mime type', [
+            'path' => $imagePath,
+            'mime' => $mimeType,
+        ]);
+        return null;
+    }
+
+    try {
+        $imageData = base64_encode(file_get_contents($resolvedPath));
+    } catch (\Throwable $e) {
+        Log::error('Gemini summary: failed to read image', [
+            'path'  => $resolvedPath,
+            'error' => $e->getMessage(),
+        ]);
+        return null;
+    }
+
+    return $this->sendImageToGemini($imageData, $mimeType);
+}
+
+private function resolveImagePath(string $imagePath): ?string
+{
+    if (empty($imagePath)) {
+        return null;
+    }
+
+    if (file_exists($imagePath)) {
+        return $imagePath;
+    }
+
+    $trimmed = ltrim($imagePath, '/');
+    $candidates = [
+        public_path($trimmed),
+        base_path($trimmed),
+    ];
+
+    if (str_starts_with($trimmed, 'backend/')) {
+        $relative = substr($trimmed, strlen('backend/'));
+        $candidates[] = public_path($relative);
+        $candidates[] = base_path($relative);
+    }
+
+    foreach ($candidates as $candidate) {
+        if ($candidate && file_exists($candidate)) {
+            return $candidate;
+        }
+    }
+
+    return null;
+}
+
+private function sendImageToGemini(string $imageData, string $mimeType): ?string
+{
     $apiKey = GeminiConfig::apiKey();
     if (empty($apiKey)) {
-        return null;
-    }
-    $model = GeminiConfig::defaultModel();
-
-    if (!file_exists($imagePath)) {
+        Log::error('Gemini summary aborted: API key missing');
         return null;
     }
 
-    $imageData = base64_encode(file_get_contents($imagePath));
+    $models = array_values(array_unique(array_filter(array_merge(
+        [GeminiConfig::chatModel()],
+        GeminiConfig::summaryModels()
+    ))));
 
-    $response = Http::withHeaders([
-        'Content-Type'   => 'application/json',
-        'X-goog-api-key' => $apiKey,
-    ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
-        'contents' => [[
-            'parts' => [
-                [
-                    'inline_data' => [
-                        'mime_type' => mime_content_type($imagePath),
-                        'data' => $imageData,
-                    ]
-                ],
-                [
-                    'text' => 'Describe this pet image in detail: breed, appearance, color, mood, and context.'
-                ]
-            ]
-        ]]
-    ]);
-
-    if (!$response->successful()) {
-        return null;
+    if (empty($models)) {
+        $models = ['gemini-1.5-flash'];
     }
 
-    return $response->json('candidates.0.content.parts.0.text');
+    foreach ($models as $model) {
+        $url = sprintf(
+            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
+            $model,
+            urlencode($apiKey)
+        );
+
+        try {
+            $response = Http::timeout(40)
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->post($url, [
+                    'contents' => [[
+                        'parts' => [
+                            [
+                                'inline_data' => [
+                                    'mime_type' => $mimeType,
+                                    'data' => $imageData,
+                                ],
+                            ],
+                            [
+                                'text' => 'Describe this pet image in detail: breed, appearance, color, mood, and context.'
+                            ],
+                        ],
+                    ]],
+                ]);
+        } catch (\Throwable $e) {
+            Log::error('Gemini summary request failed', [
+                'model' => $model,
+                'error' => $e->getMessage(),
+            ]);
+            continue;
+        }
+
+        if ($response->successful()) {
+            $text = $response->json('candidates.0.content.parts.0.text');
+            if ($text) {
+                return $text;
+            }
+        } else {
+            Log::warning('Gemini summary failed', [
+                'model'  => $model,
+                'status' => $response->status(),
+                'body'   => $response->json(),
+            ]);
+
+            if ($response->status() !== 404) {
+                break;
+            }
+        }
+    }
+
+    Log::error('Gemini summary exhausted models', ['models' => $models]);
+    return null;
 }
 
 
