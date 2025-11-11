@@ -45,7 +45,16 @@ class Transaction extends Model
 
     public function scopeCompleted($query)
     {
-        return $query->where('status', 'completed');
+        $successfulStatuses = [
+            'completed',
+            'captured',
+            'paid',
+            'success',
+            'successful',
+            'settled',
+        ];
+
+        return $query->whereIn('status', $successfulStatuses);
     }
 
     public function scopeStatus($query, ?string $status)
