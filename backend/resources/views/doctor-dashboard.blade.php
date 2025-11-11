@@ -16,7 +16,7 @@
     body.demo-overlay-open {
       overflow: hidden;
     }
-    body.demo-overlay-open #incoming-modal {
+    body.demo-overlay-open #incoming-modal:not(.hidden) {
       position: fixed;
       inset: auto 2rem 2rem auto;
       background: transparent;
