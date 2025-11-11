@@ -136,7 +136,7 @@ Route::get('/doctors/featured', function () {
 Route::post('/appointments/submit', [AppointmentSubmissionController::class, 'store'])
     ->name('api.appointments.submit');
 // Call session info (patient/doctor polling)
-Route::get('/call/{id}', [CoreCallController::class, 'show']);
+Route::get('/call/{id}', [CoreCallController::class, 'show'])->whereNumber('id');
 // routes/web.php (ya api.php)
 Route::get('/debug/pusher', function () {
     return [
@@ -152,10 +152,10 @@ Route::get('/debug/pusher', function () {
 
 // Create/accept/payment flow for video consult
 Route::post('/call/create', [CoreCallController::class, 'createSession']);
-Route::post('/call/{id}/accept', [CoreCallController::class, 'acceptCall']);
-Route::post('/call/{id}/payment-success', [CoreCallController::class, 'paymentSuccess']);
-Route::post('/call/{id}/start', [CoreCallController::class, 'markStarted']);
-Route::post('/call/{id}/end', [CoreCallController::class, 'markEnded']);
+Route::post('/call/{id}/accept', [CoreCallController::class, 'acceptCall'])->whereNumber('id');
+Route::post('/call/{id}/payment-success', [CoreCallController::class, 'paymentSuccess'])->whereNumber('id');
+Route::post('/call/{id}/start', [CoreCallController::class, 'markStarted'])->whereNumber('id');
+Route::post('/call/{id}/end', [CoreCallController::class, 'markEnded'])->whereNumber('id');
 Route::post('/internal/doctor-call-alert', [\App\Http\Controllers\Api\DoctorNotificationController::class, 'pendingCall']);
 
 Route::get('/users', [AdminController::class, 'getUsers']);
