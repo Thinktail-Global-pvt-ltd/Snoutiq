@@ -973,6 +973,7 @@ const handleCallAccepted = useCallback(
         visible={showLiveDoctorsModal}
         onClose={() => setShowLiveDoctorsModal(false)}
         nearbyDoctors={nearbyDoctors}
+        liveDoctors={liveDoctors}
         allActiveDoctors={allActiveDoctors}
         onCallDoctor={handleCallDoctor}
         loading={loading}

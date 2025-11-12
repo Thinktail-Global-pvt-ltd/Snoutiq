@@ -15,7 +15,15 @@ const useResponsive = () => {
 };
 
 const LiveDoctorSelectionModal = React.memo(
-  ({ visible, onClose, onCallDoctor, loading, nearbyDoctors = [], allActiveDoctors = [] }) => {
+  ({
+    visible,
+    onClose,
+    onCallDoctor,
+    loading,
+    nearbyDoctors = [],
+    liveDoctors = [],
+    allActiveDoctors = [],
+  }) => {
     const { moderateScale } = useResponsive();
     const [selectedDoctor, setSelectedDoctor] = useState(null);
     const [showProfile, setShowProfile] = useState(false);
@@ -40,31 +48,65 @@ const LiveDoctorSelectionModal = React.memo(
     );
 
     const activeNearbyDoctors = useMemo(() => {
-      if (!Array.isArray(nearbyDoctors) || nearbyDoctors.length === 0) {
+      const numericActiveIds = Array.isArray(allActiveDoctors)
+        ? allActiveDoctors
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id))
+        : [];
+
+      if (!numericActiveIds.length) {
         return [];
       }
-      if (!Array.isArray(allActiveDoctors) || allActiveDoctors.length === 0) {
-        return [];
-      }
-      const activeSet = new Set(
-        allActiveDoctors.map((id) => Number(id)).filter((id) => Number.isFinite(id))
-      );
-      
-      // ✅ FIX: Filter and return COMPLETE doctor objects with all data
-      return nearbyDoctors.filter((doctor) => {
-        const doctorId = Number(doctor.id);
-        const isActive = activeSet.has(doctorId);
-        
-        // Log to verify we have complete data
-        if (isActive && doctor.chat_price) {
-          console.log(`✅ Active doctor ${doctor.name} (${doctorId}) has chat_price: ${doctor.chat_price}`);
-        } else if (isActive && !doctor.chat_price) {
-          console.warn(`⚠️ Active doctor ${doctor.name} (${doctorId}) missing chat_price!`);
+
+      const activeSet = new Set(numericActiveIds);
+
+      const mergeDoctorPayload = (primary = {}, secondary = {}) => {
+        const merged = { ...secondary, ...primary };
+        const rawPrice =
+          primary?.chat_price ??
+          primary?.price ??
+          secondary?.chat_price ??
+          secondary?.price ??
+          null;
+
+        if (rawPrice !== null && rawPrice !== undefined) {
+          const numericPrice = Number(rawPrice);
+          if (Number.isFinite(numericPrice)) {
+            merged.chat_price = numericPrice;
+            merged.price = numericPrice;
+          }
         }
-        
-        return isActive;
-      });
-    }, [nearbyDoctors, allActiveDoctors]);
+
+        return merged;
+      };
+
+      const activeDoctorMap = new Map();
+
+      const upsertDoctor = (doctor) => {
+        if (!doctor) return;
+        const doctorId = Number(doctor.id ?? doctor.doctor_id);
+        if (!Number.isFinite(doctorId) || !activeSet.has(doctorId)) {
+          return;
+        }
+
+        if (activeDoctorMap.has(doctorId)) {
+          const existing = activeDoctorMap.get(doctorId);
+          activeDoctorMap.set(doctorId, mergeDoctorPayload(existing, doctor));
+        } else {
+          activeDoctorMap.set(doctorId, mergeDoctorPayload(doctor));
+        }
+      };
+
+      if (Array.isArray(liveDoctors) && liveDoctors.length > 0) {
+        liveDoctors.forEach(upsertDoctor);
+      }
+
+      if (Array.isArray(nearbyDoctors) && nearbyDoctors.length > 0) {
+        nearbyDoctors.forEach(upsertDoctor);
+      }
+
+      return Array.from(activeDoctorMap.values());
+    }, [nearbyDoctors, liveDoctors, allActiveDoctors]);
 
     // Only show currently active doctors in the modal
     const filteredDoctors = useMemo(() => {
