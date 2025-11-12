@@ -1885,7 +1885,7 @@ const DoctorRegistration = () => {
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
+                {/* <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Claim Draft Clinic (optional)
                   </label>
@@ -1910,7 +1910,7 @@ const DoctorRegistration = () => {
                     Choosing a draft ensures this submission updates the
                     pre-created clinic page shared by sales.
                   </p>
-                </div>
+                </div> */}
                 {/* Business Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
