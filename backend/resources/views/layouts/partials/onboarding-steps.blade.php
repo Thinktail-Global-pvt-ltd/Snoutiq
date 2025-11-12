@@ -49,13 +49,13 @@
           $state = $i < $active ? 'done' : ($i === $active ? 'active' : 'todo');
           $link = $routes[$i] ?? $s5;
         @endphp
-        <a href="{{ $link }}" class="group flex items-center gap-3 p-3 rounded-xl border transition @if($state==='active') border-indigo-500 bg-indigo-50 @elseif($state==='done') border-emerald-400 bg-emerald-50 @else border-gray-200 bg-white hover:bg-gray-50 @endif">
-          <span class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold @if($state==='active') bg-indigo-600 text-white @elseif($state==='done') bg-emerald-600 text-white @else bg-gray-200 text-gray-700 @endif">
+        <a href="{{ $link }}" class="group flex items-center gap-3 p-3 rounded-xl border transition @if($state==='active') border-indigo-500 bg-indigo-50 @elseif($state==='done') border-emerald-400 bg-emerald-50 @else border-rose-200 bg-rose-50 hover:bg-rose-100 @endif">
+          <span class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold @if($state==='active') bg-indigo-600 text-white @elseif($state==='done') bg-emerald-600 text-white @else bg-rose-100 text-rose-700 @endif">
             {{ $state==='done' ? '✓' : $i }}
           </span>
           <span>
-            <div class="text-sm font-semibold @if($state==='active') text-indigo-800 @elseif($state==='done') text-emerald-800 @else text-gray-800 @endif">{{ $labels[$i]['title'] }}</div>
-            <div class="text-xs text-gray-500">{{ $labels[$i]['desc'] }}</div>
+            <div class="text-sm font-semibold @if($state==='active') text-indigo-800 @elseif($state==='done') text-emerald-800 @else text-rose-800 @endif">{{ $labels[$i]['title'] }}</div>
+            <div class="text-xs @if($state==='active' || $state==='done') text-gray-500 @else text-rose-500 @endif">{{ $labels[$i]['desc'] }}</div>
           </span>
         </a>
       @endforeach

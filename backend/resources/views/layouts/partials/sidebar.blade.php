@@ -242,12 +242,12 @@
         <span class="truncate">Video Consultation</span>
       </a>
 
-      <a href="{{ route('doctor.demo-call') }}" class="{{ $baseItem }} {{ $active('doctor.demo-call') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+      <!-- <a href="{{ route('doctor.demo-call') }}" class="{{ $baseItem }} {{ $active('doctor.demo-call') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.5 3.5a2.121 2.121 0 0 1 3 3l-1.4 1.4a2 2 0 0 1-2.46.24c-.86-.54-1.86-.9-2.9-1.04a8.06 8.06 0 0 0-5.62 1.64l-.2.16a2 2 0 0 0-.22 3.06l1.23 1.23a2 2 0 0 1 .25 2.49l-1.42 2.37a2 2 0 0 1-2.41.84 12.04 12.04 0 0 1-4.11-2.7A12 12 0 0 1 3 7.5c.03-1.28.24-2.54.62-3.76a2 2 0 0 1 1.97-1.47h.41a2 2 0 0 1 1.78 1.07l.91 1.82" />
         </svg>
         <span class="truncate">Demo Call Sandbox</span>
-      </a>
+      </a> -->
       
       <a href="{{ route('groomer.services.index') }}" class="{{ $baseItem }} {{ $active('groomer.services.index') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -311,6 +311,13 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l2.5 2.5"/>
         </svg>
         <span class="truncate">Emergency Coverage</span>
+      </a>
+
+      <a href="{{ route('doctor.documents') }}" class="{{ $baseItem }} {{ $active('doctor.documents') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m-3-9h-2a1 1 0 00-1 1v12a1 1 0 001 1h6a1 1 0 001-1V8a1 1 0 00-1-1h-2"/>
+        </svg>
+        <span class="truncate">Documents & Compliance</span>
       </a>
     @endif
   </nav>

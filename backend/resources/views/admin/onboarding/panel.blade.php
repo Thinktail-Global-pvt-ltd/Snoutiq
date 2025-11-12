@@ -269,10 +269,10 @@
                 <span class="dot"></span>
                 <span>Only pending clinics</span>
             </button>
-            <button type="button" class="filter-chip" data-filter-complete>
+            <!-- <button type="button" class="filter-chip" data-filter-complete>
                 <span class="dot"></span>
-                <span>Only completed clinics</span>
-            </button>
+                <span>Only complete / partial</span>
+            </button> -->
             <div class="search-summary" data-search-summary></div>
         </div>
     </div>
@@ -852,11 +852,11 @@
             blockMap.get(blockId).push(row);
         });
 
-        const clinicStatus = new Map();
+        const clinicStatusPending = new Map();
         blockMap.forEach((rows, blockId) => {
             const summaryRow = rows.find(row => row.dataset.clinicSummary === 'true');
             const status = summaryRow ? (summaryRow.dataset.clinicStatus ?? 'pending') : 'complete';
-            clinicStatus.set(blockId, status === 'pending');
+            clinicStatusPending.set(blockId, status === 'pending');
         });
 
         let pendingFilterEnabled = false;
@@ -919,7 +919,12 @@
             let visibleBlocks = 0;
             blockMap.forEach((rows, blockId) => {
                 const matchesTerm = term === '' || rows.some(row => (row.dataset.searchText || '').includes(term));
-                const matchesStatus = !pendingFilterEnabled || clinicStatus.get(blockId);
+                let matchesStatus = true;
+                if (pendingFilterEnabled) {
+                    matchesStatus = clinicStatusPending.get(blockId);
+                } else if (completeFilterEnabled) {
+                    matchesStatus = !clinicStatusPending.get(blockId);
+                }
                 const matches = matchesTerm && matchesStatus;
                 rows.forEach(row => row.classList.toggle('d-none', !matches));
                 if (matches) {

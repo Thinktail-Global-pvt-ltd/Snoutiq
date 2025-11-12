@@ -36,7 +36,7 @@
       <div>
         <h2 class="text-xl font-semibold text-gray-900">Clinic License & Documents</h2>
         <p class="text-sm text-gray-600 mt-1 max-w-2xl">
-          Keep your clinic credentials handy. Upload the latest registration document and confirm the active license number.
+          Business registration proof (GST Certificate, MSME certificate, Shop registration). Upload the relevant registration document and confirm the active registration number.
         </p>
       </div>
       @if($clinic?->license_document)
@@ -53,7 +53,7 @@
     <form method="POST" action="{{ route('doctor.documents.update', request()->only(['onboarding', 'step'])) }}" enctype="multipart/form-data" class="space-y-4">
       @csrf
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="license_no">Clinic license number *</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="license_no">Business registration number *</label>
         <input
           type="text"
           id="license_no"
@@ -61,7 +61,7 @@
           required
           value="{{ old('license_no', $clinic->license_no ?? '') }}"
           class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
-          placeholder="Enter your registration/license number"
+          placeholder="Enter your business registration number"
         />
         @error('license_no')
           <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
@@ -69,7 +69,7 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="license_document">Upload supporting document</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="license_document">Upload Business registration proof</label>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3">
           <div>
             <p class="text-sm text-gray-700">
