@@ -25,6 +25,45 @@ class SalesCrmController extends Controller
         ]);
     }
 
+    public function clinicQrDirectory()
+    {
+        $clinics = VetRegisterationTemp::orderBy('name')->get();
+
+        $options = new QROptions([
+            'outputType' => QRCode::OUTPUT_IMAGE_PNG,
+            'scale' => 8,
+            'margin' => 1,
+            'eccLevel' => QRCode::ECC_M,
+            'imageTransparent' => false,
+            'outputBase64' => false,
+        ]);
+
+        $clinicQrs = $clinics->map(function (VetRegisterationTemp $clinic) use ($options) {
+            $slug = $clinic->slug ?: Str::slug($clinic->name ?: 'clinic-'.$clinic->id);
+            if ($slug === '') {
+                $slug = 'clinic-'.$clinic->id;
+            }
+
+            $targetUrl = 'https://snoutiq.com/backend/vets/'.$slug;
+            $pngBinary = (new QRCode($options))->render($targetUrl);
+
+            return [
+                'id' => $clinic->id,
+                'name' => $clinic->name ?: ('Clinic #'.$clinic->id),
+                'slug' => $slug,
+                'target_url' => $targetUrl,
+                'qr_data_uri' => 'data:image/png;base64,'.base64_encode($pngBinary),
+                'city' => $clinic->city,
+                'status' => $clinic->status,
+            ];
+        });
+
+        return view('backend.sales.sales-new', [
+            'clinicQrs' => $clinicQrs,
+            'generatedAt' => now()->timezone('Asia/Kolkata')->format('d M Y, h:i A'),
+        ]);
+    }
+
     public function storeLegacyQr(Request $request)
     {
         $data = $request->validate([

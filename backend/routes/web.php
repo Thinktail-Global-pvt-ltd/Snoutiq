@@ -88,6 +88,7 @@ Route::post('/sales/logout', function (Request $request) {
 Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
     Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
     Route::get('/sales/dashboard', [SalesDashboardController::class, 'page'])->name('sales.dashboard');
+    Route::get('/sales/clinic-qr', [SalesCrmController::class, 'clinicQrDirectory'])->name('sales.clinic-qr');
     Route::post('/sales/legacy-qr', [SalesCrmController::class, 'storeLegacyQr'])->name('sales.legacy-qr.store');
     Route::delete('/sales/legacy-qr/{legacyQrRedirect}', [SalesCrmController::class, 'destroyLegacyQr'])->name('sales.legacy-qr.destroy');
 });
