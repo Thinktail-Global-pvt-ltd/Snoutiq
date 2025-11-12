@@ -8,6 +8,7 @@ use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 use Zxing\QrReader;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
@@ -224,6 +225,30 @@ class SalesCrmController extends Controller
             'qrDataUri' => $qrDataUri,
             'referralCode' => $this->referralCodeForClinic($clinic),
             'targetUrl' => $targetUrl,
+        ]);
+    }
+
+    public function qrAnalytics()
+    {
+        $redirects = LegacyQrRedirect::with('clinic')
+            ->orderByDesc('scan_count')
+            ->orderByDesc('last_scanned_at')
+            ->paginate(50);
+
+        $totalScans = (int) LegacyQrRedirect::sum('scan_count');
+        $activeCodes = LegacyQrRedirect::where('status', 'active')->count();
+        $inactiveCodes = LegacyQrRedirect::where('status', '!=', 'active')->orWhereNull('status')->count();
+        $lastScanAtRaw = LegacyQrRedirect::max('last_scanned_at');
+        $lastScanAt = $lastScanAtRaw ? Carbon::parse($lastScanAtRaw) : null;
+
+        return view('backend.sales.qr-analytics', [
+            'redirects' => $redirects,
+            'stats' => [
+                'total_scans' => $totalScans,
+                'active_codes' => $activeCodes,
+                'inactive_codes' => $inactiveCodes,
+                'last_scan_at' => $lastScanAt,
+            ],
         ]);
     }
 

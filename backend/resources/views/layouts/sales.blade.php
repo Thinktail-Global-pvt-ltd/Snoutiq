@@ -88,6 +88,7 @@
     $salesLinks = [
         ['label' => 'CRM', 'href' => route('sales.crm'), 'icon' => '🧾', 'pattern' => 'sales.crm'],
         ['label' => 'Clinic QRs', 'href' => route('sales.clinic-qr'), 'icon' => 'QR', 'pattern' => 'sales.clinic-qr'],
+        ['label' => 'QR Analytics', 'href' => route('sales.qr-analytics'), 'icon' => '📈', 'pattern' => 'sales.qr-analytics'],
         ['label' => 'Dashboard', 'href' => route('sales.dashboard'), 'icon' => '📊', 'pattern' => 'sales.dashboard'],
         ['label' => 'Admin Onboarding', 'href' => route('admin.onboarding.panel'), 'icon' => '↗', 'external' => true],
     ];
