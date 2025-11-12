@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import img1 from '../assets/images/dog winter.png';
+import img2 from '../assets/images/pawproduction.png';
+import img3 from '../assets/images/tickfever.png';
 
 export const metadata = {
   title: "Blog - SnoutIQ Veterinary Insights",
@@ -33,6 +36,7 @@ const featuredPost = {
 
 const posts = [
   {
+    image:img1,
     title: "Dog Winter Care Guide – How to Take Care of Dogs in Winter & Keep Them Warm",
     excerpt:
       "Learn the best dog winter care guide with practical tips for taking care of dogs’ paws in winter, grooming, diet, and keeping your dog warm and healthy all season long.",
@@ -44,6 +48,7 @@ const posts = [
     trending: true,
   },
   {
+     image:img3,
     title: "Tick Fever in Dogs – Symptoms, Causes & Treatment | Complete Guide",
     excerpt:
       "Learn about tick fever in dogs — common symptoms, causes, prevention tips, and treatment options. Understand how to detect tick fever early and keep your dog safe.",
@@ -55,6 +60,7 @@ const posts = [
     trending: true,
   },
   {
+     image:img2,
     title: "Protecting Pet Paws in Winter – Tips, Products & Care Guide for Pet Parents",
     excerpt:
       "Learn how to protect your pet’s paws in winter with easy home care tips, natural remedies, and prevention hacks. Discover safe paw care, winter boots, and DIY protection methods for dogs and cats.",
@@ -279,7 +285,14 @@ function BlogCard({ post }) {
       to={`/blog/${post.slug}`}
       className="group bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col border border-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-2"
     >
-      <div className="relative bg-gradient-to-br from-blue-50 to-cyan-50 aspect-[16/9] flex items-center justify-center overflow-hidden">
+      <div
+        className="relative bg-gradient-to-br from-blue-50 to-cyan-50 aspect-[16/9] flex items-center justify-center overflow-hidden"
+        style={{
+          backgroundImage: `url(${post.image})`,   // ✅ fixed
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
         <div className="absolute inset-0 bg-pattern opacity-5" />
         <div className="relative text-4xl transform group-hover:scale-110 transition-transform duration-300">
           {post.trending ? "🚀" : "📝"}
@@ -291,10 +304,6 @@ function BlogCard({ post }) {
             TRENDING
           </div>
         )}
-
-        {/* <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-sm text-blue-700 text-[10px] font-semibold rounded-full shadow-sm border border-blue-200">
-          {post.category}
-        </div> */}
       </div>
 
       <div className="p-6 lg:p-8 flex flex-col flex-grow space-y-3">
@@ -326,6 +335,7 @@ function BlogCard({ post }) {
     </Link>
   );
 }
+
 
 /* -------------------- LATEST ARTICLES -------------------- */
 
@@ -520,10 +530,10 @@ export default function Blog() {
           onSearchChange={setSearchQuery}
           onSearchSubmit={handleSearchSubmit}
         />
-        <CategoryBar
+        {/* <CategoryBar
           activeCategory={activeCategory}
           onCategoryChange={setActiveCategory}
-        />
+        /> */}
         {/* <FeaturedArticle /> */}
         <LatestArticles
           posts={posts}
