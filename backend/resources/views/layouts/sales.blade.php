@@ -92,6 +92,12 @@
         ['label' => 'Dashboard', 'href' => route('sales.dashboard'), 'icon' => '📊', 'pattern' => 'sales.dashboard'],
         ['label' => 'Admin Onboarding', 'href' => route('admin.onboarding.panel'), 'icon' => '↗', 'external' => true],
     ];
+
+    if (request()->routeIs('sales.qr-analytics')) {
+        $salesLinks = array_values(array_filter($salesLinks, function ($link) {
+            return ! in_array($link['pattern'] ?? null, ['sales.crm', 'sales.dashboard']);
+        }));
+    }
 @endphp
 <body>
     <aside class="sales-sidebar">
