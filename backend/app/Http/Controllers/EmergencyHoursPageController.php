@@ -4,9 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Doctor;
 use Illuminate\Http\Request;
+use App\Services\OnboardingProgressService;
 
 class EmergencyHoursPageController extends Controller
 {
+    protected OnboardingProgressService $progressService;
+
+    public function __construct(OnboardingProgressService $progressService)
+    {
+        $this->progressService = $progressService;
+    }
+
     public function editor(Request $request)
     {
         $vetId = $request->session()->get('user_id')
@@ -27,7 +35,8 @@ class EmergencyHoursPageController extends Controller
 
         $page_title = 'Emergency Coverage Hours';
         $clinicId = $vetId ? (int) $vetId : null;
+        $stepStatus = $this->progressService->getStatusForRequest($request);
 
-        return view('snoutiq.emergency-hours', compact('doctors', 'page_title', 'clinicId'));
+        return view('snoutiq.emergency-hours', compact('doctors', 'page_title', 'clinicId', 'stepStatus'));
     }
 }

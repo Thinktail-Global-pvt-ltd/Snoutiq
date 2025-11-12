@@ -25,6 +25,15 @@
   $nextUrl = $active < $totalSteps ? $routes[$active + 1] : route('doctor.dashboard');
   $backUrl = $active > 1 ? $routes[$active - 1] : null;
   $percent = (int) round(($active / max(1, $totalSteps)) * 100);
+  $stepStatus = $stepStatus ?? [];
+  $statusKeys = [
+    1 => 'services',
+    2 => 'video',
+    3 => 'clinic_hours',
+    4 => 'emergency',
+    5 => 'documents',
+  ];
+  $hasExplicitStatus = count($stepStatus) > 0;
 @endphp
 
 <div class="mb-4">
@@ -46,7 +55,13 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
       @foreach($steps as $i)
         @php
-          $state = $i < $active ? 'done' : ($i === $active ? 'active' : 'todo');
+          $statusKey = $statusKeys[$i] ?? null;
+          $statusDone = $statusKey ? !empty($stepStatus[$statusKey]) : false;
+          if ($hasExplicitStatus) {
+            $state = $i === $active ? 'active' : ($statusDone ? 'done' : 'todo');
+          } else {
+            $state = $i < $active ? 'done' : ($i === $active ? 'active' : 'todo');
+          }
           $link = $routes[$i] ?? $s5;
         @endphp
         <a href="{{ $link }}" class="group flex items-center gap-3 p-3 rounded-xl border transition @if($state==='active') border-indigo-500 bg-indigo-50 @elseif($state==='done') border-emerald-400 bg-emerald-50 @else border-rose-200 bg-rose-50 hover:bg-rose-100 @endif">

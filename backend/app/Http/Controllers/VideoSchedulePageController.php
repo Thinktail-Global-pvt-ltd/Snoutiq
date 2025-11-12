@@ -4,16 +4,25 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Doctor;
+use App\Services\OnboardingProgressService;
 
 class VideoSchedulePageController extends Controller
 {
+    protected OnboardingProgressService $progressService;
+
+    public function __construct(OnboardingProgressService $progressService)
+    {
+        $this->progressService = $progressService;
+    }
+
     // Pet parent-facing viewer (read-only)
     public function petIndex(Request $request)
     {
         $doctors = Doctor::orderBy('doctor_name')->get(['id','doctor_name']);
         $readonly = true;
         $page_title = 'Video Calling Schedule by Doctor';
-        return view('snoutiq.video-calling-schedule', compact('doctors','readonly','page_title'));
+        $stepStatus = $this->progressService->getStatusForRequest($request);
+        return view('snoutiq.video-calling-schedule', compact('doctors','readonly','page_title','stepStatus'));
     }
 
     // Optional: provider/editor view (write-enabled) – not used by pet sidebar
@@ -34,6 +43,7 @@ class VideoSchedulePageController extends Controller
         }
         $readonly = false;
         $page_title = 'Manage Video Calling Schedule (Separate)';
-        return view('snoutiq.video-calling-schedule', compact('doctors','readonly','page_title'));
+        $stepStatus = $this->progressService->getStatusForRequest($request);
+        return view('snoutiq.video-calling-schedule', compact('doctors','readonly','page_title','stepStatus'));
     }
 }

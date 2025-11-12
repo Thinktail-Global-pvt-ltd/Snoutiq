@@ -12,10 +12,16 @@
 @section('page_title', $page_title)
 
 @section('content')
-@php $isDebugView = request()->boolean('debug'); @endphp
+@php
+  $isDebugView = request()->boolean('debug');
+  $stepStatus = $stepStatus ?? [];
+@endphp
 <div class="max-w-5xl mx-auto space-y-6 px-4 sm:px-6 lg:px-0">
   @if(request()->get('onboarding')==='1')
-    @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 2))])
+    @include('layouts.partials.onboarding-steps', [
+      'active' => (int) (request()->get('step', 2)),
+      'stepStatus' => $stepStatus
+    ])
   @endif
 
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

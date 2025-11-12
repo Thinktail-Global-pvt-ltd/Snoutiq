@@ -35,6 +35,7 @@ use App\Http\Middleware\EnsureSalesAuthenticated;
 use App\Http\Controllers\QrTrackingController;
 use App\Http\Controllers\PushSchedulerController;
 use App\Models\LegacyQrRedirect;
+use App\Services\OnboardingProgressService;
 
 
 // Public routes
@@ -308,7 +309,10 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     // Clinic dashboard shell (links to doctor console)
     Route::view('/clinic-dashboard', 'clinic-dashboard')->name('clinic.dashboard');
     Route::view('/clinic/doctors', 'clinic.doctors')->name('clinic.doctors');
-    Route::view('/dashboard/services', 'groomer.services.index')->name('groomer.services.index');
+    Route::get('/dashboard/services', function (Request $request, OnboardingProgressService $progressService) {
+        $stepStatus = $progressService->getStatusForRequest($request);
+        return view('groomer.services.index', compact('stepStatus'));
+    })->name('groomer.services.index');
 
     // Booking flow
     Route::view('/booking/clinics', 'booking.clinics')->name('booking.clinics');
@@ -334,50 +338,17 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     })->name('doctor.booking.detail');
 
     // Weekly schedule (existing, secure)
-    Route::get('/doctor/schedule', function () {
-        $sessionRole = session('role')
-            ?? data_get(session('auth_full'), 'role')
-            ?? data_get(session('user'), 'role');
-
-        $candidates = [
-            session('clinic_id'),
-            session('vet_registerations_temp_id'),
-            session('vet_registeration_id'),
-            session('vet_id'),
-            data_get(session('user'), 'clinic_id'),
-            data_get(session('user'), 'vet_registeration_id'),
-            data_get(session('auth_full'), 'clinic_id'),
-            data_get(session('auth_full'), 'user.clinic_id'),
-            data_get(session('auth_full'), 'user.vet_registeration_id'),
-        ];
-
-        if ($sessionRole !== 'doctor') {
-            array_unshift(
-                $candidates,
-                session('user_id'),
-                data_get(session('user'), 'id')
-            );
-        }
-
-        $vetId = null;
-        foreach ($candidates as $candidate) {
-            if ($candidate === null || $candidate === '') {
-                continue;
-            }
-            $num = (int) $candidate;
-            if ($num > 0) {
-                $vetId = $num;
-                break;
-            }
-        }
-
+    Route::get('/doctor/schedule', function (Request $request, OnboardingProgressService $progressService) {
+        $vetId = $progressService->resolveClinicId($request);
         $doctors = collect();
         if ($vetId) {
             $doctors = Doctor::where('vet_registeration_id', $vetId)
                 ->orderBy('doctor_name')
-                ->get(['id','doctor_name','doctors_price']);
+                ->get(['id', 'doctor_name', 'doctors_price']);
         }
-        return view('snoutiq.provider-schedule', compact('doctors', 'vetId'));
+
+        $stepStatus = $progressService->getStatusForRequest($request);
+        return view('snoutiq.provider-schedule', compact('doctors', 'vetId', 'stepStatus'));
     })->name('doctor.schedule');
 
     Route::get('/doctor/emergency-hours', [EmergencyHoursPageController::class, 'editor'])->name('doctor.emergency-hours');

@@ -13,8 +13,12 @@
 
 @section('content')
 <div class="max-w-5xl mx-auto space-y-6">
+  @php $stepStatus = $stepStatus ?? []; @endphp
   @if(request()->get('onboarding') === '1')
-    @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 5))])
+    @include('layouts.partials.onboarding-steps', [
+      'active' => (int) (request()->get('step', 5)),
+      'stepStatus' => $stepStatus,
+    ])
   @endif
 
   @if (session('status'))

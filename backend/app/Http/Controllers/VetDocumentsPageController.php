@@ -7,9 +7,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use App\Services\OnboardingProgressService;
 
 class VetDocumentsPageController extends Controller
 {
+    protected OnboardingProgressService $progressService;
+
+    public function __construct(OnboardingProgressService $progressService)
+    {
+        $this->progressService = $progressService;
+    }
+
     private function clinicId(Request $request): ?int
     {
         $session = $request->session();
@@ -74,6 +82,7 @@ class VetDocumentsPageController extends Controller
             'doctors' => $doctors,
             'page_title' => $page_title,
             'vetId' => $vetId,
+            'stepStatus' => $this->progressService->getStatusForRequest($request),
         ]);
     }
 

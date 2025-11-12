@@ -13,8 +13,12 @@
 
 @section('content')
 <div class="max-w-5xl mx-auto space-y-6 px-4 sm:px-6">
+  @php $stepStatus = $stepStatus ?? []; @endphp
   @if(request()->get('onboarding')==='1')
-    @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 2))])
+    @include('layouts.partials.onboarding-steps', [
+      'active' => (int) (request()->get('step', 2)),
+      'stepStatus' => $stepStatus,
+    ])
   @endif
 
   <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
