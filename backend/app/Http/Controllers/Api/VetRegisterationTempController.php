@@ -108,7 +108,7 @@ class VetRegisterationTempController extends Controller
                 'name'             => 'required|string|max:255',
                 'city'             => 'required|string|max:255',
                 'pincode'          => 'required|string|max:20',
-                'license_no'       => 'required|string|max:255',
+               // 'license_no'       => 'required|string|max:255',
                 'coordinates'      => 'nullable|array',
                 'address'          => 'nullable|string',
                 'chat_price'       => 'nullable|numeric',
