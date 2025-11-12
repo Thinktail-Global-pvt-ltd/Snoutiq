@@ -35,6 +35,9 @@
         .admin-secondary-nav { display: flex; flex-direction: column; gap: 0.35rem; }
         .admin-secondary-nav a { color: rgba(255, 255, 255, 0.65); border-radius: 0.75rem; padding: 0.55rem 0.9rem; text-decoration: none; font-weight: 500; display: block; transition: background 0.2s ease, color 0.2s ease; }
         .admin-secondary-nav a.active, .admin-secondary-nav a:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
+        .admin-shell--no-sidebar { display: block; }
+        .admin-shell--no-sidebar .admin-main { max-width: 1200px; margin: 0 auto; }
+        .admin-shell--no-sidebar .admin-header { border-radius: 0 0 18px 18px; margin-bottom: 1.5rem; }
         @media (max-width: 991px) {
             .admin-shell { flex-direction: column; }
             .admin-sidebar { width: 100%; flex-direction: row; align-items: center; gap: 1rem; padding: 1.5rem; }
@@ -44,7 +47,9 @@
     </style>
 </head>
 <body>
-<div class="admin-shell">
+@php $hideSidebar = trim($__env->yieldContent('hide-sidebar')) === 'true'; @endphp
+<div class="admin-shell {{ $hideSidebar ? 'admin-shell--no-sidebar' : '' }}">
+    @unless($hideSidebar)
     <aside class="admin-sidebar">
         <div class="brand">
             SnoutIQ Admin
@@ -76,6 +81,7 @@
             <button type="submit" class="btn btn-outline-light w-100">Log out</button>
         </form>
     </aside>
+    @endunless
     <main class="admin-main">
         <header class="admin-header">
             <h1 class="h4 mb-0">@yield('page-title', 'Admin Dashboard')</h1>

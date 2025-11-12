@@ -1,5 +1,6 @@
 @extends('layouts.admin-panel')
 
+@section('hide-sidebar', 'true')
 @section('page-title', 'Onboarding Overview')
 
 @php
@@ -85,6 +86,59 @@
     .search-summary {
         font-size: 0.85rem;
         color: #475569;
+    }
+    .clinic-row-summary {
+        cursor: pointer;
+    }
+    .clinic-row-summary:focus {
+        outline: 2px solid #94a3b8;
+        outline-offset: -4px;
+    }
+    .clinic-row-summary .clinic-toggle {
+        display: inline-flex;
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 999px;
+        align-items: center;
+        justify-content: center;
+        background: #e2e8f0;
+        font-weight: 700;
+        margin-right: 0.65rem;
+        transition: transform .2s ease, background .2s ease;
+    }
+    .clinic-row-summary.is-open .clinic-toggle {
+        transform: rotate(45deg);
+        background: #cbd5f5;
+    }
+    .clinic-details-row {
+        display: none;
+    }
+    .clinic-details-row.is-open {
+        display: table-row;
+    }
+    .filter-chip {
+        border: none;
+        border-radius: 999px;
+        padding: 0.35rem 0.9rem;
+        font-weight: 600;
+        background: #e2e8f0;
+        color: #0f172a;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .filter-chip .dot {
+        width: 0.6rem;
+        height: 0.6rem;
+        border-radius: 999px;
+        background: currentColor;
+    }
+    .filter-chip.is-active {
+        background: linear-gradient(135deg, #2563eb, #7c3aed);
+        color: #fff;
+        box-shadow: 0 10px 25px rgba(79, 70, 229, 0.25);
     }
 </style>
 @endpush
@@ -210,7 +264,17 @@
                        data-onboarding-search>
             </div>
         </div>
-        <div class="search-summary" data-search-summary></div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" class="filter-chip" data-filter-pending>
+                <span class="dot"></span>
+                <span>Only pending clinics</span>
+            </button>
+            <button type="button" class="filter-chip" data-filter-complete>
+                <span class="dot"></span>
+                <span>Only completed clinics</span>
+            </button>
+            <div class="search-summary" data-search-summary></div>
+        </div>
     </div>
 
     <section id="overview" class="mb-5">
@@ -295,17 +359,27 @@
                                             @forelse($section['rows'] as $clinic)
                                                 @php
                                                     $blockId = $key.'-clinic-'.$loop->index;
+                                                    $detailsId = $blockId.'-details';
                                                     $searchTokens = Str::lower(trim(
                                                         ($clinic['clinic_name'] ?? $clinic['clinic'] ?? '') . ' ' .
                                                         ($clinic['slug'] ?? '') . ' ' .
                                                         collect($clinic['doctors'] ?? [])->pluck('doctor_name')->implode(' ')
                                                     ));
+                                                    $statusField = $section['statusField'];
+                                                    $isComplete = data_get($clinic, $statusField, false);
+                                                    $badgeClass = $isComplete ? $section['statusClasses'][0] : $section['statusClasses'][1];
+                                                    $badgeLabel = $isComplete ? $section['statusLabels'][0] : $section['statusLabels'][1];
                                                 @endphp
-                                                <tr data-clinic-block="{{ $blockId }}" data-search-text="{{ $searchTokens }}">
+                                                <tr class="clinic-row-summary" data-clinic-block="{{ $blockId }}" data-search-text="{{ $searchTokens }}" data-clinic-summary="true" data-clinic-status="{{ $isComplete ? 'complete' : 'pending' }}" role="button" tabindex="0" aria-expanded="false" aria-controls="{{ $detailsId }}">
                                                     <td>
-                                                        <div class="fw-semibold">{{ $clinic['clinic_name'] }}</div>
-                                                        <div class="small text-muted">Slug: {{ $clinic['slug'] ?? '—' }}</div>
-                                                        <div class="small text-muted">Email: {{ $clinic['email'] ?? '—' }}</div>
+                                                        <div class="d-flex align-items-start gap-2">
+                                                            <span class="clinic-toggle">+</span>
+                                                            <div>
+                                                                <div class="fw-semibold">{{ $clinic['clinic_name'] }}</div>
+                                                                <div class="small text-muted">Slug: {{ $clinic['slug'] ?? '—' }}</div>
+                                                                <div class="small text-muted">Email: {{ $clinic['email'] ?? '—' }}</div>
+                                                            </div>
+                                                        </div>
                                                     </td>
                                                     <td>
                                                         <div>{{ $clinic['city'] ?? '—' }}</div>
@@ -326,16 +400,10 @@
                                                         @endif
                                                     </td>
                                                     <td>
-                                                        @php
-                                                            $statusField = $section['statusField'];
-                                                            $isComplete = data_get($clinic, $statusField, false);
-                                                            $badgeClass = $isComplete ? $section['statusClasses'][0] : $section['statusClasses'][1];
-                                                            $badgeLabel = $isComplete ? $section['statusLabels'][0] : $section['statusLabels'][1];
-                                                        @endphp
                                                         <span class="badge {{ $badgeClass }}">{{ $badgeLabel }}</span>
                                                     </td>
                                                 </tr>
-                                                <tr data-clinic-block="{{ $blockId }}" data-search-text="{{ $searchTokens }}">
+                                                <tr id="{{ $detailsId }}" class="clinic-details-row" data-clinic-block="{{ $blockId }}" data-search-text="{{ $searchTokens }}" data-clinic-details="true">
                                                     <td colspan="{{ count($section['columns']) }}" class="bg-body-tertiary">
                                                         <div class="row g-3 py-3">
                                                             <div class="col-lg-3 col-sm-6">
@@ -770,6 +838,8 @@
     document.addEventListener('DOMContentLoaded', function () {
         const searchInput = document.querySelector('[data-onboarding-search]');
         const searchSummary = document.querySelector('[data-search-summary]');
+        const pendingFilterButton = document.querySelector('[data-filter-pending]');
+        const completeFilterButton = document.querySelector('[data-filter-complete]');
         const blockMap = new Map();
         document.querySelectorAll('[data-clinic-block]').forEach(row => {
             const blockId = row.getAttribute('data-clinic-block');
@@ -782,17 +852,87 @@
             blockMap.get(blockId).push(row);
         });
 
-        const applySearch = () => {
-            if (!searchInput) {
+        const clinicStatus = new Map();
+        blockMap.forEach((rows, blockId) => {
+            const summaryRow = rows.find(row => row.dataset.clinicSummary === 'true');
+            const status = summaryRow ? (summaryRow.dataset.clinicStatus ?? 'pending') : 'complete';
+            clinicStatus.set(blockId, status === 'pending');
+        });
+
+        let pendingFilterEnabled = false;
+        let completeFilterEnabled = false;
+        pendingFilterButton?.addEventListener('click', () => {
+            pendingFilterEnabled = !pendingFilterEnabled;
+            if (pendingFilterEnabled) {
+                completeFilterEnabled = false;
+                completeFilterButton?.classList.remove('is-active');
+            }
+            pendingFilterButton.classList.toggle('is-active', pendingFilterEnabled);
+            applySearch();
+        });
+        completeFilterButton?.addEventListener('click', () => {
+            completeFilterEnabled = !completeFilterEnabled;
+            if (completeFilterEnabled) {
+                pendingFilterEnabled = false;
+                pendingFilterButton?.classList.remove('is-active');
+            }
+            completeFilterButton.classList.toggle('is-active', completeFilterEnabled);
+            applySearch();
+        });
+
+        const toggleClinicBlock = (blockId, forceState = null) => {
+            const rows = blockMap.get(blockId);
+            if (!rows) {
                 return;
             }
-            const term = searchInput.value.trim().toLowerCase();
+            const summaryRow = rows.find(row => row.dataset.clinicSummary === 'true');
+            const detailRows = rows.filter(row => row.dataset.clinicDetails === 'true');
+            const isOpen = detailRows.some(row => row.classList.contains('is-open'));
+            const shouldOpen = typeof forceState === 'boolean' ? forceState : !isOpen;
+            detailRows.forEach(row => row.classList.toggle('is-open', shouldOpen));
+            if (summaryRow) {
+                summaryRow.classList.toggle('is-open', shouldOpen);
+                summaryRow.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+                const toggleEl = summaryRow.querySelector('.clinic-toggle');
+                if (toggleEl) {
+                    toggleEl.textContent = shouldOpen ? '−' : '+';
+                }
+            }
+        };
+
+        blockMap.forEach((rows, blockId) => {
+            const summaryRow = rows.find(row => row.dataset.clinicSummary === 'true');
+            if (!summaryRow) {
+                return;
+            }
+            summaryRow.addEventListener('click', () => toggleClinicBlock(blockId));
+            summaryRow.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleClinicBlock(blockId);
+                }
+            });
+        });
+
+        const applySearch = () => {
+            const term = searchInput ? searchInput.value.trim().toLowerCase() : '';
             let visibleBlocks = 0;
-            blockMap.forEach(rows => {
-                const matches = term === '' || rows.some(row => (row.dataset.searchText || '').includes(term));
+            blockMap.forEach((rows, blockId) => {
+                const matchesTerm = term === '' || rows.some(row => (row.dataset.searchText || '').includes(term));
+                const matchesStatus = !pendingFilterEnabled || clinicStatus.get(blockId);
+                const matches = matchesTerm && matchesStatus;
                 rows.forEach(row => row.classList.toggle('d-none', !matches));
                 if (matches) {
                     visibleBlocks++;
+                } else {
+                    const summaryRow = rows.find(row => row.dataset.clinicSummary === 'true');
+                    const detailRows = rows.filter(row => row.dataset.clinicDetails === 'true');
+                    detailRows.forEach(row => row.classList.remove('is-open'));
+                    summaryRow?.classList.remove('is-open');
+                    const toggleEl = summaryRow?.querySelector('.clinic-toggle');
+                    if (toggleEl) {
+                        toggleEl.textContent = '+';
+                    }
                 }
             });
             if (searchSummary) {
@@ -804,8 +944,8 @@
 
         if (searchInput) {
             searchInput.addEventListener('input', applySearch);
-            applySearch();
         }
+        applySearch();
 
         const sidebarNav = document.querySelector('[data-panel-nav]');
         const sidebarLinks = sidebarNav ? Array.from(sidebarNav.querySelectorAll('a[href^="#"]')) : [];
