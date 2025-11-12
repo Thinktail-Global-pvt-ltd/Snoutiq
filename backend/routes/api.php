@@ -179,7 +179,7 @@ Route::get('/dog-breeds/all', [\App\Http\Controllers\Api\DogBreedController::cla
 
 
 
-use App\Http\Controllers\Api\ActiveDoctorController;
+// use App\Http\Controllers\Api\ActiveDoctorController;
 use App\Http\Controllers\Api\GeminiChatController;
 use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\VideoCallingController;
@@ -211,7 +211,7 @@ Route::get('/weather/hourly-schedule', [WeatherController::class, 'hourlySchedul
 // routes/api.php
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/nearby-doctors', [VideoCallingController::class, 'nearbyDoctors']);
-Route::get('/active-doctors', ActiveDoctorController::class);
+// Route::get('/active-doctors', ActiveDoctorController::class);
 
 // ---- Prescriptions ----
 Route::get('/prescriptions', [PrescriptionController::class, 'index']);
