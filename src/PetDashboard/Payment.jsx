@@ -25,6 +25,20 @@ import {
 
 const API_BASE = "https://snoutiq.com/backend";
 
+const parseAmountValue = (value) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[^0-9.]/g, "");
+    if (!cleaned) return null;
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+  return null;
+};
+
 /* ---------- Helper: check doctor has a valid ID ---------- */
 function hasValidDoctorId(doctor, fallbackId) {
   if (!doctor || typeof doctor !== "object") return false;
@@ -41,33 +55,41 @@ function normalizeDoctorForPayment(input, doctorIdFallback) {
   const id = Number(base.id || src.id || doctorIdFallback);
 
   // Collect all possible price fields
-  const priceCandidates = [
+  const priceCandidatesRaw = [
     src.chat_price,
     base.chat_price,
     src.price,
     base.price,
     src.consultation_fee,
     base.consultation_fee,
+    src.doctors_price,
+    base.doctors_price,
     src.doctor?.chat_price,
     src.doctor?.price,
     src.doctor?.consultation_fee,
-  ].filter((v) => v !== undefined && v !== null && v !== "");
+    src.doctor?.doctors_price,
+  ];
 
-  let amount = null;
-  if (priceCandidates.length) {
-    const n = Number(priceCandidates[0]);
-    if (Number.isFinite(n) && n > 0) amount = n;
-  }
+  const amount =
+    priceCandidatesRaw
+      .map((candidate) => parseAmountValue(candidate))
+      .find((candidate) => candidate !== null) ?? null;
 
   const normalized = {
     id: id || null,
     name:
       base.name ||
+      base.doctor_name ||
       src.name ||
+      src.doctor_name ||
       base.email?.split?.("@")[0] ||
       (id ? `Doctor ${id}` : "Doctor"),
     clinic_name:
-      base.clinic_name || src.clinic_name || "Veterinary Clinic",
+      base.clinic_name ||
+      src.clinic_name ||
+      base.clinic?.name ||
+      src.clinic?.name ||
+      "Veterinary Clinic",
     rating: base.rating ?? src.rating ?? 4.5,
     distance: base.distance ?? src.distance ?? null,
     photo:
@@ -83,6 +105,30 @@ function normalizeDoctorForPayment(input, doctorIdFallback) {
   console.log("✅ Final normalized doctor:", normalized);
   return normalized;
 }
+
+/* ---------- Helper: detect usable doctor info ---------- */
+const hasValidConsultationFee = (doctor) => {
+  if (!doctor || typeof doctor !== "object") return false;
+  const priceCandidates = [
+    doctor.amount,
+    doctor.chat_price,
+    doctor.price,
+    doctor.consultation_fee,
+    doctor.doctors_price,
+  ];
+
+  return priceCandidates.some(
+    (value) => parseAmountValue(value) !== null
+  );
+};
+
+const isDoctorProfileComplete = (doctor, fallbackId) => {
+  if (!doctor) return false;
+  if (doctor.placeholder) return false;
+  return (
+    hasValidDoctorId(doctor, fallbackId) && hasValidConsultationFee(doctor)
+  );
+};
 
 const Payment = () => {
   const [searchParams] = useSearchParams();
@@ -141,9 +187,31 @@ const Payment = () => {
 
   // ---------- Resolve doctorInfo from multiple sources ----------
   useEffect(() => {
+    let cancelled = false;
+
+    const cacheDoctorInfo = (doc, sourceLabel) => {
+      if (!doc || cancelled) return;
+      console.log(`✅ Using doctor from ${sourceLabel}:`, doc);
+      setDoctorInfo(doc);
+      if (isDoctorProfileComplete(doc, doctorIdValue)) {
+        try {
+          sessionStorage.setItem(
+            "payment_doctor_info",
+            JSON.stringify(doc)
+          );
+        } catch (error) {
+          console.warn("⚠️ Failed to cache doctor info:", error);
+        }
+      }
+    };
+
     const resolveDoctorInfo = async () => {
       if (!doctorIdValue) {
         console.warn("❌ No doctorId available");
+        return;
+      }
+
+      if (isDoctorProfileComplete(doctorInfo, doctorIdValue)) {
         return;
       }
 
@@ -156,37 +224,37 @@ const Payment = () => {
         doctorFromState &&
         hasValidDoctorId(doctorFromState, doctorIdValue)
       ) {
-        const doc = normalizeDoctorForPayment(
+        const normalized = normalizeDoctorForPayment(
           doctorFromState,
           doctorIdValue
         );
-        console.log("✅ Using doctor from navigation state:", doc);
-        setDoctorInfo(doc);
-        sessionStorage.setItem(
-          "payment_doctor_info",
-          JSON.stringify(doc)
+        if (isDoctorProfileComplete(normalized, doctorIdValue)) {
+          cacheDoctorInfo(normalized, "navigation state");
+          return;
+        }
+        console.warn(
+          "⚠️ Navigation state doctor missing price, continuing fallback chain."
         );
-        return;
       }
+
+      let bestEffortDoctor = doctorInfo || null;
 
       // 2️⃣ From sessionStorage (survives refresh)
       try {
-        const cached = sessionStorage.getItem(
-          "payment_doctor_info"
-        );
+        const cached =
+          typeof window !== "undefined"
+            ? sessionStorage.getItem("payment_doctor_info")
+            : null;
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (
-            hasValidDoctorId(parsed, doctorIdValue) &&
-            String(parsed.id) === String(doctorIdValue)
-          ) {
-            console.log(
-              "✅ Using cached doctor from sessionStorage:",
-              parsed
-            );
-            setDoctorInfo(parsed);
+          if (isDoctorProfileComplete(parsed, doctorIdValue)) {
+            cacheDoctorInfo(parsed, "sessionStorage");
             return;
           }
+          bestEffortDoctor = bestEffortDoctor || parsed;
+          console.warn(
+            "⚠️ Cached doctor lacks price; will look for fresher info."
+          );
         }
       } catch (e) {
         console.warn("⚠️ Failed to parse cached doctor:", e);
@@ -213,24 +281,25 @@ const Payment = () => {
         contextDoctor &&
         hasValidDoctorId(contextDoctor, doctorIdValue)
       ) {
-        const doc = normalizeDoctorForPayment(
+        const normalizedContext = normalizeDoctorForPayment(
           contextDoctor,
           doctorIdValue
         );
-        console.log("✅ Using doctor from context:", doc);
-        setDoctorInfo(doc);
-        sessionStorage.setItem(
-          "payment_doctor_info",
-          JSON.stringify(doc)
+        if (isDoctorProfileComplete(normalizedContext, doctorIdValue)) {
+          cacheDoctorInfo(normalizedContext, "doctor context");
+          return;
+        }
+        console.warn(
+          "⚠️ Context doctor missing price; fetching from API next."
         );
-        return;
+        bestEffortDoctor = bestEffortDoctor || normalizedContext;
       }
 
       // 4️⃣ From backend API
       console.log("🌐 Fetching doctor from backend API...");
       try {
         const res = await axios.get(
-          `${API_BASE}/api/doctor/${doctorIdValue}`
+          `${API_BASE}/api/doctors/${doctorIdValue}`
         );
         const apiDoctor = res.data?.doctor || res.data;
 
@@ -238,17 +307,18 @@ const Payment = () => {
           apiDoctor &&
           hasValidDoctorId(apiDoctor, doctorIdValue)
         ) {
-          const doc = normalizeDoctorForPayment(
+          const normalizedApiDoctor = normalizeDoctorForPayment(
             apiDoctor,
             doctorIdValue
           );
-          console.log("✅ Using doctor from API:", doc);
-          setDoctorInfo(doc);
-          sessionStorage.setItem(
-            "payment_doctor_info",
-            JSON.stringify(doc)
+          if (isDoctorProfileComplete(normalizedApiDoctor, doctorIdValue)) {
+            cacheDoctorInfo(normalizedApiDoctor, "doctor API");
+            return;
+          }
+          console.warn(
+            "⚠️ API doctor response missing price; keeping previous data."
           );
-          return;
+          bestEffortDoctor = bestEffortDoctor || normalizedApiDoctor;
         }
       } catch (error) {
         console.error(
@@ -258,24 +328,37 @@ const Payment = () => {
       }
 
       // 5️⃣ Fallback (no price → button disabled)
-      console.warn("⚠️ Using fallback doctor data");
-      const fallback = normalizeDoctorForPayment(
-        { id: doctorIdValue },
-        doctorIdValue
-      );
-      setDoctorInfo(fallback);
-      sessionStorage.setItem(
-        "payment_doctor_info",
-        JSON.stringify(fallback)
-      );
+      if (!doctorInfo && bestEffortDoctor) {
+        console.warn(
+          "⚠️ Falling back to best-effort doctor data without price."
+        );
+        cacheDoctorInfo(bestEffortDoctor, "best-effort cache");
+        return;
+      }
+
+      if (!doctorInfo) {
+        console.warn("⚠️ Using minimal fallback doctor data");
+        const fallback = normalizeDoctorForPayment(
+          { id: doctorIdValue },
+          doctorIdValue
+        );
+        cacheDoctorInfo(fallback, "minimal fallback");
+      } else {
+        console.log("ℹ️ Keeping existing doctor info; no better data found.");
+      }
     };
 
     resolveDoctorInfo();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     doctorIdValue,
     doctorFromState,
     nearbyDoctors,
     liveDoctors,
+    doctorInfo,
   ]);
 
   // ---------- Cleanup helper ----------
