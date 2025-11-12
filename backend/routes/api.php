@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
+use App\Http\Controllers\Api\DashboardProfileController;
 use App\Models\User;
 use App\Models\DeviceToken;
 use App\Models\Doctor;
@@ -178,6 +179,7 @@ Route::get('/dog-breeds/all', [\App\Http\Controllers\Api\DogBreedController::cla
 
 
 
+use App\Http\Controllers\Api\ActiveDoctorController;
 use App\Http\Controllers\Api\GeminiChatController;
 use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\VideoCallingController;
@@ -209,6 +211,7 @@ Route::get('/weather/hourly-schedule', [WeatherController::class, 'hourlySchedul
 // routes/api.php
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/nearby-doctors', [VideoCallingController::class, 'nearbyDoctors']);
+Route::get('/active-doctors', ActiveDoctorController::class);
 
 // ---- Prescriptions ----
 Route::get('/prescriptions', [PrescriptionController::class, 'index']);
@@ -663,6 +666,18 @@ use App\Http\Controllers\Api\LocationSlotsController;
 use App\Http\Controllers\Api\GeoController;
 
 Route::get('/geo/pincodes',        [GeoController::class, 'pincodes']);
+
+// Dashboard profile APIs (session-aware)
+Route::middleware('web')->prefix('dashboard/profile')->group(function () {
+    Route::get('/', [DashboardProfileController::class, 'show'])->name('api.dashboard.profile.show');
+    Route::put('/clinic', [DashboardProfileController::class, 'updateClinic'])
+        ->name('api.dashboard.profile.clinic')
+        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::put('/doctor/{doctor}', [DashboardProfileController::class, 'updateDoctor'])
+        ->name('api.dashboard.profile.doctor')
+        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+});
+
 // These rely on session (user_id), so attach 'web' middleware to enable session cookies
 Route::middleware('web')->group(function(){
     Route::get('/geo/nearest-pincode', [LocationSlotsController::class, 'nearestPincode']);

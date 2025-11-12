@@ -172,15 +172,27 @@
         <p class="text-xs text-white/70 break-all truncate">{{ $clinicEmail }}</p>
       @endif
       @if($clinicId && !in_array($sessionRole, ['pet','patient','user'], true))
-        <p class="text-[11px] text-white/50 truncate">ID: {{ $clinicId }}</p>
+        <p class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/15 text-[11px] text-white/80">
+          <span class="opacity-70">ID</span>
+          <span class="font-semibold">{{ $clinicId }}</span>
+        </p>
       @endif
     </div>
+    <div class="mt-3 text-[11px] uppercase tracking-wide text-white/60">
+      Role · {{ ucfirst(str_replace('_',' ',$sessionRole ?? 'user')) }}
+    </div>
+    @if(!in_array($sessionRole, ['pet','patient','user'], true))
+      <a href="{{ route('dashboard.profile') }}"
+         class="mt-4 inline-flex items-center gap-2 w-full justify-center px-3 py-2 text-xs font-semibold rounded-xl bg-white/15 hover:bg-white/25 transition">
+        Manage Profile
+      </a>
+    @endif
   </div>
   
   <!-- Navigation -->
   <nav class="px-2 lg:px-3 py-4 space-y-1 text-sm grow overflow-y-auto sidebar-scrollbar">
     @php
-      $role = session('role') ?? data_get(session('user'), 'role');
+      $role = $sessionRole;
       $active = function($patterns){
         foreach ((array)$patterns as $p) {
           if (request()->routeIs($p)) return true;
@@ -216,11 +228,25 @@
       </a>
     @else
       <!-- Vet/Doctor Menu -->
+      <a href="{{ route('dashboard.profile') }}" class="{{ $baseItem }} {{ $active('dashboard.profile') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A4 4 0 018 16h8a4 4 0 012.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span class="truncate">Profile</span>
+      </a>
+
       <a href="{{ route('doctor.dashboard') }}" class="{{ $baseItem }} {{ $active('doctor.dashboard') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
         </svg>
         <span class="truncate">Video Consultation</span>
+      </a>
+
+      <a href="{{ route('doctor.demo-call') }}" class="{{ $baseItem }} {{ $active('doctor.demo-call') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.5 3.5a2.121 2.121 0 0 1 3 3l-1.4 1.4a2 2 0 0 1-2.46.24c-.86-.54-1.86-.9-2.9-1.04a8.06 8.06 0 0 0-5.62 1.64l-.2.16a2 2 0 0 0-.22 3.06l1.23 1.23a2 2 0 0 1 .25 2.49l-1.42 2.37a2 2 0 0 1-2.41.84 12.04 12.04 0 0 1-4.11-2.7A12 12 0 0 1 3 7.5c.03-1.28.24-2.54.62-3.76a2 2 0 0 1 1.97-1.47h.41a2 2 0 0 1 1.78 1.07l.91 1.82" />
+        </svg>
+        <span class="truncate">Demo Call Sandbox</span>
       </a>
       
       <a href="{{ route('groomer.services.index') }}" class="{{ $baseItem }} {{ $active('groomer.services.index') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">

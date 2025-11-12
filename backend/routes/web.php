@@ -285,12 +285,21 @@ Route::match(['get', 'post'], '/rag-snoutic-symptom-checker', function (Request 
 
 // Protected application routes (requires session user)
 Route::middleware([EnsureSessionUser::class])->group(function(){
+    Route::get('/profile', function () {
+        return view('dashboard.profile');
+    })->name('dashboard.profile');
+
     // Dashboards
     Route::get('/doctor', function () {
         $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
         $doctorId  = auth()->id() ?? 301;
         return view('doctor-dashboard', compact('socketUrl','doctorId'));
     })->name('doctor.dashboard');
+    Route::get('/doctor/demo-call', function () {
+        $socketUrl = config('app.socket_server_url') ?? env('SOCKET_SERVER_URL', 'http://127.0.0.1:4000');
+        $doctorId  = auth()->id() ?? 301;
+        return view('doctor.demo-call', compact('socketUrl','doctorId'));
+    })->name('doctor.demo-call');
     // Lightweight live console (single view) for receiving calls
     Route::view('/doctor/live', 'doctor.live-console')->name('doctor.live');
     // Clinic dashboard shell (links to doctor console)

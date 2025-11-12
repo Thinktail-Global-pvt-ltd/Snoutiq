@@ -1,25 +1,16 @@
 ﻿{{-- resources/views/groomer/services/index.blade.php --}}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Services</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
+@extends('layouts.snoutiq-dashboard')
+
+@section('title','Services')
+@section('page_title','Services')
+
+@section('head')
 <style>
   /* ===============================
      Global / Utility Styles
   =============================== */
   #client-logger {
     font-family: ui-monospace, Menlo, Consolas, monospace;
-  }
-
-  /* Hide debug/auth controls in header */
-  #btn-auth,
-  #toggle-diag {
-    display: none !important;
   }
 
   /* ===============================
@@ -130,9 +121,7 @@
     background: #9ca3af;
   }
 </style>
-
-</head>
-<body class="h-screen bg-gray-50">
+@endsection
 
 @php
   $isOnboarding = request()->get('onboarding') === '1';
@@ -173,92 +162,38 @@
   }
 @endphp
 
-<div class="flex h-full">
-  {{-- Shared sidebar --}}
-  @include('layouts.partials.sidebar')
-  
-  <!-- Main -->
-  <main class="flex-1 flex flex-col overflow-hidden">
-    <header class="h-auto sm:h-16 bg-white border-b border-gray-200 flex items-center justify-around px-4 sm:px-6 py-3 sm:py-0">
-      <div class="header-content flex items-center gap-3">
-        <h1 class="text-lg font-semibold text-gray-800">Services</h1>
-        <span id="status-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" title="Connecting…"></span>
-        <span id="status-pill" class="hidden px-3 py-1 rounded-full text-xs font-bold">…</span>
+@section('content')
+<div class="max-w-6xl mx-auto space-y-6">
+  @if($isOnboarding)
+    <div>
+      @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 1))])
+    </div>
+  @endif
+
+  @if($sessionRole === 'doctor')
+    <div class="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm text-indigo-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div>
+        <div class="font-semibold text-indigo-950">Logged in as Doctor</div>
+        <div>{{ $doctorRecord?->doctor_name ?? 'Doctor' }}</div>
       </div>
-
-      <div class="header-buttons flex items-center gap-2">
-        <button id="btn-auth"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">
-          🔐 Auth
-        </button>
-
-        <button id="toggle-diag"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800">
-          Diagnostics
-        </button>
-
-        <button id="btn-open-create"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white">
-          + Add Service
-        </button>
-
-        @if($sessionRole === 'doctor')
-          <span class="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
-            <span class="uppercase tracking-wide text-[11px] text-indigo-500">Role</span>
-            Doctor · #{{ $doctorRecord?->id ?? ($doctorId ?? '—') }}
-          </span>
-        @else
-          <span class="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <span class="uppercase tracking-wide text-[11px] text-emerald-500">Role</span>
-            {{ ucfirst($sessionRole ?? (auth()->user()->role ?? 'clinic')) }}
-          </span>
+      <div class="flex items-center gap-3 text-xs text-indigo-700">
+        <span class="px-2 py-1 rounded-lg bg-white border border-indigo-200 font-mono">Doctor ID: {{ $doctorRecord?->id ?? ($doctorId ?? '—') }}</span>
+        @if($doctorRecord?->vet_registeration_id)
+          <span class="px-2 py-1 rounded-lg bg-white border border-indigo-200 font-mono">Clinic ID: {{ $doctorRecord->vet_registeration_id }}</span>
         @endif
-
-        <div class="text-right sm:block">
-          <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? ($doctorRecord?->doctor_name ?? 'Doctor') }}</div>
-          <div class="text-xs text-gray-500">
-            {{ ucfirst($sessionRole ?? (auth()->user()->role ?? 'doctor')) }}
-            @if($sessionRole === 'doctor' && ($doctorRecord?->vet_registeration_id ?? $sessionClinicId))
-              · Clinic #{{ $doctorRecord?->vet_registeration_id ?? $sessionClinicId }}
-            @endif
-          </div>
-        </div>
-        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-          {{ strtoupper(substr(auth()->user()->name ?? $doctorRecord?->doctor_name ?? 'D',0,1)) }}
-        </div>
       </div>
-    </header>
+    </div>
+  @endif
 
-    <!-- Onboarding steps ribbon -->
-    @if(request()->get('onboarding')==='1')
-      <div class="px-4 sm:px-6 pt-4">
-        @include('layouts.partials.onboarding-steps', ['active' => (int) (request()->get('step', 1))])
-      </div>
-    @endif
-
-    <!-- Page Content -->
-    <section class="flex-1 p-4 sm:p-6 overflow-auto">
-      <div class="max-w-6xl mx-auto">
-        @if($sessionRole === 'doctor')
-          <div class="mb-4 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm text-indigo-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <div class="font-semibold text-indigo-950">Logged in as Doctor</div>
-              <div>{{ $doctorRecord?->doctor_name ?? 'Doctor' }}</div>
-            </div>
-            <div class="flex items-center gap-3 text-xs text-indigo-700">
-              <span class="px-2 py-1 rounded-lg bg-white border border-indigo-200 font-mono">Doctor ID: {{ $doctorRecord?->id ?? ($doctorId ?? '—') }}</span>
-              @if($doctorRecord?->vet_registeration_id)
-                <span class="px-2 py-1 rounded-lg bg-white border border-indigo-200 font-mono">Clinic ID: {{ $doctorRecord->vet_registeration_id }}</span>
-              @endif
-            </div>
-          </div>
-        @endif
-
-        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div class="p-3 border-b">
-            <input id="search" type="text" placeholder="Search by name..."
-                   class="search-input w-full md:w-80 bg-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 border-0">
-          </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="p-4 border-b flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <input id="search" type="text" placeholder="Search by name..."
+             class="search-input w-full md:w-80 bg-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 border-0">
+      <button id="btn-open-create"
+              class="w-full md:w-auto inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white">
+        + Add Service
+      </button>
+    </div>
           
           <!-- Desktop Table View -->
           <div class="table-container hidden md:block">
@@ -281,11 +216,8 @@
           <!-- Mobile Card View -->
           <div id="mobile-rows" class="md:hidden p-4 space-y-4"></div>
           
-          <div id="empty" class="hidden p-8 text-center text-gray-500">No services found.</div>
-        </div>
-      </div>
-    </section>
-  </main>
+    <div id="empty" class="hidden p-8 text-center text-gray-500">No services found.</div>
+  </div>
 </div>
 
 <!-- Create Modal -->
@@ -452,6 +384,9 @@
   🪶 Logs (<span id="log-count">0</span>)
 </button>
 
+@endsection
+
+@section('scripts')
 <script>
   const SESSION_LOGIN_URL = @json(url('/api/session/login'));
   const SESSION_ROLE = @json($sessionRole);
@@ -1045,31 +980,4 @@
     window.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='`'){ e.preventDefault(); uiPanel.classList.toggle('hidden'); }});
   })();
 </script>
-
-<!-- Inject Logout link next to "+ Add Service" and ensure Auth/Diagnostics stay hidden -->
-<script>
-  document.addEventListener('DOMContentLoaded', function(){
-    try{
-      var rightGroup = document.querySelector('header .flex.items-center.gap-3:last-child');
-      if (rightGroup) {
-        // Add logout link if not present
-        if (!rightGroup.querySelector('a[data-role="logout-link"]')) {
-          var a = document.createElement('a');
-          a.href = '{{ route('logout') }}';
-          a.setAttribute('data-role','logout-link');
-          a.className = 'px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50 text-gray-700 hidden sm:inline-block';
-          a.textContent = 'Logout';
-          rightGroup.appendChild(a);
-        }
-      }
-    }catch(_){ /* noop */ }
-  });
-  // Safety: hide auth/diag via JS as well
-  (function(){
-    var a=document.getElementById('btn-auth'); if(a) a.style.display='none';
-    var d=document.getElementById('toggle-diag'); if(d) d.style.display='none';
-  })();
-</script>
-
-</body>
-</html>
+@endsection
