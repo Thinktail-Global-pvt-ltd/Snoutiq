@@ -16,6 +16,7 @@ export const AuthContext = createContext();
 
 const CLINIC_NEARBY_API = "https://snoutiq.com/backend/api/nearby-vets";
 const DOCTOR_NEARBY_API = "https://snoutiq.com/backend/api/nearby-doctors";
+const ACTIVE_DOCTORS_API = "https://snoutiq.com/backend/api/active-doctors";
 
 export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
@@ -29,10 +30,64 @@ export const AuthProvider = ({ children }) => {
 
   const isFetchingRef = useRef(false);
   const lastFetchTimeRef = useRef(0);
+  const nearbyDoctorsRef = useRef([]);
   const FETCH_COOLDOWN = 5000; // ms
 
   const memoizedNearbyDoctors = useMemo(() => nearbyDoctors, [nearbyDoctors]);
   const memoizedLiveDoctors = useMemo(() => liveDoctors, [liveDoctors]);
+
+  const persistLiveDoctors = useCallback((list) => {
+    const safeList = Array.isArray(list) ? list : [];
+    setLiveDoctors(safeList);
+    if (safeList.length) {
+      localStorage.setItem("live_doctors", JSON.stringify(safeList));
+    } else {
+      localStorage.removeItem("live_doctors");
+    }
+  }, []);
+
+  useEffect(() => {
+    nearbyDoctorsRef.current = nearbyDoctors;
+  }, [nearbyDoctors]);
+
+  const fallbackLiveDoctors = useCallback(
+    (ids = []) => {
+      const numericIds = Array.isArray(ids)
+        ? ids
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        : [];
+
+      if (!numericIds.length) {
+        persistLiveDoctors([]);
+        return [];
+      }
+
+      const cachedMatches = nearbyDoctorsRef.current.filter((doctor) =>
+        numericIds.includes(doctor.id)
+      );
+
+      if (cachedMatches.length) {
+        persistLiveDoctors(cachedMatches);
+        return cachedMatches;
+      }
+
+      const placeholders = numericIds.map((id) => ({
+        id,
+        doctor_id: id,
+        name: `Doctor #${id}`,
+        clinic_name: "Online Veterinarian",
+        clinic_id: null,
+        chat_price: null,
+        profile_image: null,
+        placeholder: true,
+      }));
+
+      persistLiveDoctors(placeholders);
+      return placeholders;
+    },
+    [persistLiveDoctors]
+  );
 
   // Load auth + doctors from localStorage
   useEffect(() => {
@@ -75,94 +130,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Socket: listen to active doctors
-  useEffect(() => {
-    if (!socket) {
-      console.warn("Socket not available");
-      return;
-    }
-
-    console.log("🔌 Setting up socket listeners for active doctors");
-
-    const handleActiveDoctors = (doctorIds) => {
-      console.log("📡 Received active-doctors from socket:", doctorIds);
-
-      const numericIds = Array.isArray(doctorIds)
-        ? doctorIds
-            .map((id) => Number(id))
-            .filter((id) => Number.isFinite(id) && id > 0)
-        : [];
-
-      setAllActiveDoctors(numericIds);
-
-      // ✅ CRITICAL FIX: Don't modify nearbyDoctors here at all!
-      // Just update liveDoctors by filtering existing nearbyDoctors
-      // This prevents placeholder creation from overwriting real data
-      
-      const liveNearbyDoctors = nearbyDoctors.filter((doctor) =>
-        numericIds.includes(doctor.id)
-      );
-
-      console.log(
-        `✅ ${liveNearbyDoctors.length} live doctors found from ${nearbyDoctors.length} nearby:`,
-        liveNearbyDoctors.map((d) => `${d.name} (${d.id}) - ₹${d.chat_price || 'NO PRICE'}`)
-      );
-
-      setLiveDoctors(liveNearbyDoctors);
-      localStorage.setItem(
-        "live_doctors",
-        JSON.stringify(liveNearbyDoctors)
-      );
-    };
-
-    const handleDoctorOnline = (data) => {
-      console.log(`🟢 Doctor came online: ${data.doctorId}`);
-      socket.emit("get-active-doctors");
-    };
-
-    const handleDoctorOffline = (data) => {
-      console.log(`🔴 Doctor went offline: ${data.doctorId}`);
-      socket.emit("get-active-doctors");
-    };
-
-    socket.on("active-doctors", handleActiveDoctors);
-    socket.on("doctor-online", handleDoctorOnline);
-    socket.on("doctor-offline", handleDoctorOffline);
-
-    console.log("🔄 Requesting initial active doctors list");
-    socket.emit("get-active-doctors");
-
-    const interval = setInterval(() => {
-      socket.emit("get-active-doctors");
-    }, 20000);
-
-    return () => {
-      console.log("🧹 Cleaning up socket listeners");
-      socket.off("active-doctors", handleActiveDoctors);
-      socket.off("doctor-online", handleDoctorOnline);
-      socket.off("doctor-offline", handleDoctorOffline);
-      clearInterval(interval);
-    };
-  }, [nearbyDoctors]);
-
-  // Keep liveDoctors in sync when nearbyDoctors / allActiveDoctors change
-  useEffect(() => {
-    if (nearbyDoctors.length > 0 && allActiveDoctors.length > 0) {
-      const updatedLiveDoctors = nearbyDoctors.filter((doctor) =>
-        allActiveDoctors.includes(doctor.id)
-      );
-
-      console.log(
-        `🔄 Auto-updating live doctors: ${updatedLiveDoctors.length} live out of ${nearbyDoctors.length} nearby`
-      );
-
-      setLiveDoctors(updatedLiveDoctors);
-      localStorage.setItem(
-        "live_doctors",
-        JSON.stringify(updatedLiveDoctors)
-      );
-    }
-  }, [nearbyDoctors, allActiveDoctors]);
 
   // Fetch nearby doctors (clinics + doctors) with cooldown + abort
   const fetchNearbyDoctors = useCallback(async () => {
@@ -361,6 +328,197 @@ export const AuthProvider = ({ children }) => {
       console.error("Error updating nearby doctors:", error);
     }
   }, []);
+
+  const fetchActiveDoctorProfiles = useCallback(
+    async (targetDoctorIds = null) => {
+      const targetIds = Array.isArray(targetDoctorIds)
+        ? targetDoctorIds
+        : allActiveDoctors;
+
+      if (!token) {
+        console.warn("No auth token available; falling back to cached doctors.");
+        return fallbackLiveDoctors(targetIds);
+      }
+
+      try {
+        const params = {};
+        if (Array.isArray(targetIds) && targetIds.length > 0) {
+          params.ids = targetIds.join(",");
+        }
+
+        const response = await axios.get(ACTIVE_DOCTORS_API, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          params,
+        });
+
+        const incoming = Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+
+        if (!incoming.length) {
+          console.log("ℹ️ Active doctors API returned an empty list.");
+          return fallbackLiveDoctors(targetIds);
+        }
+
+        const normalizedActive = incoming
+          .map((entry) => normalizeDoctorEntry(entry))
+          .filter(Boolean);
+
+        persistLiveDoctors(normalizedActive);
+
+        updateNearbyDoctors([...incoming, ...nearbyDoctorsRef.current]);
+        return normalizedActive;
+      } catch (error) {
+        console.error(
+          "❌ Failed to load live doctor profiles:",
+          error?.message || error
+        );
+        return fallbackLiveDoctors(targetIds);
+      }
+    },
+    [token, updateNearbyDoctors, fallbackLiveDoctors, persistLiveDoctors, allActiveDoctors]
+  );
+
+  // Socket: listen to active doctors
+  useEffect(() => {
+    if (!socket) {
+      console.warn("Socket not available");
+      return;
+    }
+
+    console.log("🔌 Setting up socket listeners for active doctors");
+
+    const handleActiveDoctors = (doctorIds) => {
+      console.log("📡 Received active-doctors from socket:", doctorIds);
+
+      const numericIds = Array.isArray(doctorIds)
+        ? doctorIds
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        : [];
+
+      setAllActiveDoctors(numericIds);
+
+      if (numericIds.length === 0) {
+        persistLiveDoctors([]);
+        return;
+      }
+
+      fetchActiveDoctorProfiles(numericIds);
+    };
+
+    const handleDoctorOnline = (data) => {
+      console.log(`🟢 Doctor came online: ${data.doctorId}`);
+      socket.emit("get-active-doctors");
+    };
+
+    const handleDoctorOffline = (data) => {
+      console.log(`🔴 Doctor went offline: ${data.doctorId}`);
+      socket.emit("get-active-doctors");
+    };
+
+    socket.on("active-doctors", handleActiveDoctors);
+    socket.on("doctor-online", handleDoctorOnline);
+    socket.on("doctor-offline", handleDoctorOffline);
+
+    console.log("🔄 Requesting initial active doctors list");
+    socket.emit("get-active-doctors");
+
+    const interval = setInterval(() => {
+      socket.emit("get-active-doctors");
+    }, 20000);
+
+    return () => {
+      console.log("🧹 Cleaning up socket listeners");
+      socket.off("active-doctors", handleActiveDoctors);
+      socket.off("doctor-online", handleDoctorOnline);
+      socket.off("doctor-offline", handleDoctorOffline);
+      clearInterval(interval);
+    };
+  }, [fetchActiveDoctorProfiles]);
+
+  // Keep liveDoctors in sync when nearbyDoctors / allActiveDoctors change
+  useEffect(() => {
+    if (allActiveDoctors.length === 0) {
+      setLiveDoctors([]);
+      localStorage.removeItem("live_doctors");
+      return;
+    }
+
+    if (nearbyDoctors.length === 0) {
+      fetchActiveDoctorProfiles(allActiveDoctors);
+      return;
+    }
+
+    const updatedLiveDoctors = nearbyDoctors.filter((doctor) =>
+      allActiveDoctors.includes(doctor.id)
+    );
+
+    if (updatedLiveDoctors.length === 0) {
+      fetchActiveDoctorProfiles(allActiveDoctors);
+      return;
+    }
+
+    console.log(
+      `🔄 Auto-updating live doctors: ${updatedLiveDoctors.length} live out of ${nearbyDoctors.length} nearby`
+    );
+
+    persistLiveDoctors(updatedLiveDoctors);
+  }, [nearbyDoctors, allActiveDoctors, fetchActiveDoctorProfiles, persistLiveDoctors]);
+
+  // Demo fallback: if ?demo=1&doctorId=XYZ is present, mock a doctor entry
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (nearbyDoctors.length > 0) return;
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const isDemoMode =
+        params.get("demo") === "1" || params.get("demoMode") === "true";
+      const doctorParam = params.get("doctorId") || params.get("doctor");
+
+      if (!isDemoMode || !doctorParam) return;
+
+      const doctorId = Number(doctorParam);
+      if (!Number.isFinite(doctorId) || doctorId <= 0) return;
+
+      const priceParam = Number(params.get("price"));
+      const experienceParam = Number(params.get("experience"));
+
+      const placeholderDoctor = {
+        id: doctorId,
+        clinic_id: Number(params.get("clinicId")) || doctorId,
+        name: params.get("doctorName") || `Dr. Demo #${doctorId}`,
+        clinic_name: params.get("clinicName") || "SnoutIQ Demo Clinic",
+        specialization:
+          params.get("specialization") || "Virtual Veterinary Expert",
+        experience: Number.isFinite(experienceParam) ? experienceParam : 6,
+        distance: 0.1,
+        rating: 4.9,
+        chat_price: Number.isFinite(priceParam) ? priceParam : 700,
+        profile_image: params.get("doctorAvatar") || null,
+        slug: params.get("doctorSlug") || `demo-doctor-${doctorId}`,
+      };
+
+      console.log(
+        "🧪 Demo mode detected. Seeding placeholder doctor:",
+        placeholderDoctor
+      );
+
+      updateNearbyDoctors([placeholderDoctor]);
+      setAllActiveDoctors([doctorId]);
+      setLiveDoctors([placeholderDoctor]);
+      localStorage.setItem(
+        "live_doctors",
+        JSON.stringify([placeholderDoctor])
+      );
+    } catch (error) {
+      console.warn("Demo doctor bootstrap failed:", error);
+    }
+  }, [nearbyDoctors.length, updateNearbyDoctors]);
 
   // Logout
   const logout = async () => {

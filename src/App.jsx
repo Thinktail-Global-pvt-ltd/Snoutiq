@@ -454,6 +454,9 @@ import DoctorWaitingRoom from "./VetDashboard/DoctorWaitingRoom";
 import PrescriptionPage from "./VetDashboard/PrescriptionPage";
 import HealthRecordsScreen from "./PetDashboard/HealthRecordsScreen";
 import Blog from "./blog/Blog";
+import DogWinterCareGuide from "./blog/DogWinterCareGuide";
+import TickFeverGuide from "./blog/TickFeverGuide";
+import PetPawProtecteGuide from "./blog/PetPawProtecteGuide";
 const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
@@ -794,7 +797,19 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/blog" element={<Blog/>}/>
+            <Route path="/blog" element={<Blog />} />
+            <Route
+              path="/blog/dog-winter-care-guide"
+              element={<DogWinterCareGuide />}
+            />
+            <Route
+              path="/blog/symptoms-of-tick-fever-in-dogs"
+              element={<TickFeverGuide />}
+            />
+            <Route
+              path="/blog/protecting-pet-paws-in-winter-tips-guide"
+              element={<PetPawProtecteGuide />}
+            />
           </Routes>
         </Suspense>
       </div>

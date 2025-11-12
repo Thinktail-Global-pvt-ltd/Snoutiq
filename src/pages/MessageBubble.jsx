@@ -300,7 +300,7 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   const [showLiveDoctorsModal, setShowLiveDoctorsModal] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("idle");
   const activeToastIds = useRef(new Set());
-  
+
   // ✅ CRITICAL FIX: Store selected doctor to preserve complete data
   const selectedDoctorRef = useRef(null);
 
@@ -385,100 +385,251 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
     activeToastIds.current.add(toastId);
   }, [clearAllToasts, dismissToast]);
 
-  const handleCallAccepted = useCallback(
-    (data) => {
-      console.log("🔔 Call accepted - Starting navigation process", data);
+  // const handleCallAccepted = useCallback(
+  //   (data) => {
+  //     console.log("🔔 Call accepted - Starting navigation process", data);
 
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+  //     if (timeoutRef.current) {
+  //       clearTimeout(timeoutRef.current);
+  //       timeoutRef.current = null;
+  //     }
 
-      clearAllToasts();
-      setCallStatus({ type: "accepted", ...data });
-      setLoading(false);
-      setShowSearchModal(false);
-      setConnectionStatus("connected");
+  //     clearAllToasts();
+  //     setCallStatus({ type: "accepted", ...data });
+  //     setLoading(false);
+  //     setShowSearchModal(false);
+  //     setConnectionStatus("connected");
 
-      // ✅ CRITICAL FIX: Use stored doctor from ref (guaranteed complete data)
-      // Fallback to context search only if ref is empty
-      const doctor = 
-        selectedDoctorRef.current ||
-        (nearbyDoctors || []).find((d) => String(d.id) === String(data.doctorId)) ||
-        (liveDoctors || []).find((d) => String(d.id) === String(data.doctorId));
+  //     // ✅ CRITICAL FIX: Use stored doctor from ref (guaranteed complete data)
+  //     // Fallback to context search only if ref is empty
+  //     const doctor =
+  //       selectedDoctorRef.current ||
+  //       (nearbyDoctors || []).find(
+  //         (d) => String(d.id) === String(data.doctorId)
+  //       ) ||
+  //       (liveDoctors || []).find((d) => String(d.id) === String(data.doctorId));
 
-      if (!doctor) {
-        console.error("❌ No doctor found for ID:", data.doctorId);
-        const errorToastId = toast.error("Doctor information not found. Please try again.");
-        activeToastIds.current.add(errorToastId);
-        return;
-      }
+  //     if (!doctor) {
+  //       console.error("❌ No doctor found for ID:", data.doctorId);
+  //       const errorToastId = toast.error(
+  //         "Doctor information not found. Please try again."
+  //       );
+  //       activeToastIds.current.add(errorToastId);
+  //       return;
+  //     }
 
-      console.log("✅ Using doctor for payment:", {
-        id: doctor.id,
-        name: doctor.name,
-        chat_price: doctor.chat_price
-      });
+  //     console.log("✅ Using doctor for payment:", {
+  //       id: doctor.id,
+  //       name: doctor.name,
+  //       chat_price: doctor.chat_price,
+  //     });
 
-      const patientIdLocal = user?.id || "temp_user";
+  //     const patientIdLocal = user?.id || "temp_user";
 
-      const toastId = toast.success(
-        `🎉 Call connected with veterinarian! Redirecting...`,
-        { duration: 3000, icon: "🐾" }
-      );
-      activeToastIds.current.add(toastId);
+  //     const toastId = toast.success(
+  //       `🎉 Call connected with veterinarian! Redirecting...`,
+  //       { duration: 3000, icon: "🐾" }
+  //     );
+  //     activeToastIds.current.add(toastId);
 
-      setTimeout(() => {
-        try {
-          if (data.requiresPayment) {
-            const query = new URLSearchParams({
-              callId: String(data.callId || ""),
-              doctorId: String(doctor.id || ""),
-              channel: String(data.channel || ""),
-              patientId: String(patientIdLocal || ""),
-            }).toString();
+  //     setTimeout(() => {
+  //       try {
+  //         if (data.requiresPayment) {
+  //           const patientIdLocal = user?.id || "temp_user";
 
-            console.log("📤 Navigating to payment with complete doctor:", doctor);
+  //           const query = new URLSearchParams({
+  //             callId: String(data.callId || ""),
+  //             doctorId: String(doctor.id || ""),
+  //             channel: String(data.channel || ""),
+  //             patientId: String(patientIdLocal || ""),
+  //           }).toString();
 
-            if (typeof navigation === "function") {
-              navigation(`/payment/${data.callId}?${query}`, {
-                state: {
-                  doctor: doctor, // ✅ Complete doctor object with chat_price
-                  channel: data.channel,
-                  patientId: patientIdLocal,
-                  callId: data.callId,
-                },
-              });
-            } else {
-              // ✅ Fallback: Store doctor in sessionStorage for page reload scenarios
-              sessionStorage.setItem('payment_doctor', JSON.stringify(doctor));
-              window.location.href = `/payment/${data.callId}?${query}`;
-            }
-          } else {
-            const query = new URLSearchParams({
-              uid: String(patientIdLocal || ""),
-              role: "audience",
-              callId: String(data.callId || ""),
-              doctorId: String(doctor.id || ""),
-              patientId: String(patientIdLocal || ""),
-            }).toString();
+  //           console.log(
+  //             "📤 Navigating to payment with complete doctor:",
+  //             doctor
+  //           );
 
-            if (typeof navigation === "function") {
-              navigation(`/call-page/${data.channel}?${query}`);
-            } else {
-              window.location.href = `/call-page/${data.channel}?${query}`;
-            }
+  //           // ✅ Always cache doctor for refresh support
+  //           try {
+  //             sessionStorage.setItem("payment_doctor", JSON.stringify(doctor));
+  //           } catch (e) {
+  //             console.warn("Unable to store payment_doctor", e);
+  //           }
+
+  //           if (typeof navigation === "function") {
+  //             navigation(`/payment/${data.callId}?${query}`, {
+  //               state: {
+  //                 doctor,
+  //                 channel: data.channel,
+  //                 patientId: patientIdLocal,
+  //                 callId: data.callId,
+  //               },
+  //             });
+  //           } else {
+  //             // fallback direct redirect
+  //             window.location.href = `/payment/${data.callId}?${query}`;
+  //           }
+
+  //           return;
+  //         } else {
+  //           const query = new URLSearchParams({
+  //             uid: String(patientIdLocal || ""),
+  //             role: "audience",
+  //             callId: String(data.callId || ""),
+  //             doctorId: String(doctor.id || ""),
+  //             patientId: String(patientIdLocal || ""),
+  //           }).toString();
+
+  //           if (typeof navigation === "function") {
+  //             navigation(`/call-page/${data.channel}?${query}`);
+  //           } else {
+  //             window.location.href = `/call-page/${data.channel}?${query}`;
+  //           }
+  //         }
+  //       } catch (error) {
+  //         console.error("❌ Navigation failed:", error);
+  //         const errorToastId = toast.error(
+  //           "Failed to redirect. Please try again."
+  //         );
+  //         activeToastIds.current.add(errorToastId);
+  //       }
+  //     }, 800);
+  //   },
+  //   [navigation, nearbyDoctors, liveDoctors, user?.id, clearAllToasts]
+  // );
+// Update this section in your MessageBubble.jsx file
+
+const handleCallAccepted = useCallback(
+  (data) => {
+    console.log("🔔 Call accepted - Starting navigation process", data);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    clearAllToasts();
+    setCallStatus({ type: "accepted", ...data });
+    setLoading(false);
+    setShowSearchModal(false);
+    setConnectionStatus("connected");
+
+    // ✅ CRITICAL FIX: Use stored doctor from ref (guaranteed complete data)
+    const doctor =
+      selectedDoctorRef.current ||
+      (nearbyDoctors || []).find((d) => String(d.id) === String(data.doctorId)) ||
+      (liveDoctors || []).find((d) => String(d.id) === String(data.doctorId));
+
+    if (!doctor) {
+      console.error("❌ No doctor found for ID:", data.doctorId);
+      const errorToastId = toast.error("Doctor information not found. Please try again.");
+      activeToastIds.current.add(errorToastId);
+      return;
+    }
+
+    // ✅ Log complete doctor object for debugging
+    console.log("✅ Complete doctor data for payment:", {
+      id: doctor.id,
+      name: doctor.name,
+      chat_price: doctor.chat_price,
+      price: doctor.price,
+      clinic_name: doctor.clinic_name,
+      fullObject: doctor,
+    });
+
+    const patientIdLocal = user?.id || "temp_user";
+
+    const toastId = toast.success(`🎉 Call connected with veterinarian! Redirecting...`, {
+      duration: 3000,
+      icon: "🐾",
+    });
+    activeToastIds.current.add(toastId);
+
+    setTimeout(() => {
+      try {
+        if (data.requiresPayment) {
+          const query = new URLSearchParams({
+            callId: String(data.callId || ""),
+            doctorId: String(doctor.id || ""),
+            channel: String(data.channel || ""),
+            patientId: String(patientIdLocal || ""),
+          }).toString();
+
+          console.log("📤 Navigating to payment with complete doctor data");
+          console.log("💰 Doctor price info:", {
+            chat_price: doctor.chat_price,
+            price: doctor.price,
+            amount: doctor.chat_price || doctor.price || "NOT SET",
+          });
+
+          // ✅ CRITICAL: Store complete doctor in sessionStorage for refresh recovery
+          try {
+            const doctorForStorage = {
+              id: doctor.id,
+              name: doctor.name,
+              clinic_name: doctor.clinic_name,
+              rating: doctor.rating,
+              distance: doctor.distance,
+              profile_image: doctor.profile_image || doctor.image,
+              chat_price: doctor.chat_price || doctor.price,
+              price: doctor.chat_price || doctor.price,
+              email: doctor.email,
+              mobile: doctor.mobile,
+              // Include nested doctor object if present
+              doctor: doctor.doctor || {
+                id: doctor.id,
+                name: doctor.name,
+                chat_price: doctor.chat_price || doctor.price,
+              },
+            };
+
+            sessionStorage.setItem("payment_doctor_info", JSON.stringify(doctorForStorage));
+            console.log("✅ Cached doctor to sessionStorage:", doctorForStorage);
+          } catch (e) {
+            console.warn("⚠️ Unable to cache doctor to sessionStorage:", e);
           }
-        } catch (error) {
-          console.error("❌ Navigation failed:", error);
-          const errorToastId = toast.error("Failed to redirect. Please try again.");
-          activeToastIds.current.add(errorToastId);
-        }
-      }, 800);
-    },
-    [navigation, nearbyDoctors, liveDoctors, user?.id, clearAllToasts]
-  );
 
+          // ✅ Navigate with complete state
+          if (typeof navigation === "function") {
+            navigation(`/payment/${data.callId}?${query}`, {
+              state: {
+                doctor: doctor, // Pass complete doctor object
+                channel: data.channel,
+                patientId: patientIdLocal,
+                callId: data.callId,
+              },
+            });
+          } else {
+            // Fallback: direct redirect (will rely on sessionStorage)
+            window.location.href = `/payment/${data.callId}?${query}`;
+          }
+
+          return;
+        } else {
+          // Free call - no payment required
+          const query = new URLSearchParams({
+            uid: String(patientIdLocal || ""),
+            role: "audience",
+            callId: String(data.callId || ""),
+            doctorId: String(doctor.id || ""),
+            patientId: String(patientIdLocal || ""),
+          }).toString();
+
+          if (typeof navigation === "function") {
+            navigation(`/call-page/${data.channel}?${query}`);
+          } else {
+            window.location.href = `/call-page/${data.channel}?${query}`;
+          }
+        }
+      } catch (error) {
+        console.error("❌ Navigation failed:", error);
+        const errorToastId = toast.error("Failed to redirect. Please try again.");
+        activeToastIds.current.add(errorToastId);
+      }
+    }, 800);
+  },
+  [navigation, nearbyDoctors, liveDoctors, user?.id, clearAllToasts]
+);
   useEffect(() => {
     if (!socket) {
       console.error("Socket not available");
@@ -495,7 +646,9 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setCallStatus({ type: "sent", ...data });
       setConnectionStatus("connecting");
       toast.dismiss("call-sent");
-      const toastId = toast.loading("📞 Calling veterinarian...", { id: "call-sent" });
+      const toastId = toast.loading("📞 Calling veterinarian...", {
+        id: "call-sent",
+      });
       activeToastIds.current.add(toastId);
     };
 
@@ -562,7 +715,9 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
       setShowSearchModal(false);
       setConnectionStatus("failed");
       clearAllToasts();
-      const toastId = toast.error("🐕 Veterinarian is on another call", { duration: 4000 });
+      const toastId = toast.error("🐕 Veterinarian is on another call", {
+        duration: 4000,
+      });
       activeToastIds.current.add(toastId);
     };
 
@@ -614,12 +769,14 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
 
   const handleCallDoctor = useCallback(
     (doctor) => {
-      const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const callId = `call_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 8)}`;
       const channel = `channel_${callId}`;
 
       // ✅ CRITICAL FIX: Store complete doctor object before making call
       selectedDoctorRef.current = doctor;
-      
+
       console.log("📞 Starting call with doctor:", doctor);
       console.log("💰 Doctor chat_price:", doctor.chat_price || "NOT SET");
       console.log("🔍 Full doctor object:", JSON.stringify(doctor, null, 2));
@@ -678,7 +835,8 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
   };
 
   const buttonState = getButtonState();
-  const buttonDisabled = buttonState === "unavailable" || buttonState === "loading";
+  const buttonDisabled =
+    buttonState === "unavailable" || buttonState === "loading";
 
   const getButtonText = () => {
     switch (buttonState) {
@@ -714,13 +872,21 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
         <button
           className={`
             w-full relative overflow-hidden rounded-xl sm:rounded-2xl 
-            ${buttonDisabled ? "opacity-60 cursor-not-allowed" : "hover:shadow-xl"}
+            ${
+              buttonDisabled
+                ? "opacity-60 cursor-not-allowed"
+                : "hover:shadow-xl"
+            }
             ${buttonState === "loading" ? "opacity-80" : ""}
           `}
           onClick={() => {
             if (nearbyDoctors && nearbyDoctors.length > 0) {
-              console.log(`🔵 Opening doctor selection modal with ${nearbyDoctors.length} doctors`);
-              console.log(`📊 ${allActiveDoctors.length} doctors currently online`);
+              console.log(
+                `🔵 Opening doctor selection modal with ${nearbyDoctors.length} doctors`
+              );
+              console.log(
+                `📊 ${allActiveDoctors.length} doctors currently online`
+              );
               setShowLiveDoctorsModal(true);
             } else {
               console.warn("❌ No nearby doctors available at all");
@@ -766,10 +932,11 @@ const StartCallButton = ({ navigation, onShowLiveDoctors }) => {
           <div className="flex items-center justify-center gap-2 mt-2 sm:mt-3">
             <span className="text-green-500 text-xs sm:text-sm">✅</span>
             <span className="text-[10px] sm:text-xs font-semibold text-green-600 break-words text-center">
-              {allActiveDoctors.length > 0 
-                ? `${allActiveDoctors.length} veterinarian${allActiveDoctors.length !== 1 ? 's' : ''} online • Instant connection • Secure call`
-                : 'Licensed veterinarians • Book appointment or wait for online doctors'
-              }
+              {allActiveDoctors.length > 0
+                ? `${allActiveDoctors.length} veterinarian${
+                    allActiveDoctors.length !== 1 ? "s" : ""
+                  } online • Instant connection • Secure call`
+                : "Licensed veterinarians • Book appointment or wait for online doctors"}
             </span>
           </div>
         )}

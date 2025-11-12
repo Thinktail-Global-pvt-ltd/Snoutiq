@@ -33,67 +33,38 @@ const featuredPost = {
 
 const posts = [
   {
-    title: "The Future of Telemedicine in Veterinary Care",
+    title: "Dog Winter Care Guide – How to Take Care of Dogs in Winter & Keep Them Warm",
     excerpt:
-      "How secure video consultations, remote triage, and digital follow-ups are reshaping modern pet care delivery and client expectations.",
-    author: "Dr. Rahul Mehta",
-    date: "November 2, 2024",
+      "Learn the best dog winter care guide with practical tips for taking care of dogs’ paws in winter, grooming, diet, and keeping your dog warm and healthy all season long.",
+    author: "Snoutiq Editer",
+    date: "November 11, 2025",
     readTime: "6 min read",
     category: "Telemedicine",
-    slug: "future-of-telemedicine",
+    slug: "dog-winter-care-guide",
     trending: true,
   },
   {
-    title: "10 Ways AI is Transforming Veterinary Diagnostics",
+    title: "Tick Fever in Dogs – Symptoms, Causes & Treatment | Complete Guide",
     excerpt:
-      "From imaging analysis to automated triage, explore how AI tools are boosting diagnostic accuracy and speed while reducing errors.",
-    author: "Dr. Anjali Verma",
-    date: "October 28, 2024",
+      "Learn about tick fever in dogs — common symptoms, causes, prevention tips, and treatment options. Understand how to detect tick fever early and keep your dog safe.",
+    author: "Snoutiq Editer",
+    date: "November 11, 2024",
     readTime: "7 min read",
     category: "AI & Technology",
-    slug: "ai-veterinary-diagnostics",
+    slug: "symptoms-of-tick-fever-in-dogs",
     trending: true,
   },
   {
-    title: "Best Practices for Client Communication in 2024",
+    title: "Protecting Pet Paws in Winter – Tips, Products & Care Guide for Pet Parents",
     excerpt:
-      "Proven playbooks for reminders, follow-ups, and empathetic communication that keeps clients loyal and engaged.",
-    author: "Dr. Vikram Malhotra",
-    date: "October 25, 2024",
+      "Learn how to protect your pet’s paws in winter with easy home care tips, natural remedies, and prevention hacks. Discover safe paw care, winter boots, and DIY protection methods for dogs and cats.",
+    author: "Snoutiq Editer",
+    date: "November 11, 2025",
     readTime: "5 min read",
     category: "Client Relations",
-    slug: "client-communication-best-practices",
+    slug: "protecting-pet-paws-in-winter-tips-guide",
   },
-  {
-    title: "Maximizing Revenue with Smart Scheduling",
-    excerpt:
-      "Design a schedule that reduces idle time, manages urgent slots, and boosts throughput without team burnout.",
-    author: "Dr. Meera Reddy",
-    date: "October 20, 2024",
-    readTime: "6 min read",
-    category: "Practice Management",
-    slug: "smart-scheduling-revenue",
-  },
-  {
-    title: "Emergency Triage: A Veterinarian's Guide",
-    excerpt:
-      "Structured protocols to quickly identify critical cases and streamline emergency decision-making in high-pressure situations.",
-    author: "Dr. Suresh Nair",
-    date: "October 15, 2024",
-    readTime: "9 min read",
-    category: "Emergency Care",
-    slug: "emergency-triage-guide",
-  },
-  {
-    title: "Building a Sustainable Veterinary Practice",
-    excerpt:
-      "Environmental and financial sustainability strategies for modern veterinary clinics looking to reduce waste and increase efficiency.",
-    author: "Dr. Arjun Patel",
-    date: "October 12, 2024",
-    readTime: "7 min read",
-    category: "Practice Management",
-    slug: "sustainable-veterinary-practice",
-  },
+ 
 ];
 
 const categories = [
@@ -321,9 +292,9 @@ function BlogCard({ post }) {
           </div>
         )}
 
-        <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-sm text-blue-700 text-[10px] font-semibold rounded-full shadow-sm border border-blue-200">
+        {/* <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-sm text-blue-700 text-[10px] font-semibold rounded-full shadow-sm border border-blue-200">
           {post.category}
-        </div>
+        </div> */}
       </div>
 
       <div className="p-6 lg:p-8 flex flex-col flex-grow space-y-3">
@@ -456,14 +427,14 @@ function LatestArticles({ posts, activeCategory, searchQuery }) {
               ))}
             </div>
 
-            <div className="text-center mt-14">
+            {/* <div className="text-center mt-14">
               <button
                 type="button"
                 className="px-8 py-3 bg-white text-gray-700 font-semibold rounded-2xl border border-blue-200 shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 hover:border-blue-300"
               >
                 Load More Articles
               </button>
-            </div>
+            </div> */}
           </>
         )}
       </Container>
@@ -553,7 +524,7 @@ export default function Blog() {
           activeCategory={activeCategory}
           onCategoryChange={setActiveCategory}
         />
-        <FeaturedArticle />
+        {/* <FeaturedArticle /> */}
         <LatestArticles
           posts={posts}
           activeCategory={activeCategory}

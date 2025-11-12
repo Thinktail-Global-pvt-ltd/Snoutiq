@@ -2,7 +2,6 @@ import React, {
   useState,
   useEffect,
   useContext,
-  useMemo,
   useRef,
 } from "react";
 import {
@@ -26,12 +25,69 @@ import {
 
 const API_BASE = "https://snoutiq.com/backend";
 
+/* ---------- Helper: check doctor has a valid ID ---------- */
+function hasValidDoctorId(doctor, fallbackId) {
+  if (!doctor || typeof doctor !== "object") return false;
+  const id = doctor.id || doctor.doctor?.id || fallbackId;
+  return !!id && Number.isFinite(Number(id));
+}
+
+/* ---------- Helper: normalize any doctor shape into a clean object ---------- */
+function normalizeDoctorForPayment(input, doctorIdFallback) {
+  const src = input || {};
+  const base =
+    src.doctor && typeof src.doctor === "object" ? src.doctor : src;
+
+  const id = Number(base.id || src.id || doctorIdFallback);
+
+  // Collect all possible price fields
+  const priceCandidates = [
+    src.chat_price,
+    base.chat_price,
+    src.price,
+    base.price,
+    src.consultation_fee,
+    base.consultation_fee,
+    src.doctor?.chat_price,
+    src.doctor?.price,
+    src.doctor?.consultation_fee,
+  ].filter((v) => v !== undefined && v !== null && v !== "");
+
+  let amount = null;
+  if (priceCandidates.length) {
+    const n = Number(priceCandidates[0]);
+    if (Number.isFinite(n) && n > 0) amount = n;
+  }
+
+  const normalized = {
+    id: id || null,
+    name:
+      base.name ||
+      src.name ||
+      base.email?.split?.("@")[0] ||
+      (id ? `Doctor ${id}` : "Doctor"),
+    clinic_name:
+      base.clinic_name || src.clinic_name || "Veterinary Clinic",
+    rating: base.rating ?? src.rating ?? 4.5,
+    distance: base.distance ?? src.distance ?? null,
+    photo:
+      base.profile_image ||
+      src.profile_image ||
+      base.image ||
+      src.image ||
+      null,
+    amount: amount,
+    chat_price: amount,
+  };
+
+  console.log("✅ Final normalized doctor:", normalized);
+  return normalized;
+}
+
 const Payment = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-
-  console.log(Object.fromEntries(searchParams.entries()), "✅ All params");
 
   const { nearbyDoctors, liveDoctors, user } = useContext(AuthContext);
 
@@ -42,13 +98,16 @@ const Payment = () => {
   const [timeLeft, setTimeLeft] = useState(5 * 60);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
-  const originalDoctorRef = useRef(null);
   const hasCleanedUp = useRef(false);
   const countdownInterval = useRef(null);
   const paymentWindowActive = useRef(false);
 
-  // ---- URL & state params ----
+  // ---------- Extract params ----------
   const callIdFromParams = searchParams.get("callId");
+  const channelFromParams = searchParams.get("channel");
+  const patientIdFromParams = searchParams.get("patientId");
+  const doctorIdFromParams = searchParams.get("doctorId");
+
   const {
     doctor: doctorFromState,
     channel,
@@ -56,139 +115,175 @@ const Payment = () => {
     callId: callIdFromState,
   } = location.state || {};
 
-  const channelFromParams = searchParams.get("channel");
-  const patientIdFromParams = searchParams.get("patientId");
-  const doctorIdFromParams = searchParams.get("doctorId");
-
   const callId = callIdFromState || callIdFromParams || "";
   const channelValue = channel || channelFromParams || "";
-  const patientIdValue = patientId || patientIdFromParams || user?.id || "";
+  const patientIdValue =
+    patientId || patientIdFromParams || user?.id || "";
 
-  // ✅ Preserve original doctor from state (most trusted)
-  if (!originalDoctorRef.current && doctorFromState) {
-    originalDoctorRef.current = doctorFromState;
-    console.log("💾 Stored doctor from navigation state:", doctorFromState);
-  }
+  const doctorIdValue =
+    (doctorFromState &&
+      (doctorFromState.id || doctorFromState.doctor?.id)) ||
+    doctorIdFromParams ||
+    "";
 
-  // Pick best doctor from context if needed
-  const doctorFromContext = useMemo(() => {
-    const baseId =
-      originalDoctorRef.current?.doctor?.id ||
-      originalDoctorRef.current?.id ||
-      doctorIdFromParams;
+  const hasEssentialParams = Boolean(
+    callId && doctorIdValue && patientIdValue
+  );
 
-    if (!baseId) return null;
+  console.log("🔍 Payment Page Debug:", {
+    callId,
+    doctorIdValue,
+    patientIdValue,
+    channelValue,
+    doctorFromState,
+    hasEssentialParams,
+  });
 
-    const all = [...(nearbyDoctors || []), ...(liveDoctors || [])];
-    const found = all.find((d) => String(d.id) === String(baseId));
-
-    return found || null;
-  }, [nearbyDoctors, liveDoctors, doctorIdFromParams]);
-
-  // ✅ CRITICAL FIX: Enhanced doctor resolution with multiple fallbacks
+  // ---------- Resolve doctorInfo from multiple sources ----------
   useEffect(() => {
-    const resolveDoctorInfo = () => {
-      let sourceDoctor = null;
-      let source = "unknown";
-
-      // Priority 1: Navigation state (most reliable)
-      if (originalDoctorRef.current) {
-        sourceDoctor = originalDoctorRef.current;
-        source = "navigation-state";
-      }
-
-      // Priority 2: SessionStorage fallback (for page reloads)
-      if (!sourceDoctor) {
-        try {
-          const stored = sessionStorage.getItem("payment_doctor");
-          if (stored) {
-            sourceDoctor = JSON.parse(stored);
-            source = "sessionStorage";
-            sessionStorage.removeItem("payment_doctor"); // Clean up
-            console.log("🔄 Retrieved doctor from sessionStorage:", sourceDoctor);
-          }
-        } catch (err) {
-          console.error("Failed to parse stored doctor:", err);
-        }
-      }
-
-      // Priority 3: Context lookup as last resort
-      if (!sourceDoctor && doctorIdFromParams) {
-        sourceDoctor = doctorFromContext;
-        source = "context-lookup";
-      }
-
-      if (!sourceDoctor) {
-        console.error("❌ No doctor data available from any source");
-        setDoctorInfo(null);
+    const resolveDoctorInfo = async () => {
+      if (!doctorIdValue) {
+        console.warn("❌ No doctorId available");
         return;
       }
-
-      console.log(`📦 Doctor source: ${source}`, sourceDoctor);
-
-      // Normalize doctor object
-      const base =
-        sourceDoctor.doctor && typeof sourceDoctor.doctor === "object"
-          ? sourceDoctor.doctor
-          : sourceDoctor;
-
-      const amount = resolvePrice(sourceDoctor, base);
-      const id = base.id || sourceDoctor.id || doctorIdFromParams;
-
-      if (!id || !amount) {
-        console.error("❌ Invalid doctor data:", {
-          id,
-          amount,
-          sourceDoctor,
-        });
-        setDoctorInfo(null);
-        return;
-      }
-
-      const info = {
-        id: Number(id),
-        name:
-          base.name ||
-          sourceDoctor.name ||
-          base.email?.split("@")[0] ||
-          `Doctor ${id}`,
-        clinic_name:
-          base.clinic_name ||
-          sourceDoctor.clinic_name ||
-          "Veterinary Clinic",
-        rating: base.rating || sourceDoctor.rating || 4.5,
-        distance: base.distance || sourceDoctor.distance || null,
-        photo:
-          base.profile_image ||
-          sourceDoctor.profile_image ||
-          base.image ||
-          sourceDoctor.image ||
-          null,
-        amount,
-        chat_price: amount,
-      };
 
       console.log(
-        `💰 Resolved doctor: id=${info.id}, name=${info.name}, amount=₹${info.amount}`
+        `🔍 Resolving doctor info for ID: ${doctorIdValue}`
       );
 
-      setDoctorInfo(info);
+      // 1️⃣ From navigation state (most reliable)
+      if (
+        doctorFromState &&
+        hasValidDoctorId(doctorFromState, doctorIdValue)
+      ) {
+        const doc = normalizeDoctorForPayment(
+          doctorFromState,
+          doctorIdValue
+        );
+        console.log("✅ Using doctor from navigation state:", doc);
+        setDoctorInfo(doc);
+        sessionStorage.setItem(
+          "payment_doctor_info",
+          JSON.stringify(doc)
+        );
+        return;
+      }
+
+      // 2️⃣ From sessionStorage (survives refresh)
+      try {
+        const cached = sessionStorage.getItem(
+          "payment_doctor_info"
+        );
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (
+            hasValidDoctorId(parsed, doctorIdValue) &&
+            String(parsed.id) === String(doctorIdValue)
+          ) {
+            console.log(
+              "✅ Using cached doctor from sessionStorage:",
+              parsed
+            );
+            setDoctorInfo(parsed);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("⚠️ Failed to parse cached doctor:", e);
+      }
+
+      // 3️⃣ From context (nearbyDoctors + liveDoctors)
+      const all = [...(nearbyDoctors || []), ...(liveDoctors || [])];
+
+      // direct id match
+      let contextDoctor = all.find(
+        (d) => String(d.id) === String(doctorIdValue)
+      );
+
+      // nested doctor.id match
+      if (!contextDoctor) {
+        contextDoctor = all.find(
+          (d) =>
+            d.doctor &&
+            String(d.doctor.id) === String(doctorIdValue)
+        );
+      }
+
+      if (
+        contextDoctor &&
+        hasValidDoctorId(contextDoctor, doctorIdValue)
+      ) {
+        const doc = normalizeDoctorForPayment(
+          contextDoctor,
+          doctorIdValue
+        );
+        console.log("✅ Using doctor from context:", doc);
+        setDoctorInfo(doc);
+        sessionStorage.setItem(
+          "payment_doctor_info",
+          JSON.stringify(doc)
+        );
+        return;
+      }
+
+      // 4️⃣ From backend API
+      console.log("🌐 Fetching doctor from backend API...");
+      try {
+        const res = await axios.get(
+          `${API_BASE}/api/doctor/${doctorIdValue}`
+        );
+        const apiDoctor = res.data?.doctor || res.data;
+
+        if (
+          apiDoctor &&
+          hasValidDoctorId(apiDoctor, doctorIdValue)
+        ) {
+          const doc = normalizeDoctorForPayment(
+            apiDoctor,
+            doctorIdValue
+          );
+          console.log("✅ Using doctor from API:", doc);
+          setDoctorInfo(doc);
+          sessionStorage.setItem(
+            "payment_doctor_info",
+            JSON.stringify(doc)
+          );
+          return;
+        }
+      } catch (error) {
+        console.error(
+          "❌ API fetch failed:",
+          error.response?.data || error.message
+        );
+      }
+
+      // 5️⃣ Fallback (no price → button disabled)
+      console.warn("⚠️ Using fallback doctor data");
+      const fallback = normalizeDoctorForPayment(
+        { id: doctorIdValue },
+        doctorIdValue
+      );
+      setDoctorInfo(fallback);
+      sessionStorage.setItem(
+        "payment_doctor_info",
+        JSON.stringify(fallback)
+      );
     };
 
     resolveDoctorInfo();
-  }, [doctorFromContext, doctorIdFromParams]);
+  }, [
+    doctorIdValue,
+    doctorFromState,
+    nearbyDoctors,
+    liveDoctors,
+  ]);
 
-  console.log("🧭 callIdFromParams:", callIdFromParams);
-  console.log("🧭 doctorIdFromParams:", doctorIdFromParams);
-  console.log("🧭 doctorInfo:", doctorInfo);
-  console.log("🧭 callId state:", callId);
-
-  // ---- cleanup helper ----
+  // ---------- Cleanup helper ----------
   const performCleanup = (reason = "unknown") => {
     if (hasCleanedUp.current) return;
     hasCleanedUp.current = true;
 
-    console.log(`🧹 Performing cleanup - Reason: ${reason}`);
+    console.log(`🧹 Cleanup - Reason: ${reason}`);
 
     if (countdownInterval.current) {
       clearInterval(countdownInterval.current);
@@ -209,7 +304,7 @@ const Payment = () => {
     paymentWindowActive.current = false;
   };
 
-  // ---- load Razorpay script ----
+  // ---------- Load Razorpay script ----------
   useEffect(() => {
     const loadRazorpayScript = () =>
       new Promise((resolve) => {
@@ -218,7 +313,8 @@ const Payment = () => {
           return resolve(true);
         }
         const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.src =
+          "https://checkout.razorpay.com/v1/checkout.js";
         script.onload = () => {
           setRazorpayLoaded(true);
           resolve(true);
@@ -233,9 +329,10 @@ const Payment = () => {
       });
 
     loadRazorpayScript();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- countdown timer ----
+  // ---------- Countdown timer ----------
   useEffect(() => {
     countdownInterval.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -257,7 +354,7 @@ const Payment = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- socket listeners for call status ----
+  // ---------- Socket listeners ----------
   useEffect(() => {
     if (!socket || !callId) return;
 
@@ -294,9 +391,10 @@ const Payment = () => {
       socket.off("doctor-cancelled", handleDoctorCancelled);
       socket.off("call-timeout", handleCallTimeout);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callId]);
 
-  // ---- cleanup on unmount ----
+  // ---------- Cleanup on unmount ----------
   useEffect(() => {
     return () => {
       if (paymentStatus !== "success") {
@@ -306,10 +404,13 @@ const Payment = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentStatus]);
 
-  // ---- before unload ----
+  // ---------- Before unload warning ----------
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (paymentStatus !== "success" && paymentWindowActive.current) {
+      if (
+        paymentStatus !== "success" &&
+        paymentWindowActive.current
+      ) {
         performCleanup("browser-close");
         e.preventDefault();
         e.returnValue =
@@ -319,10 +420,14 @@ const Payment = () => {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () =>
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener(
+        "beforeunload",
+        handleBeforeUnload
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentStatus]);
 
-  // ---- handle payment ----
+  // ---------- Handle payment ----------
   const handlePayment = async () => {
     if (!window.Razorpay || !razorpayLoaded) {
       console.error("Razorpay SDK not loaded");
@@ -331,8 +436,8 @@ const Payment = () => {
       return;
     }
 
-    if (!doctorInfo || !doctorInfo.amount || !callId || !patientIdValue) {
-      console.error("❌ Missing data for payment:", {
+    if (!doctorInfo || !callId || !patientIdValue) {
+      console.error("❌ Missing basic data for payment:", {
         doctorInfo,
         callId,
         patientIdValue,
@@ -341,9 +446,17 @@ const Payment = () => {
       return;
     }
 
-    const amount = Number(doctorInfo.amount);
+    const rawAmount =
+      doctorInfo.amount ?? doctorInfo.chat_price ?? null;
+    const amount = Number(rawAmount);
+
     if (!Number.isFinite(amount) || amount <= 0) {
-      console.error("❌ Invalid amount for payment:", amount);
+      console.error(
+        "❌ Invalid amount for payment:",
+        rawAmount,
+        "doctorInfo:",
+        doctorInfo
+      );
       setPaymentStatus("error");
       return;
     }
@@ -353,77 +466,138 @@ const Payment = () => {
     paymentWindowActive.current = true;
 
     try {
-      console.log(`💳 Creating order for ₹${amount} | callId=${callId}`);
+      console.log(
+        `💳 Creating order for ₹${amount} | callId=${callId}`
+      );
 
-      const orderRes = await axios.post(`${API_BASE}/api/create-order`, {
-        amount,
-        callId,
-        doctorId: doctorInfo.id,
-        patientId: patientIdValue,
-        channel: channelValue,
-      });
+      const orderRes = await axios.post(
+        `${API_BASE}/api/create-order`,
+        {
+          amount,
+          callId,
+          doctorId: doctorInfo.id,
+          patientId: patientIdValue,
+          channel: channelValue,
+        }
+      );
 
-      if (
-        !orderRes.data?.success ||
-        !orderRes.data?.order_id ||
-        !orderRes.data?.key
-      ) {
-        console.error("❌ Invalid order response", orderRes.data);
-        throw new Error("Invalid order response");
+      console.log(
+        "🔁 Create-order response:",
+        orderRes.data
+      );
+
+      const data = orderRes.data || {};
+
+      // Be flexible with backend response keys
+      const success =
+        typeof data.success === "boolean"
+          ? data.success
+          : true;
+
+      const orderId =
+        data.order_id ||
+        data.orderId ||
+        data.id ||
+        data.order?.id;
+
+      const key =
+        data.key ||
+        data.key_id ||
+        data.razorpayKeyId ||
+        data.razorpay_key_id;
+
+      if (!success || !orderId || !key) {
+        console.error(
+          "❌ Invalid order response shape:",
+          data
+        );
+        throw new Error("Invalid order response from backend");
       }
-
-      const { order_id, key } = orderRes.data;
 
       const options = {
         key,
-        order_id,
+        order_id: orderId,
         name: "SnoutIQ Veterinary Consultation",
         description: `Video consultation with ${doctorInfo.name}`,
         image: "https://snoutiq.com/logo.webp",
         theme: { color: "#4F46E5" },
         handler: async (response) => {
           paymentWindowActive.current = false;
-          console.log("✅ Payment success:", response);
+          console.log(
+            "✅ Payment success:",
+            response
+          );
 
           try {
-            const verifyRes = await axios.post(`${API_BASE}/api/rzp/verify`, {
-              callId,
-              doctorId: doctorInfo.id,
-              patientId: patientIdValue,
-              channel: channelValue,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
+            const verifyRes = await axios.post(
+              `${API_BASE}/api/rzp/verify`,
+              {
+                callId,
+                doctorId: doctorInfo.id,
+                patientId: patientIdValue,
+                channel: channelValue,
+                razorpay_order_id:
+                  response.razorpay_order_id,
+                razorpay_payment_id:
+                  response.razorpay_payment_id,
+                razorpay_signature:
+                  response.razorpay_signature,
+              }
+            );
 
-            console.log("Verify API Response:", verifyRes.data);
+            console.log(
+              "🔍 Verify API Response:",
+              verifyRes.data
+            );
+
+            if (
+              verifyRes.data &&
+              typeof verifyRes.data.success ===
+                "boolean" &&
+              !verifyRes.data.success
+            ) {
+              throw new Error(
+                "Verify API reported failure"
+              );
+            }
 
             socket?.emit("payment-completed", {
               callId,
               patientId: patientIdValue,
               doctorId: doctorInfo.id,
               channel: channelValue,
-              paymentId: response.razorpay_payment_id,
+              paymentId:
+                response.razorpay_payment_id,
             });
 
             setPaymentStatus("success");
             setLoading(false);
+            sessionStorage.removeItem(
+              "payment_doctor_info"
+            );
 
             const query = new URLSearchParams({
               uid: String(patientIdValue || ""),
               role: "audience",
               callId: String(callId || ""),
-              doctorId: String(doctorInfo.id || ""),
-              patientId: String(patientIdValue || ""),
+              doctorId: String(
+                doctorInfo.id || ""
+              ),
+              patientId: String(
+                patientIdValue || ""
+              ),
             }).toString();
 
             setTimeout(() => {
-              navigate(`/call-page/${channelValue}?${query}`);
+              navigate(
+                `/call-page/${channelValue}?${query}`
+              );
             }, 1200);
           } catch (error) {
             console.error(
               "Payment verification error:",
-              error.response?.data || error.message
+              error.response?.data ||
+                error.message
             );
             setPaymentStatus("verification-failed");
             setLoading(false);
@@ -432,7 +606,9 @@ const Payment = () => {
         },
         modal: {
           ondismiss: () => {
-            console.warn("💳 Payment popup closed by user");
+            console.warn(
+              "💳 Payment popup closed by user"
+            );
             setLoading(false);
             setPaymentStatus("cancelled");
             paymentWindowActive.current = false;
@@ -445,7 +621,10 @@ const Payment = () => {
       const rzp = new window.Razorpay(options);
 
       rzp.on("payment.failed", (response) => {
-        console.error("💳 Payment failed:", response.error);
+        console.error(
+          "💳 Payment failed:",
+          response.error
+        );
         setPaymentStatus("error");
         setLoading(false);
         paymentWindowActive.current = false;
@@ -465,18 +644,39 @@ const Payment = () => {
     }
   };
 
-  // ---- helpers ----
+  // ---------- Helpers ----------
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    return `${mins}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
+  const hasValidPrice =
+    (doctorInfo?.amount &&
+      Number(doctorInfo.amount) > 0) ||
+    (doctorInfo?.chat_price &&
+      Number(doctorInfo.chat_price) > 0);
+
   const getDisplayPrice = () => {
-    if (doctorInfo?.amount) {
-      return `₹${doctorInfo.amount}`;
+    if (doctorInfo?.amount &&
+        Number(doctorInfo.amount) > 0) {
+      return `₹${Number(
+        doctorInfo.amount
+      )}`;
     }
-    return "₹500";
+    if (doctorInfo?.chat_price &&
+        Number(doctorInfo.chat_price) > 0) {
+      return `₹${Number(
+        doctorInfo.chat_price
+      )}`;
+    }
+    console.warn(
+      "⚠️ No valid price found in doctorInfo:",
+      doctorInfo
+    );
+    return "...";
   };
 
   const paymentMethods = [
@@ -486,7 +686,12 @@ const Payment = () => {
       icon: "💳",
       description: "Pay securely with your card",
     },
-    { id: "upi", name: "UPI", icon: "📱", description: "UPI apps" },
+    {
+      id: "upi",
+      name: "UPI",
+      icon: "📱",
+      description: "UPI apps",
+    },
     {
       id: "netbanking",
       name: "Net Banking",
@@ -511,7 +716,7 @@ const Payment = () => {
     ],
   };
 
-  // ---- UI states (timeout / cancelled) ----
+  // ---------- UI States ----------
   if (!razorpayLoaded) {
     return (
       <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
@@ -521,14 +726,15 @@ const Payment = () => {
             Loading Payment Gateway...
           </h2>
           <p className="text-gray-600">
-            Please wait while we set up secure payment processing.
+            Please wait while we set up secure payment
+            processing.
           </p>
         </div>
       </div>
     );
   }
 
-  if (!doctorInfo || !callId) {
+  if (!hasEssentialParams) {
     return (
       <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
@@ -537,7 +743,8 @@ const Payment = () => {
             Unable to start payment
           </h2>
           <p className="text-red-600 mb-6">
-            Missing consultation details. Please go back and try again.
+            Missing consultation details. Please go back and
+            try again.
           </p>
           <button
             onClick={() => navigate("/dashboard")}
@@ -545,6 +752,22 @@ const Payment = () => {
           >
             Back to Dashboard
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!doctorInfo) {
+    return (
+      <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            Loading Doctor Information...
+          </h2>
+          <p className="text-gray-600">
+            Fetching consultation details...
+          </p>
         </div>
       </div>
     );
@@ -573,7 +796,7 @@ const Payment = () => {
     );
   }
 
-  // ---- main payment UI ----
+  // ---------- Main UI ----------
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden">
@@ -583,15 +806,21 @@ const Payment = () => {
             <div className="flex items-center">
               <VideoCameraIcon className="w-8 h-8 mr-2" />
               <div>
-                <h1 className="text-2xl font-bold">Video Call Payment</h1>
+                <h1 className="text-2xl font-bold">
+                  Video Call Payment
+                </h1>
                 <p className="opacity-90">
                   Complete payment to join consultation
                 </p>
               </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold">{formatTime(timeLeft)}</div>
-              <div className="text-sm opacity-80">Time left</div>
+              <div className="text-2xl font-bold">
+                {formatTime(timeLeft)}
+              </div>
+              <div className="text-sm opacity-80">
+                Time left
+              </div>
             </div>
           </div>
         </div>
@@ -608,8 +837,8 @@ const Payment = () => {
                 </h2>
               </div>
               <p className="text-sm text-green-700">
-                The doctor has accepted your call request and is waiting for
-                you to complete the payment.
+                The doctor has accepted your call request and
+                is waiting for you to complete the payment.
               </p>
             </div>
 
@@ -645,7 +874,9 @@ const Payment = () => {
                   </p>
                   {doctorInfo.rating && (
                     <div className="flex items-center mt-1">
-                      <span className="text-yellow-400 mr-1">⭐</span>
+                      <span className="text-yellow-400 mr-1">
+                        ⭐
+                      </span>
                       <span className="text-sm text-gray-600">
                         {doctorInfo.rating}/5
                       </span>
@@ -656,22 +887,33 @@ const Payment = () => {
 
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Duration:</span>
+                  <span className="text-gray-600">
+                    Duration:
+                  </span>
                   <span className="font-medium">
                     {packageDetails.duration}
                   </span>
                 </div>
                 {doctorInfo.distance && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Distance:</span>
+                    <span className="text-gray-600">
+                      Distance:
+                    </span>
                     <span className="font-medium">
-                      {doctorInfo.distance.toFixed(1)} km away
+                      {doctorInfo.distance.toFixed(
+                        1
+                      )}{" "}
+                      km away
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Call ID:</span>
-                  <span className="font-mono text-xs">{callId}</span>
+                  <span className="text-gray-600">
+                    Call ID:
+                  </span>
+                  <span className="text-mono text-xs">
+                    {callId}
+                  </span>
                 </div>
                 <div className="flex justify-between text-lg font-semibold mt-4 pt-4 border-t border-gray-200">
                   <span>Total Amount:</span>
@@ -687,10 +929,13 @@ const Payment = () => {
                 What&apos;s Included
               </h3>
               <ul className="space-y-2 text-sm text-blue-700">
-                {packageDetails.features.map((feature) => (
-                  <li key={feature} className="flex items-center">
+                {packageDetails.features.map((f) => (
+                  <li
+                    key={f}
+                    className="flex items-center"
+                  >
                     <CheckCircleIcon className="w-4 h-4 text-green-500 mr-2" />
-                    {feature}
+                    {f}
                   </li>
                 ))}
               </ul>
@@ -705,24 +950,28 @@ const Payment = () => {
               </h2>
 
               <div className="grid grid-cols-2 gap-3 mb-6">
-                {paymentMethods.map((method) => (
+                {paymentMethods.map((m) => (
                   <div
-                    key={method.id}
-                    onClick={() => setSelectedMethod(method.id)}
+                    key={m.id}
+                    onClick={() =>
+                      setSelectedMethod(m.id)
+                    }
                     className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
-                      selectedMethod === method.id
+                      selectedMethod === m.id
                         ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
                         : "border-gray-300 hover:border-indigo-300"
                     }`}
                   >
                     <div className="flex items-center">
-                      <span className="text-2xl mr-2">{method.icon}</span>
+                      <span className="text-2xl mr-2">
+                        {m.icon}
+                      </span>
                       <div>
                         <p className="font-medium text-gray-900 text-sm">
-                          {method.name}
+                          {m.name}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {method.description}
+                          {m.description}
                         </p>
                       </div>
                     </div>
@@ -733,14 +982,20 @@ const Payment = () => {
               <div className="flex items-center justify-center p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <LockClosedIcon className="w-5 h-5 text-green-600 mr-2" />
                 <span className="text-sm text-gray-600">
-                  Secure & encrypted payment processing
+                  Secure &amp; encrypted payment
+                  processing
                 </span>
               </div>
             </div>
 
             <button
               onClick={handlePayment}
-              disabled={loading || timeLeft <= 0 || !razorpayLoaded}
+              disabled={
+                loading ||
+                timeLeft <= 0 ||
+                !razorpayLoaded ||
+                !hasValidPrice
+              }
               className="w-full py-4 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
@@ -751,12 +1006,13 @@ const Payment = () => {
               ) : (
                 <>
                   <CreditCardIcon className="w-5 h-5 mr-2" />
-                  Pay {getDisplayPrice()} &amp; Join Call
+                  Pay {getDisplayPrice()} &amp; Join
+                  Call
                 </>
               )}
             </button>
 
-            {/* status banners */}
+            {/* Status banners */}
             {paymentStatus === "success" && (
               <StatusBanner
                 icon={CheckCircleIcon}
@@ -778,7 +1034,8 @@ const Payment = () => {
                 text="Payment cancelled. Doctor is still waiting."
               />
             )}
-            {paymentStatus === "verification-failed" && (
+            {paymentStatus ===
+              "verification-failed" && (
               <StatusBanner
                 icon={XCircleIcon}
                 color="red"
@@ -788,12 +1045,22 @@ const Payment = () => {
 
             <div className="text-center">
               <div className="flex items-center justify-center space-x-6 mb-2">
-                <TrustBadge Icon={ShieldCheckIcon} label="SSL Secure" />
-                <TrustBadge Icon={LockClosedIcon} label="Encrypted" />
-                <TrustBadge Icon={CreditCardIcon} label="PCI DSS" />
+                <TrustBadge
+                  Icon={ShieldCheckIcon}
+                  label="SSL Secure"
+                />
+                <TrustBadge
+                  Icon={LockClosedIcon}
+                  label="Encrypted"
+                />
+                <TrustBadge
+                  Icon={CreditCardIcon}
+                  label="PCI DSS"
+                />
               </div>
               <p className="text-xs text-gray-500">
-                Your payment information is secure and encrypted.
+                Your payment information is secure and
+                encrypted.
               </p>
             </div>
 
@@ -802,7 +1069,8 @@ const Payment = () => {
                 <div className="flex items-center">
                   <ClockIcon className="w-5 h-5 text-red-600 mr-2" />
                   <span className="text-sm text-red-800 font-medium">
-                    Hurry! Payment window expires in {formatTime(timeLeft)}.
+                    Hurry! Payment window expires in{" "}
+                    {formatTime(timeLeft)}.
                   </span>
                 </div>
               </div>
@@ -813,7 +1081,9 @@ const Payment = () => {
         <div className="bg-gray-50 p-4 border-t border-gray-200 text-center">
           <p className="text-sm text-gray-600">
             Need help? Contact{" "}
-            <span className="text-indigo-600">support@snoutiq.com</span>
+            <span className="text-indigo-600">
+              support@snoutiq.com
+            </span>
           </p>
         </div>
       </div>
@@ -821,8 +1091,7 @@ const Payment = () => {
   );
 };
 
-// ---- small components & helpers ----
-
+// ---------- Helper Components ----------
 const TimeoutScreen = ({
   navigate,
   icon: Icon,
@@ -834,12 +1103,17 @@ const TimeoutScreen = ({
     className={`min-h-screen bg-${color}-50 flex items-center justify-center p-4`}
   >
     <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-      <Icon className={`w-16 h-16 text-${color}-500 mx-auto mb-4`} />
-      <h2 className={`text-2xl font-bold text-${color}-800 mb-4`}>{title}</h2>
+      <Icon
+        className={`w-16 h-16 text-${color}-500 mx-auto mb-4`}
+      />
+      <h2
+        className={`text-2xl font-bold text-${color}-800 mb-4`}
+      >
+        {title}
+      </h2>
       <p className={`text-${color}-600 mb-6`}>{message}</p>
       <button
         onClick={() => navigate("/dashboard")}
-        // className={`w-full py-3 bg-${color}-600 text-white rounded-lg hover:bg
         className={`w-full py-3 bg-${color}-600 text-white rounded-lg hover:bg-${color}-700`}
       >
         Back to Dashboard
@@ -855,31 +1129,21 @@ const StatusBanner = ({ icon: Icon, color, text }) => (
     <Icon
       className={`w-6 h-6 text-${color}-600 mr-2`}
     />
-    <span className={`text-${color}-800 text-sm`}>{text}</span>
+    <span
+      className={`text-${color}-800 text-sm`}
+    >
+      {text}
+    </span>
   </div>
 );
 
 const TrustBadge = ({ Icon, label }) => (
   <div className="flex items-center">
     <Icon className="w-4 h-4 text-green-600 mr-1" />
-    <span className="text-xs text-gray-600">{label}</span>
+    <span className="text-xs text-gray-600">
+      {label}
+    </span>
   </div>
 );
-
-function resolvePrice(src, base) {
-  const candidates = [
-    base.chat_price,
-    src.chat_price,
-    base.price,
-    src.price,
-  ].filter((v) => v !== undefined && v !== null);
-
-  if (!candidates.length) return 500;
-
-  const asNumber = Number(candidates[0]);
-  return Number.isFinite(asNumber) && asNumber > 0
-    ? asNumber
-    : 500;
-}
 
 export default Payment;
