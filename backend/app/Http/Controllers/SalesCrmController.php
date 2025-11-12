@@ -39,11 +39,7 @@ class SalesCrmController extends Controller
         ]);
 
         $clinicQrs = $clinics->map(function (VetRegisterationTemp $clinic) use ($options) {
-            $slug = $clinic->slug ?: Str::slug($clinic->name ?: 'clinic-'.$clinic->id);
-            if ($slug === '') {
-                $slug = 'clinic-'.$clinic->id;
-            }
-
+            $slug = $this->slugForClinic($clinic);
             $targetUrl = 'https://snoutiq.com/backend/vets/'.$slug;
             $pngBinary = (new QRCode($options))->render($targetUrl);
 
@@ -55,6 +51,7 @@ class SalesCrmController extends Controller
                 'qr_data_uri' => 'data:image/png;base64,'.base64_encode($pngBinary),
                 'city' => $clinic->city,
                 'status' => $clinic->status,
+                'referral_code' => $this->referralCodeForClinic($clinic),
             ];
         });
 
@@ -205,6 +202,31 @@ class SalesCrmController extends Controller
         return redirect()->route('sales.crm')->with('status', 'Mapping removed.');
     }
 
+    public function clinicCard(VetRegisterationTemp $clinic)
+    {
+        $slug = $this->slugForClinic($clinic);
+        $targetUrl = 'https://snoutiq.com/backend/vets/'.$slug;
+
+        $options = new QROptions([
+            'outputType' => QRCode::OUTPUT_IMAGE_PNG,
+            'scale' => 10,
+            'margin' => 1,
+            'eccLevel' => QRCode::ECC_M,
+            'imageTransparent' => false,
+            'outputBase64' => false,
+        ]);
+
+        $qrBinary = (new QRCode($options))->render($targetUrl);
+        $qrDataUri = 'data:image/png;base64,'.base64_encode($qrBinary);
+
+        return view('backend.sales.clinic-card', [
+            'clinicName' => $clinic->name ?: ('Clinic #'.$clinic->id),
+            'qrDataUri' => $qrDataUri,
+            'referralCode' => $this->referralCodeForClinic($clinic),
+            'targetUrl' => $targetUrl,
+        ]);
+    }
+
     private function prepareClinicDraft(int $clinicId, ?string $publicId): void
     {
         $clinic = VetRegisterationTemp::find($clinicId);
@@ -341,5 +363,27 @@ class SalesCrmController extends Controller
         }
 
         return $clinic->fresh();
+    }
+
+    private function slugForClinic(VetRegisterationTemp $clinic): string
+    {
+        $slug = $clinic->slug ?: Str::slug($clinic->name ?: ('clinic-'.$clinic->id));
+        if ($slug === '') {
+            $slug = 'clinic-'.$clinic->id;
+        }
+
+        return $slug;
+    }
+
+    private function referralCodeForClinic(VetRegisterationTemp $clinic): string
+    {
+        $idSeed = max(1, (int) $clinic->id);
+        $base36 = strtoupper(str_pad(base_convert((string) $idSeed, 10, 36), 5, '0', STR_PAD_LEFT));
+        $slugFragment = strtoupper(Str::substr(Str::slug($clinic->slug ?: $clinic->name), 0, 2));
+        if ($slugFragment === '') {
+            $slugFragment = 'CL';
+        }
+
+        return 'SN-'.$slugFragment.$base36;
     }
 }

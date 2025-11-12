@@ -47,10 +47,16 @@
         color: #475569;
         word-break: break-all;
     }
-    .qr-card .meta {
-        font-size: 0.82rem;
-        color: #475569;
-    }
+.qr-card .meta {
+    font-size: 0.82rem;
+    color: #475569;
+}
+.qr-card .referral {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #1d4ed8;
+    letter-spacing: 0.08em;
+}
     .qr-card .actions {
         display: flex;
         gap: 0.6rem;
@@ -89,6 +95,7 @@
                         <div>
                             <p class="title">{{ $entry['name'] }}</p>
                             <p class="slug">{{ $entry['target_url'] }}</p>
+                            <p class="referral">Referral: {{ $entry['referral_code'] }}</p>
                             <p class="meta">
                                 ID #{{ $entry['id'] }}
                                 @if($entry['city']) · {{ $entry['city'] }} @endif
@@ -98,6 +105,7 @@
                         <div class="actions">
                             <a href="{{ $entry['target_url'] }}" target="_blank" rel="noopener">Open page</a>
                             <a href="{{ $entry['qr_data_uri'] }}" download="{{ $entry['slug'] }}-qr.png">Download PNG</a>
+                            <a href="{{ route('sales.clinic-card', $entry['id']) }}" target="_blank" rel="noopener">Booking card</a>
                         </div>
                     </article>
                 @endforeach
