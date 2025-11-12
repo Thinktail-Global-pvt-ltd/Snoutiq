@@ -41,7 +41,9 @@ class SalesCrmController extends Controller
 
         $clinicQrs = $clinics->map(function (VetRegisterationTemp $clinic) use ($options) {
             $slug = $this->slugForClinic($clinic);
-            $targetUrl = 'https://snoutiq.com/backend/vets/'.$slug;
+            $redirect = $this->ensureLegacyRedirectForClinic($clinic);
+            $targetUrl = route('legacy-qr.redirect', ['code' => $redirect->code]);
+            $landingUrl = 'https://snoutiq.com/backend/vets/'.$slug;
             $pngBinary = (new QRCode($options))->render($targetUrl);
 
             return [
@@ -49,10 +51,14 @@ class SalesCrmController extends Controller
                 'name' => $clinic->name ?: ('Clinic #'.$clinic->id),
                 'slug' => $slug,
                 'target_url' => $targetUrl,
+                'landing_url' => $landingUrl,
                 'qr_data_uri' => 'data:image/png;base64,'.base64_encode($pngBinary),
                 'city' => $clinic->city,
                 'status' => $clinic->status,
                 'referral_code' => $this->referralCodeForClinic($clinic),
+                'scan_count' => $redirect->scan_count,
+                'last_scanned_at' => $redirect->last_scanned_at,
+                'legacy_code' => $redirect->code,
             ];
         });
 
@@ -410,5 +416,38 @@ class SalesCrmController extends Controller
         }
 
         return 'SN-'.$slugFragment.$base36;
+    }
+
+    private function ensureLegacyRedirectForClinic(VetRegisterationTemp $clinic): LegacyQrRedirect
+    {
+        $redirect = LegacyQrRedirect::where('clinic_id', $clinic->id)->orderByDesc('id')->first();
+
+        if ($redirect) {
+            $needsUpdate = false;
+            if ($clinic->public_id && $redirect->public_id !== $clinic->public_id) {
+                $redirect->public_id = $clinic->public_id;
+                $needsUpdate = true;
+            }
+            if ($needsUpdate) {
+                $redirect->save();
+            }
+
+            return $redirect;
+        }
+
+        $baseCode = 'qr-'.$this->slugForClinic($clinic);
+        $candidate = $baseCode;
+        $suffix = 1;
+        while (LegacyQrRedirect::where('code', $candidate)->exists()) {
+            $candidate = $baseCode.'-'.$suffix++;
+        }
+
+        return LegacyQrRedirect::create([
+            'code' => $candidate,
+            'clinic_id' => $clinic->id,
+            'public_id' => $clinic->public_id,
+            'status' => 'inactive',
+            'scan_count' => 0,
+        ]);
     }
 }

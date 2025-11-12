@@ -47,10 +47,13 @@
         color: #475569;
         word-break: break-all;
     }
-.qr-card .meta {
-    font-size: 0.82rem;
-    color: #475569;
-}
+    .qr-card .slug strong {
+        color: #0f172a;
+    }
+    .qr-card .meta {
+        font-size: 0.82rem;
+        color: #475569;
+    }
 .qr-card .referral {
     font-size: 0.9rem;
     font-weight: 700;
@@ -94,16 +97,22 @@
                         <img src="{{ $entry['qr_data_uri'] }}" alt="QR for {{ $entry['slug'] }}">
                         <div>
                             <p class="title">{{ $entry['name'] }}</p>
-                            <p class="slug">{{ $entry['target_url'] }}</p>
+                            <p class="slug">
+                                <strong>Tracker:</strong> {{ $entry['target_url'] }}<br>
+                                <strong>Landing:</strong> {{ $entry['landing_url'] }}
+                            </p>
                             <p class="referral">Referral: {{ $entry['referral_code'] }}</p>
                             <p class="meta">
                                 ID #{{ $entry['id'] }}
                                 @if($entry['city']) · {{ $entry['city'] }} @endif
                                 @if($entry['status']) · status: {{ ucfirst($entry['status']) }} @endif
+                                @if(!is_null($entry['scan_count']))
+                                    · scans: {{ number_format($entry['scan_count']) }}
+                                @endif
                             </p>
                         </div>
                         <div class="actions">
-                            <a href="{{ $entry['target_url'] }}" target="_blank" rel="noopener">Open page</a>
+                            <a href="{{ $entry['landing_url'] }}" target="_blank" rel="noopener">Open page</a>
                             <a href="{{ $entry['qr_data_uri'] }}" download="{{ $entry['slug'] }}-qr.png">Download PNG</a>
                             <a href="{{ route('sales.clinic-card', $entry['id']) }}" target="_blank" rel="noopener">Booking card</a>
                         </div>
