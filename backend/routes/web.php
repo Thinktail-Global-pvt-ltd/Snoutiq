@@ -149,6 +149,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
         Route::get('/bookings', [AdminPanelController::class, 'bookings'])->name('admin.bookings');
         Route::get('/analytics/video', [AdminPanelController::class, 'videoAnalytics'])->name('admin.analytics.video');
+        Route::get('/analytics/pincode-heatmap', [AdminPanelController::class, 'pincodeHeatmap'])->name('admin.analytics.pincode-heatmap');
         Route::get('/supports', [AdminPanelController::class, 'supports'])->name('admin.supports');
         Route::get('/sp/{user}', [AdminPanelController::class, 'serviceProviderProfile'])->name('admin.sp.profile');
 
@@ -732,6 +733,48 @@ Route::middleware('web')->get('/api/admin/video/pincode-slots', function (\Illum
     $doctorId = (int) $request->query('doctor_id', 0);
     $pincodeFilter = trim((string) $request->query('pincode', ''));
 
+    $pincodeCoords = DB::table('geo_pincodes')
+        ->whereNotNull('pincode')
+        ->get(['pincode', 'lat', 'lon'])
+        ->mapWithKeys(fn ($row) => [
+            trim((string) $row->pincode) => [
+                'lat' => $row->lat !== null ? (float) $row->lat : null,
+                'lon' => $row->lon !== null ? (float) $row->lon : null,
+            ],
+        ])
+        ->all();
+
+    $clinicCoordinates = DB::table('vet_registerations_temp')
+        ->get(['id', 'coordinates', 'lat', 'lng'])
+        ->mapWithKeys(function ($row) {
+            $coords = null;
+            if (is_array($row->coordinates)) {
+                $coords = $row->coordinates;
+            } elseif (is_string($row->coordinates)) {
+                $coords = json_decode($row->coordinates, true);
+            }
+            $lat = null;
+            $lon = null;
+            if ($row->lat !== null) {
+                $lat = (float) $row->lat;
+            } elseif (isset($coords['lat'])) {
+                $lat = (float) $coords['lat'];
+            }
+            if ($row->lng !== null) {
+                $lon = (float) $row->lng;
+            } elseif (isset($coords['lon'])) {
+                $lon = (float) $coords['lon'];
+            }
+
+            return [
+                (int)$row->id => [
+                    'lat' => $lat,
+                    'lon' => $lon,
+                ],
+            ];
+        })
+        ->all();
+
     $toMinutes = static function (?string $time): ?int {
         if (!$time) {
             return null;
@@ -752,6 +795,9 @@ Route::middleware('web')->get('/api/admin/video/pincode-slots', function (\Illum
         ->select(
             'dva.doctor_id',
             'vrt.pincode',
+            'vrt.id as clinic_id',
+            'vrt.name as clinic_name',
+            'vrt.coordinates as clinic_coordinates',
             'vrt.clinic_profile',
             'vrt.name as vet_name',
             'dva.start_time',
@@ -768,21 +814,33 @@ Route::middleware('web')->get('/api/admin/video/pincode-slots', function (\Illum
         ->get();
 
     foreach ($availability as $row) {
+        $clinicId = (int) ($row->clinic_id ?? 0);
         $code = trim((string) $row->pincode);
         if ($code === '') {
             $code = 'Unknown';
         }
-        if (!isset($matrix[$code])) {
-            $matrix[$code] = [
+        $clinicName = $row->clinic_profile ?: $row->clinic_name ?: $row->vet_name ?: 'Unknown clinic';
+        $entryKey = $clinicId > 0 ? (string)$clinicId : sprintf('pincode-%s-%s', $code, md5($clinicName));
+
+        if (!isset($matrix[$entryKey])) {
+            $coords = $clinicCoordinates[$clinicId] ?? null;
+            if (($coords['lat'] ?? null) === null && ($coords['lon'] ?? null) === null) {
+                $coords = $pincodeCoords[$code] ?? null;
+            }
+
+            $matrix[$entryKey] = [
+                'clinic_id' => $clinicId ?: null,
+                'clinic_name' => $clinicName,
                 'pincode' => $code,
-                'clinics' => [],
+                'clinics' => [$clinicName],
                 'hours' => array_fill(0, 24, ['doctors' => []]),
                 'doctor_ids' => [],
+                'lat' => $coords['lat'] ?? null,
+                'lon' => $coords['lon'] ?? null,
             ];
         }
-        $clinicName = $row->clinic_profile ?: $row->vet_name;
         if ($clinicName) {
-            $matrix[$code]['clinics'][$clinicName] = true;
+            $matrix[$entryKey]['clinics'][$clinicName] = true;
         }
 
         $startMin = $toMinutes($row->start_time);
@@ -817,31 +875,32 @@ Route::middleware('web')->get('/api/admin/video/pincode-slots', function (\Illum
                 if ($hourIndex < 0 || $hourIndex > 23) {
                     continue;
                 }
-                $matrix[$code]['hours'][$hourIndex]['doctors'][$row->doctor_id] = true;
-                $matrix[$code]['doctor_ids'][$row->doctor_id] = true;
+                $matrix[$entryKey]['hours'][$hourIndex]['doctors'][$row->doctor_id] = true;
+                $matrix[$entryKey]['doctor_ids'][$row->doctor_id] = true;
                 $overallDoctorIds[$row->doctor_id] = true;
             }
         }
     }
 
     $totalDoctorHours = 0;
-    foreach ($matrix as $code => $entry) {
+
+    foreach ($matrix as $entryKey => $entry) {
         $clinics = array_keys($entry['clinics']);
         sort($clinics, SORT_NATURAL);
-        $matrix[$code]['clinics'] = $clinics;
+        $matrix[$entryKey]['clinics'] = $clinics;
         $rowTotals = ['doctor_hours' => 0, 'unique_doctors' => count($entry['doctor_ids'])];
         foreach ($entry['hours'] as $hour => $cell) {
             $count = isset($cell['doctors']) ? count($cell['doctors']) : 0;
-            $matrix[$code]['hours'][$hour] = ['count' => $count];
+            $matrix[$entryKey]['hours'][$hour] = ['count' => $count];
             $rowTotals['doctor_hours'] += $count;
         }
-        $matrix[$code]['totals'] = $rowTotals;
+        $matrix[$entryKey]['totals'] = $rowTotals;
         $totalDoctorHours += $rowTotals['doctor_hours'];
     }
 
     $rowsOut = array_values($matrix);
     usort($rowsOut, static function ($a, $b) {
-        return strcmp($a['pincode'], $b['pincode']);
+        return strcmp($a['clinic_name'] ?? '', $b['clinic_name'] ?? '');
     });
 
     return response()->json([

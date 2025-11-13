@@ -69,6 +69,7 @@
             <a href="{{ route('admin.bookings') }}" class="{{ request()->routeIs('admin.bookings') ? 'active' : '' }}">Bookings</a>
             <a href="{{ route('admin.supports') }}" class="{{ request()->routeIs('admin.supports') ? 'active' : '' }}">Supports</a>
             <a href="{{ route('admin.video.slot-overview') }}" class="{{ request()->routeIs('admin.video.slot-overview') ? 'active' : '' }}">Video Slot Overview</a>
+            <a href="{{ route('admin.analytics.pincode-heatmap') }}" class="{{ request()->routeIs('admin.analytics.pincode-heatmap') ? 'active' : '' }}">Pincode Heatmap</a>
         </nav>
         @hasSection('sidebar-secondary')
             <div class="mb-4">

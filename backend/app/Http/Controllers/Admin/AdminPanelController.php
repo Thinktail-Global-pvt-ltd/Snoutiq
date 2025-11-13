@@ -117,6 +117,11 @@ class AdminPanelController extends Controller
         ));
     }
 
+    public function pincodeHeatmap(): View
+    {
+        return view('admin.pincode-heatmap');
+    }
+
     private function getOnlineClinics(?Collection $activeClinicIds = null): Collection
     {
         $activeClinicIds = $activeClinicIds ?? $this->doctorAvailabilityService->getActiveClinicIds();
