@@ -176,13 +176,11 @@
                         $pet->breed ? 'Breed: '.$pet->breed : null,
                         $pet->pet_gender ? 'Gender: '.$pet->pet_gender : null,
                         $pet->pet_age ? 'Age: '.$pet->pet_age : null,
-                      ])->filter();
+                      ])->filter()->implode(' · ');
                     @endphp
                     <div class="border border-gray-100 rounded-lg p-2 bg-gray-50 space-y-1">
                       <div class="font-semibold">{{ $petName }}</div>
-                      @if($petDetails->isNotEmpty())
-                        <div class="text-xs text-gray-500">{{ $petDetails->implode(' · ') }}</div>
-                      @endif
+                      <div class="text-xs text-gray-500">{{ $petDetails ?: 'Details not available' }}</div>
                       <div class="text-xs text-blue-600 space-x-2">
                         @if($entry['documents']->isEmpty())
                           <span class="text-gray-400">No pet docs uploaded</span>
