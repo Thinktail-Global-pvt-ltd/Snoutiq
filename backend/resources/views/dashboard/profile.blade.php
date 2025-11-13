@@ -106,9 +106,11 @@
           </button>
         @endif
       </div>
-      <div class="mt-6 rounded-2xl border border-white/20 bg-white/10 p-4 text-center space-y-3">
-        <p class="text-xs uppercase tracking-wide text-white/70">Registered vet QR</p>
-        <p id="clinic-qr-status" class="text-sm text-white/80">Scan to visit your SnoutIQ clinic profile.</p>
+      <div class="mt-6 rounded-2xl border border-white/20 bg-white/10 p-5 space-y-4 text-white text-left">
+        <div class="space-y-1 text-center">
+          <p class="text-xs uppercase tracking-wide text-white/70">Registered vet QR</p>
+          <p id="clinic-qr-status" class="text-sm text-white/80">Scan to visit your SnoutIQ clinic profile.</p>
+        </div>
         <div class="flex justify-center">
           <img
             id="clinic-qr-image"
@@ -117,15 +119,28 @@
             class="h-32 w-32 rounded-xl bg-white/20 object-cover transition-opacity duration-200 opacity-40"
           />
         </div>
-        <a
-          id="clinic-qr-link"
-          href="#"
-          target="_blank"
-          rel="noreferrer noopener"
-          class="text-xs font-semibold text-white/90 opacity-50 pointer-events-none transition-opacity duration-200"
-        >
-          Clinic page not yet available
-        </a>
+        <div class="space-y-3 text-center">
+          <p class="text-xs text-white/70">Download a ready-to-print SnoutIQ card that highlights your clinic name.</p>
+          <div class="flex flex-col items-center gap-2">
+            <button
+              id="clinic-qr-download"
+              type="button"
+              disabled
+              class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/90 text-indigo-600 px-5 py-2 text-sm font-semibold opacity-60 pointer-events-none transition duration-150"
+            >
+              Download printable card
+            </button>
+            <a
+              id="clinic-qr-link"
+              href="#"
+              target="_blank"
+              rel="noreferrer noopener"
+              class="text-xs font-semibold text-white/90 opacity-50 pointer-events-none transition-opacity duration-200"
+            >
+              Clinic page not yet available
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -252,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const CLINIC_WEB_PAGE_BASE = 'https://snoutiq.com/backend/vets';
   const QR_SERVICE_BASE = 'https://api.qrserver.com/v1/create-qr-code/';
+  const QR_PLACEHOLDER_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
   const els = {
     clinicName: document.getElementById('clinic-name'),
@@ -267,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clinicQrImage: document.getElementById('clinic-qr-image'),
     clinicQrLink: document.getElementById('clinic-qr-link'),
     clinicQrStatus: document.getElementById('clinic-qr-status'),
+    clinicQrDownload: document.getElementById('clinic-qr-download'),
     doctorGrid: document.getElementById('doctor-grid'),
     doctorEmpty: document.getElementById('doctor-empty'),
     doctorCount: document.getElementById('doctor-count'),
@@ -280,6 +297,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let profilePayload = null;
   let clinicEditable = false;
   let editableDoctorIds = [];
+  let currentClinicPageUrl = '';
+  let currentClinicName = 'SnoutIQ Clinic';
+  const DOWNLOAD_READY_LABEL = 'Download printable card';
+  const DOWNLOAD_LOADING_LABEL = 'Preparing template...';
+  const DOWNLOAD_DISABLED_LABEL = 'QR coming soon';
 
   function formatValue(value, fallback = '—') {
     if (value === null || value === undefined) return fallback;
@@ -296,6 +318,51 @@ document.addEventListener('DOMContentLoaded', () => {
     return `₹${num.toLocaleString('en-IN')}`;
   }
 
+  function sanitizeFileName(value) {
+    return String(value ?? 'clinic')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'clinic';
+  }
+
+  function setDownloadButtonState(isEnabled, label) {
+    if (!els.clinicQrDownload) return;
+    const text = label ?? (isEnabled ? DOWNLOAD_READY_LABEL : DOWNLOAD_DISABLED_LABEL);
+    els.clinicQrDownload.disabled = !isEnabled;
+    els.clinicQrDownload.textContent = text;
+    els.clinicQrDownload.classList.toggle('opacity-60', !isEnabled);
+    els.clinicQrDownload.classList.toggle('pointer-events-none', !isEnabled);
+  }
+
+  function loadImageFromBlob(blob) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.decoding = 'async';
+      image.onload = () => {
+        URL.revokeObjectURL(image.src);
+        resolve(image);
+      };
+      image.onerror = reject;
+      image.src = URL.createObjectURL(blob);
+    });
+  }
+
+  function drawRoundedRectangle(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function buildClinicPageUrl(slug) {
     if (!slug) return '';
     const trimmed = String(slug).trim();
@@ -308,9 +375,77 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${QR_SERVICE_BASE}?size=220x220&margin=12&data=${encodeURIComponent(pageUrl)}`;
   }
 
-  function updateClinicQr(slug) {
+  async function buildDownloadableTemplate(pageUrl, clinicName) {
+    const qrUrl = buildQrImageUrl(pageUrl);
+    if (!qrUrl) {
+      throw new Error('QR code is not ready yet.');
+    }
+    const response = await fetch(qrUrl);
+    if (!response.ok) {
+      throw new Error('Could not download the QR code.');
+    }
+    const qrBlob = await response.blob();
+    const qrImage = await loadImageFromBlob(qrBlob);
+    const width = 760;
+    const height = 1100;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx2d = canvas.getContext('2d');
+    const bgGradient = ctx2d.createLinearGradient(0, 0, width, height);
+    bgGradient.addColorStop(0, '#0f172a');
+    bgGradient.addColorStop(1, '#4338ca');
+    ctx2d.fillStyle = bgGradient;
+    ctx2d.fillRect(0, 0, width, height);
+
+    ctx2d.fillStyle = 'rgba(255,255,255,0.08)';
+    drawRoundedRectangle(ctx2d, 40, 40, width - 80, 260, 34);
+
+    ctx2d.fillStyle = '#e0e7ff';
+    ctx2d.font = '700 32px Inter, system-ui, sans-serif';
+    ctx2d.fillText('SnoutIQ Clinic', 60, 110);
+
+    ctx2d.fillStyle = '#ffffff';
+    ctx2d.font = '600 44px Inter, system-ui, sans-serif';
+    ctx2d.fillText(clinicName, 60, 170);
+
+    ctx2d.font = '500 18px Inter, system-ui, sans-serif';
+    ctx2d.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx2d.fillText('Scan to visit your clinic profile on SnoutIQ', 60, 212);
+
+    ctx2d.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx2d.lineWidth = 1;
+    ctx2d.beginPath();
+    ctx2d.moveTo(60, 228);
+    ctx2d.lineTo(width - 60, 228);
+    ctx2d.stroke();
+
+    const qrSize = 360;
+    const qrX = (width - qrSize) / 2;
+    const qrY = 320;
+
+    ctx2d.fillStyle = '#ffffff';
+    drawRoundedRectangle(ctx2d, qrX - 18, qrY - 18, qrSize + 36, qrSize + 36, 32);
+    ctx2d.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+
+    ctx2d.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx2d.font = '600 20px Inter, system-ui, sans-serif';
+    ctx2d.textAlign = 'center';
+    ctx2d.fillText('Scan this code', width / 2, qrY + qrSize + 58);
+
+    ctx2d.font = '400 16px Inter, system-ui, sans-serif';
+    ctx2d.fillText('Powered by SnoutIQ', width / 2, qrY + qrSize + 82);
+    ctx2d.textAlign = 'start';
+
+    return canvas;
+  }
+
+  function updateClinicQr(slug, clinicName) {
     const pageUrl = buildClinicPageUrl(slug);
     const hasPageUrl = Boolean(pageUrl);
+    currentClinicPageUrl = pageUrl;
+    const candidateName = formatValue(clinicName, '');
+    currentClinicName = candidateName || 'SnoutIQ Clinic';
     if (els.clinicQrStatus) {
       els.clinicQrStatus.textContent = hasPageUrl
         ? 'Scan to visit your clinic on SnoutIQ.'
@@ -328,13 +463,10 @@ document.addEventListener('DOMContentLoaded', () => {
       els.clinicQrLink.classList.toggle('pointer-events-none', !hasPageUrl);
     }
     if (els.clinicQrImage) {
-      if (hasPageUrl) {
-        els.clinicQrImage.src = buildQrImageUrl(pageUrl);
-      } else {
-        els.clinicQrImage.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
-      }
+      els.clinicQrImage.src = hasPageUrl ? buildQrImageUrl(pageUrl) : QR_PLACEHOLDER_IMAGE;
       els.clinicQrImage.classList.toggle('opacity-40', !hasPageUrl);
     }
+    setDownloadButtonState(hasPageUrl);
   }
 
   updateClinicQr(null);
@@ -466,7 +598,8 @@ document.addEventListener('DOMContentLoaded', () => {
       editableDoctorIds = Array.isArray(data?.editable?.doctor_ids) ? data.editable.doctor_ids.map(Number) : [];
       toggleClinicForm(!clinicEditable);
       fillClinicSummary(data.clinic || null);
-      updateClinicQr(data.clinic?.slug);
+      const clinicNameForTemplate = data.clinic?.clinic_profile || data.clinic?.name;
+      updateClinicQr(data.clinic?.slug, clinicNameForTemplate);
       fillClinicForm(data.clinic || null);
       if (els.clinicId && data.clinic_id) {
         els.clinicId.textContent = data.clinic_id;
@@ -528,6 +661,39 @@ document.addEventListener('DOMContentLoaded', () => {
     els.clinicForm.addEventListener('reset', (event) => {
       event.preventDefault();
       fillClinicForm(profilePayload?.clinic || null);
+    });
+  }
+
+  if (els.clinicQrDownload) {
+    els.clinicQrDownload.addEventListener('click', async () => {
+      if (!currentClinicPageUrl) return;
+      setDownloadButtonState(false, DOWNLOAD_LOADING_LABEL);
+      try {
+        const canvas = await buildDownloadableTemplate(currentClinicPageUrl, currentClinicName);
+        await new Promise((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              reject(new Error('Template generation failed.'));
+              return;
+            }
+            const objectUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = objectUrl;
+            anchor.download = `SnoutIQ-${sanitizeFileName(currentClinicName)}.png`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            URL.revokeObjectURL(objectUrl);
+            resolve();
+          }, 'image/png');
+        });
+        Swal.fire({ icon: 'success', title: 'Template ready', timer: 1200, showConfirmButton: false });
+      } catch (error) {
+        console.error(error);
+        Swal.fire({ icon: 'error', title: 'Download failed', text: error.message || 'Unable to prepare the QR template.' });
+      } finally {
+        setDownloadButtonState(Boolean(currentClinicPageUrl));
+      }
     });
   }
 

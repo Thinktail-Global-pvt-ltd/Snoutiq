@@ -103,7 +103,9 @@ export default function CallTestPage() {
   // ---------- 3) Razorpay: open on user click, then join Agora ----------
   const openRazorpayPayment = async (sid) => {
     try {
-      const orderRes = await axios.post(`${API_BASE}/api/create-order`);
+      const orderRes = await axios.post(`${API_BASE}/api/create-order`, {
+        order_type: "video_consultation",
+      });
 
       if (!window.Razorpay) {
         log(

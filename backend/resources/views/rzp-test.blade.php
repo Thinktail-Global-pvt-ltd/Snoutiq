@@ -82,7 +82,10 @@
       const res = await fetch(ORDER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ amount })
+        body: JSON.stringify({
+          amount,
+          order_type: 'test',
+        })
       });
       if (!res.ok) throw new Error('Order API failed: ' + res.status);
       return res.json();
@@ -139,7 +142,8 @@
             const payload = {
               razorpay_order_id: resp.razorpay_order_id,
               razorpay_payment_id: resp.razorpay_payment_id,
-              razorpay_signature: resp.razorpay_signature
+              razorpay_signature: resp.razorpay_signature,
+              order_type: 'test',
             };
             log(payload, 'REQUEST verify');
             try {

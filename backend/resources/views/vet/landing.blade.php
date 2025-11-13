@@ -501,6 +501,7 @@ label{font-size:.9rem;color:#334155}
     // Payment endpoints (served from this Laravel app)
     const ORDER_URL    = @json(url('/api/create-order'));
     const VERIFY_URL   = @json(url('/api/rzp/verify'));
+    const CLINIC_ID    = @json($vet->clinic_id ?? $vet->id ?? null);
 
     const grid    = document.getElementById('qsvc-grid');
     const empty   = document.getElementById('qsvc-empty');
@@ -621,7 +622,11 @@ label{font-size:.9rem;color:#334155}
         const res = await fetch(ORDER_URL, {
           method: 'POST',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: amountInInr })
+          body: JSON.stringify({
+            amount: amountInInr,
+            clinic_id: CLINIC_ID,
+            order_type: 'service',
+          })
         });
         if (!res.ok) throw new Error('Order create failed: ' + res.status);
         return res.json();
@@ -650,6 +655,8 @@ label{font-size:.9rem;color:#334155}
                 razorpay_signature: resp.razorpay_signature,
                 vet_slug: String(vetSlug || ''),
                 service_id: String(svc.id || ''),
+                clinic_id: CLINIC_ID,
+                order_type: 'service',
               };
               const vres = await fetch(VERIFY_URL, {
                 method: 'POST',

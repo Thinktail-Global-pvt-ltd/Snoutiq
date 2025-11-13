@@ -544,6 +544,11 @@ const Payment = () => {
       return;
     }
 
+    const doctorClinicId =
+      doctorInfo?.clinic_id ??
+      doctorInfo?.doctor?.clinic_id ??
+      null;
+
     setLoading(true);
     setPaymentStatus(null);
     paymentWindowActive.current = true;
@@ -561,6 +566,8 @@ const Payment = () => {
           doctorId: doctorInfo.id,
           patientId: patientIdValue,
           channel: channelValue,
+          clinicId: doctorClinicId,
+          order_type: "video_consultation",
         }
       );
 
@@ -619,6 +626,8 @@ const Payment = () => {
                 doctorId: doctorInfo.id,
                 patientId: patientIdValue,
                 channel: channelValue,
+                clinicId: doctorClinicId,
+                order_type: "video_consultation",
                 razorpay_order_id:
                   response.razorpay_order_id,
                 razorpay_payment_id:

@@ -38,6 +38,7 @@ class PaymentController extends Controller
             'amount' => 'nullable|integer|min:1',
             'clinic_id' => 'nullable|integer',
             'service_id' => 'nullable|string',
+            'order_type' => 'nullable|string',
             'vet_slug' => 'nullable|string',
             'call_session_id' => 'nullable|string',
         ]);
@@ -210,6 +211,8 @@ class PaymentController extends Controller
         $doctorId = $context['doctor_id'] ?? null;
         $userId = $context['user_id'] ?? null;
 
+        $transactionType = $this->resolveTransactionType($notes);
+
         try {
             Transaction::updateOrCreate(
                 ['reference' => $orderId],
@@ -219,10 +222,11 @@ class PaymentController extends Controller
                     'user_id' => $userId,
                     'amount_paise' => (int) ($order['amount'] ?? 0),
                     'status' => 'pending',
-                    'type' => $notes['service_id'] ?? 'payment',
+                    'type' => $transactionType,
                     'payment_method' => null,
                     'reference' => $orderId,
                     'metadata' => [
+                        'order_type' => $transactionType,
                         'order_id' => $orderId,
                         'currency' => $order['currency'] ?? 'INR',
                         'notes' => $notes,
@@ -253,6 +257,7 @@ class PaymentController extends Controller
         $doctorId = $context['doctor_id'] ?? null;
         $userId = $context['user_id'] ?? null;
         $callId = $context['call_identifier'] ?? null;
+        $transactionType = $this->resolveTransactionType($notes);
 
         try {
             $reference = $payment->razorpay_payment_id ?? $payment->razorpay_order_id;
@@ -266,10 +271,11 @@ class PaymentController extends Controller
                 'user_id' => $userId,
                 'amount_paise' => (int) ($amount ?? 0),
                 'status' => $status ?? 'pending',
-                'type' => $notes['service_id'] ?? 'payment',
+                'type' => $transactionType,
                 'payment_method' => $method,
                 'reference' => $reference,
                 'metadata' => [
+                    'order_type' => $transactionType,
                     'order_id' => $payment->razorpay_order_id,
                     'payment_id' => $payment->razorpay_payment_id,
                     'currency' => $currency,
@@ -357,6 +363,7 @@ class PaymentController extends Controller
     {
         $mapping = [
             'vet_slug' => ['vet_slug'],
+            'order_type' => ['order_type', 'orderType', 'type', 'payment_type'],
             'service_id' => ['service_id'],
             'call_session_id' => ['call_session_id', 'callSessionId', 'call_id', 'callId'],
             'clinic_id' => ['clinic_id', 'clinicId'],
@@ -458,6 +465,24 @@ class PaymentController extends Controller
         }
 
         return $this->doctorClinicCache[$doctorId] = $clinicId;
+    }
+
+    protected function resolveTransactionType(array $notes = []): string
+    {
+        $candidate = $notes['order_type'] ?? null;
+        if (is_string($candidate)) {
+            $candidate = trim($candidate);
+        }
+
+        if ($candidate !== null && $candidate !== '') {
+            return $candidate;
+        }
+
+        if (! empty($notes['service_id'])) {
+            return 'service';
+        }
+
+        return 'payment';
     }
 
     protected function findCallSession($identifier): ?CallSession

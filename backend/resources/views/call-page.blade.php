@@ -39,6 +39,7 @@
   $uid      = request('uid');                         // ?uid=...
   $role     = request('role', 'audience');            // ?role=host|audience
   $callId   = request('callId');                      // ?callId=...
+  $clinicId = request('clinicId');
 @endphp
 
 <script>
@@ -53,6 +54,7 @@
   const PRESET_UID      = @json($uid);     // doctor or patient id (display only)
   const PRESET_ROLE     = @json($role);    // 'host' or 'audience'
   const PRESET_CALL_ID  = @json($callId);
+  const PRESET_CLINIC_ID = @json($clinicId ?? null);
 </script>
 
 <div class="max-w-6xl mx-auto p-4">
@@ -257,7 +259,10 @@
 
   async function openRazorpayPayment(sessionId){
     try{
-      const orderRes = await axios.post(`${API_BASE}/api/create-order`);
+      const orderRes = await axios.post(`${API_BASE}/api/create-order`, {
+        order_type: "video_consultation",
+        clinicId: PRESET_CLINIC_ID,
+      });
       if (!window.Razorpay){
         log('⚠️ Razorpay SDK missing'); return;
       }

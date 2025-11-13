@@ -23,6 +23,7 @@
   $channel     = $channel     ?? request()->query('channel');
   $patientId   = $patientId   ?? request()->query('patientId');
   $amountQ     = request()->query('amount'); // optional
+  $clinicId    = request()->query('clinicId');
 @endphp
 
 <div id="app" class="p-4 flex items-center justify-center"></div>
@@ -52,6 +53,7 @@
   const CHANNEL      = @json($channel);
   const PATIENT_ID   = Number(@json($patientId));
   const AMOUNT_Q     = Number(@json($amountQ)); // may be NaN
+  const CLINIC_ID    = @json($clinicId ?? null);
 
   /** ===== Local state ===== */
   let timeLeft = 5 * 60;                // 5 minutes window
@@ -302,7 +304,9 @@
           callId: CALL_ID,
           doctorId: DOCTOR_ID,
           patientId: PATIENT_ID,
-          channel: CHANNEL
+          channel: CHANNEL,
+          clinicId: CLINIC_ID,
+          order_type: 'video_consultation',
         })
       });
       const order = await res.json();
@@ -329,6 +333,8 @@
                 doctorId: DOCTOR_ID,
                 patientId: PATIENT_ID,
                 channel: CHANNEL,
+                clinicId: CLINIC_ID,
+                order_type: 'video_consultation',
                 razorpay_order_id: rp.razorpay_order_id,
                 razorpay_payment_id: rp.razorpay_payment_id,
                 razorpay_signature: rp.razorpay_signature
