@@ -75,7 +75,7 @@
               $doctorName = $doctor
                 ? ($doctor->doctor_name ?? $doctor->name ?? 'Doctor #'.$doctor->id)
                 : '-';
-              $clinicLabel = $doctor?->clinic?->name ?? $txn->clinic?->name ?? '-';
+              $clinicLabel = $doctor?->clinic?->name ?? '-';
               $user = $txn->user;
               $contact = $user?->phone ?? data_get($txn->metadata, 'contact') ?? '-';
               $email = $user?->email ?? '-';
