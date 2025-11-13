@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\ClinicEmergencyHoursController;
 use App\Http\Controllers\VetDocumentsPageController;
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\AdminPanelController;
+use App\Http\Controllers\Admin\ClinicDataReportController;
 use App\Http\Middleware\EnsureAdminAuthenticated;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\Admin\PostController;
@@ -147,6 +148,8 @@ Route::prefix('admin')->group(function () {
         Route::get('/doctors', [AdminPanelController::class, 'doctors'])->name('admin.doctors');
         Route::get('/online-doctors', [AdminPanelController::class, 'onlineDoctors'])->name('admin.online-doctors');
         Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
+        Route::get('/clinic-report', [ClinicDataReportController::class, 'index'])->name('admin.clinic-report');
+        Route::get('/clinic-report/export', [ClinicDataReportController::class, 'export'])->name('admin.clinic-report.export');
         Route::get('/bookings', [AdminPanelController::class, 'bookings'])->name('admin.bookings');
         Route::get('/analytics/video', [AdminPanelController::class, 'videoAnalytics'])->name('admin.analytics.video');
         Route::get('/analytics/pincode-heatmap', [AdminPanelController::class, 'pincodeHeatmap'])->name('admin.analytics.pincode-heatmap');
