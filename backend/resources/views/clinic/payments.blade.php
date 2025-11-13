@@ -12,6 +12,42 @@
   $totalPaise = (int) $transactions->sum('amount_paise');
   $totalInr   = $totalPaise / 100;
   $lastAt     = optional($transactions->first())->created_at;
+
+  $imageExtensions = ['jpg','jpeg','png','gif','bmp','webp','svg','heic','heif'];
+  $petDocLabels = [
+    'pet_doc1' => 'Pet Document 1',
+    'pet_doc2' => 'Pet Document 2',
+  ];
+
+  $normalizeDocumentUrl = function (?string $value) {
+    if (!$value) {
+      return null;
+    }
+    if (preg_match('#^https?://#i', $value) || str_starts_with($value, '//')) {
+      return $value;
+    }
+    $clean = ltrim($value, '/');
+    return url($clean);
+  };
+
+  $buildDocumentEntry = function (?string $path, string $label) use ($normalizeDocumentUrl, $imageExtensions) {
+    if (!$path) {
+      return null;
+    }
+    $url = $normalizeDocumentUrl($path);
+    $rawPath = $path;
+    $parsedPath = parse_url($rawPath, PHP_URL_PATH);
+    $ext = strtolower(pathinfo($parsedPath ?: $rawPath, PATHINFO_EXTENSION));
+    if ($ext === '' && str_contains($rawPath, '.')) {
+      $ext = strtolower(pathinfo($rawPath, PATHINFO_EXTENSION));
+    }
+    $isImage = in_array($ext, $imageExtensions, true);
+    return [
+      'label' => $label,
+      'url' => $url,
+      'is_image' => $isImage,
+    ];
+  };
 @endphp
 
 <div class="max-w-6xl mx-auto space-y-6">
@@ -53,10 +89,10 @@
             <th class="px-4 py-2">Status</th>
             <th class="px-4 py-2">Method</th>
             <th class="px-4 py-2">Doctor / Clinic</th>
-            <th class="px-4 py-2">Contact</th>
-            <th class="px-4 py-2">Email</th>
+            <th class="px-4 py-2">User & Summary</th>
+            <th class="px-4 py-2">Pet Details</th>
             <th class="px-4 py-2">Service</th>
-            <th class="px-4 py-2">Pets</th>
+            <th class="px-4 py-2">User Uploads</th>
           </tr>
         </thead>
         <tbody class="divide-y">
@@ -77,19 +113,29 @@
                 : '-';
               $clinicLabel = $doctor?->clinic?->name ?? '-';
               $user = $txn->user;
-              $contact = $user?->phone ?? data_get($txn->metadata, 'contact') ?? '-';
-              $email = $user?->email ?? '-';
               $serviceLabel = data_get($txn->metadata, 'service_name')
                 ?? data_get($txn->metadata, 'service')
                 ?? $txn->type
                 ?? '-';
               $petCollection = $user ? ($user->pets ?? collect()) : collect();
-              $petNames = $petCollection
-                ->pluck('name')
-                ->filter()
-                ->values()
-                ->implode(', ');
-              $petLabel = $petNames ?: '-';
+              $userDocuments = collect([
+                'pet_doc1' => $user?->pet_doc1,
+                'pet_doc2' => $user?->pet_doc2,
+              ])->map(function ($path, $key) use ($buildDocumentEntry, $petDocLabels) {
+                return $buildDocumentEntry($path, $petDocLabels[$key] ?? ucfirst(str_replace('_', ' ', $key)));
+              })->filter();
+              $petEntries = $petCollection->map(function ($pet) use ($petDocLabels, $buildDocumentEntry) {
+                $docEntries = collect([
+                  'pet_doc1' => $pet->pet_doc1,
+                  'pet_doc2' => $pet->pet_doc2,
+                ])->map(function ($path, $key) use ($petDocLabels, $buildDocumentEntry) {
+                  return $buildDocumentEntry($path, $petDocLabels[$key] ?? ucwords(str_replace('_',' ',$key)));
+                })->filter();
+                return [
+                  'pet' => $pet,
+                  'documents' => $docEntries,
+                ];
+              });
             @endphp
             <tr>
               <td class="px-4 py-2">{{ optional($txn->created_at)->timezone('Asia/Kolkata')->format('d M Y, h:i A') }}</td>
@@ -104,10 +150,57 @@
                 <div class="font-semibold">{{ $doctorName }}</div>
                 <div class="text-xs text-gray-500">{{ $clinicLabel }}</div>
               </td>
-              <td class="px-4 py-2">{{ $contact }}</td>
-              <td class="px-4 py-2">{{ $email }}</td>
+              <td class="px-4 py-2 space-y-1">
+                <div class="font-semibold">{{ $user?->name ?? data_get($txn->metadata, 'user_name') ?? '-' }}</div>
+                <div class="text-xs text-gray-500">{{ $user?->summary ?? data_get($txn->metadata, 'user_summary') ?? 'No summary available' }}</div>
+              </td>
+              <td class="px-4 py-2 space-y-2">
+                @if($petEntries->isEmpty())
+                  <div class="text-xs text-gray-500">No pet data</div>
+                @else
+                  @foreach($petEntries as $entry)
+                    @php
+                      $pet = $entry['pet'];
+                      $petName = $pet->name ?: ('Pet #'.$pet->id);
+                      $petDetails = collect([
+                        $pet->type ? $pet->type : null,
+                        $pet->breed ? 'Breed: '.$pet->breed : null,
+                        $pet->pet_gender ? 'Gender: '.$pet->pet_gender : null,
+                        $pet->pet_age ? 'Age: '.$pet->pet_age : null,
+                      ])->filter()->implode(' · ');
+                    @endphp
+                    <div class="border border-gray-100 rounded-lg p-2 bg-gray-50 space-y-1">
+                      <div class="font-semibold">{{ $petName }}</div>
+                      <div class="text-xs text-gray-500">{{ $petDetails ?: 'Details not available' }}</div>
+                      <div class="text-xs text-blue-600 space-x-2">
+                        @if($entry['documents']->isEmpty())
+                          <span class="text-gray-400">No pet docs uploaded</span>
+                        @else
+                          @foreach($entry['documents'] as $doc)
+                            <a href="{{ $doc['url'] }}" target="_blank" rel="noreferrer" class="underline">{{ $doc['label'] }}</a>
+                          @endforeach
+                        @endif
+                      </div>
+                    </div>
+                  @endforeach
+                @endif
+              </td>
               <td class="px-4 py-2">{{ $serviceLabel }}</td>
-              <td class="px-4 py-2">{{ $petLabel }}</td>
+              <td class="px-4 py-2">
+                @if($userDocuments->isEmpty())
+                  <span class="text-xs text-gray-400">No uploads</span>
+                @else
+                  <div class="flex gap-2 flex-wrap">
+                    @foreach($userDocuments as $doc)
+                      @if($doc['is_image'])
+                        <img src="{{ $doc['url'] }}" alt="{{ $doc['label'] }}" class="w-16 h-16 object-cover rounded border border-gray-200">
+                      @else
+                        <span class="text-xs text-blue-600 underline">{{ $doc['label'] }}</span>
+                      @endif
+                    @endforeach
+                  </div>
+                @endif
+              </td>
             </tr>
           @empty
             <tr>
