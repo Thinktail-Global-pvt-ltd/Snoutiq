@@ -468,6 +468,41 @@
       return callUrlFromPayload(payload);
     }
 
+    function appendUrlQueryParam(url, key, value){
+      if (!url) return null;
+      if (typeof url !== 'string') return url;
+      try {
+        const base = window.location?.origin || window.location?.href;
+        if (!base) return url;
+        const parsed = new URL(url, base);
+        if (value == null) {
+          parsed.searchParams.delete(key);
+        } else {
+          parsed.searchParams.set(key, value);
+        }
+        return parsed.href;
+      } catch (_err) {
+        return url;
+      }
+    }
+
+    function resolveRejoinUrl(payload){
+      if (!payload) return null;
+      const directCandidates = [
+        payload?.rejoinUrl,
+        payload?.rejoin_url,
+        payload?.doctorRejoinUrl,
+        payload?.doctor_rejoin_url,
+      ];
+      for (const candidate of directCandidates) {
+        if (typeof candidate === 'string' && candidate.trim()) {
+          return candidate.trim();
+        }
+      }
+      const fallback = resolveDoctorJoinUrl(payload);
+      return appendUrlQueryParam(fallback, 'rejoin', '1');
+    }
+
     function resolvePaymentUrl(payload){
       const directCandidates = [
         payload?.patientPaymentUrl,
@@ -591,6 +626,7 @@
       if (info.callIdentifier) payload.callIdentifier = info.callIdentifier;
       if (info.doctorJoinUrl) payload.doctorJoinUrl = info.doctorJoinUrl;
       if (info.patientPaymentUrl) payload.patientPaymentUrl = info.patientPaymentUrl;
+      if (info.rejoinUrl) payload.rejoinUrl = info.rejoinUrl;
       if (info.doctorId && !payload.doctorId) payload.doctorId = info.doctorId;
       if (info.patientId && !payload.patientId) payload.patientId = info.patientId;
       if (info.channelName && !payload.channel) payload.channel = info.channelName;
@@ -602,6 +638,7 @@
           if (info.callIdentifier) globalCall.callIdentifier = info.callIdentifier;
           if (info.doctorJoinUrl) globalCall.doctorJoinUrl = info.doctorJoinUrl;
           if (info.patientPaymentUrl) globalCall.patientPaymentUrl = info.patientPaymentUrl;
+          if (info.rejoinUrl) globalCall.rejoinUrl = info.rejoinUrl;
           if (info.doctorId && !globalCall.doctorId) globalCall.doctorId = info.doctorId;
           if (info.patientId && !globalCall.patientId) globalCall.patientId = info.patientId;
           if (info.channelName && !globalCall.channel) globalCall.channel = info.channelName;
@@ -623,9 +660,9 @@
           /* swallow render issues */
         }
         const doctorRow = container.querySelector('[data-role="doctor-link"]');
-        const paymentRow = container.querySelector('[data-role="payment-link"]');
+        const rejoinRow = container.querySelector('[data-role="rejoin-link"]');
         populateLinkRow(doctorRow, info.doctorJoinUrl || resolveDoctorJoinUrl(globalCall), 'Doctor Join Link');
-        populateLinkRow(paymentRow, info.patientPaymentUrl || resolvePaymentUrl(globalCall), 'Payment Page');
+        populateLinkRow(rejoinRow, info.rejoinUrl || resolveRejoinUrl(globalCall), 'Rejoin Link');
       } catch (err) {
         console.warn('[snoutiq-call] failed to update active call links', err);
       }
@@ -674,11 +711,13 @@
           callIdentifier: data?.call_identifier ?? session?.call_identifier ?? callId,
           doctorJoinUrl: data?.doctor_join_url ?? session?.doctor_join_url ?? null,
           patientPaymentUrl: data?.patient_payment_url ?? session?.patient_payment_url ?? null,
+          rejoinUrl: data?.doctor_rejoin_url ?? session?.doctor_rejoin_url ?? null,
           doctorId: data?.doctor_id ?? session?.doctor_id ?? (!Number.isNaN(doctorId) ? doctorId : null),
           patientId: data?.patient_id ?? session?.patient_id ?? patientId,
           channelName: data?.channel_name ?? session?.channel_name ?? channel,
           accepted: (data?.status ?? session?.status) === 'accepted',
         };
+        info.rejoinUrl = info.rejoinUrl || resolveRejoinUrl(info);
         callSessionCache.set(callId, info);
         applySessionInfoToPayload(payload, info);
         updateActiveCallLinks(info);
@@ -793,11 +832,11 @@
           .snoutiq-incoming-call{
             border-radius:24px!important;
             padding:0!important;
-            background:#0f172a!important;
-            box-shadow:0 40px 120px -20px rgba(0,0,0,.9),0 2px 80px 0 rgba(15,23,42,.8)!important;
+            background:#fff!important;
+            box-shadow:0 35px 60px -10px rgba(15,23,42,.25),0 16px 30px -12px rgba(15,23,42,.2)!important;
             font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;
-            color:#f8fafc!important;
-            border:1px solid rgba(148,163,184,.2);
+            color:#0f172a!important;
+            border:1px solid rgba(148,163,184,.35);
             overflow:hidden;
           }
           .snoutiq-incoming-call .swal2-title{display:none!important;}
@@ -810,21 +849,20 @@
             padding:16px 20px 20px!important;
             display:flex!important;
             gap:12px!important;
-            background:rgba(15,23,42,.6);
-            border-top:1px solid rgba(148,163,184,.15);
-            backdrop-filter:blur(12px);
+            background:#f8fafc;
+            border-top:1px solid rgba(226,232,240,.8);
+            backdrop-filter:none;
           }
 
           .snoutiq-call-card{
             display:flex;
             flex-direction:column;
-            background:
-              radial-gradient(circle at -20% -10%,rgba(99,102,241,.35) 0%,transparent 60%),
-              radial-gradient(circle at 120% 20%,rgba(16,185,129,.25) 0%,transparent 60%),
-              radial-gradient(circle at 50% 120%,rgba(244,63,94,.2) 0%,transparent 60%),
-              #0f172a;
-            padding:20px 20px 12px;
-            gap:16px;
+            background:#fff;
+            padding:26px;
+            gap:18px;
+            border-radius:28px;
+            border:1px solid rgba(226,232,240,.8);
+            box-shadow:0 30px 70px -15px rgba(15,23,42,.3),0 5px 30px rgba(15,23,42,.15);
           }
 
           .snoutiq-call-top{
@@ -917,10 +955,9 @@
             font-size:12px;
             line-height:1.4;
             font-weight:500;
-            color:#f8fafc;
-            background:rgba(30,41,59,.6);
-            border:1px solid rgba(148,163,184,.28);
-            box-shadow:0 12px 32px -8px rgba(0,0,0,.9);
+            color:#0f172a;
+            background:#f1f5f9;
+            border:1px solid #e2e8f0;
             padding:6px 10px;
             border-radius:10px;
             word-break:break-all;
@@ -940,12 +977,11 @@
           }
 
           .snoutiq-section-card{
-            background:rgba(15,23,42,.6);
-            border:1px solid rgba(148,163,184,.18);
-            border-radius:14px;
-            padding:12px 14px 10px;
-            box-shadow:0 30px 80px -20px rgba(0,0,0,.8),0 0 120px rgba(96,165,250,.15) inset;
-            backdrop-filter:blur(10px);
+            background:#f8fafc;
+            border:1px solid #e2e8f0;
+            border-radius:18px;
+            padding:14px 16px;
+            box-shadow:0 20px 35px -15px rgba(15,23,42,.15);
           }
           .snoutiq-section-head{
             display:flex;
@@ -962,7 +998,7 @@
             font-size:11px;
             line-height:1.2;
             font-weight:600;
-            color:#94a3b8;
+            color:#475569;
             text-transform:uppercase;
             letter-spacing:.14em;
           }
@@ -970,14 +1006,14 @@
             font-size:10px;
             line-height:1.2;
             font-weight:500;
-            color:#38bdf8;
+            color:#64748b;
             text-transform:uppercase;
             letter-spacing:.12em;
           }
           .snoutiq-section-status{
             font-size:12px;
             line-height:1.5;
-            color:#fda4af;
+            color:#0f172a;
             font-weight:500;
           }
 
@@ -987,7 +1023,7 @@
             gap:6px;
             font-size:13px;
             line-height:1.55;
-            color:#e2e8f0;
+            color:#0f172a;
           }
           .snoutiq-line{
             position:relative;
@@ -1002,16 +1038,16 @@
             width:4px;
             height:4px;
             border-radius:9999px;
-            background:#475569;
+            background:#cbd5e1;
           }
           .snoutiq-strong{
             font-weight:600;
-            color:#fff;
+            color:#0f172a;
           }
           .snoutiq-lines-empty{
             font-size:12px;
             font-weight:400;
-            color:#64748b;
+            color:#94a3b8;
           }
 
           .snoutiq-links-wrap{
@@ -1025,19 +1061,20 @@
             align-items:flex-start;
             justify-content:space-between;
             gap:12px;
-            background:rgba(15,23,42,.4);
-            border:1px solid rgba(148,163,184,.22);
-            border-radius:12px;
-            padding:10px 12px;
-            transition:all .18s ease;
+            background:#fff;
+            border:1px solid #e2e8f0;
+            border-radius:14px;
+            padding:12px 14px;
+            transition:all .15s ease;
+            box-shadow:0 10px 25px rgba(15,23,42,.08);
           }
           .snoutiq-link-row:not(.is-disabled):hover{
-            border-color:rgba(129,140,248,.6);
-            box-shadow:0 26px 60px -22px rgba(59,130,246,.8);
-            background:rgba(30,41,59,.6);
+            border-color:#cbd5e1;
+            box-shadow:0 18px 35px rgba(15,23,42,.12);
           }
           .snoutiq-link-row.is-disabled{
-            opacity:.5;
+            opacity:.7;
+            box-shadow:none;
           }
 
           .snoutiq-link-main{
@@ -1048,14 +1085,14 @@
           .snoutiq-link-label{
             font-size:10px;
             font-weight:600;
-            color:#f8fafc;
+            color:#475569;
             text-transform:uppercase;
             letter-spacing:.12em;
           }
           .snoutiq-link-value{
             font-size:12px;
             line-height:1.4;
-            color:#94a3b8;
+            color:#0f172a;
             font-family:'JetBrains Mono','Fira Mono',ui-monospace,monospace;
             word-break:break-all;
             max-width:220px;
@@ -1072,13 +1109,14 @@
             font-size:12px;
             font-weight:600;
             line-height:1.2;
-            color:#38bdf8;
-            background:rgba(8,51,68,.6);
-            border:1px solid rgba(56,189,248,.4);
+            color:#0f172a;
+            background:#fff;
+            border:1px solid #cbd5e1;
             border-radius:8px;
             padding:6px 10px;
             min-width:60px;
             text-align:center;
+            box-shadow:0 6px 16px rgba(15,23,42,.08);
           }
           .snoutiq-link-open[aria-disabled="true"]{
             opacity:.4;
@@ -1570,9 +1608,9 @@
       }
 
       const doctorLinkRow = container.querySelector('[data-role="doctor-link"]');
-      const paymentLinkRow = container.querySelector('[data-role="payment-link"]');
+      const rejoinLinkRow = container.querySelector('[data-role="rejoin-link"]');
       populateLinkRow(doctorLinkRow, resolveDoctorJoinUrl(payload), 'Doctor Join Link');
-      populateLinkRow(paymentLinkRow, resolvePaymentUrl(payload), 'Payment Page');
+      populateLinkRow(rejoinLinkRow, resolveRejoinUrl(payload), 'Rejoin Link');
 
       return patientId;
     }
@@ -1667,9 +1705,9 @@
                     </div>
                   </div>
 
-                  <div class="snoutiq-link-row is-disabled" data-role="payment-link">
+                  <div class="snoutiq-link-row is-disabled" data-role="rejoin-link">
                     <div class="snoutiq-link-main">
-                      <span class="snoutiq-link-label" data-role="link-label">Payment Page</span>
+                      <span class="snoutiq-link-label" data-role="link-label">Rejoin Link</span>
                       <span class="snoutiq-link-value" data-role="link-value">Not available yet</span>
                     </div>
                     <div class="snoutiq-link-actions">
