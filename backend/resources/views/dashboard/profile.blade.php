@@ -106,6 +106,27 @@
           </button>
         @endif
       </div>
+      <div class="mt-6 rounded-2xl border border-white/20 bg-white/10 p-4 text-center space-y-3">
+        <p class="text-xs uppercase tracking-wide text-white/70">Registered vet QR</p>
+        <p id="clinic-qr-status" class="text-sm text-white/80">Scan to visit your SnoutIQ clinic profile.</p>
+        <div class="flex justify-center">
+          <img
+            id="clinic-qr-image"
+            src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+            alt="Clinic QR code"
+            class="h-32 w-32 rounded-xl bg-white/20 object-cover transition-opacity duration-200 opacity-40"
+          />
+        </div>
+        <a
+          id="clinic-qr-link"
+          href="#"
+          target="_blank"
+          rel="noreferrer noopener"
+          class="text-xs font-semibold text-white/90 opacity-50 pointer-events-none transition-opacity duration-200"
+        >
+          Clinic page not yet available
+        </a>
+      </div>
     </div>
   </div>
 
@@ -229,6 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
     clinicId: Number(appEl?.dataset?.clinicId || '') || null,
     doctorId: Number(appEl?.dataset?.doctorId || '') || null,
   };
+  const CLINIC_WEB_PAGE_BASE = 'https://snoutiq.com/backend/vets';
+  const QR_SERVICE_BASE = 'https://api.qrserver.com/v1/create-qr-code/';
 
   const els = {
     clinicName: document.getElementById('clinic-name'),
@@ -241,6 +264,9 @@ document.addEventListener('DOMContentLoaded', () => {
     clinicForm: document.getElementById('clinic-form'),
     clinicEditPill: document.getElementById('clinic-edit-pill'),
     refreshBtn: document.getElementById('refresh-profile'),
+    clinicQrImage: document.getElementById('clinic-qr-image'),
+    clinicQrLink: document.getElementById('clinic-qr-link'),
+    clinicQrStatus: document.getElementById('clinic-qr-status'),
     doctorGrid: document.getElementById('doctor-grid'),
     doctorEmpty: document.getElementById('doctor-empty'),
     doctorCount: document.getElementById('doctor-count'),
@@ -269,6 +295,49 @@ document.addEventListener('DOMContentLoaded', () => {
     if (Number.isNaN(num)) return formatValue(value);
     return `₹${num.toLocaleString('en-IN')}`;
   }
+
+  function buildClinicPageUrl(slug) {
+    if (!slug) return '';
+    const trimmed = String(slug).trim();
+    if (!trimmed) return '';
+    return `${CLINIC_WEB_PAGE_BASE}/${encodeURIComponent(trimmed)}`;
+  }
+
+  function buildQrImageUrl(pageUrl) {
+    if (!pageUrl) return '';
+    return `${QR_SERVICE_BASE}?size=220x220&margin=12&data=${encodeURIComponent(pageUrl)}`;
+  }
+
+  function updateClinicQr(slug) {
+    const pageUrl = buildClinicPageUrl(slug);
+    const hasPageUrl = Boolean(pageUrl);
+    if (els.clinicQrStatus) {
+      els.clinicQrStatus.textContent = hasPageUrl
+        ? 'Scan to visit your clinic on SnoutIQ.'
+        : 'QR becomes available once your clinic page is published.';
+    }
+    if (els.clinicQrLink) {
+      if (hasPageUrl) {
+        els.clinicQrLink.href = pageUrl;
+        els.clinicQrLink.textContent = 'View clinic page';
+      } else {
+        els.clinicQrLink.removeAttribute('href');
+        els.clinicQrLink.textContent = 'Clinic page not yet available';
+      }
+      els.clinicQrLink.classList.toggle('opacity-50', !hasPageUrl);
+      els.clinicQrLink.classList.toggle('pointer-events-none', !hasPageUrl);
+    }
+    if (els.clinicQrImage) {
+      if (hasPageUrl) {
+        els.clinicQrImage.src = buildQrImageUrl(pageUrl);
+      } else {
+        els.clinicQrImage.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+      }
+      els.clinicQrImage.classList.toggle('opacity-40', !hasPageUrl);
+    }
+  }
+
+  updateClinicQr(null);
 
   function toggleClinicForm(disabled) {
     const inputs = els.clinicForm?.querySelectorAll('input, textarea, button[type="submit"]') || [];
@@ -397,6 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
       editableDoctorIds = Array.isArray(data?.editable?.doctor_ids) ? data.editable.doctor_ids.map(Number) : [];
       toggleClinicForm(!clinicEditable);
       fillClinicSummary(data.clinic || null);
+      updateClinicQr(data.clinic?.slug);
       fillClinicForm(data.clinic || null);
       if (els.clinicId && data.clinic_id) {
         els.clinicId.textContent = data.clinic_id;

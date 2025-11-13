@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
@@ -35,5 +36,10 @@ class User extends Authenticatable
     public function callSessions()
     {
         return $this->hasMany(CallSession::class, 'patient_id');
+    }
+
+    public function pets(): HasMany
+    {
+        return $this->hasMany(Pet::class);
     }
 }

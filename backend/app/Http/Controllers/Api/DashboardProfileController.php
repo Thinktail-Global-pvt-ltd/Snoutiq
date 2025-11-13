@@ -87,6 +87,7 @@ class DashboardProfileController extends Controller
             'bio',
             'hospital_profile',
             'employee_id',
+            'slug',
         ];
     }
 

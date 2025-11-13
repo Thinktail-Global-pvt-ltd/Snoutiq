@@ -12,7 +12,7 @@ use App\Http\Controllers\Admin\AdminOnboardingStatusPageController;
 use App\Http\Controllers\Admin\AdminVideoSlotOverviewController;
 use App\Models\Doctor;
 use App\Models\VetRegisterationTemp;
-use App\Models\Payment;
+use App\Models\Transaction;
 use App\Http\Middleware\EnsureSessionUser;
 use App\Http\Controllers\VideoSchedulePageController;
 use App\Http\Controllers\VideoScheduleTestPageController;
@@ -374,7 +374,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
 
     // Clinic order history (aggregates bookings across doctors of this clinic)
     Route::view('/clinic/orders', 'clinic.order-history')->name('clinic.orders');
-    // Clinic payments view (lists Razorpay payments linked via vet_slug in notes)
+    // Clinic payments view (lists transactions tied to this veterinary clinic)
     Route::get('/clinic/payments', function () {
         $sessionRole = session('role')
             ?? data_get(session('auth_full'), 'role')
@@ -418,15 +418,39 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
             $slug = $vet?->slug;
         }
 
-        $payments = Payment::query()
-            ->when($slug, function ($q) use ($slug) {
-                $q->where('notes->vet_slug', $slug);
-            })
-            ->orderByDesc('created_at')
-            ->limit(300)
-            ->get();
+        $clinicId = null;
+        $clinicCandidates = [
+            session('clinic_id'),
+            data_get(session('user'), 'clinic_id'),
+            data_get(session('auth_full'), 'clinic_id'),
+        ];
+        foreach ($clinicCandidates as $candidate) {
+            $num = (int) $candidate;
+            if ($num > 0) {
+                $clinicId = $num;
+                break;
+            }
+        }
 
-        return view('clinic.payments', compact('payments','vet','slug','vetId'));
+        $transactions = collect();
+        if ($vetId || $clinicId) {
+            $transactionsQuery = Transaction::query()
+                ->with(['doctor.clinic', 'clinic', 'user.pets'])
+                ->orderByDesc('created_at')
+                ->limit(300);
+
+            if ($vetId) {
+                $transactionsQuery->whereHas('doctor', function ($q) use ($vetId) {
+                    $q->where('vet_registeration_id', $vetId);
+                });
+            } elseif ($clinicId) {
+                $transactionsQuery->where('clinic_id', $clinicId);
+            }
+
+            $transactions = $transactionsQuery->get();
+        }
+
+        return view('clinic.payments', compact('transactions','vet','slug','vetId'));
     })->name('clinic.payments');
 
     // Booking payments from bookings table (filtered by this clinic)
