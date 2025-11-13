@@ -89,10 +89,9 @@
             <th class="px-4 py-2">Status</th>
             <th class="px-4 py-2">Method</th>
             <th class="px-4 py-2">Doctor / Clinic</th>
-            <th class="px-4 py-2">User & Summary</th>
+            <th class="px-4 py-2">User</th>
             <th class="px-4 py-2">Pet Details</th>
             <th class="px-4 py-2">Service</th>
-            <th class="px-4 py-2">User Uploads</th>
           </tr>
         </thead>
         <tbody class="divide-y">
@@ -150,9 +149,19 @@
                 <div class="font-semibold">{{ $doctorName }}</div>
                 <div class="text-xs text-gray-500">{{ $clinicLabel }}</div>
               </td>
+              @php
+                $userName = $user?->name ?? data_get($txn->metadata, 'user_name') ?? '-';
+                $summaryText = $user?->summary ?? data_get($txn->metadata, 'user_summary');
+              @endphp
               <td class="px-4 py-2 space-y-1">
-                <div class="font-semibold">{{ $user?->name ?? data_get($txn->metadata, 'user_name') ?? '-' }}</div>
-                <div class="text-xs text-gray-500">{{ $user?->summary ?? data_get($txn->metadata, 'user_summary') ?? 'No summary available' }}</div>
+                <div class="font-semibold">{{ $userName }}</div>
+                <button
+                  type="button"
+                  data-summary="{{ e($summaryText ?? 'Summary not available') }}"
+                  class="text-xs text-indigo-600 hover:text-indigo-700 focus:outline-none focus:underline"
+                >
+                  View Summary
+                </button>
               </td>
               <td class="px-4 py-2 space-y-2">
                 @if($petEntries->isEmpty())
@@ -186,21 +195,6 @@
                 @endif
               </td>
               <td class="px-4 py-2">{{ $serviceLabel }}</td>
-              <td class="px-4 py-2">
-                @if($userDocuments->isEmpty())
-                  <span class="text-xs text-gray-400">No uploads</span>
-                @else
-                  <div class="flex gap-2 flex-wrap">
-                    @foreach($userDocuments as $doc)
-                      @if($doc['is_image'])
-                        <img src="{{ $doc['url'] }}" alt="{{ $doc['label'] }}" class="w-16 h-16 object-cover rounded border border-gray-200">
-                      @else
-                        <span class="text-xs text-blue-600 underline">{{ $doc['label'] }}</span>
-                      @endif
-                    @endforeach
-                  </div>
-                @endif
-              </td>
             </tr>
           @empty
             <tr>
@@ -212,4 +206,57 @@
     </div>
   </div>
 </div>
+<div
+  id="summary-modal"
+  class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+  aria-hidden="true"
+>
+  <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6 relative">
+    <button
+      type="button"
+      class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 focus:outline-none"
+      data-summary-close
+    >
+      ×
+    </button>
+    <h3 class="text-lg font-semibold mb-4">Patient Summary</h3>
+    <p id="summary-modal-text" class="text-sm text-gray-700 whitespace-pre-line"></p>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var modal = document.getElementById('summary-modal');
+    if (!modal) {
+      return;
+    }
+    var textEl = document.getElementById('summary-modal-text');
+    var closeBtn = modal.querySelector('[data-summary-close]');
+    var openButtons = document.querySelectorAll('button[data-summary]');
+
+    function closeModal() {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      textEl.textContent = '';
+    }
+
+    function openModal(summary) {
+      textEl.textContent = summary || 'Summary not available';
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    openButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openModal(btn.dataset.summary);
+      });
+    });
+
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (event) {
+      if (event.target === modal) {
+        closeModal();
+      }
+    });
+  });
+</script>
 @endsection
