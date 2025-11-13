@@ -433,19 +433,15 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         }
 
         $transactions = collect();
-        if ($vetId || $clinicId) {
+        $preferredVetId = $vetId ?: $clinicId;
+        if ($preferredVetId) {
             $transactionsQuery = Transaction::query()
-            ->with(['doctor.clinic', 'user.pets'])
+                ->with(['doctor.clinic', 'user.pets'])
                 ->orderByDesc('created_at')
-                ->limit(300);
-
-            if ($vetId) {
-                $transactionsQuery->whereHas('doctor', function ($q) use ($vetId) {
-                    $q->where('vet_registeration_id', $vetId);
+                ->limit(300)
+                ->whereHas('doctor', function ($q) use ($preferredVetId) {
+                    $q->where('vet_registeration_id', $preferredVetId);
                 });
-            } elseif ($clinicId) {
-                $transactionsQuery->where('clinic_id', $clinicId);
-            }
 
             $transactions = $transactionsQuery->get();
         }
