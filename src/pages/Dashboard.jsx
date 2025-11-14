@@ -54,6 +54,8 @@ const Dashboard = () => {
   const typingTimeouts = useRef(new Map());
   const isAutoScrolling = useRef(false);
   const [nearbyDoctors, setNearbyDoctors] = useState([]);
+  console.log(nearbyDoctors,"ankit");
+  
 
   // NEW: last decision/score shown in the Pet Profile bar
   const [lastDecision, setLastDecision] = useState(null);
