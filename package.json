@@ -22,6 +22,7 @@
     "agora-token": "^2.0.5",
     "axios": "^1.13.2",
     "chart.js": "^4.5.0",
+    "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
     "heroicons": "^2.2.0",
     "laravel-echo": "^2.2.0",

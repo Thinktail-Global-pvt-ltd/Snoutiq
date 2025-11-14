@@ -807,25 +807,52 @@
 //   );
 // }
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { socket } from "./socket";
+import {
+  requestFcmToken,
+  subscribeToForegroundMessages,
+} from "../lib/firebaseMessaging";
 
 export default function DoctorDashboard({ doctorId = 501 }) {
   const [incomingCalls, setIncomingCalls] = useState([]);
   const [isOnline, setIsOnline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [debugLogs, setDebugLogs] = useState([]);
+  const [pushStatus, setPushStatus] = useState("idle");
+  const [pushError, setPushError] = useState(null);
   const navigate = useNavigate();
   const hasSetUpListeners = useRef(false);
+  const pushTokenRef = useRef(null);
 
   // Add debug log function
-  const addDebugLog = (message) => {
+  const addDebugLog = useCallback((message) => {
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = `${timestamp}: ${message}`;
     console.log(logEntry);
-    setDebugLogs(prev => [...prev.slice(-9), logEntry]); // Keep last 10 logs
-  };
+    setDebugLogs((prev) => [...prev.slice(-9), logEntry]); // Keep last 10 logs
+  }, []);
+
+  const registerPushTokenWithServer = useCallback(
+    (token) => {
+      if (!token || !doctorId) {
+        return;
+      }
+
+      if (!socket.connected) {
+        addDebugLog(
+          "Socket offline, will send push token after reconnecting to server"
+        );
+        return;
+      }
+
+      addDebugLog("Sending push token to socket server");
+      socket.emit("register-push-token", { doctorId, pushToken: token });
+      setPushStatus("token-sent");
+    },
+    [addDebugLog, doctorId]
+  );
 
   // Join doctor room function
   const joinDoctorRoom = () => {
@@ -848,6 +875,71 @@ export default function DoctorDashboard({ doctorId = 501 }) {
       }
     }, 3000);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchPushToken = async () => {
+      if (!doctorId) {
+        return;
+      }
+
+      setPushStatus("requesting");
+
+      try {
+        const token = await requestFcmToken();
+        if (!token || cancelled) {
+          return;
+        }
+
+        pushTokenRef.current = token;
+        setPushError(null);
+        setPushStatus("token-generated");
+        addDebugLog(`[FCM] Token generated ${token.substring(0, 10)}...`);
+        registerPushTokenWithServer(token);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        const message =
+          error?.message || "Unable to generate Firebase Cloud Messaging token";
+        addDebugLog(`[FCM] Token error: ${message}`);
+        setPushError(message);
+        setPushStatus(
+          message.toLowerCase().includes("permission")
+            ? "permission-denied"
+            : "error"
+        );
+      }
+    };
+
+    fetchPushToken();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addDebugLog, doctorId, registerPushTokenWithServer]);
+
+  useEffect(() => {
+    let unsubscribe = () => {};
+
+    subscribeToForegroundMessages((payload) => {
+      addDebugLog(`[FCM] Foreground notification: ${JSON.stringify(payload)}`);
+    })
+      .then((unsub) => {
+        unsubscribe = unsub;
+      })
+      .catch((error) => {
+        addDebugLog(`[FCM] Failed to attach listener: ${error.message}`);
+      });
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [addDebugLog]);
 
   useEffect(() => {
     if (hasSetUpListeners.current) {
@@ -873,6 +965,9 @@ export default function DoctorDashboard({ doctorId = 501 }) {
       addDebugLog("✅ Socket connected successfully");
       setConnectionStatus("connected");
       joinDoctorRoom();
+      if (pushTokenRef.current) {
+        registerPushTokenWithServer(pushTokenRef.current);
+      }
     };
 
     const handleDisconnect = () => {
@@ -919,6 +1014,24 @@ export default function DoctorDashboard({ doctorId = 501 }) {
       });
     };
 
+    const handlePushTokenRegistered = (payload) => {
+      if (Number(payload?.doctorId) !== Number(doctorId)) {
+        return;
+      }
+
+      if (payload?.success) {
+        addDebugLog("[FCM] Push token registered on server");
+        setPushStatus("registered");
+        setPushError(null);
+      } else {
+        const message = payload?.message || "Failed to register push token";
+        addDebugLog(` [FCM] Push token registration failed: ${message}`);
+        setPushStatus("error");
+        setPushError(message);
+      }
+    };
+
+
     // Error handling events
     const handleJoinError = (error) => {
       addDebugLog(`❌ Error joining doctor room: ${error.message}`);
@@ -940,6 +1053,7 @@ export default function DoctorDashboard({ doctorId = 501 }) {
     socket.on("doctor-offline", handleDoctorOffline);
     socket.on("call-requested", handleCallRequested);
     socket.on("join-error", handleJoinError);
+    socket.on("push-token-registered", handlePushTokenRegistered);
 
     // Listen to ALL socket events for debugging
     socket.onAny(handleAnyEvent);
@@ -962,6 +1076,7 @@ export default function DoctorDashboard({ doctorId = 501 }) {
       socket.off("doctor-offline", handleDoctorOffline);
       socket.off("call-requested", handleCallRequested);
       socket.off("join-error", handleJoinError);
+      socket.off("push-token-registered", handlePushTokenRegistered);
       socket.off("server-status");
       socket.offAny(handleAnyEvent);
       
@@ -1154,6 +1269,12 @@ export default function DoctorDashboard({ doctorId = 501 }) {
           <div>Is Online: {isOnline.toString()}</div>
           <div>Connection Status: {connectionStatus}</div>
           <div>Incoming Calls: {incomingCalls.length}</div>
+          <div>Push Token Status: {pushStatus}</div>
+          {pushError ? (
+            <div style={{ color: "#dc2626", fontSize: 12 }}>
+              Last Push Error: {pushError}
+            </div>
+          ) : null}
         </div>
         
         <div style={{ marginBottom: 12 }}>
