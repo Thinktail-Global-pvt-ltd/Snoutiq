@@ -1,5 +1,8 @@
 import { getMessaging, getToken, isSupported, onMessage } from "firebase/messaging";
-import { getFirebaseApp, firebaseConfig } from "../../firebaseConfig";
+
+
+import { getFirebaseApp, firebaseConfig } from "../config/firebaseConfig";
+
 
 let messagingSetupPromise = null;
 
