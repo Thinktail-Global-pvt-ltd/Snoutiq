@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\RazorpayController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
+use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Http\Controllers\Api\DashboardProfileController;
@@ -38,6 +39,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AgoraController;
 use App\Http\Controllers\Api\CallController as ApiCallController; // handles lightweight requestCall
 use App\Http\Controllers\CallController as CoreCallController;    // handles sessions + token
+use App\Http\Controllers\Api\CallRecordingController;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
@@ -167,6 +169,10 @@ Route::post('/call/{id}/accept', [CoreCallController::class, 'acceptCall'])->whe
 Route::post('/call/{id}/payment-success', [CoreCallController::class, 'paymentSuccess'])->whereNumber('id');
 Route::post('/call/{id}/start', [CoreCallController::class, 'markStarted'])->whereNumber('id');
 Route::post('/call/{id}/end', [CoreCallController::class, 'markEnded'])->whereNumber('id');
+Route::post('/call/{id}/recordings/start', [CallRecordingController::class, 'start'])->whereNumber('id');
+Route::post('/call/{id}/recordings/stop', [CallRecordingController::class, 'stop'])->whereNumber('id');
+Route::get('/call/{id}/recordings/status', [CallRecordingController::class, 'status'])->whereNumber('id');
+Route::post('/call/{id}/recordings/transcript', [CallRecordingController::class, 'requestTranscript'])->whereNumber('id');
 Route::post('/internal/doctor-call-alert', [\App\Http\Controllers\Api\DoctorNotificationController::class, 'pendingCall']);
 
 Route::get('/users', [AdminController::class, 'getUsers']);
@@ -230,6 +236,8 @@ Route::get('/test-cors', function (Request $request) {
 
 Route::get('/chats', [GeminiChatController::class, 'history']); 
 Route::post('/contact-request', [ContactRequestController::class, 'store']);
+Route::post('/referrals/download', [ReferralController::class, 'sendDownloadLink'])->name('api.referrals.download');
+Route::get('/referrals/{code}', [ReferralController::class, 'showByCode'])->name('api.referrals.lookup');
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
 Route::post('/chat/send', [GeminiChatController::class, 'sendMessage']);
 Route::get('/chat/listRooms', [GeminiChatController::class, 'listRooms']);

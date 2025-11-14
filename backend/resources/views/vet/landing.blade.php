@@ -217,6 +217,9 @@ label{font-size:.9rem;color:#334155}
       @php $clinicPhone = $vet->mobile ?? null; @endphp
       <a class="btn btn-outline" href="https://snoutiq.com/backend/custom-doctor-login"><i class="fa-solid fa-phone"></i> Call Clinic</a>
       <a class="btn btn-outline" id="video-consult-btn" href="https://snoutiq.com/backend/custom-doctor-login"><i class="fa-solid fa-video"></i> Start Video Consult</a>
+      <button class="btn btn-primary" type="button" id="download-app-btn">
+        <i class="fa-solid fa-download"></i> Download App
+      </button>
     </div>
   </header>
 
@@ -470,6 +473,9 @@ label{font-size:.9rem;color:#334155}
   <script>
   (function() {
     const vetSlug = @json($vet->slug);
+    const downloadEndpoint = @json(route('api.referrals.download'));
+    const downloadBtn = document.getElementById('download-app-btn');
+    const appDownloadLink = 'https://snoutiq.com/download';
 
     function loginRedirect(prefill = "") {
       try { if (prefill) localStorage.setItem("pendingChatQuestion", prefill); } catch(_) {}
@@ -490,6 +496,90 @@ label{font-size:.9rem;color:#334155}
     };
     document.getElementById('clinic-ask-send')?.addEventListener('click', ()=> sendAsk('clinic-ask-input'));
     document.getElementById('clinic-ask-input')?.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); sendAsk('clinic-ask-input'); }});
+
+    downloadBtn?.addEventListener('click', openDownloadModal);
+
+    async function openDownloadModal() {
+      if (typeof Swal === 'undefined') {
+        window.open(appDownloadLink, '_blank');
+        return;
+      }
+
+      const { value: formValues } = await Swal.fire({
+        title: 'Get the SnoutIQ App',
+        html: `
+          <div style="display:flex;flex-direction:column;gap:.75rem;text-align:left">
+            <label>
+              <span style="display:block;font-size:.85rem;margin-bottom:.35rem;color:#475569">Name</span>
+              <input id="snq-ref-name" class="swal2-input" placeholder="Pet parent name" style="margin:0">
+            </label>
+            <label>
+              <span style="display:block;font-size:.85rem;margin-bottom:.35rem;color:#475569">Email</span>
+              <input id="snq-ref-email" type="email" class="swal2-input" placeholder="name@example.com" style="margin:0">
+            </label>
+            <label>
+              <span style="display:block;font-size:.85rem;margin-bottom:.35rem;color:#475569">WhatsApp (optional)</span>
+              <input id="snq-ref-phone" class="swal2-input" placeholder="+91 98765 43210" style="margin:0">
+            </label>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Send me the app',
+        focusConfirm: false,
+        preConfirm: () => {
+          const name = (document.getElementById('snq-ref-name')?.value || '').trim();
+          const email = (document.getElementById('snq-ref-email')?.value || '').trim();
+          const phone = (document.getElementById('snq-ref-phone')?.value || '').trim();
+          if (!name || !email) {
+            Swal.showValidationMessage('Name and email are required.');
+            return false;
+          }
+          return { name, email, phone };
+        }
+      });
+
+      if (!formValues) return;
+
+      await submitDownloadRequest(formValues);
+    }
+
+    async function submitDownloadRequest(payload) {
+      try {
+        const response = await fetch(downloadEndpoint, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...payload,
+            vet_slug: vetSlug || null,
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const message = data?.message || 'Unable to send the download email right now.';
+          throw new Error(message);
+        }
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Check your inbox',
+          html: `
+            <p style="margin-bottom:12px">We emailed you the SnoutIQ download link${data?.referral_code ? ' along with your referral code.' : '.'}</p>
+            ${data?.referral_code ? `<div style="font-weight:700;font-size:1.5rem;letter-spacing:0.2em;margin-bottom:12px">${data.referral_code}</div>` : ''}
+            <a href="${appDownloadLink}" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600">Download the app now</a>
+          `,
+        });
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Something went wrong',
+          text: err?.message || 'Unable to send the email right now.',
+        });
+      }
+    }
   })();
   </script>
 

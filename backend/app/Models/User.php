@@ -12,7 +12,7 @@ class User extends Authenticatable
     use Notifiable;
 
     protected $fillable = [
-        'name','email','phone','role','password',
+        'name','email','phone','role','referral_code','last_vet_slug','last_vet_id','password',
         'pet_name','pet_gender','pet_age','pet_doc1','pet_doc2',
         'api_token_hash','summary','google_token','breed','latitude','longitude',
         'qr_scanner_id',
