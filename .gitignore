@@ -24,7 +24,6 @@ dist-ssr
 *.sln
 *.sw?
 serviceAccountKey.json
-socket-server/serviceAccountKey.json
 snoutiqapp-*.json
 google-services.json
 firebaseConfig.js
