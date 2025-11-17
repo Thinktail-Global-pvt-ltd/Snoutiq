@@ -383,12 +383,17 @@
 
 // export default App;
 
-import React, { lazy, Suspense } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import React, { lazy, Suspense, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+} from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import { FaPaw } from "react-icons/fa";
-import RegisterPetOwner from "./pages/RegisterPetOwner";
+import { RegistrationProvider } from "./auth/RegistrationContext";
 
 // Public pages
 const Login = lazy(() => import("./pages/Login"));
@@ -400,16 +405,15 @@ const Cancelation = lazy(() => import("./policies/Cancelation"));
 const CookiePolicy = lazy(() => import("./policies/CookiePolicy"));
 const MedicalDataConsent = lazy(() => import("./policies/MedicalDataConsent"));
 const ShippingPolicy = lazy(() => import("./policies/ShippingPolicy"));
-
-import PatientDashboard from "./pages/PatientDashboard";
-import DoctorDashboard from "./pages/DoctorDashboard";
-import CallTestPage from "./pages/CallTestPage";
-import RegisterPassword from "./pages/RegisterPetPassword";
-import RegisterPetDetails from "./pages/RegisterPetOwner";
-import { RegistrationProvider } from "./auth/RegistrationContext";
+const RegisterPetOwner = lazy(() => import("./pages/RegisterPetOwner"));
+const PatientDashboard = lazy(() => import("./pages/PatientDashboard"));
+const DoctorDashboard = lazy(() => import("./pages/DoctorDashboard"));
+const CallTestPage = lazy(() => import("./pages/CallTestPage"));
+const RegisterPassword = lazy(() => import("./pages/RegisterPetPassword"));
 
 // Core app pages
-const Home = lazy(() => import("./pages/Home"));
+// const Home = lazy(() => import("./pages/Home"));
+import Home from "./pages/Home";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const PetInfo = lazy(() => import("./PetDashboard/PetInfo"));
 const EditPet = lazy(() => import("./PetDashboard/EditPet"));
@@ -447,7 +451,42 @@ const PetMedicationTracker = lazy(() =>
   import("./PetDashboard/PetMedicationTracker")
 );
 const CallPage = lazy(() => import("../src/pages/CallTestPage"));
+const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
+// App.js mein yeh component replace karo:
 
+const ScrollToTopAndHash = () => {
+  const { pathname, hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+
+    const elementId = hash.replace("#", "");
+    const headerOffset =
+      document.querySelector("header")?.getBoundingClientRect().height ?? 0;
+
+    const scrollIntoView = () => {
+      const target = document.getElementById(elementId);
+      if (!target) return;
+
+      const top =
+        window.scrollY +
+        target.getBoundingClientRect().top -
+        (headerOffset + 16);
+
+      window.scrollTo({
+        top: Math.max(0, top),
+        behavior: "smooth",
+      });
+    };
+
+    requestAnimationFrame(scrollIntoView);
+  }, [pathname, hash]);
+
+  return null;
+};
 import SuperAdminLogin from "./admin/SuperAdminLogin";
 import AuthenticatedUserRedirect from "./auth/AuthenticatedUserRedirect";
 import DoctorWaitingRoom from "./VetDashboard/DoctorWaitingRoom";
@@ -457,11 +496,19 @@ import Blog from "./blog/Blog";
 import DogWinterCareGuide from "./blog/DogWinterCareGuide";
 import TickFeverGuide from "./blog/TickFeverGuide";
 import PetPawProtecteGuide from "./blog/PetPawProtecteGuide";
+import PricingPage from "./pages/PricingPage";
+import DelhiPage from "./pages/DelhiPage";
+import GurugramPage from "./pages/GurugramPage";
+import ClinicsSolutionPage from "./pages/ClinicsSolutionPage";
+import FeaturesPage from "./pages/FeaturesPage";
+import VideoConsultPage from "./pages/VideoConsultPage";
+import AITriagePage from "./pages/AITriagePage";
 const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
   return (
     <Router>
+      <ScrollToTopAndHash />
       <Toaster
         position="top-center"
         containerStyle={{
@@ -494,7 +541,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route
               path="/register-pet-details"
-              element={<RegisterPetDetails />}
+              element={<RegisterPetOwner />}
             />
             <Route
               path="/register-password"
@@ -810,6 +857,14 @@ function App() {
               path="/blog/protecting-pet-paws-in-winter-tips-guide"
               element={<PetPawProtecteGuide />}
             />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/delhi" element={<DelhiPage />} />
+            <Route path="/gurugram" element={<GurugramPage />} />
+            <Route path="/clinics-solution" element={<ClinicsSolutionPage />} />
+            <Route path="/features" element={<FeaturesPage />} />
+            <Route path="/video-consult" element={<VideoConsultPage />} />
+            <Route path="/ai-triage" element={<AITriagePage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </div>

@@ -1,176 +1,287 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
-import { useNavigate } from "react-router-dom";
+﻿import { Suspense, lazy } from 'react';
+import Hero from "./HeroSection";
+import FeatureCard from "../components/FeatureCard";
+import Benefits from "../components/Benefits";
 import Header from "../components/Header";
-import HeroSection from "./HeroSection";
 
-const ChatInput = lazy(() => import("../components/ChatInput"));
+const ClientLogos = lazy(() => import("../components/ClientLogos"));
+const PainPoints = lazy(() => import("../components/PainPoints"));
+const Workflow = lazy(() => import("../components/Workflow"));
+const CTA = lazy(() => import("../components/CTA"));
 const Footer = lazy(() => import("../components/Footer"));
 
-const Home = () => {
-  const navigate = useNavigate();
-  const [message, setMessage] = useState("");
-  const mainHeadingRef = React.useRef(null);
+import {
+  Video,
+  Brain,
+  Calendar,
+  MessageSquare,
+  UserCheck,
+  Smartphone,
+  BarChart3,
+  Shield,
+  Zap,
+  Users,
+  Timer,
+  CheckCircle,
+} from "lucide-react";
 
-  useEffect(() => {
-    const stored = localStorage.getItem("messageIntended");
-    if (stored) setMessage(stored);
-    if (mainHeadingRef.current) {
-      mainHeadingRef.current.style.contentVisibility = "auto";
-    }
-  }, []);
+const FEATURES = [
+  {
+    icon: Video,
+    title: "HD Video Consultations",
+    description:
+      "Connect pet owners with veterinarians through crystal-clear video calls. Diagnose, prescribe, and follow-up remotely with ease.",
+    link: "/video-consult",
+  },
+  {
+    icon: Brain,
+    title: "AI-Powered Triage",
+    description:
+      "Smart symptom analysis that prioritizes urgent cases and routes pets to the right specialist automatically.",
+    link: "/ai-triage",
+  },
+  {
+    icon: Calendar,
+    title: "Smart Scheduling",
+    description:
+      "Automated appointment booking with intelligent reminders that reduce no-shows by up to 70%.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Secure Messaging",
+    description:
+      "HIPAA-compliant chat system for follow-ups, medication reminders, and post-care instructions.",
+  },
+  {
+    icon: BarChart3,
+    title: "Analytics Dashboard",
+    description:
+      "Real-time insights into clinic performance, patient outcomes, and revenue optimization.",
+  },
+  {
+    icon: Shield,
+    title: "Medical Records",
+    description:
+      "Cloud-based EMR system with secure storage, instant access, and seamless sharing capabilities.",
+  },
+];
 
-  const handleSendMessage = (msg) => {
-    if (msg?.trim()) {
-      localStorage.setItem("messageIntended", msg);
-      navigate("/register");
-    }
-  };
+const BENEFITS = [
+  {
+    icon: Zap,
+    title: "Streamline Patient Flow",
+    description:
+      "Reduce wait times and optimize clinic operations with intelligent scheduling",
+  },
+  {
+    icon: Timer,
+    title: "Save Admin Time",
+    description:
+      "Automate repetitive tasks and focus on what matters: patient care",
+  },
+  {
+    icon: Users,
+    title: "Boost Client Satisfaction",
+    description:
+      "Delight pet owners with convenient video consultations and quick responses",
+  },
+  {
+    icon: CheckCircle,
+    title: "Easy Onboarding",
+    description:
+      "Get started in minutes with our intuitive platform and dedicated support",
+  },
+];
 
-  const features = useMemo(
-    () => [
-      {
-        icon: "✅",
-        title: "24/7 Pet Care Support",
-        description: "Instant answers anytime, anywhere",
-      },
-      {
-        icon: "👩‍⚕️",
-        title: "Personalized Pet Plans",
-        description: "Tailored advice for your pet",
-      },
-      {
-        icon: "🐾",
-        title: "Behavior Training Tips",
-        description: "Train and bond with your pet",
-      },
-    ],
-    []
-  );
+const PAIN_POINTS = [
+  {
+    problem:
+      "Long wait times frustrate pet owners and reduce clinic efficiency",
+    solution:
+      "Instant video consultations eliminate waiting rooms and streamline care delivery",
+  },
+  {
+    problem:
+      "Emergency cases get mixed with routine check-ups causing delays",
+    solution:
+      "AI triage automatically prioritizes urgent cases and routes to specialists",
+  },
+  {
+    problem:
+      "No-shows waste valuable appointment slots and reduce revenue",
+    solution:
+      "Smart reminders and easy rescheduling cut no-shows by 70%",
+  },
+  {
+    problem:
+      "Manual paperwork slows down operations and increases errors",
+    solution:
+      "Digital records and automated workflows save 10+ hours per week",
+  },
+];
 
+const WORKFLOW_STEPS = [
+  {
+    number: 1,
+    title: "Pet Owner Books",
+    description:
+      "Owner enters symptoms and books appointment through mobile app or website",
+    icon: Smartphone,
+  },
+  {
+    number: 2,
+    title: "AI Analyzes",
+    description:
+      "Smart triage system evaluates urgency and recommends appropriate care level",
+    icon: Brain,
+  },
+  {
+    number: 3,
+    title: "Vet Consults",
+    description:
+      "Veterinarian reviews case and conducts HD video consultation",
+    icon: Video,
+  },
+  {
+    number: 4,
+    title: "Follow-Up Care",
+    description:
+      "Automated reminders, prescriptions, and progress tracking ensure recovery",
+    icon: UserCheck,
+  },
+];
+
+// Simple loading component
+const SectionLoader = () => (
+  <div className="py-12 flex justify-center items-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+  </div>
+);
+
+const LazySection = ({ children }) => (
+  <Suspense fallback={<SectionLoader />}>{children}</Suspense>
+);
+
+function Home() {
   return (
     <>
       <Header />
-      <HeroSection />
-      <main className="min-h-screen bg-gradient-to-b from-white to-blue-50 flex flex-col">
-        <div className="flex-1 flex flex-col px-4 py-8 max-w-6xl mx-auto w-full">
-          {/* Hero */}
-          {/* <section className="text-center py-12 md:py-20">
-            <div className="inline-flex items-center justify-center mb-4 bg-blue-100 text-blue-800 rounded-full px-4 py-2 text-sm font-medium">
-              🐶 AI-Powered Pet Care Assistant
-            </div>
-            <h1
-              ref={mainHeadingRef}
-              className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight min-h-[3.5rem] sm:min-h-[4rem] md:min-h-[5rem]"
-            >
-              SnoutIQ - Your AI Pet Companion for{" "}
-              <span className="text-blue-600">Smart Pet Care</span>
-            </h1>
+      <main id="main-content" className="bg-white">
+        {/* Above the fold - load immediately */}
+        <Hero
+          badge="Trusted by Veterinary Professionals"
+          title="Transform Your Veterinary Practice with AI-Powered Care"
+          subtitle="Streamline consultations, reduce no-shows, and deliver exceptional pet care with SnoutIQ's intelligent platform."
+          ctaPrimary={{ text: "Start Free Trial", href: "/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing" }}
+          ctaSecondary={{ text: "Book a Live Demo", href: "https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform?usp=sharing&ouid=100613985134578372936" }}
+        />
 
-            <p className="text-lg sm:text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
-              Intelligent pet care guidance, health advice, and training tips
-              powered by advanced AI technology
-            </p>
+        <Benefits
+          benefits={BENEFITS}
+          variant="default"
+          eyebrow="Outcomes that matter"
+          title="From first symptom to lasting loyalty"
+          description="SnoutIQ removes the chaos between triage, consultation, and follow-up so your team stays focused on care."
+          id="benefits"
+        />
 
-       
-            <div className="max-w-xl mx-auto mb-16">
-              <div className="bg-white rounded-2xl shadow-lg p-1 border border-gray-200">
-                <Suspense
-                  fallback={
-                    <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-200 h-20">
-                      <div className="animate-pulse text-gray-300">
-                        Loading chat…
-                      </div>
-                    </div>
-                  }
-                >
-                  <ChatInput onSendMessage={handleSendMessage} />
-                </Suspense>
-              </div>
-              <p className="text-sm text-gray-500 mt-3">
-                Ask anything about your pet's health, behavior, or training
+        {/* Below the fold - lazy load */}
+        <LazySection>
+          <ClientLogos
+            eyebrow="Trusted by leading hospitals"
+            title="Partnering with forward-thinking veterinary clinics"
+            subtitle="High-growth independents, ER groups, and regional consolidators rely on SnoutIQ to deliver concierge-level client experiences."
+          />
+        </LazySection>
+
+        <section
+          id="features"
+          className="py-12 md:py-16 lg:py-20 bg-white"
+          aria-labelledby="features-heading"
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-8 md:mb-12 lg:mb-14">
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600 mb-3">
+                Platform overview
               </p>
-            </div>
-          </section> */}
-
-          <section
-            className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20"
-            style={{ minHeight: "200px" }}
-          >
-            {[
-              { value: "50+", label: "Registered Vets" },
-              { value: "24/7", label: "Fast, Easy, Available" },
-              { value: "Under 10", label: "Min Connect" },
-              { value: "AI System", label: "Check" },
-            ].map((stat, i) => (
-              <div
-                key={i}
-                className="text-center p-6 bg-[#DBEAFE] rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center min-w-[80px]"
-                style={{ minHeight: "160px" }}
+              <h2
+                id="features-heading"
+                className="text-3xl sm:text-4xl md:text-5xl font-bold text-slate-900 mb-4 md:mb-6 leading-tight"
               >
-                <div className="text-3xl font-bold text-blue-600 mb-2 h-8 flex items-center justify-center">
-                  {stat.value}
-                </div>
-                <div className="text-gray-600 h-6 flex items-center justify-center">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </section>
-
-          {/* Features */}
-          <section className="w-full mb-20">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                Why Pet Owners Love Us
+                Everything you need to{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+                  modernize your practice
+                </span>
               </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Advanced AI + veterinary expertise for the best pet care
+              <p className="text-lg sm:text-xl md:text-2xl text-slate-600 max-w-4xl mx-auto leading-relaxed">
+                A complete platform designed for modern veterinary clinics
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {features.map((f, idx) => (
-                <div
-                  key={idx}
-                  className="bg-blue-600 text-white rounded-2xl p-6 shadow-lg transform transition-all duration-300 hover:-translate-y-2"
-                >
-                  <div className="w-14 h-14 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mb-5 text-2xl">
-                    {f.icon}
-                  </div>
-                  <h3 className="text-xl font-bold mb-3">{f.title}</h3>
-                  <p className="text-blue-100 opacity-90">{f.description}</p>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+              {FEATURES.map((feature, index) => (
+                <FeatureCard
+                  key={feature.title}
+                  icon={feature.icon}
+                  title={feature.title}
+                  description={feature.description}
+                  link={feature.link}
+                  index={index}
+                  variant="gradient"
+                />
               ))}
             </div>
-          </section>
+          </div>
+        </section>
 
-          {/* CTA */}
-          <section className="text-center py-12 px-4 bg-blue-600 rounded-2xl text-white mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to Transform Your Pet's Life?
-            </h2>
-            <p className="text-lg text-blue-100 max-w-2xl mx-auto mb-8">
-              Join thousands of pet owners who trust our AI assistant
-            </p>
-            <button
-              onClick={() => navigate("/register")}
-              className="bg-white text-blue-600 font-semibold py-3 px-8 rounded-full hover:bg-gray-100 transition-colors duration-300 shadow-lg"
-            >
-              Get Started Now
-            </button>
-          </section>
-        </div>
+        <LazySection>
+          <PainPoints
+            id="pain-points"
+            eyebrow="Before and after SnoutIQ"
+            title="The Problems Facing Modern Vet Clinics"
+            subtitle="Traditional veterinary practices struggle with inefficiencies. SnoutIQ provides modern solutions."
+            painPoints={PAIN_POINTS}
+          />
+        </LazySection>
 
-        <Suspense
-          fallback={
-            <div className="h-40 bg-gray-50 border-t border-gray-200 animate-pulse" />
-          }
-        >
-          <Footer />
-        </Suspense>
+        <LazySection>
+          <Workflow
+            id="workflow"
+            eyebrow="How it works"
+            title="A simple, repeatable workflow from booking to follow-up"
+            subtitle="Give your clients a smooth digital experience while your team gets a clear, trackable process."
+            steps={WORKFLOW_STEPS}
+          />
+        </LazySection>
+
+        <LazySection>
+          <section
+            className="bg-gradient-to-br from-slate-50 to-blue-50"
+            aria-labelledby="cta-heading"
+          >
+            <CTA
+              id="cta"
+              eyebrow="Ready to modernize?"
+              title="Ready to Transform Your Veterinary Practice?"
+              subtitle="Join 500+ clinics already providing better care with SnoutIQ"
+              primaryButton={{ text: "Start Free Trial", href: "/pricing" }}
+              secondaryButton={{ text: "Talk to Our Team", href: "/contact" }}
+              variant="gradient"
+              bullets={[
+                "Launch in under two weeks",
+                "White-glove onboarding",
+                "Dedicated success manager",
+              ]}
+            />
+          </section>
+        </LazySection>
       </main>
+
+      <LazySection>
+        <Footer />
+      </LazySection>
     </>
   );
-};
+}
 
 export default Home;

@@ -1,398 +1,578 @@
-import React, { useState, useEffect, useContext, Fragment, lazy, Suspense } from "react";
-import { useNavigate } from "react-router-dom";
-import { Dialog, Transition } from "@headlessui/react";
-
-
-// ✅ Tree-shaking optimized imports
-import Bars3Icon from "@heroicons/react/24/outline/Bars3Icon";
-import XMarkIcon from "@heroicons/react/24/outline/XMarkIcon";
-import ChatBubbleLeftRightIcon from "@heroicons/react/24/outline/ChatBubbleLeftRightIcon";
-import UserIcon from "@heroicons/react/24/outline/UserIcon";
-import ArrowRightOnRectangleIcon from "@heroicons/react/24/outline/ArrowRightOnRectangleIcon";
-import HomeIcon from "@heroicons/react/24/outline/HomeIcon";
-import HeartIcon from "@heroicons/react/24/outline/HeartIcon";
-import BookOpenIcon from "@heroicons/react/24/outline/BookOpenIcon";
-
-const Sidebar = lazy(() => import("./Sidebar"));
-const RightSidebar = lazy(() => import("./RightSidebar"));
+﻿import React, {
+  useState,
+  useEffect,
+  useContext,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Bars3Icon,
+  XMarkIcon,
+  ChevronDownIcon,
+  UserIcon,
+  HomeIcon,
+  HeartIcon,
+  ArrowRightOnRectangleIcon,
+} from "@heroicons/react/24/outline";
 import logo from "../assets/images/logo.webp";
 import { AuthContext } from "../auth/AuthContext";
 
-const Header = () => {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState(false);
-  const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+const navItems = [
+  {
+    label: "Platform",
+    // href: "/#features",
+    description: "Telehealth, EMR, and payments in one secure stack",
+    dropdown: [
+      {
+        label: "Full Feature Overview",
+        description: "Explore everything SnoutIQ automates for care teams",
+        href: "/features",
+      },
+      {
+        label: "Video Consultation",
+        description: "Crystal clear HD visits with notes and screen share",
+        href: "/video-consult",
+      },
+      {
+        label: "AI Triage",
+        description: "Guide pet parents and flag emergencies automatically",
+        href: "/ai-triage",
+      },
+    ],
+  },
+  {
+    label: "Solutions",
+    href: "/clinics-solution",
+    description: "Built for single-site clinics and multi-location groups",
+  },
+  {
+    label: "Locations",
+    // href: "/#trusted-by",
+    description: "See the cities where SnoutIQ operates today",
+    dropdown: [
+      {
+        label: "Delhi NCR",
+        description: "Flagship coverage with 24/7 vet support",
+        href: "/delhi",
+      },
+      {
+        label: "Gurugram",
+        description: "Priority consultations for urban pet parents",
+        href: "/gurugram",
+      },
+      // {
+      //   label: "Bengaluru",
+      //   description: "Launching shortly - stay notified",
+      //   href: "/#trusted-by",
+      // },
+    ],
+  },
+  {
+    label: "Pricing",
+    href: "/pricing",
+    description: "Transparent plans with no surprise fees",
+  },
+  {
+    label: "Resources",
+    // href: "/blog",
+    description: "Guides and success stories for modern vet teams",
+    dropdown: [
+      {
+        label: "Blog Home",
+        description: "Product updates, guides, and customer stories",
+        href: "/blog",
+      },
+      {
+        label: "Reduce No-Shows",
+        description: "Framework for reliable appointment adherence",
+        href: "/blog/how-to-reduce-no-shows",
+      },
+      // {
+      //   label: "Tick Fever Guide",
+      //   description: "Shareable health education for pet parents",
+      //   href: "/blog/tick-fever",
+      // },
+    ],
+  },
+];
+
+const Header = React.memo(function Header() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [openMobileDropdown, setOpenMobileDropdown] = useState(null);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useContext(AuthContext);
+  const userDropdownRef = useRef(null);
 
-  const [isUserLoaded, setIsUserLoaded] = useState(false);
-
-  // ✅ Better logout (no full reload)
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate("/");
-  };
-
-  const handleBlog = () => navigate("/blog");
-  const handleLogin = () => navigate("/login");
-  const handleRegister = () => navigate("/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion");
-  const toggleDropdown = () => setIsDropdownOpen((prev) => !prev);
-
-  // ✅ Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!e.target.closest(".dropdown")) {
-        setIsDropdownOpen(false);
+    let ticking = false;
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        setIsScrolled(window.scrollY > 20);
+        ticking = false;
+      });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target)
+      ) {
+        setIsUserDropdownOpen(false);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleLogout = useCallback(() => {
+    localStorage.clear();
+    navigate("/");
+    setIsUserDropdownOpen(false);
+  }, [navigate]);
+
+  const handleLogin = useCallback(() => {
+    navigate("/login");
+  }, [navigate]);
+
+  const handleRegister = useCallback(() => {
+    navigate(
+      "/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing"
+    );
+  }, [navigate]);
+
+  const handleDashboard = useCallback(() => {
+    navigate("/dashboard");
+  }, [navigate]);
+
+  const handlePetInfo = useCallback(() => {
+    navigate("/pet-info");
+  }, [navigate]);
+
+  const toggleMobileDropdown = (label) => {
+    setOpenMobileDropdown((prev) => (prev === label ? null : label));
+  };
+
+  const dropdownMotion = useMemo(
+    () => ({
+      initial: { opacity: 0, y: 10, scale: 0.96 },
+      animate: { opacity: 1, y: 0, scale: 1 },
+      exit: { opacity: 0, y: 10, scale: 0.96 },
+    }),
+    []
+  );
+
+  const getHeaderOffset = useCallback(() => {
+    if (typeof document === "undefined") return 0;
+    const headerEl = document.querySelector("header");
+    if (headerEl) {
+      return headerEl.getBoundingClientRect().height + 16;
+    }
+    return 88;
+  }, []);
+
+  const smoothScrollToHash = useCallback((hash) => {
+    if (!hash) return;
+    const targetId = hash.replace("#", "");
+
+    let attempts = 0;
+    const maxAttempts = 12;
+
+    const scroll = () => {
+      const element = document.getElementById(targetId);
+      if (element) {
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
+        const offset = getHeaderOffset();
+        const targetPosition = Math.max(elementPosition - offset, 0);
+        window.scrollTo({
+          top: targetPosition,
+          behavior: "smooth",
+        });
+        return true;
+      }
+      return false;
+    };
+
+    if (scroll()) return;
+
+    const interval = setInterval(() => {
+      attempts++;
+      if (scroll() || attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+    }, 200);
+  }, [getHeaderOffset]);
+
+  const closeMenus = useCallback(() => {
+    setIsOpen(false);
+    setOpenDropdown(null);
+    setOpenMobileDropdown(null);
+  }, []);
+
+  const handleNavClick = useCallback(
+    (e, href) => {
+      if (!href) return;
+
+      const isExternal = href.startsWith("http");
+      const hasHash = href.includes("#");
+
+      if (isExternal) {
+        e?.preventDefault();
+        closeMenus();
+        window.open(href, "_blank", "noopener");
+        return;
+      }
+
+      if (hasHash) {
+        e?.preventDefault();
+        closeMenus();
+        const [path, hash] = href.split("#");
+        const cleanPath = path || "/";
+
+        if (location.pathname !== cleanPath) {
+          navigate(cleanPath, { replace: false });
+          setTimeout(() => smoothScrollToHash(`#${hash}`), 500);
+        } else {
+          setTimeout(() => smoothScrollToHash(`#${hash}`), 150);
+        }
+        return;
+      }
+
+      // Regular internal links rely on Link's default navigation
+      closeMenus();
+    },
+    [closeMenus, location.pathname, navigate, smoothScrollToHash]
+  );
+
   return (
-    <>
-      <nav className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 shadow-sm">
-        {/* Desktop Navbar */}
-        <div className="hidden md:flex items-center justify-between px-6 py-4 h-[70px]">
-          {/* Logo */}
-          <div className="flex items-center space-x-3">
-            <img
-              src={logo}
-              alt="SnoutIQ Logo"
-              loading="lazy"
-              className="h-5 cursor-pointer transition-transform hover:scale-105"
-              onClick={() => navigate(user ? "/dashboard" : "/")}
-            />
-          </div>
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? "bg-white/95 backdrop-blur-lg shadow-lg border-b border-gray-100"
+          : "bg-white/90 backdrop-blur-md border-b border-gray-100/50"
+      }`}
+    >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-1/2 focus:-translate-x-1/2 focus:px-4 focus:py-2 focus:rounded-full focus:bg-blue-600 focus:text-white focus:z-50"
+      >
+        Skip to main content
+      </a>
+      <nav aria-label="Primary navigation" className="relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 lg:h-20">
+            <Link
+              to={user ? "/dashboard" : "/"}
+              className="flex items-center space-x-3 group"
+            >
+              <img
+                src={logo}
+                alt="SnoutIQ logo"
+                loading="lazy"
+                className="h-6 w-auto transition-transform duration-200 group-hover:scale-105"
+              />
+            </Link>
 
-          {/* User Actions */}
-          <div className="flex items-center space-x-4 h-full">
-            {!user ? (
-              <>
-                {/* Blog Button for Non-logged in Users */}
-                <button
-                  onClick={handleBlog}
-                  className="text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:bg-blue-50 border border-transparent hover:border-blue-200"
+            <div className="hidden lg:flex items-center space-x-8">
+              {navItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="relative"
+                  onMouseEnter={() => item.dropdown && setOpenDropdown(item.label)}
+                  onMouseLeave={() => setOpenDropdown(null)}
                 >
-                  Blog
-                </button>
-                <button
-                  onClick={handleRegister}
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5"
-                >
-                  Register
-                </button>
-                <button
-                  onClick={handleLogin}
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5"
-                >
-                  Login
-                </button>
-              </>
-            ) : (
-              <div className="flex items-center space-x-4">
-                {/* Blog Button for Logged in Users */}
-                <button
-                  onClick={handleBlog}
-                  className="text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:bg-blue-50 border border-transparent hover:border-blue-200 flex items-center space-x-2"
-                >
-                  <BookOpenIcon className="w-4 h-4" />
-                  <span>Blog</span>
-                </button>
-
-                {/* User Dropdown */}
-                <div className="relative dropdown">
-                  <div
-                    className="bg-white rounded-lg px-4 py-3 flex items-center space-x-3 shadow-sm hover:shadow-md border border-gray-200 cursor-pointer"
-                    onClick={toggleDropdown}
+                  <Link
+                    to={item.href}
+                    className="flex items-center text-gray-700 hover:text-blue-600 font-medium transition-all duration-200 py-2 px-3 rounded-lg hover:bg-blue-50/50"
+                    onClick={(e) => handleNavClick(e, item.href)}
                   >
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                      <UserIcon className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="text-sm font-semibold text-gray-800">
-                        {user.name}
-                      </div>
-                      <div className="text-xs text-gray-500">Pet Owner</div>
-                    </div>
-                    <svg
-                      className={`w-4 h-4 text-gray-400 transition-transform ${
-                        isDropdownOpen ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
+                    <span className="text-sm tracking-tight">{item.label}</span>
+                    {item.dropdown && (
+                      <ChevronDownIcon
+                        className={`ml-1 w-4 h-4 transition-transform duration-200 ${
+                          openDropdown === item.label ? "rotate-180" : ""
+                        }`}
                       />
-                    </svg>
-                  </div>
+                    )}
+                  </Link>
 
-                  {isDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 border border-gray-200 z-50">
-                      <button
-                        onClick={() => navigate("/dashboard")}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                  <AnimatePresence>
+                    {item.dropdown && openDropdown === item.label && (
+                      <motion.div
+                        {...dropdownMotion}
+                        className="absolute top-full left-0 mt-1 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100/80 overflow-hidden ring-1 ring-black/5"
+                        role="menu"
+                        aria-label={`${item.label} menu`}
                       >
-                        <HomeIcon className="w-4 h-4 mr-2" />
-                        Dashboard
-                      </button>
-                      <button
-                        onClick={() => navigate("/pet-info")}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <HeartIcon className="w-4 h-4 mr-2" />
-                        My Pets
-                      </button>
-                      <button
-                        onClick={handleBlog}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <BookOpenIcon className="w-4 h-4 mr-2" />
-                        Blog
-                      </button>
-                      <button
-                        onClick={handleLogout}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
-                        Logout
-                      </button>
-                    </div>
-                  )}
+                        <div className="px-4 py-3 text-xs font-semibold text-blue-600 uppercase tracking-wide bg-blue-50/80">
+                          {item.description || item.label}
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {item.dropdown.map((dropItem) => (
+                            <Link
+                              key={dropItem.label}
+                              to={dropItem.href}
+                              className="flex flex-col px-4 py-3 text-left hover:bg-blue-50 transition-all duration-200"
+                              onClick={(e) => handleNavClick(e, dropItem.href)}
+                            >
+                              <span className="text-sm font-semibold text-slate-900">
+                                {dropItem.label}
+                              </span>
+                              {dropItem.description && (
+                                <span className="text-xs text-slate-500">
+                                  {dropItem.description}
+                                </span>
+                              )}
+                            </Link>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
+              ))}
+            </div>
 
-        {/* Mobile Navbar */}
-        <div className="md:hidden">
-          <div className="flex items-center justify-between px-4 py-3 h-[60px]">
-            {isUserLoaded && user && (
-              <Suspense fallback={<div>Loading menu...</div>}>
-                <button
-                  aria-label="Open menu"
-                  onClick={() => setIsLeftDrawerOpen(true)}
-                  className="p-2 rounded-lg bg-gray-100 hover:bg-indigo-50 transition-colors"
-                >
-                  <Bars3Icon className="w-6 h-6 text-gray-700" />
-                </button>
-              </Suspense>
-            )}
-
-            <img
-              src={logo}
-              alt="SnoutIQ Logo"
-              loading="lazy"
-              className="h-5 cursor-pointer transition-transform hover:scale-105"
-              onClick={() => navigate(user ? "/dashboard" : "/")}
-            />
-
-            <div className="flex items-center space-x-2">
-              {/* Blog Button for Mobile */}
-              <button
-                onClick={handleBlog}
-                className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center space-x-1"
-              >
-                <BookOpenIcon className="w-4 h-4" />
-                <span>Blog</span>
-              </button>
-
+            <div className="hidden lg:flex items-center space-x-4">
               {!user ? (
-                <div className="flex gap-1 flex-shrink-0">
-                  <button
-                    onClick={handleRegister}
-                    className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm"
-                  >
-                    Register
-                  </button>
+                <>
                   <button
                     onClick={handleLogin}
-                    className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm"
+                    className="px-6 py-2.5 text-sm font-semibold text-gray-700 hover:text-blue-600 transition-all duration-200 rounded-lg hover:bg-gray-50"
                   >
-                    Login
+                    Sign in
                   </button>
-                </div>
-              ) : (
-                <div className="relative dropdown">
-                  <div
-                    className="bg-white rounded-lg p-2 flex items-center shadow-sm hover:shadow-md border border-gray-200 cursor-pointer"
-                    onClick={toggleDropdown}
+                  <button
+                    onClick={handleRegister}
+                    className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-semibold rounded-xl hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 shadow-md"
                   >
-                    <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                      <UserIcon className="w-3 h-3 text-white" />
-                    </div>
-                  </div>
+                    Get Started
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center space-x-4">
+                  <div className="relative" ref={userDropdownRef}>
+                    <button
+                      onClick={() => setIsUserDropdownOpen((prev) => !prev)}
+                      className="flex items-center space-x-3 bg-white rounded-xl px-4 py-2.5 shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200"
+                      aria-haspopup="true"
+                      aria-expanded={isUserDropdownOpen}
+                    >
+                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center shadow-md">
+                        <UserIcon className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <span className="text-sm font-semibold text-gray-800">
+                          {user?.name || "User"}
+                        </span>
+                        <span className="text-xs text-gray-500">Pet Owner</span>
+                      </div>
+                      <ChevronDownIcon
+                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
+                          isUserDropdownOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
 
-                  {isDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 border border-gray-200 z-50">
-                      <button
-                        onClick={() => navigate("/dashboard")}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <HomeIcon className="w-4 h-4 mr-2" />
-                        Dashboard
-                      </button>
-                      <button
-                        onClick={() => navigate("/pet-info")}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <HeartIcon className="w-4 h-4 mr-2" />
-                        My Pets
-                      </button>
-                      <button
-                        onClick={handleBlog}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <BookOpenIcon className="w-4 h-4 mr-2" />
-                        Blog
-                      </button>
-                      <button
-                        onClick={handleLogout}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
-                        Logout
-                      </button>
-                    </div>
-                  )}
+                    <AnimatePresence>
+                      {isUserDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50"
+                          role="menu"
+                        >
+                          <button
+                            onClick={handleDashboard}
+                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200"
+                          >
+                            <HomeIcon className="w-4 h-4 mr-3" />
+                            Dashboard
+                          </button>
+                          <button
+                            onClick={handlePetInfo}
+                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200"
+                          >
+                            <HeartIcon className="w-4 h-4 mr-3" />
+                            My Pets
+                          </button>
+                          <div className="border-t border-gray-100 my-1" />
+                          <button
+                            onClick={handleLogout}
+                            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-all duration-200"
+                          >
+                            <ArrowRightOnRectangleIcon className="w-4 h-4 mr-3" />
+                            Logout
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
               )}
             </div>
+
+            <button
+              onClick={() => setIsOpen((prev) => !prev)}
+              className="lg:hidden p-2 rounded-lg text-gray-600 hover:text-blue-600 hover:bg-gray-100 transition-all duration-200"
+              aria-label="Toggle navigation"
+            >
+              {isOpen ? (
+                <XMarkIcon className="w-6 h-6" />
+              ) : (
+                <Bars3Icon className="w-6 h-6" />
+              )}
+            </button>
           </div>
         </div>
+
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="lg:hidden bg-white border-t border-gray-200 shadow-lg"
+            >
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+                {navItems.map((item) => (
+                  <div
+                    key={item.label}
+                    className="border-b border-gray-100 pb-2 last:border-b-0"
+                  >
+                    {!item.dropdown ? (
+                      <Link
+                        to={item.href}
+                        className="block py-3 text-gray-700 hover:text-blue-600 font-medium transition-colors text-lg"
+                        onClick={(e) => handleNavClick(e, item.href)}
+                      >
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleMobileDropdown(item.label)}
+                          className="flex items-center justify-between w-full py-3 text-gray-700 hover:text-blue-600 font-medium transition-colors text-lg"
+                          aria-expanded={openMobileDropdown === item.label}
+                        >
+                          <span>{item.label}</span>
+                          <ChevronDownIcon
+                            className={`w-5 h-5 transform transition-transform ${
+                              openMobileDropdown === item.label
+                                ? "rotate-180"
+                                : ""
+                            }`}
+                          />
+                        </button>
+                        {openMobileDropdown === item.label && (
+                          <div className="pl-4 mt-2 space-y-2 border-l-2 border-gray-100">
+                            {item.dropdown.map((dropItem) => (
+                              <Link
+                                key={dropItem.label}
+                                to={dropItem.href}
+                                className="block py-2 text-gray-600 hover:text-blue-600 transition-colors text-sm"
+                                onClick={(e) => handleNavClick(e, dropItem.href)}
+                              >
+                                <span className="font-semibold block">
+                                  {dropItem.label}
+                                </span>
+                                {dropItem.description && (
+                                  <span className="text-xs text-slate-500">
+                                    {dropItem.description}
+                                  </span>
+                                )}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+
+                <div className="pt-4 space-y-3 border-t border-gray-200">
+                  {!user ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          handleLogin();
+                          setIsOpen(false);
+                        }}
+                        className="block w-full py-3 text-center text-gray-700 font-medium border border-gray-300 rounded-xl hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
+                      >
+                        Sign in
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleRegister();
+                          setIsOpen(false);
+                        }}
+                        className="block w-full py-3 text-center bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium rounded-xl hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 shadow-md"
+                      >
+                        Get Started
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          handleDashboard();
+                          setIsOpen(false);
+                        }}
+                        className="flex items-center w-full py-3 px-4 text-gray-700 font-medium border border-gray-300 rounded-xl hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
+                      >
+                        <HomeIcon className="w-5 h-5 mr-3" />
+                        Dashboard
+                      </button>
+                      <button
+                        onClick={() => {
+                          handlePetInfo();
+                          setIsOpen(false);
+                        }}
+                        className="flex items-center w-full py-3 px-4 text-gray-700 font-medium border border-gray-300 rounded-xl hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
+                      >
+                        <HeartIcon className="w-5 h-5 mr-3" />
+                        My Pets
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setIsOpen(false);
+                        }}
+                        className="flex items-center w-full py-3 px-4 text-red-600 font-medium border border-red-200 rounded-xl hover:border-red-500 hover:bg-red-50 transition-all duration-200"
+                      >
+                        <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" />
+                        Logout
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
-
-      {/* Left Sidebar Drawer */}
-      <Transition.Root show={isLeftDrawerOpen} as={Fragment}>
-        <Dialog
-          as="div"
-          className="relative z-50"
-          onClose={setIsLeftDrawerOpen}
-        >
-          <Transition.Child
-            as={Fragment}
-            enter="ease-in-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-1"
-            leave="ease-in-out duration-300"
-            leaveFrom="opacity-1"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-hidden">
-            <div className="absolute inset-0 overflow-hidden">
-              <div className="pointer-events-none fixed inset-y-0 left-0 flex max-w-full pr-10">
-                <Transition.Child
-                  as={Fragment}
-                  enter="transform transition ease-in-out duration-300"
-                  enterFrom="-translate-x-full"
-                  enterTo="translate-x-0"
-                  leave="transform transition ease-in-out duration-300"
-                  leaveFrom="translate-x-0"
-                  leaveTo="-translate-x-full"
-                >
-                  <Dialog.Panel className="pointer-events-auto relative w-screen max-w-md">
-                    <div className="flex h-full flex-col overflow-y-auto bg-white shadow-xl">
-                      <div className="px-4 py-6 sm:px-6">
-                        <div className="flex items-start justify-between">
-                          <Dialog.Title className="text-lg font-semibold text-gray-900">
-                            Menu
-                          </Dialog.Title>
-                          <button
-                            type="button"
-                            className="rounded-md p-2 text-gray-400 hover:text-gray-500"
-                            onClick={() => setIsLeftDrawerOpen(false)}
-                          >
-                            <XMarkIcon className="h-6 w-6" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="relative flex-1 px-4 sm:px-6">
-                        <Suspense fallback={<div>Loading...</div>}>
-                          <Sidebar />
-                        </Suspense>
-                      </div>
-                    </div>
-                  </Dialog.Panel>
-                </Transition.Child>
-              </div>
-            </div>
-          </div>
-        </Dialog>
-      </Transition.Root>
-
-      {/* Right Sidebar Drawer */}
-      <Transition.Root show={isRightDrawerOpen} as={Fragment}>
-        <Dialog
-          as="div"
-          className="relative z-50"
-          onClose={setIsRightDrawerOpen}
-        >
-          <Transition.Child
-            as={Fragment}
-            enter="ease-in-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-1"
-            leave="ease-in-out duration-300"
-            leaveFrom="opacity-1"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-hidden">
-            <div className="absolute inset-0 overflow-hidden">
-              <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
-                <Transition.Child
-                  as={Fragment}
-                  enter="transform transition ease-in-out duration-300"
-                  enterFrom="translate-x-full"
-                  enterTo="translate-x-0"
-                  leave="transform transition ease-in-out duration-300"
-                  leaveFrom="translate-x-0"
-                  leaveTo="translate-x-full"
-                >
-                  <Dialog.Panel className="pointer-events-auto relative w-screen max-w-md">
-                    <div className="flex h-full flex-col overflow-y-auto bg-white shadow-xl">
-                      <div className="px-4 py-6 sm:px-6">
-                        <div className="flex items-start justify-between">
-                          <Dialog.Title className="text-lg font-semibold text-gray-900">
-                            Chat
-                          </Dialog.Title>
-                          <button
-                            type="button"
-                            className="rounded-md p-2 text-gray-400 hover:text-gray-500"
-                            onClick={() => setIsRightDrawerOpen(false)}
-                          >
-                            <XMarkIcon className="h-6 w-6" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="relative flex-1 px-4 sm:px-6">
-                        <Suspense fallback={<div>Loading chat...</div>}>
-                          <RightSidebar />
-                        </Suspense>
-                      </div>
-                    </div>
-                  </Dialog.Panel>
-                </Transition.Child>
-              </div>
-            </div>
-          </div>
-        </Dialog>
-      </Transition.Root>
-    </>
+    </header>
   );
-};
+});
 
 export default Header;

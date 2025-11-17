@@ -1,12 +1,12 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useCallback, lazy, Suspense } from "react";
 import { toast } from "react-hot-toast";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import Card from "../components/Card";
-import Header from "../components/Header";
 import logo from "../assets/images/logo.webp";
 import { AuthContext } from "../auth/AuthContext";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
+const Header = lazy(() => import("../components/Header"));
 
 // Background image for the right side
 const registerBackground =
@@ -46,55 +46,7 @@ const RegisterBasicDetails = () => {
   }, [userType, navigate]);
 
   // Enhanced location permission check
-  useEffect(() => {
-    const initializeLocation = async () => {
-      if (!navigator.geolocation) {
-        setLocationStatus("denied");
-        setLocationAllowed(false);
-        toast.error("Location services not supported in this browser");
-        return;
-      }
-
-      if (navigator.permissions) {
-        try {
-          const result = await navigator.permissions.query({
-            name: "geolocation",
-          });
-
-          if (result.state === "granted") {
-            setLocationStatus("granted");
-            requestLocation();
-          } else if (result.state === "denied") {
-            setLocationStatus("denied");
-            setLocationAllowed(false);
-            toast.error(
-              "Location access denied. Please enable in browser settings."
-            );
-          } else {
-            setLocationStatus("prompt");
-          }
-
-          result.addEventListener("change", () => {
-            if (result.state === "granted") {
-              requestLocation();
-            } else if (result.state === "denied") {
-              setLocationStatus("denied");
-              setLocationAllowed(false);
-            }
-          });
-        } catch (error) {
-          console.error("Error checking permissions:", error);
-          setLocationStatus("prompt");
-        }
-      } else {
-        setLocationStatus("prompt");
-      }
-    };
-
-    initializeLocation();
-  }, []);
-
-  const requestLocation = () => {
+  const requestLocation = useCallback(() => {
     setLocationStatus("checking");
 
     const options = {
@@ -136,7 +88,64 @@ const RegisterBasicDetails = () => {
       },
       options
     );
-  };
+  }, []);
+
+  const initializeLocation = useCallback(async () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocationStatus("denied");
+      setLocationAllowed(false);
+      toast.error("Location services not supported in this browser");
+      return null;
+    }
+
+    if (!navigator.permissions) {
+      setLocationStatus("prompt");
+      return null;
+    }
+
+    try {
+      const result = await navigator.permissions.query({
+        name: "geolocation",
+      });
+
+      const handlePermissionChange = () => {
+        if (result.state === "granted") {
+          setLocationStatus("granted");
+          requestLocation();
+        } else if (result.state === "denied") {
+          setLocationStatus("denied");
+          setLocationAllowed(false);
+        } else {
+          setLocationStatus("prompt");
+        }
+      };
+
+      handlePermissionChange();
+      result.addEventListener("change", handlePermissionChange);
+
+      return () => result.removeEventListener("change", handlePermissionChange);
+    } catch (error) {
+      console.error("Error checking permissions:", error);
+      setLocationStatus("prompt");
+      return null;
+    }
+  }, [requestLocation]);
+
+  useEffect(() => {
+    let cleanupPermission;
+    const timeout = window.setTimeout(() => {
+      initializeLocation().then((cleanup) => {
+        cleanupPermission = cleanup;
+      });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      if (typeof cleanupPermission === "function") {
+        cleanupPermission();
+      }
+    };
+  }, [initializeLocation]);
 
   const handleLocationRequest = () => {
     if (locationStatus === "denied") {
@@ -393,7 +402,9 @@ const RegisterBasicDetails = () => {
 
   return (
     <>
-      <Header />
+      <Suspense fallback={<div className="h-16 w-full bg-white/80" />}>
+        <Header />
+      </Suspense>
       <div className="min-h-screen bg-white flex mt-12">
         {/* Left Side - Registration Form */}
         <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-8 lg:px-16 xl:px-24 bg-gradient-to-br from-slate-50 to-blue-50/30 ">

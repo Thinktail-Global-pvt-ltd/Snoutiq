@@ -1,11 +1,11 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useCallback, lazy, Suspense } from "react";
 import { toast, Toaster } from "react-hot-toast";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import axios from "../axios";
 import logo from "../assets/images/logo.webp";
 import { AuthContext } from "../auth/AuthContext";
-import Header from "../components/Header";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
+const Header = lazy(() => import("../components/Header"));
 
 // Background image - you can replace this with your actual image
 const loginBackground = "https://images.unsplash.com/photo-1543466835-00a7907e9de1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1974&q=80";
@@ -31,55 +31,7 @@ const Login = () => {
   const { user, login } = useContext(AuthContext);
 
   // Enhanced location permission check
-  useEffect(() => {
-    const initializeLocation = async () => {
-      if (!navigator.geolocation) {
-        setLocationStatus("denied");
-        setLocationAllowed(false);
-        toast.error("Location services not supported in this browser");
-        return;
-      }
-
-      if (navigator.permissions) {
-        try {
-          const result = await navigator.permissions.query({
-            name: "geolocation",
-          });
-
-          if (result.state === "granted") {
-            setLocationStatus("granted");
-            requestLocation();
-          } else if (result.state === "denied") {
-            setLocationStatus("denied");
-            setLocationAllowed(false);
-            toast.error(
-              "Location access denied. Please enable in browser settings."
-            );
-          } else {
-            setLocationStatus("prompt");
-          }
-
-          result.addEventListener("change", () => {
-            if (result.state === "granted") {
-              requestLocation();
-            } else if (result.state === "denied") {
-              setLocationStatus("denied");
-              setLocationAllowed(false);
-            }
-          });
-        } catch (error) {
-          console.error("Error checking permissions:", error);
-          setLocationStatus("prompt");
-        }
-      } else {
-        setLocationStatus("prompt");
-      }
-    };
-
-    initializeLocation();
-  }, []);
-
-  const requestLocation = () => {
+  const requestLocation = useCallback(() => {
     setLocationStatus("checking");
 
     const options = {
@@ -121,7 +73,64 @@ const Login = () => {
       },
       options
     );
-  };
+  }, []);
+
+  const initializeLocation = useCallback(async () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocationStatus("denied");
+      setLocationAllowed(false);
+      toast.error("Location services not supported in this browser");
+      return null;
+    }
+
+    if (!navigator.permissions) {
+      setLocationStatus("prompt");
+      return null;
+    }
+
+    try {
+      const result = await navigator.permissions.query({
+        name: "geolocation",
+      });
+
+      const handlePermissionChange = () => {
+        if (result.state === "granted") {
+          setLocationStatus("granted");
+          requestLocation();
+        } else if (result.state === "denied") {
+          setLocationStatus("denied");
+          setLocationAllowed(false);
+        } else {
+          setLocationStatus("prompt");
+        }
+      };
+
+      handlePermissionChange();
+      result.addEventListener("change", handlePermissionChange);
+
+      return () => result.removeEventListener("change", handlePermissionChange);
+    } catch (error) {
+      console.error("Error checking permissions:", error);
+      setLocationStatus("prompt");
+      return null;
+    }
+  }, [requestLocation]);
+
+  useEffect(() => {
+    let cleanupPermission;
+    const timeout = window.setTimeout(() => {
+      initializeLocation().then((cleanup) => {
+        cleanupPermission = cleanup;
+      });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      if (typeof cleanupPermission === "function") {
+        cleanupPermission();
+      }
+    };
+  }, [initializeLocation]);
 
   const handleCustom = () => {
   window.location.assign('https://snoutiq.com/backend/custom-doctor-login');
@@ -408,7 +417,9 @@ const Login = () => {
 
   return (
     <>
-      <Header />
+      <Suspense fallback={<div className="h-16 w-full bg-white/80" />}>
+        <Header />
+      </Suspense>
       <div className="min-h-screen bg-white flex mt-12">
         {/* Left Side - Brand Section */}
         <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-blue-900 to-indigo-900">
