@@ -120,19 +120,68 @@ Route::post('/device-tokens/issue', function (Request $request) {
     ], 201);
 })->name('api.device-tokens.issue');
 
-Route::get('/doctors/featured', function () {
-    $doctor = Doctor::find(77);
+Route::get('/doctors/featured', function (Request $request) {
+    $userId = $request->query('user_id');
+    $clinic = null;
+    $doctors = collect();
 
-    if (!$doctor) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Doctor with ID 77 not found',
-        ], 404);
+    if ($userId) {
+        $user = User::find($userId);
+        if ($user) {
+            $clinic = null;
+            if (!empty($user->last_vet_id)) {
+                $clinic = \App\Models\VetRegisterationTemp::with('doctors')->find($user->last_vet_id);
+            }
+            if (!$clinic && !empty($user->last_vet_slug)) {
+                $clinic = \App\Models\VetRegisterationTemp::with('doctors')->where('slug', $user->last_vet_slug)->first();
+            }
+            if ($clinic) {
+                $doctors = $clinic->doctors;
+            }
+        }
     }
+
+    // Fallback to legacy doctor record if no clinic/doctors found
+    if (!$clinic && $doctors->isEmpty()) {
+        $fallbackDoctor = Doctor::find(77);
+        if (!$fallbackDoctor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor not found',
+            ], 404);
+        }
+        $clinic = $fallbackDoctor->clinic()->first();
+        $doctors = collect([$fallbackDoctor]);
+    }
+
+    $clinicData = $clinic ? [
+        'id' => $clinic->id,
+        'name' => $clinic->name,
+        'slug' => $clinic->slug,
+        'city' => $clinic->city,
+        'address' => $clinic->formatted_address ?? $clinic->address,
+        'phone' => $clinic->mobile,
+        'image' => $clinic->image,
+    ] : null;
+
+    $doctorsData = $doctors->map(function (Doctor $doc) {
+        return [
+            'id' => $doc->id,
+            'name' => $doc->doctor_name,
+            'email' => $doc->doctor_email,
+            'phone' => $doc->doctor_mobile,
+            'license' => $doc->doctor_license,
+            'image' => $doc->doctor_image,
+            'price' => $doc->doctors_price,
+        ];
+    })->values();
 
     return response()->json([
         'success' => true,
-        'data' => $doctor,
+        'data' => [
+            'clinic' => $clinicData,
+            'doctors' => $doctorsData,
+        ],
     ]);
 });
 
