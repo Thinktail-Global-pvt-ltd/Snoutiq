@@ -14,13 +14,14 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    role: "",
+    role: "pet",
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [userType, setUserType] = useState("pet");
+  const [testName, setTestName] = useState("");
   
   // Location states
   const [locationStatus, setLocationStatus] = useState("checking");
@@ -131,6 +132,12 @@ const Login = () => {
       }
     };
   }, [initializeLocation]);
+
+  useEffect(() => {
+    if (userType !== "pet") {
+      setTestName("");
+    }
+  }, [userType]);
 
   const handleCustom = () => {
   window.location.assign('https://snoutiq.com/backend/custom-doctor-login');
@@ -324,6 +331,8 @@ const Login = () => {
     setUserType(type);
     handleInputChange("role", getBackendRole(type));
   };
+
+  const canShowTestCredentials = testName.trim().length > 2;
 
   // Enhanced Location Status Component
   const LocationStatus = () => {
@@ -682,6 +691,115 @@ const Login = () => {
                     <p className="text-center text-red-600 text-sm mt-2">
                       Please enable location access to continue with Google login
                     </p>
+                  )}
+                </div>
+
+                {/* Manual Test Login */}
+                <div className="p-5 border border-blue-100 bg-white rounded-2xl shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-blue-900 tracking-wide uppercase">
+                        Test Access
+                      </p>
+                      <p className="text-slate-500 text-sm mt-1">
+                        Use demo credentials to explore the dashboard experience.
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
+                      Beta
+                    </span>
+                  </div>
+
+                  <div className="mt-5 space-y-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      Test name
+                    </label>
+                    <input
+                      type="text"
+                      value={testName}
+                      onChange={(e) => setTestName(e.target.value)}
+                      placeholder="e.g. Demo Clinic"
+                      className="w-full rounded-lg border border-slate-200 px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 text-slate-900 text-sm"
+                    />
+                  </div>
+
+                  {!canShowTestCredentials && (
+                    <p className="text-xs text-slate-500 mt-3">
+                      Enter at least 3 characters to unlock the credential form.
+                    </p>
+                  )}
+
+                  {canShowTestCredentials && (
+                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
+                          Test email
+                        </label>
+                        <input
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) =>
+                            handleInputChange("email", e.target.value)
+                          }
+                          onBlur={() => handleBlur("email")}
+                          placeholder="demo@example.com"
+                          className={`w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
+                            errors.email && touched.email
+                              ? "border-red-300 bg-red-50"
+                              : "border-slate-200"
+                          }`}
+                        />
+                        {errors.email && touched.email && (
+                          <p className="text-red-600 text-xs font-medium mt-1">
+                            {errors.email}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
+                          Test password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            value={formData.password}
+                            onChange={(e) =>
+                              handleInputChange("password", e.target.value)
+                            }
+                            onBlur={() => handleBlur("password")}
+                            placeholder="••••••••"
+                            className={`w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
+                              errors.password && touched.password
+                                ? "border-red-300 bg-red-50"
+                                : "border-slate-200"
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-blue-600"
+                          >
+                            {showPassword ? "Hide" : "Show"}
+                          </button>
+                        </div>
+                        {errors.password && touched.password && (
+                          <p className="text-red-600 text-xs font-medium mt-1">
+                            {errors.password}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading || locationStatus !== "granted"}
+                        className="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50"
+                      >
+                        {isLoading
+                          ? "Authorizing..."
+                          : "Access Demo Dashboard"}
+                      </button>
+                    </form>
                   )}
                 </div>
 

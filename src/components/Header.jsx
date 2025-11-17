@@ -70,11 +70,11 @@ const navItems = [
       // },
     ],
   },
-  {
-    label: "Pricing",
-    href: "/pricing",
-    description: "Transparent plans with no surprise fees",
-  },
+  // {
+  //   label: "Pricing",
+  //   href: "/pricing",
+  //   description: "Transparent plans with no surprise fees",
+  // },
   {
     label: "Resources",
     // href: "/blog",
@@ -85,11 +85,11 @@ const navItems = [
         description: "Product updates, guides, and customer stories",
         href: "/blog",
       },
-      {
-        label: "Reduce No-Shows",
-        description: "Framework for reliable appointment adherence",
-        href: "/blog/how-to-reduce-no-shows",
-      },
+      // {
+      //   label: "Reduce No-Shows",
+      //   description: "Framework for reliable appointment adherence",
+      //   href: "/blog/how-to-reduce-no-shows",
+      // },
       // {
       //   label: "Tick Fever Guide",
       //   description: "Shareable health education for pet parents",

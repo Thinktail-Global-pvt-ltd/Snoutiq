@@ -264,8 +264,8 @@ function Home() {
               eyebrow="Ready to modernize?"
               title="Ready to Transform Your Veterinary Practice?"
               subtitle="Join 500+ clinics already providing better care with SnoutIQ"
-              primaryButton={{ text: "Start Free Trial", href: "/pricing" }}
-              secondaryButton={{ text: "Talk to Our Team", href: "/contact" }}
+              primaryButton={{ text: "Start Free Trial", href: "/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing" }}
+              secondaryButton={{ text: "Talk to Our Team", href: "https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform?usp=sharing&ouid=100613985134578372936" }}
               variant="gradient"
               bullets={[
                 "Launch in under two weeks",

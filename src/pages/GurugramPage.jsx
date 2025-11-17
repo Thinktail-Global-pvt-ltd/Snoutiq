@@ -190,8 +190,8 @@ const GurugramPage = () => {
         badge="Trusted by Premium Gurugram Professionals"
         title="Gurugram's Premium Veterinary Practice Management Software"
         subtitle="Elevate your Gurugram clinic with enterprise-grade technology. AI-powered triage, luxury video consultations, and premium client experience."
-        ctaPrimary={{ text: 'Schedule Premium Demo', href: '/pricing' }}
-        ctaSecondary={{ text: 'Call: +91-124-567-8900', href: 'tel:+911245678900' }}
+        ctaPrimary={{ text: 'Schedule Premium Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
+        // ctaSecondary={{ text: 'Call: +91-124-567-8900', href: 'tel:+911245678900' }}
       />
 
       <Benefits benefits={benefits} variant="default" />
@@ -390,8 +390,8 @@ const GurugramPage = () => {
     {
       icon: 'Phone',
       title: 'Priority Line',
-      content: '+91-124-567-8900',
-      href: 'tel:+911245678900'
+      // content: '+91-124-567-8900',
+      // href: 'tel:+911245678900'
     },
     {
       icon: 'MapPin',
@@ -414,7 +414,7 @@ const GurugramPage = () => {
 
         <h3 className="font-bold text-slate-900 mb-2 text-lg">{item.title}</h3>
 
-        {item.href ? (
+        {/* {item.href ? (
           <a href={item.href} className="text-blue-600 hover:text-blue-700 text-base">
             {item.content}
           </a>
@@ -422,7 +422,7 @@ const GurugramPage = () => {
           <p className="text-slate-600 text-base whitespace-pre-line">
             {item.content}
           </p>
-        )}
+        )} */}
       </div>
     );
   })}
@@ -435,8 +435,8 @@ const GurugramPage = () => {
       <CTA
         title="Ready to Join Leading Gurugram Clinics?"
         subtitle="Transform your practice with SnoutIQ Premium today"
-        primaryButton={{ text: 'Schedule Premium Demo', href: '/pricing' }}
-        secondaryButton={{ text: 'View Pricing', href: '/pricing' }}
+        primaryButton={{ text: 'Schedule Premium Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
+        secondaryButton={{ text: 'View Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
         variant="gradient"
       />
       <Footer/>

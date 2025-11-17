@@ -190,8 +190,8 @@ const DelhiPage = () => {
         badge="Trusted by Delhi Veterinary Professionals"
         title="Delhi's Leading Veterinary Practice Management Software"
         subtitle="Transform your Delhi clinic with AI-powered triage, HD video consultations, and smart scheduling designed for modern veterinary practices."
-        ctaPrimary={{ text: 'Schedule Delhi Demo', href: '/pricing' }}
-        ctaSecondary={{ text: 'Call: +91-11-4567-8900', href: 'tel:+911145678900' }}
+        ctaPrimary={{ text: 'Schedule Delhi Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
+        ctaSecondary={{ text: 'Check Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
       />
 
       <Benefits benefits={benefits} variant="default" />
@@ -324,8 +324,8 @@ const DelhiPage = () => {
     {
       icon: 'Phone',
       title: 'Call Us',
-      content: '+91-11-4567-8900',
-      href: 'tel:+911145678900'
+      // content: '+91-11-4567-8900',
+      // href: 'tel:+911145678900'
     },
     {
       icon: 'MapPin',
@@ -347,7 +347,7 @@ const DelhiPage = () => {
         </div>
 
         <h3 className="font-bold text-slate-900 mb-2 text-lg">{item.title}</h3>
-
+{/* 
         {item.href ? (
           <a href={item.href} className="text-blue-600 hover:text-blue-700 text-base">
             {item.content}
@@ -356,7 +356,7 @@ const DelhiPage = () => {
           <p className="text-slate-600 text-base whitespace-pre-line">
             {item.content}
           </p>
-        )}
+        )} */}
       </div>
     );
   })}
@@ -369,8 +369,8 @@ const DelhiPage = () => {
       <CTA
         title="Ready to Join Leading Delhi Clinics?"
         subtitle="Transform your Delhi veterinary practice with SnoutIQ today"
-        primaryButton={{ text: 'Schedule Delhi Demo', href: '/pricing' }}
-        secondaryButton={{ text: 'View Pricing', href: '/pricing' }}
+        primaryButton={{ text: 'Schedule Delhi Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
+        secondaryButton={{ text: 'View Pricing', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
         variant="gradient"
       />
       <Footer/>

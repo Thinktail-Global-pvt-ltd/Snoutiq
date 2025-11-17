@@ -496,7 +496,7 @@ import Blog from "./blog/Blog";
 import DogWinterCareGuide from "./blog/DogWinterCareGuide";
 import TickFeverGuide from "./blog/TickFeverGuide";
 import PetPawProtecteGuide from "./blog/PetPawProtecteGuide";
-import PricingPage from "./pages/PricingPage";
+// import PricingPage from "./pages/PricingPage";
 import DelhiPage from "./pages/DelhiPage";
 import GurugramPage from "./pages/GurugramPage";
 import ClinicsSolutionPage from "./pages/ClinicsSolutionPage";
@@ -857,7 +857,7 @@ function App() {
               path="/blog/protecting-pet-paws-in-winter-tips-guide"
               element={<PetPawProtecteGuide />}
             />
-            <Route path="/pricing" element={<PricingPage />} />
+            {/* <Route path="/pricing" element={<PricingPage />} /> */}
             <Route path="/delhi" element={<DelhiPage />} />
             <Route path="/gurugram" element={<GurugramPage />} />
             <Route path="/clinics-solution" element={<ClinicsSolutionPage />} />

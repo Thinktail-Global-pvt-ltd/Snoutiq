@@ -167,7 +167,7 @@ const FeaturesPage = () => {
         title="Every Tool Your Veterinary Practice Needs"
         subtitle="From AI-powered triage to HD video consultations, SnoutIQ provides a comprehensive platform for modern veterinary care."
         ctaPrimary={{ text: 'Start Free Trial', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        ctaSecondary={{ text: 'Schedule Demo', href: '/pricing' }}
+        ctaSecondary={{ text: 'Schedule Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
         imagePlaceholder={true}
       />
 
