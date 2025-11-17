@@ -475,7 +475,7 @@ label{font-size:.9rem;color:#334155}
     const vetSlug = @json($vet->slug);
     const clinicId = @json($vet->clinic_id ?? $vet->id ?? null);
     const downloadBtn = document.getElementById('download-app-btn');
-    const appDownloadLink = 'https://snoutiq-medical-records.s3.ap-south-1.amazonaws.com/SnoutIQ+(2).apk';
+    const appDownloadLink = 'https://snoutiq-medical-records.s3.ap-south-1.amazonaws.com/application-414f293d-7ae1-4398-bb9f-6331ebcafa4c.apk';
     const appDownloadFileName = 'SnoutIQ.apk';
     const downloadTrackEndpoint = @json(route('api.downloads.track'));
     const googleClientId = '325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com';
