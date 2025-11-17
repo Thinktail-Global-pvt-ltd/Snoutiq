@@ -238,6 +238,7 @@ Route::get('/chats', [GeminiChatController::class, 'history']);
 Route::post('/contact-request', [ContactRequestController::class, 'store']);
 Route::post('/referrals/download', [ReferralController::class, 'sendDownloadLink'])->name('api.referrals.download');
 Route::get('/referrals/{code}', [ReferralController::class, 'showByCode'])->name('api.referrals.lookup');
+Route::post('/downloads/track', [ReferralController::class, 'trackDownload'])->name('api.downloads.track');
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
 Route::post('/chat/send', [GeminiChatController::class, 'sendMessage']);
 Route::get('/chat/listRooms', [GeminiChatController::class, 'listRooms']);

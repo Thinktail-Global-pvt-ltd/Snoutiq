@@ -90,6 +90,66 @@ class ReferralController extends Controller
         ], ($hasReferralColumn && ! $alreadyHasReferral) ? 201 : 200);
     }
 
+    /**
+     * Lightweight tracking: create/update a user record tied to a clinic when the APK is downloaded.
+     */
+    public function trackDownload(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email:filter', 'max:255'],
+            'google_token' => ['nullable', 'string', 'max:255'],
+            'vet_slug' => ['nullable', 'string', 'max:255'],
+            'clinic_id' => ['nullable', 'integer'],
+        ]);
+
+        $hasRoleColumn = $this->usersTableHasRoleColumn();
+        $hasVetSlugColumn = $this->usersTableHasLastVetSlugColumn();
+        $hasVetIdColumn = $this->usersTableHasLastVetIdColumn();
+
+        $email = strtolower($validated['email']);
+        $user = User::firstOrNew(['email' => $email]);
+
+        if (! $user->exists && $validated['name']) {
+            $user->name = $validated['name'];
+        } elseif (! $user->name && $validated['name']) {
+            $user->name = $validated['name'];
+        }
+
+        if ($hasRoleColumn && ! $user->role) {
+            $user->role = 'pet_owner';
+        }
+
+        if (! empty($validated['google_token'])) {
+            $user->google_token = $validated['google_token'];
+        }
+
+        $clinic = null;
+        if (! empty($validated['clinic_id'])) {
+            $clinic = VetRegisterationTemp::find($validated['clinic_id']);
+        }
+        if (! $clinic && ! empty($validated['vet_slug'])) {
+            $clinic = VetRegisterationTemp::where('slug', $validated['vet_slug'])->first();
+        }
+
+        if ($clinic) {
+            if ($hasVetSlugColumn) {
+                $user->last_vet_slug = $clinic->slug;
+            }
+            if ($hasVetIdColumn) {
+                $user->last_vet_id = $clinic->id;
+            }
+        }
+
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'user_id' => $user->id,
+            'clinic_id' => $clinic?->id,
+        ], $user->wasRecentlyCreated ? 201 : 200);
+    }
+
     public function showByCode(Request $request, string $code)
     {
         if (! $this->usersTableHasReferralCodeColumn()) {

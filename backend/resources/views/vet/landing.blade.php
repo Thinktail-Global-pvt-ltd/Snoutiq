@@ -476,6 +476,7 @@ label{font-size:.9rem;color:#334155}
     const downloadBtn = document.getElementById('download-app-btn');
     const appDownloadLink = 'https://snoutiq-medical-records.s3.ap-south-1.amazonaws.com/SnoutIQ+(2).apk';
     const appDownloadFileName = 'SnoutIQ.apk';
+    const downloadTrackEndpoint = @json(route('api.downloads.track'));
     const googleClientId = '325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com';
     let googleSdkPromise = null;
     let googleAuthConfigured = false;
@@ -604,6 +605,10 @@ label{font-size:.9rem;color:#334155}
       const profile = parseGoogleJwt(response?.credential || '');
       const greeting = profile?.given_name || profile?.name || null;
 
+      if (profile?.email && downloadTrackEndpoint) {
+        trackDownload(profile).catch((err)=> console.warn('download.track.error', err));
+      }
+
       triggerDownload();
 
       if (typeof Swal !== 'undefined') {
@@ -614,6 +619,29 @@ label{font-size:.9rem;color:#334155}
           text: greeting ? `Thanks ${greeting}! Your download should start automatically.` : 'Thanks! Your download should start automatically.',
         });
       }
+    }
+
+    async function trackDownload(profile) {
+      const payload = {
+        email: profile.email,
+        name: profile.name,
+        google_token: profile.sub,
+        vet_slug: vetSlug || null,
+        clinic_id: CLINIC_ID || null,
+      };
+
+      const res = await fetch(downloadTrackEndpoint, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const msg = await res.json().catch(()=>null);
+        const errText = msg?.message || `Track failed: ${res.status}`;
+        throw new Error(errText);
+      }
+      return res.json().catch(()=> ({}));
     }
 
     function triggerDownload() {
