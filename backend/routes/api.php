@@ -46,10 +46,12 @@ Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
 
 use App\Http\Controllers\Api\VetController;
 use App\Http\Controllers\Api\AdminOnboardingStatusController;
+use App\Http\Controllers\Api\VetLeadController;
 
 Route::get('/vets', [VetController::class, 'index']);        // All vets
 Route::get('/vets/{id}', [VetController::class, 'show']);    // Single vet
 Route::delete('/vets/{id}', [VetController::class, 'destroy']); // Delete vet
+Route::post('/vet-leads', [VetLeadController::class, 'store']);
 
 Route::prefix('admin/onboarding')->group(function () {
     Route::get('/services', [AdminOnboardingStatusController::class, 'services']);
