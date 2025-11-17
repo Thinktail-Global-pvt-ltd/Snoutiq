@@ -122,39 +122,46 @@ Route::post('/device-tokens/issue', function (Request $request) {
 
 Route::get('/doctors/featured', function (Request $request) {
     $userId = $request->query('user_id');
-    $clinic = null;
-    $doctors = collect();
-
-    if ($userId) {
-        $user = User::find($userId);
-        if ($user) {
-            $clinic = null;
-            if (!empty($user->last_vet_id)) {
-                $clinic = \App\Models\VetRegisterationTemp::with('doctors')->find($user->last_vet_id);
-            }
-            if (!$clinic && !empty($user->last_vet_slug)) {
-                $clinic = \App\Models\VetRegisterationTemp::with('doctors')->where('slug', $user->last_vet_slug)->first();
-            }
-            if ($clinic) {
-                $doctors = $clinic->doctors;
-            }
-        }
+    if (!$userId) {
+        return response()->json([
+            'success' => false,
+            'message' => 'user_id is required',
+        ], 422);
     }
 
-    // Fallback to legacy doctor record if no clinic/doctors found
-    if (!$clinic && $doctors->isEmpty()) {
-        $fallbackDoctor = Doctor::find(77);
-        if (!$fallbackDoctor) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Doctor not found',
-            ], 404);
-        }
-        $clinic = $fallbackDoctor->clinic()->first();
-        $doctors = collect([$fallbackDoctor]);
+    $user = User::find($userId);
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'User not found',
+        ], 404);
     }
 
-    $clinicData = $clinic ? [
+    if (empty($user->last_vet_id)) {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'clinic' => null,
+                'doctors' => [],
+            ],
+        ]);
+    }
+
+    $clinic = \App\Models\VetRegisterationTemp::with('doctors')
+        ->where('id', $user->last_vet_id)
+        ->first();
+
+    if (!$clinic) {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'clinic' => null,
+                'doctors' => [],
+            ],
+        ]);
+    }
+
+    $clinicData = [
         'id' => $clinic->id,
         'name' => $clinic->name,
         'slug' => $clinic->slug,
@@ -162,9 +169,9 @@ Route::get('/doctors/featured', function (Request $request) {
         'address' => $clinic->formatted_address ?? $clinic->address,
         'phone' => $clinic->mobile,
         'image' => $clinic->image,
-    ] : null;
+    ];
 
-    $doctorsData = $doctors->map(function (Doctor $doc) {
+    $doctorsData = $clinic->doctors->map(function (Doctor $doc) {
         return [
             'id' => $doc->id,
             'name' => $doc->doctor_name,
