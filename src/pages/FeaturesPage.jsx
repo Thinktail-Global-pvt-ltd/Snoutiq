@@ -42,12 +42,12 @@ const FeaturesPage = () => {
       description: 'Crystal-clear video quality for accurate remote diagnosis. Multi-device support, screen sharing, and recording capabilities.',
       link: '/video-consult',
     },
-    {
-      icon: 'Brain',
-      title: 'AI-Powered Triage',
-      description: 'Intelligent symptom analysis that prioritizes urgent cases and recommends the most appropriate specialists automatically.',
-      link: '/ai-triage',
-    },
+    // {
+    //   icon: 'Brain',
+    //   title: 'AI-Powered Triage',
+    //   description: 'Intelligent symptom analysis that prioritizes urgent cases and recommends the most appropriate specialists automatically.',
+    //   link: '/ai-triage',
+    // },
     {
       icon: 'Calendar',
       title: 'Smart Scheduling',

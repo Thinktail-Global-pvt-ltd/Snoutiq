@@ -1,6 +1,14 @@
-import React, { useState, useContext, useEffect, useCallback, lazy, Suspense } from "react";
+import React, {
+  useState,
+  useContext,
+  useEffect,
+  useCallback,
+  lazy,
+  Suspense,
+  useMemo,
+} from "react";
 import { toast, Toaster } from "react-hot-toast";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useLocation } from "react-router-dom";
 import axios from "../axios";
 import logo from "../assets/images/logo.webp";
 import { AuthContext } from "../auth/AuthContext";
@@ -21,7 +29,6 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [userType, setUserType] = useState("pet");
-  const [testName, setTestName] = useState("");
   
   // Location states
   const [locationStatus, setLocationStatus] = useState("checking");
@@ -29,6 +36,7 @@ const Login = () => {
   const [coords, setCoords] = useState({ lat: null, lng: null });
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, login } = useContext(AuthContext);
 
   // Enhanced location permission check
@@ -132,12 +140,6 @@ const Login = () => {
       }
     };
   }, [initializeLocation]);
-
-  useEffect(() => {
-    if (userType !== "pet") {
-      setTestName("");
-    }
-  }, [userType]);
 
   const handleCustom = () => {
   window.location.assign('https://snoutiq.com/backend/custom-doctor-login');
@@ -332,7 +334,10 @@ const Login = () => {
     handleInputChange("role", getBackendRole(type));
   };
 
-  const canShowTestCredentials = testName.trim().length > 2;
+  const showTestLogin = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get("test") === "1";
+  }, [location.search]);
 
   // Enhanced Location Status Component
   const LocationStatus = () => {
@@ -694,46 +699,26 @@ const Login = () => {
                   )}
                 </div>
 
-                {/* Manual Test Login */}
-                <div className="p-5 border border-blue-100 bg-white rounded-2xl shadow-sm">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-blue-900 tracking-wide uppercase">
-                        Test Access
-                      </p>
-                      <p className="text-slate-500 text-sm mt-1">
-                        Use demo credentials to explore the dashboard experience.
-                      </p>
+                {showTestLogin && (
+                  <div className="p-5 border border-blue-100 bg-white rounded-2xl shadow-sm">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-blue-900 tracking-wide uppercase">
+                          Demo Access
+                        </p>
+                        <p className="text-slate-500 text-sm mt-1">
+                          Use demo credentials to continue without Google login.
+                        </p>
+                      </div>
+                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
+                        Preview
+                      </span>
                     </div>
-                    <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
-                      Beta
-                    </span>
-                  </div>
 
-                  <div className="mt-5 space-y-2">
-                    <label className="text-sm font-medium text-slate-700">
-                      Test name
-                    </label>
-                    <input
-                      type="text"
-                      value={testName}
-                      onChange={(e) => setTestName(e.target.value)}
-                      placeholder="e.g. Demo Clinic"
-                      className="w-full rounded-lg border border-slate-200 px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 text-slate-900 text-sm"
-                    />
-                  </div>
-
-                  {!canShowTestCredentials && (
-                    <p className="text-xs text-slate-500 mt-3">
-                      Enter at least 3 characters to unlock the credential form.
-                    </p>
-                  )}
-
-                  {canShowTestCredentials && (
                     <form onSubmit={handleSubmit} className="mt-5 space-y-4">
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
-                          Test email
+                          Email
                         </label>
                         <input
                           type="email"
@@ -758,7 +743,7 @@ const Login = () => {
 
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
-                          Test password
+                          Password
                         </label>
                         <div className="relative">
                           <input
@@ -795,13 +780,11 @@ const Login = () => {
                         disabled={isLoading || locationStatus !== "granted"}
                         className="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50"
                       >
-                        {isLoading
-                          ? "Authorizing..."
-                          : "Access Demo Dashboard"}
+                        {isLoading ? "Authorizing..." : "Sign in to dashboard"}
                       </button>
                     </form>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Additional Info */}
                 <div className="text-center p-4 bg-blue-50 rounded-xl border border-blue-100">

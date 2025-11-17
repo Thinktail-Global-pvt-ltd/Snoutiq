@@ -863,7 +863,7 @@ function App() {
             <Route path="/clinics-solution" element={<ClinicsSolutionPage />} />
             <Route path="/features" element={<FeaturesPage />} />
             <Route path="/video-consult" element={<VideoConsultPage />} />
-            <Route path="/ai-triage" element={<AITriagePage />} />
+            {/* <Route path="/ai-triage" element={<AITriagePage />} /> */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

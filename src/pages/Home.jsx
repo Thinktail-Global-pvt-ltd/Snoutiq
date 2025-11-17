@@ -33,13 +33,13 @@ const FEATURES = [
       "Connect pet owners with veterinarians through crystal-clear video calls. Diagnose, prescribe, and follow-up remotely with ease.",
     link: "/video-consult",
   },
-  {
-    icon: Brain,
-    title: "AI-Powered Triage",
-    description:
-      "Smart symptom analysis that prioritizes urgent cases and routes pets to the right specialist automatically.",
-    link: "/ai-triage",
-  },
+  // {
+  //   icon: Brain,
+  //   title: "AI-Powered Triage",
+  //   description:
+  //     "Smart symptom analysis that prioritizes urgent cases and routes pets to the right specialist automatically.",
+  //   link: "/ai-triage",
+  // },
   {
     icon: Calendar,
     title: "Smart Scheduling",

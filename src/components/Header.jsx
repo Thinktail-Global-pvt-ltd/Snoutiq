@@ -36,11 +36,11 @@ const navItems = [
         description: "Crystal clear HD visits with notes and screen share",
         href: "/video-consult",
       },
-      {
-        label: "AI Triage",
-        description: "Guide pet parents and flag emergencies automatically",
-        href: "/ai-triage",
-      },
+      // {
+      //   label: "AI Triage",
+      //   description: "Guide pet parents and flag emergencies automatically",
+      //   href: "/ai-triage",
+      // },
     ],
   },
   {
