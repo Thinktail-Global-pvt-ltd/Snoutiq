@@ -9,6 +9,7 @@ use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class ReferralController extends Controller
 {
@@ -26,6 +27,10 @@ class ReferralController extends Controller
         $hasRoleColumn = $this->usersTableHasRoleColumn();
         $hasVetSlugColumn = $this->usersTableHasLastVetSlugColumn();
         $hasVetIdColumn = $this->usersTableHasLastVetIdColumn();
+        $hasReferralColumn = $this->usersTableHasReferralCodeColumn();
+
+        $alreadyHasReferral = $hasReferralColumn && $user->exists && $user->referral_code;
+        $effectiveReferralCode = null;
 
         if (! $user->exists) {
             $user->name = $validated['name'];
@@ -45,15 +50,19 @@ class ReferralController extends Controller
             $user->phone = $validated['phone'];
         }
 
-        $user->referral_code = $this->generateUniqueReferralCode($user->id);
+        if ($hasReferralColumn) {
+            if (! $alreadyHasReferral) {
+                $user->referral_code = $this->generateUniqueReferralCode($user->id);
+            }
+            $effectiveReferralCode = $user->referral_code;
+        } else {
+            $effectiveReferralCode = $this->generateEphemeralReferralCode();
+        }
 
-        $vetName = null;
         $vetSlug = $validated['vet_slug'] ?? null;
-        $clinic = null;
         if ($vetSlug) {
             $clinic = VetRegisterationTemp::where('slug', $vetSlug)->first();
             if ($clinic) {
-                $vetName = $clinic->name;
                 if ($hasVetSlugColumn) {
                     $user->last_vet_slug = $clinic->slug;
                 }
@@ -66,7 +75,7 @@ class ReferralController extends Controller
         $user->save();
 
         try {
-            Mail::to($user->email)->send(new DownloadReferralMail($user, $user->referral_code, $vetName, $vetSlug));
+            Mail::to($user->email)->send(new DownloadReferralMail($user, $effectiveReferralCode));
         } catch (\Throwable $e) {
             report($e);
 
@@ -77,12 +86,18 @@ class ReferralController extends Controller
 
         return response()->json([
             'message' => 'Referral code sent successfully.',
-            'referral_code' => $user->referral_code,
-        ], 201);
+            'referral_code' => $effectiveReferralCode,
+        ], ($hasReferralColumn && ! $alreadyHasReferral) ? 201 : 200);
     }
 
     public function showByCode(Request $request, string $code)
     {
+        if (! $this->usersTableHasReferralCodeColumn()) {
+            return response()->json([
+                'message' => 'Referral lookup is unavailable.',
+            ], 404);
+        }
+
         $lookup = trim($code);
 
         if ($lookup === '') {
@@ -173,6 +188,11 @@ class ReferralController extends Controller
         throw new \RuntimeException('Unable to generate a unique referral code at the moment.');
     }
 
+    protected function generateEphemeralReferralCode(): string
+    {
+        return 'SNQ-' . strtoupper(Str::random(6));
+    }
+
     protected function usersTableHasRoleColumn(): bool
     {
         static $hasRole = null;
@@ -198,6 +218,16 @@ class ReferralController extends Controller
         static $hasColumn = null;
         if ($hasColumn === null) {
             $hasColumn = Schema::hasColumn('users', 'last_vet_id');
+        }
+
+        return $hasColumn;
+    }
+
+    protected function usersTableHasReferralCodeColumn(): bool
+    {
+        static $hasColumn = null;
+        if ($hasColumn === null) {
+            $hasColumn = Schema::hasColumn('users', 'referral_code');
         }
 
         return $hasColumn;

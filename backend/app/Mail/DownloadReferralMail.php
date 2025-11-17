@@ -16,9 +16,7 @@ class DownloadReferralMail extends Mailable
 
     public function __construct(
         public readonly User $user,
-        public readonly string $code,
-        public readonly ?string $clinicName = null,
-        public readonly ?string $vetSlug = null
+        public readonly string $code
     ) {}
 
     public function envelope(): Envelope
@@ -34,10 +32,8 @@ class DownloadReferralMail extends Mailable
         return new Content(
             view: 'emails.download-referral',
             with: [
-                'user'       => $this->user,
-                'code'       => $this->code,
-                'clinicName' => $this->clinicName,
-                'vetSlug'    => $this->vetSlug,
+                'user' => $this->user,
+                'code' => $this->code,
             ],
         );
     }
