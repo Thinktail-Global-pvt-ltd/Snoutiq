@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -134,10 +135,22 @@ public function index()
             ], 422);
         }
 
+        $lastVetUpdated = false;
+        $userId = $request->query('user_id');
+        if (! empty($userId) && ctype_digit((string) $userId)) {
+            $user = User::find((int) $userId);
+            if ($user) {
+                $user->last_vet_id = $clinic->id;
+                $user->save();
+                $lastVetUpdated = true;
+            }
+        }
+
         return response()->json([
             'status' => 'success',
             'referral' => $referral,
             'data' => $clinic,
+            'last_vet_id_updated' => $lastVetUpdated,
         ]);
     }
 
