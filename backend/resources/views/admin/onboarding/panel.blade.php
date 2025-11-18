@@ -69,9 +69,9 @@
         border-color: rgba(34,197,94,0.3);
     }
     .step-chip.pending {
-        background: rgba(251,191,36,0.15);
-        color: #92400e;
-        border-color: rgba(251,191,36,0.3);
+        background: rgba(248,113,113,0.15);
+        color: #991b1b;
+        border-color: rgba(248,113,113,0.35);
     }
     .doctor-progress {
         min-width: 120px;
@@ -168,7 +168,7 @@
             'doctorKey' => 'services',
             'statusField' => 'services_info_complete',
             'statusLabels' => ['Complete', 'Pending'],
-            'statusClasses' => ['badge-soft-success', 'badge-soft-warning']
+            'statusClasses' => ['badge-soft-success', 'badge-soft-danger']
         ],
         'video' => [
             'title' => 'Video Calling',
@@ -185,7 +185,7 @@
             'doctorKey' => 'video',
             'statusField' => 'has_any_video_config',
             'statusLabels' => ['Configured', 'Missing'],
-            'statusClasses' => ['badge-soft-info', 'badge-soft-warning']
+            'statusClasses' => ['badge-soft-success', 'badge-soft-danger']
         ],
         'clinicHours' => [
             'title' => 'Clinic Hours',
@@ -202,7 +202,7 @@
             'doctorKey' => 'clinic_hours',
             'statusField' => 'has_any_clinic_hours',
             'statusLabels' => ['Scheduled', 'Missing'],
-            'statusClasses' => ['badge-soft-success', 'badge-soft-warning']
+            'statusClasses' => ['badge-soft-success', 'badge-soft-danger']
         ],
         'emergency' => [
             'title' => 'Emergency Coverage',
@@ -219,7 +219,7 @@
             'doctorKey' => 'emergency',
             'statusField' => 'has_emergency_program',
             'statusLabels' => ['Ready', 'Missing'],
-            'statusClasses' => ['badge-soft-danger', 'badge-soft-warning']
+            'statusClasses' => ['badge-soft-success', 'badge-soft-danger']
         ],
         'documents' => [
             'title' => 'License & Documents',
@@ -236,7 +236,7 @@
             'doctorKey' => 'documents',
             'statusField' => 'documents_complete',
             'statusLabels' => ['Verified', 'Pending'],
-            'statusClasses' => ['badge-soft-primary', 'badge-soft-warning']
+            'statusClasses' => ['badge-soft-success', 'badge-soft-danger']
         ],
     ];
 @endphp
@@ -562,8 +562,8 @@
                                                                                             $notes = $notes
                                                                                                 ? $onboardingNote . ' • ' . $notes
                                                                                                 : $onboardingNote;
-                                                                                            $badgeClass = $allStepsComplete ? 'badge-soft-success' : ($doctorStatus ? 'badge-soft-info' : 'badge-soft-warning');
-                                                                                            $badgeLabel = $allStepsComplete ? 'All Steps Ready' : ($doctorStatus ? 'Ready' : 'Missing');
+                                                                                            $badgeClass = $allStepsComplete ? 'badge-soft-success' : 'badge-soft-danger';
+                                                                                            $badgeLabel = $allStepsComplete ? 'All Steps Ready' : 'Pending Steps';
                                                                                             $totalStepCount = count($stepLabels);
                                                                                             $completedStepCount = 0;
                                                                                             foreach ($stepLabels as $stepKey => $_label) {
