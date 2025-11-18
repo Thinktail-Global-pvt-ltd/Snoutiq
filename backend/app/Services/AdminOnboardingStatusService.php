@@ -173,10 +173,23 @@ class AdminOnboardingStatusService
         $doctorsByClinic = $this->fetchDoctorsByClinic();
 
         $videoRows = DB::table('doctor_video_availability')
+            ->where('is_active', 1)
             ->select(
                 'doctor_id',
                 DB::raw('COUNT(*) as slot_count'),
                 DB::raw('MAX(updated_at) as last_updated_at')
+            )
+            ->groupBy('doctor_id')
+            ->get()
+            ->keyBy('doctor_id');
+
+        // Support legacy video availability stored in doctor_availability table
+        $legacyVideoRows = DB::table('doctor_availability')
+            ->where('service_type', 'video')
+            ->select(
+                'doctor_id',
+                DB::raw('COUNT(*) as slot_count'),
+                DB::raw('MAX(created_at) as last_created_at')
             )
             ->groupBy('doctor_id')
             ->get()
@@ -190,10 +203,22 @@ class AdminOnboardingStatusService
 
             foreach ($clinicDoctors as $doctor) {
                 $videoMeta = $videoRows->get($doctor->id);
-                $slotCount = $videoMeta ? (int) $videoMeta->slot_count : 0;
+                $legacyMeta = $legacyVideoRows->get($doctor->id);
+
+                $slotCount = ($videoMeta ? (int) $videoMeta->slot_count : 0) + ($legacyMeta ? (int) $legacyMeta->slot_count : 0);
                 $hasData = $slotCount > 0;
                 if ($hasData) {
                     $configuredCount++;
+                }
+
+                // Pick the freshest timestamp between new and legacy sources
+                $lastUpdatedCandidates = array_filter([
+                    $videoMeta && $videoMeta->last_updated_at ? (string) $videoMeta->last_updated_at : null,
+                    $legacyMeta && $legacyMeta->last_created_at ? (string) $legacyMeta->last_created_at : null,
+                ]);
+                $lastUpdatedAt = null;
+                if (!empty($lastUpdatedCandidates)) {
+                    $lastUpdatedAt = collect($lastUpdatedCandidates)->sortDesc()->first();
                 }
 
                 $doctorEntries[] = [
@@ -205,7 +230,7 @@ class AdminOnboardingStatusService
                     'video'          => [
                         'has_data'        => $hasData,
                         'slot_count'      => $slotCount,
-                        'last_updated_at' => $videoMeta && $videoMeta->last_updated_at ? (string) $videoMeta->last_updated_at : null,
+                        'last_updated_at' => $lastUpdatedAt,
                     ],
                 ];
             }

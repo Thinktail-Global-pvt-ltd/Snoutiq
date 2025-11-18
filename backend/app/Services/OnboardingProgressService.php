@@ -25,9 +25,21 @@ class OnboardingProgressService
             ->where('user_id', $clinicId)
             ->exists();
 
-        $hasVideo = $doctorIds
-            ? DB::table('doctor_video_availability')->whereIn('doctor_id', $doctorIds)->exists()
-            : false;
+        $hasVideo = false;
+        if ($doctorIds) {
+            $hasVideo = DB::table('doctor_video_availability')
+                ->where('is_active', 1)
+                ->whereIn('doctor_id', $doctorIds)
+                ->exists();
+
+            // Fallback to legacy storage in doctor_availability (service_type = video)
+            if (!$hasVideo) {
+                $hasVideo = DB::table('doctor_availability')
+                    ->where('service_type', 'video')
+                    ->whereIn('doctor_id', $doctorIds)
+                    ->exists();
+            }
+        }
 
         $hasClinicHours = $doctorIds
             ? DB::table('doctor_availability')
