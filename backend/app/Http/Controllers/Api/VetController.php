@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class VetController extends Controller
 {
@@ -86,6 +87,58 @@ public function index()
         }
 
         return response()->json($vet);
+    }
+
+    /**
+     * Fetch a clinic directly from its referral code (e.g., SN-PA0000T).
+     */
+    public function showByReferral(Request $request, string $code)
+    {
+        $referral = strtoupper(trim($code));
+
+        if (! preg_match('/^SN-([A-Z]{2})([0-9A-Z]{5})$/', $referral, $matches)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid referral format. Expected SN-XX00000.',
+            ], 422);
+        }
+
+        $idBase36 = $matches[2];
+        $clinicId = (int) base_convert($idBase36, 36, 10);
+
+        if ($clinicId <= 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Referral could not be resolved to a clinic.',
+            ], 404);
+        }
+
+        $clinic = DB::table('vet_registerations_temp')->where('id', $clinicId)->first();
+
+        if (! $clinic) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Clinic not found for the given referral.',
+            ], 404);
+        }
+
+        $slugFragment = Str::upper(Str::substr(Str::slug($clinic->slug ?? $clinic->name ?? ''), 0, 2));
+        if ($slugFragment === '') {
+            $slugFragment = 'CL';
+        }
+
+        if ($slugFragment !== $matches[1]) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Referral prefix does not match clinic slug.',
+            ], 422);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'referral' => $referral,
+            'data' => $clinic,
+        ]);
     }
 
     // 🔹 Delete vet by ID
