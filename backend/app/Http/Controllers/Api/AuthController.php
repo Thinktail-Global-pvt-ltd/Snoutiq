@@ -25,6 +25,7 @@ use App\Services\WhatsAppService;
 use App\Models\ChatRoom;
 use App\Models\Pet;
 use App\Models\Doctor;
+use App\Models\Transaction;
 
 
 use Illuminate\Support\Facades\Http;
@@ -1650,6 +1651,39 @@ public function googleLogin_bkp(Request $request)
         return response()->json(['message' => 'Logged out']);
     }
 
-    
+
+
+    public function clinicPayments(Request $request, $clinicId = null)
+    {
+        $clinicId = $clinicId ?? $request->input('clinic_id');
+        $status = $request->input('status'); // optional: filter by a specific status
+
+        if (!$clinicId || !is_numeric($clinicId) || (int) $clinicId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or missing clinic_id',
+            ], 422);
+        }
+
+        $clinicId = (int) $clinicId;
+
+        $transactions = Transaction::query()
+            ->where('clinic_id', $clinicId)
+            ->when($status, fn ($q) => $q->status($status), fn ($q) => $q->completed())
+            ->get();
+
+        $totalPaise = (int) $transactions->sum('amount_paise');
+        $totalRupees = round($totalPaise / 100, 2);
+
+        return response()->json([
+            'success'         => true,
+            'clinic_id'       => $clinicId,
+            'status_filter'   => $status ?: 'completed',
+            'transactions'    => $transactions->count(),
+            'total_paise'     => $totalPaise,
+            'total_rupees'    => $totalRupees,
+            'currency'        => 'INR',
+        ]);
+    }
 
 }

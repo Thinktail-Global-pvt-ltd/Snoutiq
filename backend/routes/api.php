@@ -369,6 +369,8 @@ Route::post('/auth/register',   [AuthController::class, 'register']);
 Route::post('/auth/initial-register', [AuthController::class, 'createInitialRegistration']);
 Route::post('/auth/login',      [AuthController::class, 'login']);
 Route::post('/auth/pet-summary', [AuthController::class, 'generatePetSummary']);
+Route::get('/clinics/{clinic}/payments', [AuthController::class, 'clinicPayments']);
+Route::get('/clinics/payments', [AuthController::class, 'clinicPayments']);
 
 Route::get('/auth/me',          [AuthController::class, 'me']);     // session check
 Route::post('/auth/logout',     [AuthController::class, 'logout']); // invalidate
