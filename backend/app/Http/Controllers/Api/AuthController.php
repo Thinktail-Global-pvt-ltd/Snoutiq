@@ -853,6 +853,7 @@ private function sendImageToGemini(string $imageData, string $mimeType): ?string
 
 public function login(Request $request)
 {
+  //  dd($request->all());
     try {
         $email = $request->input('email') ?? $request->input('login');
         $role  = $request->input('role'); // 👈 role pick karo
@@ -977,6 +978,23 @@ public function login(Request $request)
 
                 $clinicId = (int) $clinicRow->id;
 
+                $doctors = Doctor::where('vet_registeration_id', $clinicId)
+                    ->get()
+                    ->map(function (Doctor $doctor) {
+                        return [
+                            'id'                   => $doctor->id,
+                            'name'                 => $doctor->doctor_name,
+                            'email'                => $doctor->doctor_email,
+                            'mobile'               => $doctor->doctor_mobile,
+                            'license'              => $doctor->doctor_license,
+                            'image'                => $doctor->doctor_image,
+                            'toggle_availability'  => $doctor->toggle_availability,
+                            'consultation_price'   => $doctor->doctors_price,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+
                 $clinicData = (array) $clinicRow;
                 unset($clinicData['password']);
                 $clinicData['role'] = 'clinic_admin';
@@ -1000,6 +1018,7 @@ public function login(Request $request)
                     'vet_registeration_id'       => $clinicId,
                     'vet_registerations_temp_id' => $clinicId,
                     'doctor_id'  => null,
+                    'doctors'    => $doctors,
                 ];
 
                 session([
@@ -1015,6 +1034,7 @@ public function login(Request $request)
                     'vet_id'                      => $clinicId,
                     'vet_registeration_id'        => $clinicId,
                     'vet_registerations_temp_id'  => $clinicId,
+                    'doctors'                     => $doctors,
                 ]);
 
                 return response()->json($response, 200);
@@ -1032,6 +1052,23 @@ public function login(Request $request)
             $clinicForDoctor = $clinicId > 0
                 ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
                 : null;
+
+            $doctors = Doctor::where('vet_registeration_id', $clinicId)
+                ->get()
+                ->map(function (Doctor $doctor) {
+                    return [
+                        'id'                   => $doctor->id,
+                        'name'                 => $doctor->doctor_name,
+                        'email'                => $doctor->doctor_email,
+                        'mobile'               => $doctor->doctor_mobile,
+                        'license'              => $doctor->doctor_license,
+                        'image'                => $doctor->doctor_image,
+                        'toggle_availability'  => $doctor->toggle_availability,
+                        'consultation_price'   => $doctor->doctors_price,
+                    ];
+                })
+                ->values()
+                ->toArray();
 
             DB::transaction(function () use (&$plainToken, &$room, $doctorRow, $roomTitle) {
                 $plainToken = bin2hex(random_bytes(32));
@@ -1073,6 +1110,7 @@ public function login(Request $request)
                 'vet_id'      => $clinicId ?: null,
                 'vet_registeration_id'       => $clinicId ?: null,
                 'vet_registerations_temp_id' => $clinicId ?: null,
+                'doctors'     => $doctors,
             ];
 
             session([
@@ -1088,6 +1126,7 @@ public function login(Request $request)
                 'vet_id'                      => $clinicId ?: null,
                 'vet_registeration_id'        => $clinicId ?: null,
                 'vet_registerations_temp_id'  => $clinicId ?: null,
+                'doctors'                     => $doctors,
             ]);
 
             return response()->json($response, 200);
