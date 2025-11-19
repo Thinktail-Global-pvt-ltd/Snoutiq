@@ -93,4 +93,52 @@ class DoctorController extends Controller
             'clinic' => $clinic,
         ]);
     }
+
+    // PUT /api/doctors/{id}
+    public function update(Request $request, int $id)
+    {
+        $payload = $request->validate([
+            'doctor_name'   => ['nullable', 'string', 'max:255'],
+            'doctor_email'  => ['nullable', 'email', 'max:255'],
+            'doctor_mobile' => ['nullable', 'string', 'max:50'],
+            'doctor_license'=> ['nullable', 'string', 'max:255'],
+            'doctor_image'  => ['nullable', 'string', 'max:500'],
+            'vet_registeration_id' => ['nullable', 'integer'],
+            'doctors_price' => ['nullable', 'numeric'],
+            'toggle_availability' => ['nullable', 'boolean'],
+        ]);
+
+        $doctor = DB::table('doctors')->where('id', $id)->first();
+        if (! $doctor) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Doctor not found',
+            ], 404);
+        }
+
+        // Keep only provided keys (including falsy values like 0/false)
+        $updates = [];
+        foreach ($payload as $key => $value) {
+            if ($request->has($key)) {
+                $updates[$key] = $value;
+            }
+        }
+
+        if (empty($updates)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No fields provided to update',
+            ], 422);
+        }
+
+        $updates['updated_at'] = now();
+        DB::table('doctors')->where('id', $id)->update($updates);
+
+        $fresh = DB::table('doctors')->where('id', $id)->first();
+
+        return response()->json([
+            'status' => 'success',
+            'doctor' => $fresh,
+        ]);
+    }
 }

@@ -349,6 +349,7 @@ if(App\Models\UserProfile::where('user_id', $Request->user()->id)->count() == 0)
 use App\Http\Controllers\Api\PushController; // late import is okay in routes
 Route::prefix('push')->group(function () {
     Route::post('/register-token', [PushController::class, 'registerToken']);
+    Route::put('/edit-token', [PushController::class, 'editToken']);
     Route::delete('/register-token', [PushController::class, 'unregisterToken']);
     Route::post('/test', [PushController::class, 'testToToken']);
 });
@@ -652,6 +653,7 @@ Route::post('/bookings/{id}/verify-payment', [\App\Http\Controllers\Api\Bookings
 Route::get('/doctors', [DoctorController::class, 'index']);
 Route::get('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slots']);
 Route::get('/doctors/{id}', [DoctorController::class, 'show']);
+Route::put('/doctors/{id}', [DoctorController::class, 'update']);
 Route::get('/doctors/{id}/bookings', [\App\Http\Controllers\Api\BookingsController::class, 'doctorBookings']);
 Route::get('/socket/doctors/{doctor}', [\App\Http\Controllers\Api\SocketDoctorController::class, 'show']);
 
