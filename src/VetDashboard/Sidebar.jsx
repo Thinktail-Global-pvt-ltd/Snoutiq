@@ -557,7 +557,6 @@ const HeaderWithSidebar = ({ children }) => {
   const { user } = useContext(AuthContext);
   const hasListeners = useRef(false);
   const hasSetUpListeners = useRef(false);
-  // console.log(user,"ankit");
   
   const doctorId = user.id
 

@@ -21,27 +21,32 @@ import logo from "../assets/images/logo.webp";
 import { AuthContext } from "../auth/AuthContext";
 
 const navItems = [
+  // {
+  //   label: "Platform",
+  //   // href: "/#features",
+  //   description: "Telehealth, EMR, and payments in one secure stack",
+  //   dropdown: [
+  //     {
+  //       label: "Full Feature Overview",
+  //       description: "Explore everything SnoutIQ automates for care teams",
+  //       href: "/features",
+  //     },
+  //     {
+  //       label: "Video Consultation",
+  //       description: "Crystal clear HD visits with notes and screen share",
+  //       href: "/video-consult",
+  //     },
+  //     // {
+  //     //   label: "AI Triage",
+  //     //   description: "Guide pet parents and flag emergencies automatically",
+  //     //   href: "/ai-triage",
+  //     // },
+  //   ],
+  // },
   {
-    label: "Platform",
-    // href: "/#features",
-    description: "Telehealth, EMR, and payments in one secure stack",
-    dropdown: [
-      {
-        label: "Full Feature Overview",
-        description: "Explore everything SnoutIQ automates for care teams",
-        href: "/features",
-      },
-      {
-        label: "Video Consultation",
-        description: "Crystal clear HD visits with notes and screen share",
-        href: "/video-consult",
-      },
-      // {
-      //   label: "AI Triage",
-      //   description: "Guide pet parents and flag emergencies automatically",
-      //   href: "/ai-triage",
-      // },
-    ],
+    label: "Home",
+    href: "/",
+    description: "AI-powered pet care with 24/7 support, vet video consultations, and personalized health insights. Powered by SnoutIQ.",
   },
   {
     label: "Solutions",
@@ -55,12 +60,12 @@ const navItems = [
     dropdown: [
       {
         label: "Delhi NCR",
-        description: "Flagship coverage with 24/7 vet support",
+        // description: "Flagship coverage with 24/7 vet support",
         href: "/delhi",
       },
       {
         label: "Gurugram",
-        description: "Priority consultations for urban pet parents",
+        // description: "Priority consultations for urban pet parents",
         href: "/gurugram",
       },
       // {
@@ -82,7 +87,7 @@ const navItems = [
     dropdown: [
       {
         label: "Blog Home",
-        description: "Product updates, guides, and customer stories",
+        // description: "Product updates, guides, and customer stories",
         href: "/blog",
       },
       // {

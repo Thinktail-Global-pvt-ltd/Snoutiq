@@ -7,7 +7,6 @@ import Header from "../components/Header";
 const ClientLogos = lazy(() => import("../components/ClientLogos"));
 const PainPoints = lazy(() => import("../components/PainPoints"));
 const Workflow = lazy(() => import("../components/Workflow"));
-const CTA = lazy(() => import("../components/CTA"));
 const Footer = lazy(() => import("../components/Footer"));
 
 import {
@@ -252,28 +251,6 @@ function Home() {
             subtitle="Give your clients a smooth digital experience while your team gets a clear, trackable process."
             steps={WORKFLOW_STEPS}
           />
-        </LazySection>
-
-        <LazySection>
-          <section
-            className="bg-gradient-to-br from-slate-50 to-blue-50"
-            aria-labelledby="cta-heading"
-          >
-            <CTA
-              id="cta"
-              eyebrow="Ready to modernize?"
-              title="Ready to Transform Your Veterinary Practice?"
-              subtitle="Join 500+ clinics already providing better care with SnoutIQ"
-              primaryButton={{ text: "Start Free Trial", href: "/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing" }}
-              secondaryButton={{ text: "Talk to Our Team", href: "https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform?usp=sharing&ouid=100613985134578372936" }}
-              variant="gradient"
-              bullets={[
-                "Launch in under two weeks",
-                "White-glove onboarding",
-                "Dedicated success manager",
-              ]}
-            />
-          </section>
         </LazySection>
       </main>
 

@@ -503,6 +503,11 @@ import ClinicsSolutionPage from "./pages/ClinicsSolutionPage";
 import FeaturesPage from "./pages/FeaturesPage";
 import VideoConsultPage from "./pages/VideoConsultPage";
 import AITriagePage from "./pages/AITriagePage";
+import FirstAidEvery from "./blog/FirstAidEvery";
+import BoostYourDog from "./blog/BoostYourDog";
+import VaccinationSchedule from "./blog/VaccinationSchedule";
+import BestFoodForDog from "./blog/BestFoodForDog";
+import HowVetsGrow from "./blog/HowVetsGrow";
 const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
@@ -857,6 +862,11 @@ function App() {
               path="/blog/protecting-pet-paws-in-winter-tips-guide"
               element={<PetPawProtecteGuide />}
             />
+            <Route path="/blog/first-aid-tips-every-pet-parent-should-know" element={<FirstAidEvery/>}/>
+            <Route path="/blog/boost-your-dogs-immunity-naturally" element={<BoostYourDog/>}/>
+            <Route path="/blog/vaccination-schedule-for-pets-in-india" element={<VaccinationSchedule/>}/>
+            <Route path="/blog/best-food-for-dogs-in-winter" element={<BestFoodForDog/>}/>
+            <Route path="/blog/how-vets-grow-with-online-consultations" element={<HowVetsGrow/>}/>
             {/* <Route path="/pricing" element={<PricingPage />} /> */}
             <Route path="/delhi" element={<DelhiPage />} />
             <Route path="/gurugram" element={<GurugramPage />} />

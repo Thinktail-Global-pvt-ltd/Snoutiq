@@ -1,7 +1,9 @@
 import React, {
+  memo,
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -81,8 +83,8 @@ const parseAIResponse = (text) => {
 };
 
 // ------------------- FormattedAIResponse Component - Responsive -------------------
-const FormattedAIResponse = ({ text }) => {
-  const sections = parseAIResponse(text);
+const FormattedAIResponse = memo(({ text }) => {
+  const sections = useMemo(() => parseAIResponse(text), [text]);
 
   return (
     <div className="bg-gradient-to-br from-purple-50 via-white to-indigo-50 rounded-xl lg:rounded-2xl p-4 sm:p-5 lg:p-6 border-2 border-purple-200 shadow-lg max-w-full">
@@ -187,7 +189,7 @@ const FormattedAIResponse = ({ text }) => {
       </div>
     </div>
   );
-};
+});
 
 // ------------------- DoctorSearchModal - Responsive -------------------
 const DoctorSearchModal = ({
@@ -1238,7 +1240,7 @@ const EmergencyStatusBox = ({
 };
 
 // ------------------- MessageBubble - Fully Responsive -------------------
-const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
+const MessageBubbleComponent = ({ msg, index, nearbyDoctors, navigation }) => {
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -1370,5 +1372,25 @@ const MessageBubble = ({ msg, index, nearbyDoctors, navigation }) => {
     </>
   );
 };
+
+const areMessagesEqual = (prevProps, nextProps) => {
+  const prevMsg = prevProps.msg;
+  const nextMsg = nextProps.msg;
+
+  return (
+    prevProps.index === nextProps.index &&
+    prevProps.nearbyDoctors === nextProps.nearbyDoctors &&
+    prevProps.navigation === nextProps.navigation &&
+    prevMsg?.id === nextMsg?.id &&
+    prevMsg?.sender === nextMsg?.sender &&
+    prevMsg?.decision === nextMsg?.decision &&
+    prevMsg?.displayedText === nextMsg?.displayedText &&
+    prevMsg?.text === nextMsg?.text &&
+    prevMsg?.type === nextMsg?.type &&
+    prevMsg?.timestamp === nextMsg?.timestamp
+  );
+};
+
+const MessageBubble = memo(MessageBubbleComponent, areMessagesEqual);
 
 export { EmergencyStatusBox, MessageBubble, StartCallButton };

@@ -46,8 +46,8 @@ const Hero = ({
   const heroChecklist = useMemo(
     () => [
       {
-        title: "Launch telehealth fast",
-        copy: "Templates, automations, and onboarding for U.S. clinics.",
+        title: "Launch teleconsultation fast",
+        copy: "Templates, automations, and onboarding for clinics.",
       },
       {
         title: "Proactive client care",
@@ -67,7 +67,7 @@ const Hero = ({
 
   const heroStats = useMemo(
     () => [
-      { value: "4 min", label: "Avg. response time" },
+      { value: "10 min", label: "Avg. response time" },
       { value: "70%", label: "Fewer missed visits" },
       { value: "24/7", label: "Live veterinary coverage" },
     ],
@@ -272,7 +272,7 @@ const Hero = ({
                   ))}
                 </div>
                 <span className="font-semibold text-slate-600">
-                  500+ modern veterinary teams already on SnoutIQ
+                  50+ modern veterinary teams already on SnoutIQ
                 </span>
               </div>
               <ul

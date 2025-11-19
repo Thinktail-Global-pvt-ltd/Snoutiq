@@ -181,8 +181,6 @@ const PetDetailsModal = ({ onComplete, updateUser, token, user }) => {
         submitData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
-
-      console.log(res,"ankit");
       
 
       if (res.data.message?.includes("successfully")) {

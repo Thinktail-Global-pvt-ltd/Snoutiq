@@ -14,6 +14,12 @@ import Footer from "../components/Footer";
 import img1 from '../assets/images/dog winter.png';
 import img2 from '../assets/images/pawproduction.png';
 import img3 from '../assets/images/tickfever.png';
+// --------------------------------------------------------
+import img4 from '../assets/images/first_aid_tips.jpeg';
+import img5 from '../assets/images/how_to_boost.jpeg';
+import img6 from '../assets/images/how_vets_can.jpeg';
+import img7 from '../assets/images/vaccination_schedule.jpeg';
+import img8 from '../assets/images/what_should_your.jpeg';
 
 export const metadata = {
   title: "Blog - SnoutIQ Veterinary Insights",
@@ -53,7 +59,7 @@ const posts = [
     excerpt:
       "Learn about tick fever in dogs — common symptoms, causes, prevention tips, and treatment options. Understand how to detect tick fever early and keep your dog safe.",
     author: "Snoutiq Editer",
-    date: "November 11, 2024",
+    date: "November 11, 2025",
     readTime: "7 min read",
     category: "AI & Technology",
     slug: "symptoms-of-tick-fever-in-dogs",
@@ -69,6 +75,66 @@ const posts = [
     readTime: "5 min read",
     category: "Client Relations",
     slug: "protecting-pet-paws-in-winter-tips-guide",
+  },
+// -----------------------------------------------------------------------------------------
+  {
+    image:img4,
+    title: "First Aid Tips Every Pet Parent Should Know – Essential Pet Emergency Guide",
+    excerpt:
+      "Learn life-saving first aid tips every pet parent should know. Discover how to handle pet injuries, choking, burns, bleeding, and other emergencies confidently at home.",
+    author: "Snoutiq Editer",
+    date: "November 19, 2025",
+    readTime: "6 min read",
+    category: "Telemedicine",
+    slug: "first-aid-tips-every-pet-parent-should-know",
+    trending: true,
+  },
+  {
+     image:img5,
+    title: "Natural Ways to Strengthen Your Dog’s Immune System – Complete Guide",
+    excerpt:
+      "Discover natural ways to strengthen your dog’s immune system. Learn foods that boost dog immunity, effective routines, and natural immune boosters for dogs you can try at home.",
+    author: "Snoutiq Editer",
+    date: "November 19, 2025",
+    readTime: "7 min read",
+    category: "Client Relations",
+    slug: "boost-your-dogs-immunity-naturally",
+    trending: true,
+  },
+  {
+     image:img7,
+    title: "Vaccination Schedule for Pets in India – Complete Vet Approved Guide",
+    excerpt:
+      ": Learn the complete vaccination schedule for pets in India. Know which vaccines your dog or cat needs, timelines, costs, and why vaccination is vital for long, healthy lives.",
+    author: "Snoutiq Editer",
+    date: "November 19, 2025",
+    readTime: "5 min read",
+    category: "Client Relations",
+    slug: "vaccination-schedule-for-pets-in-india",
+  },
+
+   {
+     image:img8,
+    title: "Best Food for Dogs in Winter Complete Nutrition Guide 2025",
+    excerpt:
+      "Discover the best food for dogs in winter including warming meals, immunity boosting foods and a complete winter diet plan to keep your dog healthy and active.",
+    author: "Snoutiq Editer",
+    date: "November 19, 2025",
+    readTime: "7 min read",
+    category: "Client Relations",
+    slug: "best-food-for-dogs-in-winter",
+    trending: true,
+  },
+  {
+     image:img6,
+    title: "How Vets Can Grow Their Practice with Online Consultations in India",
+    excerpt:
+      "Discover how veterinarians can grow their practice using online vet consultation. Learn benefits, tools, pricing, marketing strategies and much more for scaling digital veterinary services in India.",
+    author: "Snoutiq Editer",
+    date: "November 19, 2025",
+    readTime: "5 min read",
+    category: "Client Relations",
+    slug: "how-vets-grow-with-online-consultations",
   },
  
 ];
@@ -294,16 +360,16 @@ function BlogCard({ post }) {
         }}
       >
         <div className="absolute inset-0 bg-pattern opacity-5" />
-        <div className="relative text-4xl transform group-hover:scale-110 transition-transform duration-300">
+        {/* <div className="relative text-4xl transform group-hover:scale-110 transition-transform duration-300">
           {post.trending ? "🚀" : "📝"}
-        </div>
+        </div> */}
 
-        {post.trending && (
+        {/* {post.trending && (
           <div className="absolute top-4 left-4 flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[10px] font-bold rounded-full shadow-lg">
             <TrendingUp className="w-3 h-3" />
             TRENDING
           </div>
-        )}
+        )} */}
       </div>
 
       <div className="p-6 lg:p-8 flex flex-col flex-grow space-y-3">

@@ -45,7 +45,7 @@ const Dashboard = () => {
     updateNearbyDoctors,
   } = useContext(AuthContext);
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
@@ -54,7 +54,6 @@ const Dashboard = () => {
   const typingTimeouts = useRef(new Map());
   const isAutoScrolling = useRef(false);
   const [nearbyDoctors, setNearbyDoctors] = useState([]);
-  console.log(nearbyDoctors,"ankit");
   
 
   // NEW: last decision/score shown in the Pet Profile bar
@@ -125,7 +124,6 @@ const Dashboard = () => {
     if (!token || !user?.id) return;
 
     try {
-      setIsLoading(true);
       const res = await axios.get(
         `https://snoutiq.com/backend/api/nearby-vets?user_id=${user.id}`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -138,8 +136,6 @@ const Dashboard = () => {
     } catch (err) {
       console.error("Failed to fetch nearby doctors", err);
       toast.error("Failed to fetch doctors");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -193,28 +189,13 @@ const Dashboard = () => {
     }
   }, [messages.length, scrollToBottom]);
 
-  const handleFeedback = async (feedback, timestamp) => {
-    try {
-      const consultationId = messages.find(
-        (m) => m.timestamp.getTime() === timestamp.getTime()
-      )?.consultationId;
-
-      if (!consultationId) return;
-
-      await axios.post("/api/feedback", { consultationId, feedback });
-      toast.success("Thanks for your feedback!");
-    } catch {
-      toast.error("Failed to submit feedback");
-    }
-  };
-
   const fetchChatHistory = useCallback(
     async (specificChatRoomToken = null) => {
       const tk = localStorage.getItem("token");
       if (!tk || !user) return;
 
       try {
-        setIsLoading(true);
+        setChatLoading(true);
 
         let url;
         if (specificChatRoomToken) {
@@ -231,7 +212,6 @@ const Dashboard = () => {
 
         if (res.data && Array.isArray(res.data)) {
           const decision = deriveDecision(res.data.decision);
-          console.log(decision,"ankit217");
 
 
           messagesFromAPI =
@@ -291,7 +271,7 @@ const Dashboard = () => {
         console.error("Failed to fetch history", err);
         if (specificChatRoomToken) toast.error("Failed to load chat history");
       } finally {
-        setIsLoading(false);
+        setChatLoading(false);
       }
     },
     [user]
@@ -606,7 +586,7 @@ const Dashboard = () => {
           className="flex-1 overflow-y-auto px-4 bg-gray-50 custom-scroll "
         >
           <div className="max-w-4xl mx-auto py-4">
-            {isLoading ? (
+            {chatLoading ? (
               <div className="flex justify-center items-center h-40">
                 <div className="text-center">
                   <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full mb-4 mx-auto"></div>
@@ -665,9 +645,6 @@ const Dashboard = () => {
                     <MessageBubble
                       msg={msg}
                       index={index}
-                      onFeedback={(value, timestamp) =>
-                        handleFeedback(value, timestamp)
-                      }
                       nearbyDoctors={nearbyDoctors}
                     />
                   </div>
@@ -694,16 +671,12 @@ const Dashboard = () => {
     );
   }, [
     messages,
-    user,
     sending,
     clearChat,
     handleSendMessage,
-    isLoading,
+    chatLoading,
     currentChatRoomToken,
-    canEditPetProfile,
-    petProfile,
-    lastDecision,
-    lastScore,
+    nearbyDoctors,
   ]);
 
   return (

@@ -1,8 +1,9 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync } from "fs";
+import { dirname, join } from "path";
 import admin from "firebase-admin";
+import { fileURLToPath } from "url";
 import {
   getWhatsAppConfig,
   isWhatsAppConfigured,
@@ -10,21 +11,76 @@ import {
   sendWhatsAppText,
 } from "./whatsapp-client.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const DEFAULT_SERVICE_ACCOUNT_FILE = "snoutiqapp-9cacc4ece358.json";
+
+const resolveServiceAccountPath = () => {
+  const candidates = [
+    process.env.SERVICE_ACCOUNT_PATH,
+    join(__dirname, DEFAULT_SERVICE_ACCOUNT_FILE),
+    join(__dirname, "../../", DEFAULT_SERVICE_ACCOUNT_FILE),
+    join(process.cwd(), DEFAULT_SERVICE_ACCOUNT_FILE),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return candidates[0] || null;
+};
+
+const loadServiceAccountFromEnv = () => {
+  const raw =
+    process.env.SERVICE_ACCOUNT_JSON ||
+    process.env.FIREBASE_SERVICE_ACCOUNT ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+
+  if (!raw) return null;
+
+  try {
+    const decoded = raw.trim().startsWith("{")
+      ? raw
+      : Buffer.from(raw, "base64").toString("utf8");
+    return JSON.parse(decoded);
+  } catch (error) {
+    console.error(
+      "❌ Failed to parse SERVICE_ACCOUNT_JSON / FIREBASE_SERVICE_ACCOUNT:",
+      error.message
+    );
+    return null;
+  }
+};
+
 // ==================== FIREBASE ADMIN SDK INITIALIZATION ====================
 try {
   let serviceAccount;
-  const serviceAccountPath =
-    process.env.SERVICE_ACCOUNT_PATH ||
-    join(process.cwd(), "snoutiqapp-9cacc4ece358.json");
+  const resolvedPath = resolveServiceAccountPath();
 
-  try {
-    serviceAccount = JSON.parse(readFileSync(serviceAccountPath, "utf8"));
-  } catch (error) {
-    console.error("⚠️ Could not load service account key:", error.message);
+  if (resolvedPath) {
+    try {
+      serviceAccount = JSON.parse(readFileSync(resolvedPath, "utf8"));
+    } catch (error) {
+      console.error("⚠️ Could not load service account key:", error.message);
+      console.log(
+        "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory.",
+      );
+      serviceAccount = null;
+    }
+  } else {
+    console.log("⚠️ No service account path resolved.");
     console.log(
-      "💡 Please set SERVICE_ACCOUNT_PATH environment variable or place serviceAccountKey.json in the correct location"
+      "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory.",
     );
     serviceAccount = null;
+  }
+
+  if (!serviceAccount) {
+    serviceAccount = loadServiceAccountFromEnv();
+    if (serviceAccount) {
+      console.log("✅ Loaded Firebase service account from environment variable.");
+    }
   }
 
   if (serviceAccount) {
@@ -229,39 +285,39 @@ const sendPushNotification = async (doctorId, payload) => {
 
     console.log(`📤 Sending FCM notification to doctor ${doctorId}`);
 
+    const stringifiedData = Object.entries({
+      type: "pending_call",
+      callId: payload.callId,
+      channel: payload.channel,
+      roomId: payload.channel,
+      room: payload.channel,
+      patientId: payload.patientId,
+      doctorId: payload.doctorId,
+      deepLink: payload.deepLink,
+      timestamp: payload.timestamp,
+      message: payload.message,
+      title: payload.title || payload.message,
+      body: payload.body || payload.message,
+      callerName: payload.callerName,
+      timeoutMs: payload.timeoutMs,
+      click_action: "OPEN_PENDING_CALL",
+    }).reduce((acc, [key, value]) => {
+      if (value === undefined || value === null) return acc;
+      acc[key] = String(value);
+      return acc;
+    }, {});
+
     // Build the message with ALL STRING VALUES (FCM requirement)
     const message = {
-      notification: {
-        title: "📞 Pending Video Call",
-        body: payload.message,
-      },
-      data: {
-        type: "pending_call",
-        callId: String(payload.callId),
-        channel: String(payload.channel),
-        patientId: String(payload.patientId),
-        doctorId: String(payload.doctorId),
-        deepLink: String(payload.deepLink),
-        timestamp: String(payload.timestamp),
-        click_action: "OPEN_PENDING_CALL",
-      },
       token: doctorPushToken,
+      data: stringifiedData,
 
       android: {
         priority: "high",
         ttl: 3600000,
-        notification: {
-          channelId: "calls",
-          sound: "default",
-          priority: "high",
-          visibility: "public",
-          defaultSound: true,
-          defaultVibrateTimings: true,
-          icon: "notification_icon",
-          color: "#4F46E5",
-          tag: `call_${payload.callId}`,
-          sticky: true,
-          clickAction: "OPEN_PENDING_CALL",
+        restrictedPackageName: process.env.ANDROID_APP_ID,
+        fcmOptions: {
+          analyticsLabel: "pending_call",
         },
       },
 
@@ -275,19 +331,23 @@ const sendPushNotification = async (doctorId, payload) => {
             sound: "default",
             badge: 1,
             alert: {
-              title: "📞 Pending Video Call",
-              body: payload.message,
+              title: payload.title || "📞 Pending Video Call",
+              body: payload.body || payload.message,
             },
             "content-available": 1,
             "mutable-content": 1,
+            category: "INCOMING_CALL",
           },
+        },
+        fcm_options: {
+          analytics_label: "pending_call",
         },
       },
 
       webpush: {
         notification: {
-          title: "📞 Pending Video Call",
-          body: payload.message,
+          title: payload.title || "📞 Pending Video Call",
+          body: payload.body || payload.message,
           icon: "/icon-192x192.png",
           badge: "/badge-72x72.png",
           requireInteraction: true,
@@ -296,6 +356,7 @@ const sendPushNotification = async (doctorId, payload) => {
             { action: "dismiss", title: "Dismiss" },
           ],
         },
+        data: stringifiedData,
         fcmOptions: {
           link: payload.deepLink,
         },
@@ -730,6 +791,12 @@ const notifyDoctorPendingCall = async (callSession) => {
 
   // FCM Push Notification
   if (admin.apps.length > 0) {
+    const callerDisplayName =
+      callSession.patientName ||
+      callSession.patientFullName ||
+      callSession.patient ||
+      `Patient ${patientId}`;
+    const defaultMessage = `Patient ${patientId} is waiting for you. Join the call now!`;
     const notificationPayload = {
       callId,
       doctorId,
@@ -737,7 +804,11 @@ const notifyDoctorPendingCall = async (callSession) => {
       channel,
       timestamp: new Date().toISOString(),
       type: "pending_call",
-      message: `Patient ${patientId} is waiting for you. Join the call now!`,
+      message: callSession.message || defaultMessage,
+      title: callSession.title || `Incoming call from ${callerDisplayName}`,
+      body: callSession.body || callSession.message || defaultMessage,
+      callerName: callerDisplayName,
+      timeoutMs: callSession.timeoutMs || 120000,
       deepLink: `snoutiq://call/${callId}?channel=${channel}&patientId=${patientId}`,
     };
 
@@ -1678,7 +1749,7 @@ setInterval(() => {
 }, 30_000);
 
 // -------------------- START SERVER --------------------
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4100;
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Socket.IO server running on port ${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/health`);
@@ -1696,3 +1767,4 @@ httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`📲 WhatsApp alerts: ENABLED (${WHATSAPP_ALERT_MODE} mode)`);
   }
 });
+

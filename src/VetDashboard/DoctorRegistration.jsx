@@ -978,7 +978,6 @@ const DoctorRegistration = () => {
       );
 
       if (res.status === 200 || res.status === 201) {
-        console.log(res, "ankit");
 
         // Extract slug from backend response
         const slug = res?.data?.data?.slug;
