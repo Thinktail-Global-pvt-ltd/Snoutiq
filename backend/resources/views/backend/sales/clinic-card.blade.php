@@ -5,193 +5,211 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $clinicName }} • Booking Card</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #e2e8f0;
-            padding: 30px;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #dfeaff;
+            padding: 32px 18px 48px;
+            min-height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
         }
-        .page-shell { width: 420px; position: relative; }
+        .page-shell {
+            width: 420px;
+            max-width: 100%;
+        }
         .download-btn {
             position: sticky;
-            top: 0;
-            margin-bottom: 20px;
+            top: 10px;
             width: 100%;
             border: none;
             border-radius: 999px;
-            padding: 0.9rem 1.4rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 0.95rem 1.4rem;
+            background: linear-gradient(135deg, #4d7bff, #6c6cff);
             color: #fff;
             font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.25);
+            box-shadow: 0 15px 35px rgba(77, 123, 255, 0.35);
+            margin-bottom: 22px;
         }
-        .booking-card {
+        .qr-card {
+            position: relative;
             width: 100%;
-            background: white;
-            border-radius: 20px;
+            background: #f4f8ff;
+            border-radius: 36px;
+            padding: 40px 32px 38px;
+            box-shadow: 0 22px 40px rgba(70, 86, 128, 0.18);
+            text-align: center;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
-        .card-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 25px 20px;
-            text-align: center;
+        .qr-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 36px;
+            border: 12px solid #3172ff;
+            pointer-events: none;
         }
-        .clinic-name {
-            background: white;
-            color: #667eea;
-            padding: 12px 20px;
-            border-radius: 12px;
-            font-size: 22px;
-            font-weight: 700;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        .qr-card > * {
+            position: relative;
+            z-index: 1;
         }
-        .scan-title {
-            color: white;
-            font-size: 18px;
-            font-weight: 600;
-            margin-top: 10px;
-        }
-        .card-body {
-            padding: 30px 20px;
-            text-align: center;
-        }
-        .qr-container {
-            background: white;
-            padding: 15px;
-            border-radius: 15px;
-            border: 3px solid #667eea;
+        .brand-pill {
+            background: #fff;
+            color: #3172ff;
+            border-radius: 999px;
+            font-weight: 800;
+            padding: 6px 28px;
             display: inline-block;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 15px rgba(102, 126, 234, 0.2);
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+        }
+        .hero-text {
+            color: #fff;
+            background: #0f48d5;
+            border-radius: 999px;
+            display: inline-block;
+            padding: 6px 24px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            margin-bottom: 22px;
+        }
+        .clinic-title {
+            color: #0d1d4d;
+            font-weight: 800;
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            margin-bottom: 22px;
+            letter-spacing: 0.05em;
+        }
+        .qr-wrapper {
+            width: 260px;
+            height: 260px;
+            margin: 0 auto 28px;
+            background: #fff;
+            border-radius: 32px;
+            padding: 22px;
+            box-shadow: inset 0 0 0 3px #d5ddff;
         }
         .qr-code {
-            width: 220px;
-            height: 220px;
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            border: 2px solid #e4e9ff;
+            padding: 10px;
+            background: #fff;
         }
         .qr-code img {
             width: 100%;
             height: 100%;
             object-fit: contain;
+            display: block;
         }
-        .referral-section {
-            background: #f8f9ff;
-            padding: 15px;
-            border-radius: 12px;
-            margin: 20px 0;
-            border: 2px dashed #667eea;
+        .clinic-id-label {
+            font-size: 0.85rem;
+            color: #5b668c;
+            letter-spacing: 0.25em;
         }
-        .referral-label {
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 5px;
-            font-weight: 500;
+        .clinic-id-value {
+            font-weight: 800;
+            font-size: 1.35rem;
+            color: #0d48d5;
+            letter-spacing: 0.2em;
+            margin: 6px 0 26px;
         }
-        .referral-code {
-            font-size: 24px;
-            font-weight: 700;
-            color: #667eea;
-            letter-spacing: 2px;
-        }
-        .features {
+        .feature-grid {
             display: flex;
-            justify-content: space-around;
-            padding: 20px 10px;
-            gap: 10px;
+            justify-content: space-between;
+            gap: 16px;
         }
         .feature-item {
             flex: 1;
             text-align: center;
         }
         .feature-icon {
-            width: 50px;
-            height: 50px;
+            width: 70px;
+            height: 70px;
             margin: 0 auto 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 12px;
+            border: 2px solid #0f48d5;
+            border-radius: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-size: 24px;
+            background: #fff;
         }
-        .feature-text {
-            font-size: 13px;
-            font-weight: 600;
-            color: #333;
-            line-height: 1.3;
+        .feature-item svg {
+            width: 34px;
+            height: 34px;
+            stroke: #0f48d5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
-        .card-footer {
-            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-            padding: 20px;
-            text-align: center;
-        }
-        .footer-text {
-            color: #333;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 3px;
-        }
-        .footer-brand {
-            color: #333;
-            font-size: 16px;
+        .feature-label {
+            font-size: 0.75rem;
             font-weight: 700;
-        }
-        .target-url {
-            margin-top: 8px;
-            font-size: 11px;
-            color: #475569;
-            word-break: break-all;
+            color: #0f1b36;
+            letter-spacing: 0.04em;
         }
     </style>
 </head>
 <body>
 <div class="page-shell">
     <button class="download-btn" onclick="downloadCard()">Download booking card</button>
-    <div class="booking-card" id="bookingCard">
-        <div class="card-header">
-            <div class="clinic-name">{{ $clinicName }}</div>
-            <div class="scan-title">SCAN TO BOOK YOUR APPOINTMENT</div>
-            <div class="target-url">{{ $targetUrl }}</div>
-        </div>
+    <div class="qr-card" id="bookingCard">
+        <div class="brand-pill">SNOUTIQ</div>
+        <div class="hero-text">Scan To Download App!</div>
+        <div class="clinic-title">{{ $clinicName }}</div>
 
-        <div class="card-body">
-            <div class="qr-container">
-                <div class="qr-code">
-                    <img src="{{ $qrDataUri }}" alt="QR for {{ $clinicName }}">
-                </div>
-            </div>
-
-            <div class="referral-section">
-                <div class="referral-label">REFERRAL CODE</div>
-                <div class="referral-code">{{ $referralCode }}</div>
-            </div>
-
-            <div class="features">
-                <div class="feature-item">
-                    <div class="feature-icon">📱</div>
-                    <div class="feature-text">Download<br>App</div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon">🩺</div>
-                    <div class="feature-text">Video<br>Consultation</div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon">🤖</div>
-                    <div class="feature-text">AI Symptom<br>Checker</div>
-                </div>
+        <div class="qr-wrapper">
+            <div class="qr-code">
+                <img src="{{ $qrDataUri }}" alt="QR for {{ $clinicName }}">
             </div>
         </div>
 
-        <div class="card-footer">
-            <div class="footer-text">POWERED BY</div>
-            <div class="footer-brand">SNOUTIQ - INDIA'S DIGITAL VET NETWORK</div>
+        <div class="clinic-id-label">CLINIC-ID</div>
+        <div class="clinic-id-value">{{ $referralCode }}</div>
+
+        <div class="feature-grid">
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 48 48" fill="none" stroke-width="2.5">
+                        <rect x="13" y="4" width="22" height="40" rx="4"></rect>
+                        <polyline points="19,18 24,23 29,18"></polyline>
+                        <line x1="24" y1="23" x2="24" y2="31"></line>
+                    </svg>
+                </div>
+                <div class="feature-label">DOWNLOAD APP</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 48 48" fill="none" stroke-width="2.5">
+                        <circle cx="16" cy="14" r="6"></circle>
+                        <path d="M10 30c2-4 10-4 12 0"></path>
+                        <circle cx="34" cy="18" r="6"></circle>
+                        <path d="M28 34c2-4 10-4 12 0"></path>
+                        <path d="M28 26l4 4"></path>
+                    </svg>
+                </div>
+                <div class="feature-label">VIDEO CONSULT</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 48 48" fill="none" stroke-width="2.5">
+                        <rect x="10" y="10" width="28" height="28" rx="6"></rect>
+                        <path d="M19 19h10v10H19z"></path>
+                        <path d="M24 12v6"></path>
+                        <path d="M24 30v6"></path>
+                        <path d="M12 24h6"></path>
+                        <path d="M30 24h6"></path>
+                    </svg>
+                </div>
+                <div class="feature-label">AI SYMPTOM CHECK</div>
+            </div>
         </div>
     </div>
 </div>
