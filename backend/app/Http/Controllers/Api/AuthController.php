@@ -1656,33 +1656,69 @@ public function googleLogin_bkp(Request $request)
     public function clinicPayments(Request $request, $clinicId = null)
     {
         $clinicId = $clinicId ?? $request->input('clinic_id');
-        $status = $request->input('status'); // optional: filter by a specific status
+        $vetId    = $request->input('vet_id') ?: $clinicId; // allow vet_id or fallback to clinic_id
+        $status   = $request->input('status'); // optional: filter a specific status
 
-        if (!$clinicId || !is_numeric($clinicId) || (int) $clinicId <= 0) {
+        if ((!$clinicId && !$vetId) || (isset($clinicId) && (!is_numeric($clinicId) || (int) $clinicId <= 0))) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid or missing clinic_id',
+                'message' => 'Invalid or missing clinic_id/vet_id',
             ], 422);
         }
 
-        $clinicId = (int) $clinicId;
+        $clinicId = $clinicId ? (int) $clinicId : null;
+        $vetId    = $vetId ? (int) $vetId : null;
 
-        $transactions = Transaction::query()
-            ->where('clinic_id', $clinicId)
-            ->when($status, fn ($q) => $q->status($status), fn ($q) => $q->completed())
-            ->get();
+        $successfulStatuses = [
+            'completed',
+            'captured',
+            'paid',
+            'success',
+            'successful',
+            'settled',
+        ];
 
-        $totalPaise = (int) $transactions->sum('amount_paise');
-        $totalRupees = round($totalPaise / 100, 2);
+        $baseQuery = Transaction::query()
+            ->when($clinicId || $vetId, function ($q) use ($clinicId, $vetId) {
+                $q->where(function ($sub) use ($clinicId, $vetId) {
+                    if ($clinicId) {
+                        $sub->orWhere('clinic_id', $clinicId);
+                    }
+                    if ($vetId) {
+                        $sub->orWhereHas('doctor', function ($qq) use ($vetId) {
+                            $qq->where('vet_registeration_id', $vetId);
+                        });
+                    }
+                });
+            });
+
+        $transactionsQuery = clone $baseQuery;
+        if ($status) {
+            $transactionsQuery->where('status', $status);
+        }
+
+        // Payments count (respecting status filter if provided)
+        $paymentsCount = (clone $transactionsQuery)->count();
+
+        // Collected only for successful statuses (or the provided status if caller wants)
+        $collectedQuery = clone $transactionsQuery;
+        if (!$status) {
+            $collectedQuery->whereIn('status', $successfulStatuses);
+        }
+
+        $totalPaise = (int) $collectedQuery->sum('amount_paise');
+        $totalRupees = round($totalPaise / 100, 2, PHP_ROUND_HALF_UP);
 
         return response()->json([
             'success'         => true,
             'clinic_id'       => $clinicId,
-            'status_filter'   => $status ?: 'completed',
-            'transactions'    => $transactions->count(),
+            'vet_id'          => $vetId,
+            'status_filter'   => $status ?: 'all',
+            'payments'        => $paymentsCount,
             'total_paise'     => $totalPaise,
             'total_rupees'    => $totalRupees,
             'currency'        => 'INR',
+            'transactions'    => $transactionsQuery->orderByDesc('created_at')->limit(300)->get(),
         ]);
     }
 
