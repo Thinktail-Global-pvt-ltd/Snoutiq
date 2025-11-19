@@ -1749,7 +1749,7 @@ setInterval(() => {
 }, 30_000);
 
 // -------------------- START SERVER --------------------
-const PORT = process.env.PORT || 4100;
+const PORT = process.env.PORT || 4000;
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Socket.IO server running on port ${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/health`);
