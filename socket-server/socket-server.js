@@ -14,6 +14,8 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const DEFAULT_SERVICE_ACCOUNT_FILE = "snoutiqapp-9cacc4ece358.json";
+const DEFAULT_RINGTONE =
+  process.env.CALL_NOTIFICATION_SOUND || "incoming_call";
 
 const resolveServiceAccountPath = () => {
   const candidates = [
@@ -29,28 +31,6 @@ const resolveServiceAccountPath = () => {
     }
   }
   return candidates[0] || null;
-};
-
-const loadServiceAccountFromEnv = () => {
-  const raw =
-    process.env.SERVICE_ACCOUNT_JSON ||
-    process.env.FIREBASE_SERVICE_ACCOUNT ||
-    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-
-  if (!raw) return null;
-
-  try {
-    const decoded = raw.trim().startsWith("{")
-      ? raw
-      : Buffer.from(raw, "base64").toString("utf8");
-    return JSON.parse(decoded);
-  } catch (error) {
-    console.error(
-      "❌ Failed to parse SERVICE_ACCOUNT_JSON / FIREBASE_SERVICE_ACCOUNT:",
-      error.message
-    );
-    return null;
-  }
 };
 
 // ==================== FIREBASE ADMIN SDK INITIALIZATION ====================
@@ -74,13 +54,6 @@ try {
       "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory.",
     );
     serviceAccount = null;
-  }
-
-  if (!serviceAccount) {
-    serviceAccount = loadServiceAccountFromEnv();
-    if (serviceAccount) {
-      console.log("✅ Loaded Firebase service account from environment variable.");
-    }
   }
 
   if (serviceAccount) {
@@ -181,8 +154,8 @@ const io = new Server(httpServer, {
     credentials: false,
   },
   path: "/socket.io/",
-  pingTimeout: 60000,
-  pingInterval: 25000,
+  pingTimeout: 25000,
+  pingInterval: 10000,
 });
 
 // -------------------- IN-MEMORY STATE --------------------
@@ -285,6 +258,8 @@ const sendPushNotification = async (doctorId, payload) => {
 
     console.log(`📤 Sending FCM notification to doctor ${doctorId}`);
 
+    const ringtoneSound = payload.sound || DEFAULT_RINGTONE;
+
     const stringifiedData = Object.entries({
       type: "pending_call",
       callId: payload.callId,
@@ -301,21 +276,43 @@ const sendPushNotification = async (doctorId, payload) => {
       callerName: payload.callerName,
       timeoutMs: payload.timeoutMs,
       click_action: "OPEN_PENDING_CALL",
+      ringtone: ringtoneSound,
     }).reduce((acc, [key, value]) => {
       if (value === undefined || value === null) return acc;
       acc[key] = String(value);
       return acc;
     }, {});
 
+    const notificationTitle =
+      payload.title ||
+      payload.message ||
+      `Incoming call from ${payload.callerName || "SnoutIQ"}`;
+    const notificationBody =
+      payload.body ||
+      payload.message ||
+      `Patient ${payload.patientId || ""} is waiting for you.`;
+
     // Build the message with ALL STRING VALUES (FCM requirement)
     const message = {
       token: doctorPushToken,
       data: stringifiedData,
+      notification: {
+        title: notificationTitle,
+        body: notificationBody,
+      },
 
       android: {
         priority: "high",
         ttl: 3600000,
         restrictedPackageName: process.env.ANDROID_APP_ID,
+        notification: {
+          title: notificationTitle,
+          body: notificationBody,
+          channelId: "calls",
+          priority: "max",
+          visibility: "public",
+          sound: ringtoneSound,
+        },
         fcmOptions: {
           analyticsLabel: "pending_call",
         },
@@ -328,11 +325,17 @@ const sendPushNotification = async (doctorId, payload) => {
         },
         payload: {
           aps: {
-            sound: "default",
+            sound: {
+              critical: 1,
+              name: ringtoneSound.endsWith(".caf")
+                ? ringtoneSound
+                : `${ringtoneSound}.caf`,
+              volume: 1.0,
+            },
             badge: 1,
             alert: {
-              title: payload.title || "📞 Pending Video Call",
-              body: payload.body || payload.message,
+              title: notificationTitle,
+              body: notificationBody,
             },
             "content-available": 1,
             "mutable-content": 1,
@@ -346,8 +349,8 @@ const sendPushNotification = async (doctorId, payload) => {
 
       webpush: {
         notification: {
-          title: payload.title || "📞 Pending Video Call",
-          body: payload.body || payload.message,
+          title: notificationTitle,
+          body: notificationBody,
           icon: "/icon-192x192.png",
           badge: "/badge-72x72.png",
           requireInteraction: true,
@@ -550,9 +553,9 @@ const buildTemplateComponents = (context) => {
 // -------------------- CONSTANTS --------------------
 const DOCTOR_HEARTBEAT_EVENT = "doctor-heartbeat";
 const DOCTOR_GRACE_EVENT = "doctor-grace";
-const DOCTOR_HEARTBEAT_INTERVAL_MS = 30_000;
-const DOCTOR_GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 min grace background
-const PENDING_CALL_TIMEOUT_MS = 60_000;
+const DOCTOR_HEARTBEAT_INTERVAL_MS = 15_000;
+const DOCTOR_GRACE_PERIOD_MS = 2 * 60 * 1000; // 2 min grace background
+const PENDING_CALL_TIMEOUT_MS = 45_000;
 
 // -------------------- HELPERS --------------------
 const clearDoctorTimer = (entry) => {
@@ -1749,7 +1752,7 @@ setInterval(() => {
 }, 30_000);
 
 // -------------------- START SERVER --------------------
-const PORT = process.env.PORT || 4000;
+const PORT = Number(process.env.PORT || process.env.SOCKET_PORT || 4000);
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Socket.IO server running on port ${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/health`);
@@ -1767,4 +1770,5 @@ httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`📲 WhatsApp alerts: ENABLED (${WHATSAPP_ALERT_MODE} mode)`);
   }
 });
+
 
