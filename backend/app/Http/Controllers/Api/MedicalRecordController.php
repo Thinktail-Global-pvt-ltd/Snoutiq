@@ -136,10 +136,14 @@ class MedicalRecordController extends Controller
 
     protected function buildRecordUrl(string $filePath): string
     {
-        $relative = ltrim(Storage::disk('public')->url($filePath), '/');
+        $diskUrl = Storage::disk('public')->url($filePath);
+        $path = parse_url($diskUrl, PHP_URL_PATH) ?? $diskUrl;
+        $path = '/' . ltrim($path, '/');
         $prefix = trim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
-        $fullPath = $prefix ? $prefix.'/'.$relative : $relative;
+        if ($prefix && $prefix !== '') {
+            $path = '/' . trim($prefix, '/') . $path;
+        }
 
-        return url($fullPath);
+        return url($path);
     }
 }
