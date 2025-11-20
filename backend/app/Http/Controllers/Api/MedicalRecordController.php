@@ -45,7 +45,7 @@ class MedicalRecordController extends Controller
                     'mime_type' => $record->mime_type,
                     'notes' => $record->notes,
                     'uploaded_at' => optional($record->created_at)->toIso8601String(),
-                    'url' => Storage::disk('public')->url($record->file_path),
+                    'url' => $this->buildRecordUrl($record->file_path),
                 ];
             });
 
@@ -129,8 +129,17 @@ class MedicalRecordController extends Controller
                 'mime_type' => $record->mime_type,
                 'notes' => $record->notes,
                 'uploaded_at' => optional($record->created_at)->toIso8601String(),
-                'url' => Storage::disk('public')->url($record->file_path),
+                'url' => $this->buildRecordUrl($record->file_path),
             ],
         ], 201);
+    }
+
+    protected function buildRecordUrl(string $filePath): string
+    {
+        $relative = ltrim(Storage::disk('public')->url($filePath), '/');
+        $prefix = trim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
+        $fullPath = $prefix ? $prefix.'/'.$relative : $relative;
+
+        return url($fullPath);
     }
 }
