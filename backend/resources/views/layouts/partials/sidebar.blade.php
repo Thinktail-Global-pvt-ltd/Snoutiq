@@ -188,6 +188,61 @@
       </a>
     @endif
   </div>
+
+  <div id="live-call-links" class="px-4 lg:px-6 pt-3 pb-4 border-b border-white/10 hidden">
+    <div class="flex items-center justify-between text-[10px] uppercase tracking-wider text-white/60">
+      <span>Active call links</span>
+      <span id="live-call-links-status" class="px-2 py-0.5 rounded-full bg-white/10 text-[10px] text-white">Waiting</span>
+    </div>
+    <div class="mt-3 space-y-3">
+      <div class="rounded-2xl border border-white/15 bg-white/5 p-3 space-y-1 text-white/80">
+        <div class="flex items-center justify-between text-xs font-semibold">
+          <span>Doctor Join</span>
+          <div class="flex items-center gap-2">
+            <a
+              data-role="call-link-open"
+              data-type="join"
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] rounded bg-white/20 hover:bg-white/30 transition"
+              aria-disabled="true">Open</a>
+            <button
+              type="button"
+              data-role="call-link-copy"
+              data-type="join"
+              data-default-text="Copy"
+              class="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] rounded bg-white/10 hover:bg-white/20 transition"
+              disabled>Copy</button>
+          </div>
+        </div>
+        <p class="text-[11px] text-white/70 break-words" data-role="call-link-value" data-type="join">Waiting for link…</p>
+      </div>
+      <div class="rounded-2xl border border-white/15 bg-white/5 p-3 space-y-1 text-white/80">
+        <div class="flex items-center justify-between text-xs font-semibold">
+          <span>Rejoin</span>
+          <div class="flex items-center gap-2">
+            <a
+              data-role="call-link-open"
+              data-type="rejoin"
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] rounded bg-white/20 hover:bg-white/30 transition"
+              aria-disabled="true">Open</a>
+            <button
+              type="button"
+              data-role="call-link-copy"
+              data-type="rejoin"
+              data-default-text="Copy"
+              class="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] rounded bg-white/10 hover:bg-white/20 transition"
+              disabled>Copy</button>
+          </div>
+        </div>
+        <p class="text-[11px] text-white/70 break-words" data-role="call-link-value" data-type="rejoin">Waiting for link…</p>
+      </div>
+    </div>
+  </div>
   
   <!-- Navigation -->
   <nav class="px-2 lg:px-3 py-4 space-y-1 text-sm grow overflow-y-auto sidebar-scrollbar">
@@ -298,6 +353,14 @@
         <span class="truncate">Clinic Doctors</span>
       </a>
       
+      <a href="{{ route('doctor.patients') }}" class="{{ $baseItem }} {{ $active('doctor.patients') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-3 8c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7 3.582 7 8 7z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5V3m0 18v-2m7-7h2M3 12h2"/>
+        </svg>
+        <span class="truncate">Patient Records</span>
+      </a>
+      
       <a href="{{ route('doctor.schedule') }}" class="{{ $baseItem }} {{ $active('doctor.schedule') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -390,5 +453,101 @@ document.addEventListener('DOMContentLoaded', function() {
       closeSidebar();
     }
   });
+
+  const liveCallLinksWrapper = document.getElementById('live-call-links');
+  if (liveCallLinksWrapper) {
+    const statusIndicator = document.getElementById('live-call-links-status');
+    const linkElements = {
+      join: {
+        open: liveCallLinksWrapper.querySelector('[data-role="call-link-open"][data-type="join"]'),
+        copy: liveCallLinksWrapper.querySelector('[data-role="call-link-copy"][data-type="join"]'),
+        value: liveCallLinksWrapper.querySelector('[data-role="call-link-value"][data-type="join"]'),
+      },
+      rejoin: {
+        open: liveCallLinksWrapper.querySelector('[data-role="call-link-open"][data-type="rejoin"]'),
+        copy: liveCallLinksWrapper.querySelector('[data-role="call-link-copy"][data-type="rejoin"]'),
+        value: liveCallLinksWrapper.querySelector('[data-role="call-link-value"][data-type="rejoin"]'),
+      },
+    };
+
+    function formatUrlForDisplay(value){
+      if (!value) return '';
+      const trimmed = value.trim();
+      if (trimmed.length <= 52) return trimmed;
+      return `${trimmed.slice(0, 32)}…${trimmed.slice(-16)}`;
+    }
+
+    function setLinkState(type, url){
+      const entry = linkElements[type];
+      if (!entry || !entry.open || !entry.copy || !entry.value) return;
+      if (url) {
+        entry.open.href = url;
+        entry.open.classList.remove('opacity-40');
+        entry.open.removeAttribute('aria-disabled');
+        entry.copy.disabled = false;
+        entry.copy.dataset.copyValue = url;
+        entry.value.textContent = formatUrlForDisplay(url);
+        entry.value.title = url;
+        const defaultLabel = entry.copy.dataset.defaultText || 'Copy';
+        entry.copy.textContent = defaultLabel;
+      } else {
+        entry.open.removeAttribute('href');
+        entry.open.setAttribute('aria-disabled','true');
+        entry.open.classList.add('opacity-40');
+        entry.copy.disabled = true;
+        entry.copy.removeAttribute('data-copy-value');
+        entry.value.textContent = 'Waiting for link…';
+        entry.value.removeAttribute('title');
+        const defaultLabel = entry.copy.dataset.defaultText || 'Copy';
+        entry.copy.textContent = defaultLabel;
+      }
+    }
+
+    function copyToClipboard(value){
+      if (!value) return;
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(value).catch(()=>{});
+        return;
+      }
+      const tmp = document.createElement('textarea');
+      tmp.value = value;
+      tmp.setAttribute('readonly','');
+      tmp.style.position = 'absolute';
+      tmp.style.left = '-9999px';
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand('copy');
+      document.body.removeChild(tmp);
+    }
+
+    const copyButtons = liveCallLinksWrapper.querySelectorAll('[data-role="call-link-copy"]');
+    copyButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const value = button.dataset.copyValue;
+        if (!value) return;
+        copyToClipboard(value);
+        const defaultLabel = button.dataset.defaultText || 'Copy';
+        button.textContent = 'Copied';
+        setTimeout(() => {
+          button.textContent = defaultLabel;
+        }, 1400);
+      });
+    });
+
+    window.addEventListener('snoutiq:call-links-update', (event) => {
+      const detail = event?.detail || {};
+      if (!detail.visible) {
+        liveCallLinksWrapper.classList.add('hidden');
+        if (statusIndicator) statusIndicator.textContent = 'Waiting';
+        setLinkState('join', null);
+        setLinkState('rejoin', null);
+        return;
+      }
+      liveCallLinksWrapper.classList.remove('hidden');
+      if (statusIndicator) statusIndicator.textContent = 'Incoming call';
+      setLinkState('join', detail.doctorJoinUrl);
+      setLinkState('rejoin', detail.rejoinUrl);
+    });
+  }
 });
 </script>

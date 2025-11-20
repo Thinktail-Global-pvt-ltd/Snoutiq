@@ -73,6 +73,56 @@ class ClinicsController extends Controller
         ]);
     }
 
+    // GET /api/clinics/{id}/patients
+    public function patients(string $id)
+    {
+        $clinicId = (int) $id;
+        $clinic = DB::table('vet_registerations_temp')
+            ->select('id', DB::raw('COALESCE(name, slug, CONCAT("Clinic #", id)) as name'), 'slug', 'address')
+            ->where('id', $clinicId)
+            ->first();
+
+        if (!$clinic) {
+            return response()->json(['success' => false, 'error' => 'Clinic not found'], 404);
+        }
+
+        $recordStats = DB::table('medical_records')
+            ->select(
+                'user_id',
+                DB::raw('COUNT(*) as total_records'),
+                DB::raw('MAX(created_at) as last_record_at')
+            )
+            ->where('vet_registeration_id', $clinicId)
+            ->groupBy('user_id');
+
+        $patients = DB::table('users as u')
+            ->leftJoinSub($recordStats, 'mr', function ($join) {
+                $join->on('mr.user_id', '=', 'u.id');
+            })
+            ->where('u.last_vet_id', $clinicId)
+            ->orderByDesc('u.updated_at')
+            ->limit(500)
+            ->select(
+                'u.id',
+                'u.name',
+                'u.email',
+                'u.phone',
+                'u.pet_name',
+                'u.pet_gender',
+                'u.pet_age',
+                'u.breed',
+                'u.updated_at',
+                DB::raw('COALESCE(mr.total_records, 0) as records_count'),
+                'mr.last_record_at'
+            )
+            ->get();
+
+        return response()->json([
+            'clinic' => $clinic,
+            'patients' => $patients,
+        ]);
+    }
+
     // POST /api/clinics/{id}/doctors
     public function storeDoctor(string $id)
     {

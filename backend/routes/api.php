@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Http\Controllers\Api\DashboardProfileController;
+use App\Http\Controllers\Api\MedicalRecordController;
 use App\Models\User;
 use App\Models\DeviceToken;
 use App\Models\Doctor;
@@ -40,9 +41,11 @@ use App\Http\Controllers\AgoraController;
 use App\Http\Controllers\Api\CallController as ApiCallController; // handles lightweight requestCall
 use App\Http\Controllers\CallController as CoreCallController;    // handles sessions + token
 use App\Http\Controllers\Api\CallRecordingController;
+use App\Http\Controllers\Api\RecordingUploadController;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
+Route::post('/call-recordings/upload', [RecordingUploadController::class, 'store']);
 
 use App\Http\Controllers\Api\VetController;
 use App\Http\Controllers\Api\AdminOnboardingStatusController;
@@ -684,6 +687,7 @@ Route::post('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleCont
 // Clinics
 Route::get('/clinics', [\App\Http\Controllers\Api\ClinicsController::class, 'index']);
 Route::get('/clinics/{id}/doctors', [ClinicsController::class, 'doctors']);
+Route::get('/clinics/{id}/patients', [ClinicsController::class, 'patients']);
 Route::post('/clinics/{id}/doctors', [ClinicsController::class, 'storeDoctor']);
 Route::get('/clinics/{id}/availability', [\App\Http\Controllers\Api\ClinicsController::class, 'availability']);
 Route::get('/doctors/{id}/availability', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'getAvailability']);
@@ -693,6 +697,8 @@ Route::get('/video-schedule/doctors/{id}/availability', [\App\Http\Controllers\A
 Route::get('/video-schedule/doctors/{id}/free-slots', [\App\Http\Controllers\Api\DoctorVideoScheduleController::class, 'freeSlots']);
 // Pets
 Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class, 'byUser']);
+Route::get('/users/{user}/medical-records', [MedicalRecordController::class, 'index']);
+Route::post('/medical-records', [MedicalRecordController::class, 'store']);
 
   // AI Summary from chats
   // Apply 'web' middleware to enable session access from browser-based calls

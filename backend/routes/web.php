@@ -233,6 +233,9 @@ Route::get('/video', function () {
     return view('chat');
 })->name('video.alias');
 
+// Agora lifecycle playground (manual end-to-end testing)
+Route::view('/agora/lifecycle', 'agora.lifecycle')->name('agora.lifecycle');
+
 // Actual call room (Agora join page). Channel param is optional to allow manual testing
 Route::get('/call-page/{channel?}', function () {
     return view('call-page');
@@ -340,6 +343,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     Route::get('/doctor/booking/{id}', function (int $id) {
         return view('doctor.booking-detail', ['bookingId' => $id]);
     })->name('doctor.booking.detail');
+    Route::view('/doctor/patients', 'doctor.patients')->name('doctor.patients');
 
     // Weekly schedule (existing, secure)
     Route::get('/doctor/schedule', function (Request $request, OnboardingProgressService $progressService) {
