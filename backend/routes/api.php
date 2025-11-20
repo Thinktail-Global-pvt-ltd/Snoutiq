@@ -698,7 +698,9 @@ Route::get('/video-schedule/doctors/{id}/free-slots', [\App\Http\Controllers\Api
 // Pets
 Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class, 'byUser']);
 Route::get('/users/{user}/medical-records', [MedicalRecordController::class, 'index']);
+Route::get('/medical-records/user/{user}', [MedicalRecordController::class, 'userRecords']);
 Route::post('/medical-records', [MedicalRecordController::class, 'store']);
+Route::get('/medical-records/slug/{slug}', [MedicalRecordController::class, 'indexBySlug']);
 
   // AI Summary from chats
   // Apply 'web' middleware to enable session access from browser-based calls
