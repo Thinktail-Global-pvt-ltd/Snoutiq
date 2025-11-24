@@ -319,7 +319,7 @@ const Hero = ({
                     </div>
                     <div>
                       <p className="font-semibold text-slate-900">
-                        Dr. Mayank Malhotra
+                        Dr. Maayank Malhotra
                       </p>
                       <p className="text-sm text-slate-500">Online now</p>
                     </div>
