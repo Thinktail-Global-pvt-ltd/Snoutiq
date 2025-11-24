@@ -37,6 +37,10 @@ export default function CallPage() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localTracksRef = useRef([]);
+  const remoteTracksRef = useRef({ audio: null, video: null });
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+  const audioMixingRef = useRef({ context: null, sources: [], streams: [] });
   const hasJoinedRef = useRef(false);
 
   // State
@@ -54,6 +58,9 @@ export default function CallPage() {
     camera: false,
     microphone: false
   });
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState("");
+  const [recordingError, setRecordingError] = useState("");
 
   // Initialize Agora client
   useEffect(() => {
@@ -93,6 +100,14 @@ export default function CallPage() {
   useEffect(() => {
     requestPermissions();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recordingUrl) {
+        URL.revokeObjectURL(recordingUrl);
+      }
+    };
+  }, [recordingUrl]);
 
   // Join channel and create tracks
   useEffect(() => {
@@ -180,8 +195,11 @@ export default function CallPage() {
           await client.subscribe(user, mediaType);
           console.log(`✅ Subscribed to user ${user.uid} ${mediaType}`);
 
-          if (mediaType === "video" && remoteVideoRef.current) {
-            user.videoTrack?.play(remoteVideoRef.current, { fit: "cover" });
+          if (mediaType === "video" && user.videoTrack) {
+            remoteTracksRef.current.video = { track: user.videoTrack, uid: user.uid };
+            if (remoteVideoRef.current) {
+              user.videoTrack.play(remoteVideoRef.current, { fit: "cover" });
+            }
             setRemoteUsers(prev => {
               if (!prev.some(u => u.uid === user.uid)) {
                 return [...prev, user];
@@ -190,8 +208,9 @@ export default function CallPage() {
             });
           }
           
-          if (mediaType === "audio") {
-            user.audioTrack?.play();
+          if (mediaType === "audio" && user.audioTrack) {
+            remoteTracksRef.current.audio = { track: user.audioTrack, uid: user.uid };
+            user.audioTrack.play();
           }
         } catch (err) {
           console.error("❌ Error subscribing:", err);
@@ -201,13 +220,25 @@ export default function CallPage() {
       client.on("user-unpublished", (user, mediaType) => {
         console.log(`User ${user.uid} unpublished ${mediaType}`);
         if (mediaType === "video") {
+          if (remoteTracksRef.current.video?.uid === user.uid) {
+            remoteTracksRef.current.video = null;
+          }
           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+        }
+        if (mediaType === "audio" && remoteTracksRef.current.audio?.uid === user.uid) {
+          remoteTracksRef.current.audio = null;
         }
       });
 
       client.on("user-left", (user) => {
         console.log(`User ${user.uid} left`);
         setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+        if (remoteTracksRef.current.video?.uid === user.uid) {
+          remoteTracksRef.current.video = null;
+        }
+        if (remoteTracksRef.current.audio?.uid === user.uid) {
+          remoteTracksRef.current.audio = null;
+        }
       });
     };
 
@@ -227,6 +258,7 @@ export default function CallPage() {
     
     try {
       console.log("🧹 Cleaning up...");
+      stopRecording();
       
       localTracksRef.current.forEach(track => {
         try {
@@ -246,9 +278,194 @@ export default function CallPage() {
       localTracksRef.current = [];
       setRemoteUsers([]);
       setJoined(false);
+      remoteTracksRef.current = { audio: null, video: null };
       hasJoinedRef.current = false;
     } catch (error) {
       console.error("❌ Cleanup error:", error);
+    }
+  };
+
+  const disposeAudioResources = (resources) => {
+    if (!resources) return;
+    resources.sources?.forEach((source) => {
+      try {
+        source.disconnect();
+      } catch (error) {
+        console.warn("⚠️ Failed to disconnect audio source", error);
+      }
+    });
+    resources.streams = [];
+    if (resources.context) {
+      resources.context.close().catch(() => {});
+    }
+  };
+
+  const releaseAudioResources = () => {
+    disposeAudioResources(audioMixingRef.current);
+    audioMixingRef.current = { context: null, sources: [], streams: [] };
+  };
+
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") {
+      return;
+    }
+    try {
+      recorder.stop();
+    } catch (error) {
+      console.error("❌ Error stopping recording:", error);
+    }
+  };
+
+  const buildRecordingStream = () => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    const recordingStream = new MediaStream();
+    const audioResources = { context: null, sources: [], streams: [] };
+    const localAudioTrack = localTracksRef.current.find(
+      (track) => track.trackMediaType === "audio"
+    );
+    const remoteAudioTrack = remoteTracksRef.current.audio?.track;
+    const audioTracks = [];
+
+    if (localAudioTrack?.getMediaStreamTrack) {
+      const track = localAudioTrack.getMediaStreamTrack();
+      if (track) {
+        audioTracks.push(track);
+      }
+    }
+
+    if (remoteAudioTrack?.getMediaStreamTrack) {
+      const track = remoteAudioTrack.getMediaStreamTrack();
+      if (track) {
+        audioTracks.push(track);
+      }
+    }
+
+    if (audioTracks.length === 1) {
+      recordingStream.addTrack(audioTracks[0]);
+    } else if (audioTracks.length > 1) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        recordingStream.addTrack(audioTracks[0]);
+      } else {
+        const audioContext = new AudioContextClass();
+        const destination = audioContext.createMediaStreamDestination();
+        audioTracks.forEach((track) => {
+          const stream = new MediaStream([track]);
+          const sourceNode = audioContext.createMediaStreamSource(stream);
+          sourceNode.connect(destination);
+          audioResources.streams.push(stream);
+          audioResources.sources.push(sourceNode);
+        });
+        audioResources.context = audioContext;
+        const mixedTrack = destination.stream.getAudioTracks()[0];
+        if (mixedTrack) {
+          recordingStream.addTrack(mixedTrack);
+        }
+      }
+    }
+
+    const localVideoTrack = localTracksRef.current.find(
+      (track) => track.trackMediaType === "video"
+    );
+    const preferredVideoTrack = remoteTracksRef.current.video?.track || localVideoTrack;
+    if (preferredVideoTrack?.getMediaStreamTrack) {
+      const videoTrack = preferredVideoTrack.getMediaStreamTrack();
+      if (videoTrack) {
+        recordingStream.addTrack(videoTrack);
+      }
+    }
+
+    if (!recordingStream.getTracks().length) {
+      disposeAudioResources(audioResources);
+      return null;
+    }
+
+    return { stream: recordingStream, audioResources };
+  };
+
+  const startRecording = () => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.MediaRecorder === "undefined"
+    ) {
+      setRecordingError("Recording is not supported in this browser.");
+      return;
+    }
+
+    if (!joined) {
+      setRecordingError("Join the call before starting a recording.");
+      return;
+    }
+
+    const setup = buildRecordingStream();
+    if (!setup) {
+      setRecordingError("Media tracks are not ready yet. Try again in a moment.");
+      return;
+    }
+
+    if (recordingUrl) {
+      URL.revokeObjectURL(recordingUrl);
+      setRecordingUrl("");
+    }
+
+    recordedChunksRef.current = [];
+    setRecordingError("");
+
+    try {
+      const preferredMimeType = "video/webm;codecs=vp8,opus";
+      const options = {};
+      if (
+        window.MediaRecorder.isTypeSupported?.(preferredMimeType)
+      ) {
+        options.mimeType = preferredMimeType;
+      }
+
+      const recorder = new MediaRecorder(setup.stream, options);
+      audioMixingRef.current = setup.audioResources;
+
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      });
+
+      recorder.addEventListener("stop", () => {
+        if (recordedChunksRef.current.length) {
+          const blob = new Blob(recordedChunksRef.current, {
+            type: recorder.mimeType || "video/webm",
+          });
+          const url = URL.createObjectURL(blob);
+          setRecordingUrl(url);
+        }
+        recordedChunksRef.current = [];
+        setIsRecording(false);
+        mediaRecorderRef.current = null;
+        releaseAudioResources();
+      });
+
+      recorder.addEventListener("error", (event) => {
+        console.error("Recorder error:", event.error || event);
+        setRecordingError("Recording failed. Please try again.");
+        recordedChunksRef.current = [];
+        setIsRecording(false);
+        mediaRecorderRef.current = null;
+        releaseAudioResources();
+      });
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Failed to start recording:", error);
+      setRecordingError("Unable to start recording on this device.");
+      recordedChunksRef.current = [];
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+      disposeAudioResources(setup.audioResources);
     }
   };
 
@@ -536,34 +753,134 @@ export default function CallPage() {
         </div>
 
         <div style={{
-          background: "rgba(15, 23, 42, 0.8)",
-          padding: "10px 20px",
-          borderRadius: "12px",
-          fontSize: 14,
-          fontWeight: 600,
           display: "flex",
-          alignItems: "center",
-          gap: 10,
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,255,255,0.1)"
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 8
         }}>
-          <div style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: callStatus === "connected" ? "#10b981" : 
-                       callStatus === "connecting" ? "#f59e0b" : "#ef4444",
-            boxShadow: `0 0 10px ${callStatus === "connected" ? "#10b981" : 
-                                   callStatus === "connecting" ? "#f59e0b" : "#ef4444"}`
-          }} />
-          <span style={{
-            color: callStatus === "connected" ? "#10b981" : 
-                   callStatus === "connecting" ? "#f59e0b" : "#ef4444"
-          }}>
-            {callStatus === "connected" ? "Connected" : 
-             callStatus === "connecting" ? "Connecting..." : 
-             callStatus === "error" ? "Error" : "Initializing"}
-          </span>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12
+            }}>
+            <div style={{
+              background: "rgba(15, 23, 42, 0.8)",
+              padding: "10px 20px",
+              borderRadius: "12px",
+              fontSize: 14,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              backdropFilter: "blur(10px)",
+              border: "1px solid rgba(255,255,255,0.1)"
+            }}>
+              <div style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: callStatus === "connected" ? "#10b981" : 
+                           callStatus === "connecting" ? "#f59e0b" : "#ef4444",
+                boxShadow: `0 0 10px ${callStatus === "connected" ? "#10b981" : 
+                                       callStatus === "connecting" ? "#f59e0b" : "#ef4444"}`
+              }} />
+              <span style={{
+                color: callStatus === "connected" ? "#10b981" : 
+                       callStatus === "connecting" ? "#f59e0b" : "#ef4444"
+              }}>
+                {callStatus === "connected" ? "Connected" : 
+                 callStatus === "connecting" ? "Connecting..." : 
+                 callStatus === "error" ? "Error" : "Initializing"}
+              </span>
+            </div>
+
+            {isRecording && (
+              <div style={{
+                padding: "8px 16px",
+                borderRadius: "999px",
+                background: "rgba(220, 38, 38, 0.15)",
+                border: "1px solid rgba(248,113,113,0.4)",
+                color: "#f87171",
+                fontWeight: 600,
+                fontSize: 13,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                backdropFilter: "blur(8px)"
+              }}>
+                <span style={{ fontSize: 10 }}>●</span>
+                Recording...
+              </div>
+            )}
+
+            {recordingUrl && (
+              <a
+                href={recordingUrl}
+                download={`snoutiq-call-${callId || safeChannel}.webm`}
+                style={{
+                  padding: "9px 16px",
+                  borderRadius: "10px",
+                  border: "1px solid rgba(96,165,250,0.6)",
+                  color: "#bfdbfe",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  background: "rgba(59,130,246,0.15)",
+                  transition: "all 0.2s"
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "rgba(59,130,246,0.3)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "rgba(59,130,246,0.15)";
+                }}
+              >
+                ⬇ Download Recording
+              </a>
+            )}
+
+            <button
+              type="button"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={!joined}
+              style={{
+                padding: "10px 18px",
+                borderRadius: "999px",
+                border: "none",
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: joined ? "pointer" : "not-allowed",
+                color: "white",
+                background: isRecording
+                  ? "linear-gradient(135deg, #ef4444, #b91c1c)"
+                  : "linear-gradient(135deg, #f97316, #fb923c)",
+                boxShadow: joined
+                  ? "0 6px 16px rgba(0,0,0,0.25)"
+                  : "none",
+                opacity: joined ? 1 : 0.6,
+                transition: "opacity 0.2s, transform 0.2s"
+              }}
+              onMouseOver={(e) => {
+                if (joined) e.currentTarget.style.transform = "scale(1.03)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              {isRecording ? "Stop Recording" : "Start Recording"}
+            </button>
+          </div>
+
+          {recordingError && (
+            <div style={{
+              fontSize: 12,
+              color: "#f87171",
+              fontWeight: 500,
+              textAlign: "right"
+            }}>
+              {recordingError}
+            </div>
+          )}
         </div>
       </div>
 
@@ -852,6 +1169,34 @@ export default function CallPage() {
             title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
           >
             {isCameraOff ? "📷" : "📹"}
+          </button>
+
+          <button
+            onClick={isRecording ? stopRecording : startRecording}
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              border: "none",
+              background: isRecording
+                ? "linear-gradient(135deg, #ef4444, #b91c1c)"
+                : "linear-gradient(135deg, #f59e0b, #f97316)",
+              color: "white",
+              fontSize: 26,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+              boxShadow: isRecording
+                ? "0 8px 24px rgba(239, 68, 68, 0.5)"
+                : "0 4px 14px rgba(245, 158, 11, 0.35)"
+            }}
+            onMouseOver={(e) => e.target.style.transform = "scale(1.1)"}
+            onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+            title={isRecording ? "Stop Recording" : "Start Recording"}
+          >
+            {isRecording ? "⏹" : "⏺"}
           </button>
 
           <button 

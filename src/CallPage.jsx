@@ -12,29 +12,49 @@ export default function CallPage() {
   const [users, setUsers] = useState([]);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState("");
+  const [recordingError, setRecordingError] = useState("");
   const localTracksRef = useRef([]);
+  const remoteTracksRef = useRef({ audio: null, video: null });
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
 
   useEffect(() => {
     const handleUserPublished = async (user, mediaType) => {
       await client.subscribe(user, mediaType);
       if (mediaType === "video" && user.videoTrack) {
+        remoteTracksRef.current.video = { track: user.videoTrack, uid: user.uid };
         // Update users state to trigger re-render
         setUsers(prev => [...prev.filter(u => u.uid !== user.uid), user]);
         user.videoTrack.play(`remote-player-${user.uid}`);
       }
       if (mediaType === "audio" && user.audioTrack) {
+        remoteTracksRef.current.audio = { track: user.audioTrack, uid: user.uid };
         user.audioTrack.play();
       }
     };
 
     const handleUserUnpublished = (user, mediaType) => {
       if (mediaType === "video") {
+        if (remoteTracksRef.current.video && remoteTracksRef.current.video.uid === user.uid) {
+          remoteTracksRef.current.video = null;
+        }
         setUsers(prev => prev.filter(u => u.uid !== user.uid));
+      }
+      if (mediaType === "audio" && remoteTracksRef.current.audio && remoteTracksRef.current.audio.uid === user.uid) {
+        remoteTracksRef.current.audio = null;
       }
     };
 
     const handleUserLeft = (user) => {
       setUsers(prev => prev.filter(u => u.uid !== user.uid));
+      if (remoteTracksRef.current.video && remoteTracksRef.current.video.uid === user.uid) {
+        remoteTracksRef.current.video = null;
+      }
+      if (remoteTracksRef.current.audio && remoteTracksRef.current.audio.uid === user.uid) {
+        remoteTracksRef.current.audio = null;
+      }
     };
 
     client.on("user-published", handleUserPublished);
@@ -46,6 +66,122 @@ export default function CallPage() {
       leaveChannel(); // Clean up on unmount
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recordingUrl) {
+        URL.revokeObjectURL(recordingUrl);
+      }
+    };
+  }, [recordingUrl]);
+
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") {
+      return;
+    }
+    recorder.stop();
+  };
+
+  const buildRecordingStream = () => {
+    const recordingStream = new MediaStream();
+    const localMic = localTracksRef.current[0];
+    const localCam = localTracksRef.current[1];
+
+    if (localMic) {
+      const audioTrack = localMic.getMediaStreamTrack();
+      if (audioTrack) {
+        recordingStream.addTrack(audioTrack);
+      }
+    }
+
+    if (remoteTracksRef.current.audio) {
+      const audioTrack = remoteTracksRef.current.audio.track.getMediaStreamTrack();
+      if (audioTrack) {
+        recordingStream.addTrack(audioTrack);
+      }
+    }
+
+    const preferredVideoTrack = remoteTracksRef.current.video?.track || localCam;
+    if (preferredVideoTrack) {
+      const videoTrack = preferredVideoTrack.getMediaStreamTrack();
+      if (videoTrack) {
+        recordingStream.addTrack(videoTrack);
+      }
+    }
+
+    if (recordingStream.getTracks().length === 0) {
+      return null;
+    }
+
+    return recordingStream;
+  };
+
+  const startRecording = () => {
+    if (typeof window === "undefined" || typeof window.MediaRecorder === "undefined") {
+      setRecordingError("Recording is not supported in this browser.");
+      return;
+    }
+
+    if (!joined) {
+      setRecordingError("Join the call before starting a recording.");
+      return;
+    }
+
+    const recordingStream = buildRecordingStream();
+    if (!recordingStream) {
+      setRecordingError("No media tracks available yet. Try again in a moment.");
+      return;
+    }
+
+    if (recordingUrl) {
+      URL.revokeObjectURL(recordingUrl);
+      setRecordingUrl("");
+    }
+
+    setRecordingError("");
+    recordedChunksRef.current = [];
+
+    try {
+      const recorder = new MediaRecorder(recordingStream, {
+        mimeType: "video/webm;codecs=vp8,opus",
+      });
+
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      });
+
+      recorder.addEventListener("stop", () => {
+        if (!recordedChunksRef.current.length) {
+          setIsRecording(false);
+          return;
+        }
+        const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        setRecordingUrl(url);
+        setIsRecording(false);
+        mediaRecorderRef.current = null;
+      });
+
+      recorder.addEventListener("error", (event) => {
+        console.error("Recorder error", event.error || event);
+        setRecordingError("Recording failed. Please try again.");
+        setIsRecording(false);
+        mediaRecorderRef.current = null;
+      });
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Failed to start recorder", err);
+      setRecordingError("Unable to start recording on this device.");
+      setIsRecording(false);
+      mediaRecorderRef.current = null;
+    }
+  };
 
   const joinChannel = async () => {
     try {
@@ -88,9 +224,11 @@ export default function CallPage() {
       });
       localTracksRef.current = [];
 
+      stopRecording();
       await client.leave();
       setJoined(false);
       setUsers([]);
+      remoteTracksRef.current = { audio: null, video: null };
     } catch (e) {
       console.error("Leave Error:", e.message);
       setError("Error leaving the call");
@@ -167,6 +305,26 @@ export default function CallPage() {
               Leave Call
             </button>
           </>
+        )}
+      </div>
+
+      <div className="recording-controls">
+        <button
+          onClick={isRecording ? stopRecording : startRecording}
+          disabled={!joined || loading}
+          className={`control-btn recording-btn ${isRecording ? 'recording' : ''}`}
+        >
+          {isRecording ? 'Stop Recording' : 'Start Recording'}
+        </button>
+        {recordingError && <p className="recording-error">{recordingError}</p>}
+        {recordingUrl && (
+          <a
+            className="download-link"
+            href={recordingUrl}
+            download={`snoutiq-call-${Date.now()}.webm`}
+          >
+            Download Recording
+          </a>
         )}
       </div>
     </div>

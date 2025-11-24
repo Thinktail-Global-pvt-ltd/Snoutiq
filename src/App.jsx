@@ -409,6 +409,7 @@ const RegisterPetOwner = lazy(() => import("./pages/RegisterPetOwner"));
 const PatientDashboard = lazy(() => import("./pages/PatientDashboard"));
 const DoctorDashboard = lazy(() => import("./pages/DoctorDashboard"));
 const CallTestPage = lazy(() => import("./pages/CallTestPage"));
+const CallRecordingDemo = lazy(() => import("./pages/CallRecordingDemo"));
 const RegisterPassword = lazy(() => import("./pages/RegisterPetPassword"));
 
 // Core app pages
@@ -812,6 +813,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/call-demo" element={<CallRecordingDemo />} />
             <Route
               path="/waiting-for-doctor"
               element={
