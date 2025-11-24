@@ -80,8 +80,10 @@ Route::post('/device-tokens/issue', function (Request $request) {
         'meta' => ['nullable', 'array'],
     ]);
 
+    $ownerModelHint = $data['owner_model'] ?? null;
+
     try {
-        $ownerModel = DeviceTokenOwnerResolver::resolve($data['owner_model'] ?? null);
+        $ownerModel = DeviceTokenOwnerResolver::resolve($ownerModelHint);
     } catch (\InvalidArgumentException $e) {
         return response()->json([
             'success' => false,
@@ -90,10 +92,22 @@ Route::post('/device-tokens/issue', function (Request $request) {
     }
 
     if ($ownerModel::query()->whereKey($data['user_id'])->doesntExist()) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Owner record not found for the provided user_id.',
-        ], 422);
+        if ($ownerModelHint === null) {
+            $detectedModel = DeviceTokenOwnerResolver::detectOwnerModelForId($data['user_id']);
+            if ($detectedModel) {
+                $ownerModel = $detectedModel;
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Owner record not found for the provided user_id.',
+                ], 422);
+            }
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Owner record not found for the provided user_id.',
+            ], 422);
+        }
     }
 
     $token = Str::random(64);
