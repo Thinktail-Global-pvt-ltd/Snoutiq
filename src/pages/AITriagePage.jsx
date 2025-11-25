@@ -206,8 +206,8 @@ const AITriagePage = () => {
         badge="AI-Powered Triage"
         title="Intelligent Triage That Prioritizes Every Case Correctly"
         subtitle="Advanced AI analyzes symptoms and medical history to prioritize urgent cases and route to specialists automatically."
-        ctaPrimary={{ text: 'Start Free Trial', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        ctaSecondary={{ text: 'See How It Works', href: 'https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform?pli=1' }}
+        ctaPrimary={{ text: 'Start Free Trial', href: '/vet-register' }}
+        ctaSecondary={{ text: 'See How It Works', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
       />
 
       {/* Features Section */}
@@ -262,8 +262,8 @@ const AITriagePage = () => {
       <CTA
         title="Experience AI-Powered Triage Today"
         subtitle="See how intelligent triage can transform your practice efficiency"
-        primaryButton={{ text: 'Start Free Trial', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        secondaryButton={{ text: 'Request Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform' }}
+        primaryButton={{ text: 'Start Free Trial', href: '/vet-register' }}
+        secondaryButton={{ text: 'Request Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         variant="gradient"
       />
       <Footer/>

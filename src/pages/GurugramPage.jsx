@@ -190,7 +190,7 @@ const GurugramPage = () => {
         badge="Trusted by Premium Gurugram Professionals"
         title="Gurugram's Premium Veterinary Practice Management Software"
         subtitle="Elevate your Gurugram clinic with enterprise-grade technology. AI-powered triage, luxury video consultations, and premium client experience."
-        ctaPrimary={{ text: 'Schedule Premium Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
+        ctaPrimary={{ text: 'Schedule Premium Demo', href: '/vet-register' }}
         // ctaSecondary={{ text: 'Call: +91-124-567-8900', href: 'tel:+911245678900' }}
       />
 
@@ -363,7 +363,7 @@ const GurugramPage = () => {
             <div className="text-center pt-6 border-t border-gray-200">
               <p className="text-slate-600 mb-4 text-base">Contact us for premium pricing</p>
               <Link
-                to="https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform?usp=sharing&ouid=100613985134578372936"
+                to="https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform"
                 className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all text-base"
               >
                 Schedule Premium Consultation
@@ -435,8 +435,8 @@ const GurugramPage = () => {
       <CTA
         title="Ready to Join Leading Gurugram Clinics?"
         subtitle="Transform your practice with SnoutIQ Premium today"
-        primaryButton={{ text: 'Schedule Premium Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        secondaryButton={{ text: 'View Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
+        primaryButton={{ text: 'Schedule Premium Demo', href: '/vet-register' }}
+        secondaryButton={{ text: 'View Demo', href: '/vet-register' }}
         variant="gradient"
       />
       <Footer/>

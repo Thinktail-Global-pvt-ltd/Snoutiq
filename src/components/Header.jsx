@@ -153,12 +153,12 @@ const Header = React.memo(function Header() {
   }, [navigate]);
 
   const handleLogin = useCallback(() => {
-    navigate("/login");
+  window.location.assign('https://snoutiq.com/backend/custom-doctor-login');
   }, [navigate]);
 
   const handleRegister = useCallback(() => {
     navigate(
-      "/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing"
+      "/vet-register"
     );
   }, [navigate]);
 

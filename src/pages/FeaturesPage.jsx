@@ -166,8 +166,8 @@ const FeaturesPage = () => {
         badge="Complete Feature Suite"
         title="Every Tool Your Veterinary Practice Needs"
         subtitle="From AI-powered triage to HD video consultations, SnoutIQ provides a comprehensive platform for modern veterinary care."
-        ctaPrimary={{ text: 'Start Free Trial', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        ctaSecondary={{ text: 'Schedule Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
+        ctaPrimary={{ text: 'Start Free Trial', href: '/vet-register' }}
+        ctaSecondary={{ text: 'Schedule Demo', href: '/vet-register' }}
         imagePlaceholder={true}
       />
 
@@ -207,8 +207,8 @@ const FeaturesPage = () => {
       <CTA
         title="Ready to Experience All Features?"
         subtitle="Start your 14-day free trial and see how SnoutIQ transforms your practice"
-        primaryButton={{ text: 'Start Free Trial', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        secondaryButton={{ text: 'Contact Sales', href: 'https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform' }}
+        primaryButton={{ text: 'Start Free Trial', href: '/vet-register' }}
+        secondaryButton={{ text: 'Contact Sales', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         variant="gradient"
       />
       <Footer/>

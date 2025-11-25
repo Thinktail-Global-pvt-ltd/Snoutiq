@@ -207,8 +207,8 @@ const VideoConsultPage = () => {
         badge="HD Video Consultations"
         title="Connect with Pet Owners Through Seamless Video Calls"
         subtitle="Deliver high-quality veterinary care remotely with crystal-clear HD video, screen sharing, and secure communication."
-        ctaPrimary={{ text: 'Start Free Trial', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        ctaSecondary={{ text: 'Watch Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform' }}
+        ctaPrimary={{ text: 'Start Free Trial', href: '/vet-register' }}
+        ctaSecondary={{ text: 'Watch Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
       />
 
       {/* Features Section */}
@@ -263,8 +263,8 @@ const VideoConsultPage = () => {
       <CTA
         title="Ready to Start Video Consultations?"
         subtitle="Join hundreds of clinics already providing convenient remote care"
-        primaryButton={{ text: 'Start Free Trial', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        secondaryButton={{ text: 'See Pricing', href: 'https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform' }}
+        primaryButton={{ text: 'Start Free Trial', href: '/vet-register' }}
+        secondaryButton={{ text: 'See Pricing', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         variant="gradient"
       />
       <Footer/>

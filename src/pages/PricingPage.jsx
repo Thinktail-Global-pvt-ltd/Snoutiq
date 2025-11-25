@@ -276,7 +276,7 @@ const PricingPage = () => {
                   </div>
 
                   <Link
-                    to={plan.monthlyPrice ? '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' : '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing'}
+                    to={plan.monthlyPrice ? '/vet-register' : '/vet-register'}
                     className={`w-full px-6 py-4 rounded-xl font-semibold text-center transition-all mb-8 ${
                       plan.highlighted
                         ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:shadow-lg hover:scale-105'
@@ -339,8 +339,8 @@ const PricingPage = () => {
         <CTA
           title="Ready to Get Started?"
           subtitle="Start your 14-day free trial today. No credit card required."
-          primaryButton={{ text: 'Start Free Trial', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-          secondaryButton={{ text: 'Schedule Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSdLBk7Yv8ODnzUV_0KrCotH1Kc91d1VpeUHWyovxXO_GYC4yw/viewform' }}
+          primaryButton={{ text: 'Start Free Trial', href: '/vet-register' }}
+          secondaryButton={{ text: 'Schedule Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
           variant="gradient"
         />
       </Suspense>

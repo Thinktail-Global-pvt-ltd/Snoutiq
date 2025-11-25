@@ -190,8 +190,8 @@ const DelhiPage = () => {
         badge="Trusted by Delhi Veterinary Professionals"
         title="Delhi's Leading Veterinary Practice Management Software"
         subtitle="Transform your Delhi clinic with AI-powered triage, HD video consultations, and smart scheduling designed for modern veterinary practices."
-        ctaPrimary={{ text: 'Schedule Delhi Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        ctaSecondary={{ text: 'Check Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
+        ctaPrimary={{ text: 'Schedule Delhi Demo', href: '/vet-register' }}
+        ctaSecondary={{ text: 'Check Demo', href: '/vet-register' }}
       />
 
       <Benefits benefits={benefits} variant="default" />
@@ -369,8 +369,8 @@ const DelhiPage = () => {
       <CTA
         title="Ready to Join Leading Delhi Clinics?"
         subtitle="Transform your Delhi veterinary practice with SnoutIQ today"
-        primaryButton={{ text: 'Schedule Delhi Demo', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
-        secondaryButton={{ text: 'View Pricing', href: '/register?utm_source=header&utm_medium=cta&utm_campaign=vet_landing' }}
+        primaryButton={{ text: 'Schedule Delhi Demo', href: '/vet-register' }}
+        secondaryButton={{ text: 'View Pricing', href: '/vet-register' }}
         variant="gradient"
       />
       <Footer/>
