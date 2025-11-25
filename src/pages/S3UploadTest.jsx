@@ -1,6 +1,9 @@
 import React, { useRef, useState } from "react";
 import axios from "axios";
 
+const BACKEND_BASE_URL =
+  import.meta.env.VITE_BACKEND_BASE_URL || "http://127.0.0.1:8000";
+
 const S3UploadTest = () => {
   const fileRef = useRef(null);
   const [status, setStatus] = useState("idle");
