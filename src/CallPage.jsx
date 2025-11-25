@@ -4,6 +4,7 @@ import axios from "axios";
 // import "./CallPage.css"; // We'll create this CSS file
 
 const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || "https://snoutiq.com/backend";
 
 export default function CallPage() {
   const [joined, setJoined] = useState(false);
@@ -15,6 +16,9 @@ export default function CallPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingUrl, setRecordingUrl] = useState("");
   const [recordingError, setRecordingError] = useState("");
+  const [uploadStatus, setUploadStatus] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [callIdentifier, setCallIdentifier] = useState("");
   const localTracksRef = useRef([]);
   const remoteTracksRef = useRef({ audio: null, video: null });
   const mediaRecorderRef = useRef(null);
@@ -117,6 +121,47 @@ export default function CallPage() {
     return recordingStream;
   };
 
+  const uploadRecording = async (blob) => {
+    if (!blob) {
+      return;
+    }
+    setIsUploading(true);
+    setUploadStatus("Uploading...");
+    try {
+      const formData = new FormData();
+      formData.append("recording", blob, `snoutiq-call-${Date.now()}.webm`);
+      if (callIdentifier) {
+        formData.append("call_identifier", callIdentifier);
+        formData.append("channel_name", callIdentifier);
+      }
+
+      const response = await axios.post(
+        `${BACKEND_BASE_URL}/api/call-recordings/upload`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (response.data?.path) {
+        setUploadStatus(`Saved to ${response.data.path}`);
+      } else {
+        setUploadStatus("Uploaded to S3");
+      }
+      if (response.data?.url) {
+        setRecordingUrl(response.data.url);
+      }
+    } catch (err) {
+      console.error("Upload error", err);
+      setRecordingError("Upload failed. Check console for details.");
+      setUploadStatus("Upload failed");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const startRecording = () => {
     if (typeof window === "undefined" || typeof window.MediaRecorder === "undefined") {
       setRecordingError("Recording is not supported in this browser.");
@@ -140,6 +185,7 @@ export default function CallPage() {
     }
 
     setRecordingError("");
+    setUploadStatus("");
     recordedChunksRef.current = [];
 
     try {
@@ -163,6 +209,7 @@ export default function CallPage() {
         setRecordingUrl(url);
         setIsRecording(false);
         mediaRecorderRef.current = null;
+        uploadRecording(blob);
       });
 
       recorder.addEventListener("error", (event) => {
@@ -189,7 +236,7 @@ export default function CallPage() {
       setError("");
 
       // ✅ Laravel API call
-      const res = await axios.post("https://snoutiq.com/backend/api/agora/token");
+      const res = await axios.post(`${BACKEND_BASE_URL}/api/agora/token`);
       const { appId, token, channelName, uid } = res.data;
 
       // ✅ Agora join
@@ -202,6 +249,7 @@ export default function CallPage() {
       cam.play("local-player");
       await client.publish(localTracksRef.current);
 
+      setCallIdentifier(channelName);
       setJoined(true);
     } catch (e) {
       console.error("Join Error:", e?.response?.data || e.message);
@@ -316,6 +364,12 @@ export default function CallPage() {
         >
           {isRecording ? 'Stop Recording' : 'Start Recording'}
         </button>
+        {uploadStatus && (
+          <p className="upload-status">
+            {uploadStatus}
+            {isUploading && "..."}
+          </p>
+        )}
         {recordingError && <p className="recording-error">{recordingError}</p>}
         {recordingUrl && (
           <a

@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Middleware\EnsureSalesAuthenticated;
 use App\Http\Controllers\QrTrackingController;
 use App\Http\Controllers\PushSchedulerController;
+use App\Http\Controllers\S3RecordingController;
 use App\Models\LegacyQrRedirect;
 use App\Services\OnboardingProgressService;
 
@@ -125,6 +126,8 @@ Route::post('/dev/push-scheduler', [PushSchedulerController::class, 'store'])->n
 Route::post('/dev/push-scheduler/run-now', [PushSchedulerController::class, 'runNow'])->name('dev.push-scheduler.run-now');
 Route::get('/dev/push-scheduler/logs/{run}', [PushSchedulerController::class, 'showLog'])->name('dev.push-scheduler.log');
 Route::post('/dev/push-scheduler/{notification}', [PushSchedulerController::class, 'update'])->name('dev.push-scheduler.update');
+
+Route::get('/s3-recordings', [S3RecordingController::class, 'index'])->name('s3.recordings');
 
 Route::get('/custom-doctor-login', function () { return view('custom-doctor-login'); })->name('custom-doctor-login');
 Route::get('/logout', function (\Illuminate\Http\Request $request) {
