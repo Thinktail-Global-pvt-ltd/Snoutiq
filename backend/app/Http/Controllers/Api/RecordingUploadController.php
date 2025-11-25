@@ -85,11 +85,15 @@ class RecordingUploadController extends Controller
             ], 201);
         } catch (\Throwable $e) {
             \Log::error("S3 upload failed", ['err' => $e->getMessage()]);
+            $errorMessage = $e->getMessage();
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload the recording.',
-                'error' => $e->getMessage(),
+                'message' => $errorMessage,
+                'error' => $errorMessage,
+                'errors' => [
+                    'recording' => [$errorMessage],
+                ],
             ], 500);
         }
     }
