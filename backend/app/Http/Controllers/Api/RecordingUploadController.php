@@ -16,7 +16,7 @@ class RecordingUploadController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        $disk = Storage::disk('s3');
+        $disk = $this->resolveS3Disk();
 
 \Log::info('S3 DISK CONFIG', [
     'driver' => config('filesystems.disks.s3.driver'),
@@ -48,9 +48,9 @@ class RecordingUploadController extends Controller
         $key = "recordings/{$filename}";
 
         try {
-            $disk->put($key, file_get_contents($file->getRealPath()), [
-                'ContentType' => $file->getMimeType(),
-            ]);
+        $disk->put($key, file_get_contents($file->getRealPath()), [
+            'ContentType' => $file->getMimeType(),
+        ]);
 
             $url = $disk->url($key);
             $session = $this->resolveCallSession($data);
@@ -206,7 +206,26 @@ class RecordingUploadController extends Controller
                 'error' => $error->getMessage(),
             ]);
 
-            return null;
+        return null;
+    }
+
+    private function resolveS3Region(): void
+    {
+        if (config('filesystems.disks.s3.region')) {
+            return;
+        }
+
+        $fallback = env('AWS_DEFAULT_REGION') ?: env('AGORA_STORAGE_REGION') ?: 'ap-south-1';
+        if ($fallback) {
+            \Log::warning('S3 region was missing; falling back to', ['region' => $fallback]);
+            config(['filesystems.disks.s3.region' => $fallback]);
         }
     }
+
+    private function resolveS3Disk()
+    {
+        $this->resolveS3Region();
+        return Storage::disk('s3');
+    }
+}
 }
