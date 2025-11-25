@@ -157,8 +157,9 @@ class RecordingUploadController extends Controller
         }
 
         $query = CallSession::query();
+        $supportsCallIdentifier = CallSession::supportsColumn('call_identifier');
 
-        if ($callIdentifier) {
+        if ($callIdentifier && $supportsCallIdentifier) {
             $query->where('call_identifier', $callIdentifier);
         }
 
