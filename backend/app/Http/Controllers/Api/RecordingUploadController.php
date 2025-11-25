@@ -191,25 +191,25 @@ class RecordingUploadController extends Controller
             return null;
         }
 
-        if (!$session?->id) {
-            \Log::warning('Skipping recording persistence because call_session_id is missing', [
-                'path' => $path,
-                'call_identifier' => $data['call_identifier'] ?? $data['call_id'],
-            ]);
-
-            return null;
-        }
-
         try {
+            $callSessionId = $session?->id;
+
+            if (!$callSessionId) {
+                \Log::info('Persisting recording without matched session', [
+                    'path' => $path,
+                    'call_identifier' => $data['call_identifier'] ?? $data['call_id'],
+                ]);
+            }
+
             return CallRecording::updateOrCreate(
                 [
-                    'call_session_id' => $session->id,
+                    'call_session_id' => $callSessionId,
                     'recording_path' => $path,
                 ],
                 [
-                    'call_identifier' => $data['call_identifier'] ?? $data['call_id'] ?? $session->call_identifier,
-                    'doctor_id' => $data['doctor_id'] ?? $session->doctor_id,
-                    'patient_id' => $data['patient_id'] ?? $session->patient_id,
+                    'call_identifier' => $data['call_identifier'] ?? $data['call_id'] ?? $session?->call_identifier,
+                    'doctor_id' => $data['doctor_id'] ?? $session?->doctor_id,
+                    'patient_id' => $data['patient_id'] ?? $session?->patient_id,
                     'recording_disk' => 's3',
                     'recording_name' => basename($path),
                     'recording_url' => $url,
@@ -222,8 +222,8 @@ class RecordingUploadController extends Controller
         } catch (\Throwable $error) {
             \Log::warning('Failed to persist recording record', [
                 'path' => $path,
-                'call_session_id' => $session->id,
-                'call_identifier' => $data['call_identifier'] ?? $data['call_id'] ?? $session->call_identifier,
+                'call_session_id' => $session?->id,
+                'call_identifier' => $data['call_identifier'] ?? $data['call_id'] ?? $session?->call_identifier,
                 'error' => $error->getMessage(),
             ]);
 
