@@ -25,7 +25,7 @@ const S3UploadTest = () => {
 
     try {
       const res = await axios.post(
-        "http://127.0.0.1:8000/api/call-recordings/upload",
+        "https://snoutiq.com/backend/api/call-recordings/upload",
         formData,
         {
           headers: {
