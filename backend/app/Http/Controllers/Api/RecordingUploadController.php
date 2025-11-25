@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CallRecording;
 use App\Models\CallSession;
+use Aws\Exception\AwsException;
+use Aws\S3\S3Client;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -16,24 +18,20 @@ class RecordingUploadController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
+        $disk = null;
         try {
-            $disk = $this->resolveS3Disk();
-        } catch (\Throwable $e) {
-            \Log::error('Failed to resolve S3 disk', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Storage configuration error: ' . $e->getMessage(),
-                'error' => $e->getMessage(),
-            ], 500);
+            $disk = Storage::disk('s3');
+            \Log::info('S3 DISK CONFIG', [
+                'driver' => config('filesystems.disks.s3.driver'),
+                'bucket' => config('filesystems.disks.s3.bucket'),
+                'region' => config('filesystems.disks.s3.region'),
+                'key_present' => !!config('filesystems.disks.s3.key'),
+            ]);
+        } catch (\Throwable $diskError) {
+            \Log::warning('Failed to resolve S3 disk via Flysystem, will attempt AWS SDK fallback', [
+                'error' => $diskError->getMessage(),
+            ]);
         }
-
-\Log::info('S3 DISK CONFIG', [
-    'driver' => config('filesystems.disks.s3.driver'),
-    'bucket' => config('filesystems.disks.s3.bucket'),
-    'region' => config('filesystems.disks.s3.region'),
-    'key_present' => !!config('filesystems.disks.s3.key'),
-]);
 
         $data = $request->validate([
             'call_id'         => 'nullable|string|max:64',
@@ -58,11 +56,15 @@ class RecordingUploadController extends Controller
         $key = "recordings/{$filename}";
 
         try {
-        $disk->put($key, file_get_contents($file->getRealPath()), [
-            'ContentType' => $file->getMimeType(),
-        ]);
+            if ($disk) {
+                $disk->put($key, file_get_contents($file->getRealPath()), [
+                    'ContentType' => $file->getMimeType(),
+                ]);
+                $url = $disk->url($key);
+            } else {
+                $url = $this->uploadViaAwsSdk($file, $key);
+            }
 
-            $url = $disk->url($key);
             $session = $this->resolveCallSession($data);
             $metadata = $this->parseMetadata($request, $data, $file, $key);
             $recording = $this->persistRecordingEntry($session, $data, $key, $url, $file, $metadata);
@@ -225,22 +227,62 @@ class RecordingUploadController extends Controller
         }
     }
 
-    private function resolveS3Region(): void
+    private function uploadViaAwsSdk(UploadedFile $file, string $key): string
     {
-        if (config('filesystems.disks.s3.region')) {
-            return;
+        $config = $this->awsConfig();
+        $bucket = $config['bucket'];
+
+        if (!$config['credentials']['key'] || !$config['credentials']['secret'] || !$bucket) {
+            throw new \RuntimeException('AWS credentials or bucket not configured.');
         }
 
-        $fallback = env('AWS_DEFAULT_REGION') ?: env('AGORA_STORAGE_REGION') ?: 'ap-south-1';
-        if ($fallback) {
-            \Log::warning('S3 region was missing; falling back to', ['region' => $fallback]);
-            config(['filesystems.disks.s3.region' => $fallback]);
+        try {
+            $client = new S3Client($config['client']);
+        } catch (\Throwable $exception) {
+            throw new \RuntimeException('Unable to initialize AWS SDK client: ' . $exception->getMessage(), 0, $exception);
         }
+
+        try {
+            $client->putObject([
+                'Bucket' => $bucket,
+                'Key' => $key,
+                'Body' => fopen($file->getRealPath(), 'rb'),
+                'ContentType' => $file->getMimeType(),
+            ]);
+        } catch (AwsException $awsException) {
+            throw new \RuntimeException('AWS SDK upload failed: ' . $awsException->getAwsErrorMessage(), 0, $awsException);
+        }
+
+        return $client->getObjectUrl($bucket, $key);
     }
 
-    private function resolveS3Disk()
+    private function awsConfig(): array
     {
-        $this->resolveS3Region();
-        return Storage::disk('s3');
+        $bucket = config('filesystems.disks.s3.bucket') ?? env('AWS_BUCKET');
+        $region = config('filesystems.disks.s3.region') ?? env('AWS_DEFAULT_REGION', 'ap-south-1');
+        $key = config('filesystems.disks.s3.key') ?? env('AWS_ACCESS_KEY_ID');
+        $secret = config('filesystems.disks.s3.secret') ?? env('AWS_SECRET_ACCESS_KEY');
+        $endpoint = config('filesystems.disks.s3.endpoint');
+        $usePathStyle = config('filesystems.disks.s3.use_path_style_endpoint', false);
+
+        $clientConfig = [
+            'version' => 'latest',
+            'region' => $region,
+            'credentials' => [
+                'key' => $key,
+                'secret' => $secret,
+            ],
+        ];
+
+        if ($endpoint) {
+            $clientConfig['endpoint'] = $endpoint;
+            $clientConfig['use_path_style_endpoint'] = $usePathStyle;
+        }
+
+        return [
+            'bucket' => $bucket,
+            'credentials' => ['key' => $key, 'secret' => $secret],
+            'client' => $clientConfig,
+        ];
     }
 }
