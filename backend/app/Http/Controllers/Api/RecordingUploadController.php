@@ -194,13 +194,6 @@ class RecordingUploadController extends Controller
         try {
             $callSessionId = $session?->id;
 
-            if (!$callSessionId) {
-                \Log::info('Persisting recording without matched session', [
-                    'path' => $path,
-                    'call_identifier' => $data['call_identifier'] ?? $data['call_id'],
-                ]);
-            }
-
             return CallRecording::updateOrCreate(
                 [
                     'call_session_id' => $callSessionId,
@@ -220,14 +213,14 @@ class RecordingUploadController extends Controller
                 ]
             );
         } catch (\Throwable $error) {
-            \Log::warning('Failed to persist recording record', [
+            \Log::error('Failed to persist recording record', [
                 'path' => $path,
                 'call_session_id' => $session?->id,
                 'call_identifier' => $data['call_identifier'] ?? $data['call_id'] ?? $session?->call_identifier,
                 'error' => $error->getMessage(),
             ]);
 
-            return null;
+            throw $error;
         }
     }
 
