@@ -16,7 +16,17 @@ class RecordingUploadController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        $disk = $this->resolveS3Disk();
+        try {
+            $disk = $this->resolveS3Disk();
+        } catch (\Throwable $e) {
+            \Log::error('Failed to resolve S3 disk', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Storage configuration error: ' . $e->getMessage(),
+                'error' => $e->getMessage(),
+            ], 500);
+        }
 
 \Log::info('S3 DISK CONFIG', [
     'driver' => config('filesystems.disks.s3.driver'),

@@ -42,8 +42,10 @@ const S3UploadTest = () => {
       setMessage(`Uploaded to S3 path ${res.data.path}`);
     } catch (error) {
       console.error(error);
+      const responseError = error?.response?.data?.message || error?.response?.data?.error;
+      const fallbackError = responseError || error?.message || "Upload failed.";
       setStatus("error");
-      setMessage("Upload failed. Check the console for details.");
+      setMessage(fallbackError);
     }
   };
 
