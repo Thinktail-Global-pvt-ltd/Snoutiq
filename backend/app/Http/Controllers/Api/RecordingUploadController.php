@@ -106,9 +106,13 @@ class RecordingUploadController extends Controller
             return;
         }
 
-        $session = CallSession::where('channel_name', $identifier)
-            ->orWhere('call_identifier', $identifier)
-            ->first();
+        $sessionQuery = CallSession::where('channel_name', $identifier);
+
+        if (CallSession::supportsColumn('call_identifier')) {
+            $sessionQuery->orWhere('call_identifier', $identifier);
+        }
+
+        $session = $sessionQuery->first();
 
         if (!$session) {
             return;
