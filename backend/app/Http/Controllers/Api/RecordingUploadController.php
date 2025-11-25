@@ -206,7 +206,8 @@ class RecordingUploadController extends Controller
                 'error' => $error->getMessage(),
             ]);
 
-        return null;
+            return null;
+        }
     }
 
     private function resolveS3Region(): void
@@ -227,5 +228,4 @@ class RecordingUploadController extends Controller
         $this->resolveS3Region();
         return Storage::disk('s3');
     }
-}
 }
