@@ -630,6 +630,7 @@ Route::prefix('receptionist')->group(function () {
     Route::get('/patients', [ReceptionistBookingController::class, 'patients']);
     Route::post('/patients', [ReceptionistBookingController::class, 'storePatient']);
     Route::get('/patients/{user}/pets', [ReceptionistBookingController::class, 'patientPets']);
+    Route::get('/doctors', [ReceptionistBookingController::class, 'doctors']);
 });
 
 

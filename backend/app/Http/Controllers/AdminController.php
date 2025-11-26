@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
@@ -155,8 +155,12 @@ class AdminController extends Controller
         $breed      = $request->input('breed');
         $pet_age    = (int)$request->input('pet_age');
         $pet_gender = $request->input('pet_gender');
-        $pet_doc1   = $request->input('pet_doc1');
-        $pet_doc2   = $request->input('pet_doc2');
+
+        $uploadedDoc1 = $this->storePetDocument($request, 'pet_doc1');
+        $uploadedDoc2 = $this->storePetDocument($request, 'pet_doc2');
+
+        $pet_doc1   = $uploadedDoc1 ?? $request->input('pet_doc1');
+        $pet_doc2   = $uploadedDoc2 ?? $request->input('pet_doc2');
 
         return DB::transaction(function () use ($userId, $name, $breed, $pet_age, $pet_gender, $pet_doc1, $pet_doc2) {
 
@@ -196,12 +200,31 @@ class AdminController extends Controller
     // update pet
     public function updatePet(Request $request, $petId)
     {
-        $cols = ['name','breed','pet_age','pet_gender','pet_doc1','pet_doc2'];
+        $cols = ['name','breed','pet_age','pet_gender'];
         $sets = [];
         $params = [];
         foreach ($cols as $c) {
             if ($request->has($c)) { $sets[] = "`$c` = ?"; $params[] = $request->input($c); }
         }
+
+        $doc1Upload = $this->storePetDocument($request, 'pet_doc1');
+        if ($doc1Upload) {
+            $sets[] = "`pet_doc1` = ?";
+            $params[] = $doc1Upload;
+        } elseif ($request->has('pet_doc1')) {
+            $sets[] = "`pet_doc1` = ?";
+            $params[] = $request->input('pet_doc1');
+        }
+
+        $doc2Upload = $this->storePetDocument($request, 'pet_doc2');
+        if ($doc2Upload) {
+            $sets[] = "`pet_doc2` = ?";
+            $params[] = $doc2Upload;
+        } elseif ($request->has('pet_doc2')) {
+            $sets[] = "`pet_doc2` = ?";
+            $params[] = $request->input('pet_doc2');
+        }
+
         if (!$sets) return response()->json(['status'=>'error','message'=>'No fields to update'], 422);
 
         $sql = 'UPDATE pets SET '.implode(',', $sets).', updated_at = NOW() WHERE id = ?';
@@ -241,5 +264,27 @@ class AdminController extends Controller
 
         $vets = DB::table('vet_registerations_temp')->get();
         return response()->json(['status' => 'success', 'data' => $vets]);
+    }
+
+    private function storePetDocument(Request $request, string $field): ?string
+    {
+        if (!$request->hasFile($field)) {
+            return null;
+        }
+
+        $file = $request->file($field);
+        if (!$file || !$file->isValid()) {
+            return null;
+        }
+
+        $uploadPath = public_path('uploads/pet_docs');
+        if (!File::exists($uploadPath)) {
+            File::makeDirectory($uploadPath, 0777, true, true);
+        }
+
+        $docName = time().'_'.uniqid().'_'.$file->getClientOriginalName();
+        $file->move($uploadPath, $docName);
+
+        return 'backend/uploads/pet_docs/'.$docName;
     }
 }

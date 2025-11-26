@@ -3,6 +3,174 @@
 
 @section('title','My Bookings')
 @section('page_title','My Bookings')
+@section('head')
+  <style>
+    #calendar {
+      border-radius: 1.25rem;
+      background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+      padding: 1.25rem;
+      box-shadow: inset 0 1px 0 rgba(15, 23, 42, 0.04);
+    }
+    #calendar .weekday-row {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .calendar-cell {
+      min-height: 180px;
+      border-radius: 1.25rem;
+      border: 1px solid rgba(15,23,42,0.05);
+      background: #fff;
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      box-shadow: 0 12px 24px rgba(15,23,42,0.05);
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    .calendar-cell--muted {
+      background: #f8fafc;
+      border-style: dashed;
+      border-color: rgba(148,163,184,0.35);
+      box-shadow: none;
+    }
+    .calendar-cell__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      color: #475569;
+    }
+    .calendar-cell__date {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .calendar-cell--muted .calendar-cell__date {
+      color: #94a3b8;
+    }
+    .calendar-cell__count {
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+    }
+    .calendar-cell__notes {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      flex: 1;
+    }
+    .calendar-note {
+      position: relative;
+      display: block;
+      width: 100%;
+      text-align: left;
+      border-radius: 1rem;
+      padding: 0.55rem 0.75rem 0.75rem;
+      background: linear-gradient(135deg, var(--note-start, #fef9c3), var(--note-end, #fde68a));
+      box-shadow: 0 12px 18px var(--note-shadow, rgba(120,72,0,0.2));
+      border: 1px solid rgba(15,23,42,0.05);
+      transform: rotate(var(--note-tilt, 0deg));
+      transition: transform .2s ease, box-shadow .2s ease;
+      cursor: pointer;
+    }
+    .calendar-note::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: rgba(255,255,255,0.45);
+      top: 10px;
+      right: 18px;
+      border-radius: 3px;
+      transform: rotate(45deg);
+      opacity: 0.7;
+    }
+    .calendar-note:hover {
+      transform: rotate(var(--note-tilt, 0deg)) translateY(-3px);
+      box-shadow: 0 16px 28px rgba(15,23,42,0.18);
+    }
+    .calendar-note__time {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: rgba(15,23,42,0.6);
+    }
+    .calendar-note__title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #0f172a;
+      margin-top: 0.15rem;
+    }
+    .calendar-note__pet {
+      font-size: 0.8rem;
+      color: #475569;
+    }
+    .calendar-note__summary {
+      font-size: 0.75rem;
+      color: #334155;
+      margin-top: 0.15rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .calendar-note__meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0.45rem;
+      font-size: 0.7rem;
+    }
+    .calendar-note__service {
+      font-weight: 600;
+      text-transform: capitalize;
+      color: rgba(15,23,42,0.75);
+    }
+    .status-pill {
+      padding: 0.05rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-weight: 600;
+      font-size: 0.65rem;
+      text-transform: capitalize;
+    }
+    .status-pill--success {
+      background: rgba(16,185,129,0.15);
+      color: #047857;
+      border-color: rgba(16,185,129,0.35);
+    }
+    .status-pill--info {
+      background: rgba(59,130,246,0.1);
+      color: #1d4ed8;
+      border-color: rgba(59,130,246,0.3);
+    }
+    .status-pill--pending {
+      background: rgba(250,204,21,0.18);
+      color: #92400e;
+      border-color: rgba(245,158,11,0.4);
+    }
+    .status-pill--danger {
+      background: rgba(248,113,113,0.15);
+      color: #b91c1c;
+      border-color: rgba(248,113,113,0.4);
+    }
+    .status-pill--warning {
+      background: rgba(251,191,36,0.18);
+      color: #b45309;
+      border-color: rgba(251,191,36,0.4);
+    }
+    @media (max-width: 1023px) {
+      #calendar {
+        overflow-x: auto;
+      }
+      #calRows {
+        min-width: 900px;
+      }
+    }
+  </style>
+@endsection
 @section('content')
   @php
     $debug = request()->query('debug') === '1';
@@ -95,10 +263,10 @@
       </div>
     </div>
     <div id="calendar" class="mb-4">
-      <div class="grid grid-cols-7 text-xs font-semibold text-gray-600">
+      <div class="weekday-row grid grid-cols-7 text-xs font-semibold text-gray-600 mb-3">
         <div class="p-2">Sun</div><div class="p-2">Mon</div><div class="p-2">Tue</div><div class="p-2">Wed</div><div class="p-2">Thu</div><div class="p-2">Fri</div><div class="p-2">Sat</div>
       </div>
-      <div id="calRows" class="grid grid-cols-7 gap-px bg-gray-200 rounded overflow-hidden"></div>
+      <div id="calRows" class="grid grid-cols-7 gap-3"></div>
     </div>
     <div id="list" class="divide-y hidden"></div>
   </div>
@@ -250,6 +418,64 @@
     }catch(_){ }
   }
 
+  const NOTE_PALETTES = [
+    { start: '#fef4d7', end: '#fde68a', shadow: 'rgba(251,191,36,0.4)', rotate: '-1.4deg' },
+    { start: '#e0f2fe', end: '#bae6fd', shadow: 'rgba(37,99,235,0.25)', rotate: '1.2deg' },
+    { start: '#ede9fe', end: '#ddd6fe', shadow: 'rgba(109,40,217,0.25)', rotate: '-0.6deg' },
+    { start: '#fce7f3', end: '#fbcfe8', shadow: 'rgba(236,72,153,0.3)', rotate: '0.8deg' },
+    { start: '#dcfce7', end: '#bbf7d0', shadow: 'rgba(16,185,129,0.25)', rotate: '-1deg' },
+    { start: '#fee2e2', end: '#fecaca', shadow: 'rgba(248,113,113,0.35)', rotate: '1deg' },
+  ];
+
+  function paletteForBooking(booking, idx){
+    const key = (booking.status || booking.service_type || '') + idx;
+    let hash = 0;
+    for (let i = 0; i < key.length; i++){
+      hash = (hash + key.charCodeAt(i)) % NOTE_PALETTES.length;
+    }
+    return NOTE_PALETTES[hash] || NOTE_PALETTES[0];
+  }
+
+  function statusClass(status){
+    const key = (status || 'pending').toLowerCase();
+    if (['completed','done'].includes(key)) return 'status-pill--success';
+    if (['confirmed','accepted','active'].includes(key)) return 'status-pill--info';
+    if (['cancelled','canceled','rejected','declined'].includes(key)) return 'status-pill--danger';
+    if (['rescheduled','on_hold'].includes(key)) return 'status-pill--warning';
+    return 'status-pill--pending';
+  }
+
+  function renderStickyNote(booking, idx){
+    const palette = paletteForBooking(booking, idx);
+    const schedule = booking.scheduled_for || booking.booking_created_at || '';
+    const time = schedule ? schedule.slice(11,16) : '';
+    const parent = booking.pet_parent_name || booking.pet_parent_phone || `Booking #${booking.id}`;
+    const petLine = booking.pet_name
+      ? `${booking.pet_name}${booking.pet_breed ? ` (${booking.pet_breed})` : ''}`
+      : '';
+    const summarySource = booking.user_summary || booking.ai_summary || '';
+    const summary = summarySource ? String(summarySource).split('\n')[0] : '';
+    const service = (booking.service_type || '').replace(/_/g,' ');
+    const statusText = (booking.status || 'pending').replace(/_/g,' ');
+    return `
+      <button
+        type="button"
+        class="calendar-note"
+        data-id="${booking.id}"
+        style="--note-start:${palette.start};--note-end:${palette.end};--note-shadow:${palette.shadow};--note-tilt:${palette.rotate};"
+      >
+        <div class="calendar-note__time">${esc(time || '—')}</div>
+        <div class="calendar-note__title">${esc(parent)}</div>
+        ${petLine ? `<div class="calendar-note__pet">${esc(petLine)}</div>` : ''}
+        ${summary ? `<div class="calendar-note__summary">${esc(summary)}</div>` : ''}
+        <div class="calendar-note__meta">
+          <span class="status-pill ${statusClass(booking.status)}">${esc(statusText)}</span>
+          <span class="calendar-note__service">${esc(service || 'booking')}</span>
+        </div>
+      </button>
+    `;
+  }
+
   function monthStart(dateStr){ const d=new Date(dateStr); d.setDate(1); d.setHours(0,0,0,0); return d; }
   function fmtDate(d){ const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
   function parseWhen(b){ const t=b.scheduled_for || b.booking_created_at; return t ? new Date(t.replace(' ','T')) : null; }
@@ -257,6 +483,14 @@
   function renderCalendar(rows){
     const byDay = new Map();
     rows.forEach(b=>{ const dt=parseWhen(b); if(!dt) return; const key=fmtDate(dt); if(!byDay.has(key)) byDay.set(key,[]); byDay.get(key).push(b); });
+    for(const [dayKey, list] of byDay.entries()){
+      list.sort((a,b)=>{
+        const aw = (a.scheduled_for || a.booking_created_at || '').slice(11,16);
+        const bw = (b.scheduled_for || b.booking_created_at || '').slice(11,16);
+        return aw.localeCompare(bw);
+      });
+      byDay.set(dayKey, list);
+    }
     const since = document.getElementById('since').value || new Date().toISOString().slice(0,10);
     const first = monthStart(since);
     const startCell = new Date(first); startCell.setDate(first.getDate() - first.getDay());
@@ -268,15 +502,13 @@
       const inMonth = d.getMonth()===first.getMonth();
       const items = (byDay.get(key)||[]);
       html += `
-        <div class="bg-white ${inMonth?'':'bg-gray-50'} p-2 min-h-[120px]">
-          <div class="text-xs ${inMonth?'text-gray-900':'text-gray-400'} font-semibold mb-1">${d.getDate()}</div>
-          <div class="space-y-1">
-            ${items.map(b=>`
-              <button type="button" data-id="${b.id}" class="cal-ev w-full text-left px-2 py-1 rounded border ${b.status==='completed'?'border-emerald-300 bg-emerald-50 text-emerald-800':'border-indigo-300 bg-indigo-50 text-indigo-800'} hover:shadow">
-                <div class="text-[11px] font-semibold">#${b.id} · ${(b.service_type||'').replace('_',' ')}</div>
-                <div class="text-[10px] opacity-80">${(b.scheduled_for||'').slice(11,16) || (b.booking_created_at||'').slice(11,16)}</div>
-              </button>
-            `).join('')}
+        <div class="calendar-cell ${inMonth?'':'calendar-cell--muted'}">
+          <div class="calendar-cell__header">
+            <div class="calendar-cell__date">${d.getDate()}</div>
+            <div class="calendar-cell__count">${items.length ? `${items.length} booking${items.length>1?'s':''}` : ''}</div>
+          </div>
+          <div class="calendar-cell__notes">
+            ${items.length ? items.map((b, idx)=>renderStickyNote(b, idx)).join('') : ''}
           </div>
         </div>`;
     }
@@ -339,7 +571,7 @@
 
     // Calendar click -> navigate to dedicated detail page (respect /backend)
     calendarEl.addEventListener('click', (e)=>{
-      const ev = e.target.closest('.cal-ev');
+      const ev = e.target.closest('.calendar-note');
       if(!ev) return;
       const id = ev.getAttribute('data-id');
       if(id) window.location.href = `${appBasePath}/doctor/booking/${encodeURIComponent(id)}`;

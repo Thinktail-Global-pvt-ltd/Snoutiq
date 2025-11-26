@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Doctor;
 use App\Models\User;
 use App\Models\UserPet;
+use App\Models\Receptionist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class ReceptionistBookingController extends Controller
@@ -54,6 +56,16 @@ class ReceptionistBookingController extends Controller
         $role = session('role')
             ?? data_get(session('user'), 'role')
             ?? data_get(session('auth_full'), 'role');
+
+        $receptionistId = session('receptionist_id')
+            ?? $request->input('receptionist_id')
+            ?? $request->header('X-Receptionist-Id');
+        if ($receptionistId) {
+            $receptionist = Receptionist::find((int) $receptionistId);
+            if ($receptionist?->vet_registeration_id) {
+                return (int) $receptionist->vet_registeration_id;
+            }
+        }
 
         if (in_array($role, ['doctor', 'receptionist'], true)) {
             $clinicId = session('clinic_id')
@@ -105,9 +117,19 @@ class ReceptionistBookingController extends Controller
     {
         $query = trim((string) $request->query('q', ''));
 
-        $builder = DB::table('users')
-            ->select('id', 'name', 'email', 'phone', 'role')
-            ->whereIn('role', self::PATIENT_ROLES);
+        $selectColumns = ['id', 'name', 'email', 'phone'];
+        $filterByRole = false;
+
+        if (Schema::hasColumn('users', 'role')) {
+            $selectColumns[] = 'role';
+            $filterByRole = true;
+        }
+
+        $builder = DB::table('users')->select($selectColumns);
+
+        if ($filterByRole) {
+            $builder->whereIn('role', self::PATIENT_ROLES);
+        }
 
         if ($query !== '') {
             $builder->where(function ($sub) use ($query) {
@@ -119,7 +141,7 @@ class ReceptionistBookingController extends Controller
             $builder->orderByDesc('id');
         }
 
-        $patients = $builder->limit(25)->get();
+        $patients = $builder->get();
         $petMap = collect();
 
         if ($patients->isNotEmpty()) {
@@ -150,6 +172,24 @@ class ReceptionistBookingController extends Controller
         return response()->json(['success' => true, 'data' => $pets]);
     }
 
+    public function doctors(Request $request)
+    {
+        $clinicId = $this->resolveClinicId($request);
+        if (!$clinicId) {
+            return response()->json(['success' => false, 'message' => 'clinic_id or vet_slug required'], 422);
+        }
+
+        $doctors = Doctor::query()
+            ->where('vet_registeration_id', $clinicId)
+            ->orderBy('doctor_name')
+            ->get(['id', 'doctor_name', 'doctor_email', 'doctor_mobile']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $doctors,
+        ]);
+    }
+
     public function storePatient(Request $request)
     {
         $data = $request->validate([
@@ -169,13 +209,17 @@ class ReceptionistBookingController extends Controller
             ], 422);
         }
 
-        $user = User::create([
+        $userPayload = [
             'name' => $data['name'],
             'email' => $data['email'] ?? null,
             'phone' => $data['phone'] ?? null,
-            'role' => 'pet',
             'password' => Hash::make(Str::random(16)),
-        ]);
+        ];
+        if (Schema::hasColumn('users', 'role')) {
+            $userPayload['role'] = 'pet';
+        }
+
+        $user = User::create($userPayload);
 
         $pet = null;
         if (!empty($data['pet_name'])) {

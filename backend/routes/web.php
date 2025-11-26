@@ -324,7 +324,15 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         return view('groomer.services.index', compact('stepStatus'));
     })->name('groomer.services.index');
     Route::view('/dashboard/staff', 'clinic.staff')->name('clinic.staff');
-    Route::view('/receptionist/bookings', 'receptionist.bookings')->name('receptionist.bookings');
+    Route::get('/receptionist/bookings', function(){
+        return view('receptionist.bookings', ['viewMode' => 'create']);
+    })->name('receptionist.bookings.create');
+    Route::get('/receptionist/bookings/schedule', function(){
+        return view('receptionist.bookings', ['viewMode' => 'schedule']);
+    })->name('receptionist.bookings.schedule');
+    Route::get('/receptionist/bookings/history', function(){
+        return view('receptionist.bookings', ['viewMode' => 'history']);
+    })->name('receptionist.bookings.history');
 
     // Booking flow
     Route::view('/booking/clinics', 'booking.clinics')->name('booking.clinics');
