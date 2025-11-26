@@ -155,6 +155,14 @@ class AdminController extends Controller
         $breed      = $request->input('breed');
         $pet_age    = (int)$request->input('pet_age');
         $pet_gender = $request->input('pet_gender');
+        $microchipNumber = $request->input('microchip_number');
+        $mcdRegistration = $request->input('mcd_registration_number');
+
+        try {
+            $isNeutered = $this->normalizeNeuteredFlag($request->input('is_neutered'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
+        }
 
         $uploadedDoc1 = $this->storePetDocument($request, 'pet_doc1');
         $uploadedDoc2 = $this->storePetDocument($request, 'pet_doc2');
@@ -162,7 +170,18 @@ class AdminController extends Controller
         $pet_doc1   = $uploadedDoc1 ?? $request->input('pet_doc1');
         $pet_doc2   = $uploadedDoc2 ?? $request->input('pet_doc2');
 
-        return DB::transaction(function () use ($userId, $name, $breed, $pet_age, $pet_gender, $pet_doc1, $pet_doc2) {
+        return DB::transaction(function () use (
+            $userId,
+            $name,
+            $breed,
+            $pet_age,
+            $pet_gender,
+            $microchipNumber,
+            $mcdRegistration,
+            $isNeutered,
+            $pet_doc1,
+            $pet_doc2
+        ) {
 
             // (1) migrate legacy user->pets once
             DB::statement(
@@ -178,13 +197,27 @@ class AdminController extends Controller
 
             // (2) insert the new pet (idempotent)
             DB::statement(
-                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, pet_doc1, pet_doc2, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, microchip_number, mcd_registration_number, is_neutered, pet_doc1, pet_doc2, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                  ON DUPLICATE KEY UPDATE
+                  microchip_number = COALESCE(VALUES(microchip_number), microchip_number),
+                  mcd_registration_number = COALESCE(VALUES(mcd_registration_number), mcd_registration_number),
+                  is_neutered = COALESCE(VALUES(is_neutered), is_neutered),
                    pet_doc1 = COALESCE(VALUES(pet_doc1), pet_doc1),
                    pet_doc2 = COALESCE(VALUES(pet_doc2), pet_doc2),
                    updated_at = CURRENT_TIMESTAMP',
-                [$userId, $name, $breed, $pet_age, $pet_gender, $pet_doc1, $pet_doc2]
+                [
+                    $userId,
+                    $name,
+                    $breed,
+                    $pet_age,
+                    $pet_gender,
+                    $microchipNumber,
+                    $mcdRegistration,
+                    $isNeutered,
+                    $pet_doc1,
+                    $pet_doc2,
+                ]
             );
 
             // return the row
@@ -200,11 +233,21 @@ class AdminController extends Controller
     // update pet
     public function updatePet(Request $request, $petId)
     {
-        $cols = ['name','breed','pet_age','pet_gender'];
+        $scalarCols = ['name','breed','pet_age','pet_gender','microchip_number','mcd_registration_number'];
         $sets = [];
         $params = [];
-        foreach ($cols as $c) {
+        foreach ($scalarCols as $c) {
             if ($request->has($c)) { $sets[] = "`$c` = ?"; $params[] = $request->input($c); }
+        }
+
+        if ($request->has('is_neutered')) {
+            try {
+                $neuteredFlag = $this->normalizeNeuteredFlag($request->input('is_neutered'));
+            } catch (\InvalidArgumentException $e) {
+                return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
+            }
+            $sets[] = "`is_neutered` = ?";
+            $params[] = $neuteredFlag;
         }
 
         $doc1Upload = $this->storePetDocument($request, 'pet_doc1');
@@ -253,6 +296,28 @@ class AdminController extends Controller
 
         $users = User::all();
         return response()->json(['status' => 'success', 'data' => $users]);
+    }
+
+    private function normalizeNeuteredFlag($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $value = strtoupper((string)$value);
+
+        $truthy = ['Y', 'YES', 'TRUE', '1'];
+        $falsy  = ['N', 'NO', 'FALSE', '0'];
+
+        if (in_array($value, $truthy, true)) {
+            return 'Y';
+        }
+
+        if (in_array($value, $falsy, true)) {
+            return 'N';
+        }
+
+        throw new \InvalidArgumentException('Invalid value for is_neutered. Use Y or N.');
     }
 
     // Fetch all vets

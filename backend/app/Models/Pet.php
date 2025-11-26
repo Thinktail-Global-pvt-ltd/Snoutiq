@@ -8,7 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Pet extends Model
 {
     protected $fillable = [
-        'user_id', 'name', 'breed', 'pet_age', 'pet_gender', 'pet_doc1', 'pet_doc2'
+        'user_id',
+        'name',
+        'breed',
+        'pet_age',
+        'pet_gender',
+        'microchip_number',
+        'mcd_registration_number',
+        'is_neutered',
+        'pet_doc1',
+        'pet_doc2',
     ];
 
     public function owner(): BelongsTo
