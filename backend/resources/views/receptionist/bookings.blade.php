@@ -53,6 +53,14 @@
     background: #4f46e5;
     color: #fff;
   }
+  .schedule-section-row td {
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
   @media (max-width: 640px) {
     .table-card table {
       min-width: 720px;
@@ -617,6 +625,37 @@
     }
   }
 
+  function tryParseDate(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function parseAppointmentDate(row) {
+    if (!row) return null;
+    const datePart = row.date || row.scheduled_date || row.slot_date || row.scheduled_at || row.datetime || null;
+    if (!datePart) return null;
+    const timeRaw = (row.time_slot || row.time || row.slot_time || '').trim();
+    const normalizedTime = timeRaw
+      ? (timeRaw.length === 5 ? `${timeRaw}:00` : timeRaw)
+      : '00:00:00';
+    const hasTimeInDate = datePart.includes('T') || datePart.includes(' ');
+    const candidates = [];
+    if (hasTimeInDate) {
+      candidates.push(datePart);
+    }
+    candidates.push(`${datePart}T${normalizedTime}`);
+    candidates.push(`${datePart} ${normalizedTime}`);
+    if (!hasTimeInDate) {
+      candidates.push(datePart);
+    }
+    for (const candidate of candidates) {
+      const parsed = tryParseDate(candidate);
+      if (parsed) return parsed;
+    }
+    return null;
+  }
+
   async function fetchPatients(query = '') {
     try {
       await Auth.bootstrap();
@@ -779,6 +818,25 @@
     }
   }
 
+  function createDoctorRow(row) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="px-4 py-3">
+        <div class="font-semibold text-slate-900">${formatDate(row.date + ' ' + (row.time_slot || ''))}</div>
+        <div class="text-xs text-slate-500">${row.time_slot || ''}</div>
+      </td>
+      <td class="px-4 py-3">
+        <div class="font-semibold text-slate-900">${row.patient?.name || 'Patient'}</div>
+        <div class="text-xs text-slate-500">${row.patient?.phone || row.patient?.email || ''}</div>
+      </td>
+      <td class="px-4 py-3">
+        <div class="text-sm">${row.pet_name || '—'}</div>
+      </td>
+      <td class="px-4 py-3"><span class="status-pill ${statusClass(row.status)}">${row.status || 'pending'}</span></td>
+    `;
+    return tr;
+  }
+
   function renderDoctorAppointments(rows) {
     if (!doctorRows || !doctorTable || !doctorLoading) return;
     doctorRows.innerHTML = '';
@@ -791,23 +849,36 @@
     doctorTable.classList.remove('hidden');
     doctorEmpty?.classList.add('hidden');
     doctorLoading.classList.add('hidden');
+    const now = new Date();
+    const upcoming = [];
+    const ended = [];
     rows.forEach(row => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="px-4 py-3">
-          <div class="font-semibold text-slate-900">${formatDate(row.date + ' ' + (row.time_slot || ''))}</div>
-          <div class="text-xs text-slate-500">${row.time_slot || ''}</div>
-        </td>
-        <td class="px-4 py-3">
-          <div class="font-semibold text-slate-900">${row.patient?.name || 'Patient'}</div>
-          <div class="text-xs text-slate-500">${row.patient?.phone || row.patient?.email || ''}</div>
-        </td>
-        <td class="px-4 py-3">
-          <div class="text-sm">${row.pet_name || '—'}</div>
-        </td>
-        <td class="px-4 py-3"><span class="status-pill ${statusClass(row.status)}">${row.status || 'pending'}</span></td>
-      `;
-      doctorRows.appendChild(tr);
+      const slotDate = parseAppointmentDate(row);
+      if (!slotDate || slotDate.getTime() >= now.getTime()) {
+        upcoming.push(row);
+      } else {
+        ended.push(row);
+      }
+    });
+    [
+      { label: 'Upcoming Appointments', data: upcoming, emptyText: 'No upcoming appointments' },
+      { label: 'Ended Appointments', data: ended, emptyText: 'No ended appointments yet' },
+    ].forEach(section => {
+      const header = document.createElement('tr');
+      header.className = 'schedule-section-row';
+      header.innerHTML = `<td class="px-4 py-2" colspan="4">${section.label}</td>`;
+      doctorRows.appendChild(header);
+
+      if (!section.data.length) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `<td colspan="4" class="px-4 py-3 text-sm text-slate-500">${section.emptyText}</td>`;
+        doctorRows.appendChild(emptyRow);
+        return;
+      }
+
+      section.data.forEach(row => {
+        doctorRows.appendChild(createDoctorRow(row));
+      });
     });
   }
 
