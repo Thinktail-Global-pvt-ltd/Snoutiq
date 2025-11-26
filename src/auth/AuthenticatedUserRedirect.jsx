@@ -4,7 +4,7 @@ import { AuthContext } from "./AuthContext";
 
 // 🔹 Role to Path Mapping
 const roleRoutes = {
-  vet: "/user-dashboard/bookings",
+  vet: "/user-dashboard/vet-dashboard",
   pet: "/dashboard",
   super_admin: "/user-dashboard",
 };

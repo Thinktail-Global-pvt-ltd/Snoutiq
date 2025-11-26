@@ -33,7 +33,7 @@ const RegisterBasicDetails = () => {
   // Redirect if already logged in
   if (user) {
     if (user.role === "vet") {
-      return <Navigate to="/user-dashboard/bookings" replace />;
+      return <Navigate to="/user-dashboard/vet-dashboard" replace />;
     } else {
       return <Navigate to="/dashboard" replace />;
     }

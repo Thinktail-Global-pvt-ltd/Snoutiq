@@ -17,12 +17,14 @@ export const AuthContext = createContext();
 const CLINIC_NEARBY_API = "https://snoutiq.com/backend/api/nearby-vets";
 const DOCTOR_NEARBY_API = "https://snoutiq.com/backend/api/nearby-doctors";
 const ACTIVE_DOCTORS_API = "https://snoutiq.com/backend/api/active-doctors";
+const CLINIC_DOCTORS_API = "https://snoutiq.com/backend/api/clinics";
 
 export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [chatRoomToken, setChatRoomToken] = useState(null);
+  const [doctorId, setDoctorId] = useState(null);
 
   const [nearbyDoctors, setNearbyDoctors] = useState([]);
   const [liveDoctors, setLiveDoctors] = useState([]);
@@ -35,6 +37,7 @@ export const AuthProvider = ({ children }) => {
 
   const memoizedNearbyDoctors = useMemo(() => nearbyDoctors, [nearbyDoctors]);
   const memoizedLiveDoctors = useMemo(() => liveDoctors, [liveDoctors]);
+  
 
   const persistLiveDoctors = useCallback((list) => {
     const safeList = Array.isArray(list) ? list : [];
@@ -89,6 +92,18 @@ export const AuthProvider = ({ children }) => {
     [persistLiveDoctors]
   );
 
+  const resolveClinicId = useCallback(() => {
+    return (
+      user?.clinic_id ||
+      user?.vet_registeration_id ||
+      user?.vet_id ||
+      Number(localStorage.getItem("clinic_id")) ||
+      Number(localStorage.getItem("vet_registeration_id")) ||
+      Number(localStorage.getItem("vet_id")) ||
+      null
+    );
+  }, [user]);
+
   // Load auth + doctors from localStorage
   useEffect(() => {
     try {
@@ -97,10 +112,13 @@ export const AuthProvider = ({ children }) => {
       const savedChatRoomToken = localStorage.getItem("chat_room_token");
       const savedDoctors = localStorage.getItem("nearby_doctors");
       const savedLiveDoctors = localStorage.getItem("live_doctors");
+      const savedDoctorId = localStorage.getItem("doctor_id");
 
       if (savedToken) setToken(savedToken);
       if (savedUser) setUser(JSON.parse(savedUser));
       if (savedChatRoomToken) setChatRoomToken(savedChatRoomToken);
+      if (savedDoctorId) setDoctorId(Number(savedDoctorId));
+  
 
       if (savedDoctors) {
         const parsed = JSON.parse(savedDoctors);
@@ -129,6 +147,41 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   }, []);
+
+  // Fetch clinic doctors and store first doctor_id for reuse
+  useEffect(() => {
+    const clinicId = resolveClinicId();
+    const savedDoctorId = localStorage.getItem("doctor_id");
+    if (!user || !clinicId || savedDoctorId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${CLINIC_DOCTORS_API}/${clinicId}/doctors`, {
+          headers: token
+            ? { Authorization: `Bearer ${token}` }
+            : { "Content-Type": "application/json" },
+          withCredentials: true,
+        });
+        const doctors = Array.isArray(res?.data?.doctors)
+          ? res.data.doctors
+          : Array.isArray(res?.data?.data?.doctors)
+          ? res.data.data.doctors
+          : [];
+        if (!cancelled && doctors.length && doctors[0]?.id) {
+          localStorage.setItem("doctor_id", String(doctors[0].id));
+          setDoctorId(Number(doctors[0].id));
+        }
+      } catch (err) {
+        // silent fail; doctor id is optional
+        console.warn("Unable to fetch clinic doctors for doctor_id seed", err?.message || err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, token, resolveClinicId]);
 
 
   // Fetch nearby doctors (clinics + doctors) with cooldown + abort
@@ -276,6 +329,13 @@ export const AuthProvider = ({ children }) => {
       setToken(jwtToken);
       localStorage.setItem("token", jwtToken);
       localStorage.setItem("user", JSON.stringify(userData));
+      if (userData?.doctor_id) {
+        setDoctorId(Number(userData.doctor_id));
+        localStorage.setItem("doctor_id", String(userData.doctor_id));
+      } else {
+        setDoctorId(null);
+        localStorage.removeItem("doctor_id");
+      }
 
       if (initialChatToken) {
         console.log(
@@ -526,6 +586,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setToken(null);
       setChatRoomToken(null);
+      setDoctorId(null);
       setNearbyDoctors([]);
       setLiveDoctors([]);
       setAllActiveDoctors([]);
@@ -544,6 +605,7 @@ export const AuthProvider = ({ children }) => {
         "userId",
         "userLatitude",
         "userLongitude",
+        "doctor_id",
       ];
       keysToRemove.forEach((key) => localStorage.removeItem(key));
 
@@ -573,6 +635,7 @@ export const AuthProvider = ({ children }) => {
       liveDoctors: memoizedLiveDoctors,
       allActiveDoctors,
       loading,
+      doctor_id: doctorId,
       isLoggedIn: !!token,
     }),
     [
@@ -585,6 +648,7 @@ export const AuthProvider = ({ children }) => {
       allActiveDoctors,
       fetchNearbyDoctors,
       updateNearbyDoctors,
+      doctorId,
     ]
   );
 

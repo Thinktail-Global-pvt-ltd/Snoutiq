@@ -54,6 +54,19 @@ const DoctorRegistration = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [activeStep, setActiveStep] = useState(1);
+  const steps = [
+    {
+      id: 1,
+      title: "Clinic Details",
+      subtitle: "Location, contact & fees",
+    },
+    {
+      id: 2,
+      title: "Doctor Details",
+      subtitle: "Team info & credentials",
+    },
+  ];
 
   // State for multiple doctors
   const [doctors, setDoctors] = useState([
@@ -600,192 +613,53 @@ const DoctorRegistration = () => {
     previewReader.readAsDataURL(compressedFile);
   };
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
+  const handleNextStep = () => {
+    const newErrors = { ...errors };
+    const newTouched = { ...touched };
+    const clinicFields = {
+      name,
+      mobileNumber,
+      email,
+      address,
+      city,
+      pinCode,
+      chatPrice,
+    };
 
-  //   // Mark all fields as touched
-  //   const allTouched = {};
-  //   Object.keys(errors).forEach((key) => {
-  //     allTouched[key] = true;
-  //   });
-  //   setTouched(allTouched);
+    Object.entries(clinicFields).forEach(([field, value]) => {
+      newErrors[field] = validateField(field, value);
+      newTouched[field] = true;
+    });
 
-  //   // Validate the form
-  //   if (!validateForm()) {
-  //     toast.error("Please fix the errors in the form");
-  //     return;
-  //   }
+    if (!coordinates.lat || !coordinates.lng) {
+      newErrors.coordinates = "Please set your clinic location on the map";
+      newTouched.coordinates = true;
+    } else {
+      newErrors.coordinates = "";
+    }
 
-  //   if (!acceptedTerms) {
-  //     toast.error("Please accept the terms before submitting!");
-  //     return;
-  //   }
+    setErrors(newErrors);
+    setTouched(newTouched);
 
-  //   setIsProfileSaving(true);
-  //   try {
-  //     const formData = new FormData();
-  //     formData.append("name", name);
-  //     formData.append("city", city);
-  //     formData.append("pincode", pinCode);
-  //     formData.append("mobile", mobileNumber);
-  //     formData.append("email", email);
-  //     formData.append("employee_id", "N/A");
-  //     formData.append("password", password);
-  //     formData.append("confirmPassword", confirmPassword);
+    const hasErrors = Object.keys(clinicFields).some((key) => newErrors[key]);
 
-  //     // Send coordinates as an array instead of JSON string
-  //     if (coordinates.lat && coordinates.lng) {
-  //       formData.append("coordinates[]", coordinates.lat);
-  //       formData.append("coordinates[]", coordinates.lng);
-  //     }
+    if (hasErrors || newErrors.coordinates) {
+      toast.error("Please complete clinic details before continuing");
+      return false;
+    }
 
-  //     formData.append("address", address);
-  //     formData.append("chat_price", chatPrice);
-  //     formData.append("bio", bio);
-  //     formData.append("inhome_grooming_services", inhome_grooming_services);
-  //     formData.append("acceptedTerms", acceptedTerms);
-
-  //     // Add all the Google Places data if available
-  //     if (businessDetails) {
-  //       formData.append("place_id", businessDetails.place_id || "");
-  //       formData.append(
-  //         "business_status",
-  //         businessDetails.business_status || "OPERATIONAL"
-  //       );
-  //       formData.append(
-  //         "formatted_address",
-  //         businessDetails.formatted_address || address
-  //       );
-  //       formData.append("lat", coordinates.lat);
-  //       formData.append("lng", coordinates.lng);
-
-  //       // Viewport data
-  //       if (businessDetails.geometry?.viewport) {
-  //         const viewport = businessDetails.geometry.viewport;
-  //         formData.append("viewport_ne_lat", viewport.getNorthEast().lat());
-  //         formData.append("viewport_ne_lng", viewport.getNorthEast().lng());
-  //         formData.append("viewport_sw_lat", viewport.getSouthWest().lat());
-  //         formData.append("viewport_sw_lng", viewport.getSouthWest().lng());
-  //       }
-
-  //       formData.append("icon", businessDetails.icon || "");
-  //       formData.append(
-  //         "icon_background_color",
-  //         businessDetails.icon_background_color || ""
-  //       );
-  //       formData.append(
-  //         "icon_mask_base_uri",
-  //         businessDetails.icon_mask_base_uri || ""
-  //       );
-
-  //       // Send open_now as boolean (not string)
-  //       formData.append(
-  //         "open_now",
-  //         businessDetails.opening_hours?.open_now ? "1" : "0"
-  //       );
-
-  //       // Send types as individual array items
-  //       if (businessDetails.types && Array.isArray(businessDetails.types)) {
-  //         businessDetails.types.forEach((type, index) => {
-  //           formData.append(`types[${index}]`, type);
-  //         });
-  //       }
-
-  //       // Send photos as individual array items
-  //       if (businessDetails.photos && Array.isArray(businessDetails.photos)) {
-  //         businessDetails.photos.forEach((photo, index) => {
-  //           formData.append(`photos[${index}][height]`, photo.height);
-  //           formData.append(`photos[${index}][width]`, photo.width);
-  //           formData.append(
-  //             `photos[${index}][photo_reference]`,
-  //             photo.photo_reference
-  //           );
-  //         });
-  //       }
-
-  //       // Plus code
-  //       if (businessDetails.plus_code) {
-  //         formData.append(
-  //           "compound_code",
-  //           businessDetails.plus_code.compound_code || ""
-  //         );
-  //         formData.append(
-  //           "global_code",
-  //           businessDetails.plus_code.global_code || ""
-  //         );
-  //       }
-
-  //       formData.append("rating", businessDetails.rating?.toString() || "0");
-  //       formData.append(
-  //         "user_ratings_total",
-  //         businessDetails.user_ratings_total?.toString() || "0"
-  //       );
-  //     }
-
-  //     if (clinicPictureFile) {
-  //       formData.append("hospital_profile", clinicPictureFile);
-  //     }
-
-  //     // Add doctors data
-  //     doctors.forEach((doctor, index) => {
-  //       formData.append(`doctors[${index}][doctor_name]`, doctor.doctor_name);
-  //       formData.append(`doctors[${index}][doctor_email]`, doctor.doctor_email);
-  //       formData.append(
-  //         `doctors[${index}][doctor_mobile]`,
-  //         doctor.doctor_mobile
-  //       );
-  //       formData.append(
-  //         `doctors[${index}][doctor_license]`,
-  //         doctor.doctor_license
-  //       );
-  //       if (doctor.doctor_image) {
-  //         formData.append(
-  //           `doctors[${index}][doctor_image]`,
-  //           doctor.doctor_image
-  //         );
-  //       }
-  //     });
-
-  //     const res = await axios.post(
-  //       "https://snoutiq.com/backend/api/vet-registerations/store",
-  //       formData,
-  //       {
-  //         headers: {
-  //           "Content-Type": "multipart/form-data",
-  //         },
-  //       }
-  //     );
-
-  //     if (res.status === 200 || res.status === 201) {
-  //       console.log(res, "ankit");
-
-  //       // Extract slug from backend response
-  //       const slug = res?.data?.data?.slug;
-
-  //       if (slug) {
-  //         // Show success message
-  //         toast.success(res.data.message || "Profile saved successfully!");
-
-  //         // Redirect to the vet profile page
-  //         window.location.href = `https://snoutiq.com/backend/vets/${slug}`;
-  //       } else {
-  //         toast.error("Something went wrong: slug not found");
-  //       }
-  //     }
-  //   } catch (error) {
-  //     const errorMessage =
-  //       error.response && error.response.data && error.response.data.message
-  //         ? error.response.data.message
-  //         : "Error saving profile";
-  //     toast.error(errorMessage);
-  //     console.log("Error details:", error.response?.data);
-  //   } finally {
-  //     setIsProfileSaving(false);
-  //   }
-  // };
+    setActiveStep(2);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return true;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (activeStep === 1) {
+      handleNextStep();
+      return;
+    }
 
     // Mark all fields as touched
     const allTouched = {
@@ -1031,8 +905,8 @@ const DoctorRegistration = () => {
   return (
     <>
       <Header />
-      <div className="w-full min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4 flex justify-center items-start overflow-auto mt-12">
-        <div className="w-full max-w-4xl mx-auto">
+      <div className="w-full min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4 flex justify-center items-start overflow-auto mt-16">
+        <div className="w-full max-w-6xl mx-auto">
           <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 mx-auto my-4 border border-gray-100">
             {/* Terms and Conditions Modal */}
             {showTermsModal && (
@@ -1257,9 +1131,9 @@ const DoctorRegistration = () => {
                         </h4>
                         <p className="text-gray-700 mb-4">
                           Payments are processed via authorized payment
-                          gateways. Refunds will be credited to the User’s
+                          gateways. Refunds will be credited to the User's
                           Snoutiq wallet. Wallet funds may be used for future
-                          services or withdrawn to the User’s verified bank/UPI
+                          services or withdrawn to the User's verified bank/UPI
                           account on request and verification. Refunds will be
                           issued only where no consultation occurred (e.g., RVP
                           no-show, technical failure that prevented a scheduled
@@ -1311,7 +1185,7 @@ const DoctorRegistration = () => {
                         </h4>
                         <p className="text-gray-700 mb-4">
                           Except for liability that cannot be excluded under
-                          Indian law, Snoutiq’s aggregate liability to a User
+                          Indian law, Snoutiq's aggregate liability to a User
                           shall be limited to the amount paid by the User for
                           the relevant transaction in the preceding 12 months.
                           Users will indemnify Snoutiq for claims arising from
@@ -1348,7 +1222,7 @@ const DoctorRegistration = () => {
                           violates privacy. Snoutiq will moderate reviews and
                           may remove or redact content that violates this
                           policy. RVPs may flag reviews for investigation;
-                          unresolved disputes will be handled by Snoutiq’s
+                          unresolved disputes will be handled by Snoutiq's
                           moderation team and its grievance process.
                         </p>
                       </div>
@@ -1394,12 +1268,12 @@ const DoctorRegistration = () => {
                           Snoutiq and RVPs will take reasonable clinical
                           measures consistent with accepted standards of care,
                           but outcomes cannot be guaranteed. In the event of a
-                          pet’s death where teleconsultation was a contributing
+                          pet's death where teleconsultation was a contributing
                           or complicating factor, the following apply:
                         </p>
                         <ul className="list-disc pl-5 mb-4 text-gray-700">
                           <li>
-                            Snoutiq’s role is facilitative; RVPs retain
+                            Snoutiq's role is facilitative; RVPs retain
                             professional responsibility for clinical decisions.
                           </li>
                           <li>
@@ -1442,7 +1316,7 @@ const DoctorRegistration = () => {
                         <p className="text-gray-700 mb-4">
                           RVPs are independent contractors providing
                           professional services to Users via the Platform. This
-                          Agreement governs the RVP’s use of the Platform and
+                          Agreement governs the RVP's use of the Platform and
                           relationship with Snoutiq. RVPs do not become
                           employees of Snoutiq by using the Platform.
                         </p>
@@ -1512,7 +1386,7 @@ const DoctorRegistration = () => {
                           personal contact details to rebook outside the
                           Platform after initial contact, (c) offering discounts
                           conditional on off-platform payment, or (d) re-routing
-                          appointments to the RVP’s clinic without disclosing
+                          appointments to the RVP's clinic without disclosing
                           fees and without recording through the Platform.
                           Violations may lead to immediate suspension,
                           withholding of payments, penalties, and termination.
@@ -1600,9 +1474,9 @@ const DoctorRegistration = () => {
                           3. Refund Mechanics
                         </h4>
                         <p className="text-gray-700 mb-4">
-                          Approved refunds will be credited to the User’s
+                          Approved refunds will be credited to the User's
                           Snoutiq Wallet. Wallet funds may be applied to future
-                          services or withdrawn to the User’s verified bank/UPI
+                          services or withdrawn to the User's verified bank/UPI
                           account on request. Withdrawal requests are subject to
                           verification. Refunds will be processed within{" "}
                           <b>7 working days</b> of approval.
@@ -1654,7 +1528,7 @@ const DoctorRegistration = () => {
                         </h4>
                         <h4 className="font-medium mb-2">Consent Checkbox</h4>
                         <p className="text-gray-700 mb-4">
-                          I have read and agree to Snoutiq’s Terms of Service
+                          I have read and agree to Snoutiq's Terms of Service
                           and Privacy Policy. I understand that
                           teleconsultations have limitations and are not a
                           replacement for in-person emergency care.
@@ -1794,8 +1668,7 @@ const DoctorRegistration = () => {
             )}
 
             {/* Header Section */}
-            <div className="pb-4 border-b border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
+            <div className="pb-2 border-b border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="w-24 h-24 rounded-lg flex items-center justify-center">
                   <img
                     src={logo}
@@ -1803,16 +1676,14 @@ const DoctorRegistration = () => {
                     className="h-5 cursor-pointer transition-transform hover:scale-105"
                   />
                 </div>
-                <div>
+<div>
                   <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                     Doctor Registration
                   </h1>
                   <p className="text-gray-600 mt-1 hidden sm:block">
-                    Complete your profile to start your practice
+                    Complete your profile in two simple steps
                   </p>
                 </div>
-              </div>
-
               <button
                 onClick={() => setBusinessSearchDialogOpen(true)}
                 className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors"
@@ -1834,332 +1705,800 @@ const DoctorRegistration = () => {
               </button>
             </div>
 
-            {/* Clinic Image Upload */}
-            <div className="flex flex-col items-center my-6">
-              <div className="relative w-32 h-32 rounded-full border-2 border-dashed border-gray-300 bg-gray-100 overflow-hidden hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                <img
-                  src={currentPic1}
-                  alt="Clinic"
-                  className="w-full h-full object-cover"
-                />
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  onChange={handleClinicImageChange}
-                />
-                <label className="absolute bottom-2 right-2 bg-white border-2 border-blue-600 rounded-full w-8 h-8 flex items-center justify-center cursor-pointer shadow-md hover:bg-gray-50">
-                  <svg
-                    className="w-4 h-4 text-blue-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleClinicImageChange}
-                  />
-                </label>
+            {/* Progress Steps */}
+            <div className="mt-6 mb-8">
+              <div className="flex items-center justify-center">
+                {steps.map((step, index) => {
+                  const isActive = activeStep === step.id;
+                  const isDone = activeStep > step.id;
+                  return (
+                    <div key={step.id} className="flex items-center">
+                      <div className="flex flex-col items-center">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold border-2 ${
+                            isActive
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : isDone
+                              ? "bg-green-500 text-white border-green-500"
+                              : "bg-white text-gray-500 border-gray-300"
+                          }`}
+                        >
+                          {isDone ? (
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={3}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          ) : (
+                            step.id
+                          )}
+                        </div>
+                        <div className="mt-2 text-center">
+                          <p
+                            className={`text-sm font-medium ${
+                              isActive
+                                ? "text-blue-600"
+                                : isDone
+                                ? "text-green-600"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {step.title}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {step.subtitle}
+                          </p>
+                        </div>
+                      </div>
+                      {index < steps.length - 1 && (
+                        <div
+                          className={`w-16 h-1 mx-2 ${
+                            isDone ? "bg-green-500" : "bg-gray-300"
+                          }`}
+                        ></div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <p className="text-gray-600 text-sm mt-2">
-                Drag & drop or click to upload Clinic
-              </p>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Claim Draft Clinic (optional)
-                  </label>
-                  <select
-                    value={selectedDraftSlug}
-                    onChange={handleDraftClinicSelect}
-                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={isLoadingDraftClinics}
-                  >
-                    <option value="">
-                      {isLoadingDraftClinics
-                        ? "Loading draft clinics..."
-                        : "Select an existing draft to claim"}
-                    </option>
-                    {draftClinics.map((clinic) => (
-                      <option key={clinic.slug} value={clinic.slug}>
-                        {clinic.name || "Unnamed Clinic"} ({clinic.slug})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-gray-500 text-xs mt-2">
-                    Choosing a draft ensures this submission updates the
-                    pre-created clinic page shared by sales.
-                  </p>
-                </div> */}
-                {/* Business Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Business Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    onBlur={() => handleBlur("name")}
-                    placeholder="Enter your business name"
-                    required
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.name && touched.name
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    }`}
-                  />
-                  {errors.name && touched.name && (
-                    <p className="text-red-500 text-xs mt-1">{errors.name}</p>
-                  )}
-                </div>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {activeStep === 1 && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Left Column - Clinic Image and Basic Info */}
+                    <div className="lg:col-span-1 space-y-6">
+                      {/* Clinic Image Upload */}
+                      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Clinic Photo
+                        </h3>
+                        <div className="flex flex-col items-center">
+                          <div className="relative w-40 h-40 rounded-full border-2 border-dashed border-gray-300 bg-gray-100 overflow-hidden hover:border-blue-500 hover:bg-blue-50 transition-colors">
+                            <img
+                              src={currentPic1}
+                              alt="Clinic"
+                              className="w-full h-full object-cover"
+                            />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={handleClinicImageChange}
+                            />
+                            <label className="absolute bottom-3 right-3 bg-white border-2 border-blue-600 rounded-full w-10 h-10 flex items-center justify-center cursor-pointer shadow-md hover:bg-gray-50">
+                              <svg
+                                className="w-5 h-5 text-blue-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                              </svg>
+                            </label>
+                          </div>
+                          <p className="text-gray-600 text-sm mt-3 text-center">
+                            Click to upload clinic photo
+                          </p>
+                        </div>
+                      </div>
 
-                {/* Mobile Number */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mobile Number *
-                  </label>
-                  <input
-                    type="tel"
-                    value={mobileNumber}
-                    onChange={(e) => setMobileNumber(e.target.value)}
-                    onBlur={() => handleBlur("mobileNumber")}
-                    placeholder="Enter Your Mobile Number"
-                    required
-                    maxLength={10}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.mobileNumber && touched.mobileNumber
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    }`}
-                  />
-                  {errors.mobileNumber && touched.mobileNumber && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors.mobileNumber}
-                    </p>
-                  )}
-                </div>
+                      {/* Consultation Fee & Services */}
+                      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Services & Pricing
+                        </h3>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Consultation Fee (INR) *
+                            </label>
+                            <input
+                              type="number"
+                              value={chatPrice}
+                              onChange={(e) => setChatPrice(e.target.value)}
+                              onBlur={() => handleBlur("chatPrice")}
+                              placeholder="Enter consultation fee"
+                              required
+                              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                errors.chatPrice && touched.chatPrice
+                                  ? "border-red-500"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                            {errors.chatPrice && touched.chatPrice && (
+                              <p className="text-red-500 text-xs mt-1">
+                                {errors.chatPrice}
+                              </p>
+                            )}
+                          </div>
 
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email ID *
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onBlur={() => handleBlur("email")}
-                    placeholder="Enter Email Address"
-                    required
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.email && touched.email
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    }`}
-                  />
-                  {errors.email && touched.email && (
-                    <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-                  )}
-                </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              At Home Services *
+                            </label>
+                            <select
+                              value={inhome_grooming_services}
+                              onChange={(e) =>
+                                set_inhome_grooming_services(e.target.value)
+                              }
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            >
+                              <option value={1}>Yes</option>
+                              <option value={0}>No</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-                {/* Address */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Address *
-                  </label>
-                  {isLoaded && (
-                    <Autocomplete
-                      onLoad={(autocompleteInstance) => {
-                        window.autocompleteRef = autocompleteInstance;
-                      }}
-                      onPlaceChanged={() => {
-                        const place = window.autocompleteRef?.getPlace();
-                        if (!place?.geometry) {
-                          alert("Please select a place from suggestions.");
-                          return;
-                        }
+                    {/* Right Column - Clinic Details */}
+                    <div className="lg:col-span-2 space-y-6">
+                      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Clinic Information
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Business Name */}
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Business Name *
+                            </label>
+                            <input
+                              type="text"
+                              value={name}
+                              onChange={(e) => setName(e.target.value)}
+                              onBlur={() => handleBlur("name")}
+                              placeholder="Enter your business name"
+                              required
+                              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                errors.name && touched.name
+                                  ? "border-red-500"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                            {errors.name && touched.name && (
+                              <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+                            )}
+                          </div>
 
-                        setAddress(place.formatted_address);
-                        setCoordinates({
-                          lat: place.geometry.location.lat(),
-                          lng: place.geometry.location.lng(),
-                        });
-                        const addressComponents =
-                          place.address_components || [];
-                        const cityComponent = addressComponents.find(
-                          (c) =>
-                            c.types.includes("locality") ||
-                            c.types.includes("administrative_area_level_2")
-                        );
-                        const pinCodeComponent = addressComponents.find((c) =>
-                          c.types.includes("postal_code")
-                        );
-                        setCity(cityComponent ? cityComponent.long_name : "");
-                        setPinCode(
-                          pinCodeComponent ? pinCodeComponent.long_name : ""
-                        );
-                      }}
+                          {/* Mobile Number */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Mobile Number *
+                            </label>
+                            <input
+                              type="tel"
+                              value={mobileNumber}
+                              onChange={(e) => setMobileNumber(e.target.value)}
+                              onBlur={() => handleBlur("mobileNumber")}
+                              placeholder="Enter mobile number"
+                              required
+                              maxLength={10}
+                              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                errors.mobileNumber && touched.mobileNumber
+                                  ? "border-red-500"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                            {errors.mobileNumber && touched.mobileNumber && (
+                              <p className="text-red-500 text-xs mt-1">
+                                {errors.mobileNumber}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Email */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Email ID *
+                            </label>
+                            <input
+                              type="email"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              onBlur={() => handleBlur("email")}
+                              placeholder="Enter email address"
+                              required
+                              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                errors.email && touched.email
+                                  ? "border-red-500"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                            {errors.email && touched.email && (
+                              <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                            )}
+                          </div>
+
+                          {/* Address */}
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Address *
+                            </label>
+                            {isLoaded && (
+                              <Autocomplete
+                                onLoad={(autocompleteInstance) => {
+                                  window.autocompleteRef = autocompleteInstance;
+                                }}
+                                onPlaceChanged={() => {
+                                  const place = window.autocompleteRef?.getPlace();
+                                  if (!place?.geometry) {
+                                    alert("Please select a place from suggestions.");
+                                    return;
+                                  }
+
+                                  setAddress(place.formatted_address);
+                                  setCoordinates({
+                                    lat: place.geometry.location.lat(),
+                                    lng: place.geometry.location.lng(),
+                                  });
+                                  const addressComponents =
+                                    place.address_components || [];
+                                  const cityComponent = addressComponents.find(
+                                    (c) =>
+                                      c.types.includes("locality") ||
+                                      c.types.includes("administrative_area_level_2")
+                                  );
+                                  const pinCodeComponent = addressComponents.find((c) =>
+                                    c.types.includes("postal_code")
+                                  );
+                                  setCity(cityComponent ? cityComponent.long_name : "");
+                                  setPinCode(
+                                    pinCodeComponent ? pinCodeComponent.long_name : ""
+                                  );
+                                }}
+                              >
+                                <input
+                                  type="text"
+                                  value={address}
+                                  onChange={(e) => setAddress(e.target.value)}
+                                  onBlur={() => handleBlur("address")}
+                                  placeholder="Enter your address, city, or village"
+                                  required
+                                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                    errors.address && touched.address
+                                      ? "border-red-500"
+                                      : "border-gray-300"
+                                  }`}
+                                />
+                              </Autocomplete>
+                            )}
+                            {errors.address && touched.address && (
+                              <p className="text-red-500 text-xs mt-1">
+                                {errors.address}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* City */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              City *
+                            </label>
+                            <input
+                              type="text"
+                              value={city}
+                              onChange={(e) => setCity(e.target.value)}
+                              onBlur={() => handleBlur("city")}
+                              placeholder="Enter city"
+                              required
+                              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                errors.city && touched.city
+                                  ? "border-red-500"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                            {errors.city && touched.city && (
+                              <p className="text-red-500 text-xs mt-1">{errors.city}</p>
+                            )}
+                          </div>
+
+                          {/* PIN Code */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              PIN Code *
+                            </label>
+                            <input
+                              type="text"
+                              value={pinCode}
+                              onChange={(e) => setPinCode(e.target.value)}
+                              onBlur={() => handleBlur("pinCode")}
+                              placeholder="Enter PIN code"
+                              required
+                              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                errors.pinCode && touched.pinCode
+                                  ? "border-red-500"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                            {errors.pinCode && touched.pinCode && (
+                              <p className="text-red-500 text-xs mt-1">
+                                {errors.pinCode}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Bio */}
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Comments (Optional)
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
+                            placeholder="Write about your medical experience and specialization"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Google Maps for fine-tuning location */}
+                      {/* {isLoaded && coordinates.lat && coordinates.lng && (
+                        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                            Clinic Location
+                          </h3>
+                          <GoogleMap
+                            mapContainerStyle={{
+                              height: "300px",
+                              width: "100%",
+                              borderRadius: "12px",
+                              border: "1px solid #e5e7eb",
+                            }}
+                            center={coordinates}
+                            zoom={15}
+                          >
+                            <Marker
+                              position={coordinates}
+                              draggable
+                              onDragEnd={handleMarkerDragEnd}
+                            />
+                          </GoogleMap>
+                          <p className="text-sm text-gray-600 mt-2 italic">
+                            Drag the marker to precisely set your location
+                          </p>
+                        </div>
+                      )} */}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-4">
+                    <button
+                      type="button"
+                      onClick={handleNextStep}
+                      className="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
                     >
-                      <input
-                        type="text"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        onBlur={() => handleBlur("address")}
-                        placeholder="Enter your address, city, or village"
-                        required
-                        className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          errors.address && touched.address
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                      />
-                    </Autocomplete>
-                  )}
-                  {errors.address && touched.address && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors.address}
-                    </p>
-                  )}
+                      Continue to Doctor Details
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
+              )}
 
-                {/* City */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    City *
-                  </label>
-                  <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    onBlur={() => handleBlur("city")}
-                    placeholder="Enter city"
-                    required
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.city && touched.city
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    }`}
-                  />
-                  {errors.city && touched.city && (
-                    <p className="text-red-500 text-xs mt-1">{errors.city}</p>
-                  )}
+              {activeStep === 2 && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Left Column - Account Setup */}
+                    <div className="lg:col-span-1 space-y-6">
+                      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Account Setup
+                        </h3>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Password *
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                placeholder="Enter your password"
+                                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                  errors.password && touched.password
+                                    ? "border-red-500"
+                                    : "border-gray-300"
+                                }`}
+                              />
+                              {errors.password && touched.password && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors.password}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Confirm Password *
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
+                                placeholder="Confirm your password"
+                                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                  errors.confirmPassword && touched.confirmPassword
+                                    ? "border-red-500"
+                                    : "border-gray-300"
+                                }`}
+                              />
+                              {errors.confirmPassword && touched.confirmPassword && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors.confirmPassword}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Terms and Conditions */}
+                      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Agreement
+                        </h3>
+                        
+                        <label
+                          className={`flex items-start p-4 rounded-lg border-2 transition-all ${
+                            errors.terms && touched.terms
+                              ? "border-red-500 bg-red-50"
+                              : "border-gray-200 hover:border-blue-300"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={acceptedTerms}
+                            onChange={(e) => {
+                              setAcceptedTerms(e.target.checked);
+                              if (e.target.checked) {
+                                setErrors({ ...errors, terms: "" });
+                              }
+                            }}
+                            onBlur={() => setTouched({ ...touched, terms: true })}
+                            className="mt-1 mr-3 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700 leading-relaxed">
+                            I agree to the{" "}
+                            <span
+                              onClick={() => {
+                                setActiveTerm("provider_agreement_rvp");
+                                setShowTermsModal(true);
+                              }}
+                              className="text-blue-600 hover:underline cursor-pointer"
+                            >
+                              Provider Agreement
+                            </span>
+                            {" *"}
+                          </span>
+                        </label>
+                        {errors.terms && touched.terms && (
+                          <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                            <svg
+                              className="w-4 h-4"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            {errors.terms}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Column - Doctors Information */}
+                    <div className="lg:col-span-2 space-y-6">
+                      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            Doctors Information
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={handleAddDoctor}
+                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 4v16m8-8H4"
+                              />
+                            </svg>
+                            Add Doctor
+                          </button>
+                        </div>
+
+                        {doctors.map((doctor, index) => (
+                          <div
+                            key={index}
+                            className="border border-gray-200 rounded-lg p-6 mb-6"
+                          >
+                            <div className="flex justify-between items-start mb-6">
+                              <h4 className="text-md font-semibold text-gray-900">
+                                Doctor {index + 1}
+                              </h4>
+                              {doctors.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDoctor(index)}
+                                  className="text-red-600 hover:text-red-800 transition-colors"
+                                >
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                    />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                              {/* Doctor Photo */}
+                              <div className="md:col-span-1">
+                                <div className="flex flex-col items-center">
+                                  <div className="relative w-24 h-24 rounded-full border-2 border-dashed border-gray-300 bg-gray-100 overflow-hidden hover:border-blue-500 hover:bg-blue-50 transition-colors">
+                                    <img
+                                      src={doctor.doctor_image_preview}
+                                      alt={`Doctor ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                      onChange={(e) => handleDoctorImageChange(e, index)}
+                                    />
+                                    <label className="absolute bottom-1 right-1 bg-white border-2 border-blue-600 rounded-full w-6 h-6 flex items-center justify-center cursor-pointer shadow-sm hover:bg-gray-50">
+                                      <svg
+                                        className="w-3 h-3 text-blue-600"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                        />
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                                        />
+                                      </svg>
+                                    </label>
+                                  </div>
+                                  <p className="text-gray-600 text-xs mt-2">Doctor Photo</p>
+                                </div>
+                              </div>
+
+                              {/* Doctor Details */}
+                              <div className="md:col-span-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* Doctor Name */}
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Doctor Name *
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={doctor.doctor_name}
+                                      onChange={(e) =>
+                                        handleDoctorChange(
+                                          index,
+                                          "doctor_name",
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder="Enter doctor name"
+                                      required
+                                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    />
+                                  </div>
+
+                                  {/* Doctor Email */}
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Doctor Email *
+                                    </label>
+                                    <input
+                                      type="email"
+                                      value={doctor.doctor_email}
+                                      onChange={(e) =>
+                                        handleDoctorChange(
+                                          index,
+                                          "doctor_email",
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder="Enter doctor email"
+                                      required
+                                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    />
+                                  </div>
+
+                                  {/* Doctor Mobile */}
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Doctor Mobile *
+                                    </label>
+                                    <input
+                                      type="tel"
+                                      value={doctor.doctor_mobile}
+                                      onChange={(e) =>
+                                        handleDoctorChange(
+                                          index,
+                                          "doctor_mobile",
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder="Enter doctor mobile"
+                                      required
+                                      maxLength={10}
+                                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    />
+                                  </div>
+
+                                  {/* Doctor License */}
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Doctor License No. *
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={doctor.doctor_license}
+                                      onChange={(e) =>
+                                        handleDoctorChange(
+                                          index,
+                                          "doctor_license",
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder="Enter license number"
+                                      required
+                                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setActiveStep(1)}
+                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Back to Clinic Details
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isProfileSaving}
+                      className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed min-w-[220px]"
+                    >
+                      {isProfileSaving ? (
+                        <div className="flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Saving...
+                        </div>
+                      ) : (
+                        "Complete Registration"
+                      )}
+                    </button>
+                  </div>
                 </div>
+              )}
+            </form>
 
-                {/* PIN Code */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    PIN Code *
-                  </label>
-                  <input
-                    type="text"
-                    value={pinCode}
-                    onChange={(e) => setPinCode(e.target.value)}
-                    onBlur={() => handleBlur("pinCode")}
-                    placeholder="Enter PIN code"
-                    required
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.pinCode && touched.pinCode
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    }`}
-                  />
-                  {errors.pinCode && touched.pinCode && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors.pinCode}
-                    </p>
-                  )}
-                </div>
-
-                {/* Consultation Fee */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Consultation Fee (INR) *
-                  </label>
-                  <input
-                    type="number"
-                    value={chatPrice}
-                    onChange={(e) => setChatPrice(e.target.value)}
-                    onBlur={() => handleBlur("chatPrice")}
-                    placeholder="Enter Your Fees"
-                    required
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.chatPrice && touched.chatPrice
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    }`}
-                  />
-                  {errors.chatPrice && touched.chatPrice && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors.chatPrice}
-                    </p>
-                  )}
-                </div>
-
-                {/* At Home Services */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Do you offer at home services? *
-                  </label>
-                  <select
-                    value={inhome_grooming_services}
-                    onChange={(e) =>
-                      set_inhome_grooming_services(e.target.value)
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            {/* Footer Links */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-gray-600 text-sm">
+                  Already have an account?{" "}
+                  <a
+                    href="https://snoutiq.com/backend/custom-doctor-login"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline font-medium"
                   >
-                    <option value={1}>Yes</option>
-                    <option value={0}>No</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Bio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Comments (Optional)
-                </label>
-                <textarea
-                  rows={3}
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Write about your medical experience and specialization"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                />
-              </div>
-
-              {/* Doctors Section */}
-              <div className="mt-8">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Doctors Information
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={handleAddDoctor}
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-                  >
+                    Login here
+                  </a>
+                </p>
+                
+                <div className="flex items-center gap-6 text-sm">
+                  <div className="flex items-center gap-2">
                     <svg
-                      className="w-5 h-5"
+                      className="w-4 h-4 text-blue-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -2168,529 +2507,37 @@ const DoctorRegistration = () => {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M12 4v16m8-8H4"
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                       />
                     </svg>
-                    Add Doctor
-                  </button>
-                </div>
-
-                {doctors.map((doctor, index) => (
-                  <div
-                    key={index}
-                    className="border border-gray-200 rounded-lg p-6 mb-6"
-                  >
-                    <div className="flex justify-between items-start mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Doctor {index + 1}
-                      </h3>
-                      {doctors.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveDoctor(index)}
-                          className="text-red-600 hover:text-red-800 transition-colors"
-                        >
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col items-center mb-6">
-                      <div className="relative w-24 h-24 rounded-full border-2 border-dashed border-gray-300 bg-gray-100 overflow-hidden hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                        <img
-                          src={doctor.doctor_image_preview}
-                          alt={`Doctor ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          onChange={(e) => handleDoctorImageChange(e, index)}
-                        />
-                        <label className="absolute bottom-1 right-1 bg-white border-2 border-blue-600 rounded-full w-6 h-6 flex items-center justify-center cursor-pointer shadow-sm hover:bg-gray-50">
-                          <svg
-                            className="w-3 h-3 text-blue-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                          </svg>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => handleDoctorImageChange(e, index)}
-                          />
-                        </label>
-                      </div>
-                      <p className="text-gray-600 text-xs mt-2">Doctor Photo</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Doctor Name */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Doctor Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={doctor.doctor_name}
-                          onChange={(e) =>
-                            handleDoctorChange(
-                              index,
-                              "doctor_name",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Enter doctor name"
-                          required
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        />
-                      </div>
-
-                      {/* Doctor Email */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Doctor Email *
-                        </label>
-                        <input
-                          type="email"
-                          value={doctor.doctor_email}
-                          onChange={(e) =>
-                            handleDoctorChange(
-                              index,
-                              "doctor_email",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Enter doctor email"
-                          required
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        />
-                      </div>
-
-                      {/* Doctor Mobile */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Doctor Mobile *
-                        </label>
-                        <input
-                          type="tel"
-                          value={doctor.doctor_mobile}
-                          onChange={(e) =>
-                            handleDoctorChange(
-                              index,
-                              "doctor_mobile",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Enter doctor mobile"
-                          required
-                          maxLength={10}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        />
-                      </div>
-
-                      {/* Doctor License */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Doctor License No. *
-                        </label>
-                        <input
-                          type="text"
-                          value={doctor.doctor_license}
-                          onChange={(e) =>
-                            handleDoctorChange(
-                              index,
-                              "doctor_license",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Enter doctor license number"
-                          required
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Employee ID */}
-                {/* <div className="mt-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Employee ID *
-                  </label>
-                  <input
-                    type="text"
-                    value={employeeId}
-                    onChange={(e) => setEmployeeId(e.target.value)}
-                    placeholder="Enter Your Employee ID"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  />
-                </div> */}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Password *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      placeholder="Enter your password (min. 6 characters)"
-                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.password && touched.password
-                          ? "border-red-500"
-                          : "border-gray-300"
-                      }`}
-                    />
-                    {errors.password && touched.password && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {errors.password}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Confirm Password */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm Password *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      placeholder="Confirm your password"
-                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.confirmPassword && touched.confirmPassword
-                          ? "border-red-500"
-                          : "border-gray-300"
-                      }`}
-                    />
-                    {errors.confirmPassword && touched.confirmPassword && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {errors.confirmPassword}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {/* Terms and Conditions */}
-              <div className="mt-6">
-                <label
-                  className={`flex items-start p-4 rounded-lg border-2 transition-all ${
-                    errors.terms && touched.terms
-                      ? "border-red-500 bg-red-50"
-                      : "border-gray-200 hover:border-blue-300"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={acceptedTerms}
-                    onChange={(e) => {
-                      setAcceptedTerms(e.target.checked);
-                      if (e.target.checked) {
-                        setErrors({ ...errors, terms: "" });
-                      }
-                    }}
-                    onBlur={() => setTouched({ ...touched, terms: true })}
-                    className="mt-1 mr-3 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700 leading-relaxed">
-                    By continuing, I confirm that I have read and agree to
-                    SnoutIQ’s:{" "}
-                    <span
-                      onClick={() => {
-                        setActiveTerm("provider_agreement_rvp");
-                        setShowTermsModal(true);
-                      }}
-                      className="text-blue-600 hover:underline cursor-pointer"
+                    <a
+                      href="mailto:support@snoutiq.com"
+                      className="text-gray-600 hover:text-blue-600 transition-colors"
                     >
-                      Provider Agreement (RVP)
-                    </span>
-                    {/* {/* <ul className="list-disc pl-6 mt-2 space-y-1"> */}
-                    {/* <li>
-                        <span
-                          onClick={() => {
-                            setActiveTerm("privacy");
-                            setShowTermsModal(true);
-                          }}
-                          className="text-blue-600 hover:underline cursor-pointer"
-                        >
-                          Privacy Policy
-                        </span>
-                      </li> */}
-                    {/* <li>
-                        <span
-                          onClick={() => {
-                            setActiveTerm("terms");
-                            setShowTermsModal(true);
-                          }}
-                          className="text-blue-600 hover:underline cursor-pointer"
-                        >
-                          Terms & Conditions
-                        </span>
-                      </li> */}
-                    {/* <li>
-                        <span
-                          onClick={() => {
-                            setActiveTerm("community_reviews_policy");
-                            setShowTermsModal(true);
-                          }}
-                          className="text-blue-600 hover:underline cursor-pointer"
-                        >
-                          Community Reviews Policy
-                        </span>
-                      </li> */}
-                    {/* <li>
-                        <span
-                          onClick={() => {
-                            setActiveTerm("cookie_policy");
-                            setShowTermsModal(true);
-                          }}
-                          className="text-blue-600 hover:underline cursor-pointer"
-                        >
-                          Cookie Policy
-                        </span>
-                      </li> */}
-                    {/* <li>
-                        <span
-                          onClick={() => {
-                            setActiveTerm("pet_death_disclaimer");
-                            setShowTermsModal(true);
-                          }}
-                          className="text-blue-600 hover:underline cursor-pointer"
-                        >
-                          Pet Death Disclaimer
-                        </span>
-                      </li> */}
-                    {/* <li>
-                        <span
-                          onClick={() => {
-                            setActiveTerm("provider_agreement_rvp");
-                            setShowTermsModal(true);
-                          }}
-                          className="text-blue-600 hover:underline cursor-pointer"
-                        >
-                          Provider Agreement (RVP)
-                        </span>
-                      </li> */}
-                    {/* <li>
-                        <span
-                          onClick={() => {
-                            setActiveTerm("third_party_services_policy");
-                            setShowTermsModal(true);
-                          }}
-                          className="text-blue-600 hover:underline cursor-pointer"
-                        >
-                          Third-Party Services Policy
-                        </span>
-                      </li> */}
-                    {/* <li>
-                        <span
-                          onClick={() => {
-                            setActiveTerm("refund_cancellation_policy");
-                            setShowTermsModal(true);
-                          }}
-                          className="text-blue-600 hover:underline cursor-pointer"
-                        >
-                          Refund & Cancellation Policy
-                        </span>
-                      </li> */}
-                    {/* <li>
-                        <span
-                          onClick={() => {
-                            setActiveTerm("ui_text_snippets");
-                            setShowTermsModal(true);
-                          }}
-                          className="text-blue-600 hover:underline cursor-pointer"
-                        >
-                          UI Text Snippets
-                        </span>
-                      </li> */}
-                    {/* </ul>  */}
-                  </span>
-                  {" *"}
-                </label>
-                {errors.terms && touched.terms && (
-                  <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                      support@snoutiq.com
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <svg
-                      className="w-4 h-4"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
+                      className="w-4 h-4 text-green-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
                       <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
                       />
                     </svg>
-                    {errors.terms}
-                  </p>
-                )}
-              </div>
-
-              {/* Google Maps for fine-tuning location */}
-              {isLoaded && coordinates.lat && coordinates.lng && (
-                <div className="mt-8">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Fine-tune Your Location
-                  </label>
-                  <GoogleMap
-                    mapContainerStyle={{
-                      height: "300px",
-                      width: "100%",
-                      borderRadius: "12px",
-                      border: "1px solid #e5e7eb",
-                    }}
-                    center={coordinates}
-                    zoom={15}
-                  >
-                    <Marker
-                      position={coordinates}
-                      draggable
-                      onDragEnd={handleMarkerDragEnd}
-                    />
-                  </GoogleMap>
-                  <p className="text-sm text-gray-600 mt-2 italic">
-                    Drag the marker to precisely set your location
-                  </p>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <div className="flex justify-center mt-8">
-                <button
-                  type="submit"
-                  disabled={isProfileSaving}
-                  className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed min-w-[220px]"
-                >
-                  {isProfileSaving ? (
-                    <div className="flex items-center justify-center">
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Saving...
-                    </div>
-                  ) : (
-                    "Complete Registration"
-                  )}
-                </button>
-              </div>
-            </form>
-            <div className="mt-6 pt-4 border-t border-gray-200 items-center text-center">
-              <p className="text-gray-600 text-sm">
-                Already have an account?{" "}
-                <a
-                  href="https://snoutiq.com/backend/custom-doctor-login"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline font-medium"
-                >
-                  Login here
-                </a>
-              </p>
-            </div>
-            <div className="mt-4 pt-2 ">
-              <h3 className="text-lg font-semibold text-gray-800 text-center mb-4">
-                Contact Us
-              </h3>
-
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-gray-700">
-                {/* Email */}
-                <div className="flex items-center gap-2 group">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-blue-600 group-hover:text-blue-800 transition-colors"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M16 12H8m8-4H8m8 8H8m12-12H4a2 2 0 00-2 2v12a2
-          2 0 002 2h16a2 2 0 002-2V6a2
-          2 0 00-2-2z"
-                    />
-                  </svg>
-                  <a
-                    href="mailto:support@snoutiq.com"
-                    className="font-medium hover:text-blue-600 transition-colors"
-                  >
-                    support@snoutiq.com
-                  </a>
-                </div>
-
-                {/* Divider */}
-                <div className="hidden sm:block h-6 w-px bg-gray-300"></div>
-
-                {/* Phone */}
-                <div className="flex items-center gap-2 group">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-green-600 group-hover:text-green-800 transition-colors"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M3 5a2 2 0 012-2h2.586a1 1 0 01.707.293l2.414
-          2.414a1 1 0 01.293.707V9a1 1 0
-          01-1 1H8a1 1 0 00-1 1v2c0
-          5.523 4.477 10 10 10h2a1 1 0
-          001-1v-1.586a1 1 0
-          00-.293-.707l-2.414-2.414a1 1 0
-          00-.707-.293H15a1 1 0
-          01-1-1v-2a1 1 0 011-1h3.586a1
-          1 0 01.707.293l2.414 2.414a1
-          1 0 01.293.707V21a2 2 0
-          01-2 2h-2C10.477 23 5 17.523
-          5 11V9a2 2 0 012-2h2a1 1 0
-          011-1V5a2 2 0 00-2-2H5a2 2 0
-          00-2 2z"
-                    />
-                  </svg>
-                  <a
-                    href="tel:+918588007466"
-                    className="font-medium hover:text-green-600 transition-colors"
-                  >
-                    +91 8588007466
-                  </a>
+                    <a
+                      href="tel:+918588007466"
+                      className="text-gray-600 hover:text-green-600 transition-colors"
+                    >
+                      +91 8588007466
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>

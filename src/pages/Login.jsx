@@ -5,14 +5,12 @@ import React, {
   useCallback,
   lazy,
   Suspense,
-  useMemo,
 } from "react";
 import { toast, Toaster } from "react-hot-toast";
-import { Link, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import axios from "../axios";
 import logo from "../assets/images/logo.webp";
 import { AuthContext } from "../auth/AuthContext";
-import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 const Header = lazy(() => import("../components/Header"));
 
 // Background image - you can replace this with your actual image
@@ -22,21 +20,18 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    role: "pet",
+    role: "vet",
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [userType, setUserType] = useState("pet");
   
   // Location states
   const [locationStatus, setLocationStatus] = useState("checking");
-  const [locationAllowed, setLocationAllowed] = useState(false);
   const [coords, setCoords] = useState({ lat: null, lng: null });
 
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, login } = useContext(AuthContext);
 
   // Enhanced location permission check
@@ -52,7 +47,6 @@ const Login = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setLocationStatus("granted");
-        setLocationAllowed(true);
         setCoords({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
@@ -62,7 +56,6 @@ const Login = () => {
       (error) => {
         console.error("Location error:", error);
         setLocationStatus("denied");
-        setLocationAllowed(false);
 
         let errorMessage = "Location access denied.";
         switch (error.code) {
@@ -87,7 +80,6 @@ const Login = () => {
   const initializeLocation = useCallback(async () => {
     if (typeof window === "undefined" || !navigator.geolocation) {
       setLocationStatus("denied");
-      setLocationAllowed(false);
       toast.error("Location services not supported in this browser");
       return null;
     }
@@ -108,7 +100,6 @@ const Login = () => {
           requestLocation();
         } else if (result.state === "denied") {
           setLocationStatus("denied");
-          setLocationAllowed(false);
         } else {
           setLocationStatus("prompt");
         }
@@ -141,11 +132,6 @@ const Login = () => {
     };
   }, [initializeLocation]);
 
-  const handleCustom = () => {
-  window.location.assign('https://snoutiq.com/backend/custom-doctor-login');
-};
-
-
   const handleLocationRequest = () => {
     if (locationStatus === "denied") {
       toast.error(
@@ -154,12 +140,6 @@ const Login = () => {
       return;
     }
     requestLocation();
-  };
-
-  const getBackendRole = (type) => {
-    if (type === "pet") return "pet";
-    if (type === "vet") return "vet";
-    return "";
   };
 
   const handleInputChange = (field, value) => {
@@ -202,10 +182,6 @@ const Login = () => {
     if (!formData.password) {
       newErrors.password = "Password is required";
     }
-    const backendRole = getBackendRole(userType);
-    if (!backendRole) {
-      newErrors.role = "Please select a role";
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -214,12 +190,6 @@ const Login = () => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    // Check location for better service
-    if (locationStatus !== "granted" || !coords.lat || !coords.lng) {
-      toast.error("Please allow location access for better service experience");
-      return;
-    }
-
     setIsLoading(true);
     try {
       const res = await axios.post(
@@ -227,13 +197,13 @@ const Login = () => {
         {
           login: formData.email,
           password: formData.password,
-          role: getBackendRole(userType),
+          role: "vet",
           latitude: coords.lat,
           longitude: coords.lng,
         }
       );
 
-      console.log("✅ Login Response:", res);
+      console.log("Login response:", res);
 
       // const chatRoomToken = res.data.chat_room?.token || null;
       const { token, user } = res.data;
@@ -253,16 +223,12 @@ const Login = () => {
 
         toast.success("Login successful!");
 
-        if (finalUser.role === "vet") {
-          navigate("/user-dashboard/bookings");
-        } else {
-          navigate("/dashboard");
-        }
+        navigate("/user-dashboard/vet-dashboard");
       } else {
         toast.error("Invalid response from server.");
       }
     } catch (error) {
-      console.error("❌ Login Error Details:", error);
+      console.error("Login error details:", error);
 
       const errorMessage =
         error.response?.data?.message ||
@@ -273,71 +239,6 @@ const Login = () => {
       setIsLoading(false);
     }
   };
-
-  const handleGoogleSuccess = async (credentialResponse) => {
-    setIsLoading(true);
-    try {
-      // Check location before proceeding with Google login
-      if (locationStatus !== "granted" || !coords.lat || !coords.lng) {
-        toast.error("Please allow location access before Google login.");
-        return;
-      }
-
-      const base64Url = credentialResponse.credential.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join("")
-      );
-      const googleData = JSON.parse(jsonPayload);
-
-      const uniqueUserId = googleData.sub;
-      const email = googleData.email || "";
-
-      const res = await axios.post(
-        "https://snoutiq.com/backend/api/google-login",
-        {
-          email,
-          google_token: uniqueUserId,
-          role: 'pet',
-          latitude: coords.lat,
-          longitude: coords.lng,
-        }
-      );
-
-      // const chatRoomToken = res.data.chat_room?.token || null;
-      const { token, user } = res.data;
-
-      if (token && user) {
-        // login(user, token, chatRoomToken);
-        // login(user, token);
-        login(user, token, null);
-
-        toast.success("Login successful!");
-        navigate("/dashboard");
-      } else {
-        toast.error("Invalid response from server.");
-      }
-    } catch (error) {
-      const errorMessage =
-        error.response?.data?.message || "Google login failed.";
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUserTypeChange = (type) => {
-    setUserType(type);
-    handleInputChange("role", getBackendRole(type));
-  };
-
-  const showTestLogin = useMemo(() => {
-    const searchParams = new URLSearchParams(location.search);
-    return searchParams.get("test") === "1";
-  }, [location.search]);
 
   // Enhanced Location Status Component
   const LocationStatus = () => {
@@ -422,19 +323,16 @@ const Login = () => {
   };
 
   if (user) {
-    if (user.role === "vet") {
-      return <Navigate to="/user-dashboard/bookings" replace />;
-    } else {
-      return <Navigate to="/dashboard" replace />;
-    }
+    return <Navigate to="/user-dashboard/vet-dashboard" replace />;
   }
 
   return (
     <>
+      <Toaster position="top-right" />
       <Suspense fallback={<div className="h-16 w-full bg-white/80" />}>
         <Header />
       </Suspense>
-      <div className="min-h-screen bg-white flex mt-12">
+      <div className="min-h-screen bg-white flex mt-16">
         {/* Left Side - Brand Section */}
         <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-blue-900 to-indigo-900">
           <div className="absolute inset-0 bg-black/20"></div>
@@ -521,10 +419,10 @@ const Login = () => {
             {/* Header */}
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-3">
-                Welcome Back
+                Veterinarian Login
               </h1>
               <p className="text-gray-600">
-                Sign in to your Snoutiq account
+                Access your Snoutiq doctor workspace
               </p>
             </div>
 
@@ -533,41 +431,12 @@ const Login = () => {
               <LocationStatus />
             </div>
 
-            {/* Role Selector */}
-            <div className="mb-8">
-              <div className="flex bg-gray-100 rounded-xl p-1.5 border border-gray-200">
-                <button
-                  onClick={() => handleUserTypeChange("pet")}
-                  className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                    userType === "pet"
-                      ? "bg-white text-blue-600 shadow-sm shadow-blue-100 border border-blue-100"
-                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                  }`}
-                >
-                  🐾 Pet Owner
-                </button>
-                <button
-                  // onClick={() => handleUserTypeChange("vet")}
-                  onClick={handleCustom}
-                  className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                    userType === "vet"
-                      ? "bg-white text-blue-600 shadow-sm shadow-blue-100 border border-blue-100"
-                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                  }`}
-                >
-                  🩺 Veterinarian
-                </button>
-              </div>
-            </div>
-
             {/* Veterinarian Login Form */}
-            {userType === "vet" && (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Email Field */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Email Address
-                  </label>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Email Address
+                </label>
                   <input
                     type="email"
                     value={formData.email}
@@ -620,7 +489,7 @@ const Login = () => {
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                     >
-                      {showPassword ? "🔒" : "👁️"}
+                      {showPassword ? "Hide" : "Show"}
                     </button>
                   </div>
                   {errors.password && touched.password && (
@@ -633,7 +502,7 @@ const Login = () => {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={isLoading || locationStatus !== "granted"}
+                  disabled={isLoading}
                   className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-6 rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {isLoading ? (
@@ -641,165 +510,18 @@ const Login = () => {
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       Signing in...
                     </div>
-                  ) : locationStatus !== "granted" ? (
-                    "Enable Location to Sign In"
                   ) : (
                     "Sign In"
                   )}
                 </button>
               </form>
-            )}
 
-            {/* Pet Owner Google Login */}
-            {userType === "pet" && (
-              <div className="space-y-6">
-                {/* Divider */}
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-white text-gray-500 font-medium">
-                      Continue with
-                    </span>
-                  </div>
-                </div>
-
-                {/* Google Login */}
-                <div className="w-full">
-                  <GoogleOAuthProvider
-                    clientId="325007826401-dhsrqhkpoeeei12gep3g1sneeg5880o7.apps.googleusercontent.com"
-                    onScriptLoadError={() =>
-                      console.error("Google OAuth script failed to load")
-                    }
-                    onScriptLoadSuccess={() =>
-                      console.log("Google OAuth script loaded")
-                    }
-                  >
-                    <div className="flex justify-center">
-                      <GoogleLogin
-                        onSuccess={handleGoogleSuccess}
-                        onError={() => toast.error("Google login failed")}
-                        useOneTap
-                        theme="filled_blue"
-                        size="large"
-                        text="continue_with"
-                        shape="rectangular"
-                        width="100%"
-                        locale="en"
-                        disabled={locationStatus !== "granted"}
-                      />
-                    </div>
-                  </GoogleOAuthProvider>
-                  
-                  {locationStatus !== "granted" && (
-                    <p className="text-center text-red-600 text-sm mt-2">
-                      Please enable location access to continue with Google login
-                    </p>
-                  )}
-                </div>
-
-                {showTestLogin && (
-                  <div className="p-5 border border-blue-100 bg-white rounded-2xl shadow-sm">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-blue-900 tracking-wide uppercase">
-                          Demo Access
-                        </p>
-                        <p className="text-slate-500 text-sm mt-1">
-                          Use demo credentials to continue without Google login.
-                        </p>
-                      </div>
-                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
-                        Preview
-                      </span>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) =>
-                            handleInputChange("email", e.target.value)
-                          }
-                          onBlur={() => handleBlur("email")}
-                          placeholder="demo@example.com"
-                          className={`w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
-                            errors.email && touched.email
-                              ? "border-red-300 bg-red-50"
-                              : "border-slate-200"
-                          }`}
-                        />
-                        {errors.email && touched.email && (
-                          <p className="text-red-600 text-xs font-medium mt-1">
-                            {errors.email}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
-                          Password
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            value={formData.password}
-                            onChange={(e) =>
-                              handleInputChange("password", e.target.value)
-                            }
-                            onBlur={() => handleBlur("password")}
-                            placeholder="••••••••"
-                            className={`w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
-                              errors.password && touched.password
-                                ? "border-red-300 bg-red-50"
-                                : "border-slate-200"
-                            }`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-blue-600"
-                          >
-                            {showPassword ? "Hide" : "Show"}
-                          </button>
-                        </div>
-                        {errors.password && touched.password && (
-                          <p className="text-red-600 text-xs font-medium mt-1">
-                            {errors.password}
-                          </p>
-                        )}
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isLoading || locationStatus !== "granted"}
-                        className="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50"
-                      >
-                        {isLoading ? "Authorizing..." : "Sign in to dashboard"}
-                      </button>
-                    </form>
-                  </div>
-                )}
-
-                {/* Additional Info */}
-                <div className="text-center p-4 bg-blue-50 rounded-xl border border-blue-100">
-                  <p className="text-blue-700 text-sm font-medium">
-                    🔒 Secure & encrypted login
-                  </p>
-                  <p className="text-blue-600 text-xs mt-1">
-                    Location data helps us provide better service
-                  </p>
-                </div>
-              </div>
-            )}
+            <div className="mt-6 text-center text-sm text-gray-500">
+              Location helps us find nearby pet parents. You can still sign in without granting it.
+            </div>
 
             {/* Sign Up Link */}
-            <div className="mt-8 pt-6 border-t border-gray-100">
+            <div className="mt-4 pt-6 border-t border-gray-100">
               <p className="text-center text-gray-600 text-sm">
                 Don't have an account?{" "}
                 <Link

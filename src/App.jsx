@@ -432,7 +432,6 @@ const VetHome = lazy(() => import("./VetDashboard/VetHome"));
 const HeaderWithSidebar = lazy(() => import("./VetDashboard/Sidebar"));
 const VetOnwerProfile = lazy(() => import("./VetDashboard/VetOnwerProfile"));
 const VetPayment = lazy(() => import("./VetDashboard/VetPayment"));
-const VetDocument = lazy(() => import("./VetDashboard/VetDocument"));
 const Ratings = lazy(() => import("./VetDashboard/Rating"));
 const Support = lazy(() => import("./pages/Support"));
 const VetOwner = lazy(() => import("./admin/VetOwner"));
@@ -510,6 +509,23 @@ import BoostYourDog from "./blog/BoostYourDog";
 import VaccinationSchedule from "./blog/VaccinationSchedule";
 import BestFoodForDog from "./blog/BestFoodForDog";
 import HowVetsGrow from "./blog/HowVetsGrow";
+import VetDashboard from "./VetDashboard/VetDashboard";
+import VetServices from "./VetDashboard/VetServices";
+import VetClinicHour from "./VetDashboard/VetClinicHour";
+import VetVideoCallingSchedule from "./VetDashboard/VetVideoCallingSchedule";
+import VetDoctors from "./VetDashboard/VetDoctors";
+import VetAIAssistantView from "./VetDashboard/VetAIAssistantView";
+import VetBookingPayments from "./VetDashboard/VetBookingPayments";
+import VetAppointment from "./VetDashboard/VetAppointment";
+import VetPatientRecord from "./VetDashboard/VetPatientRecord";
+import VetDocuments from "./VetDashboard/VetDocuments";
+import VetProfile from "./VetDashboard/VetProfile";
+import VetOrderHistory from "./VetDashboard/VetOrderHistory";
+import VetOrderDetails from "./VetDashboard/VetOrderDetails";
+import VetEmergencyHours from "./VetDashboard/VetEmergencyHours";
+import VetFollowUp from "./VetDashboard/VetFollowUp";
+import ClinicKyc from "./VetDashboard/ClinicKyc";
+import QrCodeBranding from "./VetDashboard/QrCodeBranding";
 const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
@@ -676,22 +692,113 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/user-dashboard/vet-document"
-              element={
-                <ProtectedRoute>
-                  <HeaderWithSidebar>
-                    <VetDocument />
-                  </HeaderWithSidebar>
-                </ProtectedRoute>
-              }
-            />
+            
             <Route
               path="/user-dashboard/vet-payment"
               element={
                 <ProtectedRoute>
                   <HeaderWithSidebar>
                     <VetPayment />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+              <Route
+              path="/user-dashboard/Total-Doctors"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetDoctors />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+             <Route
+              path="/user-dashboard/AIAssistantView"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetAIAssistantView />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+              <Route
+              path="/user-dashboard/booking-payments"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetBookingPayments />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+              <Route
+              path="/user-dashboard/appointment"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetAppointment />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+               <Route
+              path="/user-dashboard/patient-records"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetPatientRecord />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user-dashboard/order-history"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetOrderHistory />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user-dashboard/order/:id"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetOrderDetails />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user-dashboard/emergency-hours"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetEmergencyHours />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+               <Route
+              path="/user-dashboard/Doctor-Documents"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetDocuments />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+              <Route
+              path="/user-dashboard/Doctor-Profile"
+              element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetProfile />
                   </HeaderWithSidebar>
                 </ProtectedRoute>
               }
@@ -806,6 +913,69 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/user-dashboard/vet-dashboard" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetDashboard />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
+             <Route path="/user-dashboard/vet-services" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetServices />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
+            <Route path="/user-dashboard/vet-clinic-hours" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetClinicHour />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
+             <Route path="/user-dashboard/vet-videocalling-schedule" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetVideoCallingSchedule />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
+             <Route path="/user-dashboard/order-history" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetOrderHistory />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
+             <Route path="/user-dashboard/doctor-emergency-hours" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetEmergencyHours />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
+             <Route path="/user-dashboard/doctor-follow-up" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <VetFollowUp />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
+             <Route path="/user-dashboard/clinic-kyc" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <ClinicKyc />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
+             <Route path="/user-dashboard/Qr-Code-Branding" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <QrCodeBranding />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
             <Route
               path="/doctor-testing"
               element={
@@ -879,6 +1049,7 @@ function App() {
             <Route path="/video-consult" element={<VideoConsultPage />} />
             {/* <Route path="/ai-triage" element={<AITriagePage />} /> */}
             <Route path="*" element={<NotFoundPage />} />
+
           </Routes>
         </Suspense>
       </div>

@@ -56,7 +56,7 @@ export default function SuperAdminLogin() {
         toast.success("Login successful!");
 
         if (finalUser.role === "vet") {
-          navigate("/user-dashboard/bookings");
+          navigate("/user-dashboard/vet-dashboard");
         } else {
           navigate("/dashboard");
           toast(`Welcome ${finalUser.role}, dashboard is only for vets.`);

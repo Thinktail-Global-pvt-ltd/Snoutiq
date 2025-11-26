@@ -1,279 +1,355 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import axios from "axios";
+import { useAuth } from "../auth/AuthContext";
 
-const VetPayment = () => {
-  const [walletBalance, setWalletBalance] = useState(12500);
-  const [transactions, setTransactions] = useState([
-    { id: 1, type: 'credit', amount: 2000, description: 'Video Consultation', date: '2024-01-15', status: 'completed' },
-    { id: 2, type: 'debit', amount: 500, description: 'Withdrawal', date: '2024-01-14', status: 'completed' },
-    { id: 3, type: 'credit', amount: 1500, description: 'Clinic Visit', date: '2024-01-13', status: 'completed' },
-    { id: 4, type: 'credit', amount: 3000, description: 'Emergency Service', date: '2024-01-12', status: 'pending' },
-    { id: 5, type: 'debit', amount: 1000, description: 'Equipment Purchase', date: '2024-01-10', status: 'completed' }
-  ]);
+// Constants
+const API_BASE = import.meta.env.VITE_BACKEND_API || "https://snoutiq.com/backend/api";
+const SUCCESS_STATUSES = new Set(["completed", "captured", "paid", "success", "successful", "settled"]);
+const STATUS_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "completed", label: "Completed" },
+  { value: "captured", label: "Captured" },
+  { value: "paid", label: "Paid" },
+  { value: "success", label: "Success" },
+  { value: "failed", label: "Failed" },
+];
 
-  const [servicePrices, setServicePrices] = useState({
-    videoConsultation: 500,
-    clinicVisit: 800,
-    emergencyService: 2000,
-    homeVisit: 1500,
-    groomingService: 700
+// Utility functions
+const formatRupees = (paise) => {
+  const amount = Number(paise || 0) / 100;
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
+
+const formatDate = (isoString) => {
+  if (!isoString) return "-";
+  try {
+    return new Date(isoString).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour12: true,
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return isoString;
+  }
+};
+
+const getFromStorage = (key) => {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(key);
+  const num = Number(raw);
+  return Number.isFinite(num) && num > 0 ? num : null;
+};
+
+// Custom hook for payment data
+const usePayments = (clinicId, vetId, statusFilter) => {
+  const [state, setState] = useState({
+    loading: false,
+    error: "",
+    transactions: [],
+    summary: null,
   });
 
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  useEffect(() => {
+    const fetchPayments = async () => {
+      if (!clinicId && !vetId) {
+        setState(prev => ({ ...prev, error: "Missing clinic_id or vet_id. Please log in again.", transactions: [], summary: null }));
+        return;
+      }
 
-  const handlePriceChange = (service, newPrice) => {
-    setServicePrices(prev => ({
-      ...prev,
-      [service]: parseInt(newPrice) || 0
-    }));
-  };
-
-  const handleWithdraw = () => {
-    if (withdrawAmount && withdrawAmount > 0 && withdrawAmount <= walletBalance) {
-      const newTransaction = {
-        id: transactions.length + 1,
-        type: 'debit',
-        amount: parseInt(withdrawAmount),
-        description: 'Withdrawal',
-        date: new Date().toISOString().split('T')[0],
-        status: 'processing'
-      };
+      setState(prev => ({ ...prev, loading: true, error: "" }));
       
-      setTransactions(prev => [newTransaction, ...prev]);
-      setWalletBalance(prev => prev - parseInt(withdrawAmount));
-      setWithdrawAmount('');
-      setShowWithdrawModal(false);
-    }
-  };
+      try {
+        const params = {
+          clinic_id: clinicId || undefined,
+          vet_id: vetId || undefined,
+          status: statusFilter === "all" ? undefined : statusFilter,
+        };
 
-  const TransactionItem = ({ transaction }) => (
-    <div className="flex items-center justify-between p-4 border-b border-gray-100">
-      <div className="flex items-center">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-          transaction.type === 'credit' ? 'bg-green-100' : 'bg-red-100'
-        }`}>
-          <svg className={`w-5 h-5 ${
-            transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
-          }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {transaction.type === 'credit' ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-            )}
-          </svg>
-        </div>
-        <div className="ml-4">
-          <p className="font-medium text-gray-900">{transaction.description}</p>
-          <p className="text-sm text-gray-500">{transaction.date}</p>
-        </div>
-      </div>
-      <div className="text-right">
-        <p className={`font-semibold ${
-          transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
-        }`}>
-          {transaction.type === 'credit' ? '+' : '-'}₹{transaction.amount}
-        </p>
-        <span className={`text-xs px-2 py-1 rounded-full ${
-          transaction.status === 'completed' ? 'bg-green-100 text-green-800' :
-          transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-          'bg-blue-100 text-blue-800'
-        }`}>
-          {transaction.status}
-        </span>
-      </div>
-    </div>
-  );
+        const { data } = await axios.get(`${API_BASE}/clinics/payments`, {
+          params,
+          withCredentials: true,
+        });
 
-  const PriceInput = ({ label, value, onChange }) => (
-    <div className="flex items-center justify-between p-4 border-b border-gray-100">
-      <span className="text-gray-700">{label}</span>
-      <div className="flex items-center">
-        <span className="text-gray-500 mr-2">₹</span>
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-24 px-3 py-1 border border-gray-300 rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-    </div>
-  );
+        if (!data?.success) {
+          throw new Error(data?.message || "Unable to load payments right now.");
+        }
+
+        setState({
+          loading: false,
+          error: "",
+          transactions: Array.isArray(data.transactions) ? data.transactions : [],
+          summary: {
+            totalPayments: data.payments ?? 0,
+            totalRupees: data.total_rupees ?? 0,
+            status: data.status_filter ?? "all",
+            clinicId: data.clinic_id ?? clinicId ?? null,
+            vetId: data.vet_id ?? vetId ?? null,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to load clinic payments", err);
+        const message = err?.response?.data?.message || err?.message || "Unable to load payments.";
+        setState(prev => ({ ...prev, loading: false, error: message, transactions: [], summary: null }));
+      }
+    };
+
+    fetchPayments();
+  }, [clinicId, vetId, statusFilter]);
+
+  return state;
+};
+
+// Table Row Component
+const TransactionRow = React.memo(({ transaction }) => {
+  const paymentId = transaction.reference || `TXN#${transaction.id}`;
+  const orderId = transaction.metadata?.order_id || transaction.metadata?.razorpay_order_id || "-";
+  const amountLabel = formatRupees(transaction.amount_paise || 0);
+  const statusKey = String(transaction.status || "").toLowerCase();
+  const isSuccess = SUCCESS_STATUSES.has(statusKey);
+  const methodLabel = transaction.payment_method || transaction.type || transaction.gateway || "-";
+  const userName = transaction.metadata?.user_name || transaction.user?.name || transaction.user_id || "-";
+  const doctorLabel = transaction.metadata?.doctor_name || transaction.doctor?.doctor_name || transaction.doctor_id || "-";
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment & Wallet</h1>
-        <p className="text-gray-600">Manage your earnings, set service prices, and withdraw funds</p>
-      </div>
+    <tr className="hover:bg-gray-50 transition-colors duration-150">
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+        {formatDate(transaction.created_at)}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-900">
+        {paymentId}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-900">
+        {orderId}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+        {amountLabel}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap">
+        <span
+          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+            isSuccess
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-800"
+          }`}
+        >
+          {transaction.status || "-"}
+        </span>
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+        {methodLabel}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+        {userName}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+        {doctorLabel}
+      </td>
+    </tr>
+  );
+});
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left Column - Wallet & Transactions */}
-        <div className="space-y-6">
-          {/* Wallet Balance Card */}
-          <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-6 text-white">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">Wallet Balance</h2>
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            
-            <div className="mb-6">
-              <p className="text-3xl font-bold">₹{walletBalance.toLocaleString()}</p>
-              <p className="text-blue-200 text-sm">Available for withdrawal</p>
-            </div>
+TransactionRow.displayName = 'TransactionRow';
 
-            <button
-              onClick={() => setShowWithdrawModal(true)}
-              className="w-full bg-white text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
-            >
-              Withdraw Funds
-            </button>
-          </div>
+// Summary Cards Component
+const SummaryCards = React.memo(({ summary, resolvedClinicId, lastPaymentAt }) => (
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+      <dt className="text-sm font-medium text-gray-500 truncate">Clinic ID</dt>
+      <dd className="mt-1 text-2xl font-semibold text-gray-900">
+        {summary?.clinicId || resolvedClinicId || "-"}
+      </dd>
+    </div>
+    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+      <dt className="text-sm font-medium text-gray-500 truncate">Total Payments</dt>
+      <dd className="mt-1 text-2xl font-semibold text-gray-900">
+        {summary?.totalPayments ?? 0}
+      </dd>
+    </div>
+    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+      <dt className="text-sm font-medium text-gray-500 truncate">Amount Collected</dt>
+      <dd className="mt-1 text-2xl font-semibold text-gray-900">
+        {formatRupees((summary?.totalRupees ?? 0) * 100)}
+      </dd>
+    </div>
+    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+      <dt className="text-sm font-medium text-gray-500 truncate">Last Payment</dt>
+      <dd className="mt-1 text-lg font-semibold text-gray-900">{lastPaymentAt}</dd>
+    </div>
+  </div>
+));
 
-          {/* Transactions History */}
-          <div className="bg-white rounded-xl shadow-md">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {transactions.map(transaction => (
-                <TransactionItem key={transaction.id} transaction={transaction} />
-              ))}
-            </div>
-            <div className="p-4 text-center">
-              <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                View All Transactions
-              </button>
-            </div>
-          </div>
-        </div>
+SummaryCards.displayName = 'SummaryCards';
 
-        {/* Right Column - Service Pricing */}
-        <div className="space-y-6">
-          {/* Service Pricing Card */}
-          <div className="bg-white rounded-xl shadow-md">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Service Pricing</h2>
-              <p className="text-sm text-gray-600">Set your prices for different services</p>
-            </div>
-            
-            <div className="divide-y divide-gray-100">
-              <PriceInput
-                label="Video Consultation"
-                value={servicePrices.videoConsultation}
-                onChange={(value) => handlePriceChange('videoConsultation', value)}
-              />
-              <PriceInput
-                label="Clinic Visit"
-                value={servicePrices.clinicVisit}
-                onChange={(value) => handlePriceChange('clinicVisit', value)}
-              />
-              <PriceInput
-                label="Emergency Service"
-                value={servicePrices.emergencyService}
-                onChange={(value) => handlePriceChange('emergencyService', value)}
-              />
-              <PriceInput
-                label="Home Visit"
-                value={servicePrices.homeVisit}
-                onChange={(value) => handlePriceChange('homeVisit', value)}
-              />
-              <PriceInput
-                label="Grooming Service"
-                value={servicePrices.groomingService}
-                onChange={(value) => handlePriceChange('groomingService', value)}
-              />
-            </div>
+// Loading Skeleton
+const LoadingSkeleton = () => (
+  <div className="animate-pulse space-y-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-gray-200 rounded-lg h-24"></div>
+      ))}
+    </div>
+    <div className="bg-gray-200 rounded-lg h-64"></div>
+  </div>
+);
 
-            <div className="p-6">
-              <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                Save Prices
-              </button>
-            </div>
-          </div>
+// Main Component
+const VetPayment = () => {
+  const { user } = useAuth();
+  const [statusFilter, setStatusFilter] = useState("all");
 
-          {/* Earnings Summary */}
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Earnings Summary</h2>
-            
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">This Month</p>
-                <p className="text-xl font-bold text-gray-900">₹8,500</p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Last Month</p>
-                <p className="text-xl font-bold text-gray-900">₹12,300</p>
-              </div>
-            </div>
+  const resolvedIds = useMemo(() => ({
+    clinicId: user?.clinic_id || user?.vet_registeration_id || user?.vet_id || getFromStorage("clinic_id") || getFromStorage("vet_registeration_id") || null,
+    vetId: user?.vet_registeration_id || user?.vet_id || getFromStorage("vet_id") || getFromStorage("userId") || null,
+  }), [user]);
 
-            <div className="bg-green-50 p-4 rounded-lg">
-              <p className="text-sm text-green-600">Total Earnings</p>
-              <p className="text-2xl font-bold text-green-900">₹1,24,800</p>
-            </div>
-          </div>
-        </div>
-      </div>
+  const { loading, error, transactions, summary } = usePayments(
+    resolvedIds.clinicId,
+    resolvedIds.vetId,
+    statusFilter
+  );
 
-      {/* Withdraw Modal */}
-      {showWithdrawModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Withdraw Funds</h2>
-            
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amount to Withdraw
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500">₹</span>
-                <input
-                  type="number"
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter amount"
-                  max={walletBalance}
-                />
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
-                Available: ₹{walletBalance.toLocaleString()}
+  const lastPaymentAt = useMemo(() => {
+    if (!transactions.length) return "-";
+    return formatDate(transactions[0]?.created_at);
+  }, [transactions]);
+
+  const handleStatusFilterChange = useCallback((e) => {
+    setStatusFilter(e.target.value);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Clinic Payments</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Manage and track your clinic payment transactions
               </p>
             </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Bank Account
+            <div className="flex items-center gap-3">
+              <label htmlFor="status-filter" className="text-sm font-medium text-gray-700">
+                Filter by Status
               </label>
-              <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>ICICI Bank **** 1234</option>
-                <option>HDFC Bank **** 5678</option>
-                <option>Add new bank account</option>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={handleStatusFilterChange}
+                className="block w-40 rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {STATUS_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowWithdrawModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleWithdraw}
-                disabled={!withdrawAmount || withdrawAmount > walletBalance}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Confirm Withdraw
-              </button>
             </div>
           </div>
         </div>
-      )}
+
+        {/* Error Alert */}
+        {error && (
+          <div className="mb-6 rounded-md bg-red-50 p-4 border border-red-200">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Error</h3>
+                <div className="mt-1 text-sm text-red-700">{error}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
+        {loading ? (
+          <LoadingSkeleton />
+        ) : (
+          <>
+            <SummaryCards 
+              summary={summary} 
+              resolvedClinicId={resolvedIds.clinicId}
+              lastPaymentAt={lastPaymentAt}
+            />
+
+            {/* Transactions Table */}
+            <div className="mt-8 bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+                  <span className="text-sm text-gray-500">
+                    Showing {transactions.length} transactions
+                  </span>
+                </div>
+              </div>
+
+              {transactions.length === 0 ? (
+                <div className="text-center py-12">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">No transactions</h3>
+                  <p className="mt-1 text-sm text-gray-500">No payment transactions found for the selected criteria.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date & Time
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Payment ID
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Order ID
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Amount
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Method
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          User
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Doctor
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {transactions.map((transaction) => (
+                        <TransactionRow key={transaction.id} transaction={transaction} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
 
-export default VetPayment;
+export default React.memo(VetPayment);

@@ -153,7 +153,7 @@ const Header = React.memo(function Header() {
   }, [navigate]);
 
   const handleLogin = useCallback(() => {
-  window.location.assign('https://snoutiq.com/backend/custom-doctor-login');
+    navigate("/login");
   }, [navigate]);
 
   const handleRegister = useCallback(() => {

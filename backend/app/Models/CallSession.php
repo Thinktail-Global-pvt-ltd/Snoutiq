@@ -5,7 +5,11 @@ namespace App\Models;
 use App\Support\CallSessionUrlBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class CallSession extends Model
@@ -27,6 +31,19 @@ class CallSession extends Model
         'amount_paid',
         'currency',
         'qr_scanner_id',
+        'recording_resource_id',
+        'recording_sid',
+        'recording_status',
+        'recording_started_at',
+        'recording_ended_at',
+        'recording_file_list',
+        'recording_url',
+        'transcript_status',
+        'transcript_text',
+        'transcript_url',
+        'transcript_requested_at',
+        'transcript_completed_at',
+        'transcript_error',
     ];
 
     protected $casts = [
@@ -35,6 +52,11 @@ class CallSession extends Model
         'ended_at'          => 'datetime',
         'duration_seconds'  => 'integer',
         'amount_paid'       => 'integer',
+        'recording_started_at' => 'datetime',
+        'recording_ended_at'   => 'datetime',
+        'recording_file_list'  => 'array',
+        'transcript_requested_at' => 'datetime',
+        'transcript_completed_at' => 'datetime',
     ];
 
     protected static array $columnSupportCache = [];
@@ -179,9 +201,94 @@ class CallSession extends Model
     {
         return $this->belongsTo(Doctor::class, 'doctor_id');
     }
+    
+    public function recordings(): HasMany
+    {
+        return $this->hasMany(CallRecording::class);
+    }
 
     public function qrScanner(): BelongsTo
     {
         return $this->belongsTo(LegacyQrRedirect::class, 'qr_scanner_id');
+    }
+
+    public function hasActiveRecording(): bool
+    {
+        return in_array($this->recording_status, ['starting', 'recording'], true)
+            && !empty($this->recording_resource_id)
+            && !empty($this->recording_sid);
+    }
+
+    public function resolvedRecordingFilePath(): ?string
+    {
+        $files = $this->recording_file_list;
+
+        if (!$files) {
+            return $this->recording_url;
+        }
+
+        if (is_array($files) && array_key_exists('fileList', $files)) {
+            $files = $files['fileList'];
+        }
+
+        if (is_array($files)) {
+            $first = $files[0] ?? null;
+
+            if (is_array($first)) {
+                return $first['fileName']
+                    ?? $first['filename']
+                    ?? $first['file_name']
+                    ?? $this->recording_url;
+            }
+        }
+
+        if (is_string($files)) {
+            return $files;
+        }
+
+        return $this->recording_url;
+    }
+
+    public function recordingDisk(): string
+    {
+        return config('services.agora.recording.disk', config('filesystems.default'));
+    }
+
+    public function recordingTemporaryUrl(?Carbon $expiresAt = null): ?string
+    {
+        $path = $this->resolvedRecordingFilePath();
+
+        if (!$path) {
+            return null;
+        }
+
+        $diskName = $this->recordingDisk();
+        $disk = Storage::disk($diskName);
+
+        if (method_exists($disk, 'temporaryUrl')) {
+            try {
+                return $disk->temporaryUrl($path, $expiresAt ?? now()->addMinutes(60));
+            } catch (\Throwable $e) {
+                Log::warning('Failed to create temporary recording URL', [
+                    'session_id' => $this->id,
+                    'path'       => $path,
+                    'disk'       => $diskName,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
+        }
+
+        try {
+            return $disk->url($path);
+        } catch (\Throwable $e) {
+            Log::error('Failed to resolve recording URL', [
+                'session_id' => $this->id,
+                'path'       => $path,
+                'disk'       => $diskName,
+                'error'      => $e->getMessage(),
+            ]);
+        }
+
+        return $this->recording_url;
     }
 }
