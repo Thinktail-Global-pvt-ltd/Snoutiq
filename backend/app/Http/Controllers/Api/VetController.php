@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class VetController extends Controller
@@ -137,7 +138,7 @@ public function index()
 
         $lastVetUpdated = false;
         $userId = $request->query('user_id');
-        if (! empty($userId) && ctype_digit((string) $userId)) {
+        if ($this->usersTableHasLastVetIdColumn() && ! empty($userId) && ctype_digit((string) $userId)) {
             $user = User::find((int) $userId);
             if ($user) {
                 $user->last_vet_id = $clinic->id;
@@ -164,5 +165,16 @@ public function index()
         }
 
         return response()->json(['message' => 'Vet not found'], 404);
+    }
+
+    protected function usersTableHasLastVetIdColumn(): bool
+    {
+        static $hasColumn = null;
+
+        if ($hasColumn === null) {
+            $hasColumn = Schema::hasColumn('users', 'last_vet_id');
+        }
+
+        return $hasColumn;
     }
 }

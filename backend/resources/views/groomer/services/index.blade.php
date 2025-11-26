@@ -402,7 +402,7 @@
     return Number.isFinite(num) && num > 0 ? num : null;
   })();
   const SERVER_USER_ID = (() => {
-    if (SESSION_ROLE === 'doctor' && SESSION_CLINIC_ID) {
+    if (['doctor','receptionist'].includes(SESSION_ROLE) && SESSION_CLINIC_ID) {
       return SESSION_CLINIC_ID;
     }
     const raw = @json(auth()->id() ?? session('user_id') ?? data_get(session('user'), 'id'));

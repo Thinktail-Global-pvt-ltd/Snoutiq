@@ -248,6 +248,12 @@
   <nav class="px-2 lg:px-3 py-4 space-y-1 text-sm grow overflow-y-auto sidebar-scrollbar">
     @php
       $role = $sessionRole;
+      $isPetRole = in_array($role, ['pet','patient','user'], true);
+      $isAdminRole = $role === 'admin';
+      $isDoctorRole = $role === 'doctor';
+      $isReceptionRole = $role === 'receptionist';
+      $showPetMenu = $isAdminRole || $isPetRole;
+      $showClinicMenu = $isAdminRole || (!$isPetRole && !$isDoctorRole && !$isReceptionRole);
       $active = function($patterns){
         foreach ((array)$patterns as $p) {
           if (request()->routeIs($p)) return true;
@@ -256,132 +262,157 @@
       };
       $baseItem = 'nav-item group flex items-center gap-3 px-3 py-2.5 rounded-lg transition hover:bg-white/10';
     @endphp
-    
-    <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Menu</div>
-    
-    @if($role === 'pet' || $role === 'patient' || $role === 'user')
-      <!-- Pet/Patient User Menu -->
-      <a href="{{ route('user.bookings') }}" class="{{ $baseItem }} {{ $active('user.bookings') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+
+    @if($isDoctorRole)
+      <div class="px-3 py-6 text-sm text-white/70">Sidebar hidden for doctor role.</div>
+    @elseif($isReceptionRole)
+      <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Receptionist</div>
+      <a href="{{ route('receptionist.bookings') }}" class="{{ $baseItem }} {{ $active('receptionist.bookings') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18m-9 5h9"/>
         </svg>
-        <span class="truncate">My Orders</span>
-      </a>
-      
-      <a href="{{ route('booking.clinics') }}" class="{{ $baseItem }} {{ $active('booking.clinics') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 19h14a2 2 0 002-2v-6H3v6a2 2 0 002 2z"/>
-        </svg>
-        <span class="truncate">Book Appointment</span>
-      </a>
-      
-      <a href="{{ route('pet.video.schedule') }}" class="{{ $baseItem }} {{ $active('pet.video.schedule') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-        </svg>
-        <span class="truncate">Video Calling Schedule by Doctor</span>
+        <span class="truncate">Clinic Bookings</span>
       </a>
     @else
-      <!-- Vet/Doctor Menu -->
-      <a href="{{ route('dashboard.profile') }}" class="{{ $baseItem }} {{ $active('dashboard.profile') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A4 4 0 018 16h8a4 4 0 012.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-        </svg>
-        <span class="truncate">Profile</span>
-      </a>
+      @if($showPetMenu)
+        <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">
+          {{ $isAdminRole ? 'Pet Owner Menu' : 'Menu' }}
+        </div>
+        <a href="{{ route('user.bookings') }}" class="{{ $baseItem }} {{ $active('user.bookings') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/>
+          </svg>
+          <span class="truncate">My Orders</span>
+        </a>
+        
+        <a href="{{ route('booking.clinics') }}" class="{{ $baseItem }} {{ $active('booking.clinics') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 19h14a2 2 0 002-2v-6H3v6a2 2 0 002 2z"/>
+          </svg>
+          <span class="truncate">Book Appointment</span>
+        </a>
+        
+        <a href="{{ route('pet.video.schedule') }}" class="{{ $baseItem }} {{ $active('pet.video.schedule') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
+          <span class="truncate">Video Calling Schedule by Doctor</span>
+        </a>
+      @endif
 
-      <a href="{{ route('doctor.dashboard') }}" class="{{ $baseItem }} {{ $active('doctor.dashboard') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-        </svg>
-        <span class="truncate">Video Consultation</span>
-      </a>
+      @if($showClinicMenu)
+        <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2 {{ $showPetMenu ? 'mt-6' : '' }}">
+          {{ $showPetMenu ? 'Clinic Menu' : 'Menu' }}
+        </div>
 
-      <!-- <a href="{{ route('doctor.demo-call') }}" class="{{ $baseItem }} {{ $active('doctor.demo-call') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.5 3.5a2.121 2.121 0 0 1 3 3l-1.4 1.4a2 2 0 0 1-2.46.24c-.86-.54-1.86-.9-2.9-1.04a8.06 8.06 0 0 0-5.62 1.64l-.2.16a2 2 0 0 0-.22 3.06l1.23 1.23a2 2 0 0 1 .25 2.49l-1.42 2.37a2 2 0 0 1-2.41.84 12.04 12.04 0 0 1-4.11-2.7A12 12 0 0 1 3 7.5c.03-1.28.24-2.54.62-3.76a2 2 0 0 1 1.97-1.47h.41a2 2 0 0 1 1.78 1.07l.91 1.82" />
-        </svg>
-        <span class="truncate">Demo Call Sandbox</span>
-      </a> -->
-      
-      <a href="{{ route('groomer.services.index') }}" class="{{ $baseItem }} {{ $active('groomer.services.index') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6H4v-6z"/>
-        </svg>
-        <span class="truncate">Services</span>
-      </a>
-      
-      <a href="{{ route('doctor.bookings') }}" class="{{ $baseItem }} {{ $active('doctor.bookings') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2z"/>
-        </svg>
-        <span class="truncate">My Bookings</span>
-      </a>
-      
-      <a href="{{ route('doctor.video.schedule.manage') }}" class="{{ $baseItem }} {{ $active('doctor.video.schedule.manage') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        <span class="truncate">Video Calling Schedule</span>
-      </a>
-      
-      <a href="{{ route('clinic.orders') }}" class="{{ $baseItem }} {{ $active('clinic.orders') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/>
-        </svg>
-        <span class="truncate">Order History</span>
-      </a>
-      
-      <a href="{{ route('clinic.payments') }}" class="{{ $baseItem }} {{ $active('clinic.payments') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-4.418 0-8 1.79-8 4s3.582 4 8 4 8-1.79 8-4-3.582-4-8-4zm0-6v4m0 12v4"/>
-        </svg>
-        <span class="truncate">Payments</span>
-      </a>
-      
-      <a href="{{ route('clinic.booking.payments') }}" class="{{ $baseItem }} {{ $active('clinic.booking.payments') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l2 2 4-4m-7 6h8a2 2 0 002-2V8a2 2 0 00-2-2H9l-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2h2z"/>
-        </svg>
-        <span class="truncate">Booking Payments</span>
-      </a>
-      
-      <a href="{{ route('clinic.doctors') }}" class="{{ $baseItem }} {{ $active('clinic.doctors') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-4a4 4 0 11-8 0 4 4 0 018 0z"/>
-        </svg>
-        <span class="truncate">Clinic Doctors</span>
-      </a>
-      
-      <a href="{{ route('doctor.patients') }}" class="{{ $baseItem }} {{ $active('doctor.patients') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-3 8c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7 3.582 7 8 7z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5V3m0 18v-2m7-7h2M3 12h2"/>
-        </svg>
-        <span class="truncate">Patient Records</span>
-      </a>
-      
-      <a href="{{ route('doctor.schedule') }}" class="{{ $baseItem }} {{ $active('doctor.schedule') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        <span class="truncate">Clinic Schedule</span>
-      </a>
-      
-      <a href="{{ route('doctor.emergency-hours') }}" class="{{ $baseItem }} {{ $active('doctor.emergency-hours') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636A9 9 0 105.636 18.364 9 9 0 1018.364 5.636z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l2.5 2.5"/>
-        </svg>
-        <span class="truncate">Emergency Coverage</span>
-      </a>
+        <a href="{{ route('dashboard.profile') }}" class="{{ $baseItem }} {{ $active('dashboard.profile') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A4 4 0 018 16h8a4 4 0 012.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          <span class="truncate">Profile</span>
+        </a>
 
-      <a href="{{ route('doctor.documents') }}" class="{{ $baseItem }} {{ $active('doctor.documents') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m-3-9h-2a1 1 0 00-1 1v12a1 1 0 001 1h6a1 1 0 001-1V8a1 1 0 00-1-1h-2"/>
-        </svg>
-        <span class="truncate">Documents & Compliance</span>
-      </a>
+        <a href="{{ route('doctor.dashboard') }}" class="{{ $baseItem }} {{ $active('doctor.dashboard') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
+          <span class="truncate">Video Consultation</span>
+        </a>
+
+        <a href="{{ route('groomer.services.index') }}" class="{{ $baseItem }} {{ $active('groomer.services.index') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h6v6H4V6zm0 8h6v6H4v-6zm8-8h6v6h-6V6zm0 8h6v6H4v-6z"/>
+          </svg>
+          <span class="truncate">Services</span>
+        </a>
+
+        <a href="{{ route('clinic.staff') }}" class="{{ $baseItem }} {{ $active('clinic.staff') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-4a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+          <span class="truncate">Staff</span>
+        </a>
+        
+        <a href="{{ route('doctor.bookings') }}" class="{{ $baseItem }} {{ $active('doctor.bookings') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2z"/>
+          </svg>
+          <span class="truncate">My Bookings</span>
+        </a>
+        
+        <a href="{{ route('doctor.video.schedule.manage') }}" class="{{ $baseItem }} {{ $active('doctor.video.schedule.manage') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span class="truncate">Video Calling Schedule</span>
+        </a>
+        
+        <a href="{{ route('clinic.orders') }}" class="{{ $baseItem }} {{ $active('clinic.orders') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/>
+          </svg>
+          <span class="truncate">Order History</span>
+        </a>
+        
+        <a href="{{ route('clinic.payments') }}" class="{{ $baseItem }} {{ $active('clinic.payments') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-4.418 0-8 1.79-8 4s3.582 4 8 4 8-1.79 8-4-3.582-4-8-4zm0-6v4m0 12v4"/>
+          </svg>
+          <span class="truncate">Payments</span>
+        </a>
+        
+        <a href="{{ route('clinic.booking.payments') }}" class="{{ $baseItem }} {{ $active('clinic.booking.payments') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l2 2 4-4m-7 6h8a2 2 0 002-2V8a2 2 0 00-2-2H9l-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2h2z"/>
+          </svg>
+          <span class="truncate">Booking Payments</span>
+        </a>
+        
+        <a href="{{ route('clinic.doctors') }}" class="{{ $baseItem }} {{ $active('clinic.doctors') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-4a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+          <span class="truncate">Clinic Doctors</span>
+        </a>
+
+        <a href="{{ route('doctor.patients') }}" class="{{ $baseItem }} {{ $active('doctor.patients') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-3 8c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7 3.582 7 8 7z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5V3m0 18v-2m7-7h2M3 12h2"/>
+          </svg>
+          <span class="truncate">Patient Records</span>
+        </a>
+        
+        <a href="{{ route('doctor.schedule') }}" class="{{ $baseItem }} {{ $active('doctor.schedule') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span class="truncate">Clinic Schedule</span>
+        </a>
+        
+        <a href="{{ route('doctor.emergency-hours') }}" class="{{ $baseItem }} {{ $active('doctor.emergency-hours') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636A9 9 0 105.636 18.364 9 9 0 1018.364 5.636z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l2.5 2.5"/>
+          </svg>
+          <span class="truncate">Emergency Coverage</span>
+        </a>
+
+        <a href="https://snoutiq.com/backend/s3-recordings" target="_blank" rel="noopener noreferrer" class="{{ $baseItem }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h3l2 2h7a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12v5m-3-3 3 3 3-3"/>
+          </svg>
+          <span class="truncate">S3 Recordings</span>
+        </a>
+
+        <a href="{{ route('doctor.documents') }}" class="{{ $baseItem }} {{ $active('doctor.documents') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m-3-9h-2a1 1 0 00-1 1v12a1 1 0 001 1h6a1 1 0 001-1V8a1 1 0 00-1-1h-2"/>
+          </svg>
+          <span class="truncate">Documents & Compliance</span>
+        </a>
+      @endif
     @endif
   </nav>
   

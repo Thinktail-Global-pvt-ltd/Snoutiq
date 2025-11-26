@@ -12,6 +12,7 @@ class Doctor extends Model
     protected $fillable = [
         'vet_registeration_id',
         'doctor_name',
+        'staff_role',
         'doctor_email',
         'doctor_mobile',
         'doctor_license',

@@ -25,6 +25,7 @@ use App\Services\WhatsAppService;
 use App\Models\ChatRoom;
 use App\Models\Pet;
 use App\Models\Doctor;
+use App\Models\Receptionist;
 use App\Models\Transaction;
 
 
@@ -1045,92 +1046,179 @@ public function login(Request $request)
                 ->where('doctor_email', $email)
                 ->first();
 
-            if (!$doctorRow) {
-                return response()->json(['message' => 'Doctor not found'], 404);
-            }
+            if ($doctorRow) {
+                $clinicId = (int) ($doctorRow->vet_registeration_id ?? 0);
+                $clinicForDoctor = $clinicId > 0
+                    ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
+                    : null;
 
-            $clinicId = (int) ($doctorRow->vet_registeration_id ?? 0);
-            $clinicForDoctor = $clinicId > 0
-                ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
-                : null;
+                $doctors = Doctor::where('vet_registeration_id', $clinicId)
+                    ->get()
+                    ->map(function (Doctor $doctor) {
+                        return [
+                            'id'                   => $doctor->id,
+                            'name'                 => $doctor->doctor_name,
+                            'email'                => $doctor->doctor_email,
+                            'mobile'               => $doctor->doctor_mobile,
+                            'license'              => $doctor->doctor_license,
+                            'image'                => $doctor->doctor_image,
+                            'toggle_availability'  => $doctor->toggle_availability,
+                            'consultation_price'   => $doctor->doctors_price,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
 
-            $doctors = Doctor::where('vet_registeration_id', $clinicId)
-                ->get()
-                ->map(function (Doctor $doctor) {
-                    return [
-                        'id'                   => $doctor->id,
-                        'name'                 => $doctor->doctor_name,
-                        'email'                => $doctor->doctor_email,
-                        'mobile'               => $doctor->doctor_mobile,
-                        'license'              => $doctor->doctor_license,
-                        'image'                => $doctor->doctor_image,
-                        'toggle_availability'  => $doctor->toggle_availability,
-                        'consultation_price'   => $doctor->doctors_price,
-                    ];
-                })
-                ->values()
-                ->toArray();
+                DB::transaction(function () use (&$plainToken, &$room, $doctorRow, $roomTitle) {
+                    $plainToken = bin2hex(random_bytes(32));
 
-            DB::transaction(function () use (&$plainToken, &$room, $doctorRow, $roomTitle) {
-                $plainToken = bin2hex(random_bytes(32));
+                    $room = ChatRoom::create([
+                        'user_id'         => $doctorRow->id,
+                        'chat_room_token' => 'room_' . Str::uuid()->toString(),
+                        'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
+                    ]);
+                });
 
-                $room = ChatRoom::create([
-                    'user_id'         => $doctorRow->id,
-                    'chat_room_token' => 'room_' . Str::uuid()->toString(),
-                    'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
+                $doctorData = (array) $doctorRow;
+                $doctorData['role'] = 'doctor';
+                $doctorData['clinic_id'] = $clinicId ?: null;
+                $doctorData['vet_registeration_id'] = $clinicId ?: null;
+                $doctorData['vet_registerations_temp_id'] = $clinicId ?: null;
+                $doctorData['email'] = $doctorRow->doctor_email;
+                if ($clinicForDoctor) {
+                    $doctorData['clinic_profile'] = $clinicForDoctor->clinic_profile ?? ($clinicForDoctor->name ?? null);
+                }
+
+                $doctorId = (int) $doctorRow->id;
+
+                $response = [
+                    'message'    => 'Login successful',
+                    'role'       => 'doctor',
+                    'email'      => $doctorRow->doctor_email,
+                    'token'      => $plainToken,
+                    'token_type' => 'Bearer',
+                    'chat_room'  => [
+                        'id'    => $room->id,
+                        'token' => $room->chat_room_token,
+                        'name'  => $room->name,
+                    ],
+                    'user'        => $doctorData,
+                    'user_id'     => $doctorId,
+                    'doctor_id'   => $doctorId,
+                    'clinic_id'   => $clinicId ?: null,
+                    'vet_id'      => $clinicId ?: null,
+                    'vet_registeration_id'       => $clinicId ?: null,
+                    'vet_registerations_temp_id' => $clinicId ?: null,
+                    'doctors'     => $doctors,
+                ];
+
+                session([
+                    'user_id'                     => $doctorId,
+                    'doctor_id'                   => $doctorId,
+                    'clinic_id'                   => $clinicId ?: null,
+                    'role'                        => 'doctor',
+                    'token'                       => $plainToken,
+                    'token_type'                  => 'Bearer',
+                    'chat_room'                   => $response['chat_room'],
+                    'user'                        => $doctorData,
+                    'auth_full'                   => $response,
+                    'vet_id'                      => $clinicId ?: null,
+                    'vet_registeration_id'        => $clinicId ?: null,
+                    'vet_registerations_temp_id'  => $clinicId ?: null,
+                    'doctors'                     => $doctors,
                 ]);
-            });
 
-            $doctorData = (array) $doctorRow;
-            $doctorData['role'] = 'doctor';
-            $doctorData['clinic_id'] = $clinicId ?: null;
-            $doctorData['vet_registeration_id'] = $clinicId ?: null;
-            $doctorData['vet_registerations_temp_id'] = $clinicId ?: null;
-            $doctorData['email'] = $doctorRow->doctor_email;
-            if ($clinicForDoctor) {
-                $doctorData['clinic_profile'] = $clinicForDoctor->clinic_profile ?? ($clinicForDoctor->name ?? null);
+                return response()->json($response, 200);
             }
 
-            $doctorId = (int) $doctorRow->id;
+            $receptionistRow = Receptionist::where('email', $email)->first();
 
-            $response = [
-                'message'    => 'Login successful',
-                'role'       => 'doctor',
-                'email'      => $doctorRow->doctor_email,
-                'token'      => $plainToken,
-                'token_type' => 'Bearer',
-                'chat_room'  => [
-                    'id'    => $room->id,
-                    'token' => $room->chat_room_token,
-                    'name'  => $room->name,
-                ],
-                'user'        => $doctorData,
-                'user_id'     => $doctorId,
-                'doctor_id'   => $doctorId,
-                'clinic_id'   => $clinicId ?: null,
-                'vet_id'      => $clinicId ?: null,
-                'vet_registeration_id'       => $clinicId ?: null,
-                'vet_registerations_temp_id' => $clinicId ?: null,
-                'doctors'     => $doctors,
-            ];
+            if ($receptionistRow) {
+                $clinicId = (int) ($receptionistRow->vet_registeration_id ?? 0);
+                $clinicRecord = $clinicId > 0
+                    ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
+                    : null;
 
-            session([
-                'user_id'                     => $doctorId,
-                'doctor_id'                   => $doctorId,
-                'clinic_id'                   => $clinicId ?: null,
-                'role'                        => 'doctor',
-                'token'                       => $plainToken,
-                'token_type'                  => 'Bearer',
-                'chat_room'                   => $response['chat_room'],
-                'user'                        => $doctorData,
-                'auth_full'                   => $response,
-                'vet_id'                      => $clinicId ?: null,
-                'vet_registeration_id'        => $clinicId ?: null,
-                'vet_registerations_temp_id'  => $clinicId ?: null,
-                'doctors'                     => $doctors,
-            ]);
+                $doctors = Doctor::where('vet_registeration_id', $clinicId)
+                    ->get()
+                    ->map(function (Doctor $doctor) {
+                        return [
+                            'id'                   => $doctor->id,
+                            'name'                 => $doctor->doctor_name,
+                            'email'                => $doctor->doctor_email,
+                            'mobile'               => $doctor->doctor_mobile,
+                            'license'              => $doctor->doctor_license,
+                            'image'                => $doctor->doctor_image,
+                            'toggle_availability'  => $doctor->toggle_availability,
+                            'consultation_price'   => $doctor->doctors_price,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
 
-            return response()->json($response, 200);
+                DB::transaction(function () use (&$plainToken, &$room, $receptionistRow, $roomTitle) {
+                    $plainToken = bin2hex(random_bytes(32));
+
+                    $room = ChatRoom::create([
+                        'user_id'         => $receptionistRow->id,
+                        'chat_room_token' => 'room_' . Str::uuid()->toString(),
+                        'name'            => $roomTitle ?? ('New chat - ' . now()->format('d M Y H:i')),
+                    ]);
+                });
+
+                $receptionistData = $receptionistRow->toArray();
+                $receptionistData['role'] = 'receptionist';
+                $receptionistData['clinic_id'] = $clinicId ?: null;
+                $receptionistData['vet_registeration_id'] = $clinicId ?: null;
+                $receptionistData['vet_registerations_temp_id'] = $clinicId ?: null;
+                $receptionistData['email'] = $receptionistRow->email;
+                if ($clinicRecord) {
+                    $receptionistData['clinic_profile'] = $clinicRecord->clinic_profile ?? ($clinicRecord->name ?? null);
+                }
+
+                $receptionistId = (int) $receptionistRow->id;
+
+                $response = [
+                    'message'    => 'Login successful',
+                    'role'       => 'receptionist',
+                    'email'      => $receptionistRow->email,
+                    'token'      => $plainToken,
+                    'token_type' => 'Bearer',
+                    'chat_room'  => [
+                        'id'    => $room->id,
+                        'token' => $room->chat_room_token,
+                        'name'  => $room->name,
+                    ],
+                    'user'        => $receptionistData,
+                    'user_id'     => $receptionistId,
+                    'receptionist_id' => $receptionistId,
+                    'clinic_id'   => $clinicId ?: null,
+                    'vet_id'      => $clinicId ?: null,
+                    'vet_registeration_id'       => $clinicId ?: null,
+                    'vet_registerations_temp_id' => $clinicId ?: null,
+                    'doctors'     => $doctors,
+                ];
+
+                session([
+                    'user_id'                     => $receptionistId,
+                    'receptionist_id'             => $receptionistId,
+                    'clinic_id'                   => $clinicId ?: null,
+                    'role'                        => 'receptionist',
+                    'token'                       => $plainToken,
+                    'token_type'                  => 'Bearer',
+                    'chat_room'                   => $response['chat_room'],
+                    'user'                        => $receptionistData,
+                    'auth_full'                   => $response,
+                    'vet_id'                      => $clinicId ?: null,
+                    'vet_registeration_id'        => $clinicId ?: null,
+                    'vet_registerations_temp_id'  => $clinicId ?: null,
+                    'doctors'                     => $doctors,
+                ]);
+
+                return response()->json($response, 200);
+            }
+
+            return response()->json(['message' => 'Doctor or receptionist not found'], 404);
         }
 
         return response()->json(['message' => 'Invalid role'], 400);

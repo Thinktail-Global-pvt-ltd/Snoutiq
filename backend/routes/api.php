@@ -42,6 +42,8 @@ use App\Http\Controllers\Api\CallController as ApiCallController; // handles lig
 use App\Http\Controllers\CallController as CoreCallController;    // handles sessions + token
 use App\Http\Controllers\Api\CallRecordingController;
 use App\Http\Controllers\Api\RecordingUploadController;
+use App\Http\Controllers\Api\StaffController;
+use App\Http\Controllers\Api\ReceptionistBookingController;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
@@ -614,6 +616,21 @@ Route::prefix('groomer')->group(function () {
  Route::get('groomer/services', [GroomerServiceController::class, 'get']); 
 Route::post('groomer/service', [GroomerServiceController::class, 'store']);
     Route::delete('groomer/service/{id}', [GroomerServiceController::class, 'destroy']);
+
+Route::prefix('staff')->group(function () {
+    Route::get('/', [StaffController::class, 'index']);
+    Route::post('/receptionists', [StaffController::class, 'storeReceptionist']);
+    Route::patch('/{type}/{id}/role', [StaffController::class, 'updateRole'])
+        ->whereIn('type', ['doctor', 'receptionist']);
+});
+
+Route::prefix('receptionist')->group(function () {
+    Route::get('/bookings', [ReceptionistBookingController::class, 'bookings']);
+    Route::post('/bookings', [ReceptionistBookingController::class, 'storeBooking']);
+    Route::get('/patients', [ReceptionistBookingController::class, 'patients']);
+    Route::post('/patients', [ReceptionistBookingController::class, 'storePatient']);
+    Route::get('/patients/{user}/pets', [ReceptionistBookingController::class, 'patientPets']);
+});
 
 
    // Clinic Reels CRUD routes (for admin panel)

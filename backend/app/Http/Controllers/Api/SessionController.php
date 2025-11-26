@@ -139,6 +139,8 @@ class SessionController extends Controller
             'clinic_admin'   => 'clinic_admin',
             'doctor'         => 'doctor',
             'doc'            => 'doctor',
+            'receptionist'   => 'receptionist',
+            'staff'          => 'receptionist',
             'admin'          => 'admin',
             'pet'            => 'pet',
             'patient'        => 'pet',

@@ -94,7 +94,7 @@ class OnboardingProgressService
             data_get($session->get('user'), 'vet_registeration_id'),
         ];
 
-        if ($role === 'doctor') {
+        if (in_array($role, ['doctor', 'receptionist'], true)) {
             array_unshift(
                 $candidates,
                 data_get($session->get('user'), 'id'),

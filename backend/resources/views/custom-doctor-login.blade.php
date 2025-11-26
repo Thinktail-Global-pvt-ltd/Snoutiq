@@ -342,6 +342,7 @@
       obj?.user?.id,
       obj?.user_id,
       obj?.doctor_id,
+      obj?.receptionist_id,
       obj?.vet_registerations_temp_id,
       obj?.vet_registration_temp_id,
       obj?.vet_registeration_id,

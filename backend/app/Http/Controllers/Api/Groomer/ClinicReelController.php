@@ -24,7 +24,7 @@ class ClinicReelController extends Controller
             ?? data_get(session('user'), 'role')
             ?? data_get(session('auth_full'), 'role');
 
-        if ($role === 'doctor') {
+        if (in_array($role, ['doctor', 'receptionist'], true)) {
             $clinicId = session('clinic_id')
                 ?? session('vet_registerations_temp_id')
                 ?? session('vet_registeration_id')

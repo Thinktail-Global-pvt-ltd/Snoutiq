@@ -323,6 +323,8 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         $stepStatus = $progressService->getStatusForRequest($request);
         return view('groomer.services.index', compact('stepStatus'));
     })->name('groomer.services.index');
+    Route::view('/dashboard/staff', 'clinic.staff')->name('clinic.staff');
+    Route::view('/receptionist/bookings', 'receptionist.bookings')->name('receptionist.bookings');
 
     // Booking flow
     Route::view('/booking/clinics', 'booking.clinics')->name('booking.clinics');
