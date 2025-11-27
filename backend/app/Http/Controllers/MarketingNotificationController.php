@@ -70,6 +70,8 @@ class MarketingNotificationController extends Controller
         $primaryFiveMinuteSchedule = $activeSchedules->first();
         $serverNow = now();
 
+        $marketingTestToken = config('push.marketing_test_token');
+
         return view('marketing.notifications', [
             'activeSchedules' => $activeSchedules,
             'recentRuns' => $recentRuns,
@@ -80,6 +82,7 @@ class MarketingNotificationController extends Controller
             'highlightToken' => $highlightToken,
             'primaryFiveMinuteSchedule' => $primaryFiveMinuteSchedule,
             'serverNowIso' => $serverNow->toIso8601String(),
+            'marketingTestToken' => $marketingTestToken,
         ]);
     }
 

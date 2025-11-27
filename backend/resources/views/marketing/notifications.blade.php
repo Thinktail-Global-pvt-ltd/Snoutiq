@@ -303,6 +303,17 @@
             @endif
         </div>
 
+        @if($marketingTestToken)
+            <div class="token-debug-box highlight-token">
+                <strong>🎯 Marketing test token override active</strong>
+                <p class="timer-meta" style="margin-top: 6px;">
+                    All marketing pushes (including the 5-minute schedule) will only target this token until you remove
+                    <code>PUSH_MARKETING_TEST_TOKEN</code> from your environment.
+                </p>
+                <code title="{{ $marketingTestToken }}">{{ \Illuminate\Support\Str::limit($marketingTestToken, 220) }}</code>
+            </div>
+        @endif
+
         @if($highlightToken)
             <div class="token-debug-box highlight-token">
                 <strong>🎯 Primary target token for debugging</strong>
@@ -324,6 +335,14 @@
                         · created {{ $highlightToken->created_at?->diffForHumans() }}
                     @endif
                 </span>
+            </div>
+        @elseif($marketingTestToken)
+            <div class="token-debug-box highlight-token">
+                <strong>🎯 Primary target token for debugging</strong>
+                <p class="timer-meta" style="margin-top: 6px;">
+                    Override token is not stored in the database, but pushes are still forced to it for testing.
+                </p>
+                <code title="{{ $marketingTestToken }}">{{ \Illuminate\Support\Str::limit($marketingTestToken, 200) }}</code>
             </div>
         @endif
 

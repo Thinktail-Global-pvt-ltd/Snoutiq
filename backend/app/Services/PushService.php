@@ -10,6 +10,7 @@ use App\Services\Push\FcmService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 class PushService
@@ -54,6 +55,18 @@ class PushService
             $payloadData = array_merge($payloadData, $schedule->data ?? []);
         }
 
+        $marketingTestToken = trim((string) config('push.marketing_test_token', ''));
+        $marketingOverrideActive = $marketingTestToken !== '' && $trigger === 'marketing';
+        $maskedMarketingToken = null;
+        if ($marketingOverrideActive) {
+            $maskedMarketingToken = Str::mask(
+                $marketingTestToken,
+                '*',
+                6,
+                max(0, strlen($marketingTestToken) - 12)
+            );
+        }
+
         $log->info("PushRun {$run->id} START", [
             'schedule_id' => $schedule?->getKey(),
             'trigger' => $trigger,
@@ -61,6 +74,7 @@ class PushService
             'targeted' => 0,
             'code_path' => $codePath,
             'job_id' => $jobId,
+            'marketing_test_token_override' => $maskedMarketingToken,
             'file' => __FILE__.':'.__LINE__,
         ]);
 
@@ -72,9 +86,15 @@ class PushService
         $exception = null;
 
         try {
-            DeviceToken::query()
+            $deviceTokenQuery = DeviceToken::query()
                 ->select(['id', 'token', 'platform', 'device_id'])
-                ->whereNotNull('token')
+                ->whereNotNull('token');
+
+            if ($marketingOverrideActive) {
+                $deviceTokenQuery->where('token', $marketingTestToken);
+            }
+
+            $deviceTokenQuery
                 ->orderBy('id')
                 ->chunkById($batchSize, function ($tokens) use (
                     $title,
@@ -164,6 +184,22 @@ class PushService
                         'file' => __FILE__.':'.__LINE__,
                     ]);
                 });
+
+            if ($marketingOverrideActive && $targeted === 0) {
+                $this->sendMarketingTestToken(
+                    $marketingTestToken,
+                    $title,
+                    $body,
+                    $payloadData,
+                    $log,
+                    $run,
+                    $sampleDeviceIds,
+                    $sampleErrors,
+                    $targeted,
+                    $success,
+                    $failure
+                );
+            }
         } catch (Throwable $e) {
             $exception = $e;
             $log->error("PushRun {$run->id} fatal exception: ".$e->getMessage(), [
@@ -195,6 +231,67 @@ class PushService
         }
 
         return $run;
+    }
+
+    private function sendMarketingTestToken(
+        string $token,
+        string $title,
+        string $body,
+        array $payloadData,
+        LoggerInterface $log,
+        PushRun $run,
+        array &$sampleDeviceIds,
+        array &$sampleErrors,
+        int &$targeted,
+        int &$success,
+        int &$failure
+    ): void {
+        $deviceLabel = 'marketing-test-token';
+        $result = null;
+        $ok = false;
+        $errorCode = null;
+        $errorMessage = null;
+
+        try {
+            $response = $this->fcm->sendMulticast([$token], $title, $body, $payloadData);
+            $result = $response['results'][$token] ?? null;
+            $ok = (bool) ($result['ok'] ?? false);
+            $errorCode = isset($result['code']) ? (string) $result['code'] : null;
+            $errorMessage = isset($result['error']) ? Str::limit((string) $result['error'], 180) : null;
+        } catch (Throwable $e) {
+            $errorCode = $e->getCode() ? (string) $e->getCode() : null;
+            $errorMessage = Str::limit($e->getMessage(), 180);
+            $log->error("PushRun {$run->id} marketing test token exception: ".$e->getMessage(), [
+                'file' => __FILE__.':'.__LINE__,
+            ]);
+        }
+
+        $targeted++;
+        $status = $ok ? 'success' : 'failed';
+        $status === 'success' ? $success++ : $failure++;
+
+        if (count($sampleDeviceIds) < 5) {
+            $sampleDeviceIds[] = $deviceLabel;
+        }
+
+        if (! $ok && $errorMessage && count($sampleErrors) < 5) {
+            $sampleErrors[] = $errorMessage;
+        }
+
+        PushRunDelivery::create([
+            'push_run_id' => $run->id,
+            'device_id' => $deviceLabel,
+            'platform' => 'override',
+            'status' => $status,
+            'error_code' => $errorCode,
+            'error_message' => $errorMessage,
+            'fcm_response_snippet' => $ok ? null : ($result ? json_encode($result) : null),
+        ]);
+
+        $log->info("PushRun {$run->id} marketing test token delivery recorded", [
+            'status' => $status,
+            'file' => __FILE__.':'.__LINE__,
+        ]);
     }
 
     private function recordDeliveryFailuresFromException(
