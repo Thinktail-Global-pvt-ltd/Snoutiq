@@ -19,6 +19,7 @@ use App\Http\Controllers\VideoScheduleTestPageController;
 use App\Http\Controllers\EmergencyHoursPageController;
 use App\Http\Controllers\Api\ClinicEmergencyHoursController;
 use App\Http\Controllers\VetDocumentsPageController;
+use App\Http\Controllers\Dev\FcmMonitorController;
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Controllers\Admin\ClinicDataReportController;
@@ -101,6 +102,8 @@ Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
 
 // Developer utilities
 Route::view('/dev/fcm-test', 'fcm.test')->name('dev.fcm-test');
+Route::get('/dev/fcm-monitor', [FcmMonitorController::class, 'index'])->name('dev.fcm-monitor');
+Route::get('/dev/fcm-monitor/status', [FcmMonitorController::class, 'status'])->name('dev.fcm-monitor.status');
 Route::get('/dev/api-documentation', function () {
     $docPath = resource_path('docs/api_documentation.md');
 
