@@ -123,6 +123,50 @@
             margin: 0;
             color: #1e40af;
         }
+        .token-debug-box {
+            margin-top: 20px;
+            border: 1px dashed #cbd5f5;
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 14px 16px;
+        }
+        .token-debug-box strong {
+            color: #0f172a;
+        }
+        .token-debug-list {
+            margin: 12px 0 0;
+            padding-left: 18px;
+            list-style: decimal;
+            max-height: 230px;
+            overflow-y: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 13px;
+        }
+        .token-debug-list li {
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+        .token-debug-meta {
+            display: block;
+            margin-top: 2px;
+            color: #475569;
+            font-size: 12px;
+        }
+        .timer-display {
+            font-size: 28px;
+            font-weight: 600;
+            color: #0f172a;
+            letter-spacing: 2px;
+        }
+        .timer-meta {
+            margin-top: 8px;
+            color: #475569;
+            font-size: 13px;
+        }
+        .highlight-token {
+            background: #fef2f2;
+            border-left-color: #dc2626;
+        }
     </style>
 </head>
 <body>
@@ -234,6 +278,87 @@
         <div class="button-group">
             <button type="submit" class="secondary">Schedule Every 5 Minutes</button>
         </div>
+
+        <div class="token-debug-box" style="margin-top: 18px;">
+            <strong>⏱ Next Automated Run</strong>
+            @if($primaryFiveMinuteSchedule)
+                @php
+                    $nextRunAt = $primaryFiveMinuteSchedule->next_run_at;
+                    $lastRunAt = $primaryFiveMinuteSchedule->last_run_at;
+                @endphp
+                <p class="timer-meta" style="margin-top: 6px;">
+                    Scheduled for: {{ $nextRunAt ? $nextRunAt->format('Y-m-d H:i:s') : 'Not yet scheduled' }} (server time)
+                </p>
+                <div class="timer-display" id="five-minute-timer"
+                    data-next-run="{{ $nextRunAt ? $nextRunAt->toIso8601String() : '' }}"
+                    data-server-now="{{ $serverNowIso }}">
+                    {{ $nextRunAt ? 'calculating…' : 'No schedule' }}
+                </div>
+                <p class="timer-meta">
+                    Last run: {{ $lastRunAt ? $lastRunAt->diffForHumans() : 'Never' }}<br>
+                    Ensure <code style="background: #e2e8f0; padding: 2px 4px; border-radius: 4px;">php artisan queue:work</code> is running so the job can execute.
+                </p>
+            @else
+                <p class="timer-meta" style="margin-top: 6px;">No active 5-minute schedule detected. Create one using the form above to enable the timer.</p>
+            @endif
+        </div>
+
+        @if($highlightToken)
+            <div class="token-debug-box highlight-token">
+                <strong>🎯 Primary target token for debugging</strong>
+                <p class="timer-meta" style="margin-top: 6px;">
+                    This is the first token in the marketing queue. Use it when you want to verify an actual device receives the push.
+                </p>
+                <code title="{{ $highlightToken->token }}">{{ \Illuminate\Support\Str::limit($highlightToken->token, 180) }}</code>
+                <span class="token-debug-meta">
+                    {{ $highlightToken->platform ?? 'unknown platform' }}
+                    · {{ $highlightToken->device_id ?? 'device-'.$highlightToken->id }}
+                    @if($highlightToken->user)
+                        · {{ $highlightToken->user->name ?? 'User #'.$highlightToken->user_id }}
+                    @elseif($highlightToken->user_id)
+                        · User #{{ $highlightToken->user_id }}
+                    @endif
+                    @if($highlightToken->last_seen_at)
+                        · last seen {{ $highlightToken->last_seen_at->diffForHumans() }}
+                    @else
+                        · created {{ $highlightToken->created_at?->diffForHumans() }}
+                    @endif
+                </span>
+            </div>
+        @endif
+
+        <div class="token-debug-box">
+            <strong>FCM tokens targeted by this schedule (testing helper)</strong>
+            <p style="color: #475569; margin: 6px 0 12px;">
+                Showing {{ $tokenPreview->count() }} of {{ $tokenPreviewCount }} stored tokens (limit {{ $tokenPreviewLimit }}). These are the device tokens the automated job will cycle through every time it runs.
+            </p>
+
+            @if($tokenPreviewCount === 0)
+                <p style="color: #b45309; margin: 0;">No FCM tokens were found. Ask a user to open the app so their device registers a token.</p>
+            @else
+                <ul class="token-debug-list">
+                    @foreach($tokenPreview as $token)
+                        <li>
+                            <code title="{{ $token->token }}">{{ \Illuminate\Support\Str::limit($token->token, 120) }}</code>
+                            <span class="token-debug-meta">
+                                {{ $token->platform ?? 'unknown platform' }}
+                                · {{ $token->device_id ?? 'device-'.$token->id }}
+                                @if($token->user)
+                                    · {{ $token->user->name ?? 'User #'.$token->user_id }}
+                                @elseif($token->user_id)
+                                    · User #{{ $token->user_id }}
+                                @endif
+                                @if($token->last_seen_at)
+                                    · last seen {{ $token->last_seen_at->diffForHumans() }}
+                                @else
+                                    · created {{ $token->created_at?->diffForHumans() }}
+                                @endif
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
     </form>
 
     <!-- Active Schedules -->
@@ -342,6 +467,49 @@
             </table>
         </div>
     @endif
+
+    <script>
+        (function () {
+            const timerEl = document.getElementById('five-minute-timer');
+            if (!timerEl) {
+                return;
+            }
+
+            const nextRunIso = timerEl.dataset.nextRun;
+            if (!nextRunIso || nextRunIso.length === 0) {
+                timerEl.textContent = 'No upcoming run scheduled';
+                return;
+            }
+
+            const serverNowIso = timerEl.dataset.serverNow;
+            const serverNow = serverNowIso ? new Date(serverNowIso) : new Date();
+            const clientNow = new Date();
+            const offsetMs = serverNow.getTime() - clientNow.getTime();
+            const nextRun = new Date(nextRunIso);
+            let intervalId = null;
+
+            function updateTimer() {
+                const current = new Date(Date.now() + offsetMs);
+                const diff = nextRun.getTime() - current.getTime();
+
+                if (diff <= 0) {
+                    timerEl.textContent = 'Any second now…';
+                    if (intervalId) {
+                        clearInterval(intervalId);
+                    }
+                    return;
+                }
+
+                const totalSeconds = Math.floor(diff / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+
+                timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            updateTimer();
+            intervalId = setInterval(updateTimer, 1000);
+        })();
+    </script>
 </body>
 </html>
-

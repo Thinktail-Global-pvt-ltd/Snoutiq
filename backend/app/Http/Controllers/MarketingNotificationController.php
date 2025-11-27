@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DeviceToken;
 use App\Models\ScheduledPushNotification;
 use App\Services\PushService;
 use App\Services\Push\FcmService;
@@ -51,10 +52,34 @@ class MarketingNotificationController extends Controller
             $firebaseStatus['is_valid_json'] = json_decode($content, true) !== null;
         }
 
+        $targetTokenSampleLimit = 25;
+        $tokenPreview = DeviceToken::query()
+            ->with(['user:id,name,email'])
+            ->select(['id', 'user_id', 'token', 'platform', 'device_id', 'last_seen_at', 'created_at'])
+            ->whereNotNull('token')
+            ->orderByDesc('last_seen_at')
+            ->orderByDesc('id')
+            ->limit($targetTokenSampleLimit)
+            ->get();
+
+        $tokenPreviewCount = DeviceToken::query()
+            ->whereNotNull('token')
+            ->count();
+
+        $highlightToken = $tokenPreview->first();
+        $primaryFiveMinuteSchedule = $activeSchedules->first();
+        $serverNow = now();
+
         return view('marketing.notifications', [
             'activeSchedules' => $activeSchedules,
             'recentRuns' => $recentRuns,
             'firebaseStatus' => $firebaseStatus,
+            'tokenPreview' => $tokenPreview,
+            'tokenPreviewCount' => $tokenPreviewCount,
+            'tokenPreviewLimit' => $targetTokenSampleLimit,
+            'highlightToken' => $highlightToken,
+            'primaryFiveMinuteSchedule' => $primaryFiveMinuteSchedule,
+            'serverNowIso' => $serverNow->toIso8601String(),
         ]);
     }
 
@@ -305,4 +330,3 @@ class MarketingNotificationController extends Controller
         $pending->delay(now()->addMinutes(5));
     }
 }
-
