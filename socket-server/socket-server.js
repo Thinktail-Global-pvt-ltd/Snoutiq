@@ -1,8 +1,8 @@
-import { createServer } from "http";
-import { Server } from "socket.io";
-import { existsSync, readFileSync } from "fs";
-import { dirname, join } from "path";
 import admin from "firebase-admin";
+import { existsSync, readFileSync } from "fs";
+import { createServer } from "http";
+import { dirname, join } from "path";
+import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import {
   getWhatsAppConfig,
@@ -14,8 +14,15 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const DEFAULT_SERVICE_ACCOUNT_FILE = "snoutiqapp-9cacc4ece358.json";
-const DEFAULT_RINGTONE =
-  process.env.CALL_NOTIFICATION_SOUND || "incoming_call";
+const DEFAULT_RINGTONE = (() => {
+  if (typeof process.env.CALL_NOTIFICATION_SOUND === "string") {
+    const trimmed = process.env.CALL_NOTIFICATION_SOUND.trim();
+    if (trimmed.length) {
+      return trimmed;
+    }
+  }
+  return "default";
+})();
 
 const resolveServiceAccountPath = () => {
   const candidates = [
@@ -171,12 +178,49 @@ const activeDoctors = new Map();
 //   patientSocketId, doctorSocketId,
 //   paymentId?, disconnectedAt?, ...
 // }
+const activeCallSessions = new Map();
 const activeCalls = new Map();
 const pendingCalls = new Map();
 
 // FCM Push Token Storage
 const doctorPushTokens = new Map();
 const sentCallNotifications = new Set();
+
+// -------------------- LOGGING HELPERS --------------------
+const logFlow = (stage, payload = {}) => {
+  const {
+    callId,
+    doctorId,
+    patientId,
+    channel,
+    role,
+    userId,
+    reason,
+    paymentId,
+    doctorSocketId,
+    patientSocketId,
+    socketId,
+    status,
+    extra,
+  } = payload;
+
+  const parts = [`[FLOW] ${stage}`];
+  if (callId !== undefined) parts.push(`callId=${callId}`);
+  if (doctorId !== undefined) parts.push(`doctorId=${doctorId}`);
+  if (patientId !== undefined) parts.push(`patientId=${patientId}`);
+  if (channel !== undefined) parts.push(`channel=${channel}`);
+  if (role !== undefined) parts.push(`role=${role}`);
+  if (userId !== undefined) parts.push(`userId=${userId}`);
+  if (paymentId !== undefined) parts.push(`paymentId=${paymentId}`);
+  if (doctorSocketId !== undefined) parts.push(`doctorSocketId=${doctorSocketId}`);
+  if (patientSocketId !== undefined) parts.push(`patientSocketId=${patientSocketId}`);
+  if (socketId !== undefined) parts.push(`socketId=${socketId}`);
+  if (status !== undefined) parts.push(`status=${status}`);
+  if (reason !== undefined) parts.push(`reason=${reason}`);
+  if (extra) parts.push(`extra=${extra}`);
+
+  console.log(parts.join(" | "));
+};
 
 // -------------------- NOTIFICATION HELPERS --------------------
 const getNotificationKey = (callId, doctorId) =>
@@ -1002,6 +1046,17 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
     callSession.doctorSocketId = socket.id;
     activeCalls.set(callId, callSession);
 
+    const { patientId, channel } = callSession;
+
+    logFlow("call-accepted", {
+      callId,
+      doctorId,
+      patientId,
+      channel,
+      doctorSocketId: socket.id,
+      status: callSession?.status,
+    });
+
     // re-emit anything relevant so doctor dashboard rings
     if (callSession.status === "requested") {
       io.to(roomName).emit("call-requested", {
@@ -1045,6 +1100,10 @@ io.on("connection", (socket) => {
   // ========== DOCTOR JOINS THEIR "ROOM" ==========
   socket.on("join-doctor", (doctorIdRaw) => {
     const doctorId = Number(doctorIdRaw);
+    if (!Number.isFinite(doctorId)) {
+      console.warn("Invalid doctorId for join-doctor:", doctorIdRaw);
+      return;
+    }
     const roomName = `doctor-${doctorId}`;
     socket.join(roomName);
 
@@ -1179,13 +1238,22 @@ io.on("connection", (socket) => {
 
   // ========== PATIENT STARTS CALL ==========
   // IMPORTANT: We DO NOT block if doctor is offline/busy.
-  socket.on("call-requested", ({ doctorId, patientId, channel }) => {
+  socket.on("call-requested", ({ doctorId, patientId, channel, callId: incomingCallId }) => {
     console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
 
-    // make a unique callId
-    const callId = `call_${Date.now()}_${Math.random()
-      .toString(36)
-      .substring(2, 8)}`;
+    const callId =
+      incomingCallId ||
+      `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+    if (activeCallSessions.has(callId)) {
+      console.log(`⚠️ Call ${callId} already exists, ignoring duplicate`);
+      socket.emit("call-status-update", {
+        callId,
+        status: "duplicate",
+        message: "Call already in progress",
+      });
+      return;
+    }
 
     const doctorEntry = activeDoctors.get(doctorId) || null;
     const connectionStatus = doctorEntry?.connectionStatus || "disconnected";
@@ -1207,6 +1275,16 @@ io.on("connection", (socket) => {
       doctorSocketId: doctorEntry?.socketId || null,
     };
 
+    logFlow("call-requested", {
+      callId,
+      doctorId,
+      patientId,
+      channel,
+      socketId: socket.id,
+      extra: `doctorConnected=${doctorConnected}, doctorBusy=${doctorBusy}`,
+    });
+
+    activeCallSessions.set(callId, callSession);
     activeCalls.set(callId, callSession);
 
     if (shouldQueue) {
@@ -1359,6 +1437,7 @@ io.on("connection", (socket) => {
     // cleanup that call after 30s
     setTimeout(() => {
       activeCalls.delete(callId);
+      activeCallSessions.delete(callId);
       emitAvailableDoctors();
       console.log(`🗑️ Cleaned up rejected call ${callId}`);
     }, 30_000);
@@ -1380,6 +1459,15 @@ io.on("connection", (socket) => {
     callSession.paidAt = new Date();
     if (channel) callSession.channel = channel;
     activeCalls.set(callId, callSession);
+
+    logFlow("payment-completed", {
+      callId,
+      doctorId,
+      patientId,
+      channel: callSession.channel,
+      paymentId,
+      patientSocketId: socket.id,
+    });
 
     // tell patient: you're good, here's your join link (audience role)
     socket.emit("payment-verified", {
@@ -1445,6 +1533,15 @@ io.on("connection", (socket) => {
       activeCalls.set(callId, call);
     }
 
+    logFlow("call-started", {
+      callId,
+      userId,
+      role,
+      doctorId: call?.doctorId,
+      patientId: call?.patientId,
+      channel: call?.channel,
+    });
+
     emitAvailableDoctors();
   });
 
@@ -1464,6 +1561,18 @@ io.on("connection", (socket) => {
 
         const isDoctorEnding = role === "host";
         const isPatientEnding = role === "audience";
+
+        logFlow("call-ended", {
+          callId,
+          doctorId: doctorId ?? callSession.doctorId,
+          patientId: patientId ?? callSession.patientId,
+          channel: channel ?? callSession.channel,
+          userId,
+          role,
+          reason: "ended",
+          doctorSocketId: callSession.doctorSocketId,
+          patientSocketId: callSession.patientSocketId,
+        });
 
         // notify the other party directly if we know their socket
         if (isDoctorEnding && callSession.patientSocketId) {
@@ -1535,6 +1644,7 @@ io.on("connection", (socket) => {
       // cleanup call memory shortly after
       setTimeout(() => {
         activeCalls.delete(callId);
+        activeCallSessions.delete(callId);
         emitAvailableDoctors();
         console.log(`🗑️ Cleaned up ended call ${callId}`);
       }, 10_000);
@@ -1619,6 +1729,20 @@ io.on("connection", (socket) => {
         callSession.disconnectedAt = new Date();
         callSession.disconnectedBy = isDoctor ? "doctor" : "patient";
 
+        logFlow("socket-disconnect", {
+          callId,
+          doctorId: callSession.doctorId,
+          patientId: callSession.patientId,
+          channel: callSession.channel,
+          userId: isDoctor ? callSession.doctorId : callSession.patientId,
+          role: isDoctor ? "doctor" : "patient",
+          reason: "disconnect",
+          doctorSocketId: callSession.doctorSocketId,
+          patientSocketId: callSession.patientSocketId,
+          status: callSession.status,
+          socketId: socket.id,
+        });
+
         if (wasCallActive) {
           const otherSocketId = isDoctor
             ? callSession.patientSocketId
@@ -1638,6 +1762,20 @@ io.on("connection", (socket) => {
                 isDoctor ? "patient" : "doctor"
               } (socket: ${otherSocketId})`
             );
+
+            // Force the counterpart socket to disconnect from server to keep both sides in sync
+            const otherSocket = io.sockets.sockets.get(otherSocketId);
+            if (otherSocket) {
+              otherSocket.disconnect(true);
+              logFlow("force-disconnect-counterpart", {
+                callId,
+                doctorId: callSession.doctorId,
+                patientId: callSession.patientId,
+                channel: callSession.channel,
+                socketId: otherSocketId,
+                reason: "peer_disconnected",
+              });
+            }
           }
 
           // backup notify via rooms

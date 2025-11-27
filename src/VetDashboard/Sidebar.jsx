@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { AuthContext } from "../auth/AuthContext";
-import RingtonePopup from '../pages/RingtonePopup';
-// Heroicons (outline set)
+import RingtonePopup from "../pages/RingtonePopup";
 import {
   Bars3Icon,
   XMarkIcon,
@@ -13,11 +12,72 @@ import {
   CalendarIcon,
   CogIcon,
   HeartIcon,
-  UserGroupIcon,
-  ExclamationTriangleIcon,
   StarIcon,
 } from "@heroicons/react/24/outline";
-import { socket } from '../pages/socket';
+import logo from "../assets/images/dark bg.webp";
+import {
+  LayoutDashboard,
+  UserCircle,
+  Receipt,
+  Star,
+  Calendar,
+  AlertTriangle,
+  Users,
+  FileStack,
+  Video,
+  Bot,
+  CreditCard,
+  BadgeCheck,
+  QrCode,
+  UserCog,
+  History,
+  ClipboardList,
+  Stethoscope,
+  FileText,
+  HeartPulse,
+} from "lucide-react";
+
+import { socket } from "../pages/socket";
+
+/* =======================
+   Clinic Info Card (Sidebar Top)
+   ======================= */
+
+const ClinicInfoCard = ({ user, onManageProfile }) => {
+  if (!user) return null;
+
+  const displayName = user.name || "Demo Clinic";
+  const email = user.email || "test@gmail.com";
+  const idLabel = user.clinic_id || user.id || "--";
+  const roleLabel = (user.role || "clinic_admin")
+    .replace("_", " ")
+    .toUpperCase();
+
+  return (
+    <div className="mb-6 px-2">
+      <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 p-4 shadow-lg border border-indigo-300/40">
+        <div className="text-sm font-semibold text-white truncate">
+          {displayName}
+        </div>
+        <div className="text-[11px] text-indigo-100 truncate">{email}</div>
+
+        <div className="mt-3 flex items-center justify-between text-[11px] text-indigo-100/90">
+          <span className="px-2 py-0.5 rounded-full bg-indigo-800/80 border border-indigo-300/60">
+            ID {idLabel}
+          </span>
+          <span className="uppercase tracking-wide">ROLE · {roleLabel}</span>
+        </div>
+
+        <button
+          onClick={onManageProfile}
+          className="mt-4 w-full rounded-xl bg-white/95 text-indigo-700 text-xs font-semibold py-2 hover:bg-white transition-colors"
+        >
+          Manage Profile
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const HeaderWithSidebar = ({ children }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -33,41 +93,31 @@ const HeaderWithSidebar = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useContext(AuthContext);
-  const hasListeners = useRef(false);
   const hasSetUpListeners = useRef(false);
-  
-  const doctorId = user.id
-  // console.log(doctorId,"ankit234");
-  // console.log(user,"ankitere");
-  
-  
 
-  
+  const doctorId = user?.id;
 
-  // Add debug log function
   const addDebugLog = (message) => {
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = `${timestamp}: ${message}`;
-    // console.log(logEntry);
-    setDebugLogs(prev => [...prev.slice(-9), logEntry]); // Keep last 10 logs
+    setDebugLogs((prev) => [...prev.slice(-9), logEntry]);
   };
 
-  // Join doctor room function
   const joinDoctorRoom = () => {
-    // Prevent multiple join attempts if already online
     if (isOnline) {
       addDebugLog(`⚠️ Already online, skipping join-doctor`);
       return;
     }
-    
+
     addDebugLog(`🏥 Emitting join-doctor event for ID: ${doctorId}`);
     setConnectionStatus("joining");
     socket.emit("join-doctor", doctorId);
-    
-    // Set a timeout to detect if we don't receive doctor-online event
+
     setTimeout(() => {
       if (!isOnline && socket.connected) {
-        addDebugLog(`⚠️ TIMEOUT: No doctor-online event received after 3 seconds`);
+        addDebugLog(
+          `⚠️ TIMEOUT: No doctor-online event received after 3 seconds`
+        );
         addDebugLog(`🔄 Retrying join-doctor...`);
         socket.emit("join-doctor", doctorId);
       }
@@ -77,20 +127,19 @@ const HeaderWithSidebar = ({ children }) => {
   useEffect(() => {
     const savedLive = localStorage.getItem("doctorLive");
     if (savedLive === "true") goLive();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Connect doctor socket - Enhanced version
   const goLive = () => {
     addDebugLog(`🟢 Going live - Doctor ID: ${doctorId}`);
-    
+
     if (!socket.connected) {
       addDebugLog("🔌 Socket not connected, connecting...");
       socket.connect();
     }
-    
-    // Join doctor room
+
     joinDoctorRoom();
-    
+
     setIsLive(true);
     localStorage.setItem("doctorLive", "true");
     addDebugLog("✅ Doctor is now live");
@@ -98,13 +147,13 @@ const HeaderWithSidebar = ({ children }) => {
 
   const goOffline = () => {
     addDebugLog(`⚪ Going offline - Doctor ID: ${doctorId}`);
-    
+
     socket.emit("leave-doctor", doctorId);
-    
+
     if (socket.connected) {
       socket.disconnect();
     }
-    
+
     setIsLive(false);
     setIsOnline(false);
     setIncomingCall(null);
@@ -114,21 +163,17 @@ const HeaderWithSidebar = ({ children }) => {
     addDebugLog("⚪ Doctor is offline");
   };
 
-  // Toggle live status button
   const handleToggle = () => (isLive ? goOffline() : goLive());
 
-  // Enhanced Socket listeners setup
   useEffect(() => {
-    // Prevent duplicate listener setup
     if (hasSetUpListeners.current) {
       addDebugLog("⚠️ Listeners already set up, skipping");
       return;
     }
-    
+
     hasSetUpListeners.current = true;
     addDebugLog(`🏥 Setting up socket listeners for doctorId: ${doctorId}`);
 
-    // Check if socket is already connected
     if (socket.connected) {
       addDebugLog("✅ Socket already connected, joining doctor room");
       setConnectionStatus("connected");
@@ -140,12 +185,10 @@ const HeaderWithSidebar = ({ children }) => {
       setConnectionStatus("connecting");
     }
 
-    // Socket connection events
     const handleConnect = () => {
       addDebugLog("✅ Socket connected successfully");
       setConnectionStatus("connected");
-      
-      // Auto-rejoin if we were live before
+
       if (localStorage.getItem("doctorLive") === "true") {
         addDebugLog("🔄 Auto-rejoining doctor room after reconnection");
         joinDoctorRoom();
@@ -163,7 +206,6 @@ const HeaderWithSidebar = ({ children }) => {
       setConnectionStatus("error");
     };
 
-    // Doctor-specific events
     const handleDoctorOnline = (data) => {
       addDebugLog(`👨‍⚕️ Doctor online event received: ${JSON.stringify(data)}`);
       if (data.doctorId === doctorId) {
@@ -181,46 +223,43 @@ const HeaderWithSidebar = ({ children }) => {
       }
     };
 
-    // In HeaderWithSidebar component, update the handleCallRequested function:
-const handleCallRequested = (callData) => {
-  addDebugLog(`📞 Incoming call received: ${JSON.stringify(callData)}`);
-  
-  // Create call object for RingtonePopup - FIX patientId mapping
-  const incomingCallData = {
-    id: callData.callId,
-    patientId: callData.patientId, // ✅ This was missing
-    channel: callData.channel,
-    timestamp: Date.now(),
-    doctorId,
-  };
+    const handleCallRequested = (callData) => {
+      addDebugLog(`📞 Incoming call received: ${JSON.stringify(callData)}`);
 
-  setIncomingCall(incomingCallData);
-  
-  setIncomingCalls(prev => {
-    const exists = prev.some(call => call.id === callData.callId);
-    if (exists) {
-      addDebugLog(`⚠️ Duplicate call ignored: ${callData.callId}`);
-      return prev;
-    }
-    
-    return [...prev, { ...callData, id: callData.callId }];
-  });
-};
+      const incomingCallData = {
+        id: callData.callId,
+        patientId: callData.patientId,
+        channel: callData.channel,
+        timestamp: Date.now(),
+        doctorId,
+      };
 
-    // Error handling events
+      setIncomingCall(incomingCallData);
+
+      setIncomingCalls((prev) => {
+        const exists = prev.some((call) => call.id === callData.callId);
+        if (exists) {
+          addDebugLog(`⚠️ Duplicate call ignored: ${callData.callId}`);
+          return prev;
+        }
+
+        return [...prev, { ...callData, id: callData.callId }];
+      });
+    };
+
     const handleJoinError = (error) => {
       addDebugLog(`❌ Error joining doctor room: ${error.message}`);
       setConnectionStatus("error");
     };
 
-    // Generic event listener to catch ALL events for debugging
     const handleAnyEvent = (eventName, ...args) => {
-      if (eventName !== 'ping' && eventName !== 'pong') {
-        addDebugLog(`📡 Event received: ${eventName} - ${JSON.stringify(args)}`);
+      if (eventName !== "ping" && eventName !== "pong") {
+        addDebugLog(
+          `📡 Event received: ${eventName} - ${JSON.stringify(args)}`
+        );
       }
     };
 
-    // Add event listeners
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("connect_error", handleConnectError);
@@ -228,21 +267,17 @@ const handleCallRequested = (callData) => {
     socket.on("doctor-offline", handleDoctorOffline);
     socket.on("call-requested", handleCallRequested);
     socket.on("join-error", handleJoinError);
-
-    // Listen to ALL socket events for debugging
     socket.onAny(handleAnyEvent);
 
-    // Test server communication
     addDebugLog("🧪 Testing server communication...");
     socket.emit("get-server-status");
     socket.on("server-status", (status) => {
       addDebugLog(`📊 Server status received: ${JSON.stringify(status)}`);
     });
 
-    // Cleanup function
     return () => {
       addDebugLog("🧹 Cleaning up socket listeners");
-      
+
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("connect_error", handleConnectError);
@@ -252,30 +287,27 @@ const handleCallRequested = (callData) => {
       socket.off("join-error", handleJoinError);
       socket.off("server-status");
       socket.offAny(handleAnyEvent);
-      
+
       if (socket.connected && isLive) {
         addDebugLog(`🚪 Emitting leave-doctor for ID: ${doctorId}`);
         socket.emit("leave-doctor", doctorId);
       }
-      
+
       setIsOnline(false);
       setConnectionStatus("disconnected");
       hasSetUpListeners.current = false;
     };
-  }, [doctorId, isLive]); // Added isLive to dependencies
+  }, [doctorId, isLive]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle call actions from RingtonePopup
   const handleCallClose = () => {
     addDebugLog("🔕 Closing incoming call popup");
     setIncomingCall(null);
-    
-    // Also remove from calls list
+
     if (incomingCall) {
-      setIncomingCalls(prev => prev.filter(c => c.id !== incomingCall.id));
+      setIncomingCalls((prev) => prev.filter((c) => c.id !== incomingCall.id));
     }
   };
 
-  // Manual rejoin function for debugging
   const manualRejoin = () => {
     addDebugLog("🔄 Manual rejoin triggered");
     setIsOnline(false);
@@ -283,20 +315,12 @@ const handleCallRequested = (callData) => {
     socket.emit("join-doctor", doctorId);
   };
 
-  // Test server communication
   const testServerCommunication = () => {
     addDebugLog("🧪 Testing server communication manually");
     socket.emit("ping", { doctorId, timestamp: Date.now() });
     socket.once("pong", (data) => {
       addDebugLog(`🏓 Pong received: ${JSON.stringify(data)}`);
     });
-  };
-
-  // Get status color and text for UI
-  const getStatusColor = () => {
-    if (isOnline) return "#16a34a"; // green
-    if (connectionStatus === "connecting" || connectionStatus === "joining" || connectionStatus === "rejoining") return "#f59e0b"; // yellow
-    return "#dc2626"; // red
   };
 
   const getStatusText = () => {
@@ -308,7 +332,8 @@ const handleCallRequested = (callData) => {
     return "🔴 OFFLINE";
   };
 
-  // ✅ Navigation config with correct heroicons
+  // ========== NAV CONFIG ==========
+
   const navConfig = {
     common1: [
       {
@@ -353,182 +378,130 @@ const handleCallRequested = (callData) => {
             icon: <HeartIcon className="w-5 h-5" />,
             path: "/user-dashboard/health-records",
           },
-          // {
-          //   text: "Daily Care",
-          //   icon: <HeartIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/pet-daily-care",
-          // },
-          // {
-          //   text: "My Bookings",
-          //   icon: <CalendarIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/my-bookings",
-          // },
-          // {
-          //   text: "History",
-          //   icon: <UserGroupIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/history",
-          // },
-          // {
-          //   text: "Vaccinations",
-          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/vaccination-tracker",
-          // },
-          // {
-          //   text: "Medication Tracker",
-          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/medical-tracker",
-          // },
-          // {
-          //   text: "Weight Monitoring",
-          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/weight-monitoring",
-          // },
-          // {
-          //   text: "Vet Visits",
-          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/vet-visits",
-          // },
-          // {
-          //   text: "Photo Timeline",
-          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/photo-timeline",
-          // },
-          // {
-          //   text: "Emergency Contacts",
-          //   icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/emergency-contacts",
-          // },
         ],
       },
     ],
-  vet: [
-  {
-    category: "Overview",
-    items: [
+    vet: [
       {
-        text: "Dashboard",
-        icon: <HomeIcon className="w-5 h-5" />,
-        path: "/user-dashboard/vet-dashboard",
+        category: "Overview",
+        items: [
+          {
+            text: "Dashboard",
+            icon: <LayoutDashboard className="w-5 h-5" />,
+            path: "/user-dashboard/vet-dashboard",
+          },
+          {
+            text: "Profile",
+            icon: <UserCircle className="w-5 h-5" />,
+            path: "/user-dashboard/Doctor-Profile",
+          },
+          {
+            text: "Order History",
+            icon: <History className="w-5 h-5" />,
+            path: "/user-dashboard/order-history",
+          },
+        ],
       },
       {
-        text: "Profile",
-        icon: <UserIcon className="w-5 h-5" />,
-        path: "/user-dashboard/Doctor-Profile",
+        category: "Clinic Management",
+        items: [
+          {
+            text: "Services",
+            icon: <Star className="w-5 h-5" />,
+            path: "/user-dashboard/vet-services",
+          },
+          {
+            text: "Clinic Hours",
+            icon: <Calendar className="w-5 h-5" />,
+            path: "/user-dashboard/vet-clinic-hours",
+          },
+          {
+            text: "Emergency Hours",
+            icon: <AlertTriangle className="w-5 h-5" />,
+            path: "/user-dashboard/doctor-emergency-hours",
+          },
+          {
+            text: "Doctors",
+            icon: <Users className="w-5 h-5" />,
+            path: "/user-dashboard/Total-Doctors",
+          },
+          {
+            text: "Doctor Documents",
+            icon: <FileStack className="w-5 h-5" />,
+            path: "/user-dashboard/Doctor-Documents",
+          },
+        ],
       },
       {
-        text: "Order History",
-        icon: <ArrowRightOnRectangleIcon className="w-5 h-5" />,
-        path: "/user-dashboard/order-history",
+        category: "Appointments & Records",
+        items: [
+          {
+            text: "Booking Requests",
+            icon: <ClipboardList className="w-5 h-5" />,
+            path: "/user-dashboard/booking-payments",
+          },
+          {
+            text: "Appointments",
+            icon: <Stethoscope className="w-5 h-5" />,
+            path: "/user-dashboard/appointment",
+          },
+          {
+            text: "Follow Up",
+            icon: <FileText className="w-5 h-5" />,
+            path: "/user-dashboard/doctor-follow-up",
+          },
+          {
+            text: "Patient Records",
+            icon: <HeartPulse className="w-5 h-5" />,
+            path: "/user-dashboard/patient-records",
+          },
+        ],
+      },
+      {
+        category: "Communication",
+        items: [
+          {
+            text: "Video Calling Schedule",
+            icon: <Video className="w-5 h-5" />,
+            path: "/user-dashboard/vet-videocalling-schedule",
+          },
+          {
+            text: "AI Assistant",
+            icon: <Bot className="w-5 h-5" />,
+            path: "/user-dashboard/AIAssistantView",
+          },
+        ],
+      },
+      {
+        category: "Finance",
+        items: [
+          {
+            text: "Payment",
+            icon: <CreditCard className="w-5 h-5" />,
+            path: "/user-dashboard/vet-payment",
+          },
+          {
+            text: "Clinic KYC",
+            icon: <BadgeCheck className="w-5 h-5" />,
+            path: "/user-dashboard/clinic-kyc",
+          },
+          {
+            text: "QR Code Branding",
+            icon: <QrCode className="w-5 h-5" />,
+            path: "/user-dashboard/Qr-Code-Branding",
+          },
+          {
+            text: "Staff Management",
+            icon: <UserCog className="w-5 h-5" />,
+            path: "/user-dashboard/staff-management",
+          },
+        ],
       },
     ],
-  },
-
-  {
-    category: "Clinic Management",
-    items: [
-      {
-        text: "Services",
-        icon: <StarIcon className="w-5 h-5" />,
-        path: "/user-dashboard/vet-services",
-      },
-      {
-        text: "Clinic Hours",
-        icon: <CalendarIcon className="w-5 h-5" />,
-        path: "/user-dashboard/vet-clinic-hours",
-      },
-      {
-        text: "Emergency Hours",
-        icon: <ExclamationTriangleIcon className="w-5 h-5" />,
-        path: "/user-dashboard/doctor-emergency-hours",
-      },
-      {
-        text: "Doctors",
-        icon: <UserGroupIcon className="w-5 h-5" />,
-        path: "/user-dashboard/Total-Doctors",
-      },
-      {
-        text: "Doctor Documents",
-        icon: <Bars3Icon className="w-5 h-5" />,
-        path: "/user-dashboard/Doctor-Documents",
-      },
-    ],
-  },
-
-  {
-    category: "Appointments & Records",
-    items: [
-      {
-        text: "Booking Requests",
-        icon: <CalendarIcon className="w-5 h-5" />,
-        path: "/user-dashboard/booking-payments",
-      },
-      {
-        text: "Appointments",
-        icon: <CalendarIcon className="w-5 h-5" />,
-        path: "/user-dashboard/appointment",
-      },
-      {
-        text: "Follow Up",
-        icon: <ArrowRightOnRectangleIcon className="w-5 h-5" />,
-        path: "/user-dashboard/doctor-follow-up",
-      },
-      {
-        text: "Patient Records",
-        icon: <Bars3Icon className="w-5 h-5" />,
-        path: "/user-dashboard/patient-records",
-      },
-    ],
-  },
-
-  {
-    category: "Communication",
-    items: [
-      {
-        text: "Video Calling Schedule",
-        icon: <VideoCameraIcon className="w-5 h-5" />,
-        path: "/user-dashboard/vet-videocalling-schedule",
-      },
-      {
-        text: "AI Assistant",
-        icon: <CogIcon className="w-5 h-5" />,
-        path: "/user-dashboard/AIAssistantView",
-      },
-    ],
-  },
-
-  {
-    category: "Finance",
-    items: [
-      {
-        text: "Payment",
-        icon: <HeartIcon className="w-5 h-5" />,
-        path: "/user-dashboard/vet-payment",
-      },
-        {
-        text: "Clinic KYC",
-        icon: <HeartIcon className="w-5 h-5" />,
-        path: "/user-dashboard/clinic-kyc",
-      },
-        {
-        text: "QR Code Branding",
-        icon: <HeartIcon className="w-5 h-5" />,
-        path: "/user-dashboard/Qr-Code-Branding",
-      },
-     
-    ],
-  },
-],
-
-
     common: [
       {
         category: "Account",
         items: [
-          // {
-          //   text: "Ratings & Reviews",
-          //   icon: <StarIcon className="w-5 h-5" />,
-          //   path: "/user-dashboard/rating-page",
-          // },
           {
             text: "Support",
             icon: <CogIcon className="w-5 h-5" />,
@@ -549,7 +522,6 @@ const handleCallRequested = (callData) => {
     ...(navConfig.common || []),
   ];
 
-  // set active nav item
   useEffect(() => {
     const currentPath = location.pathname;
     for (const category of mainNavItems) {
@@ -561,7 +533,6 @@ const handleCallRequested = (callData) => {
     }
   }, [location.pathname, mainNavItems]);
 
-  // toggle functions
   const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -576,10 +547,24 @@ const handleCallRequested = (callData) => {
     navigate(
       "/register?utm_source=facebook&utm_medium=paid_social&utm_campaign=pet_emergency_test1&utm_content=chat_conversion"
     );
+
   const handleLogout = () => {
     localStorage.clear();
     navigate("/");
     window.location.reload();
+  };
+
+  // card ka button
+  const handleManageProfile = () => {
+    if (!user) return;
+    if (user.role === "clinic_admin") {
+      navigate("/user-dashboard/Doctor-Profile");
+    } else if (user.role === "pet") {
+      navigate("/user-dashboard/pet-info");
+    } else {
+      navigate("/dashboard");
+    }
+    setIsSidebarOpen(false);
   };
 
   return (
@@ -592,11 +577,19 @@ const handleCallRequested = (callData) => {
               className="text-xl font-bold cursor-pointer"
               onClick={() => navigate(user ? "/dashboard" : "/")}
             >
-              SnoutIQ
+              <img src={logo} className="h-10 w-auto" />
             </div>
           </div>
 
           <nav className="flex-1 px-2 py-4 overflow-y-auto">
+            {/* ⭐ Clinic card at top of sidebar */}
+            {user?.role === "clinic_admin" && (
+              <ClinicInfoCard
+                user={user}
+                onManageProfile={handleManageProfile}
+              />
+            )}
+
             {mainNavItems.map((category, i) => (
               <div key={i} className="mb-6">
                 <h3 className="px-3 text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">
@@ -659,18 +652,21 @@ const handleCallRequested = (callData) => {
                       borderRadius: "6px",
                       border: "none",
                       cursor: "pointer",
-                      fontWeight: "bold"
+                      fontWeight: "bold",
                     }}
                   >
-                    {isOnline ? "🟢 Online" : isLive ? "🟡 Connecting..." : "⚪ Offline"}
+                    {isOnline
+                      ? "🟢 Online"
+                      : isLive
+                      ? "🟡 Connecting..."
+                      : "⚪ Offline"}
                   </button>
                   <VideoCameraIcon
                     className={`h-5 w-5 ${
                       isOnline ? "text-green-500" : "text-gray-400"
                     }`}
                   />
-                  
-                  {/* Show incoming calls count */}
+
                   {incomingCalls.length > 0 && (
                     <div className="bg-red-500 text-white text-xs rounded-full px-2 py-1 font-bold">
                       {incomingCalls.length} calls
@@ -679,25 +675,25 @@ const handleCallRequested = (callData) => {
                 </div>
               )}
 
-              {/* Debug Panel Toggle for Doctors */}
-              {user?.business_status && process.env.NODE_ENV === 'development' && (
-                <div className="flex space-x-2">
-                  <button 
-                    onClick={manualRejoin}
-                    className="px-2 py-1 text-xs bg-blue-500 text-white rounded"
-                    title="Manual Rejoin"
-                  >
-                    🔄
-                  </button>
-                  <button 
-                    onClick={testServerCommunication}
-                    className="px-2 py-1 text-xs bg-green-500 text-white rounded"
-                    title="Test Server"
-                  >
-                    🧪
-                  </button>
-                </div>
-              )}
+              {user?.business_status &&
+                process.env.NODE_ENV === "development" && (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={manualRejoin}
+                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded"
+                      title="Manual Rejoin"
+                    >
+                      🔄
+                    </button>
+                    <button
+                      onClick={testServerCommunication}
+                      className="px-2 py-1 text-xs bg-green-500 text-white rounded"
+                      title="Test Server"
+                    >
+                      🧪
+                    </button>
+                  </div>
+                )}
 
               {!user ? (
                 <div className="flex space-x-2">
@@ -764,49 +760,30 @@ const handleCallRequested = (callData) => {
                   {getStatusText()} - Ready to receive video calls
                 </p>
                 <p className="text-sm text-green-600">
-                  Socket ID: {socket.id || "Not connected"} | Status: {connectionStatus}
+                  Socket ID: {socket.id || "Not connected"} | Status:{" "}
+                  {connectionStatus}
                 </p>
               </div>
-              {/* Show connection details */}
               <div className="text-xs text-green-600">
                 Calls: {incomingCalls.length}
               </div>
             </div>
           )}
 
-          {/* Render the RingtonePopup when there's an incoming call */}
           {incomingCall && (
             <RingtonePopup
               call={incomingCall}
               doctorId={doctorId}
-              // onClose={handleCallClose}
-      //  patientId={incomingCall.patientId}
-      patientId={incomingCall?.patientId}
-       onClose={() => setIncomingCall(null)}
+              patientId={incomingCall?.patientId}
+              onClose={handleCallClose}
             />
           )}
-
-          {/* Debug Panel for Development */}
-          {/* {user?.business_status && process.env.NODE_ENV === 'development' && (
-            <div className="mb-6 p-4 bg-gray-100 rounded-lg text-xs">
-              <h4 className="font-bold mb-2">Debug Info:</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-                <div>Socket: {socket.connected ? "✅" : "❌"}</div>
-                <div>Online: {isOnline ? "✅" : "❌"}</div>
-                <div>Live: {isLive ? "✅" : "❌"}</div>
-                <div>Calls: {incomingCalls.length}</div>
-              </div>
-              <div className="max-h-20 overflow-y-auto bg-black text-green-400 p-2 rounded font-mono">
-                {debugLogs.slice(-3).map((log, i) => <div key={i}>{log}</div>)}
-              </div>
-            </div>
-          )} */}
 
           <div>{children}</div>
         </main>
       </div>
 
-      {/* Mobile Sidebar - keeping the original code */}
+      {/* Mobile Sidebar */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div
@@ -826,6 +803,14 @@ const handleCallRequested = (callData) => {
             </div>
 
             <nav className="flex-1 px-2 py-4 overflow-y-auto">
+              {/* ⭐ Mobile sidebar top card */}
+              {user?.role === "clinic_admin" && (
+                <ClinicInfoCard
+                  user={user}
+                  onManageProfile={handleManageProfile}
+                />
+              )}
+
               {mainNavItems.map((category, i) => (
                 <div key={i} className="mb-6">
                   <h3 className="px-3 text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">

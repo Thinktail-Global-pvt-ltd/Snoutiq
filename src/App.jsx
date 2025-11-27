@@ -526,6 +526,8 @@ import VetEmergencyHours from "./VetDashboard/VetEmergencyHours";
 import VetFollowUp from "./VetDashboard/VetFollowUp";
 import ClinicKyc from "./VetDashboard/ClinicKyc";
 import QrCodeBranding from "./VetDashboard/QrCodeBranding";
+import StaffManagement from "./VetDashboard/StaffManagement";
+import DoctorMobileApp from "./DoctorMobileApp";
 const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
@@ -976,6 +978,13 @@ function App() {
                   </HeaderWithSidebar>
                 </ProtectedRoute>
             }/>
+            <Route path="/user-dashboard/staff-management" element={
+                <ProtectedRoute>
+                  <HeaderWithSidebar>
+                    <StaffManagement />
+                  </HeaderWithSidebar>
+                </ProtectedRoute>
+            }/>
             <Route
               path="/doctor-testing"
               element={
@@ -1049,6 +1058,7 @@ function App() {
             <Route path="/video-consult" element={<VideoConsultPage />} />
             {/* <Route path="/ai-triage" element={<AITriagePage />} /> */}
             <Route path="*" element={<NotFoundPage />} />
+            <Route path="/doctor-mobile" element={<DoctorMobileApp/>}/>
 
           </Routes>
         </Suspense>
