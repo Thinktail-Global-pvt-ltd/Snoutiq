@@ -40,72 +40,20 @@ class SendFcmEvery10Seconds implements ShouldQueue, ShouldBeUnique
 
     public function handle(PushService $pushService): void
     {
-        $handler = static::class.'@handle';
-        $tracker = new QueryTracker();
-        $tracker->start();
-        $startedAt = microtime(true);
-        $run = null;
-        $jobId = $this->job?->getJobId();
-        $extra = [];
-
-        FounderAudit::info('run_now.start', [
-            'handler' => $handler,
-            'schedule_id' => $this->scheduleId,
-            'job_id' => $jobId,
-        ]);
-
-        $lock = null;
-        $lockAcquired = false;
-        $lockRejected = false;
-        $store = Cache::getStore();
-        if ($store instanceof LockProvider) {
-            $lock = Cache::lock('fcm10:lock:' . $this->scheduleId, 9);
-            if (! $lock->get()) {
-                $extra = ['skipped' => true, 'reason' => 'lock'];
-                $lockRejected = true; // another worker already handling this tick
-            } else {
-                $lockAcquired = true;
-            }
+        // DISABLED: 10-second notifications are no longer supported
+        // This job will immediately return without processing anything
+        // and will not dispatch itself again
+        
+        $schedule = S::find($this->scheduleId);
+        if ($schedule) {
+            // Deactivate the schedule to prevent it from being restarted
+            $schedule->is_active = false;
+            $schedule->next_run_at = null;
+            $schedule->save();
         }
-
-        try {
-            if ($lockRejected) {
-                return;
-            }
-
-            $schedule = S::find($this->scheduleId);
-            if (! $schedule || ! $schedule->is_active || $schedule->frequency !== S::FREQUENCY_TEN_SECONDS) {
-                $extra = ['skipped' => true];
-                return;
-            }
-
-            $jobId = $this->job?->getJobId();
-            try {
-                $run = $pushService->broadcast(
-                    $schedule,
-                    $schedule->title,
-                    $schedule->body ?? '',
-                    'scheduled',
-                    'SendFcmEvery10Seconds@handle → PushService@broadcast',
-                    $jobId
-                );
-            } catch (Throwable $e) {
-                FounderAudit::error('run_now.exception', $e, [
-                    'handler' => $handler,
-                    'job_id' => $jobId,
-                    'schedule_id' => $this->scheduleId,
-                ]);
-                throw $e;
-            }
-            $schedule->forceFill(['last_run_at' => now()])->save();
-
-            $this->dispatchNext();
-        } finally {
-            $this->finalizeLogging($tracker, $handler, $jobId, $startedAt, $run ?? null, $extra);
-            if ($lock && $lockAcquired) {
-                $lock->release();
-            }
-        }
+        
+        // Do not dispatch next - this stops the 10-second cycle
+        return;
     }
 
     protected function dispatchNext(): void

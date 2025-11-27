@@ -11,6 +11,7 @@ class ScheduledPushNotification extends Model
     use HasFactory;
 
     public const FREQUENCY_ONE_MINUTE = 'one_minute';
+    public const FREQUENCY_FIVE_MINUTES = 'five_minutes';
     public const FREQUENCY_DAILY = 'daily';
     public const FREQUENCY_WEEKLY = 'weekly';
     public const FREQUENCY_MONTHLY = 'monthly';
@@ -22,6 +23,7 @@ class ScheduledPushNotification extends Model
     public const FREQUENCIES = [
         self::FREQUENCY_TEN_SECONDS,
         self::FREQUENCY_ONE_MINUTE,
+        self::FREQUENCY_FIVE_MINUTES,
         self::FREQUENCY_DAILY,
         self::FREQUENCY_WEEKLY,
         self::FREQUENCY_MONTHLY,
@@ -54,6 +56,7 @@ class ScheduledPushNotification extends Model
         return [
             self::FREQUENCY_TEN_SECONDS => 'Every 10 seconds',
             self::FREQUENCY_ONE_MINUTE => 'Every 1 minute',
+            self::FREQUENCY_FIVE_MINUTES => 'Every 5 minutes',
             self::FREQUENCY_DAILY => 'Daily',
             self::FREQUENCY_WEEKLY => 'Weekly',
             self::FREQUENCY_MONTHLY => 'Monthly',
@@ -67,6 +70,7 @@ class ScheduledPushNotification extends Model
     {
         return match ($this->frequency) {
             self::FREQUENCY_ONE_MINUTE => $ref->copy()->addMinute(),
+            self::FREQUENCY_FIVE_MINUTES => $ref->copy()->addMinutes(5),
             self::FREQUENCY_DAILY => $ref->copy()->addDay(),
             self::FREQUENCY_WEEKLY => $ref->copy()->addWeek(),
             self::FREQUENCY_MONTHLY => $ref->copy()->addMonth(),

@@ -104,9 +104,10 @@ class PushSchedulerController extends Controller
         $notification->last_run_at = null;
         $notification->save();
 
-        if ($notification->frequency === ScheduledPushNotification::FREQUENCY_TEN_SECONDS) {
-            $this->startTenSecondTicker($notification);
-        }
+        // DISABLED: 10-second notifications are no longer supported
+        // if ($notification->frequency === ScheduledPushNotification::FREQUENCY_TEN_SECONDS) {
+        //     $this->startTenSecondTicker($notification);
+        // }
 
         return redirect()
             ->route('dev.push-scheduler')
@@ -140,9 +141,10 @@ class PushSchedulerController extends Controller
                 ? null
                 : $notification->computeNextRun($now);
             $notification->save();
-            if ($notification->frequency === ScheduledPushNotification::FREQUENCY_TEN_SECONDS) {
-                $this->startTenSecondTicker($notification);
-            }
+            // DISABLED: 10-second notifications are no longer supported
+            // if ($notification->frequency === ScheduledPushNotification::FREQUENCY_TEN_SECONDS) {
+            //     $this->startTenSecondTicker($notification);
+            // }
             $message = sprintf(
                 'Resumed %s schedule. Next run: %s',
                 ScheduledPushNotification::frequencyLabels()[$notification->frequency] ?? $notification->frequency,

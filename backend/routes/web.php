@@ -36,6 +36,7 @@ use App\Http\Middleware\EnsureSalesAuthenticated;
 use App\Http\Controllers\QrTrackingController;
 use App\Http\Controllers\PushSchedulerController;
 use App\Http\Controllers\S3RecordingController;
+use App\Http\Controllers\MarketingNotificationController;
 use App\Models\LegacyQrRedirect;
 use App\Services\OnboardingProgressService;
 
@@ -126,6 +127,14 @@ Route::post('/dev/push-scheduler', [PushSchedulerController::class, 'store'])->n
 Route::post('/dev/push-scheduler/run-now', [PushSchedulerController::class, 'runNow'])->name('dev.push-scheduler.run-now');
 Route::get('/dev/push-scheduler/logs/{run}', [PushSchedulerController::class, 'showLog'])->name('dev.push-scheduler.log');
 Route::post('/dev/push-scheduler/{notification}', [PushSchedulerController::class, 'update'])->name('dev.push-scheduler.update');
+
+// Marketing notifications
+Route::get('/marketing/notifications', [MarketingNotificationController::class, 'index'])->name('marketing.notifications');
+Route::post('/marketing/notifications/test', [MarketingNotificationController::class, 'sendTest'])->name('marketing.notifications.test');
+Route::post('/marketing/notifications/send-now', [MarketingNotificationController::class, 'sendNow'])->name('marketing.notifications.send-now');
+Route::post('/marketing/notifications/schedule-5min', [MarketingNotificationController::class, 'scheduleEvery5Minutes'])->name('marketing.notifications.schedule-5min');
+Route::post('/marketing/notifications/{notification}/run-now', [MarketingNotificationController::class, 'runNow'])->name('marketing.notifications.run-now');
+Route::post('/marketing/notifications/{notification}/stop', [MarketingNotificationController::class, 'stopSchedule'])->name('marketing.notifications.stop');
 
 Route::get('/s3-recordings', [S3RecordingController::class, 'index'])->name('s3.recordings');
 
