@@ -303,46 +303,41 @@
             @endif
         </div>
 
-        @if($marketingTestToken)
-            <div class="token-debug-box highlight-token">
-                <strong>🎯 Marketing test token override active</strong>
-                <p class="timer-meta" style="margin-top: 6px;">
-                    All marketing pushes (including the 5-minute schedule) will only target this token until you remove
-                    <code>PUSH_MARKETING_TEST_TOKEN</code> from your environment.
-                </p>
-                <code title="{{ $marketingTestToken }}">{{ \Illuminate\Support\Str::limit($marketingTestToken, 220) }}</code>
-            </div>
-        @endif
+        @php
+            $debugToken = $marketingTestToken ?: ($highlightToken->token ?? null);
+        @endphp
 
-        @if($highlightToken)
+        @if($debugToken)
             <div class="token-debug-box highlight-token">
                 <strong>🎯 Primary target token for debugging</strong>
-                <p class="timer-meta" style="margin-top: 6px;">
-                    This is the first token in the marketing queue. Use it when you want to verify an actual device receives the push.
-                </p>
-                <code title="{{ $highlightToken->token }}">{{ \Illuminate\Support\Str::limit($highlightToken->token, 180) }}</code>
-                <span class="token-debug-meta">
-                    {{ $highlightToken->platform ?? 'unknown platform' }}
-                    · {{ $highlightToken->device_id ?? 'device-'.$highlightToken->id }}
-                    @if($highlightToken->user)
-                        · {{ $highlightToken->user->name ?? 'User #'.$highlightToken->user_id }}
-                    @elseif($highlightToken->user_id)
-                        · User #{{ $highlightToken->user_id }}
-                    @endif
-                    @if($highlightToken->last_seen_at)
-                        · last seen {{ $highlightToken->last_seen_at->diffForHumans() }}
-                    @else
-                        · created {{ $highlightToken->created_at?->diffForHumans() }}
-                    @endif
-                </span>
-            </div>
-        @elseif($marketingTestToken)
-            <div class="token-debug-box highlight-token">
-                <strong>🎯 Primary target token for debugging</strong>
-                <p class="timer-meta" style="margin-top: 6px;">
-                    Override token is not stored in the database, but pushes are still forced to it for testing.
-                </p>
-                <code title="{{ $marketingTestToken }}">{{ \Illuminate\Support\Str::limit($marketingTestToken, 200) }}</code>
+                @if($marketingTestToken)
+                    <p class="timer-meta" style="margin-top: 6px;">
+                        A marketing test override is active, so the scheduler will only send to this token until
+                        <code>PUSH_MARKETING_TEST_TOKEN</code> is cleared.
+                    </p>
+                @else
+                    <p class="timer-meta" style="margin-top: 6px;">
+                        This is the first token in the marketing queue. Use it when you want to verify an actual device receives the push.
+                    </p>
+                @endif
+                <code title="{{ $debugToken }}">{{ \Illuminate\Support\Str::limit($debugToken, 220) }}</code>
+
+                @if(!$marketingTestToken && $highlightToken)
+                    <span class="token-debug-meta">
+                        {{ $highlightToken->platform ?? 'unknown platform' }}
+                        · {{ $highlightToken->device_id ?? 'device-'.$highlightToken->id }}
+                        @if($highlightToken->user)
+                            · {{ $highlightToken->user->name ?? 'User #'.$highlightToken->user_id }}
+                        @elseif($highlightToken->user_id)
+                            · User #{{ $highlightToken->user_id }}
+                        @endif
+                        @if($highlightToken->last_seen_at)
+                            · last seen {{ $highlightToken->last_seen_at->diffForHumans() }}
+                        @else
+                            · created {{ $highlightToken->created_at?->diffForHumans() }}
+                        @endif
+                    </span>
+                @endif
             </div>
         @endif
 
