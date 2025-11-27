@@ -138,6 +138,8 @@ Route::post('/marketing/notifications/send-now', [MarketingNotificationControlle
 Route::post('/marketing/notifications/schedule-5min', [MarketingNotificationController::class, 'scheduleEvery5Minutes'])->name('marketing.notifications.schedule-5min');
 Route::post('/marketing/notifications/{notification}/run-now', [MarketingNotificationController::class, 'runNow'])->name('marketing.notifications.run-now');
 Route::post('/marketing/notifications/{notification}/stop', [MarketingNotificationController::class, 'stopSchedule'])->name('marketing.notifications.stop');
+Route::get('/marketing/notifications/single', [MarketingNotificationController::class, 'single'])->name('marketing.notifications.single');
+Route::post('/marketing/notifications/single', [MarketingNotificationController::class, 'scheduleSingle'])->name('marketing.notifications.single.schedule');
 
 Route::get('/s3-recordings', [S3RecordingController::class, 'index'])->name('s3.recordings');
 

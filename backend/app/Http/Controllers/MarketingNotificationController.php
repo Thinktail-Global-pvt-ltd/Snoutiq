@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DeviceToken;
+use App\Models\MarketingSingleNotification;
 use App\Models\ScheduledPushNotification;
 use App\Services\PushService;
 use App\Services\Push\FcmService;
@@ -11,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Support\Carbon;
 use App\Jobs\SendFcmEvery5Minutes;
+use App\Jobs\SendMarketingSingleNotification;
 use Throwable;
 
 class MarketingNotificationController extends Controller
@@ -84,6 +86,87 @@ class MarketingNotificationController extends Controller
             'serverNowIso' => $serverNow->toIso8601String(),
             'marketingTestToken' => $marketingTestToken,
         ]);
+    }
+
+    /**
+     * Show the single-token scheduling dashboard.
+     */
+    public function single(): View
+    {
+        $timezone = config('app.timezone', 'UTC');
+        $pendingNotifications = MarketingSingleNotification::query()
+            ->where('status', MarketingSingleNotification::STATUS_PENDING)
+            ->orderBy('send_at')
+            ->get();
+
+        $recentNotifications = MarketingSingleNotification::query()
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        $targetTokenSampleLimit = 25;
+        $tokenPreview = DeviceToken::query()
+            ->with(['user:id,name,email'])
+            ->select(['id', 'user_id', 'token', 'platform', 'device_id', 'last_seen_at', 'created_at'])
+            ->whereNotNull('token')
+            ->orderByDesc('last_seen_at')
+            ->orderByDesc('id')
+            ->limit($targetTokenSampleLimit)
+            ->get();
+
+        $tokenPreviewCount = DeviceToken::query()
+            ->whereNotNull('token')
+            ->count();
+
+        return view('marketing.single-notifications', [
+            'pendingNotifications' => $pendingNotifications,
+            'recentNotifications' => $recentNotifications,
+            'timezone' => $timezone,
+            'tokenPreview' => $tokenPreview,
+            'tokenPreviewLimit' => $targetTokenSampleLimit,
+            'tokenPreviewCount' => $tokenPreviewCount,
+            'defaultScheduledFor' => now()->timezone($timezone)->addMinutes(10)->format('Y-m-d\TH:i'),
+        ]);
+    }
+
+    /**
+     * Store a one-off notification that sends one minute before the selected time.
+     */
+    public function scheduleSingle(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'max:500'],
+            'title' => ['required', 'string', 'max:120'],
+            'body' => ['required', 'string', 'max:500'],
+            'scheduled_for' => ['required', 'date_format:Y-m-d\TH:i'],
+        ]);
+
+        $timezone = config('app.timezone', 'UTC');
+        $scheduledFor = Carbon::createFromFormat('Y-m-d\TH:i', $validated['scheduled_for'], $timezone);
+        $sendAt = $scheduledFor->copy()->subMinute();
+        if ($sendAt->lessThan(now())) {
+            $sendAt = now()->addSeconds(5);
+        }
+
+        $notification = MarketingSingleNotification::create([
+            'token' => $validated['token'],
+            'title' => $validated['title'],
+            'body' => $validated['body'],
+            'scheduled_for' => $scheduledFor,
+            'send_at' => $sendAt,
+            'status' => MarketingSingleNotification::STATUS_PENDING,
+        ]);
+
+        $pending = SendMarketingSingleNotification::dispatch($notification->id);
+        $pending->delay($sendAt);
+
+        return redirect()
+            ->route('marketing.notifications.single')
+            ->with('success', sprintf(
+                'Notification queued! It will be sent at %s (%s) which is 1 minute before your target time.',
+                $sendAt->timezone($timezone)->toDayDateTimeString(),
+                $timezone
+            ));
     }
 
     /**
