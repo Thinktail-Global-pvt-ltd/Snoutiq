@@ -1,3 +1,5 @@
+// src/socket-server/index.js (example path)
+
 import admin from "firebase-admin";
 import { existsSync, readFileSync } from "fs";
 import { createServer } from "http";
@@ -11,15 +13,17 @@ import {
   sendWhatsAppText,
 } from "./whatsapp-client.js";
 
+// -------------------- PATH + CONSTANTS --------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
 const DEFAULT_SERVICE_ACCOUNT_FILE = "snoutiqapp-9cacc4ece358.json";
+
+// Default ringtone for FCM notification (Android / iOS)
 const DEFAULT_RINGTONE = (() => {
   if (typeof process.env.CALL_NOTIFICATION_SOUND === "string") {
     const trimmed = process.env.CALL_NOTIFICATION_SOUND.trim();
-    if (trimmed.length) {
-      return trimmed;
-    }
+    if (trimmed.length) return trimmed;
   }
   return "default";
 })();
@@ -51,14 +55,14 @@ try {
     } catch (error) {
       console.error("⚠️ Could not load service account key:", error.message);
       console.log(
-        "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory.",
+        "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory."
       );
       serviceAccount = null;
     }
   } else {
     console.log("⚠️ No service account path resolved.");
     console.log(
-      "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory.",
+      "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory."
     );
     serviceAccount = null;
   }
@@ -78,112 +82,29 @@ try {
   console.error("❌ Firebase Admin SDK initialization error:", error.message);
 }
 
-// -------------------- HTTP SERVER (health + debug APIs) --------------------
-const httpServer = createServer((req, res) => {
-  try {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-
-    // CORS preflight
-    if (req.method === "OPTIONS") {
-      res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      });
-      res.end();
-      return;
-    }
-
-    // health check
-    if (req.method === "GET" && url.pathname === "/health") {
-      res.writeHead(200, {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      });
-      res.end(
-        JSON.stringify({
-          status: "ok",
-          timestamp: new Date().toISOString(),
-          firebase: admin.apps.length > 0 ? "enabled" : "disabled",
-        })
-      );
-      return;
-    }
-
-    // list active doctors (not busy)
-    if (req.method === "GET" && url.pathname === "/active-doctors") {
-      const available = [];
-      for (const [doctorId, info] of activeDoctors.entries()) {
-        const status = info.connectionStatus || "disconnected";
-        if (["connected", "grace"].includes(status) && !isDoctorBusy(doctorId)) {
-          available.push({
-            doctorId,
-            status: info.connectionStatus,
-            lastSeen: info.lastSeen,
-          });
-        }
-      }
-
-      res.writeHead(200, {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      });
-      res.end(
-        JSON.stringify({
-          activeDoctors: available,
-          count: available.length,
-          updatedAt: new Date().toISOString(),
-        })
-      );
-      return;
-    }
-
-    res.writeHead(404, {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    });
-    res.end(JSON.stringify({ error: "Not Found" }));
-  } catch (error) {
-    console.error("HTTP server error:", error);
-    res.writeHead(500, {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    });
-    res.end(JSON.stringify({ error: "Server error" }));
-  }
-});
-
-// -------------------- SOCKET.IO SETUP --------------------
-const io = new Server(httpServer, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-    credentials: false,
-  },
-  path: "/socket.io/",
-  pingTimeout: 25000,
-  pingInterval: 10000,
-});
-
 // -------------------- IN-MEMORY STATE --------------------
 // activeDoctors: doctorId -> {
-//   socketId, joinedAt, lastSeen, connectionStatus, location?, offlineTimer?, disconnectedAt?
+//   socketId, joinedAt, lastSeen, connectionStatus ("connected" | "disconnected"),
+//   location?, disconnectedAt?
 // }
 const activeDoctors = new Map();
 
 // activeCalls: callId -> {
 //   callId, doctorId, patientId, channel,
-//   status,
+//   status ("queued" | "requested" | "accepted" | "payment_completed" | "active" | "ended" | ...),
 //   createdAt, acceptedAt?, rejectedAt?, endedAt?, paidAt?,
 //   patientSocketId, doctorSocketId,
 //   paymentId?, disconnectedAt?, ...
 // }
-const activeCallSessions = new Map();
 const activeCalls = new Map();
+
+// pendingCalls: doctorId -> [ { callId, doctorId, patientSocketId, queuedAt, timer } ]
 const pendingCalls = new Map();
 
-// FCM Push Token Storage
+// FCM Push Token Storage (in-memory, TODO: persist to DB)
 const doctorPushTokens = new Map();
+
+// simple dedupe set: `${callId}:${doctorId}`
 const sentCallNotifications = new Set();
 
 // -------------------- LOGGING HELPERS --------------------
@@ -237,9 +158,7 @@ const clearNotificationSent = (callId, doctorId) => {
   sentCallNotifications.delete(getNotificationKey(callId, doctorId));
 };
 
-/**
- * Store/update doctor's push token
- */
+// -------------------- PUSH TOKEN HELPERS --------------------
 const storeDoctorPushToken = async (doctorId, token) => {
   try {
     if (!doctorId || !token) {
@@ -258,12 +177,9 @@ const storeDoctorPushToken = async (doctorId, token) => {
   }
 };
 
-/**
- * Get doctor's push token
- */
 const getDoctorPushToken = async (doctorId) => {
   try {
-    let token = doctorPushTokens.get(doctorId);
+    const token = doctorPushTokens.get(doctorId);
 
     if (!token) {
       console.log(`⚠️ No cached token for doctor ${doctorId}`);
@@ -281,9 +197,7 @@ const getDoctorPushToken = async (doctorId) => {
   }
 };
 
-/**
- * Send Push Notification using Firebase Admin SDK
- */
+// -------------------- FCM NOTIFICATION SENDER --------------------
 const sendPushNotification = async (doctorId, payload) => {
   try {
     const doctorPushToken = await getDoctorPushToken(doctorId);
@@ -336,7 +250,6 @@ const sendPushNotification = async (doctorId, payload) => {
       payload.message ||
       `Patient ${payload.patientId || ""} is waiting for you.`;
 
-    // Build the message with ALL STRING VALUES (FCM requirement)
     const message = {
       token: doctorPushToken,
       data: stringifiedData,
@@ -525,6 +438,7 @@ const DEFAULT_WHATSAPP_TEXT_TEMPLATE = [
 ].join("\n");
 const WHATSAPP_ALERT_TEXT_TEMPLATE =
   process.env.WHATSAPP_ALERT_TEXT_TEMPLATE || DEFAULT_WHATSAPP_TEXT_TEMPLATE;
+
 const resolveWhatsAppAlertMode = () => {
   const mode = (process.env.WHATSAPP_ALERT_MODE || "").trim().toLowerCase();
   if (mode === "text" || mode === "template") {
@@ -540,6 +454,7 @@ const resolveWhatsAppAlertMode = () => {
   }
   return "text";
 };
+
 const WHATSAPP_ALERT_MODE = resolveWhatsAppAlertMode();
 const WHATSAPP_ALERT_TEMPLATE_NAME =
   process.env.WHATSAPP_ALERT_TEMPLATE_NAME ||
@@ -596,24 +511,53 @@ const buildTemplateComponents = (context) => {
 
 // -------------------- CONSTANTS --------------------
 const DOCTOR_HEARTBEAT_EVENT = "doctor-heartbeat";
-const DOCTOR_GRACE_EVENT = "doctor-grace";
 const DOCTOR_HEARTBEAT_INTERVAL_MS = 15_000;
-const DOCTOR_GRACE_PERIOD_MS = 2 * 60 * 1000; // 2 min grace background
+
+// 24 hours stale timeout → safety fallback (prevents ghost doctors forever)
+const DOCTOR_STALE_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+
 const PENDING_CALL_TIMEOUT_MS = 45_000;
+const ACTIVE_DOCTOR_LOG_INTERVAL_MS = 5_000;
+const ACTIVE_DOCTOR_REQUEST_LOG_INTERVAL_MS = 5_000;
+
+let lastAvailableDoctorLog = {
+  timestamp: 0,
+  available: 0,
+  online: 0,
+};
+let lastActiveDoctorRequestLog = {
+  timestamp: 0,
+  available: 0,
+  busy: 0,
+};
 
 // -------------------- HELPERS --------------------
-const clearDoctorTimer = (entry) => {
+// ✅ ALWAYS ONLINE FIX: Mark doctor as disconnected but DON'T remove from map.
+// They stay in "live doctors" list; only manual "Offline" removes them.
+// 24-hour stale cleanup will finally remove very old entries.
+const markDoctorDisconnected = (doctorId, socketId) => {
+  const entry = activeDoctors.get(doctorId);
   if (!entry) return;
-  if (entry.offlineTimer) {
-    clearTimeout(entry.offlineTimer);
-    entry.offlineTimer = null;
+
+  // If doctor already reconnected on a new socket, don't touch new session
+  if (socketId && entry.socketId && entry.socketId !== socketId) {
+    console.log(
+      `ℹ️ Doctor ${doctorId} already reconnected, ignoring old socket ${socketId}`
+    );
+    return;
   }
+
+  entry.connectionStatus = "disconnected";
+  entry.disconnectedAt = new Date();
+  entry.socketId = null; // clear active socket but KEEP doctor entry
+
+  activeDoctors.set(doctorId, entry);
+  console.log(`🔌 Doctor ${doctorId} marked as disconnected (stays online)`);
 };
 
 const upsertDoctorEntry = (doctorId, values = {}) => {
   if (!doctorId) return null;
   const existing = activeDoctors.get(doctorId) || {};
-  clearDoctorTimer(existing);
 
   const entry = {
     ...existing,
@@ -630,35 +574,7 @@ const upsertDoctorEntry = (doctorId, values = {}) => {
   return entry;
 };
 
-const scheduleDoctorRemoval = (doctorId, socketId) => {
-  const entry = activeDoctors.get(doctorId);
-  if (!entry) return;
-
-  // if doctor already reconnected on a new socket, don't kill the new one
-  if (socketId && entry.socketId && entry.socketId !== socketId) {
-    return;
-  }
-
-  clearDoctorTimer(entry);
-  entry.connectionStatus = "grace";
-  entry.disconnectedAt = new Date();
-
-  entry.offlineTimer = setTimeout(() => {
-    const current = activeDoctors.get(doctorId);
-    if (!current) return;
-
-    if (socketId && current.socketId && current.socketId !== socketId) {
-      return;
-    }
-
-    activeDoctors.delete(doctorId);
-    emitAvailableDoctors();
-  }, DOCTOR_GRACE_PERIOD_MS);
-
-  activeDoctors.set(doctorId, entry);
-};
-
-// NOTE: doctor "busy" means there's already a call in requested/accepted/payment_completed with him.
+// NOTE: doctor "busy" means there's already a call in requested/accepted/payment_completed/active with him.
 const isDoctorBusy = (doctorId) => {
   for (const [, call] of activeCalls.entries()) {
     if (
@@ -674,27 +590,30 @@ const isDoctorBusy = (doctorId) => {
   return false;
 };
 
-const expirePendingCall = (doctorId, callId, reason = "timeout") => {
+const removePendingCallEntry = (doctorId, callId) => {
   const queue = pendingCalls.get(doctorId);
-  if (queue) {
-    const index = queue.findIndex((entry) => entry.callId === callId);
-    if (index >= 0) {
-      const [entry] = queue.splice(index, 1);
-      if (entry?.timer) {
-        clearTimeout(entry.timer);
-      }
-    }
-    if (queue.length) {
-      pendingCalls.set(doctorId, queue);
-    } else {
-      pendingCalls.delete(doctorId);
-    }
+  if (!queue) return false;
+
+  const index = queue.findIndex((entry) => entry.callId === callId);
+  if (index < 0) return false;
+
+  const [entry] = queue.splice(index, 1);
+  if (entry?.timer) clearTimeout(entry.timer);
+
+  if (queue.length) {
+    pendingCalls.set(doctorId, queue);
+  } else {
+    pendingCalls.delete(doctorId);
   }
 
+  return true;
+};
+
+const expirePendingCall = (doctorId, callId, reason = "timeout") => {
+  removePendingCallEntry(doctorId, callId);
+
   const session = activeCalls.get(callId);
-  if (!session) {
-    return;
-  }
+  if (!session) return;
 
   activeCalls.delete(callId);
   clearNotificationSent(callId, doctorId);
@@ -945,18 +864,14 @@ const enqueuePendingCall = (callSession) => {
 
 const deliverNextPendingCall = (doctorId) => {
   const queue = pendingCalls.get(doctorId);
-  if (!queue || queue.length === 0) {
-    return;
-  }
+  if (!queue || queue.length === 0) return;
 
   const doctorEntry = activeDoctors.get(doctorId);
-  if (!doctorEntry || !doctorEntry.socketId) {
-    return;
-  }
+  if (!doctorEntry || !doctorEntry.socketId) return;
+
   const status = doctorEntry.connectionStatus || "disconnected";
-  if (!["connected", "grace"].includes(status)) {
-    return;
-  }
+  if (status !== "connected") return;
+
   if (isDoctorBusy(doctorId)) {
     console.log(
       `⛔ Doctor ${doctorId} still busy. Pending calls remain queued.`
@@ -965,9 +880,7 @@ const deliverNextPendingCall = (doctorId) => {
   }
 
   const entry = queue.shift();
-  if (entry?.timer) {
-    clearTimeout(entry.timer);
-  }
+  if (entry?.timer) clearTimeout(entry.timer);
 
   if (queue.length) {
     pendingCalls.set(doctorId, queue);
@@ -1015,21 +928,36 @@ const deliverNextPendingCall = (doctorId) => {
   );
 };
 
-// broadcast list of available doctors (who are not on a live/locked call)
+// Broadcast list of available doctors (not busy) + "live" doctors (connected/disconnected)
 const emitAvailableDoctors = () => {
   const available = [];
   const allOnline = [];
-  
+
   for (const [doctorId, info] of activeDoctors.entries()) {
     const status = info.connectionStatus || "connected";
-    if (["connected", "grace"].includes(status)) {
+    if (["connected", "disconnected"].includes(status)) {
       allOnline.push(doctorId);
-      if (!isDoctorBusy(doctorId)) {
-        available.push(doctorId);
-      }
+      if (!isDoctorBusy(doctorId)) available.push(doctorId);
     }
   }
-  console.log(`📤 Broadcasting ${available.length} available doctors (${allOnline.length} online total):`, available);
+
+  const now = Date.now();
+  const shouldLog =
+    now - lastAvailableDoctorLog.timestamp > ACTIVE_DOCTOR_LOG_INTERVAL_MS ||
+    available.length !== lastAvailableDoctorLog.available ||
+    allOnline.length !== lastAvailableDoctorLog.online;
+
+  if (shouldLog) {
+    console.log(
+      `📤 Broadcasting ${available.length} available doctors (${allOnline.length} online total)`
+    );
+    lastAvailableDoctorLog = {
+      timestamp: now,
+      available: available.length,
+      online: allOnline.length,
+    };
+  }
+
   io.emit("active-doctors", available);
   io.emit("live-doctors", allOnline);
 };
@@ -1040,7 +968,8 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
 
   for (const [callId, callSession] of activeCalls.entries()) {
     if (callSession.doctorId !== doctorId) continue;
-    if (["ended", "rejected", "disconnected"].includes(callSession.status)) continue;
+    if (["ended", "rejected", "disconnected"].includes(callSession.status))
+      continue;
 
     // update this session with latest doctor socket
     callSession.doctorSocketId = socket.id;
@@ -1057,7 +986,6 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
       status: callSession?.status,
     });
 
-    // re-emit anything relevant so doctor dashboard rings
     if (callSession.status === "requested") {
       io.to(roomName).emit("call-requested", {
         callId,
@@ -1065,7 +993,7 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
         patientId: callSession.patientId,
         channel: callSession.channel,
         timestamp: new Date().toISOString(),
-        queued: true, // means this call was waiting while you were away
+        queued: true, // was waiting while you were away
       });
     }
 
@@ -1093,6 +1021,97 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
   deliverNextPendingCall(doctorId);
 };
 
+// -------------------- HTTP SERVER (health + debug APIs) --------------------
+const httpServer = createServer((req, res) => {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+
+    // CORS preflight
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      });
+      res.end();
+      return;
+    }
+
+    // health check
+    if (req.method === "GET" && url.pathname === "/health") {
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.end(
+        JSON.stringify({
+          status: "ok",
+          timestamp: new Date().toISOString(),
+          firebase: admin.apps.length > 0 ? "enabled" : "disabled",
+        })
+      );
+      return;
+    }
+
+    // list active doctors (not busy) – counts both connected + disconnected (always-online mode)
+    if (req.method === "GET" && url.pathname === "/active-doctors") {
+      const available = [];
+      for (const [doctorId, info] of activeDoctors.entries()) {
+        const status = info.connectionStatus || "disconnected";
+        if (
+          ["connected", "disconnected"].includes(status) &&
+          !isDoctorBusy(doctorId)
+        ) {
+          available.push({
+            doctorId,
+            status,
+            lastSeen: info.lastSeen,
+            socketId: info.socketId || null,
+          });
+        }
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.end(
+        JSON.stringify({
+          activeDoctors: available,
+          count: available.length,
+          updatedAt: new Date().toISOString(),
+        })
+      );
+      return;
+    }
+
+    res.writeHead(404, {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(JSON.stringify({ error: "Not Found" }));
+  } catch (error) {
+    console.error("HTTP server error:", error);
+    res.writeHead(500, {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(JSON.stringify({ error: "Server error" }));
+  }
+});
+
+// -------------------- SOCKET.IO SETUP --------------------
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: false,
+  },
+  path: "/socket.io/",
+  pingTimeout: 25000,
+  pingInterval: 10000,
+});
+
 // -------------------- CORE SOCKET LOGIC --------------------
 io.on("connection", (socket) => {
   console.log(`⚡ Client connected: ${socket.id}`);
@@ -1108,7 +1127,7 @@ io.on("connection", (socket) => {
     socket.join(roomName);
 
     const existing = activeDoctors.get(doctorId);
-    if (existing && existing.socketId !== socket.id) {
+    if (existing && existing.socketId && existing.socketId !== socket.id) {
       console.log(
         `⚠️ Doctor ${doctorId} reconnecting (old socket: ${existing.socketId})`
       );
@@ -1133,8 +1152,42 @@ io.on("connection", (socket) => {
 
     emitAvailableDoctors();
 
-    // if there were queued calls for this doc, notify them now
+    // If there were queued / in-progress calls for this doctor, replay them
     deliverPendingSessionsToDoctor(doctorId, socket);
+  });
+
+  // Doctor explicitly sets ONLINE (header toggle / app opened)
+  socket.on("doctor-online", (payload = {}) => {
+    const doctorId = Number(payload?.doctorId ?? payload?.id);
+    if (!doctorId) return;
+
+    upsertDoctorEntry(doctorId, {
+      socketId: socket.id,
+      lastSeen: new Date(),
+      connectionStatus: "connected",
+    });
+
+    emitAvailableDoctors();
+  });
+
+  // Doctor explicitly goes OFFLINE – ONLY manual button should call this
+  socket.on("doctor-offline", (payload = {}) => {
+    const doctorId = Number(payload?.doctorId ?? payload?.id);
+    if (!doctorId) return;
+
+    console.log(`👋 Doctor ${doctorId} manually set to offline`);
+
+    activeDoctors.delete(doctorId);
+    socket.leave(`doctor-${doctorId}`);
+
+    // Let this doctor know
+    socket.emit("doctor-offline", {
+      doctorId,
+      status: "offline",
+      timestamp: new Date().toISOString(),
+    });
+
+    emitAvailableDoctors();
   });
 
   // ========== HEARTBEAT FROM DOCTOR FRONTEND ==========
@@ -1142,32 +1195,22 @@ io.on("connection", (socket) => {
     const doctorId = Number(payload.doctorId || payload.id);
     if (!doctorId) return;
 
-    const existing = activeDoctors.get(doctorId);
-    const wasGrace = existing?.connectionStatus === "grace";
-
-    const entry = upsertDoctorEntry(doctorId, {
+    upsertDoctorEntry(doctorId, {
       socketId: socket.id,
       lastSeen: new Date(),
       connectionStatus: "connected",
     });
-
-    if (entry && wasGrace) {
-      // tell FE "you were in grace but now I see you again"
-      socket.emit(DOCTOR_GRACE_EVENT, {
-        doctorId,
-        status: "connected",
-        timestamp: new Date().toISOString(),
-      });
-    }
   });
 
-  // ========== REGISTER PUSH TOKEN (ENHANCED) ==========
+  // ========== REGISTER PUSH TOKEN ==========
   socket.on("register-push-token", async ({ doctorId, pushToken }) => {
     doctorId = Number(doctorId);
 
     if (!doctorId || !pushToken) {
       console.log(
-        `⚠️ Invalid push token registration: doctorId=${doctorId}, token=${pushToken ? "present" : "missing"}`
+        `⚠️ Invalid push token registration: doctorId=${doctorId}, token=${
+          pushToken ? "present" : "missing"
+        }`
       );
       socket.emit("push-token-registered", {
         success: false,
@@ -1194,12 +1237,12 @@ io.on("connection", (socket) => {
         timestamp: new Date().toISOString(),
       });
 
-      // Optional: Send test notification
+      // Optional: send test notification
       if (process.env.SEND_TEST_NOTIFICATION === "true") {
         console.log(`🧪 Sending test notification to doctor ${doctorId}`);
         await sendPushNotification(doctorId, {
           callId: "test_" + Date.now(),
-          doctorId: doctorId,
+          doctorId,
           patientId: "test",
           channel: "test_channel",
           timestamp: new Date().toISOString(),
@@ -1229,117 +1272,136 @@ io.on("connection", (socket) => {
       else available.push(doctorId);
     }
 
-    console.log(
-      `📊 Active doctors request: ${available.length} available, ${busy.length} busy`
-    );
+    const now = Date.now();
+    const shouldLog =
+      now - lastActiveDoctorRequestLog.timestamp >
+        ACTIVE_DOCTOR_REQUEST_LOG_INTERVAL_MS ||
+      available.length !== lastActiveDoctorRequestLog.available ||
+      busy.length !== lastActiveDoctorRequestLog.busy;
+
+    if (shouldLog) {
+      console.log(
+        `📊 Active doctors request: ${available.length} available, ${busy.length} busy`
+      );
+      lastActiveDoctorRequestLog = {
+        timestamp: now,
+        available: available.length,
+        busy: busy.length,
+      };
+    }
 
     socket.emit("active-doctors", available);
   });
 
   // ========== PATIENT STARTS CALL ==========
-  // IMPORTANT: We DO NOT block if doctor is offline/busy.
-  socket.on("call-requested", ({ doctorId, patientId, channel, callId: incomingCallId }) => {
-    console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
+  // IMPORTANT: We DO NOT block if doctor is offline/busy – we queue + notify.
+  socket.on(
+    "call-requested",
+    ({ doctorId, patientId, channel, callId: incomingCallId }) => {
+      console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
 
-    const callId =
-      incomingCallId ||
-      `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      doctorId = Number(doctorId);
 
-    if (activeCallSessions.has(callId)) {
-      console.log(`⚠️ Call ${callId} already exists, ignoring duplicate`);
-      socket.emit("call-status-update", {
-        callId,
-        status: "duplicate",
-        message: "Call already in progress",
-      });
-      return;
-    }
+      const callId =
+        incomingCallId ||
+        `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
-    const doctorEntry = activeDoctors.get(doctorId) || null;
-    const connectionStatus = doctorEntry?.connectionStatus || "disconnected";
-    const doctorHasSocket = Boolean(doctorEntry?.socketId);
-    const doctorConnected =
-      doctorHasSocket && ["connected", "grace"].includes(connectionStatus);
-    const doctorBusy = isDoctorBusy(doctorId);
-    const shouldQueue = !doctorConnected || doctorBusy;
+      if (activeCalls.has(callId)) {
+        console.log(`⚠️ Call ${callId} already exists, ignoring duplicate`);
+        socket.emit("call-status-update", {
+          callId,
+          status: "duplicate",
+          message: "Call already in progress",
+        });
+        return;
+      }
 
-    const callSession = {
-      callId,
-      doctorId,
-      patientId,
-      channel,
-      status: shouldQueue ? "queued" : "requested",
-      createdAt: new Date(),
-      queuedAt: shouldQueue ? new Date() : null,
-      patientSocketId: socket.id,
-      doctorSocketId: doctorEntry?.socketId || null,
-    };
+      const doctorEntry = activeDoctors.get(doctorId) || null;
+      const connectionStatus = doctorEntry?.connectionStatus || "disconnected";
+      const doctorHasSocket = Boolean(doctorEntry?.socketId);
+      const doctorConnected =
+        doctorHasSocket && connectionStatus === "connected";
+      const doctorBusy = isDoctorBusy(doctorId);
+      const shouldQueue = !doctorConnected || doctorBusy;
 
-    logFlow("call-requested", {
-      callId,
-      doctorId,
-      patientId,
-      channel,
-      socketId: socket.id,
-      extra: `doctorConnected=${doctorConnected}, doctorBusy=${doctorBusy}`,
-    });
-
-    activeCallSessions.set(callId, callSession);
-    activeCalls.set(callId, callSession);
-
-    if (shouldQueue) {
-      enqueuePendingCall(callSession);
-
-      socket.emit("call-status-update", {
+      const callSession = {
         callId,
         doctorId,
         patientId,
-        status: "pending",
-        queued: true,
-        timestamp: new Date().toISOString(),
+        channel,
+        status: shouldQueue ? "queued" : "requested",
+        createdAt: new Date(),
+        queuedAt: shouldQueue ? new Date() : null,
+        patientSocketId: socket.id,
+        doctorSocketId: doctorEntry?.socketId || null,
+      };
+
+      logFlow("call-requested", {
+        callId,
+        doctorId,
+        patientId,
+        channel,
+        socketId: socket.id,
+        extra: `doctorConnected=${doctorConnected}, doctorBusy=${doctorBusy}`,
       });
+
+      activeCalls.set(callId, callSession);
+
+      if (shouldQueue) {
+        enqueuePendingCall(callSession);
+
+        socket.emit("call-status-update", {
+          callId,
+          doctorId,
+          patientId,
+          status: "pending",
+          queued: true,
+          timestamp: new Date().toISOString(),
+        });
+
+        socket.emit("call-sent", {
+          callId,
+          doctorId,
+          patientId,
+          channel,
+          status: "pending",
+          queued: true,
+          message:
+            doctorBusy && doctorConnected
+              ? "Doctor is finishing another call. We've queued yours and will alert them immediately."
+              : "Doctor is currently offline/away. We've queued your call and will alert them as soon as they come online.",
+        });
+
+        emitAvailableDoctors();
+        return;
+      }
+
+      // Direct ring to connected doctor
+      io.to(`doctor-${doctorId}`).emit("call-requested", {
+        callId,
+        doctorId,
+        patientId,
+        channel,
+        timestamp: new Date().toISOString(),
+        queued: false,
+      });
+
+      // Also send push notification in case app is backgrounded / killed
+      notifyDoctorPendingCall(callSession).catch(() => {});
 
       socket.emit("call-sent", {
         callId,
         doctorId,
         patientId,
         channel,
-        status: "pending",
-        queued: true,
-        message:
-          doctorBusy && doctorConnected
-            ? "Doctor is finishing another call. We've queued yours and will alert them immediately."
-            : "Doctor is currently offline. We've queued your call and will alert them as soon as they come online.",
+        status: "sent",
+        queued: false,
+        message: "Ringing the doctor now…",
       });
 
       emitAvailableDoctors();
-      return;
     }
-
-    io.to(`doctor-${doctorId}`).emit("call-requested", {
-      callId,
-      doctorId,
-      patientId,
-      channel,
-      timestamp: new Date().toISOString(),
-      queued: false,
-    });
-
-    // Also send push notification in case app is backgrounded
-    notifyDoctorPendingCall(callSession).catch(() => {});
-
-    socket.emit("call-sent", {
-      callId,
-      doctorId,
-      patientId,
-      channel,
-      status: "sent",
-      queued: false,
-      message: "Ringing the doctor now…",
-    });
-
-    emitAvailableDoctors();
-  });
+  );
 
   // ========== DOCTOR ACCEPTS CALL ==========
   socket.on("call-accepted", (data) => {
@@ -1358,7 +1420,6 @@ io.on("connection", (socket) => {
     callSession.doctorSocketId = socket.id;
     activeCalls.set(callId, callSession);
 
-    // notify patient they must pay
     if (callSession.patientSocketId) {
       io.to(callSession.patientSocketId).emit("call-accepted", {
         callId,
@@ -1382,9 +1443,14 @@ io.on("connection", (socket) => {
     console.log(`❌ Call ${callId} rejected by doctor ${doctorId}: ${reason}`);
     clearNotificationSent(callId, doctorId);
 
+    const pendingRemoved = removePendingCallEntry(doctorId, callId);
     const callSession = activeCalls.get(callId);
     if (!callSession) {
       console.log(`❌ Call session ${callId} not found for rejection`);
+      if (pendingRemoved) {
+        deliverNextPendingCall(doctorId);
+        emitAvailableDoctors();
+      }
       return;
     }
 
@@ -1392,7 +1458,9 @@ io.on("connection", (socket) => {
     callSession.rejectedAt = new Date();
     callSession.rejectionReason = reason;
 
-    // notify patient (best effort)
+    // Ensure any queued instance for this doctor is removed immediately
+    removePendingCallEntry(doctorId, callId);
+
     if (callSession.patientSocketId) {
       io.to(callSession.patientSocketId).emit("call-rejected", {
         callId,
@@ -1410,7 +1478,6 @@ io.on("connection", (socket) => {
       );
     }
 
-    // backup notify via rooms
     if (callSession.patientId) {
       io.to(`patient-${callSession.patientId}`).emit("call-rejected", {
         callId,
@@ -1425,7 +1492,6 @@ io.on("connection", (socket) => {
       });
     }
 
-    // broadcast status update
     io.emit("call-status-update", {
       callId,
       status: "rejected",
@@ -1434,13 +1500,11 @@ io.on("connection", (socket) => {
       timestamp: new Date().toISOString(),
     });
 
-    // cleanup that call after 30s
-    setTimeout(() => {
-      activeCalls.delete(callId);
-      activeCallSessions.delete(callId);
-      emitAvailableDoctors();
-      console.log(`🗑️ Cleaned up rejected call ${callId}`);
-    }, 30_000);
+    // Remove active call immediately so it can't be re-delivered on reconnect
+    activeCalls.delete(callId);
+    emitAvailableDoctors();
+    deliverNextPendingCall(doctorId);
+    console.log(`🗑️ Cleaned up rejected call ${callId}`);
   });
 
   // ========== PATIENT PAYMENT COMPLETED ==========
@@ -1469,7 +1533,7 @@ io.on("connection", (socket) => {
       patientSocketId: socket.id,
     });
 
-    // tell patient: you're good, here's your join link (audience role)
+    // Tell patient: you're good, here's your join link (audience)
     socket.emit("payment-verified", {
       callId,
       channel: callSession.channel,
@@ -1507,11 +1571,10 @@ io.on("connection", (socket) => {
       timestamp: new Date().toISOString(),
     };
 
-    // tell doctor: patient has paid, join NOW (host role)
+    // Tell doctor: join now (host)
     if (callSession.doctorSocketId) {
       io.to(callSession.doctorSocketId).emit("patient-paid", patientPaidData);
     } else {
-      // doctor was offline → room emit (so when he rejoins we replay anyway)
       io.to(`doctor-${doctorId}`).emit("patient-paid", {
         ...patientPaidData,
         queued: true,
@@ -1574,7 +1637,6 @@ io.on("connection", (socket) => {
           patientSocketId: callSession.patientSocketId,
         });
 
-        // notify the other party directly if we know their socket
         if (isDoctorEnding && callSession.patientSocketId) {
           io.to(callSession.patientSocketId).emit("call-ended-by-other", {
             callId,
@@ -1601,39 +1663,49 @@ io.on("connection", (socket) => {
           );
         }
 
-        // backup: notify via rooms
         if (callSession.doctorId) {
-          io.to(`doctor-${callSession.doctorId}`).emit(
-            "call-ended-by-other",
-            {
-              callId,
-              endedBy: isDoctorEnding ? "doctor" : "patient",
-              reason: "ended",
-              message: isDoctorEnding
-                ? "Doctor has ended the call"
-                : "Patient has ended the call",
-              timestamp: new Date().toISOString(),
-            }
-          );
+          io.to(`doctor-${callSession.doctorId}`).emit("call-ended-by-other", {
+            callId,
+            endedBy: isDoctorEnding ? "doctor" : "patient",
+            reason: "ended",
+            message: isDoctorEnding
+              ? "Doctor has ended the call"
+              : "Patient has ended the call",
+            timestamp: new Date().toISOString(),
+          });
         }
 
         if (callSession.patientId) {
-          io.to(`patient-${callSession.patientId}`).emit(
-            "call-ended-by-other",
-            {
-              callId,
-              endedBy: isDoctorEnding ? "doctor" : "patient",
-              reason: "ended",
-              message: isDoctorEnding
-                ? "Doctor has ended the call"
-                : "Patient has ended the call",
-              timestamp: new Date().toISOString(),
-            }
-          );
+          io.to(`patient-${callSession.patientId}`).emit("call-ended-by-other", {
+            callId,
+            endedBy: isDoctorEnding ? "doctor" : "patient",
+            reason: "ended",
+            message: isDoctorEnding
+              ? "Doctor has ended the call"
+              : "Patient has ended the call",
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (callSession.patientSocketId) {
+          io.to(callSession.patientSocketId).emit("force-disconnect", {
+            callId,
+            reason: "ended",
+            endedBy: isDoctorEnding ? "doctor" : "patient",
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (callSession.doctorSocketId) {
+          io.to(callSession.doctorSocketId).emit("force-disconnect", {
+            callId,
+            reason: "ended",
+            endedBy: isDoctorEnding ? "doctor" : "patient",
+            timestamp: new Date().toISOString(),
+          });
         }
       }
 
-      // broadcast status update
       io.emit("call-status-update", {
         callId,
         status: "ended",
@@ -1641,17 +1713,15 @@ io.on("connection", (socket) => {
         timestamp: new Date().toISOString(),
       });
 
-      // cleanup call memory shortly after
       setTimeout(() => {
         activeCalls.delete(callId);
-        activeCallSessions.delete(callId);
         emitAvailableDoctors();
         console.log(`🗑️ Cleaned up ended call ${callId}`);
       }, 10_000);
     }
   );
 
-  // ========== DOCTOR MANUALLY LEAVES ==========
+  // ========== DOCTOR MANUALLY LEAVES (similar to doctor-offline) ==========
   socket.on("leave-doctor", (doctorIdRaw) => {
     const doctorId = Number(doctorIdRaw);
     console.log(`👋 Doctor ${doctorId} leaving`);
@@ -1698,18 +1768,19 @@ io.on("connection", (socket) => {
   socket.on("disconnect", (reason) => {
     console.log(`❌ Disconnected: ${socket.id}, reason: ${reason}`);
 
-    // mark any doctor with this socket as "grace"
+    // Mark any doctor with this socket as "disconnected" but keep them in map
     for (const [doctorId, info] of activeDoctors.entries()) {
       if (info.socketId === socket.id) {
         console.log(
-          `🔌 Doctor ${doctorId} socket disconnected, entering grace period`
+          `🔌 Doctor ${doctorId} socket disconnected, marking as disconnected (always-online mode)`
         );
-        scheduleDoctorRemoval(doctorId, socket.id);
-        emitAvailableDoctors();
+        markDoctorDisconnected(doctorId, socket.id);
       }
     }
 
-    // also handle calls where this socket was in the middle
+    emitAvailableDoctors();
+
+    // Handle calls where this socket was in the middle
     for (const [callId, callSession] of activeCalls.entries()) {
       if (
         callSession.patientSocketId === socket.id ||
@@ -1720,7 +1791,6 @@ io.on("connection", (socket) => {
         const isDoctor = callSession.doctorSocketId === socket.id;
         const isPatient = callSession.patientSocketId === socket.id;
 
-        // Only notify if call was actually active
         const wasCallActive =
           callSession.status === "active" ||
           (callSession.doctorJoinedAt && callSession.patientJoinedAt);
@@ -1748,12 +1818,13 @@ io.on("connection", (socket) => {
             ? callSession.patientSocketId
             : callSession.doctorSocketId;
 
-          // tell the other side
           if (otherSocketId) {
             io.to(otherSocketId).emit("other-party-disconnected", {
               callId,
               disconnectedBy: isDoctor ? "doctor" : "patient",
-              message: `The ${isDoctor ? "doctor" : "patient"} disconnected unexpectedly`,
+              message: `The ${
+                isDoctor ? "doctor" : "patient"
+              } disconnected unexpectedly`,
               timestamp: new Date().toISOString(),
             });
 
@@ -1763,7 +1834,13 @@ io.on("connection", (socket) => {
               } (socket: ${otherSocketId})`
             );
 
-            // Force the counterpart socket to disconnect from server to keep both sides in sync
+            io.to(otherSocketId).emit("force-disconnect", {
+              callId,
+              reason: "peer_disconnected",
+              disconnectedBy: isDoctor ? "doctor" : "patient",
+              timestamp: new Date().toISOString(),
+            });
+
             const otherSocket = io.sockets.sockets.get(otherSocketId);
             if (otherSocket) {
               otherSocket.disconnect(true);
@@ -1778,7 +1855,6 @@ io.on("connection", (socket) => {
             }
           }
 
-          // backup notify via rooms
           if (callSession.doctorId) {
             socket
               .to(`doctor-${callSession.doctorId}`)
@@ -1803,7 +1879,6 @@ io.on("connection", (socket) => {
               });
           }
 
-          // global status broadcast
           io.emit("call-status-update", {
             callId,
             status: "disconnected",
@@ -1812,7 +1887,6 @@ io.on("connection", (socket) => {
           });
         }
 
-        // cleanup after 30s
         setTimeout(() => {
           activeCalls.delete(callId);
           emitAvailableDoctors();
@@ -1825,33 +1899,36 @@ io.on("connection", (socket) => {
 
 // -------------------- PERIODIC CLEANUPS --------------------
 
-// kill stale doctors that never heartbeat back after grace x2
+// 24-hour safety: remove stale doctors who never heartbeat again
 setInterval(() => {
   const now = Date.now();
   let removedCount = 0;
-  
+
   for (const [doctorId, info] of activeDoctors.entries()) {
     const lastSeen = info.lastSeen ? new Date(info.lastSeen).getTime() : 0;
     if (!lastSeen) continue;
-    if (now - lastSeen > DOCTOR_GRACE_PERIOD_MS * 2) {
+    if (now - lastSeen > DOCTOR_STALE_TIMEOUT_MS) {
       console.log(
-        `⏳ Removing stale doctor ${doctorId} after heartbeat timeout (last seen: ${new Date(lastSeen).toISOString()})`
+        `⏳ Removing stale doctor ${doctorId} after 24h timeout (last seen: ${new Date(
+          lastSeen
+        ).toISOString()})`
       );
       activeDoctors.delete(doctorId);
       removedCount++;
     }
   }
-  
+
   if (removedCount > 0) {
     console.log(`🧹 Cleanup: Removed ${removedCount} stale doctor(s)`);
     emitAvailableDoctors();
   }
 }, DOCTOR_HEARTBEAT_INTERVAL_MS);
 
-// auto time-out calls older than 5 minutes that haven't finished
+// Auto time-out calls older than 5 minutes that haven't finished
 setInterval(() => {
   const now = new Date();
   const threshold = 5 * 60 * 1000;
+
   for (const [callId, callSession] of activeCalls.entries()) {
     const age = now - callSession.createdAt;
     if (
@@ -1881,10 +1958,10 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// periodic log of server state
+// Periodic log of server state
 setInterval(() => {
   console.log(
-    `📊 Stats: Connections: ${io.engine.clientsCount}, Active Doctors: ${activeDoctors.size}, Active Calls: ${activeCalls.size}, Pending Calls: ${pendingCalls.size}`
+    `📊 Stats: Connections: ${io.engine.clientsCount}, Active Doctors: ${activeDoctors.size}, Active Calls: ${activeCalls.size}, Pending Doctor Queues: ${pendingCalls.size}`
   );
   console.log(`👨‍⚕️ Active Doctor IDs:`, Array.from(activeDoctors.keys()));
 }, 30_000);
@@ -1896,17 +1973,19 @@ httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`📍 Health check: http://localhost:${PORT}/health`);
   console.log(`📍 Active doctors: http://localhost:${PORT}/active-doctors`);
   console.log(
-    `🔥 Firebase Admin initialized: ${admin.apps.length > 0 ? "YES" : "NO"}`
+    `🔥 Firebase Admin initialized: ${
+      admin.apps.length > 0 ? "YES" : "NO"
+    }`
   );
   console.log(
-    `📱 Push notifications: ${admin.apps.length > 0 ? "ENABLED" : "DISABLED"}`
+    `📱 Push notifications: ${
+      admin.apps.length > 0 ? "ENABLED" : "DISABLED"
+    }`
   );
-  console.log(`⏰ Doctor grace period: ${DOCTOR_GRACE_PERIOD_MS / 1000}s`);
+  console.log(`⏰ Doctor stale timeout: ${DOCTOR_STALE_TIMEOUT_MS / 1000}s`);
   console.log(`⏱️ Pending call timeout: ${PENDING_CALL_TIMEOUT_MS / 1000}s`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || "development"}`);
   if (isWhatsAppConfigured() && WHATSAPP_ALERT_HAS_RECIPIENTS) {
     console.log(`📲 WhatsApp alerts: ENABLED (${WHATSAPP_ALERT_MODE} mode)`);
   }
 });
-
-
