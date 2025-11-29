@@ -80,6 +80,10 @@
 
       <div class="flex items-center gap-3">
         @yield('header_actions')
+        <div id="call-ringing-badge" class="hidden items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 shadow-sm cursor-pointer hover:bg-amber-100 transition">
+          <span class="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span data-role="ring-text">Phone is ringing</span>
+        </div>
         <span class="hidden md:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold
               {{ $sessionRole === 'doctor' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' }}">
           <span class="uppercase tracking-wide text-[11px] {{ $sessionRole === 'doctor' ? 'text-indigo-500' : 'text-emerald-500' }}">Role</span>

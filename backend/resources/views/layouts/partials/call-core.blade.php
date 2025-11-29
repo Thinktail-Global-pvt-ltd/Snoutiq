@@ -22,6 +22,8 @@
     const label       = document.getElementById('visibility-label');
     const statusDot   = document.getElementById('status-dot');
     const statusPill  = document.getElementById('status-pill');
+    const ringNotice  = document.getElementById('call-ringing-badge');
+    const ringNoticeText = ringNotice ? ringNotice.querySelector('[data-role="ring-text"]') : null;
 
     window.__SNOUTIQ_LAYOUT_HANDLES_VISIBILITY = true;
 
@@ -44,6 +46,17 @@
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
+
+    if (ringNotice) {
+      ringNotice.addEventListener('click', ()=>{
+        if (globalCall) {
+          acceptGlobalCall(globalCall);
+          return;
+        }
+        const href = ringNotice.dataset.href || '';
+        if (href) window.location.href = href;
+      });
+    }
 
     const sessionUser = @json($coreSessionUser);
     const sessionAuth = @json($coreSessionAuth);
@@ -75,6 +88,8 @@
     let ringResumePending = false;
     let ringResumeListener = null;
     const callSessionCache = new Map();
+    const ENABLE_CALL_AUDIO = false;
+    const ENABLE_CALL_MODAL = false;
 
     const HEARTBEAT_EVENT = 'doctor-heartbeat';
     const HEARTBEAT_INTERVAL = 25000;
@@ -351,6 +366,7 @@
 
     function startGlobalTone(){
       try{
+        if (!ENABLE_CALL_AUDIO) return;
         cancelRingResume();
         const audio = ensureRingAudio();
         if (!audio) return;
@@ -382,10 +398,61 @@
       }
     }
 
+    function showRingNotice(payload){
+      if (!ringNotice) return;
+      const patientName = extractPatientName(payload);
+      const channel = extractChannelName(payload);
+      const parts = ['Phone is ringing'];
+      if (patientName) parts.push(`· ${patientName}`);
+      else if (channel) parts.push(`· ${channel}`);
+      if (ringNoticeText) {
+        ringNoticeText.textContent = parts.join(' ');
+      }
+      const target = resolveDoctorJoinUrl(payload);
+      ringNotice.dataset.href = target || '';
+      ringNotice.classList.remove('hidden');
+    }
+
+    function hideRingNotice(){
+      if (!ringNotice) return;
+      if (ringNoticeText) {
+        ringNoticeText.textContent = 'Phone is ringing';
+      }
+      ringNotice.dataset.href = '';
+      ringNotice.classList.add('hidden');
+    }
+
     function emitCallEvent(name, detail){
       try{
         window.dispatchEvent(new CustomEvent(name, { detail }));
       }catch(_){}
+    }
+
+    function gatherCallLinkPayload(payload, info){
+      const source = Object.assign({}, payload || globalCall || {});
+      if (info) {
+        if (info.doctorJoinUrl) source.doctorJoinUrl = info.doctorJoinUrl;
+        if (info.rejoinUrl) source.rejoinUrl = info.rejoinUrl;
+        if (info.channelName) source.channel = source.channel || info.channelName;
+      }
+      return source;
+    }
+
+    function publishCallLinks({ visible = false, payload = null, info = null } = {}){
+      if (!visible) {
+        emitCallEvent('snoutiq:call-links-update', { visible: false });
+        return;
+      }
+      const source = gatherCallLinkPayload(payload, info);
+      const doctorJoinUrl = resolveDoctorJoinUrl(source);
+      const rejoinUrl = resolveRejoinUrl(source);
+      emitCallEvent('snoutiq:call-links-update', {
+        visible: true,
+        doctorJoinUrl,
+        rejoinUrl,
+        callId: normaliseCallId(source),
+        channel: source?.channel || '',
+      });
     }
 
     function updateDoctorId(id){
@@ -518,104 +585,6 @@
       return paymentUrlFromPayload(payload);
     }
 
-    function formatLinkDisplay(url){
-      if (!url) return '';
-      try {
-        const parsed = new URL(url, window.location?.origin || undefined);
-        const displayValue = `${parsed.pathname}${parsed.search}`;
-        if (displayValue.length > 58) {
-          return `${displayValue.slice(0, 55)}…`;
-        }
-        return displayValue || parsed.href;
-      } catch (_err) {
-        return url.length > 58 ? `${url.slice(0,55)}…` : url;
-      }
-    }
-
-    function bindCopyButton(button){
-      if (!button || button.dataset.copyBound === '1') return;
-      button.addEventListener('click', async (event) => {
-        event.preventDefault();
-        const value = button.dataset.copyValue;
-        if (!value) return;
-        try {
-          if (navigator?.clipboard?.writeText) {
-            await navigator.clipboard.writeText(value);
-          } else {
-            const tmp = document.createElement('textarea');
-            tmp.value = value;
-            tmp.setAttribute('readonly', '');
-            tmp.style.position = 'absolute';
-            tmp.style.left = '-9999px';
-            document.body.appendChild(tmp);
-            tmp.select();
-            document.execCommand('copy');
-            document.body.removeChild(tmp);
-          }
-          button.classList.add('is-copied');
-          button.textContent = 'Copied!';
-          setTimeout(() => {
-            button.classList.remove('is-copied');
-            button.textContent = 'Copy';
-          }, 1500);
-        } catch (err) {
-          console.warn('[snoutiq-call] copy failed', err);
-        }
-      });
-      button.dataset.copyBound = '1';
-    }
-
-    function populateLinkRow(rowEl, url, label){
-      if (!rowEl) return;
-      try {
-        if (label) {
-          const labelEl = rowEl.querySelector('[data-role="link-label"]');
-          if (labelEl) labelEl.textContent = label;
-        }
-        const valueEl = rowEl.querySelector('[data-role="link-value"]');
-        const openEl = rowEl.querySelector('[data-role="link-open"]');
-        const copyEl = rowEl.querySelector('[data-role="link-copy"]');
-
-        if (!url) {
-          rowEl.classList.add('is-disabled');
-          if (valueEl) {
-            valueEl.textContent = 'Not available yet';
-            valueEl.removeAttribute('title');
-          }
-          if (openEl) {
-            openEl.removeAttribute('href');
-            openEl.setAttribute('aria-disabled','true');
-          }
-          if (copyEl) {
-            copyEl.disabled = true;
-            copyEl.removeAttribute('data-copy-value');
-            copyEl.classList.remove('is-copied');
-            copyEl.textContent = 'Copy';
-          }
-          return;
-        }
-
-        rowEl.classList.remove('is-disabled');
-        if (valueEl) {
-          valueEl.textContent = formatLinkDisplay(url);
-          valueEl.title = url;
-        }
-        if (openEl) {
-          openEl.href = url;
-          openEl.setAttribute('aria-disabled','false');
-        }
-        if (copyEl) {
-          copyEl.disabled = false;
-          copyEl.dataset.copyValue = url;
-          copyEl.classList.remove('is-copied');
-          copyEl.textContent = 'Copy';
-          bindCopyButton(copyEl);
-        }
-      } catch (err) {
-        console.warn('[snoutiq-call] failed to populate link row', err);
-      }
-    }
-
     function normaliseCallId(payload){
       return (payload?.callId || payload?.call_id || payload?.callIdentifier || '').toString().trim();
     }
@@ -659,10 +628,7 @@
         } catch (_err) {
           /* swallow render issues */
         }
-        const doctorRow = container.querySelector('[data-role="doctor-link"]');
-        const rejoinRow = container.querySelector('[data-role="rejoin-link"]');
-        populateLinkRow(doctorRow, info.doctorJoinUrl || resolveDoctorJoinUrl(globalCall), 'Doctor Join Link');
-        populateLinkRow(rejoinRow, info.rejoinUrl || resolveRejoinUrl(globalCall), 'Rejoin Link');
+        publishCallLinks({ visible: globalAlertOpen, info });
       } catch (err) {
         console.warn('[snoutiq-call] failed to update active call links', err);
       }
@@ -791,9 +757,11 @@
           channel,
         });
       }
+      hideRingNotice();
       const target = resolveDoctorJoinUrl(payload);
       if (target) window.location.href = target;
       globalCall = null;
+      publishCallLinks({ visible: false });
     }
 
     function rejectGlobalCall(payload, reason = 'rejected'){
@@ -802,7 +770,9 @@
       if (socket && callId) {
         socket.emit('call-rejected', { callId, reason });
       }
+      hideRingNotice();
       globalCall = null;
+      publishCallLinks({ visible: false });
     }
 
     function dismissGlobalCall(reason){
@@ -810,7 +780,9 @@
         if (globalAlertOpen && window.Swal) Swal.close();
       }catch(_){}
       stopGlobalTone();
+      hideRingNotice();
       globalAlertOpen = false;
+      publishCallLinks({ visible: false });
       if (reason && globalCall) {
         rejectGlobalCall(globalCall, reason);
       }
@@ -1219,6 +1191,25 @@
       return null;
     }
 
+    function extractChannelName(payload){
+      if (!payload || typeof payload !== 'object') return '';
+      const channelCandidates = [
+        payload?.channel,
+        payload?.channelName,
+        payload?.channel_name,
+        payload?.call?.channel,
+        payload?.call?.channel_name,
+        payload?.context?.channel,
+        payload?.meta?.channel,
+      ];
+      for (const value of channelCandidates) {
+        if (value == null) continue;
+        const str = String(value).trim();
+        if (str) return str;
+      }
+      return '';
+    }
+
     function extractPatientName(payload){
       if (!payload || typeof payload !== 'object') return '';
       const candidates = [
@@ -1607,19 +1598,21 @@
         });
       }
 
-      const doctorLinkRow = container.querySelector('[data-role="doctor-link"]');
-      const rejoinLinkRow = container.querySelector('[data-role="rejoin-link"]');
-      populateLinkRow(doctorLinkRow, resolveDoctorJoinUrl(payload), 'Doctor Join Link');
-      populateLinkRow(rejoinLinkRow, resolveRejoinUrl(payload), 'Rejoin Link');
-
       return patientId;
     }
 
     // UPDATED modal HTML (dark dropdown style)
     function renderGlobalCallAlert(payload){
+      if (!ENABLE_CALL_MODAL) {
+        globalCall = payload;
+        showRingNotice(payload);
+        publishCallLinks({ visible: true, payload });
+        return;
+      }
       if (window.DOCTOR_PAGE_HANDLE_CALLS) return;
       globalCall = payload;
       emitCallEvent('snoutiq:call-overlay-open', payload);
+      publishCallLinks({ visible: true, payload });
       startGlobalTone();
       if (globalAlertOpen) return;
       if (window.Swal) {
@@ -1676,56 +1669,6 @@
                 <div class="snoutiq-lines" data-role="summary" style="display:none;"></div>
               </div>
 
-              <div class="snoutiq-section-card">
-                <div class="snoutiq-section-head">
-                  <div class="snoutiq-section-left">
-                    <div class="snoutiq-section-title">Links</div>
-                    <div class="snoutiq-section-subtag">Session Access</div>
-                  </div>
-                </div>
-
-                <div class="snoutiq-links-wrap">
-
-                  <div class="snoutiq-link-row is-disabled" data-role="doctor-link">
-                    <div class="snoutiq-link-main">
-                      <span class="snoutiq-link-label" data-role="link-label">Doctor Join Link</span>
-                      <span class="snoutiq-link-value" data-role="link-value">Not available yet</span>
-                    </div>
-                    <div class="snoutiq-link-actions">
-                      <a class="snoutiq-link-open"
-                         data-role="link-open"
-                         href="#"
-                         target="_blank"
-                         rel="noopener noreferrer"
-                         aria-disabled="true">Open</a>
-                      <button type="button"
-                              class="snoutiq-link-copy"
-                              data-role="link-copy"
-                              disabled>Copy</button>
-                    </div>
-                  </div>
-
-                  <div class="snoutiq-link-row is-disabled" data-role="rejoin-link">
-                    <div class="snoutiq-link-main">
-                      <span class="snoutiq-link-label" data-role="link-label">Rejoin Link</span>
-                      <span class="snoutiq-link-value" data-role="link-value">Not available yet</span>
-                    </div>
-                    <div class="snoutiq-link-actions">
-                      <a class="snoutiq-link-open"
-                         data-role="link-open"
-                         href="#"
-                         target="_blank"
-                         rel="noopener noreferrer"
-                         aria-disabled="true">Open</a>
-                      <button type="button"
-                              class="snoutiq-link-copy"
-                              data-role="link-copy"
-                              disabled>Copy</button>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
             </div>
 
             <div class="snoutiq-footer-note">
@@ -1765,6 +1708,7 @@
         }).then(result => {
           globalAlertOpen = false;
           stopGlobalTone();
+          publishCallLinks({ visible: false });
           if (result.isConfirmed) {
             acceptGlobalCall(payload);
           } else if (result.isDenied) {
@@ -1778,6 +1722,7 @@
       stopGlobalTone();
       if (accept) acceptGlobalCall(payload);
       else rejectGlobalCall(payload, 'dismissed');
+      publishCallLinks({ visible: false });
     }
 
     function setHeaderStatus(state){
@@ -1925,8 +1870,11 @@
       socket.on('call-requested', (payload)=>{
         if (payload?.doctorId) updateDoctorId(payload.doctorId);
         persistCallSession(payload);
+        globalCall = payload;
+        publishCallLinks({ visible: true, payload });
         emitCallEvent('snoutiq:call-requested', payload);
-        if (!window.DOCTOR_PAGE_HANDLE_CALLS) {
+        showRingNotice(payload);
+        if (!window.DOCTOR_PAGE_HANDLE_CALLS && ENABLE_CALL_MODAL) {
           renderGlobalCallAlert(payload);
         }
       });
@@ -1935,6 +1883,9 @@
       cancelEvents.forEach(eventName=>{
         socket.on(eventName, (payload)=>{
           emitCallEvent(`snoutiq:${eventName}`, payload);
+          hideRingNotice();
+          globalCall = null;
+          publishCallLinks({ visible: false });
           if (!window.DOCTOR_PAGE_HANDLE_CALLS) {
             dismissGlobalCall();
           }

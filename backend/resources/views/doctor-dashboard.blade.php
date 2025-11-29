@@ -115,6 +115,10 @@
 
       <div class="flex items-center gap-3">
         <button id="btn-add-service" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white">+ Add Service</button>
+        <div id="call-ringing-badge" class="hidden items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 shadow-sm cursor-pointer hover:bg-amber-100 transition">
+          <span class="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span data-role="ring-text">Phone is ringing</span>
+        </div>
         <div class="text-right">
           <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name ?? 'Doctor' }}</div>
           <div class="text-xs text-gray-500">{{ auth()->user()->role ?? 'doctor' }}</div>
