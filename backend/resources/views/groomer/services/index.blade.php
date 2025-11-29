@@ -964,26 +964,7 @@
       if (openParam === 'create' || addParam === '1') {
         openCreate();
       }
-      // Onboarding Step 1 helper
-      if ((url.searchParams.get('onboarding')||'') === '1' && (url.searchParams.get('step')||'1') === '1'){
-        if (localStorage.getItem('onboarding_v1_done') !== '1'){
-          // Professional guide modal
-          if (window.Swal){
-            const res = await Swal.fire({
-              icon:'info',
-              title:'Step 1 of 3: Add a Service',
-              html:'Create at least one service your clinic offers. This helps patients find and book you easily.',
-              showCancelButton:true,
-              confirmButtonText:'Next Step',
-              cancelButtonText:"I'll add a service first"
-            });
-            if (res.isConfirmed){
-              const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
-              window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor/video-calling-schedule/manage?onboarding=1&step=2`;
-            }
-          }
-        }
-      }
+      // Onboarding SweetAlert prompt removed to avoid blocking service creation flow.
     } catch(_){}
   });
 
