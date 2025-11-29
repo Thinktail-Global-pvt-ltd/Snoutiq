@@ -115,8 +115,23 @@ class PushController extends Controller
             'owner_model' => ['nullable', 'string'],
         ]);
 
+        $metaPayload = $validated['meta'] ?? [
+            'app' => 'snoutiq',
+            'env' => app()->environment(),
+        ];
+
         $resolvedUserId = Auth::id() ?? ($validated['user_id'] ?? null);
-        $ownerModelHint = Auth::id() ? \App\Models\User::class : ($validated['owner_model'] ?? null);
+        if (!$resolvedUserId && isset($metaPayload['user_id'])) {
+            $metaUserId = filter_var($metaPayload['user_id'], FILTER_VALIDATE_INT);
+            $resolvedUserId = $metaUserId !== false ? $metaUserId : null;
+        }
+
+        $metaOwnerModel = $metaPayload['owner_model'] ?? null;
+        $ownerModelExplicit = $validated['owner_model'] ?? (is_string($metaOwnerModel) ? $metaOwnerModel : null);
+        $ownerModelHint = Auth::id()
+            ? \App\Models\User::class
+            : $ownerModelExplicit;
+        $ownerModelProvidedExplicitly = $ownerModelExplicit !== null;
 
         try {
             $ownerModel = DeviceTokenOwnerResolver::resolve($ownerModelHint);
@@ -127,15 +142,26 @@ class PushController extends Controller
         }
 
         if ($resolvedUserId && $ownerModel::query()->whereKey($resolvedUserId)->doesntExist()) {
-            return response()->json([
-                'error' => 'Owner record not found for the provided identifier.',
-            ], 422);
+            // If no explicit owner model was provided, try to auto-detect one using the id
+            if (! $ownerModelProvidedExplicitly) {
+                $detectedModel = DeviceTokenOwnerResolver::detectOwnerModelForId($resolvedUserId);
+                if ($detectedModel) {
+                    $ownerModel = $detectedModel;
+                } else {
+                    return response()->json([
+                        'error' => 'Owner record not found for the provided identifier.',
+                    ], 422);
+                }
+            } else {
+                return response()->json([
+                    'error' => 'Owner record not found for the provided identifier.',
+                ], 422);
+            }
         }
 
-        $metaPayload = $validated['meta'] ?? [
-            'app' => 'snoutiq',
-            'env' => app()->environment(),
-        ];
+        if ($resolvedUserId) {
+            $metaPayload['user_id'] = $resolvedUserId;
+        }
         $metaPayload['owner_model'] = $ownerModel;
 
         try {
