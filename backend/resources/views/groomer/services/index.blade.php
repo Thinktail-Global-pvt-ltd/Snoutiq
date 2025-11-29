@@ -644,9 +644,22 @@
   const empty = $('#empty');
   const search = $('#search');
   const createModal = $('#create-modal');
+  const createForm  = document.getElementById('create-form');
   const editModal   = $('#edit-modal');
+  const editForm    = document.getElementById('edit-form');
   const open = el => el.classList.remove('hidden');
   const close = el => el.classList.add('hidden');
+  const resetCreateForm = () => {
+    if (!createForm) return;
+    createForm.reset();
+    // Force selects to blank/default so data doesn't stick between opens
+    ['petType','main_service','status'].forEach(name=>{
+      const field = createForm.elements[name];
+      if (field && field.tagName === 'SELECT') field.value = '';
+    });
+  };
+  const openCreate = () => { resetCreateForm(); open(createModal); };
+  const closeCreate = () => { resetCreateForm(); close(createModal); };
   function esc(s){ return (''+(s??'')).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 
   // ===== List + Render =====
@@ -763,8 +776,8 @@
   });
 
   // ===== Create =====
-  document.getElementById('btn-open-create').addEventListener('click', ()=> open(createModal));
-  $$('.btn-close', createModal).forEach(b=> b.addEventListener('click', ()=> close(createModal)));
+  document.getElementById('btn-open-create').addEventListener('click', openCreate);
+  $$('.btn-close', createModal).forEach(b=> b.addEventListener('click', closeCreate));
 
   document.getElementById('create-form').addEventListener('submit', async (e)=>{
     e.preventDefault();
@@ -790,7 +803,7 @@
         body: payload
       });
       Swal.fire({icon:'success', title:'Service Created', text:'Service was created successfully', timer:1500, showConfirmButton:false});
-      close(createModal);
+      closeCreate();
       await fetchServices();
       ClientLog?.info('service.create.success', JSON.stringify(res).slice(0,800));
       // If onboarding is active, move to Step 2 (Video Calling Schedule)
@@ -878,7 +891,7 @@
   }
 
   function fillEdit(s){
-    const f = document.getElementById('edit-form');
+    const f = editForm;
     f.elements['id'].value = s.id;
     f.elements['serviceName'].value = s.name || '';
     f.elements['description'].value = s.description || '';
@@ -949,7 +962,7 @@
       const openParam = (url.searchParams.get('open') || '').toLowerCase();
       const addParam  = url.searchParams.get('add_service');
       if (openParam === 'create' || addParam === '1') {
-        open(createModal);
+        openCreate();
       }
       // Onboarding Step 1 helper
       if ((url.searchParams.get('onboarding')||'') === '1' && (url.searchParams.get('step')||'1') === '1'){
