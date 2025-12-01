@@ -14,16 +14,23 @@ class DashboardProfileController extends Controller
      */
     protected function resolveContext(Request $request): array
     {
+        // Prefer explicit query params when provided (to avoid relying on session for IDs)
+        $queryRole = $this->normalizeString($request->query('role'));
+        $queryClinicId = (int) $request->query('clinic_id', 0);
+        $queryDoctorId = (int) $request->query('doctor_id', 0);
+
         $session = $request->session();
         $sessionAuth = $session->get('auth_full');
         $sessionUser = $session->get('user');
 
-        $role = $session->get('role')
+        $role = $queryRole
+            ?? $session->get('role')
             ?? data_get($sessionAuth, 'role')
             ?? data_get($sessionUser, 'role')
             ?? 'clinic_admin';
 
         $clinicCandidates = [
+            $queryClinicId > 0 ? $queryClinicId : null,
             $session->get('clinic_id'),
             $session->get('vet_registerations_temp_id'),
             $session->get('vet_registeration_id'),
@@ -58,7 +65,8 @@ class DashboardProfileController extends Controller
         $doctorId = $session->get('doctor_id')
             ?? data_get($session->get('doctor'), 'id')
             ?? data_get($sessionAuth, 'doctor_id')
-            ?? data_get($sessionAuth, 'user.doctor_id');
+            ?? data_get($sessionAuth, 'user.doctor_id')
+            ?? ($queryDoctorId > 0 ? $queryDoctorId : null);
 
         $doctorId = $doctorId ? (int) $doctorId : null;
 
@@ -140,6 +148,7 @@ class DashboardProfileController extends Controller
 
         $doctorsQuery = Doctor::query()->select($this->doctorSelect());
         if ($ctx['clinic_id']) {
+            // Always show all doctors belonging to the clinic id in the URL/query
             $doctorsQuery->where('vet_registeration_id', $ctx['clinic_id']);
         } elseif ($ctx['doctor_id']) {
             $doctorsQuery->where('id', $ctx['doctor_id']);
@@ -157,6 +166,17 @@ class DashboardProfileController extends Controller
             $editableDoctorIds = [$ctx['doctor_id']];
         }
 
+        // Build links for the clinic public page + QR image (for both local and hosted usage)
+        $clinicPagePath = null;
+        $clinicPageUrl = null;
+        $clinicQrImage = null;
+        if ($clinic && $clinic->slug) {
+            $clinicPagePath = '/vets/' . rawurlencode($clinic->slug);
+            $clinicPageUrl = url($clinicPagePath);
+            $clinicQrImage = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data='
+                . urlencode($clinicPageUrl);
+        }
+
         return response()->json([
             'success' => true,
             'role' => $ctx['role'],
@@ -165,6 +185,9 @@ class DashboardProfileController extends Controller
             'clinic' => $clinic,
             'doctors' => $doctors,
             'doctor' => $currentDoctor,
+            'clinic_page_path' => $clinicPagePath,
+            'clinic_page_url' => $clinicPageUrl,
+            'clinic_qr_image' => $clinicQrImage,
             'editable' => [
                 'clinic' => $ctx['can_edit_clinic'] && (bool) $ctx['clinic_id'],
                 'doctor_ids' => $editableDoctorIds,
