@@ -158,9 +158,10 @@ const Header = React.memo(function Header() {
   }, [navigate]);
 
   const handleRegister = useCallback(() => {
-    navigate(
-      "/vet-register"
-    );
+    // navigate(
+    //   "/vet-register"
+    // );
+      window.location.assign('https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform');
   }, [navigate]);
 
   const handleDashboard = useCallback(() => {

@@ -190,7 +190,7 @@ const GurugramPage = () => {
         badge="Trusted by Premium Gurugram Professionals"
         title="Gurugram's Premium Veterinary Practice Management Software"
         subtitle="Elevate your Gurugram clinic with enterprise-grade technology. AI-powered triage, luxury video consultations, and premium client experience."
-        ctaPrimary={{ text: 'Schedule Premium Demo', href: '/vet-register' }}
+        ctaPrimary={{ text: 'Schedule Premium Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         // ctaSecondary={{ text: 'Call: +91-124-567-8900', href: 'tel:+911245678900' }}
       />
 
@@ -435,8 +435,8 @@ const GurugramPage = () => {
       <CTA
         title="Ready to Join Leading Gurugram Clinics?"
         subtitle="Transform your practice with SnoutIQ Premium today"
-        primaryButton={{ text: 'Schedule Premium Demo', href: '/vet-register' }}
-        secondaryButton={{ text: 'View Demo', href: '/vet-register' }}
+        primaryButton={{ text: 'Schedule Premium Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
+        secondaryButton={{ text: 'View Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         variant="gradient"
       />
       <Footer/>

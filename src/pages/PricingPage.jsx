@@ -276,7 +276,7 @@ const PricingPage = () => {
                   </div>
 
                   <Link
-                    to={plan.monthlyPrice ? '/vet-register' : '/vet-register'}
+                    to={plan.monthlyPrice ? 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' : 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform'}
                     className={`w-full px-6 py-4 rounded-xl font-semibold text-center transition-all mb-8 ${
                       plan.highlighted
                         ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:shadow-lg hover:scale-105'
@@ -339,7 +339,7 @@ const PricingPage = () => {
         <CTA
           title="Ready to Get Started?"
           subtitle="Start your 14-day free trial today. No credit card required."
-          primaryButton={{ text: 'Start Free Trial', href: '/vet-register' }}
+          primaryButton={{ text: 'Start Free Trial', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
           secondaryButton={{ text: 'Schedule Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
           variant="gradient"
         />

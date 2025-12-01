@@ -207,7 +207,7 @@ const VideoConsultPage = () => {
         badge="HD Video Consultations"
         title="Connect with Pet Owners Through Seamless Video Calls"
         subtitle="Deliver high-quality veterinary care remotely with crystal-clear HD video, screen sharing, and secure communication."
-        ctaPrimary={{ text: 'Start Free Trial', href: '/vet-register' }}
+        ctaPrimary={{ text: 'Start Free Trial', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         ctaSecondary={{ text: 'Watch Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
       />
 
@@ -263,7 +263,7 @@ const VideoConsultPage = () => {
       <CTA
         title="Ready to Start Video Consultations?"
         subtitle="Join hundreds of clinics already providing convenient remote care"
-        primaryButton={{ text: 'Start Free Trial', href: '/vet-register' }}
+        primaryButton={{ text: 'Start Free Trial', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         secondaryButton={{ text: 'See Pricing', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         variant="gradient"
       />

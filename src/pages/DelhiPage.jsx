@@ -190,8 +190,8 @@ const DelhiPage = () => {
         badge="Trusted by Delhi Veterinary Professionals"
         title="Delhi's Leading Veterinary Practice Management Software"
         subtitle="Transform your Delhi clinic with AI-powered triage, HD video consultations, and smart scheduling designed for modern veterinary practices."
-        ctaPrimary={{ text: 'Schedule Delhi Demo', href: '/vet-register' }}
-        ctaSecondary={{ text: 'Check Demo', href: '/vet-register' }}
+        ctaPrimary={{ text: 'Schedule Delhi Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
+        ctaSecondary={{ text: 'Check Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
       />
 
       <Benefits benefits={benefits} variant="default" />
@@ -369,8 +369,8 @@ const DelhiPage = () => {
       <CTA
         title="Ready to Join Leading Delhi Clinics?"
         subtitle="Transform your Delhi veterinary practice with SnoutIQ today"
-        primaryButton={{ text: 'Schedule Delhi Demo', href: '/vet-register' }}
-        secondaryButton={{ text: 'View Pricing', href: '/vet-register' }}
+        primaryButton={{ text: 'Schedule Delhi Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
+        secondaryButton={{ text: 'View Pricing', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         variant="gradient"
       />
       <Footer/>

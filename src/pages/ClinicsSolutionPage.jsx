@@ -189,8 +189,8 @@ const ClinicsSolutionPage = () => {
         badge="Built for Veterinary Clinics"
         title="Transform Your Clinic into a Modern Digital Practice"
         subtitle="Complete practice management solution that increases revenue, improves efficiency, and delivers exceptional patient care."
-        ctaPrimary={{ text: 'Schedule Demo', href: '/vet-register' }}
-        ctaSecondary={{ text: 'View Demo', href: '/vet-register' }}
+        ctaPrimary={{ text: 'Schedule Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
+        ctaSecondary={{ text: 'View Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
       />
 
       {/* Benefits Section */}
@@ -324,8 +324,8 @@ const ClinicsSolutionPage = () => {
       <CTA
         title="Ready to Modernize Your Clinic?"
         subtitle="Start growing your practice with SnoutIQ today"
-        primaryButton={{ text: 'Schedule Demo', href: '/vet-register' }}
-        secondaryButton={{ text: 'View Demo', href: '/vet-register' }}
+        primaryButton={{ text: 'Schedule Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
+        secondaryButton={{ text: 'View Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         variant="gradient"
       />
       <Footer/>

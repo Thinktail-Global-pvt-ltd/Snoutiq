@@ -171,7 +171,7 @@ function Home() {
           badge="Trusted by Veterinary Professionals"
           title="Transform Your Veterinary Practice with AI-Powered Care"
           subtitle="Streamline consultations, reduce no-shows, and deliver exceptional pet care with SnoutIQ's intelligent platform."
-          ctaPrimary={{ text: "Start Free Trial", href: "/vet-register" }}
+          ctaPrimary={{ text: "Start Free Trial", href: "https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform" }}
           ctaSecondary={{ text: "Book a Live Demo", href: "https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform" }}
         />
 
