@@ -144,6 +144,80 @@ Route::post('/device-tokens/issue', function (Request $request) {
     ], 201);
 })->name('api.device-tokens.issue');
 
+// Simple doctor profile read/update via query param doctor_id (no auth)
+Route::get('/doctor/profile', function (Request $request) {
+    $doctorId = $request->query('doctor_id');
+    if (!$doctorId) {
+        return response()->json(['message' => 'doctor_id is required'], 422);
+    }
+
+    $doctor = Doctor::find($doctorId);
+    if (!$doctor) {
+        return response()->json(['message' => 'Doctor not found'], 404);
+    }
+
+    return response()->json([
+        'data' => [
+            'id' => $doctor->id,
+            'doctor_name' => $doctor->doctor_name,
+            'doctor_email' => $doctor->doctor_email,
+            'doctor_mobile' => $doctor->doctor_mobile,
+            'doctor_license' => $doctor->doctor_license,
+            'doctor_image' => $doctor->doctor_image,
+            'doctor_document' => $doctor->doctor_document,
+            'toggle_availability' => $doctor->toggle_availability,
+            'doctors_price' => $doctor->doctors_price,
+            'vet_registeration_id' => $doctor->vet_registeration_id,
+            'staff_role' => $doctor->staff_role,
+        ],
+    ]);
+});
+
+Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
+    $doctorId = $request->query('doctor_id');
+    if (!$doctorId) {
+        return response()->json(['message' => 'doctor_id is required'], 422);
+    }
+
+    $doctor = Doctor::find($doctorId);
+    if (!$doctor) {
+        return response()->json(['message' => 'Doctor not found'], 404);
+    }
+
+    $validated = $request->validate([
+        'doctor_name' => 'sometimes|required|string|max:255',
+        'doctor_email' => 'sometimes|nullable|email|max:255',
+        'doctor_mobile' => 'sometimes|nullable|string|max:25',
+        'doctor_license' => 'sometimes|nullable|string|max:150',
+        'staff_role' => 'sometimes|nullable|string|max:100',
+        'doctor_image' => 'sometimes|nullable|string|max:500',
+        'doctor_document' => 'sometimes|nullable|string|max:500',
+        'toggle_availability' => 'sometimes|boolean',
+        'doctors_price' => 'sometimes|nullable|numeric|min:0|max:1000000',
+        'vet_registeration_id' => 'sometimes|nullable|integer|exists:vet_registerations_temp,id',
+    ]);
+
+    $doctor->fill($validated);
+    $doctor->save();
+
+    return response()->json([
+        'message' => 'Doctor profile updated successfully.',
+        'data' => [
+            'id' => $doctor->id,
+            'doctor_name' => $doctor->doctor_name,
+            'doctor_email' => $doctor->doctor_email,
+            'doctor_mobile' => $doctor->doctor_mobile,
+            'doctor_license' => $doctor->doctor_license,
+            'doctor_image' => $doctor->doctor_image,
+            'doctor_document' => $doctor->doctor_document,
+            'toggle_availability' => $doctor->toggle_availability,
+            'doctors_price' => $doctor->doctors_price,
+            'vet_registeration_id' => $doctor->vet_registeration_id,
+            'staff_role' => $doctor->staff_role,
+        ],
+    ]);
+});
+
 Route::get('/doctors/featured', function (Request $request) {
     $userId = $request->query('user_id');
     if (!$userId) {

@@ -38,51 +38,28 @@ class PushController extends Controller
         }
 
         try {
-            // Priority 1: explicit old_token
-            // Priority 2: match by user_id + device_id
-            // Priority 3: first token for this user (last seen)
-            $tokenToUpdate = null;
-
-            if (!empty($validated['old_token'])) {
-                $tokenToUpdate = DeviceToken::where('user_id', $validated['user_id'])
-                    ->where('token', $validated['old_token'])
-                    ->first();
+            // Upsert strictly on user_id (and device_id if provided to scope per device)
+            $lookup = ['user_id' => $validated['user_id']];
+            if (!empty($validated['device_id'])) {
+                $lookup['device_id'] = $validated['device_id'];
             }
 
-            if (! $tokenToUpdate && !empty($validated['device_id'])) {
-                $tokenToUpdate = DeviceToken::where('user_id', $validated['user_id'])
-                    ->where('device_id', $validated['device_id'])
-                    ->latest('last_seen_at')
-                    ->first();
-            }
-
-            if (! $tokenToUpdate) {
-                $tokenToUpdate = DeviceToken::where('user_id', $validated['user_id'])
-                    ->latest('last_seen_at')
-                    ->first();
-            }
-
-            if (! $tokenToUpdate) {
-                // create fresh record if nothing exists
-                $tokenToUpdate = new DeviceToken();
-                $tokenToUpdate->user_id = $validated['user_id'];
-            }
-
-            $tokenToUpdate->token = $validated['token'];
-            if (array_key_exists('platform', $validated)) {
-                $tokenToUpdate->platform = $validated['platform'];
-            }
-            if (array_key_exists('device_id', $validated)) {
-                $tokenToUpdate->device_id = $validated['device_id'];
-            }
             $meta = $validated['meta'] ?? [
                 'app' => 'snoutiq',
                 'env' => app()->environment(),
             ];
             $meta['owner_model'] = $ownerModel;
-            $tokenToUpdate->meta = $meta;
-            $tokenToUpdate->last_seen_at = now();
-            $tokenToUpdate->save();
+
+            $tokenToUpdate = DeviceToken::updateOrCreate(
+                $lookup,
+                [
+                    'token' => $validated['token'],
+                    'platform' => $validated['platform'] ?? null,
+                    'device_id' => $validated['device_id'] ?? null,
+                    'meta' => $meta,
+                    'last_seen_at' => now(),
+                ]
+            );
 
             return response()->json([
                 'ok'       => true,
