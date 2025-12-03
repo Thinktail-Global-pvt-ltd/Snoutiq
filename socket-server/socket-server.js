@@ -1584,6 +1584,73 @@ io.on("connection", (socket) => {
     emitAvailableDoctors();
   });
 
+  // ========== PATIENT PAYMENT CANCELLED ==========
+  socket.on("payment-cancelled", (data) => {
+    const { callId, patientId, doctorId, channel, reason } = data;
+    console.log(
+      `Payment cancelled for call ${callId} by patient ${patientId}`
+    );
+
+    const callSession = activeCalls.get(callId);
+    if (!callSession) {
+      console.log(`Call session ${callId} not found for cancellation`);
+      return;
+    }
+
+    callSession.status = "payment_cancelled";
+    callSession.cancelledAt = new Date();
+    callSession.cancellationReason =
+      reason || "patient_cancelled_payment";
+
+    clearNotificationSent(callId, doctorId);
+    removePendingCallEntry(doctorId, callId);
+
+    logFlow("payment-cancelled", {
+      callId,
+      doctorId,
+      patientId,
+      channel,
+      reason,
+      patientSocketId: socket.id,
+      doctorSocketId: callSession.doctorSocketId,
+    });
+
+    if (callSession.doctorSocketId) {
+      io.to(callSession.doctorSocketId).emit("payment-cancelled", {
+        callId,
+        doctorId,
+        patientId,
+        reason: reason || "patient_cancelled_payment",
+        message: "Patient cancelled the payment",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    io.to(`doctor-${doctorId}`).emit("payment-cancelled", {
+      callId,
+      doctorId,
+      patientId,
+      reason: reason || "patient_cancelled_payment",
+      message: "Patient cancelled the payment",
+      timestamp: new Date().toISOString(),
+    });
+
+    io.emit("call-status-update", {
+      callId,
+      status: "payment_cancelled",
+      cancelledBy: "patient",
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+
+    setTimeout(() => {
+      activeCalls.delete(callId);
+      emitAvailableDoctors();
+      deliverNextPendingCall(doctorId);
+      console.log(`Cleaned up cancelled call ${callId}`);
+    }, 2000);
+  });
+
   // ========== CALL STARTED ==========
   socket.on("call-started", ({ callId, userId, role }) => {
     console.log(`📹 User ${userId} (${role}) joined call ${callId}`);
