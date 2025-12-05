@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 
-const VetOnlineConsultationGuide = () => {
+const VaccinationScheduleForPets = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
@@ -47,43 +47,44 @@ const VetOnlineConsultationGuide = () => {
     <>
       {/* SEO Meta Tags */}
       <head>
-        <title>How Vets Can Grow Their Practice with Online Consultations in India 2024 | Complete Guide</title>
-        <meta name="title" content="How Vets Can Grow Their Practice with Online Consultations | Complete Guide 2024" />
-        <meta name="description" content="जानें कैसे veterinarians online vet consultation से अपनी practice बढ़ा सकते हैं। Complete guide on digital vet services, pricing, marketing strategies और tools in India." />
-        <meta name="keywords" content="online vet consultation, online veterinary consultation, online vet consultation india, pet doctor online, online veterinary doctor, vet consultation india free, veterinary services online" />
-        <meta name="author" content="Veterinary Expert" />
+        <title>Vaccination Schedule for Pets in India 2025 | Complete Guide for Dogs & Cats</title>
+        <meta name="title" content="Vaccination Schedule for Pets in India - Complete Guide 2025" />
+        <meta name="description" content="Complete vaccination schedule for pets in India 2025. Learn about dog and cat vaccination timeline, costs, core vaccines, booster shots and expert pet care tips." />
+        <meta name="keywords" content="vaccination schedule for pets in india, pet vaccination timeline india, dog vaccination schedule india, cat vaccination schedule india, pet vaccines cost india, rabies vaccine pets india" />
+        <meta name="author" content="Snoutiq - Pet Care Experts" />
         <meta name="robots" content="index, follow" />
-        <meta property="og:title" content="How Vets Can Grow Their Practice with Online Consultations | Complete Guide 2024" />
-        <meta property="og:description" content="Complete guide for veterinarians to grow their practice with online consultations in India. Learn tools, pricing models, and marketing strategies." />
+        <meta property="og:title" content="Vaccination Schedule for Pets in India - Complete Guide 2025" />
+        <meta property="og:description" content="Comprehensive guide on pet vaccination in India with age-wise charts, costs, and expert recommendations for dogs and cats." />
         <meta property="og:type" content="article" />
-        <meta property="og:image" content="https://yourwebsite.com/images/vet-online-consultation.jpg" />
-        <link rel="canonical" href="https://yourwebsite.com/vet-online-consultation-guide" />
+        <meta property="og:url" content="https://snoutiq.com/vaccination-schedule-pets-india" />
+        <meta property="og:image" content="https://snoutiq.com/images/pet-vaccination-guide.jpg" />
+        <link rel="canonical" href="https://snoutiq.com/vaccination-schedule-pets-india" />
         
         {/* Schema.org Markup */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
-            "@type": "BlogPosting",
-            "headline": "How Vets Can Grow Their Practice with Online Consultations in India 2024",
-            "description": "Complete guide for veterinarians to grow their practice with online consultations in India. Learn tools, pricing models, and marketing strategies.",
-            "image": "https://yourwebsite.com/images/vet-online-consultation.jpg",
+            "@type": "Article",
+            "headline": "Vaccination Schedule for Pets in India - Complete Guide 2025",
+            "description": "Complete vaccination schedule for pets in India 2025. Learn about dog and cat vaccination timeline, costs, core vaccines, booster shots and expert pet care tips.",
+            "image": "https://snoutiq.com/images/pet-vaccination-guide.jpg",
             "author": {
               "@type": "Organization",
-              "name": "Veterinary Expert"
+              "name": "Snoutiq"
             },
             "publisher": {
               "@type": "Organization",
-              "name": "Your Website",
+              "name": "Snoutiq",
               "logo": {
                 "@type": "ImageObject",
-                "url": "https://yourwebsite.com/logo.png"
+                "url": "https://snoutiq.com/logo.png"
               }
             },
             "datePublished": "2024-12-01",
-            "dateModified": "2024-12-01",
+            "dateModified": "2024-12-04",
             "mainEntityOfPage": {
               "@type": "WebPage",
-              "@id": "https://yourwebsite.com/vet-online-consultation-guide"
+              "@id": "https://snoutiq.com/vaccination-schedule-pets-india"
             }
           })}
         </script>
@@ -96,42 +97,42 @@ const VetOnlineConsultationGuide = () => {
             "mainEntity": [
               {
                 "@type": "Question",
-                "name": "Is online vet consultation effective?",
+                "name": "What is the correct vaccination schedule for pets in India?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Yes, it is highly effective for common medical problems, diet advice, behaviour consultation, and follow-ups. Studies show 60-70% of pet health queries can be resolved through online consultation without requiring a physical visit."
+                  "text": "It starts at 6 to 8 weeks of age, followed by booster doses at 10-12 weeks and 14-16 weeks, and then yearly revaccinations to maintain immunity throughout your pet's life."
                 }
               },
               {
                 "@type": "Question",
-                "name": "Can online vet consultation replace clinic visits completely?",
+                "name": "When should puppies and kittens get their first vaccine?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Not fully. While many conditions can be managed online, severe cases, emergencies, surgical procedures, and conditions requiring physical examination, lab tests, or X-rays still need in-person clinic visits."
+                  "text": "Puppies and kittens should receive their first vaccine at 6 to 8 weeks of age. This is when maternal antibodies start declining and vaccination becomes most effective."
                 }
               },
               {
                 "@type": "Question",
-                "name": "How much should vets charge for online consultations?",
+                "name": "Are Rabies vaccines mandatory in India?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Typical pricing ranges from ₹250 to ₹800 per session depending on experience, specialization, and consultation duration."
+                  "text": "Yes, Rabies vaccination is legally required for both dogs and cats in India. It protects not only your pet but also humans from this fatal disease."
                 }
               },
               {
                 "@type": "Question",
-                "name": "Are online veterinary consultation services legal in India?",
+                "name": "Do indoor pets also need vaccination?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Yes, basic guidance, consultations, and follow-up care are legally allowed in India."
+                  "text": "Yes, even indoor pets need vaccination because viruses can enter homes through shoes, hands, clothing, or visiting animals."
                 }
               },
               {
                 "@type": "Question",
-                "name": "What tools and technology do vets need for online consultations?",
+                "name": "What if I miss a vaccine date?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Essential tools include: smartphone/laptop with camera, stable 4G/5G internet, video consultation platform, digital payment gateway, and record-keeping system."
+                  "text": "Consult a vet immediately if you miss a vaccine date. Depending on the gap, your vet may restart the schedule or adjust the timeline."
                 }
               }
             ]
@@ -139,35 +140,33 @@ const VetOnlineConsultationGuide = () => {
         </script>
       </head>
 
-      <div className="font-sans text-gray-800 bg-gray-50 min-h-screen">
-       <Header/>
-        <article className="max-w-4xl mx-auto bg-white shadow-xl rounded-xl overflow-hidden my-8 mt-20" itemScope itemType="http://schema.org/BlogPosting">
+      <div className="font-sans text-gray-800 bg-gradient-to-br from-indigo-50 to-purple-50 min-h-screen">
+<Header/>
+        <article className="max-w-4xl mx-auto bg-white shadow-xl shadow-indigo-100 rounded-xl overflow-hidden my-8 mt-20" itemScope itemType="http://schema.org/BlogPosting">
           
           {/* Blog Header */}
           <header className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white relative overflow-hidden py-16 px-8 text-center">
-            {/* Background Pattern */}
-            <div className="absolute inset-0 opacity-10" style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h100v100H0z' fill='none'/%3E%3Cpath d='M50 10L90 90H10z' fill='rgba(255,255,255,0.05)'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'repeat'
-            }}></div>
+            {/* Decorative Emojis */}
+            <div className="absolute text-9xl opacity-10 -top-10 -right-10 transform -rotate-12">💉</div>
+            <div className="absolute text-7xl opacity-10 -bottom-10 -left-10 transform rotate-12">🐾</div>
             
             <div className="relative z-10">
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 drop-shadow-lg" itemProp="headline">
-                How Vets Can Grow Their Practice with Online Consultations
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-black mb-6 drop-shadow-lg" itemProp="headline">
+                Vaccination Schedule for Pets in India
               </h1>
               <p className="text-xl md:text-2xl opacity-95 font-light mb-8 leading-relaxed">
-                A Complete Guide to Digital Veterinary Services in India 2024
+                Complete Guide 2025 - Protect Your Dog & Cat with Timely Vaccines
               </p>
               
               <div className="flex flex-wrap justify-center gap-4 mt-8">
                 <span className="bg-white/20 backdrop-blur-sm px-5 py-2 rounded-full flex items-center gap-2">
-                  📅 Published: December 2024
+                  📅 Updated: December 2024
                 </span>
                 <span className="bg-white/20 backdrop-blur-sm px-5 py-2 rounded-full flex items-center gap-2">
-                  ⏱️ Reading Time: 12 minutes
+                  ⏱️ Reading Time: 8 minutes
                 </span>
                 <span className="bg-white/20 backdrop-blur-sm px-5 py-2 rounded-full flex items-center gap-2">
-                  📍 India
+                  🏥 Vet Approved
                 </span>
               </div>
             </div>
@@ -176,39 +175,33 @@ const VetOnlineConsultationGuide = () => {
           {/* Main Content */}
           <div className="px-6 md:px-10 py-8" itemProp="articleBody">
             <p className="text-gray-700 text-lg mb-6 leading-relaxed">
-              Vets can grow their practice rapidly by offering <strong className="font-bold text-indigo-600">online vet consultation</strong> because it increases reach, builds trust and helps pet parents access quick medical support. In the first few minutes, pet owners can receive expert advice through video or chat, which creates strong satisfaction and repeat bookings.
-            </p>
-
-            <p className="text-gray-700 text-lg mb-6 leading-relaxed">
-              As digital services rise in India, veterinarians are exploring new ways to connect with pet parents using technology. <strong className="font-bold text-indigo-600">Online veterinary consultation</strong> allows vets to work more efficiently, provide flexible timings and expand their client base beyond their local area. Whether you are an individual practitioner or run a full clinic, online consultations help streamline operations, reduce waiting time, and offer faster care for pets.
+              Vaccines play a crucial role in protecting your pets from dangerous diseases. Following the correct <strong className="font-bold text-indigo-600">vaccination schedule for pets in India</strong> ensures your dog or cat lives a healthy and disease-free life.
             </p>
 
             <p className="text-gray-700 text-lg mb-8 leading-relaxed">
-              This detailed guide explains how online platforms help veterinarians grow, what tools they need, how to attract more clients, and how to structure consultation services that generate consistent income.
+              This comprehensive guide covers the complete pet vaccination timeline in India, including core and optional vaccines, age-wise charts, booster shots, and costs. Whether you are a new pet parent or updating your pet's medical record, this guide makes vaccination simple and reliable.
             </p>
 
             {/* Table of Contents */}
-            <nav className="bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-500 p-6 md:p-8 rounded-xl shadow-sm mb-12" aria-label="Table of Contents">
+            <nav className="bg-gradient-to-r from-indigo-50 to-purple-100 border-l-4 border-indigo-500 p-6 md:p-8 rounded-xl shadow-sm mb-12" aria-label="Table of Contents">
               <h3 className="text-indigo-600 text-2xl font-bold mb-6 flex items-center gap-2">
                 📑 Table of Contents
               </h3>
               <ol className="list-decimal pl-5 space-y-3">
                 {[
-                  "Why Online Consultations Are Essential for Modern Vets",
-                  "Benefits of Online Consultations for Vet Practices",
-                  "What Vets Need to Start Online Consultations",
-                  "Step-by-Step: How Vets Can Grow Their Practice Digitally",
-                  "Pricing Models for Online Consultations",
-                  "Marketing Strategies to Grow Your Online Vet Services",
-                  "How Online Services Improve Clinic Efficiency",
-                  "Cases Suitable for Online Vet Consultations",
-                  "Tips to Build Trust with Online Pet Parents",
-                  "Mistakes Vets Should Avoid During Digital Consultations",
-                  "Future of Online Vet Services in India",
+                  "Why Vaccination Is Important for Your Pet",
+                  "Vaccination Schedule for Dogs in India",
+                  "Vaccination Schedule for Cats in India",
+                  "Cost of Pet Vaccination in India",
+                  "Annual Booster Shots",
+                  "What to Do If You Miss a Vaccine",
+                  "Core vs Non-Core Vaccines",
+                  "After Vaccination Care",
+                  "Quick Reference Vaccination Chart",
                   "Frequently Asked Questions"
                 ].map((item, index) => (
                   <li key={index}>
-                    <a href={`#section${index + 1}`} className="text-gray-800 hover:text-indigo-600 font-medium transition-colors duration-300">
+                    <a href={`#${item.toLowerCase().replace(/\s+/g, '-').replace(/[&]/g, '').replace(/vs/, 'vs-')}`} className="text-gray-800 hover:text-indigo-600 font-medium transition-colors duration-300">
                       {item}
                     </a>
                   </li>
@@ -216,114 +209,193 @@ const VetOnlineConsultationGuide = () => {
               </ol>
             </nav>
 
-            {/* Section 1: Why Online Consultations Are Essential */}
-            <section id="section1" className="scroll-mt-20 mb-12">
+            {/* Section 1: Why Vaccination Is Important */}
+            <section id="why-vaccination" className="scroll-mt-20 mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                1. Why Online Consultations Are Essential for Modern Vets
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
+                Why Vaccination Is Important for Your Pet
+                <div className="absolute bottom-0 left-0 w-24 h-1 bg-purple-500"></div>
               </h2>
               
               <p className="text-gray-700 text-lg mb-6 leading-relaxed">
-                The veterinary landscape in India is changing quickly. Pet ownership is increasing, awareness is rising and people now look for solutions that save time and provide immediate support. This is where <strong className="font-bold text-indigo-600">online vet consultation</strong> becomes important.
+                Vaccines prepare your pet's immune system to detect and fight harmful viruses and bacteria. Without timely vaccination, pets are highly vulnerable to fatal infections such as rabies, parvovirus, distemper, and feline panleukopenia.
               </p>
 
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-500 rounded-xl p-6 md:p-8 mb-8 shadow-sm">
-                <h3 className="text-xl font-bold text-indigo-600 mb-4 flex items-center gap-2">
-                  🔑 Key reasons for its rising popularity:
-                </h3>
-                <ul className="list-disc pl-6 space-y-3">
-                  <li><strong className="text-gray-800">Shortage of qualified vets</strong> in many locations across India</li>
-                  <li><strong className="text-gray-800">Busy schedules</strong> of pet parents who need flexible timing</li>
-                  <li><strong className="text-gray-800">Increased trust</strong> in digital health services post-pandemic</li>
-                  <li><strong className="text-gray-800">Faster follow-ups</strong> and easier diagnosis for common issues</li>
-                  <li><strong className="text-gray-800">Cost-effective solution</strong> for both vets and clients</li>
-                </ul>
-              </div>
-
-              <p className="text-gray-700 text-lg leading-relaxed">
-                When vets adopt <strong className="font-bold text-indigo-600">online veterinary consultation</strong>, they connect with pet parents who prefer convenience over waiting in a clinic. This shift not only benefits pet owners but also allows veterinarians to manage their time better and serve more animals.
-              </p>
-            </section>
-
-            {/* Section 2: Benefits */}
-            <section id="section2" className="scroll-mt-20 mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                2. Benefits of Online Consultations for Vet Practices
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
-              </h2>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {/* Benefits Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 {[
-                  { number: "3x", label: "Wider Geographic Reach" },
-                  { number: "40%", label: "More Daily Appointments" },
-                  { number: "60%", label: "Reduced Wait Times" }
-                ].map((stat, index) => (
-                  <div key={index} className="bg-white border-t-4 border-indigo-500 rounded-xl p-6 text-center shadow-lg">
-                    <div className="text-3xl md:text-4xl font-bold text-indigo-600 mb-3">{stat.number}</div>
-                    <div className="text-gray-600">{stat.label}</div>
+                  { icon: "🛡️", title: "Disease Protection", desc: "Protection from severe and deadly diseases that can be fatal" },
+                  { icon: "🚫", title: "Transmission Prevention", desc: "Reduces risk of transmission to other pets and humans" },
+                  { icon: "💰", title: "Cost Savings", desc: "Saves long-term veterinary treatment costs" },
+                  { icon: "✈️", title: "Travel Ready", desc: "Required for travel, grooming, and pet boarding facilities" },
+                  { icon: "❤️", title: "Responsible Parenting", desc: "Ensures responsible and safe pet ownership" },
+                  { icon: "📋", title: "Legal Compliance", desc: "Meets legal requirements for pet ownership" }
+                ].map((benefit, index) => (
+                  <div key={index} className="bg-white border-t-4 border-indigo-500 rounded-xl p-6 text-center shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                    <div className="text-5xl mb-4">{benefit.icon}</div>
+                    <h4 className="text-xl font-bold text-indigo-600 mb-3">{benefit.title}</h4>
+                    <p className="text-gray-600">{benefit.desc}</p>
                   </div>
                 ))}
               </div>
 
-              {[
-                {
-                  title: "a. Wider Reach Across India",
-                  content: "Using online vet consultation india, vets can support pet parents in cities, towns and remote areas. Geographic boundaries no longer limit your practice growth."
-                },
-                {
-                  title: "b. Flexible Schedule and More Bookings",
-                  content: "Offering digital consultation slots increases total daily appointments without overloading the clinic. You can serve clients even during off-hours."
-                },
-                {
-                  title: "c. Better Follow-Up System",
-                  content: "Most follow-ups can be done easily through online veterinary doctor services, saving time for both parties and ensuring better treatment compliance."
-                },
-                {
-                  title: "d. Improved Trust and Long-Term Client Relationships",
-                  content: "Regular digital communication helps build stronger vet-client relationships. Pet parents feel more connected and valued."
-                },
-                {
-                  title: "e. Reduced Operational Pressure",
-                  content: "Less crowd in the clinic means better time management, organised workflow, and reduced stress for your team."
-                }
-              ].map((item, index) => (
-                <div key={index} className="mb-6">
-                  <h3 className="text-xl font-bold text-purple-600 mb-3">{item.title}</h3>
-                  <p className="text-gray-700">{item.content}</p>
-                </div>
-              ))}
+              <p className="text-gray-700 text-lg leading-relaxed">
+                Following the correct <strong className="font-bold text-indigo-600">vaccination schedule for pets in India</strong> is essential for your pet's long-term health and wellbeing.
+              </p>
             </section>
 
-            {/* Section 3: Tools Needed */}
-            <section id="section3" className="scroll-mt-20 mb-12">
+            {/* Section 2: Dog Schedule */}
+            <section id="vaccination-schedule-for-dogs-in-india" className="scroll-mt-20 mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                3. What Vets Need to Start Online Consultations
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
+                Vaccination Schedule for Dogs in India
+                <div className="absolute bottom-0 left-0 w-24 h-1 bg-purple-500"></div>
               </h2>
-
+              
               <p className="text-gray-700 text-lg mb-6 leading-relaxed">
-                You do not need expensive setup to start offering online services. Here are the essentials:
+                Here is the recommended <strong className="font-bold text-indigo-600">vaccination schedule for pets in India</strong> for dogs:
               </p>
 
               <div className="overflow-x-auto rounded-xl shadow-lg mb-8">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gradient-to-r from-indigo-500 to-purple-600">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Category</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Tools Needed</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Budget Range</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Age</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Core Vaccines</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Optional Vaccines</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Remarks</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {[
-                      ["Device", "Smartphone, laptop or tablet", "₹10,000 - ₹50,000"],
-                      ["Internet", "Stable 4G or 5G connection", "₹500 - ₹1,500/month"],
-                      ["Consultation Platform", "Zoom, WhatsApp, SnoutIQ or clinic software", "Free - ₹2,000/month"],
-                      ["Payment Gateway", "Razorpay, UPI, Paytm, PhonePe", "2-3% transaction fee"],
-                      ["Record Keeping", "Google Sheets, Drive folders or veterinary software", "Free - ₹1,000/month"]
+                      ["6 to 8 weeks", "DHPPi", "Kennel Cough", "Primary vaccination begins"],
+                      ["10 to 12 weeks", "DHPPi (2nd dose)", "Leptospirosis", "Booster for immunity"],
+                      ["14 to 16 weeks", "DHPPi (3rd dose) + Rabies", "Coronavirus", "Rabies is legally required"],
+                      ["12 months", "DHPPi + Rabies", "Lyme Disease", "Annual booster"],
+                      ["Every year", "DHPPi + Rabies", "Tick Fever Vaccine", "Repeat yearly"]
                     ].map((row, index) => (
-                      <tr key={index} className={index % 2 === 0 ? "bg-gray-50 hover:bg-gray-100" : "bg-white hover:bg-gray-100"}>
+                      <tr key={index} className={index % 2 === 0 ? "bg-indigo-50 hover:bg-indigo-100" : "bg-white hover:bg-indigo-100"}>
+                        <td className="px-6 py-4 font-semibold text-gray-900">{row[0]}</td>
+                        <td className="px-6 py-4 text-gray-700">{row[1]}</td>
+                        <td className="px-6 py-4 text-gray-700">{row[2]}</td>
+                        <td className="px-6 py-4 text-gray-700">{row[3]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-gradient-to-r from-blue-50 to-sky-50 border-l-4 border-blue-500 rounded-xl p-6 mb-6 shadow-sm">
+                <p className="text-gray-800 text-lg flex items-start gap-2">
+                  💡 <strong className="text-blue-600">Tip:</strong> If your pet has no vaccination history, consult a vet to restart the cycle safely and create a proper immunization plan.
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-500 rounded-xl p-6 shadow-sm">
+                <h4 className="text-xl font-bold text-indigo-600 mb-4 flex items-center gap-2">
+                  📌 What is DHPPi Vaccine?
+                </h4>
+                <p className="text-gray-700 mb-4">DHPPi is a combination vaccine that protects against:</p>
+                <ul className="list-disc pl-6 space-y-3">
+                  <li className="text-gray-700"><strong>D</strong> - Distemper (viral disease affecting multiple organs)</li>
+                  <li className="text-gray-700"><strong>H</strong> - Hepatitis (liver infection)</li>
+                  <li className="text-gray-700"><strong>P</strong> - Parvovirus (severe gastrointestinal disease)</li>
+                  <li className="text-gray-700"><strong>P</strong> - Parainfluenza (respiratory infection)</li>
+                  <li className="text-gray-700"><strong>i</strong> - Infectious diseases protection</li>
+                </ul>
+              </div>
+            </section>
+
+            {/* Section 3: Cat Schedule */}
+            <section id="vaccination-schedule-for-cats-in-india" className="scroll-mt-20 mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
+                Vaccination Schedule for Cats in India
+                <div className="absolute bottom-0 left-0 w-24 h-1 bg-purple-500"></div>
+              </h2>
+              
+              <p className="text-gray-700 text-lg mb-6 leading-relaxed">
+                Here is the <strong className="font-bold text-indigo-600">vaccination schedule for pets in India</strong> for cats:
+              </p>
+
+              <div className="overflow-x-auto rounded-xl shadow-lg mb-8">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-indigo-500 to-purple-600">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Age</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Core Vaccines</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Optional Vaccines</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {[
+                      ["6 to 8 weeks", "FVRCP", "Feline Chlamydia", "First dose"],
+                      ["10 to 12 weeks", "FVRCP (2nd dose)", "FeLV", "Booster dose"],
+                      ["14 to 16 weeks", "FVRCP (3rd dose) + Rabies", "FIP", "Rabies is mandatory"],
+                      ["12 months", "FVRCP + Rabies", "FeLV Booster", "Annual booster"],
+                      ["Every year", "FVRCP + Rabies", "Optional boosters", "Recommended yearly"]
+                    ].map((row, index) => (
+                      <tr key={index} className={index % 2 === 0 ? "bg-indigo-50 hover:bg-indigo-100" : "bg-white hover:bg-indigo-100"}>
+                        <td className="px-6 py-4 font-semibold text-gray-900">{row[0]}</td>
+                        <td className="px-6 py-4 text-gray-700">{row[1]}</td>
+                        <td className="px-6 py-4 text-gray-700">{row[2]}</td>
+                        <td className="px-6 py-4 text-gray-700">{row[3]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-amber-500 rounded-xl p-6 mb-6 shadow-sm">
+                <p className="text-gray-800 text-lg font-semibold">
+                  ⚠️ <span className="text-amber-600">Important:</span> Even indoor cats need vaccinations because infections can enter homes through shoes, hands, clothing, or visiting animals. Never assume indoor cats are completely safe from diseases.
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-500 rounded-xl p-6 shadow-sm">
+                <h4 className="text-xl font-bold text-indigo-600 mb-4 flex items-center gap-2">
+                  📌 What is FVRCP Vaccine?
+                </h4>
+                <p className="text-gray-700 mb-4">FVRCP is a core combination vaccine for cats protecting against:</p>
+                <ul className="list-disc pl-6 space-y-3">
+                  <li className="text-gray-700"><strong>F</strong> - Feline Viral Rhinotracheitis (respiratory infection)</li>
+                  <li className="text-gray-700"><strong>V</strong> - Viral infections</li>
+                  <li className="text-gray-700"><strong>R</strong> - Respiratory diseases</li>
+                  <li className="text-gray-700"><strong>C</strong> - Calicivirus (respiratory and oral disease)</li>
+                  <li className="text-gray-700"><strong>P</strong> - Panleukopenia (feline distemper)</li>
+                </ul>
+              </div>
+            </section>
+
+            {/* Section 4: Cost */}
+            <section id="cost-of-pet-vaccination-in-india" className="scroll-mt-20 mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
+                Cost of Pet Vaccination in India
+                <div className="absolute bottom-0 left-0 w-24 h-1 bg-purple-500"></div>
+              </h2>
+
+              <p className="text-gray-700 text-lg mb-6 leading-relaxed">
+                Vaccination costs vary based on city, clinic reputation, and vaccine brand. Here's an approximate price guide:
+              </p>
+
+              <div className="overflow-x-auto rounded-xl shadow-lg mb-8">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-indigo-500 to-purple-600">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Vaccine</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Dog (₹)</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Cat (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {[
+                      ["DHPPi", "600 to 900", "–"],
+                      ["Rabies", "300 to 600", "300 to 600"],
+                      ["Leptospirosis", "400 to 700", "–"],
+                      ["Coronavirus", "600 to 1000", "–"],
+                      ["FVRCP", "–", "600 to 900"],
+                      ["FeLV", "–", "700 to 1000"],
+                      ["Annual Booster Package", "1000 to 1500", "900 to 1300"]
+                    ].map((row, index) => (
+                      <tr key={index} className={index % 2 === 0 ? "bg-indigo-50 hover:bg-indigo-100" : "bg-white hover:bg-indigo-100"}>
                         <td className="px-6 py-4 font-semibold text-gray-900">{row[0]}</td>
                         <td className="px-6 py-4 text-gray-700">{row[1]}</td>
                         <td className="px-6 py-4 text-gray-700">{row[2]}</td>
@@ -333,459 +405,243 @@ const VetOnlineConsultationGuide = () => {
                 </table>
               </div>
 
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-emerald-500 rounded-xl p-6 shadow-sm">
-                <p className="text-gray-800 text-lg flex items-start gap-2">
-                  💡 <strong className="text-emerald-600">Pro Tip:</strong> Once this basic setup is ready, you can begin offering <strong className="font-semibold text-gray-900">online vet doctor</strong> services to new and existing clients within days.
+              <div className="bg-gradient-to-r from-blue-50 to-sky-50 border-l-4 border-blue-500 rounded-xl p-6 shadow-sm">
+                <p className="text-gray-800 text-lg">
+                  💡 <strong className="text-blue-600">Note:</strong> Prices vary based on city, clinic, and vaccine brand. Metro cities typically charge higher rates.
                 </p>
               </div>
             </section>
 
-            {/* Section 4: Step-by-Step Guide */}
-            <section id="section4" className="scroll-mt-20 mb-12">
+            {/* Section 5: Boosters */}
+            <section id="annual-booster-shots" className="scroll-mt-20 mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                4. Step-by-Step: How Vets Can Grow Their Practice Digitally
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
+                Annual Booster Shots
+                <div className="absolute bottom-0 left-0 w-24 h-1 bg-purple-500"></div>
               </h2>
 
-              {[
-                {
-                  title: "Step 1: Add Digital Slots in Your Daily Routine",
-                  content: "Start with 1 to 2 hours daily dedicated to online vet consultation appointments. Gradually increase as demand grows."
-                },
-                {
-                  title: "Step 2: Build Visibility on Social Media",
-                  content: "Upload regular educational content like:",
-                  points: [
-                    "🩺 Skin infection tips - Common causes and home remedies",
-                    "🍖 Diet recommendations - Breed-specific nutrition guides",
-                    "💉 Vaccination reminders - Age-wise vaccination schedules",
-                    "🚨 First aid advice - Emergency care for pets"
-                  ]
-                },
-                {
-                  title: "Step 3: Promote Your Online Services Clearly",
-                  content: "Highlight your special areas of expertise such as:",
-                  points: [
-                    "Dermatology (skin conditions)",
-                    "Behaviour modification",
-                    "Nutrition counseling",
-                    "Geriatric care"
-                  ],
-                  note: "Using keywords like pet doctor online in your profiles increases discoverability on search engines."
-                },
-                {
-                  title: "Step 4: Offer Limited First Free Session",
-                  content: "Many successful vets offer online vet consultation india free for first-time clients to build trust and demonstrate value."
-                },
-                {
-                  title: "Step 5: Encourage Follow-Up Consultations",
-                  content: "Follow-ups help pets recover faster, increase client satisfaction, and build recurring revenue. Send automated reminders for check-ups."
-                }
-              ].map((step, index) => (
-                <div key={index} className="mb-8">
-                  <h3 className="text-xl font-bold text-purple-600 mb-3">{step.title}</h3>
-                  <p className="text-gray-700 mb-4">{step.content}</p>
-                  {step.points && (
-                    <ul className="list-disc pl-6 space-y-2 mb-4">
-                      {step.points.map((point, i) => (
-                        <li key={i} className="text-gray-700">{point}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {step.note && <p className="text-gray-700 italic">{step.note}</p>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="bg-white border-l-4 border-indigo-500 rounded-xl p-6 shadow-sm">
+                  <h3 className="text-xl font-bold text-indigo-600 mb-4">Dogs</h3>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li className="text-gray-700">DHPPi and Rabies once every 12 months</li>
+                  </ul>
                 </div>
-              ))}
+                <div className="bg-white border-l-4 border-purple-500 rounded-xl p-6 shadow-sm">
+                  <h3 className="text-xl font-bold text-purple-600 mb-4">Cats</h3>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li className="text-gray-700">FVRCP and Rabies annually</li>
+                    <li className="text-gray-700">FeLV as required based on exposure</li>
+                  </ul>
+                </div>
+              </div>
+
+              <p className="text-gray-700 text-lg">
+                Annual boosters help maintain strong immunity and are essential for long-term protection against diseases.
+              </p>
             </section>
 
-            {/* Section 5: Pricing Models */}
-            <section id="section5" className="scroll-mt-20 mb-12">
+            {/* Section 6: Missed Vaccine */}
+            <section id="what-to-do-if-you-miss-a-vaccine" className="scroll-mt-20 mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                5. Pricing Models for Online Consultations
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
+                What to Do If You Miss a Vaccine
+                <div className="absolute bottom-0 left-0 w-24 h-1 bg-purple-500"></div>
               </h2>
 
               <p className="text-gray-700 text-lg mb-6 leading-relaxed">
-                Below are some effective pricing strategies used by successful veterinarians:
+                Missing a vaccine is common and can be managed with proper veterinary guidance.
               </p>
 
-              {[
-                {
-                  title: "1. Pay Per Session Model",
-                  price: "₹250 to ₹800",
-                  description: "per consultation depending on your experience, specialization, and consultation duration (15-30 minutes)."
-                },
-                {
-                  title: "2. Monthly Subscription Plans",
-                  price: "₹1,500 to ₹3,000/month",
-                  description: "including:",
-                  points: [
-                    "Unlimited chat support",
-                    "2-4 video consultations",
-                    "Customized diet charts",
-                    "Priority booking"
-                  ]
-                },
-                {
-                  title: "3. Annual Wellness Plans",
-                  price: "₹8,000 to ₹15,000/year",
-                  description: "covering:",
-                  points: [
-                    "Complete vaccination guidance",
-                    "Quarterly routine health checks",
-                    "Diet adjustment throughout the year",
-                    "Behaviour consultation sessions",
-                    "24/7 chat support"
-                  ]
-                },
-                {
-                  title: "4. Emergency Call Charges",
-                  price: "₹1,000 to ₹2,000",
-                  description: "for late-night or urgent consultations outside regular hours."
-                }
-              ].map((model, index) => (
-                <div key={index} className="mb-8 p-6 border border-indigo-100 rounded-xl bg-white shadow-sm">
-                  <h3 className="text-xl font-bold text-indigo-600 mb-3">{model.title}</h3>
-                  <div className="text-2xl font-bold text-purple-600 mb-2">{model.price}</div>
-                  <p className="text-gray-700 mb-4">{model.description}</p>
-                  {model.points && (
-                    <ul className="list-disc pl-6 space-y-2">
-                      {model.points.map((point, i) => (
-                        <li key={i} className="text-gray-700">{point}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+              <ul className="list-disc pl-6 space-y-3 mb-6">
+                <li className="text-gray-700">Visit a vet immediately for assessment</li>
+                <li className="text-gray-700">Restart the schedule if needed based on gap duration</li>
+                <li className="text-gray-700">Avoid giving vaccines at home without supervision</li>
+                <li className="text-gray-700">Older pets may need antibody titer tests to check immunity levels</li>
+              </ul>
 
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-500 rounded-xl p-6 shadow-sm">
-                <h3 className="text-xl font-bold text-purple-600 mb-4">💰 Pricing Best Practices</h3>
-                <ul className="list-disc pl-6 space-y-3">
-                  <li className="text-gray-700">Keep pricing transparent and visible on all platforms</li>
-                  <li className="text-gray-700">Offer package discounts for long-term commitments</li>
-                  <li className="text-gray-700">Consider dynamic pricing based on demand and time</li>
-                  <li className="text-gray-700">Provide clear value proposition for each price tier</li>
-                </ul>
+              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-amber-500 rounded-xl p-6 shadow-sm">
+                <p className="text-gray-800 text-lg font-semibold">
+                  ⚠️ <span className="text-amber-600">Important:</span> Timely management is crucial to maintain immunity. Extended gaps may require restarting the entire vaccination series.
+                </p>
               </div>
             </section>
 
-            {/* Section 6: Marketing Strategies */}
-            <section id="section6" className="scroll-mt-20 mb-12">
+            {/* Section 7: Core vs Non-Core */}
+            <section id="core-vs-non-core-vaccines" className="scroll-mt-20 mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                6. Marketing Strategies to Grow Your Online Vet Services
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
-              </h2>
-
-              {[
-                {
-                  title: "a. Build a Professional Landing Page",
-                  content: "Your landing page should include:",
-                  points: [
-                    "📅 Consultation timings and availability calendar",
-                    "👨‍⚕️ Your experience and educational qualifications",
-                    "🎯 Specializations and areas of expertise",
-                    "💵 Clear pricing structure",
-                    "🔗 Direct booking link for appointments",
-                    "⭐ Client testimonials and success stories"
-                  ],
-                  note: "Use the term online veterinary consultation naturally within your content to improve search engine rankings."
-                },
-                {
-                  title: "b. Educate Pet Parents Through Regular Content",
-                  content: "Post 3 to 4 high-quality pieces of content weekly on:",
-                  points: [
-                    "📸 Instagram - Visual content, reels, pet care tips",
-                    "🎥 YouTube - Detailed educational videos",
-                    "👥 Facebook - Community engagement and live sessions",
-                    "🐦 Twitter/X - Quick tips and updates",
-                    "💼 LinkedIn - Professional networking"
-                  ]
-                },
-                {
-                  title: "c. Optimize Google Business Listing",
-                  content: "A properly optimized Google Business Profile helps pet parents find your online veterinary doctor services easily. Include:",
-                  points: [
-                    "Complete business information",
-                    "High-quality photos of your clinic",
-                    "Regular posts and updates",
-                    "Prompt responses to reviews",
-                    "Online booking integration"
-                  ]
-                },
-                {
-                  title: "d. Strategic Partnerships",
-                  content: "Partner with:",
-                  points: [
-                    "🏪 Pet stores and grooming centers for cross-referrals",
-                    "🐾 Animal NGOs and rescue organizations",
-                    "🏥 Pet insurance companies",
-                    "🚗 Pet taxi services"
-                  ]
-                },
-                {
-                  title: "e. Run Targeted Ad Campaigns",
-                  content: "Invest in:",
-                  points: [
-                    "Google Ads targeting local searches",
-                    "Facebook and Instagram sponsored posts",
-                    "YouTube pre-roll advertisements"
-                  ]
-                }
-              ].map((strategy, index) => (
-                <div key={index} className="mb-8">
-                  <h3 className="text-xl font-bold text-purple-600 mb-3">{strategy.title}</h3>
-                  <p className="text-gray-700 mb-4">{strategy.content}</p>
-                  {strategy.points && (
-                    <ul className="list-disc pl-6 space-y-2 mb-4">
-                      {strategy.points.map((point, i) => (
-                        <li key={i} className="text-gray-700">{point}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {strategy.note && <p className="text-gray-700 italic">{strategy.note}</p>}
-                </div>
-              ))}
-            </section>
-
-            {/* Section 7: Clinic Efficiency */}
-            <section id="section7" className="scroll-mt-20 mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                7. How Online Services Improve Clinic Efficiency
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
+                Core vs Non-Core Vaccines
+                <div className="absolute bottom-0 left-0 w-24 h-1 bg-purple-500"></div>
               </h2>
 
               <div className="overflow-x-auto rounded-xl shadow-lg mb-8">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gradient-to-r from-indigo-500 to-purple-600">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Benefit</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">How It Helps Your Practice</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Impact</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Type</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Covers</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Examples</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {[
-                      ["Scheduled consultations", "No over-crowding or unmanaged walk-ins", "⭐⭐⭐⭐⭐"],
-                      ["Faster case handling", "Easy digital access to medical records", "⭐⭐⭐⭐⭐"],
-                      ["Higher diagnostic accuracy", "Visual assessments through video calls", "⭐⭐⭐⭐"],
-                      ["Cost-saving", "Fewer unnecessary walk-ins needed", "⭐⭐⭐⭐⭐"],
-                      ["Better time management", "More balanced daily routine and work-life balance", "⭐⭐⭐⭐⭐"]
-                    ].map((row, index) => (
-                      <tr key={index} className={index % 2 === 0 ? "bg-gray-50 hover:bg-gray-100" : "bg-white hover:bg-gray-100"}>
-                        <td className="px-6 py-4 font-semibold text-gray-900">{row[0]}</td>
-                        <td className="px-6 py-4 text-gray-700">{row[1]}</td>
-                        <td className="px-6 py-4 text-yellow-500 font-bold">{row[2]}</td>
-                      </tr>
-                    ))}
+                    <tr className="bg-indigo-50 hover:bg-indigo-100">
+                      <td className="px-6 py-4 font-semibold text-gray-900">Core</td>
+                      <td className="px-6 py-4 text-gray-700">Essential for all pets</td>
+                      <td className="px-6 py-4 text-gray-700">DHPPi, FVRCP, Rabies</td>
+                    </tr>
+                    <tr className="bg-white hover:bg-indigo-100">
+                      <td className="px-6 py-4 font-semibold text-gray-900">Non-Core</td>
+                      <td className="px-6 py-4 text-gray-700">Based on lifestyle and risk</td>
+                      <td className="px-6 py-4 text-gray-700">FeLV, Leptospirosis, Kennel Cough</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
 
               <p className="text-gray-700 text-lg">
-                <strong className="font-bold text-indigo-600">Online vet consultation india</strong> creates a systematic workflow for modern clinics, helping you serve more pets while maintaining quality care.
+                Your vet will recommend non-core vaccines based on exposure, environment, and your pet's daily routine. Factors like outdoor access, interaction with other animals, and geographic location play important roles.
               </p>
             </section>
 
-            {/* Section 8: Suitable Cases */}
-            <section id="section8" className="scroll-mt-20 mb-12">
+            {/* Section 8: After Care */}
+            <section id="after-vaccination-care" className="scroll-mt-20 mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                8. Cases Suitable for Online Vet Consultations
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
+                After Vaccination Care
+                <div className="absolute bottom-0 left-0 w-24 h-1 bg-purple-500"></div>
               </h2>
 
-              <p className="text-gray-700 text-lg mb-6 leading-relaxed">
-                These medical conditions and situations can be effectively managed through digital consultations:
-              </p>
-
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-500 rounded-xl p-6 md:p-8 mb-6 shadow-sm">
-                <h3 className="text-xl font-bold text-indigo-600 mb-4 flex items-center gap-2">
-                  ✅ Ideal Cases for Online Consultation:
-                </h3>
-                <ul className="list-disc pl-6 space-y-3">
-                  {[
-                    "Skin problems - Rashes, itching, hair loss, hot spots",
-                    "Diet planning - Weight management, nutrition guidance",
-                    "Behaviour issues - Anxiety, aggression, training advice",
-                    "Mild stomach issues - Diarrhea, vomiting (non-severe)",
-                    "Vaccination guidance - Schedules and preparation",
-                    "Post-surgery follow-ups - Recovery monitoring",
-                    "Parasite prevention - Deworming and tick control",
-                    "General health queries - Preventive care advice"
-                  ].map((item, index) => (
-                    <li key={index} className="text-gray-700">{item}</li>
-                  ))}
-                </ul>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-emerald-500 rounded-xl p-6 shadow-sm">
+                  <h4 className="text-xl font-bold text-emerald-600 mb-4 flex items-center gap-2">
+                    ✅ Do's
+                  </h4>
+                  <ul className="list-disc pl-6 space-y-3">
+                    <li className="text-gray-700">Allow your pet to rest and recover</li>
+                    <li className="text-gray-700">Keep the pet well hydrated</li>
+                    <li className="text-gray-700">Monitor for mild reactions like slight fever</li>
+                    <li className="text-gray-700">Maintain a comfortable temperature</li>
+                    <li className="text-gray-700">Keep vaccination records updated</li>
+                  </ul>
+                </div>
+                <div className="bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 rounded-xl p-6 shadow-sm">
+                  <h4 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2">
+                    ❌ Don'ts
+                  </h4>
+                  <ul className="list-disc pl-6 space-y-3">
+                    <li className="text-gray-700">No bathing for 48 hours after vaccination</li>
+                    <li className="text-gray-700">No heavy exercise or strenuous activity</li>
+                    <li className="text-gray-700">Do not repeat the dose yourself</li>
+                    <li className="text-gray-700">Avoid exposing to other sick animals</li>
+                    <li className="text-gray-700">Don't skip follow-up appointments</li>
+                  </ul>
+                </div>
               </div>
 
               <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-amber-500 rounded-xl p-6 shadow-sm">
                 <p className="text-gray-800 text-lg font-semibold">
-                  ⚠️ <span className="text-amber-600">Important:</span> Urgent medical emergencies, severe trauma, surgical cases, and conditions requiring physical examination still need in-person clinic visits. Always prioritize pet safety.
+                  ⚠️ <span className="text-amber-600">Emergency Signs:</span> If your pet shows severe swelling, vomiting, difficulty breathing, or continuous high fever, visit a vet immediately. These could indicate serious allergic reactions.
                 </p>
               </div>
             </section>
 
-            {/* Section 9: Trust Building Tips */}
-            <section id="section9" className="scroll-mt-20 mb-12">
+            {/* Section 9: Quick Reference */}
+            <section id="quick-reference-vaccination-chart" className="scroll-mt-20 mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                9. Tips to Build Trust with Online Pet Parents
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
+                Quick Reference Vaccination Chart
+                <div className="absolute bottom-0 left-0 w-24 h-1 bg-purple-500"></div>
               </h2>
 
-              {[
-                {
-                  title: "a. Share Your Credentials Clearly",
-                  content: "Display your veterinary degree, registration number, years of experience, and any additional certifications prominently on all platforms."
-                },
-                {
-                  title: "b. Provide Clear and Simple Guidance",
-                  content: "Avoid complex medical jargon. Use simple language that pet parents can easily understand and follow."
-                },
-                {
-                  title: "c. Follow Up After Each Case",
-                  content: "Send follow-up messages within 24-48 hours to check on the pet's progress. Pet parents highly value this personal attention."
-                },
-                {
-                  title: "d. Maintain Transparent Communication",
-                  content: "Be honest about what can and cannot be diagnosed online. Tell clients clearly when a physical clinic visit is necessary."
-                },
-                {
-                  title: "e. Maintain Professional Documentation",
-                  content: "Keep detailed digital records of all consultations, prescriptions, and advice given. This builds credibility and helps in future consultations."
-                },
-                {
-                  title: "f. Be Punctual and Responsive",
-                  content: "Start consultations on time and respond to messages promptly. Reliability builds long-term trust."
-                }
-              ].map((tip, index) => (
-                <div key={index} className="mb-6">
-                  <h3 className="text-xl font-bold text-purple-600 mb-3">{tip.title}</h3>
-                  <p className="text-gray-700">{tip.content}</p>
-                </div>
-              ))}
-            </section>
-
-            {/* Section 10: Mistakes to Avoid */}
-            <section id="section10" className="scroll-mt-20 mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                10. Mistakes Vets Should Avoid During Digital Consultations
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
-              </h2>
-
-              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-amber-500 rounded-xl p-6 md:p-8 shadow-sm">
-                <h3 className="text-xl font-bold text-amber-600 mb-4 flex items-center gap-2">
-                  ❌ Common Mistakes to Avoid:
-                </h3>
-                <ul className="list-disc pl-6 space-y-3">
-                  {[
-                    "Over-prescribing medicines without proper diagnosis",
-                    "Skipping patient medical history review before consultation",
-                    "Relying only on chat when video consultation is needed",
-                    "Providing unclear instructions for medication or care",
-                    "Not keeping proper digital records of consultations",
-                    "Ignoring red flags that require physical examination",
-                    "Poor internet connection affecting consultation quality",
-                    "Not setting clear boundaries for consultation hours"
-                  ].map((mistake, index) => (
-                    <li key={index} className="text-gray-800">{mistake}</li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-
-            {/* Section 11: Future */}
-            <section id="section11" className="scroll-mt-20 mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 mb-8 pb-4 border-b-2 border-indigo-500 relative">
-                11. Future of Online Vet Services in India
-                <div className="absolute bottom-0 left-0 w-20 h-1 bg-purple-500"></div>
-              </h2>
-
-              <p className="text-gray-700 text-lg mb-6 leading-relaxed">
-                The demand for <strong className="font-bold text-indigo-600">online vet consultation</strong> will continue to grow exponentially because:
-              </p>
-
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-500 rounded-xl p-6 md:p-8 shadow-sm mb-8">
-                <h3 className="text-xl font-bold text-indigo-600 mb-4 flex items-center gap-2">
-                  📈 Growth Drivers:
-                </h3>
-                <ul className="list-disc pl-6 space-y-3">
-                  {[
-                    "Rising pet ownership - India has 31+ million pet dogs and growing",
-                    "Increased digital adoption - More people comfortable with online services",
-                    "Convenience preference - Pet parents prefer quick remote help",
-                    "Easy digital payments - UPI and wallets make transactions seamless",
-                    "Growing trust - Better acceptance of telemedicine for animals",
-                    "Technology advancement - AI-assisted diagnostics on the horizon",
-                    "Government support - Digital India initiatives promoting telehealth"
-                  ].map((driver, index) => (
-                    <li key={index} className="text-gray-700">{driver}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl p-8 md:p-10 text-center shadow-2xl mb-8">
-                <h3 className="text-2xl md:text-3xl font-bold mb-6">🚀 Ready to Transform Your Practice?</h3>
-                <p className="text-xl opacity-95">
-                  Vets who adopt digital innovation early will see strong growth and competitive advantage. Start offering online consultations today and expand your reach across India! The future of veterinary care is digital, and the time to start is now.
-                </p>
+              <div className="overflow-x-auto rounded-xl shadow-lg mb-8">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-indigo-500 to-purple-600">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Pet</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Core Vaccines</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Start Age</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">Booster Frequency</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    <tr className="bg-indigo-50 hover:bg-indigo-100">
+                      <td className="px-6 py-4 font-semibold text-gray-900">Dog</td>
+                      <td className="px-6 py-4 text-gray-700">DHPPi + Rabies</td>
+                      <td className="px-6 py-4 text-gray-700">6 to 8 weeks</td>
+                      <td className="px-6 py-4 text-gray-700">Annually</td>
+                    </tr>
+                    <tr className="bg-white hover:bg-indigo-100">
+                      <td className="px-6 py-4 font-semibold text-gray-900">Cat</td>
+                      <td className="px-6 py-4 text-gray-700">FVRCP + Rabies</td>
+                      <td className="px-6 py-4 text-gray-700">6 to 8 weeks</td>
+                      <td className="px-6 py-4 text-gray-700">Annually</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-emerald-500 rounded-xl p-6 shadow-sm">
                 <p className="text-gray-800 text-lg flex items-start gap-2">
-                  💡 <strong className="text-emerald-600">Expert Insight:</strong> Veterinarians who integrate online consultations report 40-60% increase in their client base within the first 6 months, along with improved work-life balance and higher revenue per hour worked.
+                  ✅ <strong className="text-emerald-600">Pro Tip:</strong> Keeping a printed or digital vaccination record helps avoid missed doses and is required for boarding, travel, and emergencies.
                 </p>
               </div>
             </section>
 
+            {/* CTA Box */}
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl p-8 md:p-10 text-center shadow-2xl mb-12">
+              <h3 className="text-2xl md:text-3xl font-bold mb-6">🏠 Visit Snoutiq for More Pet Care Tips</h3>
+              <p className="text-xl opacity-95 mb-8">
+                Explore comprehensive guides on pet nutrition, training, grooming, and emergency care.
+              </p>
+              <div className="flex flex-wrap justify-center gap-4">
+                <a href="https://snoutiq.com/" className="bg-white text-indigo-600 font-bold py-3 px-6 rounded-full hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                  Visit Homepage
+                </a>
+                <a href="https://snoutiq.com/first-aid-tips-pet-parents" className="bg-purple-500 text-white font-bold py-3 px-6 rounded-full hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                  Read First Aid Guide
+                </a>
+              </div>
+            </div>
+
             {/* FAQ Section */}
-            <section id="section12" className="scroll-mt-20 bg-gradient-to-r from-gray-50 to-indigo-50 px-6 md:px-10 py-12 rounded-xl">
+            <section id="faq" className="scroll-mt-20 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 md:px-10 py-12 rounded-xl">
               <div className="max-w-4xl mx-auto">
                 <h2 className="text-3xl md:text-4xl font-bold text-indigo-600 text-center mb-12">
-                  12. Frequently Asked Questions (FAQs)
+                  ❓ Frequently Asked Questions
                 </h2>
 
                 <div className="space-y-6">
                   {[
                     {
-                      q: "Is online vet consultation effective?",
-                      a: "Yes, it is highly effective for common medical problems, diet advice, behaviour consultation, and follow-ups. Studies show 60-70% of pet health queries can be resolved through online consultation without requiring a physical visit."
+                      q: "What is the correct vaccination schedule for pets in India?",
+                      a: "It starts at 6 to 8 weeks of age, followed by booster doses at 10-12 weeks and 14-16 weeks, and then yearly revaccinations to maintain immunity throughout your pet's life."
                     },
                     {
-                      q: "Can online vet consultation replace clinic visits completely?",
-                      a: "Not fully. While many conditions can be managed online, severe cases, emergencies, surgical procedures, and conditions requiring physical examination, lab tests, or X-rays still need in-person clinic visits."
+                      q: "When should puppies and kittens get their first vaccine?",
+                      a: "Puppies and kittens should receive their first vaccine at 6 to 8 weeks of age. This is when maternal antibodies start declining and vaccination becomes most effective."
                     },
                     {
-                      q: "How much should vets charge for online consultations?",
-                      a: "Typical pricing ranges from ₹250 to ₹800 per session depending on your experience, specialization, and consultation duration. Monthly plans can be priced at ₹1,500-₹3,000, while annual wellness packages range from ₹8,000-₹15,000."
+                      q: "Are Rabies vaccines mandatory in India?",
+                      a: "Yes, Rabies vaccination is legally required for both dogs and cats in India. It protects not only your pet but also humans from this fatal disease."
                     },
                     {
-                      q: "Are online veterinary consultation services legal in India?",
-                      a: "Yes, basic guidance, consultations, and follow-up care are legally allowed in India. However, vets must be registered with the Veterinary Council and follow proper documentation protocols. Emergency cases should always be referred for physical examination."
+                      q: "Do indoor pets also need vaccination?",
+                      a: "Yes, even indoor pets need vaccination because viruses can enter homes through shoes, hands, clothing, or visiting animals. Indoor cats and dogs remain vulnerable to airborne and contact-based diseases."
                     },
                     {
-                      q: "What tools and technology do vets need for online consultations?",
-                      a: "Essential tools include: a smartphone/laptop with camera, stable 4G/5G internet connection, video consultation platform (Zoom, WhatsApp, or specialized vet software), digital payment gateway (Razorpay, UPI, Paytm), and record-keeping system (Google Sheets or veterinary management software)."
+                      q: "What if I miss a vaccine date?",
+                      a: "Consult a vet immediately if you miss a vaccine date. Depending on the gap, your vet may restart the schedule or adjust the timeline to ensure proper immunity."
                     },
                     {
-                      q: "Does online veterinary doctor service help reach remote areas?",
-                      a: "Yes, absolutely! Online consultations connect veterinarians to pet parents across India, including tier-2, tier-3 cities and rural areas where qualified vets are scarce. This significantly expands your practice reach beyond geographic limitations."
+                      q: "Can I give vaccines at home?",
+                      a: "No, only a licensed veterinarian should administer vaccines. Proper storage, dosage, and administration techniques are critical for vaccine effectiveness and pet safety."
                     },
                     {
-                      q: "Can vets provide the first consultation free?",
-                      a: "Many successful vets offer online vet consultation india free for first-time clients as a trust-building strategy. This allows pet parents to experience your service quality before committing to paid consultations, often leading to higher conversion rates."
+                      q: "Are there any side effects of vaccines?",
+                      a: "Mild side effects like slight fever, swelling at injection site, or tiredness may occur and usually resolve within 24-48 hours. Severe reactions are rare but require immediate veterinary attention."
                     },
                     {
-                      q: "Are follow-up consultations easier online?",
-                      a: "Yes, follow-ups are significantly faster, more convenient, and cost-effective online. Pet parents can quickly share updates, photos, or videos of their pet's progress, and vets can provide guidance without requiring travel time for either party."
-                    },
-                    {
-                      q: "How can vets market their online consultation services?",
-                      a: "Effective marketing strategies include: building a professional website, active social media presence on Instagram/Facebook/YouTube, Google Business Profile optimization, content marketing with pet care tips, partnerships with pet stores and NGOs, and targeted online advertising campaigns."
-                    },
-                    {
-                      q: "What's the future scope of online veterinary services in India?",
-                      a: "The future is extremely promising! With rising pet ownership (31+ million pet dogs in India), increased digital adoption, AI-assisted diagnostics on the horizon, and growing acceptance of telemedicine, online vet services are expected to grow 50-70% year-over-year in the coming decade."
+                      q: "Do pets need yearly boosters?",
+                      a: "Yes, yearly booster shots are essential to maintain your pet's immunity against diseases. Annual vaccination ensures continued protection throughout their life."
                     }
                   ].map((faq, index) => (
-                    <div key={index} className="bg-white border-l-4 border-indigo-500 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300" itemScope itemType="https://schema.org/Question">
+                    <div key={index} className="bg-white border-l-4 border-indigo-500 rounded-xl p-6 shadow-lg hover:shadow-xl hover:translate-x-2 transition-all duration-300" itemScope itemType="https://schema.org/Question">
                       <div className="faq-question text-xl font-bold text-indigo-600 mb-4" itemProp="name">
                         {index + 1}. {faq.q}
                       </div>
@@ -798,8 +654,24 @@ const VetOnlineConsultationGuide = () => {
               </div>
             </section>
           </div>
+
+          {/* Footer */}
+          <footer className="bg-gradient-to-r from-gray-800 to-gray-900 text-white px-6 md:px-10 py-12">
+            <div className="max-w-4xl mx-auto text-center">
+              <p className="text-2xl font-bold mb-6">Final Thoughts</p>
+              <p className="text-lg mb-6 text-gray-200">
+                Following the correct <strong className="text-indigo-300">vaccination schedule for pets in India</strong> is the most effective way to protect your pet from dangerous diseases. With timely vaccines, annual boosters, a healthy diet, and regular vet visits, your pet can enjoy a long and healthy life.
+              </p>
+              <p className="text-lg mb-6 text-gray-200">
+                For more trusted pet care information, visit <a href="https://snoutiq.com/" className="text-purple-300 hover:text-purple-200 font-medium">Snoutiq</a> and also read the <a href="https://snoutiq.com/first-aid-tips-pet-parents" className="text-purple-300 hover:text-purple-200 font-medium">First Aid Tips Every Pet Parent Should Know</a> guide to stay prepared for emergencies.
+              </p>
+              <p className="text-gray-400 mt-8 text-sm">
+                © 2024 Snoutiq. All rights reserved.
+              </p>
+            </div>
+          </footer>
         </article>
-    
+<Footer/>
         {/* Back to Top Button */}
         <button
           onClick={scrollToTop}
@@ -808,10 +680,9 @@ const VetOnlineConsultationGuide = () => {
         >
           <span className="text-2xl">↑</span>
         </button>
-    <Footer/>
       </div>
     </>
   );
 };
 
-export default VetOnlineConsultationGuide;
+export default VaccinationScheduleForPets;

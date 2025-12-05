@@ -528,7 +528,9 @@ import ClinicKyc from "./VetDashboard/ClinicKyc";
 import QrCodeBranding from "./VetDashboard/QrCodeBranding";
 import StaffManagement from "./VetDashboard/StaffManagement";
 import DoctorMobileApp from "./DoctorMobileApp";
-import OnlineVetConsultationGuide from "./blog/OnlineVetConsultation";
+import RegisterAsAnOnlineVet from "./blog/RegisterAsAnOnlineVet";
+import OnlineVetConsultation from "./blog/OnlineVetConsultation";
+import VetsIncreaseMonthlyRevenue from "./blog/VetsIncreaseMonthlyRevenue";
 const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
@@ -1040,13 +1042,25 @@ function App() {
             />
              <Route
               path="/blog/online-vet-consultation"
-              element={<OnlineVetConsultationGuide />}
+              element={<OnlineVetConsultation />}
             />
-            
+             <Route
+              path="/blog/register-as-an-online-vet"
+              element={<RegisterAsAnOnlineVet />}
+            />
+              <Route
+              path="/blog/online-vet-consultation"
+              element={<OnlineVetConsultation />}
+            />
             <Route
               path="/blog/symptoms-of-tick-fever-in-dogs"
               element={<TickFeverGuide />}
             />
+             <Route
+              path="/blog/Vets-Increase-Monthly-Revenue"
+              element={<VetsIncreaseMonthlyRevenue />}
+            />
+            
             <Route
               path="/blog/protecting-pet-paws-in-winter-tips-guide"
               element={<PetPawProtecteGuide />}

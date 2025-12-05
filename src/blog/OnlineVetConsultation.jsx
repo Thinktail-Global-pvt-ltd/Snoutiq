@@ -2,7 +2,7 @@ import React from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
-const OnlineVetConsultationGuide = () => {
+const OnlineVetConsultation = () => {
   return (
     <>
       {/* SEO Meta Tags */}
@@ -482,4 +482,4 @@ const OnlineVetConsultationGuide = () => {
   );
 };
 
-export default OnlineVetConsultationGuide;
+export default OnlineVetConsultation;

@@ -147,6 +147,29 @@ const posts = [
     category: "Client Relations",
     slug: "online-vet-consultation",
   },
+ {
+     image:"",
+    title: "How to Register as an Online Vet for Video Consultations in India",
+    excerpt:
+      "Learn how to register as an online vet for video consultations in India. A complete step-by-step guide to start online vet consultation India including eligibility, benefits, pricing, verification, and top platforms to join for digital veterinary practice.",
+    author: "Snoutiq Editer",
+    date: "December 5, 2025",
+    readTime: "5 min read",
+    category: "Client Relations",
+    slug: "register-as-an-online-vet",
+  },
+   {
+     image:"",
+    title: "How Online Vet Consultation Helps Vets Increase Monthly Revenue",
+    excerpt:
+      "Learn how online vet consultation helps veterinarians boost earnings, reduce clinic costs, and grow their practice with flexible telemedicine services.",
+    author: "Snoutiq Editer",
+    date: "December 5, 2025",
+    readTime: "5 min read",
+    category: "Client Relations",
+    slug: "Vets-Increase-Monthly-Revenue",
+  },
+
 ];
 
 const categories = [
