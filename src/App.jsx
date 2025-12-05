@@ -528,6 +528,7 @@ import ClinicKyc from "./VetDashboard/ClinicKyc";
 import QrCodeBranding from "./VetDashboard/QrCodeBranding";
 import StaffManagement from "./VetDashboard/StaffManagement";
 import DoctorMobileApp from "./DoctorMobileApp";
+import OnlineVetConsultationGuide from "./blog/OnlineVetConsultation";
 const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
@@ -1037,6 +1038,11 @@ function App() {
               path="/blog/dog-winter-care-guide"
               element={<DogWinterCareGuide />}
             />
+             <Route
+              path="/blog/online-vet-consultation"
+              element={<OnlineVetConsultationGuide />}
+            />
+            
             <Route
               path="/blog/symptoms-of-tick-fever-in-dogs"
               element={<TickFeverGuide />}

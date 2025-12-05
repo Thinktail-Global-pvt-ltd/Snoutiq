@@ -136,7 +136,17 @@ const posts = [
     category: "Client Relations",
     slug: "how-vets-grow-with-online-consultations",
   },
- 
+ {
+     image:"",
+    title: "Online Vet Consultation in India ",
+    excerpt:
+      "Get instant online vet consultation from certified online veterinary doctors in India. Chat, video call and get fast guidance on SnoutIQ. Affordable & reliable pet care.",
+    author: "Snoutiq Editer",
+    date: "December 5, 2025",
+    readTime: "5 min read",
+    category: "Client Relations",
+    slug: "online-vet-consultation",
+  },
 ];
 
 const categories = [

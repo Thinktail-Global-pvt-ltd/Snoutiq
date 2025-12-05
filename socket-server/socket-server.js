@@ -1116,6 +1116,49 @@ const io = new Server(httpServer, {
 io.on("connection", (socket) => {
   console.log(`⚡ Client connected: ${socket.id}`);
 
+  // ========== PATIENT JOINS THEIR "USER" ROOM (for prescriptions/alerts) ==========
+  socket.on("join-user", (userIdRaw) => {
+    const userId = Number(userIdRaw);
+    if (!Number.isFinite(userId)) {
+      console.warn("Invalid userId for join-user:", userIdRaw);
+      return;
+    }
+    const roomName = `user_${userId}`;
+    socket.join(roomName);
+    console.log(`User ${userId} joined room ${roomName} for notifications`);
+  });
+
+  // ========== PRESCRIPTION CREATED (doctor -> patient) ==========
+  socket.on("prescription-created", (data = {}) => {
+    try {
+      const userId = Number(
+        data.userId ?? data.user_id ?? data.patientId ?? data.patient_id,
+      );
+      const doctorId = Number(data.doctorId ?? data.doctor_id);
+      const prescription = data.prescription || data;
+      if (!Number.isFinite(userId)) {
+        console.warn(
+          "prescription-created missing userId. Payload:",
+          JSON.stringify(data)
+        );
+        return;
+      }
+
+      io.to(`user_${userId}`).emit("prescription-created", {
+        prescription,
+        doctorId: Number.isFinite(doctorId) ? doctorId : undefined,
+        timestamp: new Date().toISOString(),
+      });
+      console.log(
+        `Prescription notification broadcast to user_${userId} (doctorId: ${Number.isFinite(doctorId) ? doctorId : "n/a"})`
+      );
+    } catch (error) {
+      console.error(
+        "prescription-created handler failed",
+        error?.message || error
+      );
+    }
+  });
   // ========== DOCTOR JOINS THEIR "ROOM" ==========
   socket.on("join-doctor", (doctorIdRaw) => {
     const doctorId = Number(doctorIdRaw);
@@ -2056,3 +2099,5 @@ httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`📲 WhatsApp alerts: ENABLED (${WHATSAPP_ALERT_MODE} mode)`);
   }
 });
+
+
