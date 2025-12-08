@@ -75,73 +75,50 @@ Route::get('/agora/appid', function () {
     ]);
 });
 
-Route::post('/device-tokens/issue', function (Request $request) {
+Route::get('/device-tokens/issue', function (Request $request) {
     $data = $request->validate([
         'user_id' => ['required', 'integer'],
-        'owner_model' => ['nullable', 'string'],
-        'platform' => ['nullable', 'string', 'max:50'],
         'device_id' => ['nullable', 'string', 'max:255'],
-        'meta' => ['nullable', 'array'],
     ]);
 
-    $ownerModelHint = $data['owner_model'] ?? null;
+    $query = DeviceToken::query()
+        ->where('user_id', $data['user_id']);
 
-    try {
-        $ownerModel = DeviceTokenOwnerResolver::resolve($ownerModelHint);
-    } catch (\InvalidArgumentException $e) {
+    if (!empty($data['device_id'])) {
+        $query->where('device_id', $data['device_id']);
+    }
+
+    $records = $query
+        ->orderByDesc('last_seen_at')
+        ->orderByDesc('id')
+        ->get();
+
+    if ($records->isEmpty()) {
         return response()->json([
             'success' => false,
-            'message' => $e->getMessage(),
-        ], 422);
+            'message' => 'No device tokens found for the provided user_id.',
+        ], 404);
     }
-
-    if ($ownerModel::query()->whereKey($data['user_id'])->doesntExist()) {
-        if ($ownerModelHint === null) {
-            $detectedModel = DeviceTokenOwnerResolver::detectOwnerModelForId($data['user_id']);
-            if ($detectedModel) {
-                $ownerModel = $detectedModel;
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Owner record not found for the provided user_id.',
-                ], 422);
-            }
-        } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'Owner record not found for the provided user_id.',
-            ], 422);
-        }
-    }
-
-    $token = Str::random(64);
-    $metaPayload = $data['meta'] ?? [
-        'app' => 'snoutiq',
-        'env' => app()->environment(),
-    ];
-    $metaPayload['owner_model'] = $ownerModel;
-
-    $record = DeviceToken::create([
-        'user_id' => $data['user_id'],
-        'token' => $token,
-        'platform' => $data['platform'] ?? 'web',
-        'device_id' => $data['device_id'] ?? null,
-        'meta' => $metaPayload,
-        'last_seen_at' => now(),
-    ]);
 
     return response()->json([
         'success' => true,
         'data' => [
-            'token' => $record->token,
-            'user_id' => $record->user_id,
-            'owner_model' => $ownerModel,
-            'platform' => $record->platform,
-            'device_id' => $record->device_id,
-            'meta' => $record->meta,
-            'last_seen_at' => $record->last_seen_at?->toIso8601String(),
+            'tokens' => $records->map(function (DeviceToken $record) {
+                return [
+                    'id' => $record->id,
+                    'token' => $record->token,
+                    'user_id' => $record->user_id,
+                    'owner_model' => $record->meta['owner_model'] ?? null,
+                    'platform' => $record->platform,
+                    'device_id' => $record->device_id,
+                    'meta' => $record->meta,
+                    'last_seen_at' => $record->last_seen_at?->toIso8601String(),
+                    'created_at' => $record->created_at?->toIso8601String(),
+                    'updated_at' => $record->updated_at?->toIso8601String(),
+                ];
+            }),
         ],
-    ], 201);
+    ]);
 })->name('api.device-tokens.issue');
 
 // Simple doctor profile read/update via query param doctor_id (no auth)

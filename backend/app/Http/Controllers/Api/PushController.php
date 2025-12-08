@@ -10,6 +10,7 @@ use App\Support\DeviceTokenOwnerResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Kreait\Firebase\Exception\MessagingException;
 use Throwable;
 
 class PushController extends Controller
@@ -252,6 +253,17 @@ class PushController extends Controller
             }
 
             return response()->json(['sent' => true]);
+        } catch (MessagingException $e) {
+            \Log::error('FCM test push failed', [
+                'token' => $validated['token'] ?? null,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'FCM send failed',
+                'details' => $e->getMessage(),
+            ], 500);
         } catch (Throwable $e) {
             \Log::error('FCM test push failed', [
                 'token' => $validated['token'] ?? null,
