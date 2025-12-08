@@ -405,7 +405,7 @@ const Cancelation = lazy(() => import("./policies/Cancelation"));
 const CookiePolicy = lazy(() => import("./policies/CookiePolicy"));
 const MedicalDataConsent = lazy(() => import("./policies/MedicalDataConsent"));
 const ShippingPolicy = lazy(() => import("./policies/ShippingPolicy"));
-const RegisterPetOwner = lazy(() => import("./pages/RegisterPetOwner"));
+// const RegisterPetOwner = lazy(() => import("./pages/RegisterPetOwner"));
 const PatientDashboard = lazy(() => import("./pages/PatientDashboard"));
 const DoctorDashboard = lazy(() => import("./pages/DoctorDashboard"));
 const CallTestPage = lazy(() => import("./pages/CallTestPage"));
@@ -501,8 +501,8 @@ import PetPawProtecteGuide from "./blog/PetPawProtecteGuide";
 import DelhiPage from "./pages/DelhiPage";
 import GurugramPage from "./pages/GurugramPage";
 import ClinicsSolutionPage from "./pages/ClinicsSolutionPage";
-import FeaturesPage from "./pages/FeaturesPage";
-import VideoConsultPage from "./pages/VideoConsultPage";
+// import FeaturesPage from "./pages/FeaturesPage";
+// import VideoConsultPage from "./pages/VideoConsultPage";
 import AITriagePage from "./pages/AITriagePage";
 import FirstAidEvery from "./blog/FirstAidEvery";
 import BoostYourDog from "./blog/BoostYourDog";
@@ -567,10 +567,10 @@ function App() {
             <Route path="/superadmin/login" element={<SuperAdminLogin />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/register" element={<Register />} />
-            <Route
+            {/* <Route
               path="/register-pet-details"
               element={<RegisterPetOwner />}
-            />
+            /> */}
             <Route
               path="/register-password"
               element={
@@ -580,7 +580,7 @@ function App() {
               }
             />
             <Route path="/vet-register" element={<DoctorRegistration />} />
-            <Route path="/pet-data-register" element={<RegisterPetOwner />} />
+            {/* <Route path="/pet-data-register" element={<RegisterPetOwner />} /> */}
             {/* Policy pages (public) */}
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TearmsCondition />} />
@@ -591,11 +591,11 @@ function App() {
               element={<MedicalDataConsent />}
             />
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
-            <Route path="/patient-dashboard" element={<PatientDashboard />} />
-            <Route
+            {/* <Route path="/patient-dashboard" element={<PatientDashboard />} /> */}
+            {/* <Route
               path="/doctor-dashboard"
               element={<DoctorDashboard doctorId={501} />}
-            />
+            /> */}
             <Route path="/call-page/:channelName" element={<CallPage />} />
             {/* Multiple doctor routes if needed */}
             <Route
@@ -1074,8 +1074,8 @@ function App() {
             <Route path="/delhi" element={<DelhiPage />} />
             <Route path="/gurugram" element={<GurugramPage />} />
             <Route path="/clinics-solution" element={<ClinicsSolutionPage />} />
-            <Route path="/features" element={<FeaturesPage />} />
-            <Route path="/video-consult" element={<VideoConsultPage />} />
+            {/* <Route path="/features" element={<FeaturesPage />} /> */}
+            {/* <Route path="/video-consult" element={<VideoConsultPage />} /> */}
             {/* <Route path="/ai-triage" element={<AITriagePage />} /> */}
             <Route path="*" element={<NotFoundPage />} />
             <Route path="/doctor-mobile" element={<DoctorMobileApp/>}/>
