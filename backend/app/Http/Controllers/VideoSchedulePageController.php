@@ -30,6 +30,7 @@ class VideoSchedulePageController extends Controller
     {
       
         $vetId = $request->session()->get('user_id') ?? data_get($request->session()->get('user'), 'id');
+        $clinicId = $vetId; // Clinic ID is same as vet_registeration_id
         $doctors = collect();
         if ($vetId) {
             $doctors = Doctor::where('vet_registeration_id', $vetId)
@@ -44,6 +45,6 @@ class VideoSchedulePageController extends Controller
         $readonly = false;
         $page_title = 'Manage Video Calling Schedule (Separate)';
         $stepStatus = $this->progressService->getStatusForRequest($request);
-        return view('snoutiq.video-calling-schedule', compact('doctors','readonly','page_title','stepStatus'));
+        return view('snoutiq.video-calling-schedule', compact('doctors','readonly','page_title','stepStatus','clinicId'));
     }
 }

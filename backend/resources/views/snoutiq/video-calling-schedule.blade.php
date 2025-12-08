@@ -40,9 +40,10 @@
   {{-- =================== Doctor & Settings =================== --}}
   <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4 sm:p-6">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
-      <div class="lg:col-span-2" @unless($isDebugView) style="display:none" @endunless>
-        <label class="block text-sm font-medium text-gray-700">Doctor</label>
+      <div class="lg:col-span-2">
+        <label class="block text-sm font-medium text-gray-700">Select Doctor</label>
         <select id="doctor_id" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
+          <option value="">-- Select a doctor --</option>
           @if(isset($doctors) && $doctors->count())
             @foreach($doctors as $doc)
               <option value="{{ $doc->id }}">{{ $doc->doctor_name ?? $doc->name ?? ('Doctor #'.$doc->id) }}</option>
@@ -352,7 +353,8 @@
 
     <div class="mt-2 text-xs text-gray-500" id="metaNote"></div>
     @if(!$readonly)
-      <button id="btnSave" class="mt-3 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 w-full sm:w-auto">Save Weekly Availability</button>
+      <button id="btnSave" class="mt-3 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 w-full sm:w-auto" disabled>Save Weekly Availability</button>
+      <p id="saveHint" class="mt-2 text-xs text-gray-500">Select a doctor to enable saving</p>
     @endif
     <div id="saveOut" class="mt-2 text-sm"></div>
   </fieldset>
@@ -407,6 +409,7 @@
       // make available globally
       window.SN_API_BASE = apiBase;
       window.SN_USER_ID  = Number(new URLSearchParams(location.search).get('user_id') || {{ $userId }}) || 0;
+      window.SN_CLINIC_ID = Number(@json($clinicId ?? null)) || null;
 
       window.Csrf = {
         ready: false,
@@ -443,7 +446,12 @@
       const toast = (m, ok=true)=>{ if (window.Swal) Swal.fire({toast:true,position:'top',timer:1200,showConfirmButton:false,icon:ok?'success':'error',title:String(m)}); };
       function fmt(v){ try{ return typeof v==='string'? v : JSON.stringify(v,null,2);}catch{ return String(v);} }
       function out(sel, payload, ok=true){ const d = el(sel); if(d){ d.innerHTML = `<pre style="white-space:pre-wrap">${fmt(payload)}</pre>`; d.className = ok? 'mt-2 text-sm text-green-700':'mt-2 text-sm text-red-700'; } }
-      function getDoctorId(){ const v = Number(el('#doctor_id')?.value); return Number.isFinite(v)&&v>0? v:null; }
+      function getDoctorId(){ 
+        const v = el('#doctor_id')?.value;
+        const num = Number(v);
+        return Number.isFinite(num)&&num>0? num:null; 
+      }
+      function getClinicId(){ return window.SN_CLINIC_ID; }
       function getUserId(){ return Number(window.SN_USER_ID || 0); }
 
       const NIGHT_HOURS = new Set([19,20,21,22,23,0,1,2,3,4,5,6]);
@@ -1378,7 +1386,8 @@
       }
 
       async function save(){
-        const id = getDoctorId(); if(!id){ alert('Select a doctor'); return; }
+        const id = getDoctorId(); 
+        if(!id){ alert('Select a doctor'); return; }
         const {availability, validationError} = collect();
         if(validationError){ out('#saveOut', validationError, false); return; }
         if(!availability.length){ out('#saveOut', 'Select at least one active day with valid times', false); return; }
@@ -1558,12 +1567,54 @@
         }
 
         const doctorSelect = document.querySelector('#doctor_id');
-        doctorSelect?.addEventListener('change', ()=>{ loadExisting(); });
-
-        // Initial
+        const btnSave = document.querySelector('#btnSave');
+        const saveHint = document.querySelector('#saveHint');
+        
+        function updateSaveButton(){
+          const selectedId = getDoctorId();
+          if(btnSave){
+            if(selectedId){
+              btnSave.disabled = false;
+              if(saveHint) saveHint.classList.add('hidden');
+            } else {
+              btnSave.disabled = true;
+              if(saveHint) saveHint.classList.remove('hidden');
+            }
+          }
+        }
+        
+        doctorSelect?.addEventListener('change', ()=>{
+          const selectedId = getDoctorId();
+          updateSaveButton();
+          if(selectedId) {
+            loadExisting();
+          } else {
+            // Clear the form when nothing is selected
+            const avg = document.querySelector('#avg_consultation_mins');
+            const bph = document.querySelector('#max_bph');
+            if(avg) avg.value = 20;
+            if(bph) bph.value = 3;
+            // Clear schedule table
+            els('tbody tr[data-dow]').forEach(tr=>{
+              const $active=tr.querySelector('.active'), $start=tr.querySelector('.start'), $end=tr.querySelector('.end'), $bStart=tr.querySelector('.break_start'), $bEnd=tr.querySelector('.break_end');
+              if($active) $active.checked = false;
+              if($start) $start.value = '09:00';
+              if($end) $end.value = '18:00';
+              if($bStart) $bStart.value = '';
+              if($bEnd) $bEnd.value = '';
+            });
+            loadNightScheduleTable();
+          }
+        });
+        
+        // Initial load
+        updateSaveButton();
         const dd = document.querySelector('#doctor_id');
-        if(dd && dd.options.length && dd.value){ loadExisting(); }
-        else { loadNightScheduleTable(); }
+        if(dd && dd.options.length && dd.value){ 
+          loadExisting(); 
+        } else { 
+          loadNightScheduleTable(); 
+        }
         updateEditButtonLabel();
 
         if(!READONLY) document.querySelector('#btnSave')?.addEventListener('click', save);
