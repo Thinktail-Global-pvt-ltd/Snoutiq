@@ -1,16 +1,125 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset
-      xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-      xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
-            http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
-<!-- created with Free Online Sitemap Generator www.xml-sitemaps.com -->
-
-
-<url>
-  <loc>https://snoutiq.com/</loc>
-  <lastmod>2025-09-10T05:36:16+00:00</lastmod>
-</url>
-
-
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Main Pages -->
+  <url>
+    <loc>https://snoutiq.com/</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/clinics-solution</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/delhi</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/gurugram</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <!-- Conversion Page -->
+  <url>
+    <loc>https://snoutiq.com/register</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <!-- Blog Listing -->
+  <url>
+    <loc>https://snoutiq.com/blog/</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <!-- Blog Articles -->
+  <url>
+    <loc>https://snoutiq.com/blog/how-vets-grow-with-online-consultations</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/blog/online-vet-consultation</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <!-- Canonical version -->
+  <url>
+    <loc>https://snoutiq.com/blog/register-as-an-online-vet</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <!-- Newly confirmed to include -->
+  <url>
+    <loc>https://snoutiq.com/blog/dog-winter-care-guide</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/blog/symptoms-of-tick-fever-in-dogs</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/blog/Vets-Increase-Monthly-Revenue</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/blog/protecting-pet-paws-in-winter-tips-guide</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/blog/first-aid-tips-every-pet-parent-should-know</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/blog/vaccination-schedule-for-pets-in-india</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/blog/best-food-for-dogs-in-winter</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/blog/boost-your-dogs-immunity-naturally</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <!-- Legal Pages -->
+  <url>
+    <loc>https://snoutiq.com/privacy-policy</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/terms-of-service</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/cancellation-policy</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/cookie-policy</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/medical-data-consent</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://snoutiq.com/shipping-policy</loc>
+    <lastmod>2025-12-08T08:14:01+01:00</lastmod>
+    <priority>0.4</priority>
+  </url>
 </urlset>
