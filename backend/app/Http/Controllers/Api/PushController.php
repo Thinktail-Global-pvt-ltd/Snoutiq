@@ -38,6 +38,15 @@ class PushController extends Controller
         }
 
         try {
+            $normalizedToken = $this->normalizeToken($validated['token']);
+            $oldToken = isset($validated['old_token']) ? $this->normalizeToken($validated['old_token']) : null;
+
+            if (!$this->isLikelyFcmToken($normalizedToken)) {
+                return response()->json([
+                    'error' => 'The provided token does not look like a valid FCM registration token.',
+                ], 422);
+            }
+
             // Upsert strictly on user_id (and device_id if provided to scope per device)
             $lookup = ['user_id' => $validated['user_id']];
             if (!empty($validated['device_id'])) {
@@ -50,10 +59,14 @@ class PushController extends Controller
             ];
             $meta['owner_model'] = $ownerModel;
 
+            if ($oldToken) {
+                DeviceToken::where('token', $oldToken)->delete();
+            }
+
             $tokenToUpdate = DeviceToken::updateOrCreate(
                 $lookup,
                 [
-                    'token' => $validated['token'],
+                    'token' => $normalizedToken,
                     'platform' => $validated['platform'] ?? null,
                     'device_id' => $validated['device_id'] ?? null,
                     'meta' => $meta,
@@ -96,6 +109,13 @@ class PushController extends Controller
             'app' => 'snoutiq',
             'env' => app()->environment(),
         ];
+
+        $normalizedToken = $this->normalizeToken($validated['token']);
+        if (!$this->isLikelyFcmToken($normalizedToken)) {
+            return response()->json([
+                'error' => 'The provided token does not look like a valid FCM registration token.',
+            ], 422);
+        }
 
         $resolvedUserId = Auth::id() ?? ($validated['user_id'] ?? null);
         if (!$resolvedUserId && isset($metaPayload['user_id'])) {
@@ -143,7 +163,7 @@ class PushController extends Controller
 
         try {
             $token = DeviceToken::updateOrCreate(
-                ['token' => $validated['token']],
+                ['token' => $normalizedToken],
                 [
                     'user_id' => $resolvedUserId,
                     'platform' => $validated['platform'] ?? null,
@@ -178,13 +198,15 @@ class PushController extends Controller
             'token' => ['required', 'string'],
         ]);
 
+        $normalizedToken = $this->normalizeToken($validated['token']);
+
         try {
-            DeviceToken::where('token', $validated['token'])->delete();
+            DeviceToken::where('token', $normalizedToken)->delete();
 
             return response()->json(['ok' => true]);
         } catch (Throwable $e) {
             \Log::error('Failed to unregister FCM token', [
-                'token' => $validated['token'],
+                'token' => $normalizedToken,
                 'user_id' => Auth::id(),
                 'error' => $e->getMessage(),
             ]);
@@ -209,8 +231,14 @@ class PushController extends Controller
 
         try {
             if (!empty($validated['token'])) {
+                $normalizedToken = $this->normalizeToken($validated['token']);
+                if (!$this->isLikelyFcmToken($normalizedToken)) {
+                    return response()->json([
+                        'error' => 'The provided token does not look like a valid FCM registration token.',
+                    ], 422);
+                }
                 // Send immediately for testing
-                $push->sendToToken($validated['token'], $title, $body, ['type' => 'test']);
+                $push->sendToToken($normalizedToken, $title, $body, ['type' => 'test']);
             } else {
                 // If token not provided, try sending to the current user's registered devices
                 $userId = Auth::id();
@@ -236,5 +264,24 @@ class PushController extends Controller
                 'details' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function normalizeToken(string $token): string
+    {
+        return trim(trim($token), "\"'");
+    }
+
+    private function isLikelyFcmToken(string $token): bool
+    {
+        if ($token === '') {
+            return false;
+        }
+
+        // FCM tokens are long and should not contain whitespace
+        if (strlen($token) < 80 || preg_match('/\\s/', $token)) {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -17,6 +17,46 @@ class FcmService
     {
     }
 
+    private function normalizeToken(?string $token): string
+    {
+        // Trim whitespace and stray quotes that sometimes get saved from clients
+        return trim(trim((string) $token), "\"'");
+    }
+
+    private function isLikelyFcmToken(string $token): bool
+    {
+        if ($token === '') {
+            return false;
+        }
+
+        // FCM device tokens are long (>100 chars) and contain no whitespace
+        if (strlen($token) < 80 || preg_match('/\\s/', $token)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<int,string> $tokens
+     * @return array<int,string>
+     */
+    private function filterValidTokens(array $tokens): array
+    {
+        $normalized = array_map(fn ($t) => $this->normalizeToken($t), $tokens);
+
+        return array_values(array_unique(array_filter($normalized, function ($token) {
+            if (!$this->isLikelyFcmToken($token)) {
+                \Log::warning('Skipping FCM send; token looks invalid', [
+                    'token' => $token,
+                ]);
+                return false;
+            }
+
+            return true;
+        })));
+    }
+
     /**
      * Send a notification to a single device token.
      *
@@ -24,11 +64,19 @@ class FcmService
      */
     public function sendToToken(string $token, string $title, string $body, array $data = []): void
     {
-        $message = CloudMessage::withTarget('token', $token)
+        $normalizedToken = $this->normalizeToken($token);
+        if (!$this->isLikelyFcmToken($normalizedToken)) {
+            \Log::warning('Skipping FCM send; token rejected as invalid format', [
+                'token' => $normalizedToken,
+            ]);
+            return;
+        }
+
+        $message = CloudMessage::withTarget('token', $normalizedToken)
             ->withNotification(Notification::create($title, $body))
             ->withData($data);
 
-        $this->sendMessage($message, $token);
+        $this->sendMessage($message, $normalizedToken);
     }
 
     /**
@@ -39,10 +87,12 @@ class FcmService
      */
     public function sendMulticast(array $tokens, string $title, string $body, array $data = []): array
     {
-        if (empty($tokens)) {
+        $validTokens = $this->filterValidTokens($tokens);
+
+        if (empty($validTokens)) {
             return [
                 'success' => 0,
-                'failure' => 0,
+                'failure' => count($tokens),
                 'results' => [],
             ];
         }
@@ -51,7 +101,7 @@ class FcmService
             ->withNotification(Notification::create($title, $body))
             ->withData($data);
 
-        return $this->sendMulticastMessage($message, $tokens);
+        return $this->sendMulticastMessage($message, $validTokens);
     }
 
     /**
@@ -61,7 +111,10 @@ class FcmService
      */
     public function notifyUser(int $userId, string $title, string $body, array $data = []): void
     {
-        $tokens = DeviceToken::where('user_id', $userId)->pluck('token')->all();
+        $tokens = DeviceToken::where('user_id', $userId)
+            ->pluck('token')
+            ->all();
+
         $this->sendMulticast($tokens, $title, $body, $data);
     }
 
