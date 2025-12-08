@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Models\CallSession;
 use App\Models\Doctor;
 use App\Models\User;
 use App\Models\VetRegisterationTemp;
@@ -178,6 +179,16 @@ class AppointmentSubmissionController extends Controller
             ->orderByDesc('appointment_time')
             ->get();
 
+        // Video call history for the same doctor
+        $videoCalls = CallSession::query()
+            ->with(['patient'])
+            ->where('doctor_id', $doctor->id)
+            ->orderByDesc('ended_at')
+            ->orderByDesc('started_at')
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get();
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -187,6 +198,8 @@ class AppointmentSubmissionController extends Controller
                 ],
                 'count' => $appointments->count(),
                 'appointments' => $this->formatAppointments($appointments),
+                'video_call_count' => $videoCalls->count(),
+                'video_calls' => $this->formatVideoCalls($videoCalls),
             ],
         ]);
     }
@@ -271,5 +284,40 @@ class AppointmentSubmissionController extends Controller
         $decoded = json_decode($notes ?? '{}', true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @param  Collection<int, CallSession>  $sessions
+     */
+    private function formatVideoCalls(Collection $sessions): array
+    {
+        return $sessions->map(function (CallSession $session) {
+            return $this->formatVideoCall($session);
+        })->all();
+    }
+
+    private function formatVideoCall(CallSession $session): array
+    {
+        $session->loadMissing('patient');
+        $timestamp = $session->ended_at ?? $session->started_at ?? $session->created_at;
+
+        return [
+            'id' => $session->id,
+            'patient' => [
+                'user_id' => $session->patient_id,
+                'name' => $session->patient?->name,
+                'phone' => $session->patient?->phone,
+                'email' => $session->patient?->email,
+            ],
+            'status' => $session->status,
+            'payment_status' => $session->payment_status,
+            'amount' => $session->amount_paid,
+            'currency' => $session->currency ?? 'INR',
+            'started_at' => $session->started_at?->toDateTimeString(),
+            'ended_at' => $session->ended_at?->toDateTimeString(),
+            'created_at' => $session->created_at?->toDateTimeString(),
+            'timestamp' => $timestamp?->toDateTimeString(),
+            'duration_seconds' => $session->duration_seconds,
+        ];
     }
 }
