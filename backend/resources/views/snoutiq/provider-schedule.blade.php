@@ -643,7 +643,8 @@
               });
             }
             try { localStorage.setItem('onboarding_v1_done','1'); } catch (_) {}
-            setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor/dashboard`; }, 900);
+            // Doctor dashboard route lives at /doctor (not /doctor/dashboard)
+            setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor`; }, 900);
           }
         }catch(_){ }
       } else {
