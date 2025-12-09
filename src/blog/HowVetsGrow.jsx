@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import img6 from '../assets/images/how_vets_can.jpeg';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
 
 const HowVetsGrow = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -136,8 +139,8 @@ const HowVetsGrow = () => {
           })}
         </script>
       </head>
-
-      <div className="font-sans text-gray-800 bg-gray-50 min-h-screen">
+<Header/>
+      <div className="font-sans text-gray-800 bg-gray-50 min-h-screen mt-20">
         {/* Main Blog Container */}
         <article className="max-w-4xl mx-auto bg-white shadow-xl rounded-xl overflow-hidden my-8" itemScope itemType="http://schema.org/BlogPosting">
           
@@ -170,7 +173,9 @@ const HowVetsGrow = () => {
               </div>
             </div>
           </header>
-
+<section>
+            <img src={img6} alt="image" />
+          </section>
           {/* Main Content */}
           <div className="px-6 md:px-10 py-8" itemProp="articleBody">
             <p className="text-gray-700 text-lg mb-6 leading-relaxed">
@@ -807,6 +812,7 @@ const HowVetsGrow = () => {
           <span className="text-2xl">↑</span>
         </button>
       </div>
+      <Footer/>
     </>
   );
 };

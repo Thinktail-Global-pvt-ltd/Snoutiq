@@ -1,6 +1,7 @@
 import React from 'react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
+import img2 from '../assets/images/pawproduction.png';
 
 const PetPawProtectionGuide = () => {
   return (
@@ -19,6 +20,9 @@ const PetPawProtectionGuide = () => {
             </p>
             <div className="w-20 h-1 bg-blue-500 mx-auto mt-4"></div>
           </header>
+          <section>
+            <img src={img2} alt="image" />
+          </section>
 
           {/* Introduction */}
           <section className="bg-white rounded-lg shadow-sm p-6 mb-8">

@@ -21,6 +21,10 @@ import img6 from '../assets/images/how_vets_can.jpeg';
 import img7 from '../assets/images/vaccination_schedule.jpeg';
 import img8 from '../assets/images/what_should_your.jpeg';
 
+import img9 from '../assets/images/RegisterAsOnlineVet.png';
+import img10 from '../assets/images/VetsIncreaseMonthlyRevenue.png';
+import img11 from '../assets/images/OnlineVetConsultation.png';
+
 export const metadata = {
   title: "Blog - SnoutIQ Veterinary Insights",
   description:
@@ -137,7 +141,7 @@ const posts = [
     slug: "how-vets-grow-with-online-consultations",
   },
  {
-     image:"",
+     image:img11,
     title: "Online Vet Consultation in India ",
     excerpt:
       "Get instant online vet consultation from certified online veterinary doctors in India. Chat, video call and get fast guidance on SnoutIQ. Affordable & reliable pet care.",
@@ -148,7 +152,7 @@ const posts = [
     slug: "online-vet-consultation",
   },
  {
-     image:"",
+     image:img9,
     title: "How to Register as an Online Vet for Video Consultations in India",
     excerpt:
       "Learn how to register as an online vet for video consultations in India. A complete step-by-step guide to start online vet consultation India including eligibility, benefits, pricing, verification, and top platforms to join for digital veterinary practice.",
@@ -159,7 +163,7 @@ const posts = [
     slug: "register-as-an-online-vet",
   },
    {
-     image:"",
+     image:img10,
     title: "How Online Vet Consultation Helps Vets Increase Monthly Revenue",
     excerpt:
       "Learn how online vet consultation helps veterinarians boost earnings, reduce clinic costs, and grow their practice with flexible telemedicine services.",

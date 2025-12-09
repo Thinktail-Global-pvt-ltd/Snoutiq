@@ -1,6 +1,7 @@
 import React from 'react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
+import img3 from '../assets/images/tickfever.png';
 
 const TickFeverGuide = () => {
   return (
@@ -19,7 +20,9 @@ const TickFeverGuide = () => {
             </p>
             <div className="w-20 h-1 bg-red-500 mx-auto mt-4"></div>
           </header>
-
+<section>
+            <img src={img3} alt="image" />
+          </section>
           {/* Introduction */}
           <section className="bg-white rounded-lg shadow-sm p-6 mb-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Understanding Tick Fever</h2>

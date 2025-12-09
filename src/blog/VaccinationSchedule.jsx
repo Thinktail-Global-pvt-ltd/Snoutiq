@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
+import img7 from '../assets/images/vaccination_schedule.jpeg';
 
 const VaccinationScheduleForPets = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -171,7 +172,9 @@ const VaccinationScheduleForPets = () => {
               </div>
             </div>
           </header>
-
+<section>
+            <img src={img7} alt="image" />
+          </section>
           {/* Main Content */}
           <div className="px-6 md:px-10 py-8" itemProp="articleBody">
             <p className="text-gray-700 text-lg mb-6 leading-relaxed">

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import img9 from '../assets/images/RegisterAsOnlineVet.png';
 
 const RegisterAsOnlineVet = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -205,7 +206,9 @@ const RegisterAsOnlineVet = () => {
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6" itemProp="headline">
               How to Register as an Online Vet for Video Consultations
             </h1>
-
+<section>
+            <img src={img9} alt="image" />
+          </section>
             <section itemProp="articleBody">
               {/* Introduction */}
               <h2 id="introduction" className="text-2xl md:text-3xl font-bold text-gray-800 mt-8 mb-4 border-l-4 border-indigo-500 pl-4">

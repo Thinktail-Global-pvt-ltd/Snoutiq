@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
-
+import img11 from '../assets/images/OnlineVetConsultation.png';
 const VetsIncreaseMonthlyRevenue = () => {
   // Set meta tags using useEffect
   useEffect(() => {
@@ -206,7 +206,9 @@ const VetsIncreaseMonthlyRevenue = () => {
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
             How Online Consultations Help Vets Increase Monthly Revenue
           </h1>
-
+<section>
+            <img src={img11} alt="image" />
+          </section>
           {/* Introduction Section */}
           <section className="mb-12">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 border-l-4 border-purple-600 pl-4">

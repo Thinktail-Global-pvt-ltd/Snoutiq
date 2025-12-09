@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import img4 from '../assets/images/first_aid_tips.jpeg';
 
 const PetFirstAidGuide = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -136,7 +137,9 @@ const PetFirstAidGuide = () => {
           </div>
         </div>
       </header>
-
+<section>
+            <img src={img4} alt="image" />
+          </section>
       {/* Main Content */}
       <div className="p-6 md:p-10" itemProp="articleBody">
         <p className="mb-6 text-gray-700 leading-relaxed">
