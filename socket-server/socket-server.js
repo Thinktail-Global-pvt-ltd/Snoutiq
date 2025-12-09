@@ -1,23 +1,55 @@
 // src/socket-server/index.js (example path)
 
 import admin from "firebase-admin";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import { createServer } from "http";
 import { dirname, join } from "path";
 import { Server } from "socket.io";
 import { fileURLToPath } from "url";
+import { ensureRedisConnected, redis as coreRedis } from "./redisClient.js";
+import { heartbeatDoctor, setDoctorOnline } from "./doctorPresence.js";
 import {
   getWhatsAppConfig,
   isWhatsAppConfigured,
   sendWhatsAppTemplate,
   sendWhatsAppText,
 } from "./whatsapp-client.js";
+import {
+  publishRedis,
+  subscribeRedis,
+  isRedisEnabled,
+} from "./redisClients.js";
 
 // -------------------- PATH + CONSTANTS --------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const DEFAULT_SERVICE_ACCOUNT_FILE = "snoutiqapp-9cacc4ece358.json";
+const ACTIVE_DOCTOR_DEBOUNCE_MS = 5000;
+const DISCONNECT_GRACE_MS = 30_000;
+const PENDING_CALL_MAX_PER_DOCTOR = Number(
+  process.env.PENDING_CALL_MAX_PER_DOCTOR || 3,
+);
+const REDIS_DOCTOR_PRESENCE_KEY = "ws:doctor-presence";
+const REDIS_ACTIVE_CALLS_KEY = "ws:active-calls";
+const REDIS_PENDING_QUEUE_KEY = "ws:pending-call-queues";
+const REDIS_PRESENCE_TTL_SECONDS = Number(
+  process.env.REDIS_PRESENCE_TTL_SECONDS || 70,
+);
+const REDIS_CALL_TTL_SECONDS = Number(
+  process.env.REDIS_CALL_TTL_SECONDS || 24 * 60 * 60,
+);
+const REDIS_PENDING_TTL_SECONDS = Number(
+  process.env.REDIS_PENDING_TTL_SECONDS || 600,
+);
+const REDIS_PUSH_TOKEN_KEY = "ws:doctor-push-tokens";
+const REDIS_PUSH_TOKEN_TTL_SECONDS = Number(
+  process.env.REDIS_PUSH_TOKEN_TTL_SECONDS || 30 * 24 * 60 * 60,
+);
+const REDIS_PRESCRIPTION_CHANNEL = "prescription-created";
+const SERVER_INSTANCE_ID = `${process.pid}-${Date.now()}-${Math.random()
+  .toString(36)
+  .slice(2, 8)}`;
 
 // Default ringtone for FCM notification (Android / iOS)
 const DEFAULT_RINGTONE = (() => {
@@ -44,14 +76,98 @@ const resolveServiceAccountPath = () => {
   return candidates[0] || null;
 };
 
+const loadServiceAccountFromCommonFiles = () => {
+  try {
+    const root = process.cwd();
+    const entries = readdirSync(root, { withFileTypes: true });
+    const jsonFiles = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .map((entry) => entry.name);
+
+    const preferredNames = [
+      "serviceAccountKey.json",
+      "credentials.json",
+      "firebase-adminsdk.json",
+      "api-0000000000000000000-111111-aaaaaabbbbbb.json",
+    ];
+
+    const ordered = [
+      ...preferredNames.filter((name) => jsonFiles.includes(name)),
+      ...jsonFiles.filter((name) => !preferredNames.includes(name)),
+    ];
+
+    for (const fileName of ordered) {
+      const fullPath = join(root, fileName);
+      try {
+        const parsed = JSON.parse(readFileSync(fullPath, "utf8"));
+        if (parsed?.type === "service_account") {
+          console.log(`✅ Loaded Firebase service account from ${fileName}`);
+          return parsed;
+        }
+      } catch {
+        /* ignore bad files */
+      }
+    }
+  } catch {
+    /* ignore scan errors */
+  }
+  return null;
+};
+
+const loadServiceAccountFromEnv = () => {
+  const inlineJson =
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+    process.env.SERVICE_ACCOUNT_JSON ||
+    null;
+  if (inlineJson) {
+    try {
+      return JSON.parse(inlineJson);
+    } catch (error) {
+      console.error(
+        "⚠️ Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:",
+        error?.message || error,
+      );
+    }
+  }
+
+  const base64Json = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || null;
+  if (base64Json) {
+    try {
+      const decoded = Buffer.from(base64Json, "base64").toString("utf8");
+      return JSON.parse(decoded);
+    } catch (error) {
+      console.error(
+        "⚠️ Failed to decode FIREBASE_SERVICE_ACCOUNT_BASE64:",
+        error?.message || error,
+      );
+    }
+  }
+
+  const gcloudPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || null;
+  if (gcloudPath && existsSync(gcloudPath)) {
+    try {
+      return JSON.parse(readFileSync(gcloudPath, "utf8"));
+    } catch (error) {
+      console.error(
+        "⚠️ Could not load GOOGLE_APPLICATION_CREDENTIALS file:",
+        error?.message || error,
+      );
+    }
+  }
+
+  return null;
+};
+
 // ==================== FIREBASE ADMIN SDK INITIALIZATION ====================
 try {
-  let serviceAccount;
+  let serviceAccount =
+    loadServiceAccountFromEnv() || loadServiceAccountFromCommonFiles();
   const resolvedPath = resolveServiceAccountPath();
 
-  if (resolvedPath) {
+  if (!serviceAccount && resolvedPath) {
     try {
       serviceAccount = JSON.parse(readFileSync(resolvedPath, "utf8"));
+      console.log(`✅ Loaded Firebase service account from ${resolvedPath}`);
     } catch (error) {
       console.error("⚠️ Could not load service account key:", error.message);
       console.log(
@@ -59,7 +175,7 @@ try {
       );
       serviceAccount = null;
     }
-  } else {
+  } else if (!serviceAccount) {
     console.log("⚠️ No service account path resolved.");
     console.log(
       "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory."
@@ -82,32 +198,66 @@ try {
   console.error("❌ Firebase Admin SDK initialization error:", error.message);
 }
 
+const isFirebaseReady = () => Boolean(admin?.apps?.length);
+if (!isFirebaseReady()) {
+  console.warn("[push] Firebase Admin SDK not initialized - push notifications will be skipped");
+} else {
+  console.log("[push] Firebase Admin SDK ready - push notifications enabled");
+}
+
+// -------------------- REDIS STATE HELPERS --------------------
+const isRedisStateReady = () => Boolean(coreRedis) && coreRedis.status === "ready";
+
+const setHashWithTtl = async (key, field, value, ttlSeconds) => {
+  if (!isRedisStateReady()) return;
+  try {
+    await coreRedis.hset(key, String(field), JSON.stringify(value));
+    if (ttlSeconds) {
+      await coreRedis.expire(key, ttlSeconds);
+    }
+  } catch (error) {
+    console.warn(
+      `[redis:state] hset ${key}:${field} failed`,
+      error?.message || error,
+    );
+  }
+};
+
+const removeHashField = async (key, field) => {
+  if (!isRedisStateReady()) return;
+  try {
+    await coreRedis.hdel(key, String(field));
+  } catch (error) {
+    console.warn(
+      `[redis:state] hdel ${key}:${field} failed`,
+      error?.message || error,
+    );
+  }
+};
+
 // -------------------- IN-MEMORY STATE --------------------
-// activeDoctors: doctorId -> {
-//   socketId, joinedAt, lastSeen, connectionStatus ("connected" | "disconnected"),
-//   location?, disconnectedAt?
-// }
+// activeDoctors: doctorId -> { socketId, joinedAt, lastSeen, connectionStatus, ... }
 const activeDoctors = new Map();
-
-// activeCalls: callId -> {
-//   callId, doctorId, patientId, channel,
-//   status ("queued" | "requested" | "accepted" | "payment_completed" | "active" | "ended" | ...),
-//   createdAt, acceptedAt?, rejectedAt?, endedAt?, paidAt?,
-//   patientSocketId, doctorSocketId,
-//   paymentId?, disconnectedAt?, ...
-// }
+// activeCalls: callId -> call session metadata
 const activeCalls = new Map();
-
-// pendingCalls: doctorId -> [ { callId, doctorId, patientSocketId, queuedAt, timer } ]
+// pendingCalls: doctorId -> queue of call requests waiting for doctor
 const pendingCalls = new Map();
-
-// FCM Push Token Storage (in-memory, TODO: persist to DB)
+// cached push tokens per doctor
 const doctorPushTokens = new Map();
+// grace timers per doctor
+const doctorDisconnectTimers = new Map();
+
+// Debounce/emit trackers
+let lastActiveDoctorsEmit = 0;
+let activeDoctorsEmitTimer = null;
+let pendingActiveDoctorsEmit = false;
+let lastActiveDoctorSignature = { available: "", all: "" };
+let redisPrescriptionUnsub = null;
 
 // simple dedupe set: `${callId}:${doctorId}`
 const sentCallNotifications = new Set();
 
-// -------------------- LOGGING HELPERS --------------------
+// -------------------- LOGGING / NOTIFICATION HELPERS --------------------
 const logFlow = (stage, payload = {}) => {
   const {
     callId,
@@ -143,22 +293,158 @@ const logFlow = (stage, payload = {}) => {
   console.log(parts.join(" | "));
 };
 
-// -------------------- NOTIFICATION HELPERS --------------------
+const normalizeCallId = (rawId) => {
+  if (!rawId) return "";
+  const str = String(rawId).trim();
+  if (!str) return "";
+
+  const cleaned = str.replace(/^call_+/i, "call_").replace(/_{2,}/g, "_");
+  const parts = cleaned.split("_").filter(Boolean);
+  if (!parts.length) return "";
+  const body = parts[0].toLowerCase() === "call" ? parts.slice(1) : parts;
+  return body.length ? `call_${body.join("_")}` : "call_";
+};
+
 const getNotificationKey = (callId, doctorId) =>
   `${String(callId)}:${String(doctorId)}`;
-
 const hasNotificationBeenSent = (callId, doctorId) =>
   sentCallNotifications.has(getNotificationKey(callId, doctorId));
-
 const markNotificationSent = (callId, doctorId) => {
   sentCallNotifications.add(getNotificationKey(callId, doctorId));
 };
-
 const clearNotificationSent = (callId, doctorId) => {
   sentCallNotifications.delete(getNotificationKey(callId, doctorId));
 };
 
-// -------------------- PUSH TOKEN HELPERS --------------------
+// -------------------- REDIS PERSIST HELPERS --------------------
+const persistDoctorPushToken = async (doctorId, token) => {
+  if (!doctorId || !token || !isRedisStateReady()) return;
+  try {
+    await setHashWithTtl(
+      REDIS_PUSH_TOKEN_KEY,
+      doctorId,
+      {
+        token,
+        updatedAt: new Date().toISOString(),
+      },
+      REDIS_PUSH_TOKEN_TTL_SECONDS,
+    );
+  } catch (error) {
+    console.error(`Error storing push token for doctor ${doctorId}:`, error);
+  }
+};
+
+const fetchDoctorPushTokenFromRedis = async (doctorId) => {
+  if (!doctorId || !isRedisStateReady()) return null;
+  try {
+    const raw = await coreRedis.hget(REDIS_PUSH_TOKEN_KEY, String(doctorId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.token || null;
+  } catch (error) {
+    console.warn(
+      `[redis:state] failed to fetch push token for doctor ${doctorId}`,
+      error?.message || error,
+    );
+    return null;
+  }
+};
+
+const persistDoctorPresence = async (doctorId) => {
+  if (!doctorId) return;
+  const entry = activeDoctors.get(doctorId);
+  if (!entry) {
+    await removeHashField(REDIS_DOCTOR_PRESENCE_KEY, doctorId);
+    return;
+  }
+
+  const payload = {
+    doctorId,
+    socketId: entry.socketId || null,
+    lastSeen: entry.lastSeen ? new Date(entry.lastSeen).toISOString() : null,
+    joinedAt: entry.joinedAt ? new Date(entry.joinedAt).toISOString() : null,
+    connectionStatus: entry.connectionStatus || "disconnected",
+    disconnectedAt: entry.disconnectedAt
+      ? new Date(entry.disconnectedAt).toISOString()
+      : null,
+    timestamp: new Date().toISOString(),
+  };
+
+  await setHashWithTtl(
+    REDIS_DOCTOR_PRESENCE_KEY,
+    doctorId,
+    payload,
+    REDIS_PRESENCE_TTL_SECONDS,
+  );
+};
+
+const removeDoctorPresence = async (doctorId) => {
+  if (!doctorId) return;
+  await removeHashField(REDIS_DOCTOR_PRESENCE_KEY, doctorId);
+};
+
+const persistActiveCallState = async (callSession) => {
+  if (!callSession?.callId) return;
+  const payload = {
+    ...callSession,
+    callId: callSession.callId,
+    createdAt: callSession.createdAt
+      ? new Date(callSession.createdAt).toISOString()
+      : undefined,
+    acceptedAt: callSession.acceptedAt
+      ? new Date(callSession.acceptedAt).toISOString()
+      : undefined,
+    rejectedAt: callSession.rejectedAt
+      ? new Date(callSession.rejectedAt).toISOString()
+      : undefined,
+    endedAt: callSession.endedAt
+      ? new Date(callSession.endedAt).toISOString()
+      : undefined,
+    paidAt: callSession.paidAt
+      ? new Date(callSession.paidAt).toISOString()
+      : undefined,
+    disconnectedAt: callSession.disconnectedAt
+      ? new Date(callSession.disconnectedAt).toISOString()
+      : undefined,
+  };
+
+  await setHashWithTtl(
+    REDIS_ACTIVE_CALLS_KEY,
+    callSession.callId,
+    payload,
+    REDIS_CALL_TTL_SECONDS,
+  );
+};
+
+const removeActiveCallState = async (callId) => {
+  if (!callId) return;
+  await removeHashField(REDIS_ACTIVE_CALLS_KEY, callId);
+};
+
+const persistPendingQueueState = async (doctorId) => {
+  if (!doctorId) return;
+  const queue = pendingCalls.get(doctorId) || [];
+
+  if (!queue.length) {
+    await removeHashField(REDIS_PENDING_QUEUE_KEY, doctorId);
+    return;
+  }
+
+  const serialized = queue.map((entry) => ({
+    callId: entry.callId,
+    doctorId: entry.doctorId,
+    patientSocketId: entry.patientSocketId || null,
+    queuedAt: entry.queuedAt || Date.now(),
+  }));
+
+  await setHashWithTtl(
+    REDIS_PENDING_QUEUE_KEY,
+    doctorId,
+    serialized,
+    REDIS_PENDING_TTL_SECONDS,
+  );
+};
+
 const storeDoctorPushToken = async (doctorId, token) => {
   try {
     if (!doctorId || !token) {
@@ -166,10 +452,19 @@ const storeDoctorPushToken = async (doctorId, token) => {
       return false;
     }
 
-    doctorPushTokens.set(doctorId, token);
-    console.log(`💾 Push token stored in memory for doctor ${doctorId}`);
+    const normalizedId = Number(doctorId);
+    const cached = doctorPushTokens.get(normalizedId);
+    if (cached && cached === token) {
+      console.log(
+        `ℹ️ Push token for doctor ${normalizedId} unchanged, skipping re-store`,
+      );
+      return true;
+    }
 
-    // TODO: Persist to database
+    doctorPushTokens.set(normalizedId, token);
+    await persistDoctorPushToken(normalizedId, token);
+    console.log(`✅ Push token cached for doctor ${normalizedId}`);
+
     return true;
   } catch (error) {
     console.error(`Error storing push token for doctor ${doctorId}:`, error);
@@ -179,16 +474,23 @@ const storeDoctorPushToken = async (doctorId, token) => {
 
 const getDoctorPushToken = async (doctorId) => {
   try {
-    const token = doctorPushTokens.get(doctorId);
+    const normalizedId = Number(doctorId);
+    let token = doctorPushTokens.get(normalizedId);
 
     if (!token) {
-      console.log(`⚠️ No cached token for doctor ${doctorId}`);
-      // TODO: Fetch from database as fallback
+      token = await fetchDoctorPushTokenFromRedis(normalizedId);
+      if (token) {
+        doctorPushTokens.set(normalizedId, token);
+      }
+    }
+
+    if (!token) {
+      console.log(`⚠️ No push token found for doctor ${normalizedId}`);
       return null;
     }
 
     console.log(
-      `✅ Found push token for doctor ${doctorId}: ${token.substring(0, 20)}...`
+      `✅ Found push token for doctor ${normalizedId}: ${token.substring(0, 20)}...`
     );
     return token;
   } catch (error) {
@@ -207,16 +509,15 @@ const sendPushNotification = async (doctorId, payload) => {
       return null;
     }
 
-    if (!admin.apps.length) {
-      console.log(
-        "⚠️ Firebase Admin not initialized, cannot send push notification"
-      );
+    if (!isFirebaseReady()) {
+      console.warn("[push] Firebase Admin not initialized, cannot send push notification");
       return null;
     }
 
-    console.log(`📤 Sending FCM notification to doctor ${doctorId}`);
+    console.log(`📨 Sending FCM notification to doctor ${doctorId}`);
 
     const ringtoneSound = payload.sound || DEFAULT_RINGTONE;
+    const dataOnly = payload?.dataOnly !== false;
 
     const stringifiedData = Object.entries({
       type: "pending_call",
@@ -253,23 +554,27 @@ const sendPushNotification = async (doctorId, payload) => {
     const message = {
       token: doctorPushToken,
       data: stringifiedData,
-      notification: {
-        title: notificationTitle,
-        body: notificationBody,
-      },
+      notification: dataOnly
+        ? undefined
+        : {
+            title: notificationTitle,
+            body: notificationBody,
+          },
 
       android: {
         priority: "high",
         ttl: 3600000,
         restrictedPackageName: process.env.ANDROID_APP_ID,
-        notification: {
-          title: notificationTitle,
-          body: notificationBody,
-          channelId: "calls",
-          priority: "max",
-          visibility: "public",
-          sound: ringtoneSound,
-        },
+        notification: dataOnly
+          ? undefined
+          : {
+              title: notificationTitle,
+              body: notificationBody,
+              channelId: "calls",
+              priority: "max",
+              visibility: "public",
+              sound: ringtoneSound,
+            },
         fcmOptions: {
           analyticsLabel: "pending_call",
         },
@@ -277,26 +582,32 @@ const sendPushNotification = async (doctorId, payload) => {
 
       apns: {
         headers: {
-          "apns-priority": "10",
-          "apns-push-type": "alert",
+          "apns-priority": dataOnly ? "5" : "10",
+          "apns-push-type": dataOnly ? "background" : "alert",
         },
         payload: {
           aps: {
-            sound: {
-              critical: 1,
-              name: ringtoneSound.endsWith(".caf")
-                ? ringtoneSound
-                : `${ringtoneSound}.caf`,
-              volume: 1.0,
-            },
-            badge: 1,
-            alert: {
-              title: notificationTitle,
-              body: notificationBody,
-            },
-            "content-available": 1,
-            "mutable-content": 1,
-            category: "INCOMING_CALL",
+            ...(dataOnly
+              ? {
+                  "content-available": 1,
+                }
+              : {
+                  sound: {
+                    critical: 1,
+                    name: ringtoneSound.endsWith(".caf")
+                      ? ringtoneSound
+                      : `${ringtoneSound}.caf`,
+                    volume: 1.0,
+                  },
+                  badge: 1,
+                  alert: {
+                    title: notificationTitle,
+                    body: notificationBody,
+                  },
+                  "content-available": 1,
+                  "mutable-content": 1,
+                  category: "INCOMING_CALL",
+                }),
           },
         },
         fcm_options: {
@@ -305,17 +616,19 @@ const sendPushNotification = async (doctorId, payload) => {
       },
 
       webpush: {
-        notification: {
-          title: notificationTitle,
-          body: notificationBody,
-          icon: "/icon-192x192.png",
-          badge: "/badge-72x72.png",
-          requireInteraction: true,
-          actions: [
-            { action: "join", title: "Join Call" },
-            { action: "dismiss", title: "Dismiss" },
-          ],
-        },
+        notification: dataOnly
+          ? undefined
+          : {
+              title: notificationTitle,
+              body: notificationBody,
+              icon: "/icon-192x192.png",
+              badge: "/badge-72x72.png",
+              requireInteraction: true,
+              actions: [
+                { action: "join", title: "Join Call" },
+                { action: "dismiss", title: "Dismiss" },
+              ],
+            },
         data: stringifiedData,
         fcmOptions: {
           link: payload.deepLink,
@@ -341,7 +654,7 @@ const sendPushNotification = async (doctorId, payload) => {
       console.log(
         `⚠️ Invalid token for doctor ${doctorId}, removing from cache`
       );
-      doctorPushTokens.delete(doctorId);
+      await deleteDoctorPushToken(doctorId);
     }
 
     throw error;
@@ -513,8 +826,8 @@ const buildTemplateComponents = (context) => {
 const DOCTOR_HEARTBEAT_EVENT = "doctor-heartbeat";
 const DOCTOR_HEARTBEAT_INTERVAL_MS = 15_000;
 
-// 24 hours stale timeout → safety fallback (prevents ghost doctors forever)
-const DOCTOR_STALE_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+// Short stale timeout safety fallback (prevents ghost doctors)
+const DOCTOR_STALE_TIMEOUT_MS = 70 * 1000;
 
 const PENDING_CALL_TIMEOUT_MS = 45_000;
 const ACTIVE_DOCTOR_LOG_INTERVAL_MS = 5_000;
@@ -532,46 +845,89 @@ let lastActiveDoctorRequestLog = {
 };
 
 // -------------------- HELPERS --------------------
-// ✅ ALWAYS ONLINE FIX: Mark doctor as disconnected but DON'T remove from map.
-// They stay in "live doctors" list; only manual "Offline" removes them.
-// 24-hour stale cleanup will finally remove very old entries.
+const setActiveCallSession = (callId, callSession) => {
+  const normalizedCallId = normalizeCallId(callId);
+  if (!normalizedCallId || !callSession) return null;
+  const session = { ...callSession, callId: normalizedCallId };
+  activeCalls.set(normalizedCallId, session);
+  persistActiveCallState(session).catch(() => {});
+  return session;
+};
+
+const deleteActiveCallSession = (callId) => {
+  const normalizedCallId = normalizeCallId(callId);
+  if (!normalizedCallId) return false;
+  const removed = activeCalls.delete(normalizedCallId);
+  removeActiveCallState(normalizedCallId).catch(() => {});
+  return removed;
+};
+
+// Reconnect grace: mark reconnecting immediately, drop after grace if no return.
 const markDoctorDisconnected = (doctorId, socketId) => {
   const entry = activeDoctors.get(doctorId);
   if (!entry) return;
 
   // If doctor already reconnected on a new socket, don't touch new session
   if (socketId && entry.socketId && entry.socketId !== socketId) {
-    console.log(
-      `ℹ️ Doctor ${doctorId} already reconnected, ignoring old socket ${socketId}`
-    );
+    console.log(`Doctor ${doctorId} already reconnected, ignoring old socket ${socketId}`);
     return;
   }
 
-  entry.connectionStatus = "disconnected";
+  entry.connectionStatus = "reconnecting";
   entry.disconnectedAt = new Date();
-  entry.socketId = null; // clear active socket but KEEP doctor entry
+  entry.socketId = null; // clear active socket but KEEP doctor entry during grace
 
   activeDoctors.set(doctorId, entry);
-  console.log(`🔌 Doctor ${doctorId} marked as disconnected (stays online)`);
+  persistDoctorPresence(doctorId).catch(() => {});
+  console.log(`Doctor ${doctorId} marked as reconnecting (grace window)`);
 };
 
-const upsertDoctorEntry = (doctorId, values = {}) => {
-  if (!doctorId) return null;
-  const existing = activeDoctors.get(doctorId) || {};
+const scheduleDoctorDisconnect = (doctorId, socketId) => {
+  if (!doctorId) return;
+  const existingTimer = doctorDisconnectTimers.get(doctorId);
+  if (existingTimer) clearTimeout(existingTimer);
 
-  const entry = {
-    ...existing,
-    ...values,
-    lastSeen: values.lastSeen || existing.lastSeen || new Date(),
-    joinedAt: values.joinedAt || existing.joinedAt || new Date(),
-  };
+  // Immediately mark reconnecting and emit
+  markDoctorDisconnected(doctorId, socketId);
+  emitAvailableDoctors();
 
-  if (!entry.connectionStatus) {
-    entry.connectionStatus = "connected";
+  const timer = setTimeout(() => {
+    doctorDisconnectTimers.delete(doctorId);
+    const current = activeDoctors.get(doctorId);
+    if (current && current.connectionStatus === "reconnecting") {
+      activeDoctors.delete(doctorId);
+      removeDoctorPresence(doctorId).catch(() => {});
+      console.log(
+        `Removing stale doctor ${doctorId} after reconnect grace elapsed`,
+      );
+    }
+    emitAvailableDoctors();
+  }, DISCONNECT_GRACE_MS);
+
+  doctorDisconnectTimers.set(doctorId, timer);
+};
+
+const cancelDoctorDisconnect = (doctorId) => {
+  const timer = doctorDisconnectTimers.get(doctorId);
+  if (timer) {
+    clearTimeout(timer);
+    doctorDisconnectTimers.delete(doctorId);
   }
+};
 
-  activeDoctors.set(doctorId, entry);
-  return entry;
+// Upsert helper for activeDoctors map
+const upsertDoctorEntry = (doctorId, fields = {}) => {
+  if (!doctorId) return null;
+  const current = activeDoctors.get(doctorId) || {};
+  const updated = {
+    ...current,
+    ...fields,
+  };
+  if (!updated.joinedAt) updated.joinedAt = new Date();
+  if (!updated.lastSeen) updated.lastSeen = new Date();
+  activeDoctors.set(doctorId, updated);
+  persistDoctorPresence(doctorId).catch(() => {});
+  return updated;
 };
 
 // NOTE: doctor "busy" means there's already a call in requested/accepted/payment_completed/active with him.
@@ -594,7 +950,8 @@ const removePendingCallEntry = (doctorId, callId) => {
   const queue = pendingCalls.get(doctorId);
   if (!queue) return false;
 
-  const index = queue.findIndex((entry) => entry.callId === callId);
+  const normalizedCallId = normalizeCallId(callId);
+  const index = queue.findIndex((entry) => entry.callId === normalizedCallId);
   if (index < 0) return false;
 
   const [entry] = queue.splice(index, 1);
@@ -605,22 +962,24 @@ const removePendingCallEntry = (doctorId, callId) => {
   } else {
     pendingCalls.delete(doctorId);
   }
+  persistPendingQueueState(doctorId).catch(() => {});
 
   return true;
 };
 
 const expirePendingCall = (doctorId, callId, reason = "timeout") => {
-  removePendingCallEntry(doctorId, callId);
+  const normalizedCallId = normalizeCallId(callId);
+  removePendingCallEntry(doctorId, normalizedCallId);
 
-  const session = activeCalls.get(callId);
+  const session = activeCalls.get(normalizedCallId);
   if (!session) return;
 
-  activeCalls.delete(callId);
-  clearNotificationSent(callId, doctorId);
+  deleteActiveCallSession(normalizedCallId);
+  clearNotificationSent(normalizedCallId, doctorId);
 
   if (session.patientSocketId) {
     io.to(session.patientSocketId).emit("call-failed", {
-      callId,
+      callId: normalizedCallId,
       doctorId,
       patientId: session.patientId,
       reason,
@@ -630,7 +989,7 @@ const expirePendingCall = (doctorId, callId, reason = "timeout") => {
   }
 
   io.emit("call-status-update", {
-    callId,
+    callId: normalizedCallId,
     doctorId,
     status: "expired",
     reason,
@@ -822,6 +1181,33 @@ const notifyDoctorPendingCall = async (callSession) => {
   );
 };
 
+const persistCallRequested = async (callSession) => {
+  try {
+    const createdAt =
+      callSession.createdAt instanceof Date
+        ? callSession.createdAt
+        : new Date(callSession.createdAt || Date.now());
+    await coreRedis
+      .multi()
+      .hset(`call:${callSession.callId}`, {
+        doctorId: String(callSession.doctorId ?? ""),
+        patientId: String(callSession.patientId ?? ""),
+        channel: callSession.channel || "",
+        status: callSession.status || "",
+        createdAt: createdAt.toISOString(),
+        requestedAt: new Date().toISOString(),
+        serverId: SERVER_INSTANCE_ID,
+      })
+      .expire(`call:${callSession.callId}`, 600)
+      .exec();
+  } catch (error) {
+    console.warn(
+      "[Redis] call-requested persist failed:",
+      error?.message || error,
+    );
+  }
+};
+
 const enqueuePendingCall = (callSession) => {
   const doctorId = callSession.doctorId;
   if (!doctorId) return;
@@ -849,6 +1235,7 @@ const enqueuePendingCall = (callSession) => {
 
   queue.push(entry);
   pendingCalls.set(doctorId, queue);
+  persistPendingQueueState(doctorId).catch(() => {});
 
   console.log(
     `🕒 Queued call ${callSession.callId} for doctor ${doctorId}. Pending count: ${queue.length}`
@@ -887,6 +1274,7 @@ const deliverNextPendingCall = (doctorId) => {
   } else {
     pendingCalls.delete(doctorId);
   }
+  persistPendingQueueState(doctorId).catch(() => {});
 
   if (!entry) return;
 
@@ -902,7 +1290,7 @@ const deliverNextPendingCall = (doctorId) => {
   session.status = "requested";
   session.requestedAt = new Date();
   session.doctorSocketId = doctorEntry.socketId;
-  activeCalls.set(session.callId, session);
+  setActiveCallSession(session.callId, session);
 
   io.to(`doctor-${doctorId}`).emit("call-requested", {
     callId: session.callId,
@@ -928,18 +1316,36 @@ const deliverNextPendingCall = (doctorId) => {
   );
 };
 
-// Broadcast list of available doctors (not busy) + "live" doctors (connected/disconnected)
-const emitAvailableDoctors = () => {
+const buildActiveDoctorSnapshot = () => {
   const available = [];
   const allOnline = [];
 
   for (const [doctorId, info] of activeDoctors.entries()) {
     const status = info.connectionStatus || "connected";
-    if (["connected", "disconnected"].includes(status)) {
+    const isConnected = status === "connected";
+    const isReconnecting = status === "reconnecting";
+    if (isConnected || isReconnecting) {
       allOnline.push(doctorId);
-      if (!isDoctorBusy(doctorId)) available.push(doctorId);
+      if (isConnected && !isDoctorBusy(doctorId)) {
+        available.push(doctorId);
+      }
     }
   }
+
+  return {
+    available,
+    allOnline,
+    availableKey: available.slice().sort((a, b) => a - b).join(","),
+    onlineKey: allOnline.slice().sort((a, b) => a - b).join(","),
+  };
+};
+
+// Broadcast list of available doctors (not busy) + "live" doctors (connected/reconnecting)
+const emitAvailableDoctorsInternal = (snapshot = buildActiveDoctorSnapshot()) => {
+  const { available, allOnline, availableKey, onlineKey } = snapshot;
+  const hasChanged =
+    availableKey !== lastActiveDoctorSignature.available ||
+    onlineKey !== lastActiveDoctorSignature.all;
 
   const now = Date.now();
   const shouldLog =
@@ -949,7 +1355,7 @@ const emitAvailableDoctors = () => {
 
   if (shouldLog) {
     console.log(
-      `📤 Broadcasting ${available.length} available doctors (${allOnline.length} online total)`
+      `Broadcasting ${available.length} available doctors (${allOnline.length} online total)`
     );
     lastAvailableDoctorLog = {
       timestamp: now,
@@ -958,8 +1364,74 @@ const emitAvailableDoctors = () => {
     };
   }
 
+  if (!hasChanged) {
+    return;
+  }
+
+  lastActiveDoctorSignature = { available: availableKey, all: onlineKey };
   io.emit("active-doctors", available);
   io.emit("live-doctors", allOnline);
+};
+
+const emitAvailableDoctors = () => {
+  const snapshot = buildActiveDoctorSnapshot();
+  const hasChanged =
+    snapshot.availableKey !== lastActiveDoctorSignature.available ||
+    snapshot.onlineKey !== lastActiveDoctorSignature.all;
+
+  const now = Date.now();
+  const elapsed = now - lastActiveDoctorsEmit;
+  if (!hasChanged && !pendingActiveDoctorsEmit) {
+    return;
+  }
+
+  const triggerEmit = () => {
+    pendingActiveDoctorsEmit = false;
+    lastActiveDoctorsEmit = Date.now();
+    emitAvailableDoctorsInternal();
+  };
+
+  if (elapsed >= ACTIVE_DOCTOR_DEBOUNCE_MS && !pendingActiveDoctorsEmit) {
+    triggerEmit();
+    return;
+  }
+
+  pendingActiveDoctorsEmit = true;
+  const delay = Math.max(ACTIVE_DOCTOR_DEBOUNCE_MS - elapsed, 0);
+  if (activeDoctorsEmitTimer) clearTimeout(activeDoctorsEmitTimer);
+  activeDoctorsEmitTimer = setTimeout(triggerEmit, delay);
+};
+
+
+const broadcastPrescriptionToUser = (data = {}, { publish = false } = {}) => {
+  const rawUserId =
+    data.userId ?? data.user_id ?? data.patientId ?? data.patient_id;
+  const userId = Number(rawUserId);
+  const doctorId = Number(data.doctorId ?? data.doctor_id);
+  const prescription = data.prescription || data;
+  if (!Number.isFinite(userId)) {
+    console.warn(
+      "prescription-created missing userId. Payload:",
+      JSON.stringify(data),
+    );
+    return;
+  }
+
+  const payload = {
+    prescription,
+    doctorId: Number.isFinite(doctorId) ? doctorId : undefined,
+    timestamp: data.timestamp || new Date().toISOString(),
+    userId,
+  };
+
+  io.to(`user_${userId}`).emit("prescription-created", payload);
+
+  if (publish && isRedisEnabled()) {
+    publishRedis(REDIS_PRESCRIPTION_CHANNEL, {
+      ...payload,
+      sourceId: SERVER_INSTANCE_ID,
+    }).catch(() => {});
+  }
 };
 
 // When a doctor connects (join-doctor), replay any open calls for them so they get the popup.
@@ -973,7 +1445,7 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
 
     // update this session with latest doctor socket
     callSession.doctorSocketId = socket.id;
-    activeCalls.set(callId, callSession);
+    setActiveCallSession(callId, callSession);
 
     const { patientId, channel } = callSession;
 
@@ -1019,6 +1491,124 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
   }
 
   deliverNextPendingCall(doctorId);
+};
+
+const rehydrateStateFromRedis = async () => {
+  if (!isRedisStateReady()) return;
+  try {
+    const [doctorRaw, callRaw, queueRaw] = await Promise.all([
+      coreRedis.hgetall(REDIS_DOCTOR_PRESENCE_KEY),
+      coreRedis.hgetall(REDIS_ACTIVE_CALLS_KEY),
+      coreRedis.hgetall(REDIS_PENDING_QUEUE_KEY),
+    ]);
+
+    const now = Date.now();
+    if (doctorRaw && Object.keys(doctorRaw).length) {
+      for (const [doctorIdKey, raw] of Object.entries(doctorRaw)) {
+        try {
+          const parsed = JSON.parse(raw || "{}");
+          const doctorId = Number(doctorIdKey);
+          const lastSeen = parsed.lastSeen ? new Date(parsed.lastSeen) : null;
+          if (
+            lastSeen &&
+            now - lastSeen.getTime() > DOCTOR_STALE_TIMEOUT_MS
+          ) {
+            continue;
+          }
+          activeDoctors.set(doctorId, {
+            ...parsed,
+            doctorId,
+            connectionStatus: parsed.connectionStatus || "reconnecting",
+            lastSeen: lastSeen || new Date(),
+          });
+          persistDoctorPresence(doctorId).catch(() => {});
+        } catch (error) {
+          console.warn(
+            "[redis:state] failed to parse doctor presence",
+            error?.message || error,
+          );
+        }
+      }
+    }
+
+    if (callRaw && Object.keys(callRaw).length) {
+      for (const [callIdKey, raw] of Object.entries(callRaw)) {
+        try {
+          const parsed = JSON.parse(raw || "{}");
+          const callId = parsed.callId || callIdKey;
+          const session = {
+            ...parsed,
+            callId,
+            doctorId: Number(parsed.doctorId ?? parsed.doctor_id ?? 0) || null,
+            patientId:
+              Number(parsed.patientId ?? parsed.patient_id ?? 0) || null,
+            createdAt: parsed.createdAt ? new Date(parsed.createdAt) : new Date(),
+            acceptedAt: parsed.acceptedAt
+              ? new Date(parsed.acceptedAt)
+              : undefined,
+            rejectedAt: parsed.rejectedAt
+              ? new Date(parsed.rejectedAt)
+              : undefined,
+            endedAt: parsed.endedAt ? new Date(parsed.endedAt) : undefined,
+            paidAt: parsed.paidAt ? new Date(parsed.paidAt) : undefined,
+            disconnectedAt: parsed.disconnectedAt
+              ? new Date(parsed.disconnectedAt)
+              : undefined,
+          };
+          setActiveCallSession(callId, session);
+        } catch (error) {
+          console.warn(
+            "[redis:state] failed to parse active call",
+            error?.message || error,
+          );
+        }
+      }
+    }
+
+    if (queueRaw && Object.keys(queueRaw).length) {
+      for (const [doctorIdKey, raw] of Object.entries(queueRaw)) {
+        try {
+          const parsed = JSON.parse(raw || "[]");
+          const doctorId = Number(doctorIdKey);
+          const rebuiltQueue = [];
+          for (const entry of parsed) {
+            const queuedAt = Number(entry.queuedAt) || Date.now();
+            const remaining =
+              PENDING_CALL_TIMEOUT_MS - Math.max(0, now - queuedAt);
+            if (remaining <= 0) {
+              setTimeout(
+                () => expirePendingCall(doctorId, entry.callId, "timeout"),
+                0,
+              );
+              continue;
+            }
+            const timer = setTimeout(
+              () => expirePendingCall(doctorId, entry.callId, "timeout"),
+              remaining,
+            );
+            rebuiltQueue.push({
+              callId: entry.callId,
+              doctorId,
+              patientSocketId: entry.patientSocketId || null,
+              queuedAt,
+              timer,
+            });
+          }
+          if (rebuiltQueue.length) {
+            pendingCalls.set(doctorId, rebuiltQueue);
+            persistPendingQueueState(doctorId).catch(() => {});
+          }
+        } catch (error) {
+          console.warn(
+            "[redis:state] failed to parse pending queue",
+            error?.message || error,
+          );
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("[redis:state] rehydrate failed", error?.message || error);
+  }
 };
 
 // -------------------- HTTP SERVER (health + debug APIs) --------------------
@@ -1112,6 +1702,34 @@ const io = new Server(httpServer, {
   pingInterval: 10000,
 });
 
+await rehydrateStateFromRedis();
+emitAvailableDoctors();
+
+if (isRedisEnabled() && isRedisStateReady()) {
+  try {
+    redisPrescriptionUnsub = subscribeRedis(
+      REDIS_PRESCRIPTION_CHANNEL,
+      (message) => {
+        try {
+          const parsed =
+            typeof message === "string" ? JSON.parse(message || "{}") : message;
+          if (parsed?.sourceId && parsed.sourceId === SERVER_INSTANCE_ID) {
+            return;
+          }
+          broadcastPrescriptionToUser(parsed || {}, { publish: false });
+        } catch (error) {
+          console.warn(
+            "[redis] prescription channel handler failed",
+            error?.message || error,
+          );
+        }
+      },
+    );
+  } catch (error) {
+    console.warn("[redis] subscription failed", error?.message || error);
+  }
+}
+
 // -------------------- CORE SOCKET LOGIC --------------------
 io.on("connection", (socket) => {
   console.log(`⚡ Client connected: ${socket.id}`);
@@ -1131,26 +1749,9 @@ io.on("connection", (socket) => {
   // ========== PRESCRIPTION CREATED (doctor -> patient) ==========
   socket.on("prescription-created", (data = {}) => {
     try {
-      const userId = Number(
-        data.userId ?? data.user_id ?? data.patientId ?? data.patient_id,
-      );
-      const doctorId = Number(data.doctorId ?? data.doctor_id);
-      const prescription = data.prescription || data;
-      if (!Number.isFinite(userId)) {
-        console.warn(
-          "prescription-created missing userId. Payload:",
-          JSON.stringify(data)
-        );
-        return;
-      }
-
-      io.to(`user_${userId}`).emit("prescription-created", {
-        prescription,
-        doctorId: Number.isFinite(doctorId) ? doctorId : undefined,
-        timestamp: new Date().toISOString(),
-      });
-      console.log(
-        `Prescription notification broadcast to user_${userId} (doctorId: ${Number.isFinite(doctorId) ? doctorId : "n/a"})`
+      broadcastPrescriptionToUser(
+        { ...data, timestamp: data.timestamp || new Date().toISOString() },
+        { publish: true },
       );
     } catch (error) {
       console.error(
@@ -1160,7 +1761,7 @@ io.on("connection", (socket) => {
     }
   });
   // ========== DOCTOR JOINS THEIR "ROOM" ==========
-  socket.on("join-doctor", (doctorIdRaw) => {
+  socket.on("join-doctor", async (doctorIdRaw) => {
     const doctorId = Number(doctorIdRaw);
     if (!Number.isFinite(doctorId)) {
       console.warn("Invalid doctorId for join-doctor:", doctorIdRaw);
@@ -1170,28 +1771,33 @@ io.on("connection", (socket) => {
     socket.join(roomName);
 
     const existing = activeDoctors.get(doctorId);
+    cancelDoctorDisconnect(doctorId);
     if (existing && existing.socketId && existing.socketId !== socket.id) {
       console.log(
         `⚠️ Doctor ${doctorId} reconnecting (old socket: ${existing.socketId})`
       );
     }
 
-    upsertDoctorEntry(doctorId, {
+    const updated = upsertDoctorEntry(doctorId, {
       socketId: socket.id,
       joinedAt: new Date(),
       lastSeen: new Date(),
       connectionStatus: "connected",
     });
+    await setDoctorOnline(doctorId, socket.id, { mode: "always_online" });
+
 
     console.log(
       `✅ Doctor ${doctorId} joined (Total active: ${activeDoctors.size})`
     );
 
-    socket.emit("doctor-online", {
-      doctorId,
-      status: "online",
-      timestamp: new Date().toISOString(),
-    });
+    if (!existing || existing.connectionStatus !== updated.connectionStatus) {
+      socket.emit("doctor-online", {
+        doctorId,
+        status: "online",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     emitAvailableDoctors();
 
@@ -1221,6 +1827,8 @@ io.on("connection", (socket) => {
     console.log(`👋 Doctor ${doctorId} manually set to offline`);
 
     activeDoctors.delete(doctorId);
+    removeDoctorPresence(doctorId).catch(() => {});
+    removeDoctorPresence(doctorId).catch(() => {});
     socket.leave(`doctor-${doctorId}`);
 
     // Let this doctor know
@@ -1234,7 +1842,7 @@ io.on("connection", (socket) => {
   });
 
   // ========== HEARTBEAT FROM DOCTOR FRONTEND ==========
-  socket.on(DOCTOR_HEARTBEAT_EVENT, (payload = {}) => {
+  socket.on(DOCTOR_HEARTBEAT_EVENT, async (payload = {}) => {
     const doctorId = Number(payload.doctorId || payload.id);
     if (!doctorId) return;
 
@@ -1243,6 +1851,8 @@ io.on("connection", (socket) => {
       lastSeen: new Date(),
       connectionStatus: "connected",
     });
+
+    await heartbeatDoctor(doctorId, payload?.source || "foreground");
   });
 
   // ========== REGISTER PUSH TOKEN ==========
@@ -1259,6 +1869,17 @@ io.on("connection", (socket) => {
         success: false,
         doctorId,
         message: "Invalid doctorId or token",
+      });
+      return;
+    }
+
+    const cachedToken = doctorPushTokens.get(doctorId);
+    if (cachedToken && cachedToken === pushToken) {
+      socket.emit("push-token-registered", {
+        success: true,
+        doctorId,
+        message: "Push token already registered",
+        timestamp: new Date().toISOString(),
       });
       return;
     }
@@ -1333,6 +1954,12 @@ io.on("connection", (socket) => {
       };
     }
 
+    const availableKey = available.slice().sort((a, b) => a - b).join(",");
+    if (socket._lastActiveDoctorsKey === availableKey) {
+      return;
+    }
+    socket._lastActiveDoctorsKey = availableKey;
+
     socket.emit("active-doctors", available);
   });
 
@@ -1340,14 +1967,15 @@ io.on("connection", (socket) => {
   // IMPORTANT: We DO NOT block if doctor is offline/busy – we queue + notify.
   socket.on(
     "call-requested",
-    ({ doctorId, patientId, channel, callId: incomingCallId }) => {
+    async ({ doctorId, patientId, channel, callId: incomingCallId }) => {
       console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
 
       doctorId = Number(doctorId);
 
-      const callId =
-        incomingCallId ||
-        `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const generatedCallId = `call_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 8)}`;
+      const callId = normalizeCallId(incomingCallId) || generatedCallId;
 
       if (activeCalls.has(callId)) {
         console.log(`⚠️ Call ${callId} already exists, ignoring duplicate`);
@@ -1366,6 +1994,7 @@ io.on("connection", (socket) => {
         doctorHasSocket && connectionStatus === "connected";
       const doctorBusy = isDoctorBusy(doctorId);
       const shouldQueue = !doctorConnected || doctorBusy;
+      const existingQueue = pendingCalls.get(doctorId) || [];
 
       const callSession = {
         callId,
@@ -1388,7 +2017,33 @@ io.on("connection", (socket) => {
         extra: `doctorConnected=${doctorConnected}, doctorBusy=${doctorBusy}`,
       });
 
-      activeCalls.set(callId, callSession);
+      if (shouldQueue && existingQueue.length >= PENDING_CALL_MAX_PER_DOCTOR) {
+        const message =
+          "Doctor queue is full right now. Please try another doctor or retry in a minute.";
+        socket.emit("call-status-update", {
+          callId,
+          doctorId,
+          patientId,
+          status: "rejected",
+          queued: true,
+          reason: "queue_full",
+          message,
+          timestamp: new Date().toISOString(),
+        });
+        socket.emit("call-rejected", {
+          callId,
+          doctorId,
+          patientId,
+          reason: "queue_full",
+          message,
+          timestamp: new Date().toISOString(),
+        });
+        emitAvailableDoctors();
+        return;
+      }
+
+      setActiveCallSession(callId, callSession);
+      await persistCallRequested(callSession);
 
       if (shouldQueue) {
         enqueuePendingCall(callSession);
@@ -1448,27 +2103,33 @@ io.on("connection", (socket) => {
 
   // ========== DOCTOR ACCEPTS CALL ==========
   socket.on("call-accepted", (data) => {
-    const { callId, doctorId, patientId, channel } = data;
-    console.log(`✅ Call ${callId} accepted by doctor ${doctorId}`);
-    clearNotificationSent(callId, doctorId);
+    const { callId: rawCallId, doctorId, patientId, channel } = data;
+    const normalizedCallId = normalizeCallId(rawCallId);
+    console.log(`✅ Call ${normalizedCallId} accepted by doctor ${doctorId}`);
+    clearNotificationSent(normalizedCallId, doctorId);
 
-    const callSession = activeCalls.get(callId);
+    const callSession = activeCalls.get(normalizedCallId);
     if (!callSession) {
-      console.log(`❌ Call session ${callId} not found`);
+      console.log(`❌ Call session ${normalizedCallId} not found`);
       return socket.emit("error", { message: "Call session not found" });
     }
 
     callSession.status = "accepted";
     callSession.acceptedAt = new Date();
     callSession.doctorSocketId = socket.id;
-    activeCalls.set(callId, callSession);
+    setActiveCallSession(normalizedCallId, callSession);
 
     if (callSession.patientSocketId) {
       io.to(callSession.patientSocketId).emit("call-accepted", {
-        callId,
+        callId: normalizedCallId,
         doctorId,
         patientId,
         channel,
+        agoraToken:
+          callSession.agoraToken ||
+          callSession.token ||
+          callSession.agora_token ||
+          null,
         requiresPayment: true,
         message:
           "Doctor accepted your call. Please complete payment to proceed.",
@@ -1482,14 +2143,17 @@ io.on("connection", (socket) => {
 
   // ========== DOCTOR REJECTS CALL ==========
   socket.on("call-rejected", (data) => {
-    const { callId, reason = "rejected", doctorId, patientId } = data;
-    console.log(`❌ Call ${callId} rejected by doctor ${doctorId}: ${reason}`);
-    clearNotificationSent(callId, doctorId);
+    const { callId: rawCallId, reason = "rejected", doctorId, patientId } = data;
+    const normalizedCallId = normalizeCallId(rawCallId);
+    console.log(
+      `❌ Call ${normalizedCallId} rejected by doctor ${doctorId}: ${reason}`,
+    );
+    clearNotificationSent(normalizedCallId, doctorId);
 
-    const pendingRemoved = removePendingCallEntry(doctorId, callId);
-    const callSession = activeCalls.get(callId);
+    const pendingRemoved = removePendingCallEntry(doctorId, normalizedCallId);
+    const callSession = activeCalls.get(normalizedCallId);
     if (!callSession) {
-      console.log(`❌ Call session ${callId} not found for rejection`);
+      console.log(`❌ Call session ${normalizedCallId} not found for rejection`);
       if (pendingRemoved) {
         deliverNextPendingCall(doctorId);
         emitAvailableDoctors();
@@ -1502,11 +2166,11 @@ io.on("connection", (socket) => {
     callSession.rejectionReason = reason;
 
     // Ensure any queued instance for this doctor is removed immediately
-    removePendingCallEntry(doctorId, callId);
+    removePendingCallEntry(doctorId, normalizedCallId);
 
     if (callSession.patientSocketId) {
       io.to(callSession.patientSocketId).emit("call-rejected", {
-        callId,
+        callId: normalizedCallId,
         doctorId: callSession.doctorId,
         patientId: callSession.patientId,
         reason,
@@ -1523,7 +2187,7 @@ io.on("connection", (socket) => {
 
     if (callSession.patientId) {
       io.to(`patient-${callSession.patientId}`).emit("call-rejected", {
-        callId,
+        callId: normalizedCallId,
         doctorId: callSession.doctorId,
         patientId: callSession.patientId,
         reason,
@@ -1536,7 +2200,7 @@ io.on("connection", (socket) => {
     }
 
     io.emit("call-status-update", {
-      callId,
+      callId: normalizedCallId,
       status: "rejected",
       rejectedBy: "doctor",
       reason,
@@ -1544,20 +2208,21 @@ io.on("connection", (socket) => {
     });
 
     // Remove active call immediately so it can't be re-delivered on reconnect
-    activeCalls.delete(callId);
+    deleteActiveCallSession(normalizedCallId);
     emitAvailableDoctors();
     deliverNextPendingCall(doctorId);
-    console.log(`🗑️ Cleaned up rejected call ${callId}`);
+    console.log(`🗑️ Cleaned up rejected call ${normalizedCallId}`);
   });
 
   // ========== PATIENT PAYMENT COMPLETED ==========
   socket.on("payment-completed", (data) => {
-    const { callId, patientId, doctorId, channel, paymentId } = data;
-    console.log(`💰 Payment completed for call ${callId}`);
+    const { callId: rawCallId, patientId, doctorId, channel, paymentId } = data;
+    const normalizedCallId = normalizeCallId(rawCallId);
+    console.log(`💰 Payment completed for call ${normalizedCallId}`);
 
-    const callSession = activeCalls.get(callId);
+    const callSession = activeCalls.get(normalizedCallId);
     if (!callSession) {
-      console.log(`❌ Call session ${callId} not found`);
+      console.log(`❌ Call session ${normalizedCallId} not found`);
       return socket.emit("error", { message: "Call session not found" });
     }
 
@@ -1565,10 +2230,10 @@ io.on("connection", (socket) => {
     callSession.paymentId = paymentId;
     callSession.paidAt = new Date();
     if (channel) callSession.channel = channel;
-    activeCalls.set(callId, callSession);
+    setActiveCallSession(normalizedCallId, callSession);
 
     logFlow("payment-completed", {
-      callId,
+      callId: normalizedCallId,
       doctorId,
       patientId,
       channel: callSession.channel,
@@ -1578,7 +2243,7 @@ io.on("connection", (socket) => {
 
     // Tell patient: you're good, here's your join link (audience)
     socket.emit("payment-verified", {
-      callId,
+      callId: normalizedCallId,
       channel: callSession.channel,
       patientId,
       doctorId,
@@ -1588,14 +2253,14 @@ io.on("connection", (socket) => {
         `/call-page/${callSession.channel}` +
         `?uid=${patientId}` +
         `&role=audience` +
-        `&callId=${callId}`,
+        `&callId=${normalizedCallId}`,
       role: "audience",
       uid: Number(patientId),
       timestamp: new Date().toISOString(),
     });
 
     const patientPaidData = {
-      callId,
+      callId: normalizedCallId,
       channel: callSession.channel,
       patientId,
       doctorId,
@@ -1606,7 +2271,7 @@ io.on("connection", (socket) => {
         `/call-page/${callSession.channel}` +
         `?uid=${doctorId}` +
         `&role=host` +
-        `&callId=${callId}` +
+        `&callId=${normalizedCallId}` +
         `&doctorId=${doctorId}` +
         `&patientId=${patientId}`,
       role: "host",
@@ -1629,14 +2294,15 @@ io.on("connection", (socket) => {
 
   // ========== PATIENT PAYMENT CANCELLED ==========
   socket.on("payment-cancelled", (data) => {
-    const { callId, patientId, doctorId, channel, reason } = data;
+    const { callId: rawCallId, patientId, doctorId, channel, reason } = data;
+    const normalizedCallId = normalizeCallId(rawCallId);
     console.log(
-      `Payment cancelled for call ${callId} by patient ${patientId}`
+      `Payment cancelled for call ${normalizedCallId} by patient ${patientId}`
     );
 
-    const callSession = activeCalls.get(callId);
+    const callSession = activeCalls.get(normalizedCallId);
     if (!callSession) {
-      console.log(`Call session ${callId} not found for cancellation`);
+      console.log(`Call session ${normalizedCallId} not found for cancellation`);
       return;
     }
 
@@ -1645,11 +2311,11 @@ io.on("connection", (socket) => {
     callSession.cancellationReason =
       reason || "patient_cancelled_payment";
 
-    clearNotificationSent(callId, doctorId);
-    removePendingCallEntry(doctorId, callId);
+    clearNotificationSent(normalizedCallId, doctorId);
+    removePendingCallEntry(doctorId, normalizedCallId);
 
     logFlow("payment-cancelled", {
-      callId,
+      callId: normalizedCallId,
       doctorId,
       patientId,
       channel,
@@ -1660,7 +2326,7 @@ io.on("connection", (socket) => {
 
     if (callSession.doctorSocketId) {
       io.to(callSession.doctorSocketId).emit("payment-cancelled", {
-        callId,
+        callId: normalizedCallId,
         doctorId,
         patientId,
         reason: reason || "patient_cancelled_payment",
@@ -1670,7 +2336,7 @@ io.on("connection", (socket) => {
     }
 
     io.to(`doctor-${doctorId}`).emit("payment-cancelled", {
-      callId,
+      callId: normalizedCallId,
       doctorId,
       patientId,
       reason: reason || "patient_cancelled_payment",
@@ -1679,7 +2345,7 @@ io.on("connection", (socket) => {
     });
 
     io.emit("call-status-update", {
-      callId,
+      callId: normalizedCallId,
       status: "payment_cancelled",
       cancelledBy: "patient",
       reason,
@@ -1687,27 +2353,28 @@ io.on("connection", (socket) => {
     });
 
     setTimeout(() => {
-      activeCalls.delete(callId);
+      deleteActiveCallSession(normalizedCallId);
       emitAvailableDoctors();
       deliverNextPendingCall(doctorId);
-      console.log(`Cleaned up cancelled call ${callId}`);
+      console.log(`Cleaned up cancelled call ${normalizedCallId}`);
     }, 2000);
   });
 
   // ========== CALL STARTED ==========
-  socket.on("call-started", ({ callId, userId, role }) => {
-    console.log(`📹 User ${userId} (${role}) joined call ${callId}`);
+  socket.on("call-started", ({ callId: rawCallId, userId, role }) => {
+    const normalizedCallId = normalizeCallId(rawCallId);
+    console.log(`📹 User ${userId} (${role}) joined call ${normalizedCallId}`);
 
-    const call = activeCalls.get(callId);
+    const call = activeCalls.get(normalizedCallId);
     if (call) {
       call.status = "active";
       if (role === "host") call.doctorJoinedAt = new Date();
       if (role === "audience") call.patientJoinedAt = new Date();
-      activeCalls.set(callId, call);
+      setActiveCallSession(normalizedCallId, call);
     }
 
     logFlow("call-started", {
-      callId,
+      callId: normalizedCallId,
       userId,
       role,
       doctorId: call?.doctorId,
@@ -1721,13 +2388,14 @@ io.on("connection", (socket) => {
   // ========== CALL ENDED ==========
   socket.on(
     "call-ended",
-    ({ callId, userId, role, doctorId, patientId, channel }) => {
-      console.log(`🔚 Call ${callId} ended by ${userId} (${role})`);
+    ({ callId: rawCallId, userId, role, doctorId, patientId, channel }) => {
+      const normalizedCallId = normalizeCallId(rawCallId);
+      console.log(`🔚 Call ${normalizedCallId} ended by ${userId} (${role})`);
 
-      const callSession = activeCalls.get(callId);
+      const callSession = activeCalls.get(normalizedCallId);
 
       if (callSession) {
-        clearNotificationSent(callId, callSession.doctorId);
+        clearNotificationSent(normalizedCallId, callSession.doctorId);
         callSession.status = "ended";
         callSession.endedAt = new Date();
         callSession.endedBy = userId;
@@ -1736,7 +2404,7 @@ io.on("connection", (socket) => {
         const isPatientEnding = role === "audience";
 
         logFlow("call-ended", {
-          callId,
+          callId: normalizedCallId,
           doctorId: doctorId ?? callSession.doctorId,
           patientId: patientId ?? callSession.patientId,
           channel: channel ?? callSession.channel,
@@ -1749,7 +2417,7 @@ io.on("connection", (socket) => {
 
         if (isDoctorEnding && callSession.patientSocketId) {
           io.to(callSession.patientSocketId).emit("call-ended-by-other", {
-            callId,
+            callId: normalizedCallId,
             endedBy: "doctor",
             reason: "ended",
             message: "Doctor has ended the call",
@@ -1762,7 +2430,7 @@ io.on("connection", (socket) => {
 
         if (isPatientEnding && callSession.doctorSocketId) {
           io.to(callSession.doctorSocketId).emit("call-ended-by-other", {
-            callId,
+            callId: normalizedCallId,
             endedBy: "patient",
             reason: "ended",
             message: "Patient has ended the call",
@@ -1775,7 +2443,7 @@ io.on("connection", (socket) => {
 
         if (callSession.doctorId) {
           io.to(`doctor-${callSession.doctorId}`).emit("call-ended-by-other", {
-            callId,
+            callId: normalizedCallId,
             endedBy: isDoctorEnding ? "doctor" : "patient",
             reason: "ended",
             message: isDoctorEnding
@@ -1787,7 +2455,7 @@ io.on("connection", (socket) => {
 
         if (callSession.patientId) {
           io.to(`patient-${callSession.patientId}`).emit("call-ended-by-other", {
-            callId,
+            callId: normalizedCallId,
             endedBy: isDoctorEnding ? "doctor" : "patient",
             reason: "ended",
             message: isDoctorEnding
@@ -1799,7 +2467,7 @@ io.on("connection", (socket) => {
 
         if (callSession.patientSocketId) {
           io.to(callSession.patientSocketId).emit("force-disconnect", {
-            callId,
+            callId: normalizedCallId,
             reason: "ended",
             endedBy: isDoctorEnding ? "doctor" : "patient",
             timestamp: new Date().toISOString(),
@@ -1808,7 +2476,7 @@ io.on("connection", (socket) => {
 
         if (callSession.doctorSocketId) {
           io.to(callSession.doctorSocketId).emit("force-disconnect", {
-            callId,
+            callId: normalizedCallId,
             reason: "ended",
             endedBy: isDoctorEnding ? "doctor" : "patient",
             timestamp: new Date().toISOString(),
@@ -1817,16 +2485,16 @@ io.on("connection", (socket) => {
       }
 
       io.emit("call-status-update", {
-        callId,
+        callId: normalizedCallId,
         status: "ended",
         endedBy: role,
         timestamp: new Date().toISOString(),
       });
 
       setTimeout(() => {
-        activeCalls.delete(callId);
+        deleteActiveCallSession(normalizedCallId);
         emitAvailableDoctors();
-        console.log(`🗑️ Cleaned up ended call ${callId}`);
+        console.log(`🗑️ Cleaned up ended call ${normalizedCallId}`);
       }, 10_000);
     }
   );
@@ -1884,7 +2552,7 @@ io.on("connection", (socket) => {
         console.log(
           `🔌 Doctor ${doctorId} socket disconnected, marking as disconnected (always-online mode)`
         );
-        markDoctorDisconnected(doctorId, socket.id);
+        scheduleDoctorDisconnect(doctorId, socket.id);
       }
     }
 
@@ -1998,7 +2666,7 @@ io.on("connection", (socket) => {
         }
 
         setTimeout(() => {
-          activeCalls.delete(callId);
+          deleteActiveCallSession(callId);
           emitAvailableDoctors();
           console.log(`🗑️ Cleaned up disconnected call ${callId}`);
         }, 30_000);
@@ -2007,32 +2675,34 @@ io.on("connection", (socket) => {
   });
 });
 
-// -------------------- PERIODIC CLEANUPS --------------------
-
-// 24-hour safety: remove stale doctors who never heartbeat again
+// Stale cleanup: remove doctors after inactivity/reconnect grace
 setInterval(() => {
   const now = Date.now();
   let removedCount = 0;
 
   for (const [doctorId, info] of activeDoctors.entries()) {
     const lastSeen = info.lastSeen ? new Date(info.lastSeen).getTime() : 0;
-    if (!lastSeen) continue;
-    if (now - lastSeen > DOCTOR_STALE_TIMEOUT_MS) {
-      console.log(
-        `⏳ Removing stale doctor ${doctorId} after 24h timeout (last seen: ${new Date(
-          lastSeen
-        ).toISOString()})`
-      );
+    const disconnectedAt = info.disconnectedAt
+      ? new Date(info.disconnectedAt).getTime()
+      : 0;
+    const stale = lastSeen && now - lastSeen > DOCTOR_STALE_TIMEOUT_MS;
+    const reconnectExpired =
+      info.connectionStatus === "reconnecting" &&
+      disconnectedAt &&
+      now - disconnectedAt > DISCONNECT_GRACE_MS;
+    if (stale || reconnectExpired) {
       activeDoctors.delete(doctorId);
+      removeDoctorPresence(doctorId).catch(() => {});
       removedCount++;
     }
   }
 
   if (removedCount > 0) {
-    console.log(`🧹 Cleanup: Removed ${removedCount} stale doctor(s)`);
+    console.log(`Cleanup: Removed ${removedCount} stale doctor(s)`);
     emitAvailableDoctors();
   }
-}, DOCTOR_HEARTBEAT_INTERVAL_MS);
+}, 30_000);
+
 
 // Auto time-out calls older than 5 minutes that haven't finished
 setInterval(() => {
@@ -2062,7 +2732,7 @@ setInterval(() => {
         });
       }
 
-      activeCalls.delete(callId);
+      deleteActiveCallSession(callId);
       emitAvailableDoctors();
     }
   }
@@ -2078,6 +2748,16 @@ setInterval(() => {
 
 // -------------------- START SERVER --------------------
 const PORT = Number(process.env.PORT || process.env.SOCKET_PORT || 4000);
+httpServer.on("error", (error) => {
+  if (error?.code === "EADDRINUSE") {
+    console.error(
+      `[server] Port ${PORT} is already in use. Stop the other instance or set SOCKET_PORT/PORT to a free port.`
+    );
+    process.exit(1);
+  } else {
+    console.error("[server] HTTP server error:", error);
+  }
+});
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Socket.IO server running on port ${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/health`);
@@ -2099,5 +2779,4 @@ httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`📲 WhatsApp alerts: ENABLED (${WHATSAPP_ALERT_MODE} mode)`);
   }
 });
-
 
