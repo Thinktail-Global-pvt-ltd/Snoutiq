@@ -76,12 +76,8 @@
         <label class="block text-sm font-medium text-gray-700 mb-2" for="license_document">Upload Business registration proof</label>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3">
           <div>
-            <p class="text-sm text-gray-700">
-              @if($clinic?->license_document)
-                {{ basename($clinic->license_document) }}
-              @else
-                No file uploaded yet.
-              @endif
+            <p class="text-sm text-gray-700" id="clinic_license_filename">
+              {{ $clinic?->license_document ? basename($clinic->license_document) : 'No file uploaded yet.' }}
             </p>
             <p class="text-xs text-gray-500 mt-1">Accepted formats: PDF, JPG, PNG (max 5MB)</p>
           </div>
@@ -189,12 +185,8 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2" for="doctor_document_{{ $doctor->id }}">Upload credential</label>
                 <div class="flex flex-col gap-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3">
                   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div class="text-sm text-gray-700">
-                      @if($doctor->doctor_document)
-                        {{ basename($doctor->doctor_document) }}
-                      @else
-                        No file selected.
-                      @endif
+                    <div class="text-sm text-gray-700" id="doctor_document_name_{{ $doctor->id }}">
+                      {{ $doctor->doctor_document ? basename($doctor->doctor_document) : 'No file selected.' }}
                     </div>
                     <div class="flex items-center gap-2">
                       @if($doctor->doctor_document)
@@ -209,7 +201,15 @@
                       @endif
                       <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium cursor-pointer hover:bg-indigo-700">
                         Choose file
-                        <input type="file" name="doctor_document" id="doctor_document_{{ $doctor->id }}" class="hidden" accept=".pdf,.jpg,.jpeg,.png">
+                        <input
+                          type="file"
+                          name="doctor_document"
+                          id="doctor_document_{{ $doctor->id }}"
+                          class="hidden"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          data-doctor-file-input
+                          data-target="doctor_document_name_{{ $doctor->id }}"
+                        >
                       </label>
                     </div>
                   </div>
@@ -235,4 +235,30 @@
     @endif
   </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const setFileName = (input, display) => {
+      if (!input || !display) return;
+      const defaultText = display.textContent.trim();
+      input.addEventListener('change', () => {
+        const chosen = input.files && input.files.length ? input.files[0].name : defaultText;
+        display.textContent = chosen || defaultText;
+      });
+    };
+
+    setFileName(
+      document.querySelector('#license_document'),
+      document.querySelector('#clinic_license_filename')
+    );
+
+    document.querySelectorAll('[data-doctor-file-input]').forEach((input) => {
+      const targetId = input.getAttribute('data-target');
+      const display = targetId ? document.getElementById(targetId) : null;
+      setFileName(input, display);
+    });
+  });
+</script>
 @endsection
