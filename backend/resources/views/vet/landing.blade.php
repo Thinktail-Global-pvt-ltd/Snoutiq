@@ -2,11 +2,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  @php
+    $snoutiqLogo = 'data:image/webp;base64,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';
+  @endphp
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{{ $vet->name }} | SnoutIQ</title>
   <meta name="description" content="Book appointments at {{ $vet->name }}. Video consults, clinic visits, vaccinations and more."/>
-  <link rel="icon" href="https://snoutiq.com/favicon.webp" sizes="32x32" type="image/png"/>
+  <link rel="icon" href="{{ $snoutiqLogo }}" sizes="32x32" type="image/png"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
 
   {{-- Optional: pass user/token from backend if available --}}
@@ -81,6 +84,14 @@ label{font-size:.9rem;color:#334155}
 .askbar .send{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:#f5f9ff;display:grid;place-items:center;cursor:pointer}
 .askbar .send:hover{background:#eef6ff}
 .ai-hint{font-size:.85rem;color:#6b7280}
+.ai-cta{border:none;background:none;color:var(--accent);font-weight:700;cursor:pointer;padding:0 .2rem;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+.ai-cta:focus{outline:2px solid var(--ring);outline-offset:2px;border-radius:6px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;padding:1rem;z-index:999}
+.modal-card{background:#fff;border-radius:16px;border:1px solid var(--border);max-width:420px;width:100%;padding:1.5rem;box-shadow:0 18px 45px -20px rgba(15,23,42,.4)}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.35rem}
+.modal-title{font-size:1.1rem;font-weight:800;color:var(--heading)}
+.modal-close{border:none;background:transparent;font-size:1.1rem;cursor:pointer;color:#475569}
+.modal-actions{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1rem}
 /* Quick services */
 .qsvc-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .qsvc-btn{background:#ecf3ff;border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:10px 12px;text-align:center;font-weight:800;cursor:pointer}
@@ -195,11 +206,11 @@ label{font-size:.9rem;color:#334155}
   <nav>
     <div class="container nav-wrap">
       <div class="logo" onclick="location.href='https://snoutiq.com'">
-        <img src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/> {{ $vet->name }}
+        <img src="{{ $snoutiqLogo }}" alt="SnoutIQ"/> {{ $vet->name }}
       </div>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/backend/custom-doctor-login'">Login</button>
-        <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/backend/custom-doctor-register'">Register</button>
+        <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/backend/custom-doctor-login'">Vet Login</button>
+        <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/vet-register'">Vet Register</button>
       </div>
     </div>
   </nav>
@@ -215,11 +226,15 @@ label{font-size:.9rem;color:#334155}
     </p>
     <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:.5rem">
       @php $clinicPhone = $vet->mobile ?? null; @endphp
-      <a class="btn btn-outline" href="https://snoutiq.com/backend/custom-doctor-login"><i class="fa-solid fa-phone"></i> Call Clinic</a>
-      <a class="btn btn-outline" id="video-consult-btn" href="https://snoutiq.com/backend/custom-doctor-login"><i class="fa-solid fa-video"></i> Start Video Consult</a>
-      <button class="btn btn-primary" type="button" id="download-app-btn">
+      <a class="btn btn-outline" href="https://play.google.com/store/apps/details?id=com.petai.snoutiq" target="_blank" rel="noopener">
+        <i class="fa-solid fa-phone"></i> Call Clinic
+      </a>
+      <a class="btn btn-outline" id="video-consult-btn" href="https://play.google.com/store/apps/details?id=com.petai.snoutiq" target="_blank" rel="noopener">
+        <i class="fa-solid fa-video"></i> Start Video Consult
+      </a>
+      <a class="btn btn-primary" href="https://play.google.com/store/apps/details?id=com.petai.snoutiq" target="_blank" rel="noopener" id="download-app-btn">
         <i class="fa-solid fa-download"></i> Download App
-      </button>
+      </a>
     </div>
   </header>
 
@@ -232,7 +247,28 @@ label{font-size:.9rem;color:#334155}
         <i class="fa-solid fa-paper-plane"></i>
       </button>
     </div>
-    <div class="ai-hint">AI-generated advice. Consult a licensed veterinarian.</div>
+    <div class="ai-hint">
+      AI-generated advice. Consult a licensed veterinarian.
+      <button id="ai-feature-cta" class="ai-cta" type="button">Download app to use this feature</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="app-download-modal" role="dialog" aria-modal="true" aria-labelledby="app-download-title" aria-describedby="app-download-desc">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title" id="app-download-title">Use this feature in the app</div>
+        <button class="modal-close" type="button" data-app-modal-close aria-label="Close">×</button>
+      </div>
+      <p class="muted" id="app-download-desc" style="margin-top:.1rem">
+        Get the SnoutIQ app to continue with video consults, clinic calls, and AI-guided care.
+      </p>
+      <div class="modal-actions">
+        <a class="btn btn-primary" href="https://play.google.com/store/apps/details?id=com.petai.snoutiq" target="_blank" rel="noopener" id="app-modal-download">
+          <i class="fa-solid fa-download"></i> Download App
+        </a>
+        <button class="btn btn-outline" type="button" data-app-modal-close>Not now</button>
+      </div>
+    </div>
   </div>
 
   <!-- Quick Services (DYNAMIC) -->
@@ -244,17 +280,6 @@ label{font-size:.9rem;color:#334155}
       <div id="qsvc-loading" class="muted" style="padding:.5rem 0">Loading services…</div>
       <div id="qsvc-grid" class="qsvc-grid" style="display:none"></div>
       <div id="qsvc-empty" class="muted" style="text-align:center;margin-top:.6rem;display:none">No services available right now.</div>
-    </div>
-  </section>
-
-  <!-- Clinic Reels -->
-  <section class="container section" id="reels">
-    <h2 class="heading">Clinic Reels</h2>
-    <div class="reel-grid" style="margin-top:.8rem">
-      <a class="reel-card" href="https://snoutiq.com/backend/custom-doctor-login"><div class="reel-play">▶</div><div class="reel-title">Meet Dr. Sarah</div></a>
-      <a class="reel-card" href="https://snoutiq.com/backend/custom-doctor-login"><div class="reel-play">▶</div><div class="reel-title">Clinic Tour</div></a>
-      <a class="reel-card" href="https://snoutiq.com/backend/custom-doctor-login"><div class="reel-play">▶</div><div class="reel-title">Success Story</div></a>
-      <a class="reel-card" href="https://snoutiq.com/backend/custom-doctor-login"><div class="reel-play">▶</div><div class="reel-title">Our Services</div></a>
     </div>
   </section>
 
@@ -362,7 +387,7 @@ label{font-size:.9rem;color:#334155}
       <div class="grid grid-3">
         <div>
           <div class="logo" onclick="location.href='https://snoutiq.com'">
-            <img src="https://snoutiq.com/favicon.webp" alt="SnoutIQ"/> SnoutIQ
+            <img src="{{ $snoutiqLogo }}" alt="SnoutIQ"/> SnoutIQ
           </div>
           <p class="muted" style="margin-top:.6rem;max-width:420px">
             Clinic landing powered by SnoutIQ. Book clinic & video consultations seamlessly.
@@ -456,7 +481,7 @@ label{font-size:.9rem;color:#334155}
     "@context": "https://schema.org",
     "@type": "MedicalClinic",
     "name": "{{ $vet->name }}",
-    "image": "{{ $vet->image ?? 'https://snoutiq.com/favicon.webp' }}",
+    "image": "{{ $vet->image ?? $snoutiqLogo }}",
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "{{ $vet->formatted_address ?? $vet->address ?? '' }}",
@@ -475,8 +500,10 @@ label{font-size:.9rem;color:#334155}
     const vetSlug = @json($vet->slug);
     const clinicId = @json($vet->clinic_id ?? $vet->id ?? null);
     const downloadBtn = document.getElementById('download-app-btn');
-    const appDownloadLink = 'https://snoutiq-medical-records.s3.ap-south-1.amazonaws.com/application-54b1ddd6-a722-42b7-a1a8-0135419df2a0.apk';
-    const appDownloadFileName = 'SnoutIQ.apk';
+    const appDownloadLink = 'https://play.google.com/store/apps/details?id=com.petai.snoutiq';
+    const aiFeatureCta = document.getElementById('ai-feature-cta');
+    const appModal = document.getElementById('app-download-modal');
+    const appModalCloseEls = Array.from(document.querySelectorAll('[data-app-modal-close]'));
 
     function loginRedirect(prefill = "") {
       try { if (prefill) localStorage.setItem("pendingChatQuestion", prefill); } catch(_) {}
@@ -491,23 +518,36 @@ label{font-size:.9rem;color:#334155}
     }
     window.openChat = openChat;
 
+    const showAppModal = () => toggleModal(true);
+
     const sendAsk = (id) => {
       const v = (document.getElementById(id)?.value || '').trim();
-      if (!v) return; loginRedirect(v);
+      if (v) {
+        try { sessionStorage.setItem('pendingChatQuestion', v); } catch (_) {}
+      }
+      showAppModal();
     };
-    document.getElementById('clinic-ask-send')?.addEventListener('click', ()=> sendAsk('clinic-ask-input'));
+    document.getElementById('clinic-ask-send')?.addEventListener('click', (e)=>{ e.preventDefault(); sendAsk('clinic-ask-input'); });
     document.getElementById('clinic-ask-input')?.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); sendAsk('clinic-ask-input'); }});
 
-    downloadBtn?.addEventListener('click', triggerDownload);
+    downloadBtn?.addEventListener('click', function(event) {
+      event.preventDefault();
+      triggerDownload();
+    });
+    aiFeatureCta?.addEventListener('click', function() { showAppModal(); });
+    appModalCloseEls.forEach(function(btn){ btn.addEventListener('click', function(){ toggleModal(false); }); });
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape') toggleModal(false);
+    });
 
     function triggerDownload() {
       if (!appDownloadLink) return;
-      const link = document.createElement('a');
-      link.href = appDownloadLink;
-      link.download = appDownloadFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      window.open(appDownloadLink, '_blank', 'noopener');
+    }
+
+    function toggleModal(show) {
+      if (!appModal) return;
+      appModal.style.display = show ? 'flex' : 'none';
     }
   })();
   </script>
