@@ -183,10 +183,6 @@
         <textarea name="address" rows="2" class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"></textarea>
       </div>
       <div>
-        <label class="text-sm font-medium text-gray-700">License Number</label>
-        <input name="license_no" class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
-      </div>
-      <div>
         <label class="text-sm font-medium text-gray-700">Consultation Price (₹)</label>
         <input name="chat_price" type="number" min="0" step="1" class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
       </div>
@@ -238,10 +234,6 @@
           <label class="text-sm font-medium text-gray-700">Consultation Price (₹)</label>
           <input name="doctors_price" type="number" min="0" step="1" class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
         </div>
-      </div>
-      <div>
-        <label class="text-sm font-medium text-gray-700">License Number</label>
-        <input name="doctor_license" class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
       </div>
       <div class="flex justify-end gap-3 pt-2">
         <button type="button" class="doctor-modal-close px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
@@ -519,7 +511,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setVal('city', clinic?.city ?? '');
     setVal('pincode', clinic?.pincode ?? '');
     setVal('address', clinic?.address ?? '');
-    setVal('license_no', clinic?.license_no ?? '');
     setVal('chat_price', clinic?.chat_price ?? '');
     setVal('bio', clinic?.bio ?? '');
   }
@@ -552,7 +543,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="text-xs text-gray-600 space-y-1">
           <p><span class="font-semibold text-gray-700">Phone:</span> ${formatValue(doctor.doctor_mobile)}</p>
-          <p><span class="font-semibold text-gray-700">License:</span> ${formatValue(doctor.doctor_license)}</p>
           <p><span class="font-semibold text-gray-700">Consultation:</span> ${formatCurrency(doctor.doctors_price)}</p>
         </div>
         ${canEdit ? '<button class="doctor-edit-btn mt-2 inline-flex justify-center px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-sm font-semibold hover:bg-indigo-100" data-doctor="' + doctor.id + '">Edit Doctor</button>' : ''}
@@ -567,7 +557,6 @@ document.addEventListener('DOMContentLoaded', () => {
     els.doctorForm.elements['doctor_name'].value = doctor.doctor_name || '';
     els.doctorForm.elements['doctor_email'].value = doctor.doctor_email || '';
     els.doctorForm.elements['doctor_mobile'].value = doctor.doctor_mobile || '';
-    els.doctorForm.elements['doctor_license'].value = doctor.doctor_license || '';
     els.doctorForm.elements['doctors_price'].value = doctor.doctors_price ?? '';
     if (els.doctorModalTitle) {
       els.doctorModalTitle.textContent = doctor.id === ctx.doctorId

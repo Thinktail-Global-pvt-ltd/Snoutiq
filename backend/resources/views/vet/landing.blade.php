@@ -338,6 +338,11 @@ label{font-size:.9rem;color:#334155}
   </section>
 
   <!-- Doctors -->
+  @php
+    $genericDoctorImg = 'data:image/svg+xml;base64,' . base64_encode(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="none"><rect width="96" height="96" rx="16" fill="#E5E7EB"/><circle cx="48" cy="36" r="16" fill="#CBD5E1"/><path d="M24 76c0-13.255 10.745-24 24-24s24 10.745 24 24" stroke="#CBD5E1" stroke-width="8" stroke-linecap="round"/></svg>'
+    );
+  @endphp
   <section class="container section" id="doctors">
     <h2 class="heading">Our Doctors</h2>
     @php $doctors = $vet->doctors()->orderBy('doctor_name')->get(); @endphp
@@ -347,7 +352,7 @@ label{font-size:.9rem;color:#334155}
       <div class="grid grid-3" style="margin-top:1rem">
         @foreach($doctors as $doc)
           <div class="card" style="padding:1rem;display:flex;gap:1rem;align-items:center">
-            <img class="doc-img" src="{{ $doc->doctor_image ?: 'https://placehold.co/96x96?text=Dr' }}" alt="{{ $doc->doctor_name }}">
+            <img class="doc-img" src="{{ $doc->doctor_image ?: $genericDoctorImg }}" alt="{{ $doc->doctor_name ?: 'Doctor' }}">
             <div style="flex:1">
               <div class="heading" style="font-weight:800">{{ $doc->doctor_name }}</div>
               <div class="muted" style="margin:.15rem 0">
@@ -355,8 +360,8 @@ label{font-size:.9rem;color:#334155}
                 @if($doc->doctor_email) <a href="mailto:{{ $doc->doctor_email }}" style="color:var(--accent)">Email</a>@endif
               </div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
-                <a class="pill" href="https://snoutiq.com/backend/custom-doctor-login"><i class="fa-solid fa-phone"></i>&nbsp;Call</a>
-                <a class="pill" href="https://snoutiq.com/backend/custom-doctor-login"><i class="fa-solid fa-video"></i>&nbsp;Video Consult</a>
+                <button class="pill" type="button" data-app-modal-open><i class="fa-solid fa-phone"></i>&nbsp;Call</button>
+                <button class="pill" type="button" data-app-modal-open><i class="fa-solid fa-video"></i>&nbsp;Video Consult</button>
               </div>
             </div>
           </div>
@@ -504,6 +509,7 @@ label{font-size:.9rem;color:#334155}
     const aiFeatureCta = document.getElementById('ai-feature-cta');
     const appModal = document.getElementById('app-download-modal');
     const appModalCloseEls = Array.from(document.querySelectorAll('[data-app-modal-close]'));
+    const appModalOpenEls  = Array.from(document.querySelectorAll('[data-app-modal-open]'));
 
     function loginRedirect(prefill = "") {
       try { if (prefill) localStorage.setItem("pendingChatQuestion", prefill); } catch(_) {}
@@ -532,18 +538,14 @@ label{font-size:.9rem;color:#334155}
 
     downloadBtn?.addEventListener('click', function(event) {
       event.preventDefault();
-      triggerDownload();
+      showAppModal();
     });
     aiFeatureCta?.addEventListener('click', function() { showAppModal(); });
+    appModalOpenEls.forEach(function(btn){ btn.addEventListener('click', function(){ showAppModal(); }); });
     appModalCloseEls.forEach(function(btn){ btn.addEventListener('click', function(){ toggleModal(false); }); });
     document.addEventListener('keydown', function(e){
       if (e.key === 'Escape') toggleModal(false);
     });
-
-    function triggerDownload() {
-      if (!appDownloadLink) return;
-      window.open(appDownloadLink, '_blank', 'noopener');
-    }
 
     function toggleModal(show) {
       if (!appModal) return;
