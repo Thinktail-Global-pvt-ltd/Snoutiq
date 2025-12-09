@@ -156,6 +156,8 @@
         </label>
         <input type="number"
                id="dayRate"
+               min="0"
+               step="0.01"
                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                placeholder="500"
                {{ $readonly ? 'disabled' : '' }}>
@@ -166,6 +168,8 @@
         </label>
         <input type="number"
                id="nightRate"
+               min="0"
+               step="0.01"
                class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
                placeholder="750"
                {{ $readonly ? 'disabled' : '' }}>
@@ -537,6 +541,31 @@
         metaNote: el('#metaNote'),
       };
       const SLOT_BUTTON_ALL = [...slotEls.dayButtons, ...slotEls.nightButtons];
+
+      const hydrateRates = (data) => {
+        if (slotEls.dayRate && data && Object.prototype.hasOwnProperty.call(data, 'day_rate')) {
+          slotEls.dayRate.value = data.day_rate ?? '';
+        }
+        if (slotEls.nightRate && data && Object.prototype.hasOwnProperty.call(data, 'night_rate')) {
+          slotEls.nightRate.value = data.night_rate ?? '';
+        }
+      };
+
+      const collectRates = () => {
+        const parse = (input) => {
+          if (!input) return { value: null };
+          const raw = String(input.value ?? '').trim();
+          if (raw === '') return { value: null };
+          const num = Number(raw);
+          if (!Number.isFinite(num) || num < 0) return { error: true };
+          return { value: num };
+        };
+        const day = parse(slotEls.dayRate);
+        if (day.error) return { error: 'Enter a valid Day Consultation Rate' };
+        const night = parse(slotEls.nightRate);
+        if (night.error) return { error: 'Enter a valid Night Consultation Rate' };
+        return { day_rate: day.value, night_rate: night.value };
+      };
 
       function slotBuilderActive(){ return Boolean(slotEls.builder); }
       function timeToMinutes(str){
@@ -1299,6 +1328,7 @@
           const list = Array.isArray(json?.availability)? json.availability: [];
           const avg = document.querySelector('#avg_consultation_mins'); const bph = document.querySelector('#max_bph');
           if(list[0]){ if(avg) avg.value = Number(list[0].avg_consultation_mins||20); if(bph) bph.value = Number(list[0].max_bookings_per_hour||3); }
+          hydrateRates(json);
 
           if(slotBuilderActive()){
             applyAvailabilityToState(list);
@@ -1354,49 +1384,72 @@
       }
 
       function collect(){
-        if(slotBuilderActive()){
-          const { availability, validationError } = buildAvailabilityPayload();
-          return { availability, validationError };
-        }
-        const avgMins = Number(document.querySelector('#avg_consultation_mins').value || 20);
-        const maxBph  = Number(document.querySelector('#max_bph').value || 3);
-        const availability = [];
         let validationError = null;
-        els('tbody tr[data-dow]').forEach(tr=>{
-          const active = tr.querySelector('.active')?.checked; if(!active) return;
-          const dow = Number(tr.getAttribute('data-dow'));
-          const start = tr.querySelector('.start')?.value; const end = tr.querySelector('.end')?.value;
-          const bs = tr.querySelector('.break_start')?.value || null; const be = tr.querySelector('.break_end')?.value || null;
-          if(!start||!end) return;
-          if(!(start < end)) { validationError = 'End time must be after start time.'; return; }
-          if((bs&&!be)||(!bs&&be)) { validationError = 'Provide both break start and end or leave both empty.'; return; }
-          if(bs&&be && !(bs < be)) { validationError = 'Break end must be after break start.'; return; }
-          if(bs&&be && (!(start < bs) || !(be < end))) { validationError = 'Break must lie within working hours.'; return; }
-          availability.push({
-            day_of_week:dow,
-            start_time:(start.length===5? start+':00':start),
-            end_time:(end.length===5? end+':00':end),
-            break_start: bs? (bs.length===5? bs+':00':bs):null,
-            break_end:   be? (be.length===5? be+':00':be):null,
-            avg_consultation_mins:avgMins,
-            max_bookings_per_hour:maxBph
+        let availability = [];
+
+        if(slotBuilderActive()){
+          const res = buildAvailabilityPayload();
+          availability = res.availability;
+          validationError = res.validationError;
+        } else {
+          const avgMins = Number(document.querySelector('#avg_consultation_mins').value || 20);
+          const maxBph  = Number(document.querySelector('#max_bph').value || 3);
+          els('tbody tr[data-dow]').forEach(tr=>{
+            const active = tr.querySelector('.active')?.checked; if(!active) return;
+            const dow = Number(tr.getAttribute('data-dow'));
+            const start = tr.querySelector('.start')?.value; const end = tr.querySelector('.end')?.value;
+            const bs = tr.querySelector('.break_start')?.value || null; const be = tr.querySelector('.break_end')?.value || null;
+            if(!start||!end) return;
+            if(!(start < end)) { validationError = 'End time must be after start time.'; return; }
+            if((bs&&!be)||(!bs&&be)) { validationError = 'Provide both break start and end or leave both empty.'; return; }
+            if(bs&&be && !(bs < be)) { validationError = 'Break end must be after break start.'; return; }
+            if(bs&&be && (!(start < bs) || !(be < end))) { validationError = 'Break must lie within working hours.'; return; }
+            availability.push({
+              day_of_week:dow,
+              start_time:(start.length===5? start+':00':start),
+              end_time:(end.length===5? end+':00':end),
+              break_start: bs? (bs.length===5? bs+':00':bs):null,
+              break_end:   be? (be.length===5? be+':00':be):null,
+              avg_consultation_mins:avgMins,
+              max_bookings_per_hour:maxBph
+            });
           });
-        });
-        return { availability, validationError };
+        }
+
+        const rateResult = collectRates();
+        let rates = null;
+        if(rateResult){
+          if(rateResult.error){
+            validationError = validationError || rateResult.error;
+          }else{
+            rates = { day_rate: rateResult.day_rate, night_rate: rateResult.night_rate };
+          }
+        }
+
+        return { availability, validationError, rates };
       }
 
       async function save(){
         const id = getDoctorId(); 
         if(!id){ alert('Select a doctor'); return; }
-        const {availability, validationError} = collect();
+        const {availability, validationError, rates} = collect();
         if(validationError){ out('#saveOut', validationError, false); return; }
         if(!availability.length){ out('#saveOut', 'Select at least one active day with valid times', false); return; }
         const btn = document.querySelector('#btnSave'); if(btn){ btn.disabled = true; btn.textContent = 'Saving...'; }
+        const payload = { availability };
+        if(rates){
+          if('day_rate' in rates) payload.day_rate = rates.day_rate;
+          if('night_rate' in rates) payload.night_rate = rates.night_rate;
+        }
         try{
           await window.Csrf.ensure();
-          const res = await fetch(`${apiBase}/video-schedule/doctors/${id}/availability`, window.Csrf.opts('PUT', { availability }));
+          const res = await fetch(`${apiBase}/video-schedule/doctors/${id}/availability`, window.Csrf.opts('PUT', payload));
           const text = await res.text(); let json=null; try{ json=JSON.parse(text);}catch{}
-          if(res.ok){ out('#saveOut', json ?? text ?? 'Saved', true); await loadExisting(); }
+          if(res.ok){
+            hydrateRates(json);
+            out('#saveOut', json ?? text ?? 'Saved', true);
+            await loadExisting();
+          }
           else { out('#saveOut', json ?? text ?? 'Failed to save', false); }
         }catch(e){ out('#saveOut', `Network error: ${e?.message||e}`, false); }
         finally{ if(btn){ btn.disabled=false; btn.textContent='Save Weekly Availability'; } }

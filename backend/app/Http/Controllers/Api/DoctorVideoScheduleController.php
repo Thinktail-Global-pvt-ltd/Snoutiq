@@ -20,11 +20,16 @@ class DoctorVideoScheduleController extends Controller
             'availability.*.break_end' => 'nullable',
             'availability.*.avg_consultation_mins' => 'nullable|integer',
             'availability.*.max_bookings_per_hour' => 'nullable|integer',
+            'day_rate' => 'sometimes|nullable|numeric|min:0|max:1000000',
+            'night_rate' => 'sometimes|nullable|numeric|min:0|max:1000000',
         ]);
 
         // Ensure doctor exists
-        $exists = DB::table('doctors')->where('id', (int) $id)->exists();
-        if (!$exists) {
+        $doctorRow = DB::table('doctors')
+            ->where('id', (int) $id)
+            ->select('id', 'video_day_rate', 'video_night_rate')
+            ->first();
+        if (!$doctorRow) {
             return response()->json(['success' => false, 'error' => 'Doctor not found'], 404);
         }
 
@@ -45,9 +50,28 @@ class DoctorVideoScheduleController extends Controller
                     'updated_at' => now(),
                 ]);
             }
+
+            $rateUpdates = [];
+            if (array_key_exists('day_rate', $payload)) {
+                $rateUpdates['video_day_rate'] = $payload['day_rate'] === null ? null : (float) $payload['day_rate'];
+            }
+            if (array_key_exists('night_rate', $payload)) {
+                $rateUpdates['video_night_rate'] = $payload['night_rate'] === null ? null : (float) $payload['night_rate'];
+            }
+            if (!empty($rateUpdates)) {
+                DB::table('doctors')->where('id', (int) $id)->update($rateUpdates);
+            }
         });
 
-        return response()->json(['message' => 'Doctor video availability updated', 'success' => true]);
+        $dayRate = array_key_exists('day_rate', $payload) ? $payload['day_rate'] : $doctorRow->video_day_rate;
+        $nightRate = array_key_exists('night_rate', $payload) ? $payload['night_rate'] : $doctorRow->video_night_rate;
+
+        return response()->json([
+            'message' => 'Doctor video availability updated',
+            'success' => true,
+            'day_rate' => $dayRate === null ? null : (float) $dayRate,
+            'night_rate' => $nightRate === null ? null : (float) $nightRate,
+        ]);
     }
 
     // GET /api/video-schedule/doctors/{id}/free-slots?date=YYYY-MM-DD[&days=N]
@@ -132,6 +156,11 @@ class DoctorVideoScheduleController extends Controller
     // GET /api/video-schedule/doctors/{id}/availability
     public function getAvailability(Request $request, string $id)
     {
+        $doctor = DB::table('doctors')
+            ->where('id', (int) $id)
+            ->select('video_day_rate', 'video_night_rate')
+            ->first();
+
         $rows = DB::table('doctor_video_availability')
             ->where('doctor_id', (int) $id)
             ->where('is_active', 1)
@@ -143,6 +172,8 @@ class DoctorVideoScheduleController extends Controller
             'success' => true,
             'doctor_id' => (int)$id,
             'availability' => $rows,
+            'day_rate' => $doctor?->video_day_rate === null ? null : (float) $doctor->video_day_rate,
+            'night_rate' => $doctor?->video_night_rate === null ? null : (float) $doctor->video_night_rate,
         ]);
     }
 }

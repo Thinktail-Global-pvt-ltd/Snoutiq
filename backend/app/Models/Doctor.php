@@ -20,6 +20,8 @@ class Doctor extends Model
         'doctor_image',
         'toggle_availability',
         'doctors_price',
+        'video_day_rate',
+        'video_night_rate',
     ];
 
     /**
