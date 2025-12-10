@@ -256,6 +256,10 @@
 
 @section('scripts')
 <script>
+  (function(){
+    var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/sweetalert2@11'; document.head.appendChild(s);
+  })();
+
   document.addEventListener('DOMContentLoaded', () => {
     const FINISH_URL = @json(route('dashboard.profile'));
     const setFileName = (input, display) => {
@@ -286,8 +290,19 @@
       const finishUrl = FINISH_URL || `${window.location.origin}/profile`;
 
       if (isOnboarding && finishButton){
-        finishButton.addEventListener('click', () => {
-          window.location.href = finishUrl;
+        const goToFinish = () => { window.location.href = finishUrl; };
+        finishButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (window.Swal) {
+            Swal.fire({
+              icon:'success',
+              title:'Onboarding complete',
+              text:'You are all set! Head to your dashboard.',
+              confirmButtonText:'Go to dashboard'
+            }).then(goToFinish);
+          } else {
+            goToFinish();
+          }
         });
       }
 
