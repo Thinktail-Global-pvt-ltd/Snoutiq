@@ -74,7 +74,8 @@
     <form method="POST" action="{{ route('doctor.documents.update', request()->only(['onboarding', 'step'])) }}" enctype="multipart/form-data" class="space-y-4">
       @csrf
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="license_no">Business registration number (optional)</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="license_no">Business registration number</label>
+        <p class="text-xs text-gray-500 mb-2">Required to mark onboarding as complete.</p>
         <input
           type="text"
           id="license_no"
@@ -89,7 +90,8 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="license_document">Upload Business registration proof</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="license_document">Upload Business registration proof</label>
+        <p class="text-xs text-gray-500 mb-2">Required to mark onboarding as complete.</p>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3">
           <div>
             <p class="text-sm text-gray-700" id="clinic_license_filename">
@@ -200,11 +202,11 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2" for="doctor_document_{{ $doctor->id }}">Upload credential</label>
                 <div class="flex flex-col gap-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3">
-                  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div class="text-sm text-gray-700" id="doctor_document_name_{{ $doctor->id }}">
+                  <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3">
+                    <div class="text-sm text-gray-700 min-w-0 break-words" id="doctor_document_name_{{ $doctor->id }}">
                       {{ $doctor->doctor_document ? basename($doctor->doctor_document) : 'No file selected.' }}
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                       @if($doctor->doctor_document)
                         <a href="{{ asset($doctor->doctor_document) }}" target="_blank" rel="noopener noreferrer"
                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-white text-xs font-semibold text-indigo-700 hover:bg-indigo-50">
@@ -215,7 +217,7 @@
                           View file
                         </a>
                       @endif
-                      <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium cursor-pointer hover:bg-indigo-700">
+                      <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium cursor-pointer hover:bg-indigo-700 whitespace-nowrap">
                         Choose file
                         <input
                           type="file"
@@ -261,6 +263,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     const FINISH_URL = @json(route('dashboard.profile'));
+    const HAS_LICENSE_NO = @json(trim((string) ($clinic->license_no ?? '')) !== '');
+    const HAS_LICENSE_DOC = @json(!empty($clinic?->license_document));
     const setFileName = (input, display) => {
       if (!input || !display) return;
       const defaultText = display.textContent.trim();
@@ -287,11 +291,24 @@
       const statusEl = document.querySelector('[data-onboarding-status]');
       const finishButton = document.querySelector('[data-complete-onboarding]');
       const finishUrl = FINISH_URL || `${window.location.origin}/profile`;
+      const licenseInput = document.querySelector('#license_no');
+      const licenseDocInput = document.querySelector('#license_document');
 
       if (isOnboarding && finishButton){
         const goToFinish = () => { window.location.href = finishUrl; };
         finishButton.addEventListener('click', (e) => {
           e.preventDefault();
+          const hasLicense = (licenseInput && licenseInput.value.trim() !== '') || HAS_LICENSE_NO;
+          const hasDoc = (licenseDocInput && licenseDocInput.files && licenseDocInput.files.length > 0) || HAS_LICENSE_DOC;
+          if (!hasLicense || !hasDoc) {
+            const msg = 'Business registration number and proof are required to complete onboarding.';
+            if (window.Swal) {
+              Swal.fire({ icon:'error', title:'Add clinic license details', text: msg });
+            } else {
+              alert(msg);
+            }
+            return;
+          }
           if (window.Swal) {
             Swal.fire({
               icon:'success',

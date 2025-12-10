@@ -56,7 +56,12 @@ class OnboardingProgressService
             ->where('id', $clinicId)
             ->select('license_no', 'license_document')
             ->first();
-        $hasClinicDocs = $clinicDoc && (!empty($clinicDoc->license_no) || !empty($clinicDoc->license_document));
+        $hasClinicDocs = false;
+        if ($clinicDoc) {
+            $licenseNo = trim((string) ($clinicDoc->license_no ?? ''));
+            $licenseDoc = trim((string) ($clinicDoc->license_document ?? ''));
+            $hasClinicDocs = ($licenseNo !== '') && ($licenseDoc !== '');
+        }
 
         $hasDoctorDocs = DB::table('doctors')
             ->where('vet_registeration_id', $clinicId)
