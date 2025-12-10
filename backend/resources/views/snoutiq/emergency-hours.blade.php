@@ -44,11 +44,19 @@
       <section class="lg:col-span-2 space-y-5">
         <div>
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-semibold text-gray-800">Doctors covering emergencies</h3>
-            <span class="text-xs text-gray-500" id="doctorCount">0 selected</span>
+            <h3 class="text-sm font-semibold text-gray-800">Select doctor</h3>
+            <span class="text-xs text-gray-500" id="doctorCount"></span>
           </div>
-          <div id="doctorList" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
-          <p id="doctorHint" class="text-xs text-rose-600 mt-1 hidden">Select at least one doctor.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="md:col-span-2">
+              <label for="doctorSelect" class="sr-only">Doctor</label>
+              <select id="doctorSelect" class="w-full rounded-xl border-gray-300 bg-white text-sm font-medium text-gray-800 focus:border-rose-500 focus:ring-rose-500">
+                <option value="">{{ $doctorList->isEmpty() ? 'No doctors found' : 'Select a doctor' }}</option>
+              </select>
+              <p class="mt-1 text-xs text-gray-500" id="doctorSelectNote">Pick a doctor to view their emergency slots.</p>
+              <p id="doctorHint" class="text-xs text-rose-600 mt-1 hidden">Select a doctor to continue.</p>
+            </div>
+          </div>
           @if($doctorList->isEmpty())
             <div class="mt-3 p-3 rounded-lg bg-amber-50 text-amber-700 text-sm">
               We could not find doctors linked to this clinic. Once your doctors are added, refresh this page to tag them for
@@ -58,10 +66,17 @@
         </div>
 
         <div>
-          <h3 class="text-sm font-semibold text-gray-800 mb-2">Night emergency slots</h3>
-          <p class="text-xs text-gray-500 mb-3">Choose the time blocks when you actively monitor emergency calls (IST).</p>
-          <div id="slotList" class="grid grid-cols-2 md:grid-cols-3 gap-2"></div>
-          <p id="slotHint" class="text-xs text-rose-600 mt-1 hidden">Select at least one slot.</p>
+          <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-800 mb-1">Night emergency slots</h3>
+              <p class="text-xs text-gray-500">Choose the time blocks when you actively monitor emergency calls (IST).</p>
+            </div>
+            <div class="md:text-right">
+              <p id="slotDoctorNote" class="text-[11px] font-semibold uppercase tracking-wide text-gray-500"></p>
+            </div>
+          </div>
+          <div id="slotList" class="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2"></div>
+          <p id="slotHint" class="text-xs text-rose-600 mt-1 hidden">Select at least one slot for the chosen doctor.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -131,14 +146,20 @@
   const API_BASE = `${window.location.origin}${PATH_PREFIX}/api/clinic/emergency-hours`;
 
   const state = {
-    doctors: new Set(),
-    slots: new Set(),
+    doctorSlots: new Map(),  // doctorId -> Set of slots
+    activeDoctor: null,      // Doctor currently being edited
     price: null,
   };
 
   const el = (sel) => document.querySelector(sel);
   const els = (sel) => Array.from(document.querySelectorAll(sel));
   const fmtList = (items) => items && items.length ? items.join(', ') : 'Not set';
+  const escapeHtml = (str) => String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
   const toast = (msg, ok = true) => {
     if (window.Swal) {
       Swal.fire({ toast:true, position:'top', timer:1400, showConfirmButton:false, icon: ok ? 'success' : 'error', title: String(msg) });
@@ -150,85 +171,158 @@
     box.className = ok ? 'text-sm mt-2 text-emerald-600' : 'text-sm mt-2 text-rose-600';
   };
 
-  function renderDoctors(){
-    const wrap = el('#doctorList'); if (!wrap) return;
-    wrap.innerHTML = '';
-    DOCTORS.forEach(doc => {
-      const isChecked = state.doctors.has(doc.id);
-      const baseClasses = 'flex items-center gap-3 p-3 rounded-xl border transition';
-      const activeClasses = 'border-rose-500 bg-rose-50 text-rose-900 shadow-sm';
-      const inactiveClasses = 'border-gray-200 bg-white text-gray-800 hover:border-rose-300';
-      const card = document.createElement('label');
-      card.className = `${baseClasses} ${isChecked ? activeClasses : inactiveClasses}`;
-      card.innerHTML = `
-        <input type="checkbox" class="doctor-toggle h-4 w-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500" data-doctor="${doc.id}" ${isChecked ? 'checked' : ''}>
-        <span class="text-sm font-medium">${doc.name}</span>
-      `;
-      const input = card.querySelector('input');
-      input.addEventListener('change', (e) => {
-        const id = Number(e.target.dataset.doctor);
-        if (e.target.checked) {
-          state.doctors.add(id);
-          card.className = `${baseClasses} ${activeClasses}`;
-        } else {
-          state.doctors.delete(id);
-          card.className = `${baseClasses} ${inactiveClasses}`;
-        }
-        updateDoctorCount();
-        updatePreview();
+  const getDoctorName = (id) => {
+    const match = DOCTORS.find(doc => Number(doc.id) === Number(id));
+    return match?.name || `Doctor #${id}`;
+  };
+
+  const getActiveDoctor = () => {
+    if (!state.activeDoctor) return null;
+    const match = DOCTORS.find(doc => Number(doc.id) === Number(state.activeDoctor));
+    return match ? { ...match, id: Number(match.id) } : { id: Number(state.activeDoctor), name: `Doctor #${state.activeDoctor}` };
+  };
+
+  const getDoctorsWithSlots = () => {
+    const list = [];
+    state.doctorSlots.forEach((slots, id) => {
+      if (!slots?.size) return;
+      const doc = DOCTORS.find(d => Number(d.id) === Number(id));
+      list.push({
+        id: Number(id),
+        name: doc?.name || `Doctor #${id}`,
       });
-      wrap.appendChild(card);
     });
-    updateDoctorCount();
+    return list;
+  };
+
+  const ensureDoctorSlotSet = (doctorId) => {
+    const id = Number(doctorId);
+    if (!state.doctorSlots.has(id)) {
+      state.doctorSlots.set(id, new Set());
+    }
+    return state.doctorSlots.get(id);
+  };
+
+  const syncActiveDoctor = () => {
+    if (state.activeDoctor && DOCTORS.some(doc => Number(doc.id) === Number(state.activeDoctor))) {
+      return;
+    }
+    const firstWithSlots = getDoctorsWithSlots()[0];
+    if (firstWithSlots) {
+      state.activeDoctor = Number(firstWithSlots.id);
+      return;
+    }
+    const firstDoctor = DOCTORS[0];
+    state.activeDoctor = firstDoctor ? Number(firstDoctor.id) : null;
+  };
+
+  function renderDoctorDropdown(){
+    const select = el('#doctorSelect'); if (!select) return;
+    select.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = DOCTORS.length ? 'Select a doctor' : 'No doctors found';
+    select.appendChild(placeholder);
+
+    DOCTORS.forEach(doc => {
+      const opt = document.createElement('option');
+      opt.value = doc.id;
+      opt.textContent = doc.name || `Doctor #${doc.id}`;
+      select.appendChild(opt);
+    });
+
+    if (state.activeDoctor && !DOCTORS.some(doc => Number(doc.id) === Number(state.activeDoctor))) {
+      const opt = document.createElement('option');
+      opt.value = state.activeDoctor;
+      opt.textContent = getDoctorName(state.activeDoctor);
+      select.appendChild(opt);
+    }
+
+    syncActiveDoctor();
+    if (state.activeDoctor) {
+      select.value = String(state.activeDoctor);
+    }
+
+    const badge = el('#doctorCount');
+    if (badge) {
+      badge.textContent = state.activeDoctor ? `Editing ${getDoctorName(state.activeDoctor)}` : '';
+    }
+
+    const note = el('#doctorSelectNote');
+    if (note) {
+      if (!DOCTORS.length) {
+        note.textContent = 'No doctors found for this clinic.';
+      } else {
+        note.textContent = state.activeDoctor
+          ? `Showing emergency slots for ${getDoctorName(state.activeDoctor)}.`
+          : 'Pick a doctor to view their emergency slots.';
+      }
+    }
   }
 
   function renderSlots(){
     const wrap = el('#slotList'); if (!wrap) return;
+    const note = el('#slotDoctorNote');
     wrap.innerHTML = '';
+
+    if (!DOCTORS.length) {
+      wrap.innerHTML = `<div class="col-span-full rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">No doctors found for this clinic. Add doctors to set night emergency slots.</div>`;
+      if (note) note.textContent = '';
+      updatePreview();
+      return;
+    }
+
+    syncActiveDoctor();
+    if (!state.activeDoctor) {
+      wrap.innerHTML = `<div class="col-span-full rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">Select a doctor above to set night emergency slots.</div>`;
+      if (note) note.textContent = '';
+      updatePreview();
+      return;
+    }
+
+    const slotSet = ensureDoctorSlotSet(state.activeDoctor);
     SLOT_OPTIONS.forEach(slot => {
-      const isChecked = state.slots.has(slot);
+      const isChecked = slotSet.has(slot);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.slot = slot;
       btn.className = `px-3 py-2 rounded-xl border text-sm font-medium transition ${isChecked ? 'border-rose-500 bg-rose-500 text-white shadow' : 'border-gray-200 bg-white text-gray-700 hover:border-rose-300 hover:text-rose-700'}`;
       btn.textContent = slot;
       btn.addEventListener('click', () => {
-        if (state.slots.has(slot)) {
-          state.slots.delete(slot);
+        if (slotSet.has(slot)) {
+          slotSet.delete(slot);
         } else {
-          state.slots.add(slot);
+          slotSet.add(slot);
         }
         renderSlots();
         updatePreview();
       });
       wrap.appendChild(btn);
     });
-    updatePreview();
-  }
 
-  function updateDoctorCount(){
-    const badge = el('#doctorCount');
-    if (badge) badge.textContent = `${state.doctors.size} selected`;
+    if (note) note.textContent = `Editing slots for ${getDoctorName(state.activeDoctor)}`;
+    updatePreview();
   }
 
   function updatePreview(data){
     const preview = el('#preview');
     if (!preview) return;
-    const doctors = Array.from(state.doctors)
-      .map(id => (DOCTORS.find(doc => doc.id === id)?.name || `Doctor #${id}`));
-    const slots = Array.from(state.slots);
+
+    const activeDoctor = getActiveDoctor();
+    const slotsForDoctor = activeDoctor ? Array.from(ensureDoctorSlotSet(activeDoctor.id)) : [];
     const price = typeof state.price === 'number' && !Number.isNaN(state.price)
       ? `₹${state.price.toFixed(0)}`
       : 'Not set';
 
     preview.innerHTML = `
       <div>
-        <dt class="text-xs uppercase tracking-wide text-gray-500">Doctors</dt>
-        <dd class="mt-0.5 text-gray-800">${fmtList(doctors)}</dd>
+        <dt class="text-xs uppercase tracking-wide text-gray-500">Doctor</dt>
+        <dd class="mt-0.5 text-gray-800">${activeDoctor ? escapeHtml(activeDoctor.name || `Doctor #${activeDoctor.id}`) : 'Not selected'}</dd>
       </div>
       <div>
         <dt class="text-xs uppercase tracking-wide text-gray-500">Night slots</dt>
-        <dd class="mt-0.5 text-gray-800">${fmtList(slots)}</dd>
+        <dd class="mt-0.5 text-gray-800">${slotsForDoctor.length ? fmtList(slotsForDoctor.map(escapeHtml)) : 'Not set'}</dd>
       </div>
       <div>
         <dt class="text-xs uppercase tracking-wide text-gray-500">Consultation price</dt>
@@ -242,6 +336,41 @@
     }
   }
 
+  function hydrateFromData(data){
+    state.doctorSlots = new Map();
+    state.activeDoctor = null;
+
+    const doctorIds = Array.isArray(data?.doctor_ids) ? data.doctor_ids.map(Number) : [];
+    doctorIds.forEach(id => ensureDoctorSlotSet(id));
+
+    const schedules = Array.isArray(data?.doctor_schedules) ? data.doctor_schedules : [];
+    if (schedules.length) {
+      schedules.forEach(item => {
+        const id = Number(item.doctor_id);
+        if (!Number.isFinite(id)) return;
+        const slots = Array.isArray(item.night_slots) ? item.night_slots : [];
+        const set = ensureDoctorSlotSet(id);
+        slots.forEach(slot => set.add(slot));
+      });
+    } else if (data?.doctor_slot_map && typeof data.doctor_slot_map === 'object') {
+      Object.entries(data.doctor_slot_map).forEach(([id, slots]) => {
+        const docId = Number(id);
+        if (!Number.isFinite(docId)) return;
+        const set = ensureDoctorSlotSet(docId);
+        (Array.isArray(slots) ? slots : []).forEach(slot => set.add(slot));
+      });
+    } else if (Array.isArray(data?.night_slots) && doctorIds.length) {
+      doctorIds.forEach(id => {
+        const set = ensureDoctorSlotSet(id);
+        data.night_slots.forEach(slot => set.add(slot));
+      });
+    }
+
+    const firstWithSlots = getDoctorsWithSlots()[0];
+    state.activeDoctor = firstWithSlots ? Number(firstWithSlots.id) : (doctorIds[0] ?? null);
+    syncActiveDoctor();
+  }
+
   async function loadExisting(){
     if (!CLINIC_ID) return;
     try {
@@ -253,24 +382,36 @@
         return;
       }
       const data = json?.data || {};
-      state.doctors.clear();
-      state.slots.clear();
-      (Array.isArray(data.doctor_ids) ? data.doctor_ids : []).forEach(id => state.doctors.add(Number(id)));
-      (Array.isArray(data.night_slots) ? data.night_slots : []).forEach(slot => state.slots.add(slot));
+      hydrateFromData(data);
       if (data.consultation_price !== null && data.consultation_price !== undefined) {
         state.price = Number(data.consultation_price);
         const input = el('#consultationPrice');
         if (input) input.value = state.price;
       }
-      updatePreview(data);
-      renderDoctors();
+      renderDoctorDropdown();
       renderSlots();
+      updatePreview(data);
     } catch (err) {
       console.error('loadExisting error', err);
     }
   }
 
   function bindEvents(){
+    const doctorSelect = el('#doctorSelect');
+    if (doctorSelect) {
+      doctorSelect.addEventListener('change', (e) => {
+        const raw = e.target.value;
+        const id = raw === '' ? null : Number(raw);
+        state.activeDoctor = id === null || Number.isNaN(id) ? null : id;
+        if (state.activeDoctor !== null) {
+          ensureDoctorSlotSet(state.activeDoctor);
+        }
+        renderDoctorDropdown();
+        renderSlots();
+        updatePreview();
+      });
+    }
+
     const priceInput = el('#consultationPrice');
     if (priceInput) {
       priceInput.addEventListener('input', (e) => {
@@ -291,11 +432,23 @@
     const slotHint = el('#slotHint');
     const priceHint = el('#priceHint');
 
-    if (!state.doctors.size) { doctorHint?.classList.remove('hidden'); valid = false; }
+    if (!state.activeDoctor) { doctorHint?.classList.remove('hidden'); valid = false; }
     else { doctorHint?.classList.add('hidden'); }
 
-    if (!state.slots.size) { slotHint?.classList.remove('hidden'); valid = false; }
-    else { slotHint?.classList.add('hidden'); }
+    const activeSlots = state.activeDoctor ? ensureDoctorSlotSet(state.activeDoctor) : new Set();
+    if (!state.activeDoctor || !activeSlots.size) {
+      if (slotHint) {
+        const name = state.activeDoctor ? getDoctorName(state.activeDoctor) : 'the selected doctor';
+        slotHint.textContent = `Add at least one slot for ${name}.`;
+        slotHint.classList.remove('hidden');
+      }
+      valid = false;
+    } else {
+      if (slotHint) {
+        slotHint.textContent = 'Select at least one slot for the chosen doctor.';
+        slotHint.classList.add('hidden');
+      }
+    }
 
     if (typeof state.price !== 'number' || Number.isNaN(state.price) || state.price <= 0) {
       priceHint?.classList.remove('hidden');
@@ -322,6 +475,20 @@
     setStatus('');
 
     try {
+      const doctorsToSave = getDoctorsWithSlots();
+      const doctorSchedules = doctorsToSave.map(doc => ({
+        doctor_id: doc.id,
+        night_slots: Array.from(ensureDoctorSlotSet(doc.id)),
+      }));
+      const doctorIds = doctorSchedules.map(s => s.doctor_id);
+      const nightSlots = Array.from(new Set(doctorSchedules.flatMap(s => s.night_slots)));
+
+      if (!doctorSchedules.length) {
+        setStatus('Add at least one slot for the selected doctor.', false);
+        toast('Add at least one slot for the selected doctor.', false);
+        return;
+      }
+
       const res = await fetch(API_BASE, {
         method: 'POST',
         headers: {
@@ -332,8 +499,9 @@
         },
         body: JSON.stringify({
           clinic_id: CLINIC_ID,
-          doctor_ids: Array.from(state.doctors),
-          night_slots: Array.from(state.slots),
+          doctor_ids: doctorIds,
+          doctor_schedules: doctorSchedules,
+          night_slots: nightSlots,
           consultation_price: state.price,
         }),
       });
@@ -344,16 +512,13 @@
         setStatus(json?.message || 'Emergency coverage saved.', true);
         toast(json?.message || 'Emergency coverage saved.');
         if (json?.data) {
-          state.doctors.clear();
-          state.slots.clear();
-          (Array.isArray(json.data.doctor_ids) ? json.data.doctor_ids : []).forEach(id => state.doctors.add(Number(id)));
-          (Array.isArray(json.data.night_slots) ? json.data.night_slots : []).forEach(slot => state.slots.add(slot));
+          hydrateFromData(json.data);
           if (json.data.consultation_price !== undefined && json.data.consultation_price !== null) {
             state.price = Number(json.data.consultation_price);
             const input = el('#consultationPrice');
             if (input) input.value = state.price;
           }
-          renderDoctors();
+          renderDoctorDropdown();
           renderSlots();
           updatePreview(json.data);
         } else {
@@ -392,7 +557,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    renderDoctors();
+    renderDoctorDropdown();
     renderSlots();
     bindEvents();
     loadExisting();

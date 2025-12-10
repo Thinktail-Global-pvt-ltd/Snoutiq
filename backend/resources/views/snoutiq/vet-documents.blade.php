@@ -22,10 +22,25 @@
   @endif
 
   @if (session('status'))
-    <div class="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3 text-sm"
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
          data-onboarding-status="1"
          data-status-message="{{ session('status') }}">
-      {{ session('status') }}
+      <span>{{ session('status') }}</span>
+      @if(request()->get('onboarding') === '1')
+        <button type="button"
+                data-complete-onboarding
+                class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow">
+          Complete onboarding
+        </button>
+      @endif
+    </div>
+  @elseif(request()->get('onboarding') === '1')
+    <div class="flex justify-end">
+      <button type="button"
+              data-complete-onboarding
+              class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow">
+        Complete onboarding
+      </button>
     </div>
   @endif
 
@@ -267,10 +282,17 @@
       const url = new URL(window.location.href);
       const isOnboarding = (url.searchParams.get('onboarding')||'') === '1';
       const statusEl = document.querySelector('[data-onboarding-status]');
+      const finishButton = document.querySelector('[data-complete-onboarding]');
+      const finishUrl = FINISH_URL || `${window.location.origin}/profile`;
+
+      if (isOnboarding && finishButton){
+        finishButton.addEventListener('click', () => {
+          window.location.href = finishUrl;
+        });
+      }
+
       if (isOnboarding && statusEl){
         const message = statusEl.getAttribute('data-status-message') || statusEl.textContent.trim();
-        const finishUrl = FINISH_URL || `${window.location.origin}/profile`;
-        const goNext = ()=>{ window.location.href = finishUrl; };
         try{ localStorage.setItem('onboarding_v1_done','1'); }catch(_){}
         if (window.Swal){
           Swal.fire({
@@ -279,9 +301,7 @@
             text: message || 'All onboarding steps are done.',
             timer:1700,
             showConfirmButton:false,
-          }).then(goNext);
-        }else{
-          setTimeout(goNext, 900);
+          });
         }
       }
     }catch(_){ }

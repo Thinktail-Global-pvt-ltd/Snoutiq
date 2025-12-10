@@ -289,7 +289,7 @@
         <input type="hidden" name="status" value="{{ $onboardingDefaults['status'] }}">
       @endif
       <div>
-        <label class="block text-sm font-semibold mb-1">Notes (optional)</label>
+        <label class="block text-sm font-semibold mb-1">Description (optional)</label>
         <textarea name="description" rows="3" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm"></textarea>
       </div>
 

@@ -84,6 +84,9 @@ label{font-size:.9rem;color:#334155}
 .askbar .send{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:#f5f9ff;display:grid;place-items:center;cursor:pointer}
 .askbar .send:hover{background:#eef6ff}
 .ai-hint{font-size:.85rem;color:#6b7280}
+.referral-card{display:flex;align-items:center;justify-content:space-between;gap:.9rem;flex-wrap:wrap;padding:1rem 1.2rem;background:linear-gradient(180deg,#f5f9ff,#e6f1ff);border-radius:16px;border:1px solid #d5e4ff;box-shadow:0 16px 40px -28px rgba(37,99,235,.6);max-width:540px;margin:0 auto}
+.referral-code{font-weight:900;font-size:1.15rem;letter-spacing:.08em;color:#0b1220}
+.referral-chip{display:inline-flex;align-items:center;gap:.45rem;padding:.35rem .75rem;border-radius:999px;background:#ecf3ff;border:1px solid var(--border);color:var(--accent);font-weight:800;font-size:.82rem;text-transform:uppercase}
 .ai-cta{border:none;background:none;color:var(--accent);font-weight:700;cursor:pointer;padding:0 .2rem;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
 .ai-cta:focus{outline:2px solid var(--ring);outline-offset:2px;border-radius:6px}
 .modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;padding:1rem;z-index:999}
@@ -219,6 +222,18 @@ label{font-size:.9rem;color:#334155}
   <header class="container" style="text-align:center;padding:12px 0 8px">
     <span class="tag">🏥 Clinic Profile • {{ $vet->business_status === 'OPERATIONAL' ? 'Open' : 'Status Unknown' }}</span>
     <h1 class="heading" style="font-size:2rem;margin:.7rem 0">{{ $vet->name }}</h1>
+    @if(!empty($referralCode))
+      <div class="card referral-card" aria-label="Clinic referral code" style="margin-top:.15rem">
+        <div style="display:flex;flex-direction:column;gap:.2rem;align-items:flex-start">
+          <span class="referral-chip"><i class="fa-solid fa-ticket"></i> Referral code</span>
+          <div class="referral-code">{{ $referralCode }}</div>
+          <div class="muted" style="font-size:.9rem">Share this to book directly at {{ $vet->name }}</div>
+        </div>
+        <button class="btn btn-outline" type="button" id="copy-referral-btn" data-referral="{{ $referralCode }}" style="white-space:nowrap">
+          <i class="fa-solid fa-copy"></i> Copy
+        </button>
+      </div>
+    @endif
     <p class="muted" style="max-width:820px;margin:0 auto 1rem">
       {{ $vet->formatted_address ?? $vet->address ?? ($vet->city ?? '') }}
       @if($vet->pincode) • {{ $vet->pincode }} @endif
@@ -510,6 +525,28 @@ label{font-size:.9rem;color:#334155}
     const appModal = document.getElementById('app-download-modal');
     const appModalCloseEls = Array.from(document.querySelectorAll('[data-app-modal-close]'));
     const appModalOpenEls  = Array.from(document.querySelectorAll('[data-app-modal-open]'));
+    const copyReferralBtn = document.getElementById('copy-referral-btn');
+
+    if (copyReferralBtn) {
+      const referralCode = copyReferralBtn.getAttribute('data-referral') || '';
+      const defaultLabel = copyReferralBtn.innerHTML;
+
+      copyReferralBtn.addEventListener('click', async function() {
+        if (!referralCode) return;
+
+        try {
+          await navigator.clipboard.writeText(referralCode);
+          copyReferralBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+          setTimeout(function(){ copyReferralBtn.innerHTML = defaultLabel; }, 1600);
+        } catch (err) {
+          const input = window.prompt('Copy referral code', referralCode);
+          if (input !== null) {
+            copyReferralBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+            setTimeout(function(){ copyReferralBtn.innerHTML = defaultLabel; }, 1600);
+          }
+        }
+      });
+    }
 
     function loginRedirect(prefill = "") {
       try { if (prefill) localStorage.setItem("pendingChatQuestion", prefill); } catch(_) {}
