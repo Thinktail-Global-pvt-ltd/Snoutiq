@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\MedicalRecordController;
 use App\Models\User;
 use App\Models\DeviceToken;
 use App\Models\Doctor;
+use App\Models\VetRegisterationTemp;
 use App\Support\DeviceTokenOwnerResolver;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
@@ -263,6 +264,60 @@ Route::get('/doctors/featured', function (Request $request) {
         'data' => [
             'clinic' => $clinicData,
             'doctors' => $doctorsData,
+        ],
+    ]);
+});
+
+Route::get('/users/last-vet-details', function (Request $request) {
+    $payload = $request->validate([
+        'user_id' => ['required', 'integer'],
+    ]);
+
+    $user = User::query()->select('id', 'last_vet_id')->find($payload['user_id']);
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'User not found',
+        ], 404);
+    }
+
+    if (empty($user->last_vet_id)) {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user_id' => $user->id,
+                'last_vet_id' => null,
+                'clinic' => null,
+                'doctors' => [],
+            ],
+        ]);
+    }
+
+    $clinic = VetRegisterationTemp::query()->find($user->last_vet_id);
+
+    if (!$clinic) {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user_id' => $user->id,
+                'last_vet_id' => $user->last_vet_id,
+                'clinic' => null,
+                'doctors' => [],
+            ],
+        ]);
+    }
+
+    $doctors = Doctor::query()
+        ->where('vet_registeration_id', $clinic->id)
+        ->get();
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'user_id' => $user->id,
+            'last_vet_id' => $user->last_vet_id,
+            'clinic' => $clinic,
+            'doctors' => $doctors->values(),
         ],
     ]);
 });
