@@ -1,11 +1,63 @@
 import React from 'react';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import img3 from '../assets/images/tickfever.png';
 
+const seo = {
+  title: 'Tick Fever in Dogs: Symptoms, Prevention & Treatment',
+  description:
+    'Understand tick fever in dogs with symptoms, stages, prevention tips, and treatment guidance to protect your pet from dangerous tick-borne diseases.',
+  keywords:
+    'tick fever in dogs, canine ehrlichiosis, dog tick prevention, tick fever symptoms, tick fever treatment for dogs',
+  url: 'https://snoutiq.com/blog/tick-fever-in-dogs-guide',
+  image: 'https://snoutiq.com/images/tick-fever-dogs.jpg',
+};
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: seo.title,
+  description: seo.description,
+  image: seo.image,
+  author: {
+    "@type": "Organization",
+    name: "SnoutIQ",
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "SnoutIQ",
+  },
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": seo.url,
+  },
+};
+
 const TickFeverGuide = () => {
   return (
-    <>
+    <HelmetProvider>
+      <Helmet>
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
+        <meta name="keywords" content={seo.keywords} />
+        <link rel="canonical" href={seo.url} />
+
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.description} />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content={seo.url} />
+        <meta property="og:image" content={seo.image} />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seo.title} />
+        <meta name="twitter:description" content={seo.description} />
+        <meta name="twitter:image" content={seo.image} />
+
+        <script type="application/ld+json">
+          {JSON.stringify(structuredData)}
+        </script>
+      </Helmet>
       <Header />
       <div className="min-h-screen bg-gray-50 py-8 px-4 mt-12">
         <div className="max-w-4xl mx-auto">
@@ -216,7 +268,7 @@ const TickFeverGuide = () => {
         </div>
       </div>
       <Footer />
-    </>
+    </HelmetProvider>
   );
 };
 

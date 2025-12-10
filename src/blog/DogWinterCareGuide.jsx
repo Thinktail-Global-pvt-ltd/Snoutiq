@@ -1,11 +1,63 @@
 import React from "react";
+import { Helmet, HelmetProvider } from "react-helmet-async";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
 import img1 from "../assets/images/dog winter.png";
 
+const seo = {
+  title: "Dog Winter Care Guide | Keep Your Dog Safe, Warm, and Healthy",
+  description:
+    "Practical winter care guide for dogs covering warmth, paw protection, hydration, grooming, and safety tips to keep your pet healthy in cold weather.",
+  keywords:
+    "dog winter care guide, keep dog warm in winter, dog paw protection winter, winter dog safety tips, winter diet for dogs",
+  url: "https://snoutiq.com/blog/dog-winter-care-guide",
+  image: "https://snoutiq.com/images/dog-winter-care-guide.jpg",
+};
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: seo.title,
+  description: seo.description,
+  image: seo.image,
+  author: {
+    "@type": "Organization",
+    name: "SnoutIQ",
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "SnoutIQ",
+  },
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": seo.url,
+  },
+};
+
 const DogWinterCareGuide = () => {
   return (
-    <>
+    <HelmetProvider>
+      <Helmet>
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
+        <meta name="keywords" content={seo.keywords} />
+        <link rel="canonical" href={seo.url} />
+
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.description} />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content={seo.url} />
+        <meta property="og:image" content={seo.image} />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seo.title} />
+        <meta name="twitter:description" content={seo.description} />
+        <meta name="twitter:image" content={seo.image} />
+
+        <script type="application/ld+json">
+          {JSON.stringify(structuredData)}
+        </script>
+      </Helmet>
       <Header />
       <div className="min-h-screen bg-gray-50 py-8 px-4 mt-10">
         <div className="max-w-4xl mx-auto">
@@ -304,7 +356,7 @@ const DogWinterCareGuide = () => {
         </div>
       </div>
       <Footer />
-    </>
+    </HelmetProvider>
   );
 };
 
