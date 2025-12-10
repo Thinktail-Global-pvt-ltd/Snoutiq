@@ -111,7 +111,6 @@ class VetRegisterationTempController extends Controller
                // 'license_no'       => 'required|string|max:255',
                 'coordinates'      => 'nullable|array',
                 'address'          => 'nullable|string',
-                'chat_price'       => 'nullable|numeric',
                 'bio'              => 'nullable|string',
                 'license_document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
                 'password'         => 'nullable|string|min:6',
