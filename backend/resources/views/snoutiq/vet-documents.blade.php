@@ -74,12 +74,11 @@
     <form method="POST" action="{{ route('doctor.documents.update', request()->only(['onboarding', 'step'])) }}" enctype="multipart/form-data" class="space-y-4">
       @csrf
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2" for="license_no">Business registration number *</label>
+        <label class="block text-sm font-medium text-gray-700 mb-2" for="license_no">Business registration number (optional)</label>
         <input
           type="text"
           id="license_no"
           name="license_no"
-          required
           value="{{ old('license_no', $clinic->license_no ?? '') }}"
           class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
           placeholder="Enter your business registration number"

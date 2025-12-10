@@ -94,7 +94,7 @@ class VetDocumentsPageController extends Controller
         }
 
         $validated = $request->validate([
-            'license_no' => 'required|string|max:255',
+            'license_no' => 'nullable|string|max:255',
             'license_document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
