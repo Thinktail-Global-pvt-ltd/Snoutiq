@@ -37,7 +37,6 @@ const DoctorRegistration = () => {
   // Individual state variables
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
-  const [chatPrice, setChatPrice] = useState("");
   const [draftClinics, setDraftClinics] = useState([]);
   const [selectedDraftSlug, setSelectedDraftSlug] = useState("");
   const [isLoadingDraftClinics, setIsLoadingDraftClinics] = useState(false);
@@ -112,9 +111,6 @@ const DoctorRegistration = () => {
         if (!/^\d{6}$/.test(value))
           error = "Valid 6-digit PIN code is required";
         break;
-      case "chatPrice":
-        if (!value || value <= 0) error = "Valid consultation fee is required";
-        break;
       case "password":
         if (value.length < 6) error = "Password must be at least 6 characters";
         break;
@@ -152,7 +148,6 @@ const DoctorRegistration = () => {
     newErrors.address = validateField("address", address);
     newErrors.city = validateField("city", city);
     newErrors.pinCode = validateField("pinCode", pinCode);
-    newErrors.chatPrice = validateField("chatPrice", chatPrice);
     newErrors.password = validateField("password", password);
     newErrors.confirmPassword = validateField(
       "confirmPassword",
@@ -623,7 +618,6 @@ const DoctorRegistration = () => {
       address,
       city,
       pinCode,
-      chatPrice,
     };
 
     Object.entries(clinicFields).forEach(([field, value]) => {
@@ -669,7 +663,6 @@ const DoctorRegistration = () => {
       address: true,
       city: true,
       pinCode: true,
-      chatPrice: true,
       password: true,
       confirmPassword: true,
       terms: true, // Add this
@@ -727,14 +720,13 @@ const DoctorRegistration = () => {
       // Send coordinates as an array instead of JSON string
       if (coordinates.lat && coordinates.lng) {
         formData.append("coordinates[]", coordinates.lat);
-        formData.append("coordinates[]", coordinates.lng);
-      }
+      formData.append("coordinates[]", coordinates.lng);
+    }
 
-      formData.append("address", address);
-      formData.append("chat_price", chatPrice);
-      formData.append("bio", bio);
-      formData.append("inhome_grooming_services", inhome_grooming_services);
-      formData.append("acceptedTerms", acceptedTerms);
+    formData.append("address", address);
+    formData.append("bio", bio);
+    formData.append("inhome_grooming_services", inhome_grooming_services);
+    formData.append("acceptedTerms", acceptedTerms);
 
       if (selectedDraftSlug) {
         formData.append("draft_slug", selectedDraftSlug);
@@ -1829,32 +1821,7 @@ const DoctorRegistration = () => {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           Services & Pricing
                         </h3>
-                        
                         <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Consultation Fee (INR) *
-                            </label>
-                            <input
-                              type="number"
-                              value={chatPrice}
-                              onChange={(e) => setChatPrice(e.target.value)}
-                              onBlur={() => handleBlur("chatPrice")}
-                              placeholder="Enter consultation fee"
-                              required
-                              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                errors.chatPrice && touched.chatPrice
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
-                            />
-                            {errors.chatPrice && touched.chatPrice && (
-                              <p className="text-red-500 text-xs mt-1">
-                                {errors.chatPrice}
-                              </p>
-                            )}
-                          </div>
-
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               At Home Services *
