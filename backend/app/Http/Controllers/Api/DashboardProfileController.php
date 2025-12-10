@@ -217,6 +217,7 @@ class DashboardProfileController extends Controller
             'pincode' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
             'license_no' => 'nullable|string|max:120',
+            'chat_price' => 'nullable|numeric|min:0|max:1000000',
             'bio' => 'nullable|string|max:2000',
         ]);
 
@@ -237,6 +238,9 @@ class DashboardProfileController extends Controller
             'pincode' => $this->normalizeString($payload['pincode'] ?? null),
             'address' => $this->normalizeString($payload['address'] ?? null),
             'license_no' => $this->normalizeString($payload['license_no'] ?? null),
+            'chat_price' => array_key_exists('chat_price', $payload)
+                ? ($payload['chat_price'] === null ? null : (float) $payload['chat_price'])
+                : $clinic->chat_price,
             'bio' => $this->normalizeString($payload['bio'] ?? null),
         ];
 
