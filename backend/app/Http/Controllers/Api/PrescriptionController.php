@@ -38,6 +38,20 @@ class PrescriptionController extends Controller
         return response()->json($prescription);
     }
 
+    // GET /api/doctors/{doctorId}/prescriptions?user_id=
+    public function forDoctor(Request $request, int $doctorId)
+    {
+        $query = Prescription::query()
+            ->where('doctor_id', $doctorId)
+            ->orderByDesc('id');
+
+        if ($request->filled('user_id')) {
+            $query->where('user_id', (int) $request->query('user_id'));
+        }
+
+        return response()->json($query->paginate(20));
+    }
+
     // POST /api/prescriptions
     public function store(Request $request)
     {

@@ -39,7 +39,7 @@
 
   {{-- =================== Doctor & Settings =================== --}}
   <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200/60 p-4 sm:p-6">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
       <div class="lg:col-span-2">
         <label class="block text-sm font-medium text-gray-700">Select Doctor</label>
         <select id="doctor_id" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500">
@@ -52,21 +52,6 @@
             <option value="">No doctors found</option>
           @endif
         </select>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Service Type</label>
-        <input type="text" value="video" disabled class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-gray-600">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Avg Consultation (mins)</label>
-        <input type="number" id="avg_consultation_mins" value="20" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" @if($readonly) disabled @endif>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Max bookings / hour</label>
-        <input type="number" id="max_bph" value="3" class="mt-1 w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" @if($readonly) disabled @endif>
       </div>
 
       {{-- 24/7 toggle (debug only) --}}
@@ -414,6 +399,11 @@
       window.SN_API_BASE = apiBase;
       window.SN_USER_ID  = Number(new URLSearchParams(location.search).get('user_id') || {{ $userId }}) || 0;
       window.SN_CLINIC_ID = Number(@json($clinicId ?? null)) || null;
+      const DEFAULT_SERVICE_TYPE = 'video';
+      const DEFAULT_AVG_CONSULTATION_MINS = 20;
+      const DEFAULT_MAX_BOOKINGS_PER_HOUR = 3;
+      let avgConsultationMins = DEFAULT_AVG_CONSULTATION_MINS;
+      let maxBookingsPerHour = DEFAULT_MAX_BOOKINGS_PER_HOUR;
 
       window.Csrf = {
         ready: false,
@@ -838,8 +828,8 @@
       }
       function buildAvailabilityPayload(){
         if(!slotBuilderActive()) return { availability: [], validationError: null };
-        const avgMins = Number(el('#avg_consultation_mins')?.value || 20);
-        const maxBph  = Number(el('#max_bph')?.value || 3);
+        const avgMins = avgConsultationMins || DEFAULT_AVG_CONSULTATION_MINS;
+        const maxBph  = maxBookingsPerHour || DEFAULT_MAX_BOOKINGS_PER_HOUR;
         const dayList = Array.from(slotState.selectedDays).sort((a,b)=>a-b);
         const availability = [];
         const makeRow = (def, dow)=>({
@@ -1326,8 +1316,10 @@
           const text = await res.text(); let json=null; try{ json = JSON.parse(text.replace(/^\uFEFF/,'')); }catch{}
           if(!res.ok){ out('#saveOut', text || 'Failed to load', false); await loadNightScheduleTable(); return; }
           const list = Array.isArray(json?.availability)? json.availability: [];
-          const avg = document.querySelector('#avg_consultation_mins'); const bph = document.querySelector('#max_bph');
-          if(list[0]){ if(avg) avg.value = Number(list[0].avg_consultation_mins||20); if(bph) bph.value = Number(list[0].max_bookings_per_hour||3); }
+          const avgVal = Number(list[0]?.avg_consultation_mins ?? DEFAULT_AVG_CONSULTATION_MINS);
+          const bphVal = Number(list[0]?.max_bookings_per_hour ?? DEFAULT_MAX_BOOKINGS_PER_HOUR);
+          avgConsultationMins = Number.isFinite(avgVal) && avgVal > 0 ? avgVal : DEFAULT_AVG_CONSULTATION_MINS;
+          maxBookingsPerHour = Number.isFinite(bphVal) && bphVal > 0 ? bphVal : DEFAULT_MAX_BOOKINGS_PER_HOUR;
           hydrateRates(json);
 
           if(slotBuilderActive()){
@@ -1392,8 +1384,8 @@
           availability = res.availability;
           validationError = res.validationError;
         } else {
-          const avgMins = Number(document.querySelector('#avg_consultation_mins').value || 20);
-          const maxBph  = Number(document.querySelector('#max_bph').value || 3);
+          const avgMins = avgConsultationMins || DEFAULT_AVG_CONSULTATION_MINS;
+          const maxBph  = maxBookingsPerHour || DEFAULT_MAX_BOOKINGS_PER_HOUR;
           els('tbody tr[data-dow]').forEach(tr=>{
             const active = tr.querySelector('.active')?.checked; if(!active) return;
             const dow = Number(tr.getAttribute('data-dow'));
@@ -1662,10 +1654,8 @@
             loadExisting();
           } else {
             // Clear the form when nothing is selected
-            const avg = document.querySelector('#avg_consultation_mins');
-            const bph = document.querySelector('#max_bph');
-            if(avg) avg.value = 20;
-            if(bph) bph.value = 3;
+            avgConsultationMins = DEFAULT_AVG_CONSULTATION_MINS;
+            maxBookingsPerHour = DEFAULT_MAX_BOOKINGS_PER_HOUR;
             // Clear schedule table
             els('tbody tr[data-dow]').forEach(tr=>{
               const $active=tr.querySelector('.active'), $start=tr.querySelector('.start'), $end=tr.querySelector('.end'), $bStart=tr.querySelector('.break_start'), $bEnd=tr.querySelector('.break_end');

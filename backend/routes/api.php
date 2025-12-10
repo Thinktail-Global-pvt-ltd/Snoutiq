@@ -352,6 +352,7 @@ Route::get('/nearby-doctors', [VideoCallingController::class, 'nearbyDoctors']);
 
 // ---- Prescriptions ----
 Route::get('/prescriptions', [PrescriptionController::class, 'index']);
+Route::get('/doctors/{doctor_id}/prescriptions', [PrescriptionController::class, 'forDoctor'])->whereNumber('doctor_id');
 Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show']);
 Route::post('/prescriptions', [PrescriptionController::class, 'store']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);
