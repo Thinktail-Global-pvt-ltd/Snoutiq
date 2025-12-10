@@ -1448,7 +1448,26 @@
           if(res.ok){
             hydrateRates(json);
             out('#saveOut', json ?? text ?? 'Saved', true);
-            await loadExisting();
+            const url = new URL(location.href);
+            const isOnboarding = (url.searchParams.get('onboarding')||'') === '1';
+            if (isOnboarding){
+              const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+              const nextUrl = `${window.location.origin}${PATH_PREFIX}/doctor/schedule?onboarding=1&step=3`;
+              const goNext = ()=>{ window.location.href = nextUrl; };
+              if (window.Swal){
+                Swal.fire({
+                  icon:'success',
+                  title:'Video schedule saved',
+                  text:'Next: set your clinic hours.',
+                  timer:1500,
+                  showConfirmButton:false,
+                }).then(goNext);
+              }else{
+                setTimeout(goNext, 800);
+              }
+            }else{
+              await loadExisting();
+            }
           }
           else { out('#saveOut', json ?? text ?? 'Failed to save', false); }
         }catch(e){ out('#saveOut', `Network error: ${e?.message||e}`, false); }

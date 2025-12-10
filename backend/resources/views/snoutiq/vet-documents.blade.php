@@ -22,7 +22,9 @@
   @endif
 
   @if (session('status'))
-    <div class="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3 text-sm">
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3 text-sm"
+         data-onboarding-status="1"
+         data-status-message="{{ session('status') }}">
       {{ session('status') }}
     </div>
   @endif
@@ -240,6 +242,7 @@
 @section('scripts')
 <script>
   document.addEventListener('DOMContentLoaded', () => {
+    const FINISH_URL = @json(route('dashboard.profile'));
     const setFileName = (input, display) => {
       if (!input || !display) return;
       const defaultText = display.textContent.trim();
@@ -259,6 +262,29 @@
       const display = targetId ? document.getElementById(targetId) : null;
       setFileName(input, display);
     });
+
+    try{
+      const url = new URL(window.location.href);
+      const isOnboarding = (url.searchParams.get('onboarding')||'') === '1';
+      const statusEl = document.querySelector('[data-onboarding-status]');
+      if (isOnboarding && statusEl){
+        const message = statusEl.getAttribute('data-status-message') || statusEl.textContent.trim();
+        const finishUrl = FINISH_URL || `${window.location.origin}/profile`;
+        const goNext = ()=>{ window.location.href = finishUrl; };
+        try{ localStorage.setItem('onboarding_v1_done','1'); }catch(_){}
+        if (window.Swal){
+          Swal.fire({
+            icon:'success',
+            title:'Documents saved',
+            text: message || 'All onboarding steps are done.',
+            timer:1700,
+            showConfirmButton:false,
+          }).then(goNext);
+        }else{
+          setTimeout(goNext, 900);
+        }
+      }
+    }catch(_){ }
   });
 </script>
 @endsection

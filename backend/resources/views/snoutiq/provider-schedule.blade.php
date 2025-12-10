@@ -77,9 +77,21 @@
         <h3 class="text-lg font-semibold text-slate-900">Weekly clinic schedule</h3>
         <p class="text-sm text-slate-500">Set your default hours once — we’ll mirror them to weekdays, keep weekends off and auto-save.</p>
       </div>
-      <div class="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-600">
-        <span class="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-        Saving happens automatically
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-600">
+          <span class="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+          Saving happens automatically
+        </div>
+        <button
+          type="button"
+          id="btnManualSave"
+          class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1"
+        >
+          Save & Continue
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -342,6 +354,23 @@
   const toast = (msg, ok = true) => {
     if (window.Swal) {
       Swal.fire({ toast:true, position:'top', timer:1400, showConfirmButton:false, icon: ok ? 'success' : 'error', title:String(msg) });
+    }
+  };
+  const toggleManualSaveButton = (loading = false) => {
+    const btn = el('#btnManualSave');
+    if (!btn) return;
+    if (loading) {
+      if (!btn.dataset.oldLabel) btn.dataset.oldLabel = btn.innerHTML;
+      btn.disabled = true;
+      btn.classList.add('opacity-80','cursor-not-allowed');
+      btn.innerHTML = '<span class="flex items-center gap-2 justify-center"><span>Saving…</span><svg class="h-4 w-4 animate-spin text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8" stroke-width="4" class="opacity-75" stroke-linecap="round"></path></svg></span>';
+    } else {
+      if (btn.dataset.oldLabel) {
+        btn.innerHTML = btn.dataset.oldLabel;
+        delete btn.dataset.oldLabel;
+      }
+      btn.disabled = false;
+      btn.classList.remove('opacity-80','cursor-not-allowed');
     }
   };
   const toHM = (t) => (t && t.length >= 5 ? t.slice(0,5) : '');
@@ -628,23 +657,26 @@
         if (!autoTriggered) toast(successMessage);
         revealWeekly();
         setMetaNote('Clinic schedule saved. You can fine-tune weekdays below.');
-        await loadExistingAvailability();
         try{
           const u = new URL(location.href);
-          const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
-          if ((u.searchParams.get('onboarding')||'') === '1'){
-            if (window.Swal && !autoTriggered){
+          const isOnboarding = (u.searchParams.get('onboarding')||'') === '1';
+          if (isOnboarding && !autoTriggered){
+            const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+            const nextUrl = `${window.location.origin}${PATH_PREFIX}/doctor/emergency-hours?onboarding=1&step=4`;
+            const goNext = ()=>{ window.location.href = nextUrl; };
+            if (window.Swal){
               Swal.fire({
                 icon:'success',
                 title:'Clinic schedule saved',
-                text:'All set! Your onboarding is complete.',
+                text:'Next: set your emergency coverage.',
                 timer:1500,
                 showConfirmButton:false,
-              });
+              }).then(goNext);
+            }else{
+              setTimeout(goNext, 900);
             }
-            try { localStorage.setItem('onboarding_v1_done','1'); } catch (_) {}
-            // Doctor dashboard route lives at /doctor (not /doctor/dashboard)
-            setTimeout(()=>{ window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor`; }, 900);
+          } else {
+            await loadExistingAvailability();
           }
         }catch(_){ }
       } else {
@@ -716,6 +748,16 @@
 
     applyDefaultHours(true);
     isBootstrapping = false;
+
+    const manualSave = el('#btnManualSave');
+    manualSave?.addEventListener('click', async ()=>{
+      toggleManualSaveButton(true);
+      try{
+        await saveAvailability(false);
+      }finally{
+        toggleManualSaveButton(false);
+      }
+    });
   });
 </script>
 

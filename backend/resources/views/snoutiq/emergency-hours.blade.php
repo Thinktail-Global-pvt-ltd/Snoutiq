@@ -362,20 +362,19 @@
         const u = new URL(location.href);
         const isOnboarding = (u.searchParams.get('onboarding')||'') === '1';
         if (isOnboarding) {
-          localStorage.setItem('onboarding_v1_done','1');
-          const redirectToDashboard = () => {
-            const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
-            window.location.href = `${window.location.origin}${PATH_PREFIX}/doctor`;
-          };
+          const PATH_PREFIX = location.pathname.startsWith('/backend') ? '/backend' : '';
+          const nextUrl = `${window.location.origin}${PATH_PREFIX}/doctor/documents?onboarding=1&step=5`;
+          const redirectToDocuments = () => { window.location.href = nextUrl; };
           if (window.Swal) {
             Swal.fire({
               icon: 'success',
               title: 'Emergency coverage saved',
-              text: 'Great! Your onboarding is complete.',
-              confirmButtonText: 'Go to dashboard',
-            }).then(redirectToDashboard);
+              text: 'Next: upload your documents & compliance files.',
+              timer: 1500,
+              showConfirmButton: false,
+            }).then(redirectToDocuments);
           } else {
-            redirectToDashboard();
+            setTimeout(redirectToDocuments, 900);
           }
         }
       } else {
