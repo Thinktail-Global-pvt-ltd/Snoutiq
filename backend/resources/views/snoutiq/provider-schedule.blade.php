@@ -509,7 +509,8 @@
     const avgMins     = (avgConsultationMins && avgConsultationMins > 0)
       ? avgConsultationMins
       : DEFAULT_AVG_CONSULTATION_MINS;
-    const maxBph      = Number(el('#max_bph').value || 3);
+    const maxBphInput = el('#max_bph');
+    const maxBph      = Number((maxBphInput?.value || '').trim() || 3);
 
     const availability = [];
     let validationError = null;
