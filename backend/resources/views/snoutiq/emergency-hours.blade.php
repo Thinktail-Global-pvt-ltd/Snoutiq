@@ -79,12 +79,7 @@
           <p id="slotHint" class="text-xs text-rose-600 mt-1 hidden">Select at least one slot for the chosen doctor.</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label for="consultationPrice" class="block text-sm font-medium text-gray-700">Emergency consultation price (₹)</label>
-            <input type="number" min="0" step="50" id="consultationPrice" class="mt-1 w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" placeholder="1200">
-            <p id="priceHint" class="text-xs text-rose-600 mt-1 hidden">Enter a valid price.</p>
-          </div>
+        <div class="grid grid-cols-1 gap-4">
           <div class="text-xs text-gray-500 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg px-3 py-3">
             <div class="font-semibold text-indigo-800 mb-1">Tips for faster triage</div>
             <ul class="list-disc pl-4 space-y-1">
@@ -148,7 +143,7 @@
   const state = {
     doctorSlots: new Map(),  // doctorId -> Set of slots
     activeDoctor: null,      // Doctor currently being edited
-    price: null,
+    price: 0,
   };
 
   const el = (sel) => document.querySelector(sel);
@@ -311,9 +306,6 @@
 
     const activeDoctor = getActiveDoctor();
     const slotsForDoctor = activeDoctor ? Array.from(ensureDoctorSlotSet(activeDoctor.id)) : [];
-    const price = typeof state.price === 'number' && !Number.isNaN(state.price)
-      ? `₹${state.price.toFixed(0)}`
-      : 'Not set';
 
     preview.innerHTML = `
       <div>
@@ -323,10 +315,6 @@
       <div>
         <dt class="text-xs uppercase tracking-wide text-gray-500">Night slots</dt>
         <dd class="mt-0.5 text-gray-800">${slotsForDoctor.length ? fmtList(slotsForDoctor.map(escapeHtml)) : 'Not set'}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-gray-500">Consultation price</dt>
-        <dd class="mt-0.5 text-gray-800">${price}</dd>
       </div>
     `;
 
@@ -385,8 +373,8 @@
       hydrateFromData(data);
       if (data.consultation_price !== null && data.consultation_price !== undefined) {
         state.price = Number(data.consultation_price);
-        const input = el('#consultationPrice');
-        if (input) input.value = state.price;
+      } else {
+        state.price = 0;
       }
       renderDoctorDropdown();
       renderSlots();
@@ -412,17 +400,6 @@
       });
     }
 
-    const priceInput = el('#consultationPrice');
-    if (priceInput) {
-      priceInput.addEventListener('input', (e) => {
-        const value = Number(e.target.value);
-        if (!Number.isNaN(value)) {
-          state.price = value;
-          updatePreview();
-        }
-      });
-    }
-
     el('#btnSaveEmergency')?.addEventListener('click', saveEmergency);
   }
 
@@ -430,7 +407,6 @@
     let valid = true;
     const doctorHint = el('#doctorHint');
     const slotHint = el('#slotHint');
-    const priceHint = el('#priceHint');
 
     if (!state.activeDoctor) { doctorHint?.classList.remove('hidden'); valid = false; }
     else { doctorHint?.classList.add('hidden'); }
@@ -448,13 +424,6 @@
         slotHint.textContent = 'Select at least one slot for the chosen doctor.';
         slotHint.classList.add('hidden');
       }
-    }
-
-    if (typeof state.price !== 'number' || Number.isNaN(state.price) || state.price <= 0) {
-      priceHint?.classList.remove('hidden');
-      valid = false;
-    } else {
-      priceHint?.classList.add('hidden');
     }
 
     return valid;
@@ -482,6 +451,7 @@
       }));
       const doctorIds = doctorSchedules.map(s => s.doctor_id);
       const nightSlots = Array.from(new Set(doctorSchedules.flatMap(s => s.night_slots)));
+      const priceToSave = (typeof state.price === 'number' && !Number.isNaN(state.price)) ? state.price : 0;
 
       if (!doctorSchedules.length) {
         setStatus('Add at least one slot for the selected doctor.', false);
@@ -502,7 +472,7 @@
           doctor_ids: doctorIds,
           doctor_schedules: doctorSchedules,
           night_slots: nightSlots,
-          consultation_price: state.price,
+          consultation_price: priceToSave,
         }),
       });
       const text = await res.text();
@@ -515,8 +485,8 @@
           hydrateFromData(json.data);
           if (json.data.consultation_price !== undefined && json.data.consultation_price !== null) {
             state.price = Number(json.data.consultation_price);
-            const input = el('#consultationPrice');
-            if (input) input.value = state.price;
+          } else {
+            state.price = 0;
           }
           renderDoctorDropdown();
           renderSlots();
