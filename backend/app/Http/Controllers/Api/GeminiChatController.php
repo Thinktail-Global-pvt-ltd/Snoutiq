@@ -13,6 +13,8 @@ use App\Support\GeminiConfig;
 
 class GeminiChatController extends Controller
 {
+    // Hardcoded Gemini API key per request (bypasses env/config)
+    private const HARDCODED_GEMINI_API_KEY = 'AIzaSyBpPcK2nf7xMYhzn62HE66PE5vKumpQkO8';
     private const UNIFIED_SESSION_TTL_MIN = 1440; // 24h
 
     public function sendMessage(Request $request)
@@ -821,7 +823,7 @@ PROMPT;
 
     private function callGeminiApi_curl(string $prompt, int $attempt = 1): string
     {
-        $apiKey = GeminiConfig::apiKey();
+        $apiKey = self::HARDCODED_GEMINI_API_KEY;
         if (empty($apiKey)) {
             return "AI error: Gemini API key is not configured.";
         }

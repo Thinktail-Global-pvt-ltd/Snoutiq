@@ -956,16 +956,6 @@
   document.addEventListener('DOMContentLoaded', async ()=>{
     await fetchServices();
     attachActionListeners();
-    
-    try{
-      const url = new URL(location.href);
-      const openParam = (url.searchParams.get('open') || '').toLowerCase();
-      const addParam  = url.searchParams.get('add_service');
-      if (openParam === 'create' || addParam === '1') {
-        openCreate();
-      }
-      // Onboarding SweetAlert prompt removed to avoid blocking service creation flow.
-    } catch(_){}
   });
 
   // ===== Logger hotkey =====
