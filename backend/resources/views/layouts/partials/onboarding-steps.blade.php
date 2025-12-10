@@ -38,18 +38,9 @@
 
 <div class="mb-4">
   <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <span class="text-sm font-semibold text-gray-800">Clinic Setup</span>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">Step {{ $active }} of {{ $totalSteps }}</span>
-      </div>
-      <div class="flex items-center gap-2">
-        @if($backUrl)
-          <a href="{{ $backUrl }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-300 hover:bg-gray-50 text-gray-700">Back</a>
-        @endif
-        <a href="{{ $nextUrl }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white">{{ $active < $totalSteps ? 'Next' : 'Finish' }}</a>
-        <a href="{{ route('doctor.dashboard') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 hover:text-gray-700">Skip for now</a>
-      </div>
+    <div class="flex items-center gap-2 mb-3">
+      <span class="text-sm font-semibold text-gray-800">Clinic Setup</span>
+      <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">Step {{ $active }} of {{ $totalSteps }}</span>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
