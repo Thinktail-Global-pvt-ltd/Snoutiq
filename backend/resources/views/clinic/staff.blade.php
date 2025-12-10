@@ -100,7 +100,7 @@
           + Add Staff
         </button>
         <div class="text-xs text-gray-500">
-          Newly added staff are stored in the receptionist table.
+          Doctors are saved to the doctors table; receptionists go to the receptionist table.
         </div>
       </div>
     </div>

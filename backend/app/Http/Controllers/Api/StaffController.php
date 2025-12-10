@@ -8,6 +8,7 @@ use App\Models\Receptionist;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class StaffController extends Controller
@@ -170,13 +171,37 @@ class StaffController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'role' => ['nullable', 'string', Rule::in(self::EDITABLE_ROLES)],
         ]);
+        $role = $validated['role'] ?? 'receptionist';
+
+        // If the user chooses Doctor, save into doctors table; otherwise save to receptionist.
+        if ($role === 'doctor') {
+            $doctorData = [
+                'vet_registeration_id' => $clinicId,
+                'doctor_name' => $validated['name'],
+                'doctor_email' => $validated['email'] ?? null,
+                'doctor_mobile' => $validated['phone'] ?? null,
+            ];
+
+            // Only set staff_role if the column exists (older schemas may not have it)
+            if (Schema::hasColumn('doctors', 'staff_role')) {
+                $doctorData['staff_role'] = 'doctor';
+            }
+
+            $doctor = Doctor::create($doctorData);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Doctor added',
+                'data' => $doctor,
+            ], 201);
+        }
 
         $receptionist = Receptionist::create([
             'vet_registeration_id' => $clinicId,
             'name' => $validated['name'],
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
-            'role' => $validated['role'] ?? 'receptionist',
+            'role' => $role,
             'status' => 'active',
         ]);
 
