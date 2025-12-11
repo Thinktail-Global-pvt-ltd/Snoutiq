@@ -67,7 +67,7 @@
     .pm-left{min-height:640px}
     .pm-right{min-height:680px}
     .pm-searchRow{display:flex;gap:8px;align-items:center;margin-bottom:10px}
-    .pm-input{padding:10px;border-radius:10px;border:1px solid #eef6ff;width:100%;font-size:14px}
+    .pm-input{padding:10px;border-radius:10px;border:1px solid #eef6ff;width:100%;font-size:14px;background:#fff}
     .pm-select{max-width:190px}
     .pm-tagsRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
     .pm-tagWrap{display:flex;gap:6px;flex-wrap:wrap}
@@ -106,7 +106,7 @@
     .pm-alert{background:#fff1f2;border:1px solid #fecdd3;color:#b91c1c;padding:12px;border-radius:12px;margin:10px 0;font-size:14px}
     .pm-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
     .pm-overlay.is-visible{display:flex}
-    .pm-modal{width:760px;max-width:100%;background:var(--pm-panel);border-radius:12px;padding:16px;box-shadow:0 18px 48px rgba(2,6,23,0.12);max-height:88vh;overflow:auto}
+    .pm-modal{width:760px;max-width:100%;background:#fff!important;border-radius:12px;padding:16px;box-shadow:0 18px 48px rgba(2,6,23,0.12);max-height:88vh;overflow:auto;opacity:1}
     .pm-formRow{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
     .pm-formField{flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px}
     .pm-input.textarea{height:120px}
