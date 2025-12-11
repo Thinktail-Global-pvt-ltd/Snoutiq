@@ -827,6 +827,7 @@ Route::post('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleCont
 
 // Clinics
 Route::get('/clinics', [\App\Http\Controllers\Api\ClinicsController::class, 'index']);
+Route::get('/clinics/services', [ClinicsController::class, 'servicesByClinicId']);
 Route::get('/clinics/{id}/services', [ClinicsController::class, 'services']);
 Route::get('/clinics/{id}/doctors', [ClinicsController::class, 'doctors']);
 Route::get('/clinics/{id}/patients', [ClinicsController::class, 'patients']);

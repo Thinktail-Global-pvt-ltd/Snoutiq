@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ClinicsController extends Controller
 {
@@ -71,6 +73,78 @@ class ClinicsController extends Controller
             'doctors' => $doctors,
             'availability' => $availability,
         ]);
+    }
+
+    // GET /api/clinics/{id}/services
+    public function services(Request $request, string $id)
+    {
+        $clinicId = (int) $id;
+
+        $clinic = DB::table('vet_registerations_temp')
+            ->select('id', DB::raw('COALESCE(name, slug, CONCAT("Clinic #", id)) as name'), 'slug', 'address')
+            ->where('id', $clinicId)
+            ->first();
+
+        if (!$clinic) {
+            return response()->json(['success' => false, 'error' => 'Clinic not found'], 404);
+        }
+
+        $columns = [
+            'id',
+            'name',
+            'description',
+            'pet_type',
+            'price',
+            'duration',
+            'status',
+            'service_pic',
+        ];
+
+        if (Schema::hasColumn('groomer_services', 'main_service')) {
+            $columns[] = 'main_service';
+        }
+        if (Schema::hasColumn('groomer_services', 'groomer_service_category_id')) {
+            $columns[] = 'groomer_service_category_id as category_id';
+        }
+
+        $servicesQuery = DB::table('groomer_services')
+            ->where('user_id', $clinicId)
+            ->select($columns)
+            ->orderBy('name');
+
+        if ($status = $request->query('status')) {
+            $servicesQuery->where('status', $status);
+        }
+
+        $services = $servicesQuery->get();
+
+        return response()->json([
+            'clinic'   => $clinic,
+            'services' => $services,
+        ]);
+    }
+
+    // GET /api/clinics/services?clinic_id=123
+    public function servicesByClinicId(Request $request)
+    {
+        $clinicId = (int) $request->query('clinic_id', 0);
+        if ($clinicId <= 0) {
+            $slug = strtolower(trim((string) $request->query('vet_slug', $request->query('clinic_slug', ''))));
+            if ($slug !== '') {
+                $clinicId = (int) DB::table('vet_registerations_temp')
+                    ->whereRaw('LOWER(slug) = ?', [$slug])
+                    ->value('id');
+            }
+        }
+
+        if ($clinicId <= 0) {
+            return response()->json([
+                'success' => false,
+                'error' => 'clinic_id is required',
+            ], 422);
+        }
+
+        return $this->services($request, (string) $clinicId);
     }
 
     // GET /api/clinics/{id}/patients
