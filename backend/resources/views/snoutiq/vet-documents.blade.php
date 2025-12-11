@@ -262,7 +262,7 @@
   })();
 
   document.addEventListener('DOMContentLoaded', () => {
-    const FINISH_URL = @json(route('dashboard.profile'));
+    const FINISH_URL = @json(route('dashboard.vet-home'));
     const HAS_LICENSE_NO = @json(trim((string) ($clinic->license_no ?? '')) !== '');
     const HAS_LICENSE_DOC = @json(!empty($clinic?->license_document));
     const setFileName = (input, display) => {

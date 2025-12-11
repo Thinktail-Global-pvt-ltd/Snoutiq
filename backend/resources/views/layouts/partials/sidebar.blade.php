@@ -317,6 +317,13 @@
           {{ $showPetMenu ? 'Clinic Menu' : 'Menu' }}
         </div>
 
+        <a href="{{ route('dashboard.vet-home') }}" class="{{ $baseItem }} {{ $active('dashboard.vet-home') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-7 9 7v7a2 2 0 01-2 2h-4a2 2 0 01-2-2v-4H9v4a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+          </svg>
+          <span class="truncate">Dashboard</span>
+        </a>
+
         <a href="{{ route('dashboard.profile') }}" class="{{ $baseItem }} {{ $active('dashboard.profile') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
           <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A4 4 0 018 16h8a4 4 0 012.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>

@@ -38,6 +38,7 @@ use App\Http\Controllers\QrTrackingController;
 use App\Http\Controllers\PushSchedulerController;
 use App\Http\Controllers\S3RecordingController;
 use App\Http\Controllers\MarketingNotificationController;
+use App\Http\Controllers\Dev\NotificationPlaygroundController;
 use App\Models\LegacyQrRedirect;
 use App\Services\OnboardingProgressService;
 
@@ -104,6 +105,9 @@ Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
 Route::view('/dev/fcm-test', 'fcm.test')->name('dev.fcm-test');
 Route::get('/dev/fcm-monitor', [FcmMonitorController::class, 'index'])->name('dev.fcm-monitor');
 Route::get('/dev/fcm-monitor/status', [FcmMonitorController::class, 'status'])->name('dev.fcm-monitor.status');
+Route::get('/dev/notify', [NotificationPlaygroundController::class, 'index'])->name('dev.notify');
+Route::post('/dev/notify', [NotificationPlaygroundController::class, 'send'])->name('dev.notify.send');
+Route::get('/dev/notify/next', [NotificationPlaygroundController::class, 'nextAppointment'])->name('dev.notify.next');
 Route::get('/dev/api-documentation', function () {
     $docPath = resource_path('docs/api_documentation.md');
 
@@ -316,6 +320,8 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     Route::get('/profile', function () {
         return view('dashboard.profile');
     })->name('dashboard.profile');
+
+    Route::get('/dashboard/clinic-home', \App\Http\Controllers\VetDashboardController::class)->name('dashboard.vet-home');
 
     // Dashboards
     Route::get('/doctor', function () {

@@ -1,612 +1,931 @@
-﻿{{-- resources/views/doctor/bookings.blade.php --}}
 @extends('layouts.snoutiq-dashboard')
 
-@section('title','My Bookings')
-@section('page_title','My Bookings')
+@section('title','Appointments')
+@section('page_title','Appointments')
+
+@php
+  $sessionClinicId = session('clinic_id')
+    ?? session('vet_registerations_temp_id')
+    ?? session('vet_registeration_id')
+    ?? session('vet_id')
+    ?? data_get(session('user'), 'clinic_id')
+    ?? data_get(session('auth_full'), 'clinic_id')
+    ?? data_get(session('auth_full'), 'user.clinic_id')
+    ?? data_get(session('doctor'), 'vet_registeration_id')
+    ?? optional(auth()->user())->clinic_id
+    ?? optional(auth()->user())->vet_registeration_id;
+@endphp
+
 @section('head')
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
-    #calendar {
-      border-radius: 1.25rem;
-      background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-      padding: 1.25rem;
-      box-shadow: inset 0 1px 0 rgba(15, 23, 42, 0.04);
+    #appointmentsShell {
+      --bg:#f5f7fb; --panel:#ffffff; --muted:#6b7280;
+      --blue:#2563eb; --blue-100:#e6f0ff; --purple:#7c3aed; --purple-100:#f2eefe;
+      --green:#10b981; --green-100:#e6fff2; --orange:#f97316; --red:#ef4444;
+      --radius:12px; --shadow:0 8px 30px rgba(10,20,40,0.06);
+      font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: var(--bg);
+      color: #0b1220;
+      padding: 8px;
+      border-radius: 16px;
     }
-    #calendar .weekday-row {
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+    #appointmentsShell .appt-container{max-width:1180px;margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:18px}
+    #appointmentsShell .header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    #appointmentsShell .title{font-size:28px;font-weight:700;color:var(--blue)}
+    #appointmentsShell .subtitle{color:var(--muted);font-size:13px;margin-top:6px}
+    #appointmentsShell .header-right{display:flex;align-items:center;gap:10px}
+    #appointmentsShell .doctorChip{background:var(--panel);padding:8px 12px;border-radius:999px;box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;font-weight:700}
+    #appointmentsShell .btn{padding:9px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+    #appointmentsShell .btn-ghost{background:var(--panel);border:1px solid #eef6ff;color:var(--muted)}
+    #appointmentsShell .btn-primary{background:linear-gradient(90deg,var(--blue),var(--purple));color:white;box-shadow:var(--shadow)}
+    #appointmentsShell .small{font-size:13px;color:var(--muted)}
+    #appointmentsShell .filterBar{background:var(--panel);padding:12px;border-radius:12px;box-shadow:var(--shadow);overflow:hidden;transition:max-height .3s ease}
+    #appointmentsShell .filterToggle{display:flex;gap:8px;align-items:center;cursor:pointer}
+    #appointmentsShell .filterRow{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center}
+    #appointmentsShell .pill{padding:8px 14px;border-radius:999px;background:#fff;border:1px solid #eef3ff;color:var(--muted);cursor:pointer;font-weight:700}
+    #appointmentsShell .pill.active{background:var(--blue);color:#fff;border-color:transparent}
+    #appointmentsShell .pill.tele.active{background:var(--purple)}
+    #appointmentsShell .select,#appointmentsShell .search{padding:8px 12px;border-radius:10px;border:1px solid #eef6ff}
+    #appointmentsShell .search{min-width:240px}
+    #appointmentsShell .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    #appointmentsShell .kpi{background:var(--panel);padding:14px;border-radius:10px;box-shadow:var(--shadow)}
+    #appointmentsShell .kpi .num{font-weight:800;font-size:18px}
+    #appointmentsShell .kpi .label{color:var(--muted);font-size:13px;margin-top:6px}
+    #appointmentsShell .calendar{background:var(--panel);padding:14px;border-radius:12px;box-shadow:var(--shadow)}
+    #appointmentsShell .cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    #appointmentsShell .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
+    #appointmentsShell .weekday{font-size:12px;color:var(--muted);text-align:center}
+    #appointmentsShell .day{height:88px;border-radius:10px;display:flex;flex-direction:column;align-items:center;padding:8px;position:relative;cursor:pointer}
+    #appointmentsShell .day .num{font-weight:700}
+    #appointmentsShell .day .dots{display:flex;gap:4px;position:absolute;bottom:8px}
+    #appointmentsShell .dot{width:8px;height:8px;border-radius:50%}
+    #appointmentsShell .dot.in-clinic{background:var(--blue)}
+    #appointmentsShell .dot.telemedicine{background:var(--purple)}
+    #appointmentsShell .dot.walk-in{background:var(--green)}
+    #appointmentsShell .dot.follow-up{background:var(--orange)}
+    #appointmentsShell .day.today{background:linear-gradient(180deg,#eef6ff,#fff);box-shadow:0 8px 26px rgba(37,99,235,0.06)}
+    #appointmentsShell .day.selected{outline:3px solid rgba(37,99,235,0.08)}
+    #appointmentsShell .main{display:flex;flex-direction:column;gap:12px}
+    #appointmentsShell .tabs{display:flex;gap:8px;align-items:center;justify-content:space-between}
+    #appointmentsShell .tabButtons{display:flex;gap:8px}
+    #appointmentsShell .tabBtn{padding:8px 12px;border-radius:999px;border:1px solid #eef6ff;background:#fff;cursor:pointer;font-weight:700}
+    #appointmentsShell .tabBtn.active{background:linear-gradient(90deg,var(--blue),var(--purple));color:#fff;box-shadow:var(--shadow)}
+    #appointmentsShell .timelineCard{background:var(--panel);padding:14px;border-radius:12px;box-shadow:var(--shadow);min-height:360px;display:flex;flex-direction:column}
+    #appointmentsShell .timelineWrap{display:flex;gap:12px;flex:1;min-height:260px;position:relative}
+    #appointmentsShell .leftTimes{width:72px;display:flex;flex-direction:column;gap:4px;padding-top:4px}
+    #appointmentsShell .timeRow{height:40px;color:var(--muted);text-align:right;padding-right:8px;font-size:13px}
+    #appointmentsShell .rightArea{flex:1;position:relative;padding-left:8px;border-left:1px dashed #eef6ff}
+    #appointmentsShell .appt{position:absolute;left:8px;right:8px;border-radius:10px;padding:10px;color:#062b4b;font-weight:700;box-shadow:0 10px 26px rgba(2,6,23,0.06);cursor:pointer;overflow:hidden;background:linear-gradient(90deg,var(--blue-100),#fff);border-left:6px solid var(--blue)}
+    #appointmentsShell .appt .meta{display:flex;justify-content:space-between;align-items:center}
+    #appointmentsShell .appt .sub{font-size:13px;color:#234;opacity:0.95;margin-top:6px;font-weight:600}
+    #appointmentsShell .appt.telemedicine{background:linear-gradient(90deg,var(--purple-100),#fff);border-left:6px solid var(--purple)}
+    #appointmentsShell .appt.walk-in{background:linear-gradient(90deg,var(--green-100),#fff);border-left:6px solid var(--green)}
+    #appointmentsShell .appt.follow,#appointmentsShell .appt.follow-up{background:linear-gradient(90deg,#fff3eb,#fff);border-left:6px solid var(--orange)}
+    #appointmentsShell .appt.conflict{box-shadow:0 0 0 4px rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.14)}
+    #appointmentsShell .joinBtn{padding:6px 10px;border-radius:8px;border:0;background:linear-gradient(90deg,var(--blue),var(--purple));color:white;cursor:pointer;font-size:12px;font-weight:700}
+    #appointmentsShell .slotCard{background:var(--panel);padding:12px;border-radius:12px;box-shadow:var(--shadow)}
+    #appointmentsShell .docGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+    #appointmentsShell .col{background:#fafcff;border-radius:10px;padding:10px;min-height:300px}
+    #appointmentsShell .docName{font-weight:800;margin-bottom:10px}
+    #appointmentsShell .slot{height:56px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;margin-bottom:8px;cursor:pointer}
+    #appointmentsShell .slot.free{background:#eef6ff;color:var(--blue)}
+    #appointmentsShell .slot.booked{background:var(--blue)}
+    #appointmentsShell .slot.tele{background:var(--purple)}
+    #appointmentsShell .slot.break{background:var(--orange)}
+    #appointmentsShell .slot.unavail{background:#f2f4f8;color:var(--muted);font-weight:700}
+    #appointmentsShell .overlay{position:fixed;inset:0;background:rgba(10,12,16,0.45);display:none;align-items:center;justify-content:center;z-index:999}
+    #appointmentsShell .modal{width:920px;background:var(--panel);border-radius:12px;padding:16px;box-shadow:0 18px 48px rgba(2,6,23,0.12);max-height:88vh;overflow:auto}
+    #appointmentsShell .steps{display:flex;gap:8px;margin-bottom:12px}
+    #appointmentsShell .step{flex:1;padding:10px;border-radius:8px;background:#f8fbff;text-align:center;font-weight:700}
+    #appointmentsShell .formRow{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+    #appointmentsShell .input{width:100%;padding:10px;border-radius:8px;border:1px solid #eef6ff}
+    #appointmentsShell .tooltip{position:fixed;padding:8px 10px;background:#0b1220;color:white;border-radius:8px;font-size:13px;pointer-events:none;z-index:1600;display:none}
+    #appointmentsShell .patientPanel{position:fixed;right:0;top:0;bottom:0;width:420px;background:var(--panel);box-shadow:-10px 0 40px rgba(2,6,23,0.12);transform:translateX(100%);transition:transform .28s;z-index:1200;overflow:auto}
+    #appointmentsShell .patientPanel.open{transform:translateX(0)}
+    #appointmentsShell .patientHead{padding:16px;background:linear-gradient(90deg,var(--blue),var(--purple));color:white}
+    #appointmentsShell .teleModal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--panel);padding:16px;border-radius:12px;box-shadow:var(--shadow);display:none;z-index:2000}
+    @media(max-width:980px){
+      #appointmentsShell .docGrid{grid-template-columns:repeat(2,1fr)}
+      #appointmentsShell .docGrid .col{min-height:220px}
     }
-    .calendar-cell {
-      min-height: 180px;
-      border-radius: 1.25rem;
-      border: 1px solid rgba(15,23,42,0.05);
-      background: #fff;
-      padding: 0.85rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
-      box-shadow: 0 12px 24px rgba(15,23,42,0.05);
-      transition: border-color .2s ease, box-shadow .2s ease;
-    }
-    .calendar-cell--muted {
-      background: #f8fafc;
-      border-style: dashed;
-      border-color: rgba(148,163,184,0.35);
-      box-shadow: none;
-    }
-    .calendar-cell__header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.75rem;
-      color: #475569;
-    }
-    .calendar-cell__date {
-      font-size: 1rem;
-      font-weight: 600;
-      color: #0f172a;
-    }
-    .calendar-cell--muted .calendar-cell__date {
-      color: #94a3b8;
-    }
-    .calendar-cell__count {
-      font-weight: 600;
-      text-transform: uppercase;
-      font-size: 0.65rem;
-      letter-spacing: 0.08em;
-    }
-    .calendar-cell__notes {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      flex: 1;
-    }
-    .calendar-note {
-      position: relative;
-      display: block;
-      width: 100%;
-      text-align: left;
-      border-radius: 1rem;
-      padding: 0.55rem 0.75rem 0.75rem;
-      background: linear-gradient(135deg, var(--note-start, #fef9c3), var(--note-end, #fde68a));
-      box-shadow: 0 12px 18px var(--note-shadow, rgba(120,72,0,0.2));
-      border: 1px solid rgba(15,23,42,0.05);
-      transform: rotate(var(--note-tilt, 0deg));
-      transition: transform .2s ease, box-shadow .2s ease;
-      cursor: pointer;
-    }
-    .calendar-note::after {
-      content: '';
-      position: absolute;
-      width: 22px;
-      height: 22px;
-      background: rgba(255,255,255,0.45);
-      top: 10px;
-      right: 18px;
-      border-radius: 3px;
-      transform: rotate(45deg);
-      opacity: 0.7;
-    }
-    .calendar-note:hover {
-      transform: rotate(var(--note-tilt, 0deg)) translateY(-3px);
-      box-shadow: 0 16px 28px rgba(15,23,42,0.18);
-    }
-    .calendar-note__time {
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: rgba(15,23,42,0.6);
-    }
-    .calendar-note__title {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #0f172a;
-      margin-top: 0.15rem;
-    }
-    .calendar-note__pet {
-      font-size: 0.8rem;
-      color: #475569;
-    }
-    .calendar-note__summary {
-      font-size: 0.75rem;
-      color: #334155;
-      margin-top: 0.15rem;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .calendar-note__meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.35rem;
-      margin-top: 0.45rem;
-      font-size: 0.7rem;
-    }
-    .calendar-note__service {
-      font-weight: 600;
-      text-transform: capitalize;
-      color: rgba(15,23,42,0.75);
-    }
-    .status-pill {
-      padding: 0.05rem 0.5rem;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      font-weight: 600;
-      font-size: 0.65rem;
-      text-transform: capitalize;
-    }
-    .status-pill--success {
-      background: rgba(16,185,129,0.15);
-      color: #047857;
-      border-color: rgba(16,185,129,0.35);
-    }
-    .status-pill--info {
-      background: rgba(59,130,246,0.1);
-      color: #1d4ed8;
-      border-color: rgba(59,130,246,0.3);
-    }
-    .status-pill--pending {
-      background: rgba(250,204,21,0.18);
-      color: #92400e;
-      border-color: rgba(245,158,11,0.4);
-    }
-    .status-pill--danger {
-      background: rgba(248,113,113,0.15);
-      color: #b91c1c;
-      border-color: rgba(248,113,113,0.4);
-    }
-    .status-pill--warning {
-      background: rgba(251,191,36,0.18);
-      color: #b45309;
-      border-color: rgba(251,191,36,0.4);
-    }
-    @media (max-width: 1023px) {
-      #calendar {
-        overflow-x: auto;
-      }
-      #calRows {
-        min-width: 900px;
-      }
+    @media(max-width:640px){
+      #appointmentsShell .kpis{grid-template-columns:repeat(2,1fr)}
+      #appointmentsShell .docGrid{grid-template-columns:repeat(1,1fr)}
     }
   </style>
 @endsection
+
 @section('content')
-  @php
-    $debug = request()->query('debug') === '1';
-    // Restrict doctors list to the logged-in vet (session user)
-    // Fall back to existing clinic session keys if needed
-    $sessionRole = session('role')
-        ?? data_get(session('auth_full'), 'role')
-        ?? data_get(session('user'), 'role');
+<div id="appointmentsShell">
+  <div class="appt-container">
 
-    $clinicCandidates = [
-        session('clinic_id'),
-        session('vet_registerations_temp_id'),
-        session('vet_registeration_id'),
-        session('vet_id'),
-        data_get(session('user'), 'clinic_id'),
-        data_get(session('user'), 'vet_registeration_id'),
-        data_get(session('auth_full'), 'clinic_id'),
-        data_get(session('auth_full'), 'user.clinic_id'),
-        data_get(session('auth_full'), 'user.vet_registeration_id'),
-    ];
+    <div class="header">
+      <div>
+        <div class="title">Appointments</div>
+        <div class="subtitle">Manage telemedicine, online bookings & walk-ins — demo (clinic-wide)</div>
+      </div>
 
-    if ($sessionRole !== 'doctor') {
-        array_unshift(
-            $clinicCandidates,
-            session('user_id'),
-            data_get(session('user'), 'id')
-        );
-    }
-
-    $resolvedClinicId = null;
-    foreach ($clinicCandidates as $candidate) {
-        if ($candidate === null || $candidate === '') {
-            continue;
-        }
-        $num = (int) $candidate;
-        if ($num > 0) {
-            $resolvedClinicId = $num;
-            break;
-        }
-    }
-
-    $resolvedClinic = $resolvedClinicId ? \App\Models\VetRegisterationTemp::find($resolvedClinicId) : null;
-    $resolvedDoctorId = session('doctor_id')
-        ?? data_get(session('auth_full'), 'doctor_id')
-        ?? data_get(session('auth_full'), 'user.doctor_id')
-        ?? data_get(session('user'), 'doctor_id')
-        ?? ($sessionRole === 'doctor' ? (session('user_id') ?? data_get(session('user'), 'id')) : null);
-  @endphp
-  <div class="max-w-5xl mx-auto bg-white rounded-xl shadow p-4">
-    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1">
-        <div id="rowDoctorId" style="{{ $debug ? '' : 'display:none' }}">
-          <label class="block text-sm font-medium text-gray-700">Doctor ID</label>
-          <input id="doctor_id" type="number" class="mt-1 w-full rounded border-gray-300" placeholder="e.g. 1">
+      <div class="header-right">
+        <div class="doctorChip" title="Showing all clinic doctors">
+          Doctors: <strong style="margin-left:6px">All doctors ▾</strong>
         </div>
-        <div class="md:col-span-{{ $debug ? '1' : '2' }}">
-          <label class="block text-sm font-medium text-gray-700">Doctor</label>
-          <select id="doctor_select" class="mt-1 w-full rounded border-gray-300">
-            <option value="">-- Select Doctor --</option>
-          </select>
-          <div id="doctor_meta" class="text-xs text-gray-500 mt-1">Select a doctor to view their bookings.</div>
+        <button class="btn btn-ghost" id="exportBtn">Export CSV</button>
+        <button class="btn btn-ghost" id="printBtn">Print</button>
+        <button class="btn btn-primary" id="openCreateBtn">+ Create Appointment</button>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpiRow">
+      <div class="kpi"><div class="num" id="k1">1,248</div><div class="label">Locked-in Pet Parents</div></div>
+      <div class="kpi"><div class="num" id="k2">44%</div><div class="label">Repeat Rate (30d)</div></div>
+      <div class="kpi"><div class="num" id="k3">₹42,500</div><div class="label">Telemed Revenue (30d)</div></div>
+      <div class="kpi"><div class="num" id="k4">72%</div><div class="label">Clinic Utilization Today</div></div>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="filterToggle" id="filterToggle" aria-expanded="false" style="cursor:pointer">
+        <div class="pill" style="padding:8px 12px">Filters ▾</div>
+        <div class="small">Click to expand filters</div>
+      </div>
+    </div>
+
+    <div class="filterBar" id="filterBar" style="max-height:0;padding-top:0;padding-bottom:0;">
+      <div class="filterRow" style="margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="small">Type</div>
+          <div>
+            <span class="pill active" data-type="all">All</span>
+            <span class="pill" data-type="in-clinic">In-Clinic</span>
+            <span class="pill tele" data-type="telemedicine">Telemedicine</span>
+            <span class="pill walk" data-type="walk-in">Walk-in</span>
+            <span class="pill follow" data-type="follow-up">Follow-up</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="small">Status</div>
+          <div>
+            <span class="pill" data-status="upcoming">Upcoming</span>
+            <span class="pill" data-status="completed">Completed</span>
+            <span class="pill" data-status="cancelled">Cancelled</span>
+            <span class="pill" data-status="waiting">Waiting</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="small">Doctor</div>
+          <select id="doctorFilter" class="select"><option value="">All doctors</option></select>
+        </div>
+
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <div>
+            <button class="pill active" data-date="0">Today</button>
+            <button class="pill" data-date="1">Tomorrow</button>
+            <button class="pill" data-date="7">This week</button>
+          </div>
+          <input id="datePicker" class="select" type="date"/>
+          <input id="searchInput" class="search" placeholder="Search pet, owner, phone..." />
+        </div>
+      </div>
+    </div>
+
+    <div class="calendar">
+      <div class="cal-head">
+        <div>
+          <div style="font-weight:800" id="monthLabel">December 2025</div>
+          <div class="small">Click a day to populate timeline & slot grid</div>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700">Since</label>
-          <input id="since" type="date" value="{{ date('Y-m-d') }}" class="mt-1 w-full rounded border-gray-300">
-        </div>
-        <div class="flex items-end">
-          <button id="btnLoad" class="px-4 py-2 rounded bg-indigo-600 text-white">Load</button>
+          <button class="btn btn-ghost" id="prevMonth">◀</button>
+          <button class="btn btn-ghost" id="nextMonth">▶</button>
         </div>
       </div>
-      <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 text-xs text-indigo-700 md:max-w-xs">
-        @if($resolvedClinic)
-          <div class="font-semibold text-indigo-900">Clinic</div>
-          <div>{{ $resolvedClinic->name ?? 'Clinic' }} <span class="text-indigo-500">·</span> <span class="font-mono">#{{ $resolvedClinicId }}</span></div>
-          <div class="mt-1">Doctors shown below belong to this clinic.</div>
-        @elseif($resolvedClinicId)
-          <div class="font-semibold text-indigo-900">Clinic ID</div>
-          <div class="font-mono">#{{ $resolvedClinicId }}</div>
-          <div class="mt-1">Doctors shown below belong to this clinic.</div>
-        @else
-          <div class="font-semibold text-amber-700">Clinic not detected</div>
-          <div class="text-amber-600">Sign in as a clinic to load its doctors.</div>
-        @endif
+
+      <div class="cal-grid">
+        <div class="weekday">Sun</div><div class="weekday">Mon</div><div class="weekday">Tue</div><div class="weekday">Wed</div><div class="weekday">Thu</div><div class="weekday">Fri</div><div class="weekday">Sat</div>
+      </div>
+
+      <div class="cal-grid" id="calendarDays" style="margin-top:12px"></div>
+    </div>
+
+    <div class="main">
+      <div class="tabs">
+        <div class="tabButtons">
+          <button class="tabBtn active" id="tabTimeline">Timeline</button>
+          <button class="tabBtn" id="tabGrid">Slot Grid</button>
+        </div>
+      </div>
+
+      <div class="timelineCard" id="timelineCard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:800" id="timelineTitle">Today's Schedule</div>
+          <div class="small" id="timelineSub">Click an appointment to view pet details</div>
+        </div>
+
+        <div class="timelineWrap" id="timelineWrap">
+          <div class="leftTimes" id="leftTimes"></div>
+          <div class="rightArea" id="rightArea"></div>
+        </div>
+      </div>
+
+      <div class="slotCard" id="slotCard" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:800">Slot Grid</div>
+          <div class="small">Columns show each doctor (click a free tile to book)</div>
+        </div>
+        <div class="docGrid" id="docGrid"></div>
       </div>
     </div>
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-      <div class="md:col-span-4 flex items-center justify-between">
-        <div id="doctor_badge" class="text-sm text-gray-600">No doctor selected.</div>
-        <div class="text-xs text-gray-500">Clinic ID: <span id="clinic_badge">{{ $resolvedClinicId ? '#'.$resolvedClinicId : '—' }}</span></div>
-      </div>
-    </div>
-    <div id="calendar" class="mb-4">
-      <div class="weekday-row grid grid-cols-7 text-xs font-semibold text-gray-600 mb-3">
-        <div class="p-2">Sun</div><div class="p-2">Mon</div><div class="p-2">Tue</div><div class="p-2">Wed</div><div class="p-2">Thu</div><div class="p-2">Fri</div><div class="p-2">Sat</div>
-      </div>
-      <div id="calRows" class="grid grid-cols-7 gap-3"></div>
-    </div>
-    <div id="list" class="divide-y hidden"></div>
   </div>
+
+  <div class="overlay" id="modalOverlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div><div style="font-weight:800" id="modalTitle">Create Appointment</div><div class="small">Clinic flow — owner → pet → details</div></div>
+        <div><button class="btn btn-ghost" id="closeModal">Close</button></div>
+      </div>
+
+      <div class="steps">
+        <div class="step" id="st1">1 — Owner</div>
+        <div class="step" id="st2">2 — Pet</div>
+        <div class="step" id="st3">3 — Details</div>
+      </div>
+
+      <div id="step1">
+        <div class="formRow">
+          <div style="flex:1">
+            <label class="small">Phone or name</label>
+            <input id="ownerSearch" class="input" placeholder="+91 98xxxx or John" />
+            <div id="ownerResults" class="small" style="margin-top:8px"></div>
+          </div>
+          <div style="width:200px">
+            <label class="small">Quick</label>
+            <button class="btn btn-ghost" id="addOwner">+ Add owner</button>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" id="toPet">Next</button></div>
+      </div>
+
+      <div id="step2" style="display:none">
+        <div class="formRow">
+          <div style="flex:1">
+            <label class="small">Select Pet</label>
+            <div id="petCards" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px"></div>
+          </div>
+          <div style="width:260px">
+            <label class="small">Add quick pet</label>
+            <input id="quickName" class="input" placeholder="Pet name" style="margin-bottom:8px"/>
+            <input id="quickBreed" class="input" placeholder="Breed" style="margin-bottom:8px"/>
+            <button class="btn btn-ghost" id="addPet">Add Pet</button>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between"><button class="btn btn-ghost" id="backTo1">Back</button><button class="btn btn-primary" id="toDetails">Next</button></div>
+      </div>
+
+      <div id="step3" style="display:none">
+        <div class="formRow">
+          <div style="flex:1">
+            <label class="small">Type</label>
+            <select id="typeSelect" class="input"><option value="in-clinic">In-Clinic</option><option value="telemedicine">Telemedicine</option><option value="walk-in">Walk-in</option><option value="follow-up">Follow-up</option></select>
+          </div>
+          <div style="flex:1">
+            <label class="small">Reason</label>
+            <select id="reasonSelect" class="input"><option>Annual Checkup</option><option>Vaccination</option><option>Skin Issue</option><option>Dental</option><option>Emergency</option></select>
+          </div>
+        </div>
+
+        <div class="formRow">
+          <div style="flex:1">
+            <label class="small">Doctor</label>
+            <select id="modalDoctor" class="input"></select>
+            <div style="margin-top:10px">
+              <label class="small">Pick a slot</label>
+              <div id="modalSlots" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+            </div>
+          </div>
+          <div style="width:320px">
+            <div class="small">Fee Estimate</div>
+            <div style="margin-top:8px;background:#fbfbff;padding:12px;border-radius:8px;border:1px solid #eef6ff">Consult ₹800<br><strong>Total ₹800</strong></div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between">
+          <button class="btn btn-ghost" id="backTo2">Back</button>
+          <button class="btn btn-primary" id="createApptBtn">Create Appointment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <div class="patientPanel" id="patientPanel">
+    <div class="patientHead">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div style="width:52px;height:52px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px">🐶</div>
+          <div>
+            <div id="pName" style="font-weight:800">Pet</div>
+            <div class="small" id="pBrief">Breed • age</div>
+          </div>
+        </div>
+        <div><button class="btn btn-ghost" id="closePatient">Close</button></div>
+      </div>
+    </div>
+    <div style="padding:12px">
+      <div><strong>Owner</strong><div class="small" id="pOwner">Owner — phone</div></div>
+      <div style="margin-top:12px"><strong>Last visits</strong><div class="small" id="pVisits">—</div></div>
+      <div style="margin-top:12px"><strong>Actions</strong><div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary" id="startTele">Start Tele</button><button class="btn btn-ghost" id="reschedBtn">Reschedule</button></div></div>
+    </div>
+  </div>
+
+  <div class="teleModal" id="teleModal"><div id="teleContent">Tele call simulation</div></div>
+
+  <div class="patientPanel" id="dayPanel">
+    <div class="patientHead">
+      <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+        <div>
+          <div id="dayTitle" style="font-weight:800">Appointments</div>
+          <div class="small">Pet parents for the selected day</div>
+        </div>
+        <div><button class="btn btn-ghost" id="closeDayPanel">Close</button></div>
+      </div>
+    </div>
+    <div style="padding:12px" id="dayList"></div>
+  </div>
+</div>
 @endsection
 
 @section('scripts')
 <script>
-  // ---------- Smart base detection (localhost & production, with/without /backend) ----------
-  const ORIGIN          = window.location.origin;                 // http://127.0.0.1:8000, https://snoutiq.com
-  const PATHNAME        = window.location.pathname;               // current path
-  const ON_BACKEND_PATH = PATHNAME.startsWith('/backend');
-  const IS_LOCAL        = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
-
-  // Prefix internal page links when app is served under /backend
-  const appBasePath = ON_BACKEND_PATH ? '/backend' : '';
-
-  // API base:
-  // - Local:      {origin}/api
-  // - Production: {origin}/backend/api
+(() => {
+  const query = new URLSearchParams(window.location.search);
+  const qsClinic = query.get('clinic_id') || query.get('vet_id') || query.get('clinicId') || query.get('vetId');
+  const storedAuth = (()=>{ try { return JSON.parse(localStorage.getItem('auth_full') || sessionStorage.getItem('auth_full') || '{}'); } catch(e){ return {}; }})();
+  const storedClinic = storedAuth?.user?.vet_registeration_id || storedAuth?.user?.clinic_id || storedAuth?.clinic_id;
+  const CLINIC_ID = Number(qsClinic || @json($sessionClinicId ?? null) || storedClinic || '') || null;
+  const clinicConfig = {
+    clinicId: CLINIC_ID || "clinic_001",
+    timezone: "Asia/Kolkata",
+    workingHours: {start:"08:00", end:"20:00"},
+    slotDurationMinutes: 30,
+    telemedEnabled: true,
+    commissionPercent: 25
+  };
+  const ORIGIN = window.location.origin;
+  const IS_LOCAL = /(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(window.location.hostname);
   const apiBase = IS_LOCAL ? `${ORIGIN}/api` : `${ORIGIN}/backend/api`;
-  // ------------------------------------------------------------------------------------------
+  const endpoints = {
+    doctors: (clinicId) => clinicId ? `${apiBase}/doctors?vet_id=${clinicId}` : `${apiBase}/doctors`,
+    appointmentsByDoctor: (doctorId) => `${apiBase}/appointments/by-doctor/${doctorId}`,
+  };
+  const qsDoctor = query.get('doctor_id') || query.get('doctorId');
 
-  // tiny fetch helper (same as other pages)
-  async function api(url){
-    const res  = await fetch(url, { headers: { 'Accept': 'application/json' }});
-    const text = await res.text();
-    let j = null; try { j = JSON.parse(text.replace(/^\uFEFF/, '')); } catch {}
-    return { ok: res.ok, status: res.status, json: j, raw: text };
-  }
-
-  // Session-derived IDs
-  const SESSION_DOCTOR_ID = Number(@json($resolvedDoctorId ?? null)) || null;
-  const SESSION_USER_ID   = Number(@json(session('user_id') ?? data_get(session('user'), 'id') ?? null)) || null;
-  const SESSION_CLINIC_ID = Number(@json($resolvedClinicId ?? null)) || null;
-  const calendarEl = document.getElementById('calendar');
-  const calRows = document.getElementById('calRows');
-  // panel used for legacy list/details rendering
-  const list = document.getElementById('list');
-  const doctorSelect = document.getElementById('doctor_select');
-  const doctorMeta = document.getElementById('doctor_meta');
-  const doctorBadge = document.getElementById('doctor_badge');
-  const debugEnabled = new URLSearchParams(location.search).get('debug') === '1';
-  const doctorInput = document.getElementById('doctor_id');
-
-  const esc = (value) => String(value ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-  const formatSymptoms = (value) => {
-    if (!value) return '';
-    if (Array.isArray(value)) return value.join(', ');
-    if (typeof value === 'string') {
-      try { const parsed = JSON.parse(value); if (Array.isArray(parsed)) return parsed.join(', '); } catch (_) {}
-      return value;
-    }
-    return String(value);
+  const state = {
+    selectedDate: new Date(),
+    filterTypes: ['all'],
+    filterStatus: [],
+    filterDoctors: [],
+    search: '',
+    view: 'timeline',
+    modalStep: 1,
+    selectedOwner: null,
+    selectedPet: null,
+    selectedSlot: null,
+    selectedDoctor: null,
+    doctors: [],
+    owners: [],
+    pets: [],
+    appointments: [],
+    loading: false
   };
 
-  // Final vet id resolver (prefer clinic id, fallback to session user id, then storage, then /api/session/get)
-  let FINAL_VET_ID = SESSION_CLINIC_ID || SESSION_USER_ID || null;
+  const $ = (id) => document.getElementById(id);
 
-  async function bootResolveVetId(){
-    if (FINAL_VET_ID) return FINAL_VET_ID;
-    try {
-      const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full') || localStorage.getItem('sn_session_v1');
-      if (raw) {
-        const obj = JSON.parse(raw);
-        const candidate = Number(obj?.user?.id ?? obj?.user_id ?? obj?.vet_id ?? obj?.clinic_id ?? NaN);
-        if (!Number.isNaN(candidate) && candidate) {
-          FINAL_VET_ID = candidate;
-        }
-      }
-    } catch(_){}
-    if (!FINAL_VET_ID) {
-      try {
-        const r = await api(`${apiBase}/session/get`);
-        const id = Number(r?.json?.user_id ?? r?.json?.user?.id ?? NaN);
-        if (!Number.isNaN(id) && id) FINAL_VET_ID = id;
-      } catch(_){}
-    }
-    return FINAL_VET_ID;
-  }
+  const sameDay = (a,b) => new Date(a).toDateString() === new Date(b).toDateString();
+  const formatTime = (d) => new Date(d).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  const pad = (n) => n.toString().padStart(2,'0');
+  const getDoctor = (id) => state.doctors.find(d => String(d.id) === String(id)) || {name:'Doctor'};
+  const getOwner = (id) => state.owners.find(o => o.id === id) || {name:'Owner', phone:'—'};
+  const getPet = (id) => state.pets.find(p => p.id === id) || {name:'Pet', breed:'—', age:'—'};
 
-  function doctorApiUrl(){
-    const params = new URLSearchParams();
-    if (FINAL_VET_ID) {
-      params.set('vet_id', FINAL_VET_ID);
-    }
-    const query = params.toString();
-    return `${apiBase}/doctors${query ? `?${query}` : ''}`;
-  }
-
-  function updateDoctorBadge(){
-    if(!doctorBadge) return;
-    const selected = doctorSelect?.selectedOptions?.[0];
-    if(selected && selected.value){
-      const label = selected.textContent.trim();
-      doctorBadge.innerHTML = `<span class="text-gray-800 font-medium">${esc(label)}</span> <span class="text-gray-500">(ID: <span class="font-mono">#${esc(selected.value)}</span>)</span>`;
-    } else {
-      doctorBadge.textContent = 'No doctor selected.';
+  async function loadData(){
+    state.loading = true;
+    renderAll();
+    await loadDoctors();
+    await loadAppointmentsForClinic();
+    state.loading = false;
+    renderAll();
+    if(!CLINIC_ID){
+      console.warn('No clinic_id detected; fetched doctors without clinic filter.');
     }
   }
 
-  async function loadDoctorDropdown(){
+  async function loadDoctors(){
     try{
-      if(doctorMeta){
-        doctorMeta.textContent = FINAL_VET_ID
-          ? 'Loading doctors for this clinic…'
-          : 'Loading available doctors…';
-      }
-      const res = await api(doctorApiUrl());
-      console.log('[doctor-bookings] GET /doctors =>', res);
-      if(!res.ok){
-        if(doctorMeta){ doctorMeta.textContent = 'Unable to load doctors.'; }
-        return;
-      }
-      const doctors = Array.isArray(res.json?.doctors) ? res.json.doctors : [];
-      if(!doctors.length){
-        if(doctorMeta){
-          doctorMeta.textContent = FINAL_VET_ID
-            ? 'No doctors found for this clinic.'
-            : 'No doctors found.';
-        }
-        if(doctorSelect){
-          doctorSelect.innerHTML = '<option value="">-- No doctors available --</option>';
-        }
-        if(doctorInput){ doctorInput.value = ''; }
-        updateDoctorBadge();
-        return;
-      }
-      const options = doctors
-        .map(d => ({ id: String(d.id), label: d.doctor_name ? `${d.doctor_name} (#${d.id})` : `Doctor #${d.id}` }))
-        .sort((a,b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
-      console.log('[doctor-bookings] doctors options:', options);
-      if(doctorSelect){
-        doctorSelect.innerHTML = '<option value="">-- Select Doctor --</option>' + options.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
-        // Keep input/select in a valid state: if SESSION_DOCTOR_ID doesn't exist, fall back to first
-        const match = doctorInput?.value ? options.find(opt => opt.id === String(doctorInput.value)) : null;
-        if(match){
-          doctorSelect.value = match.id;
-        } else if(options.length){
-          doctorSelect.value = options[0].id;
-          if(doctorInput) doctorInput.value = options[0].id;
-        }
-        updateDoctorBadge();
-      }
-      // Auto-load after dropdown is populated and a valid doctor is selected
-      if(doctorInput?.value){
-        await load();
-      }
-      if(doctorMeta){ doctorMeta.textContent = 'Select a doctor to view their bookings.'; }
-    }catch(_){ }
-  }
-
-  const NOTE_PALETTES = [
-    { start: '#fef4d7', end: '#fde68a', shadow: 'rgba(251,191,36,0.4)', rotate: '-1.4deg' },
-    { start: '#e0f2fe', end: '#bae6fd', shadow: 'rgba(37,99,235,0.25)', rotate: '1.2deg' },
-    { start: '#ede9fe', end: '#ddd6fe', shadow: 'rgba(109,40,217,0.25)', rotate: '-0.6deg' },
-    { start: '#fce7f3', end: '#fbcfe8', shadow: 'rgba(236,72,153,0.3)', rotate: '0.8deg' },
-    { start: '#dcfce7', end: '#bbf7d0', shadow: 'rgba(16,185,129,0.25)', rotate: '-1deg' },
-    { start: '#fee2e2', end: '#fecaca', shadow: 'rgba(248,113,113,0.35)', rotate: '1deg' },
-  ];
-
-  function paletteForBooking(booking, idx){
-    const key = (booking.status || booking.service_type || '') + idx;
-    let hash = 0;
-    for (let i = 0; i < key.length; i++){
-      hash = (hash + key.charCodeAt(i)) % NOTE_PALETTES.length;
+      const res = await fetch(endpoints.doctors(CLINIC_ID), { credentials: 'include' });
+      const json = await res.json();
+      const list = json?.doctors || json?.data?.doctors || [];
+      state.doctors = list.map(doc => ({
+        ...doc,
+        name: doc.name || doc.doctor_name || `Doctor #${doc.id}`,
+        online: doc.toggle_availability !== 0 && doc.toggle_availability !== false,
+        breaks: doc.breaks || []
+      }));
+    }catch(err){
+      console.error('Failed to load doctors', err);
+      state.doctors = [];
     }
-    return NOTE_PALETTES[hash] || NOTE_PALETTES[0];
   }
 
-  function statusClass(status){
-    const key = (status || 'pending').toLowerCase();
-    if (['completed','done'].includes(key)) return 'status-pill--success';
-    if (['confirmed','accepted','active'].includes(key)) return 'status-pill--info';
-    if (['cancelled','canceled','rejected','declined'].includes(key)) return 'status-pill--danger';
-    if (['rescheduled','on_hold'].includes(key)) return 'status-pill--warning';
-    return 'status-pill--pending';
+  async function loadAppointmentsForClinic(){
+    const doctorIds = (state.doctors || []).map(d => d.id);
+    if(qsDoctor && !doctorIds.includes(Number(qsDoctor))) doctorIds.push(Number(qsDoctor));
+    const results = await Promise.all(doctorIds.map(id => {
+      let doc = state.doctors.find(d => String(d.id)===String(id));
+      if(!doc){
+        doc = { id, name: `Doctor #${id}`, online: true, breaks: [] };
+        state.doctors.push(doc);
+      }
+      return fetchDocAppointments(doc);
+    }));
+    state.appointments = results.flat();
   }
 
-  function renderStickyNote(booking, idx){
-    const palette = paletteForBooking(booking, idx);
-    const schedule = booking.scheduled_for || booking.booking_created_at || '';
-    const time = schedule ? schedule.slice(11,16) : '';
-    const parent = booking.pet_parent_name || booking.pet_parent_phone || `Booking #${booking.id}`;
-    const petLine = booking.pet_name
-      ? `${booking.pet_name}${booking.pet_breed ? ` (${booking.pet_breed})` : ''}`
-      : '';
-    const summarySource = booking.user_summary || booking.ai_summary || '';
-    const summary = summarySource ? String(summarySource).split('\n')[0] : '';
-    const service = (booking.service_type || '').replace(/_/g,' ');
-    const statusText = (booking.status || 'pending').replace(/_/g,' ');
-    return `
-      <button
-        type="button"
-        class="calendar-note"
-        data-id="${booking.id}"
-        style="--note-start:${palette.start};--note-end:${palette.end};--note-shadow:${palette.shadow};--note-tilt:${palette.rotate};"
-      >
-        <div class="calendar-note__time">${esc(time || '—')}</div>
-        <div class="calendar-note__title">${esc(parent)}</div>
-        ${petLine ? `<div class="calendar-note__pet">${esc(petLine)}</div>` : ''}
-        ${summary ? `<div class="calendar-note__summary">${esc(summary)}</div>` : ''}
-        <div class="calendar-note__meta">
-          <span class="status-pill ${statusClass(booking.status)}">${esc(statusText)}</span>
-          <span class="calendar-note__service">${esc(service || 'booking')}</span>
-        </div>
-      </button>
-    `;
+  async function fetchDocAppointments(doc){
+    try{
+      const res = await fetch(endpoints.appointmentsByDoctor(doc.id), { credentials: 'include' });
+      const json = await res.json();
+      const list = json?.data?.appointments || [];
+      return list.map(item => normalizeAppointment(item, doc));
+    }catch(err){
+      console.error('Failed to load appointments for doctor', doc?.id, err);
+      return [];
+    }
   }
 
-  function monthStart(dateStr){ const d=new Date(dateStr); d.setDate(1); d.setHours(0,0,0,0); return d; }
-  function fmtDate(d){ const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
-  function parseWhen(b){ const t=b.scheduled_for || b.booking_created_at; return t ? new Date(t.replace(' ','T')) : null; }
+  function normalizeAppointment(raw, doctor){
+    const patient = raw?.patient || {};
+    const ownerId = ensureOwner(patient);
+    const petName = raw?.pet_name || raw?.pet?.name || patient.name || 'Pet';
+    const petId = ensurePet(petName, ownerId);
+    const times = deriveTimes(raw?.date, raw?.time_slot);
+    const doctorId = String(doctor?.id ?? raw?.doctor?.id ?? raw?.doctor_id ?? raw?.doctorId ?? '');
+    const amountValue = normalizeAmount(raw?.amount);
+    return {
+      id: String(raw?.id ?? `app_${Date.now()}`),
+      doctorId,
+      petId,
+      ownerId,
+      start: times.start,
+      end: times.end,
+      type: (raw?.service_type || raw?.type || 'in-clinic'),
+      reason: raw?.reason || 'Appointment',
+      status: raw?.status || 'upcoming',
+      amount: amountValue,
+      currency: raw?.currency || 'INR'
+    };
+  }
 
-  function renderCalendar(rows){
-    const byDay = new Map();
-    rows.forEach(b=>{ const dt=parseWhen(b); if(!dt) return; const key=fmtDate(dt); if(!byDay.has(key)) byDay.set(key,[]); byDay.get(key).push(b); });
-    for(const [dayKey, list] of byDay.entries()){
-      list.sort((a,b)=>{
-        const aw = (a.scheduled_for || a.booking_created_at || '').slice(11,16);
-        const bw = (b.scheduled_for || b.booking_created_at || '').slice(11,16);
-        return aw.localeCompare(bw);
+  function normalizeAmount(v){
+    if(v === null || v === undefined || v === '') return null;
+    const num = Number(v);
+    if(Number.isNaN(num)) return null;
+    // Treat large values as paise and convert to rupees
+    return num > 1000 ? num / 100 : num;
+  }
+
+  function deriveTimes(dateStr, slotStr){
+    const start = parseDateTime(dateStr, slotStr, 'start') || new Date();
+    const end = parseDateTime(dateStr, slotStr, 'end') || new Date(start.getTime() + clinicConfig.slotDurationMinutes*60000);
+    return { start: start.toISOString(), end: end.toISOString() };
+  }
+
+  function parseDateTime(dateStr, slotStr, which){
+    if(!dateStr) return null;
+    const base = new Date(dateStr);
+    if(Number.isNaN(base.getTime())) return null;
+    if(slotStr){
+      const parts = slotStr.split(/-|to|–/i);
+      const target = which === 'end' && parts[1] ? parts[1] : parts[0];
+      const t = (target || '').trim();
+      const m = t.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?/i);
+      if(m){
+        let h = parseInt(m[1],10);
+        const mins = parseInt(m[2] || '0',10);
+        const ampm = (m[3] || '').toUpperCase();
+        if(ampm === 'PM' && h < 12) h += 12;
+        if(ampm === 'AM' && h === 12) h = 0;
+        base.setHours(h, mins, 0, 0);
+        return base;
+      }
+    }
+    return base;
+  }
+
+  function ensureOwner(patient){
+    const id = patient?.user_id ? `owner_${patient.user_id}` : (patient?.phone ? `owner_${patient.phone}` : `owner_${patient?.name || 'anon'}`);
+    let owner = state.owners.find(o => o.id === id);
+    if(!owner){
+      owner = {id, name: patient?.name || 'Patient', phone: patient?.phone || '—'};
+      state.owners.push(owner);
+    }
+    return id;
+  }
+
+  function ensurePet(name, ownerId){
+    const safeName = name || 'Pet';
+    const id = `pet_${ownerId}_${safeName.replace(/\s+/g,'_')}`;
+    let pet = state.pets.find(p => p.id === id);
+    if(!pet){
+      pet = {id, name: safeName, ownerId, breed:'', age:''};
+      state.pets.push(pet);
+    }
+    return id;
+  }
+
+  function populateDoctorFilter(){
+    const select = $('doctorFilter');
+    if(!select) return;
+    select.innerHTML = '<option value="">All doctors</option>';
+    state.doctors.forEach(doc => {
+      const opt = document.createElement('option');
+      opt.value = doc.id; opt.textContent = doc.name + (doc.online ? ' • Online' : ' • Offline');
+      select.appendChild(opt);
+    });
+  }
+
+  function renderKPIs(){
+    const now = new Date();
+    const since30 = new Date(now); since30.setDate(now.getDate() - 30);
+    const last30 = state.appointments.filter(a => new Date(a.start) >= since30);
+    const ownerIds = new Set(last30.map(a => a.ownerId));
+    $('k1').textContent = ownerIds.size.toLocaleString(); // Locked-in Pet Parents (last 30d unique owners)
+
+    // Repeat rate = owners with 2+ appts in last 30d / total owners
+    const counts = {};
+    last30.forEach(a => { counts[a.ownerId] = (counts[a.ownerId] || 0) + 1; });
+    const repeatOwners = Object.values(counts).filter(c => c >= 2).length;
+    const repeatRate = ownerIds.size ? Math.round((repeatOwners / ownerIds.size) * 100) : 0;
+    $('k2').textContent = `${repeatRate}%`;
+
+    // Telemed Revenue (30d) — using appointment amount where type is telemedicine
+    const teleRevenue = last30
+      .filter(a => String(a.type).toLowerCase() === 'telemedicine' && a.amount != null)
+      .reduce((sum, a) => sum + (a.amount || 0), 0);
+    $('k3').textContent = formatCurrency(teleRevenue, '₹');
+
+    // Clinic Utilization Today
+    const totalSlots = state.doctors.length ? state.doctors.length * ((parseInt(clinicConfig.workingHours.end.split(':')[0]) - parseInt(clinicConfig.workingHours.start.split(':')[0]))*2 || 0) : 0;
+    const booked = state.appointments.filter(a=> sameDay(a.start,state.selectedDate) && a.status!=='cancelled').length;
+    const utilization = totalSlots > 0 ? Math.round((booked/totalSlots)*100) : 0;
+    $('k4').textContent = utilization + '%';
+  }
+
+  function formatCurrency(value, symbol='₹'){
+    if(value == null) return symbol + '0';
+    return symbol + value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+
+  function renderCalendar(){
+    const month = new Date(state.selectedDate).getMonth();
+    const year = new Date(state.selectedDate).getFullYear();
+    $('monthLabel').textContent = new Date(year,month,1).toLocaleString('default',{month:'long',year:'numeric'});
+    const first = new Date(year,month,1), start=first.getDay();
+    const days = new Date(year,month+1,0).getDate();
+    const container = $('calendarDays'); container.innerHTML='';
+    for(let i=0;i<start;i++){ container.appendChild(createDay()) }
+    for(let d=1; d<=days; d++){
+      const date = new Date(year,month,d);
+      const dayEl = createDay(date);
+      const apps = state.appointments.filter(a=> sameDay(a.start,date) && passesFilters(a));
+      apps.forEach(a=>{
+        const dot = document.createElement('div'); dot.className='dot ' + a.type;
+        dot.title = `${formatTime(a.start)} ${getPet(a.petId).name} (${a.type})`;
+        dayEl.querySelector('.dots').appendChild(dot);
       });
-      byDay.set(dayKey, list);
+      if(sameDay(date,new Date())) dayEl.classList.add('today');
+      if(sameDay(date,state.selectedDate)) dayEl.classList.add('selected');
+      dayEl.addEventListener('click', ()=>{ state.selectedDate=date; renderAll(); openDayPanel(date); });
+      if(apps.length){
+        dayEl.addEventListener('mouseenter',(e)=> showTooltip(e, apps.slice(0,4).map(a=>`${formatTime(a.start)} ${getPet(a.petId).name} — ${a.type}`).join('<br>')));
+        dayEl.addEventListener('mouseleave', hideTooltip);
+      }
+      container.appendChild(dayEl);
     }
-    const since = document.getElementById('since').value || new Date().toISOString().slice(0,10);
-    const first = monthStart(since);
-    const startCell = new Date(first); startCell.setDate(first.getDate() - first.getDay());
-    const totalCells = 42;
-    let html='';
-    for(let i=0;i<totalCells;i++){
-      const d=new Date(startCell); d.setDate(startCell.getDate()+i);
-      const key=fmtDate(d);
-      const inMonth = d.getMonth()===first.getMonth();
-      const items = (byDay.get(key)||[]);
-      html += `
-        <div class="calendar-cell ${inMonth?'':'calendar-cell--muted'}">
-          <div class="calendar-cell__header">
-            <div class="calendar-cell__date">${d.getDate()}</div>
-            <div class="calendar-cell__count">${items.length ? `${items.length} booking${items.length>1?'s':''}` : ''}</div>
+  }
+  function createDay(date){
+    const div = document.createElement('div'); div.className='day';
+    const num = document.createElement('div'); num.className='num'; num.textContent = date ? date.getDate() : '';
+    div.appendChild(num);
+    const dots = document.createElement('div'); dots.className='dots'; div.appendChild(dots);
+    return div;
+  }
+
+  function renderTimeline(){
+    $('timelineTitle').textContent = sameDay(state.selectedDate,new Date()) ? "Today's Schedule" : state.selectedDate.toDateString();
+    const left = $('leftTimes'); left.innerHTML='';
+    for(let h=8; h<=20; h++){
+      const t = document.createElement('div'); t.className='timeRow'; t.style.height='40px'; t.textContent = pad(h)+':00'; left.appendChild(t);
+    }
+    const right = $('rightArea'); right.innerHTML='';
+    const dayApps = state.appointments.filter(a=> sameDay(a.start,state.selectedDate) && passesFilters(a));
+    const conflicts = findConflicts(dayApps);
+    dayApps.forEach(a=>{
+      const s = new Date(a.start), e = new Date(a.end);
+      const minutesFrom8 = (s.getHours()-8)*60 + s.getMinutes();
+      const top = (minutesFrom8/60) * 40;
+      const height = Math.max(36, ((e-s)/60000)/60 * 40);
+      const ap = document.createElement('div'); ap.className = 'appt '+a.type;
+      if(conflicts.includes(a.id)) ap.classList.add('conflict');
+      ap.style.top = top + 'px'; ap.style.height = height + 'px';
+      ap.innerHTML = `<div class="meta"><div>${formatTime(a.start)} • ${getPet(a.petId).name}</div><div style="font-size:12px;color:#274b6a">${getDoctor(a.doctorId).name}</div></div><div class="sub">${a.reason} <span style="float:right">${a.status}</span></div>`;
+      if(a.type==='telemedicine'){
+        const btn = document.createElement('button'); btn.className='joinBtn'; btn.textContent='Join'; btn.style.marginTop='6px';
+        btn.onclick = (ev)=>{ ev.stopPropagation(); startTeleSimulation(a); };
+        ap.appendChild(btn);
+      }
+      ap.addEventListener('click', ()=> openPatientPanel(getPet(a.petId)));
+      ap.addEventListener('mouseenter',(ev)=> showTooltip(ev, `${getPet(a.petId).name} — ${formatTime(a.start)}<br>${getOwner(a.ownerId).name} • ${a.reason}`));
+      ap.addEventListener('mouseleave', hideTooltip);
+      right.appendChild(ap);
+    });
+  }
+
+  function renderDocGrid(){
+    const grid = $('docGrid'); grid.innerHTML='';
+    const filteredDocs = state.doctors.filter(d=> state.filterDoctors.length ? state.filterDoctors.includes(String(d.id)) : true);
+    filteredDocs.forEach(doc=>{
+      const col = document.createElement('div'); col.className='col';
+      const name = document.createElement('div'); name.className='docName'; name.textContent = doc.name + (doc.online ? ' • Online' : ' • Offline');
+      col.appendChild(name);
+      for(let h=8; h<20; h++){
+        for(let m=0;m<60;m+=30){
+          const slot = document.createElement('div'); slot.className='slot free';
+          const t = new Date(state.selectedDate); t.setHours(h,m,0,0);
+          slot.textContent = `${pad(h)}:${pad(m)}`;
+          const inBreak = (doc.breaks||[]).some(b=> isBetweenTime(b.start,b.end,t));
+          const booked = state.appointments.some(a=> String(a.doctorId)===String(doc.id) && new Date(a.start) <= t && new Date(a.end) > t && a.status!=='cancelled');
+          if(booked){ slot.className='slot booked'; slot.textContent=`${pad(h)}:${pad(m)} · Booked`; }
+          else if(inBreak){ slot.className='slot break'; slot.textContent=`${pad(h)}:${pad(m)} · Break`; }
+          else if(!doc.online){ slot.className='slot unavail'; slot.textContent=`${pad(h)}:${pad(m)} · Unavailable`; }
+          slot.addEventListener('click', ()=>{ if(slot.classList.contains('booked')||slot.classList.contains('break')||slot.classList.contains('unavail')) return; openCreateModalWithSlot(t, doc.id); });
+          col.appendChild(slot);
+        }
+      }
+      grid.appendChild(col);
+    });
+  }
+
+  function renderAll(){
+    populateDoctorFilter();
+    renderKPIs();
+    renderCalendar();
+    renderTimeline();
+    renderDocGrid();
+  }
+
+  function passesFilters(a){
+    if(!state.filterTypes.includes('all') && !state.filterTypes.includes(a.type)) return false;
+    if(state.filterStatus.length && !state.filterStatus.includes(a.status)) return false;
+    if(state.filterDoctors.length && !state.filterDoctors.includes(String(a.doctorId))) return false;
+    if(state.search){
+      const hay = `${getPet(a.petId).name} ${getOwner(a.ownerId).name} ${getOwner(a.ownerId).phone}`.toLowerCase();
+      if(!hay.includes(state.search.toLowerCase())) return false;
+    }
+    return true;
+  }
+  function isBetweenTime(start,end,dt){
+    const [sh,sm]=start.split(':').map(Number); const [eh,em]=end.split(':').map(Number);
+    const s = new Date(dt); s.setHours(sh,sm,0,0); const e = new Date(dt); e.setHours(eh,em,0,0);
+    return dt>=s && dt<e;
+  }
+  function findConflicts(dayApps){
+    const byDoc = {}; const conflicts=[];
+    dayApps.forEach(a=> { byDoc[a.doctorId] = byDoc[a.doctorId] || []; byDoc[a.doctorId].push(a); });
+    Object.values(byDoc).forEach(arr=>{
+      arr.sort((x,y)=> new Date(x.start) - new Date(y.start));
+      for(let i=0;i<arr.length-1;i++){
+        if(new Date(arr[i].end) > new Date(arr[i+1].start)){
+          conflicts.push(arr[i].id); conflicts.push(arr[i+1].id);
+        }
+      }
+    });
+    return conflicts;
+  }
+
+  function showTooltip(ev,html){
+    const t = $('tooltip'); t.innerHTML = html; t.style.display='block';
+    t.style.left = (ev.clientX + 12) + 'px'; t.style.top = (ev.clientY + 12) + 'px';
+  }
+  function hideTooltip(){ $('tooltip').style.display='none'; }
+
+  function openCreateModalWithSlot(dt, doctorId){
+    state.selectedSlot = dt;
+    state.selectedDoctor = doctorId ? String(doctorId) : null;
+    $('modalOverlay').style.display='flex';
+    state.modalStep = 1; renderModal();
+  }
+
+  function renderModal(){
+    $('step1').style.display = state.modalStep===1 ? 'block' : 'none';
+    $('step2').style.display = state.modalStep===2 ? 'block' : 'none';
+    $('step3').style.display = state.modalStep===3 ? 'block' : 'none';
+    renderOwnerResults();
+    renderPetCards();
+    const mdoc = $('modalDoctor'); mdoc.innerHTML='';
+    state.doctors.forEach(d=>{ const o = document.createElement('option'); o.value=d.id; o.textContent = d.name + (d.online?' • Online':' • Offline'); mdoc.appendChild(o) });
+    if(state.selectedDoctor) mdoc.value = state.selectedDoctor;
+    const slotArea = $('modalSlots'); slotArea.innerHTML='';
+    const selDoc = state.selectedDoctor || (mdoc.options[0] && mdoc.options[0].value) || (state.doctors[0] && String(state.doctors[0].id));
+    for(let h=8; h<20; h++){
+      for(let m=0;m<60;m+=30){
+        const b = document.createElement('button'); b.className='pill'; b.style.margin='6px'; b.textContent=`${pad(h)}:${pad(m)}`;
+        const t = new Date(state.selectedDate); t.setHours(h,m,0,0);
+        const booked = state.appointments.some(a=> String(a.doctorId)===String(selDoc) && new Date(a.start) <= t && new Date(a.end) > t && a.status!=='cancelled');
+        const doc = getDoctor(selDoc);
+        const inBreak = (doc.breaks||[]).some(bx=> isBetweenTime(bx.start,bx.end,t));
+        if(booked){ b.disabled=true; b.textContent='Booked' } else if(inBreak){ b.disabled=true; b.textContent='Break' } else if(!doc.online){ b.disabled=true; b.textContent='Unavailable' }
+        b.onclick = ()=>{ state.selectedSlot = t; highlightModalSlot(b) };
+        slotArea.appendChild(b);
+      }
+    }
+    $('modalDoctor').onchange = ()=>{ state.selectedDoctor = $('modalDoctor').value; renderModal(); };
+  }
+
+  function highlightModalSlot(btn){
+    document.querySelectorAll('#modalSlots button').forEach(b=> b.style.boxShadow='none');
+    btn.style.boxShadow='0 8px 20px rgba(37,99,235,0.12)';
+  }
+
+  function renderOwnerResults(){
+    const q = $('ownerSearch').value.trim().toLowerCase();
+    const out = $('ownerResults'); out.innerHTML='';
+    if(!q) return;
+    const found = state.owners.filter(o=> (o.phone || '').includes(q) || (o.name || '').toLowerCase().includes(q));
+    if(found.length===0){ out.textContent = 'No owner found — will create new'; return; }
+    found.forEach(o=>{
+      const d = document.createElement('div'); d.className='small'; d.style.padding='6px'; d.style.cursor='pointer'; d.textContent = `${o.name} • ${o.phone}`;
+      d.onclick = ()=>{ state.selectedOwner = o; $('ownerResults').innerHTML = `Selected: ${o.name}`; };
+      out.appendChild(d);
+    });
+  }
+
+  function renderPetCards(){
+    const wrap = $('petCards'); wrap.innerHTML='';
+    const ownerId = state.selectedOwner ? state.selectedOwner.id : null;
+    const list = ownerId ? state.pets.filter(p=> p.ownerId===ownerId ) : state.pets;
+    list.forEach(p=>{
+      const card = document.createElement('div'); card.style.padding='10px'; card.style.border='1px solid #eef6ff'; card.style.cursor='pointer';
+      card.innerHTML = `<div style="font-weight:800">${p.name}</div><div class="small">${p.breed} • ${p.age}</div>`;
+      card.onclick = ()=>{ state.selectedPet = p; document.querySelectorAll('#petCards div').forEach(n=>n.style.outline='none'); card.style.outline='3px solid rgba(37,99,235,0.12)'; };
+      wrap.appendChild(card);
+    });
+  }
+
+  function createApptFromModal(){
+    if(!state.selectedOwner){ alert('Select or enter owner'); return; }
+    if(!state.selectedPet){ alert('Select pet'); return; }
+    if(!state.selectedSlot){ alert('Select slot'); return; }
+    const ap = {
+      id: 'app_' + Date.now(),
+      doctorId: state.selectedDoctor || $('modalDoctor').value || (state.doctors[0] ? String(state.doctors[0].id) : null),
+      petId: state.selectedPet.id,
+      ownerId: state.selectedOwner.id || ('owner_' + Date.now()),
+      start: state.selectedSlot.toISOString(),
+      end: new Date(state.selectedSlot.getTime() + clinicConfig.slotDurationMinutes*60000).toISOString(),
+      type: $('typeSelect').value,
+      reason: $('reasonSelect').value,
+      status: 'upcoming'
+    };
+    const conflict = state.appointments.some(a=> a.doctorId===ap.doctorId && new Date(a.start) < new Date(ap.end) && new Date(a.end) > new Date(ap.start) && a.status!=='cancelled');
+    if(conflict && !confirm('Conflict detected for selected doctor. Create anyway?')) return;
+    state.appointments.push(ap);
+    alert('Appointment created (demo)');
+    closeModalAll();
+    renderAll();
+  }
+
+  function closeModalAll(){ $('modalOverlay').style.display='none'; state.selectedOwner=null; state.selectedPet=null; state.selectedSlot=null; state.selectedDoctor=null; }
+
+  function openPatientPanel(pet){
+    $('pName').textContent = pet.name; $('pBrief').textContent = `${pet.breed} • ${pet.age}`;
+    const owner = getOwner(pet.ownerId); $('pOwner').textContent = `${owner.name} • ${owner.phone}`; $('pVisits').textContent = 'Last visit: Demo';
+    $('patientPanel').classList.add('open');
+  }
+  function closePatientPanel(){ $('patientPanel').classList.remove('open'); }
+
+  function openDayPanel(date){
+    const listWrap = $('dayList');
+    const dateLabel = date ? new Date(date).toDateString() : '';
+    $('dayTitle').textContent = `Appointments — ${dateLabel}`;
+    const items = state.appointments.filter(a=> sameDay(a.start,date) && passesFilters(a));
+    if(!items.length){
+      listWrap.innerHTML = '<div class="small">No appointments for this day.</div>';
+    } else {
+      listWrap.innerHTML = items.map(a=>{
+        const owner = getOwner(a.ownerId);
+        const pet = getPet(a.petId);
+        return `
+          <div style="padding:10px;border:1px solid #eef6ff;border-radius:10px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-weight:700">
+              <span>${formatTime(a.start)} • ${pet.name}</span>
+              <span class="small">${(a.type||'').replace('_',' ')}</span>
+            </div>
+            <div class="small" style="margin-top:4px">${owner.name} • ${owner.phone || '—'}</div>
+            <div class="small" style="margin-top:2px">Doctor: ${getDoctor(a.doctorId).name} • Status: ${a.status}</div>
           </div>
-          <div class="calendar-cell__notes">
-            ${items.length ? items.map((b, idx)=>renderStickyNote(b, idx)).join('') : ''}
-          </div>
-        </div>`;
+        `;
+      }).join('');
     }
-    document.getElementById('calRows').innerHTML = html;
+    $('dayPanel').classList.add('open');
+  }
+  function closeDayPanel(){ $('dayPanel').classList.remove('open'); }
+
+  function startTeleSimulation(app){
+    $('teleContent').textContent = `Joining tele-call for ${getPet(app.petId).name} with ${getDoctor(app.doctorId).name}...`;
+    $('teleModal').style.display='block';
+    setTimeout(()=>{ $('teleModal').style.display='none'; alert('Tele call ended (demo)'); }, 3500);
   }
 
-  async function load(){
-    if(!doctorInput || !doctorInput.value){ alert('Doctor ID missing'); return; }
-    const since = document.getElementById('since').value;
-    const url = `${apiBase}/doctors/${encodeURIComponent(doctorInput.value)}/bookings` + (since? `?since=${encodeURIComponent(since)}` : '');
-    console.log('[doctor-bookings] fetching:', url);
-    const res = await api(url);
-    console.log('[doctor-bookings] bookings response:', res);
-    if(!res.ok){
-      if(list){ list.innerHTML = '<div class="text-sm text-red-600">Failed to load</div>'; list.classList.remove('hidden'); }
-      return;
-    }
-    const rows = Array.isArray(res.json?.bookings) ? res.json.bookings : [];
-    console.log('[doctor-bookings] normalized bookings:', rows);
-    renderCalendar(rows);
+  function exportCSV(){
+    const rows=[['id','date','time','pet','owner','type','reason','doctor','status']];
+    state.appointments.filter(a=> passesFilters(a)).forEach(a=>{
+      const dt=new Date(a.start);
+      rows.push([a.id, dt.toLocaleDateString(), formatTime(a.start), getPet(a.petId).name, getOwner(a.ownerId).name, a.type, a.reason, getDoctor(a.doctorId).name, a.status]);
+    });
+    const csv = rows.map(r=> r.map(c=> '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='appointments.csv'; a.click(); URL.revokeObjectURL(url);
   }
 
-  document.getElementById('btnLoad').addEventListener('click', load);
+  function findConflictsOnDate(date){
+    const dayApps = state.appointments.filter(a=> sameDay(a.start,date));
+    return findConflicts(dayApps);
+  }
 
-  // Month navigation (if you add prev/next buttons with ids btnPrev/btnNext)
-  document.getElementById('btnPrev')?.addEventListener('click', ()=>{
-    const since = document.getElementById('since');
-    const d = new Date(since.value || new Date()); d.setMonth(d.getMonth()-1); d.setDate(1); since.value=d.toISOString().slice(0,10); load();
-  });
-  document.getElementById('btnNext')?.addEventListener('click', ()=>{
-    const since = document.getElementById('since');
-    const d = new Date(since.value || new Date()); d.setMonth(d.getMonth()+1); d.setDate(1); since.value=d.toISOString().slice(0,10); load();
-  });
+  document.addEventListener('DOMContentLoaded', ()=>{
+    populateDoctorFilter();
+    renderAll();
 
-  document.addEventListener('DOMContentLoaded', async ()=>{
-    // Prefill doctor from session if present (may not be a real doctor id)
-    if(SESSION_DOCTOR_ID && doctorInput){ doctorInput.value = SESSION_DOCTOR_ID; }
-    // Resolve vet/clinic id and reflect in badge
-    await bootResolveVetId();
-    const clinicBadge = document.getElementById('clinic_badge');
-    if (clinicBadge) clinicBadge.textContent = FINAL_VET_ID ? `#${FINAL_VET_ID}` : '—';
-    // Populate dropdown and auto-load a valid doctor selection
-    loadDoctorDropdown();
-    // Keep input/select in sync on user interaction
-    if(doctorSelect){
-      doctorSelect.addEventListener('change', ()=>{
-        if(doctorInput) doctorInput.value = doctorSelect.value;
-        updateDoctorBadge();
-        if(doctorInput?.value){ load(); }
-      });
-    }
-    if(doctorInput && doctorSelect){
-      doctorInput.addEventListener('input', ()=>{
-        const val = doctorInput.value;
-        const opt = Array.from(doctorSelect.options).find(o => o.value === val);
-        doctorSelect.value = opt ? opt.value : '';
-        updateDoctorBadge();
-      });
-    }
-
-    // Calendar click -> navigate to dedicated detail page (respect /backend)
-    calendarEl.addEventListener('click', (e)=>{
-      const ev = e.target.closest('.calendar-note');
-      if(!ev) return;
-      const id = ev.getAttribute('data-id');
-      if(id) window.location.href = `${appBasePath}/doctor/booking/${encodeURIComponent(id)}`;
+    const filterBar = $('filterBar'), toggle = $('filterToggle');
+    toggle.addEventListener('click', ()=>{
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      if(expanded){ filterBar.style.maxHeight = '0'; filterBar.style.paddingTop='0'; filterBar.style.paddingBottom='0'; }
+      else { filterBar.style.maxHeight = '260px'; filterBar.style.paddingTop='12px'; filterBar.style.paddingBottom='12px'; }
     });
 
-    // Legacy list “View Details” handler (if any)
-    list.addEventListener('click', async (e)=>{
-      const btn = e.target.closest('.view-btn'); if(!btn) return;
-      const id = btn.getAttribute('data-id');
-      const panel = document.getElementById(`det-${id}`);
-      if(!panel) return;
-      const wasHidden = panel.classList.contains('hidden');
-      panel.classList.toggle('hidden');
-      if (wasHidden && !panel.getAttribute('data-loaded')) {
-        const res = await api(`${apiBase}/bookings/details/${encodeURIComponent(id)}`);
-        if(res.ok && res.json?.booking){
-          const b = res.json.booking;
-          const pretty = (v)=> typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v ?? '');
-          panel.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div><div class="text-gray-500">IDs</div><div>Booking #${esc(b.id)} · User #${esc(b.user_id)} · Pet #${esc(b.pet_id)}</div></div>
-              <div><div class="text-gray-500">Service</div><div>${esc(b.service_type)} · Urgency: ${esc(b.urgency)}</div></div>
-              <div><div class="text-gray-500">Status</div><div>${esc(b.status)}</div></div>
-              <div><div class="text-gray-500">Scheduled For</div><div>${esc(b.scheduled_for ?? '')}</div></div>
-              <div><div class="text-gray-500">Location</div><div>${esc(b.user_address ?? '')}</div></div>
-              <div><div class="text-gray-500">Coords</div><div>${esc(b.user_latitude ?? '')}, ${esc(b.user_longitude ?? '')}</div></div>
-              <div class="md:col-span-2"><div class="text-gray-500">Symptoms</div><pre class="whitespace-pre-wrap bg-white border rounded p-2">${pretty(b.symptoms)}</pre></div>
-              <div class="md:col-span-2"><div class="text-gray-500">AI Summary</div><pre class="whitespace-pre-wrap bg-white border rounded p-2">${pretty(b.ai_summary)}</pre></div>
-            </div>`;
-          panel.setAttribute('data-loaded','1');
-        } else {
-          panel.innerHTML = '<div class="text-xs text-red-600">Failed to fetch details.</div>';
+    document.querySelectorAll('#appointmentsShell .pill').forEach(p=>{
+      p.addEventListener('click', ()=>{
+        const t = p.dataset.type, s = p.dataset.status, d = p.dataset.date;
+        if(t!==undefined){
+          if(t==='all'){ state.filterTypes=['all']; document.querySelectorAll('#appointmentsShell [data-type]').forEach(x=>x.classList.remove('active')); p.classList.add('active'); }
+          else { p.classList.toggle('active'); const act = Array.from(document.querySelectorAll('#appointmentsShell [data-type].active')).map(n=>n.dataset.type); state.filterTypes = act.length?act:['all']; }
+        } else if(s!==undefined){
+          p.classList.toggle('active'); state.filterStatus = Array.from(document.querySelectorAll('#appointmentsShell [data-status].active')).map(n=>n.dataset.status);
+        } else if(d!==undefined){
+          document.querySelectorAll('#appointmentsShell [data-date]').forEach(x=>x.classList.remove('active')); p.classList.add('active');
+          const days = parseInt(d); const nd = new Date(); nd.setDate(nd.getDate()+days); state.selectedDate = nd;
         }
-      }
+        renderAll();
+      });
     });
+
+    $('doctorFilter').addEventListener('change', ()=>{ const val=$('doctorFilter').value; state.filterDoctors = val? [val]: []; renderAll(); });
+
+    $('datePicker').addEventListener('change', ()=>{ state.selectedDate = new Date($('datePicker').value); renderAll(); });
+    $('searchInput').addEventListener('input', (e)=>{ state.search = e.target.value; renderAll(); });
+
+    $('prevMonth').addEventListener('click', ()=>{ const d=new Date(state.selectedDate); d.setMonth(d.getMonth()-1); state.selectedDate=new Date(d); renderAll(); });
+    $('nextMonth').addEventListener('click', ()=>{ const d=new Date(state.selectedDate); d.setMonth(d.getMonth()+1); state.selectedDate=new Date(d); renderAll(); });
+
+    $('tabTimeline').addEventListener('click', ()=>{ state.view='timeline'; $('tabTimeline').classList.add('active'); $('tabGrid').classList.remove('active'); $('timelineCard').style.display='block'; $('slotCard').style.display='none'; renderAll();});
+    $('tabGrid').addEventListener('click', ()=>{ state.view='grid'; $('tabGrid').classList.add('active'); $('tabTimeline').classList.remove('active'); $('timelineCard').style.display='none'; $('slotCard').style.display='block'; renderAll();});
+
+    $('openCreateBtn').addEventListener('click', ()=>{ $('modalOverlay').style.display='flex'; state.modalStep=1; renderModal(); });
+
+    $('closeModal').addEventListener('click', ()=> closeModalAll());
+    $('toPet').addEventListener('click', ()=>{ const q = $('ownerSearch').value.trim(); if(!q) return alert('Enter phone or owner'); state.selectedOwner = state.owners.find(o=> o.phone===q) || {id: 'owner_tmp_'+Date.now(), name: q, phone: q}; state.modalStep=2; renderModal(); });
+    $('backTo1').addEventListener('click', ()=>{ state.modalStep=1; renderModal(); });
+    $('toDetails').addEventListener('click', ()=>{ if(!state.selectedPet) return alert('Pick a pet'); state.modalStep=3; renderModal(); });
+    $('backTo2').addEventListener('click', ()=>{ state.modalStep=2; renderModal(); });
+    $('createApptBtn').addEventListener('click', createApptFromModal);
+
+    $('addPet').addEventListener('click', ()=>{ const n=$('quickName').value.trim(), b=$('quickBreed').value.trim(); if(!n) return alert('Enter name'); const ownerId = state.selectedOwner ? state.selectedOwner.id : null; const p={id:'pet_'+Date.now(),name:n,ownerId:ownerId,breed:b||'Unknown',age:'0y'}; state.pets.push(p); renderPetCards(); });
+    $('addOwner').addEventListener('click', ()=>{ const ph = prompt('Owner phone'); if(!ph) return; const o={id:'owner_'+Date.now(),name:'New Owner',phone:ph}; state.owners.push(o); state.selectedOwner=o; renderModal(); });
+
+    $('exportBtn').addEventListener('click', exportCSV);
+    $('printBtn').addEventListener('click', ()=> window.print());
+
+    $('closePatient').addEventListener('click', closePatientPanel);
+    $('closeDayPanel').addEventListener('click', closeDayPanel);
+    $('startTele').addEventListener('click', ()=> alert('Demo: start tele — integrate real WebRTC/SDK in production'));
+    $('reschedBtn').addEventListener('click', ()=> alert('Demo: open reschedule flow'));
+
+    window.findConflictsOnDate = findConflictsOnDate;
+    loadData();
   });
+})();
 </script>
 @endsection

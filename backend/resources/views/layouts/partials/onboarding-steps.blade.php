@@ -22,7 +22,7 @@
     4 => $s4,
     5 => $s5,
   ];
-  $nextUrl = $active < $totalSteps ? $routes[$active + 1] : route('dashboard.profile');
+  $nextUrl = $active < $totalSteps ? $routes[$active + 1] : route('dashboard.vet-home');
   $backUrl = $active > 1 ? $routes[$active - 1] : null;
   $percent = (int) round(($active / max(1, $totalSteps)) * 100);
   $stepStatus = $stepStatus ?? [];
