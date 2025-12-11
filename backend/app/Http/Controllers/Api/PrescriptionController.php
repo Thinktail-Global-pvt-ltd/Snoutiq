@@ -61,6 +61,8 @@ class PrescriptionController extends Controller
             'content_html',
             'next_medicine_day',
             'next_visit_day',
+            'temperature',
+            'temperature_unit',
         ]);
 
         $validator = Validator::make(array_merge($data, ['image' => $request->file('image')]), [
@@ -69,6 +71,8 @@ class PrescriptionController extends Controller
             'content_html' => 'required|string',
             'next_medicine_day' => 'nullable|date',
             'next_visit_day'    => 'nullable|date',
+            'temperature'       => 'nullable|numeric',
+            'temperature_unit'  => 'nullable|string|in:C,F,c,f',
         ]);
 
         if ($validator->fails()) {
@@ -76,6 +80,15 @@ class PrescriptionController extends Controller
                 'message' => 'Validation failed',
                 'errors'  => $validator->errors(),
             ], 422);
+        }
+
+        $data = $validator->validated();
+
+        if (array_key_exists('temperature_unit', $data) && $data['temperature_unit'] !== null) {
+            $data['temperature_unit'] = strtoupper($data['temperature_unit']);
+        }
+        if (array_key_exists('temperature', $data) && $data['temperature'] !== null && empty($data['temperature_unit'])) {
+            $data['temperature_unit'] = 'C';
         }
 
         // Handle file upload (optional) -> save directly under public/prescriptions

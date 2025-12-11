@@ -16,10 +16,13 @@ class Prescription extends Model
         'image_path',
         'next_medicine_day',
         'next_visit_day',
+        'temperature',
+        'temperature_unit',
     ];
 
     protected $casts = [
         'next_medicine_day' => 'date',
         'next_visit_day' => 'date',
+        'temperature' => 'float',
     ];
 }

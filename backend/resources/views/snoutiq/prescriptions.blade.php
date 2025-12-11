@@ -46,6 +46,20 @@
     </div>
     <label>Content HTML</label>
     <textarea name="content_html" rows="4"><p>Rx: Rest and hydration.</p></textarea>
+    <div class="row">
+      <div>
+        <label>Temperature</label>
+        <input type="number" name="temperature" step="0.01" placeholder="e.g. 101.5">
+      </div>
+      <div>
+        <label>Unit</label>
+        <select name="temperature_unit">
+          <option value="">Default (C)</option>
+          <option value="C">Celsius</option>
+          <option value="F">Fahrenheit</option>
+        </select>
+      </div>
+    </div>
     <label>Image (optional)</label>
     <input type="file" name="image" accept="image/*">
     <button type="submit">Create</button>
@@ -86,4 +100,3 @@
   });
 </script>
 @endsection
-
