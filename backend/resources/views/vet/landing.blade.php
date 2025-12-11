@@ -218,7 +218,7 @@ label{font-size:.9rem;color:#334155}
       </div>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
         <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/backend/custom-doctor-login'">Vet Login</button>
-        <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/vet-register'">Vet Register</button>
+        <!-- <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/vet-register'">Vet Register</button> -->
       </div>
     </div>
   </nav>
