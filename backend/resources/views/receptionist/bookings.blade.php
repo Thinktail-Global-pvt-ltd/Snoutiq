@@ -288,8 +288,8 @@
           <label class="block text-sm font-semibold mb-1">Service Type</label>
           <select name="service_type" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
             <option value="in_clinic">In Clinic</option>
-            <option value="video">Video</option>
-            <option value="home_visit">Home Visit</option>
+            <!-- <option value="video">Video</option>
+            <option value="home_visit">Home Visit</option> -->
           </select>
         </div>
       </div>
