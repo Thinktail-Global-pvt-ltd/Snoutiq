@@ -4,6 +4,8 @@
 <head>
   @php
     $snoutiqLogo = 'data:image/webp;base64,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';
+    $appDownloadUrl = 'https://play.google.com/store/apps/details?id=com.petai.snoutiq';
+    $downloadQrSrc  = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' . urlencode($appDownloadUrl);
   @endphp
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -76,14 +78,17 @@ nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-f
 .input:focus,.select:focus,textarea:focus{outline:2px solid var(--ring);border-color:transparent}
 label{font-size:.9rem;color:#334155}
 .doc-img{width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid var(--border)}
-/* hero / askbar */
-.ai-hero{padding:18px 0 8px;text-align:center}
-.askbar{max-width:680px;margin:8px auto 6px;padding:6px 8px;border:1px solid var(--border);border-radius:12px;background:#fff;display:flex;align-items:center;gap:8px;box-shadow:0 8px 30px -12px rgba(37,99,235,.18)}
-.askbar i{font-size:16px;opacity:.85}
-.askbar input{flex:1;border:none;outline:none;font-size:14px;padding:.5rem}
-.askbar .send{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:#f5f9ff;display:grid;place-items:center;cursor:pointer}
-.askbar .send:hover{background:#eef6ff}
-.ai-hint{font-size:.85rem;color:#6b7280}
+/* download & qr */
+.download-wrap{display:flex;justify-content:center}
+.download-card{display:flex;flex-wrap:wrap;align-items:center;gap:1.25rem;justify-content:space-between;background:#fff;border:1px solid #d8e6ff;border-radius:20px;padding:18px 20px;box-shadow:0 18px 40px -26px rgba(37,99,235,.45);max-width:620px;width:100%;margin:0 auto}
+.download-left{display:flex;flex-direction:column;gap:.45rem;flex:1 1 260px;text-align:left}
+.download-chip{display:inline-flex;align-items:center;gap:.45rem;padding:.38rem .75rem;border-radius:999px;background:#e8f1ff;border:1px solid #d7e6ff;font-weight:800;color:#2563eb;font-size:.85rem;width:max-content}
+.download-sub{color:#55607a;font-size:.95rem;max-width:420px}
+.download-actions{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin-top:.15rem}
+.qr-card{display:flex;flex-direction:column;align-items:center;gap:6px;background:#f8fbff;border:1px solid var(--border);padding:14px 16px;border-radius:16px;box-shadow:0 10px 28px -18px rgba(37,99,235,.35)}
+.qr-card img{width:150px;height:150px;border-radius:12px;border:1px solid #dfe7ff}
+.qr-label{font-weight:800;color:#334155;font-size:.95rem}
+.qr-sub{color:#64748b;font-size:.85rem}
 .referral-card{display:flex;align-items:center;justify-content:space-between;gap:.9rem;flex-wrap:wrap;padding:1rem 1.2rem;background:linear-gradient(180deg,#f5f9ff,#e6f1ff);border-radius:16px;border:1px solid #d5e4ff;box-shadow:0 16px 40px -28px rgba(37,99,235,.6);max-width:540px;margin:0 auto}
 .referral-code{font-weight:900;font-size:1.15rem;letter-spacing:.08em;color:#0b1220}
 .referral-chip{display:inline-flex;align-items:center;gap:.45rem;padding:.35rem .75rem;border-radius:999px;background:#ecf3ff;border:1px solid var(--border);color:var(--accent);font-weight:800;font-size:.82rem;text-transform:uppercase}
@@ -239,34 +244,27 @@ label{font-size:.9rem;color:#334155}
       @if($vet->pincode) • {{ $vet->pincode }} @endif
       @if(!is_null($vet->open_now)) • {{ $vet->open_now ? 'Open now' : 'Closed now' }} @endif
     </p>
-    <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:.5rem">
-      @php $clinicPhone = $vet->mobile ?? null; @endphp
-      <a class="btn btn-outline" href="https://play.google.com/store/apps/details?id=com.petai.snoutiq" target="_blank" rel="noopener">
-        <i class="fa-solid fa-phone"></i> Call Clinic
-      </a>
-      <a class="btn btn-outline" id="video-consult-btn" href="https://play.google.com/store/apps/details?id=com.petai.snoutiq" target="_blank" rel="noopener">
-        <i class="fa-solid fa-video"></i> Start Video Consult
-      </a>
-      <a class="btn btn-primary" href="https://play.google.com/store/apps/details?id=com.petai.snoutiq" target="_blank" rel="noopener" id="download-app-btn">
-        <i class="fa-solid fa-download"></i> Download App
-      </a>
+    <div class="download-wrap" style="margin-top:.5rem">
+      <div class="download-card">
+        <div class="download-left">
+          <div class="download-chip"><i class="fa-solid fa-mobile-screen-button"></i> SnoutIQ App</div>
+          <div class="heading" style="font-size:1.4rem;font-weight:900">Download to book visits in 1 tap</div>
+          <div class="download-sub">Skip calls and queues. Book clinic visits, track care, and get reminders directly in the SnoutIQ app.</div>
+          <div class="download-actions">
+            <a class="btn btn-primary" href="{{ $appDownloadUrl }}" target="_blank" rel="noopener" id="download-app-btn">
+              <i class="fa-solid fa-download"></i> Download App
+            </a>
+            <span class="pill" style="background:#ecf9ff;border-color:#c7ebff;color:#0284c7"><i class="fa-brands fa-google-play"></i>&nbsp;Play Store</span>
+          </div>
+        </div>
+        <div class="qr-card" aria-label="Download app QR">
+          <img src="{{ $downloadQrSrc }}" alt="QR code to download the SnoutIQ app"/>
+          <div class="qr-label">Scan to download</div>
+          <div class="qr-sub">Opens the same link</div>
+        </div>
+      </div>
     </div>
   </header>
-
-  <!-- Inline ask box -->
-  <div class="container" id="clinic-ask-wrap" style="text-align:center;padding:6px 0 10px">
-    <div class="askbar" style="max-width:720px;margin:0 auto">
-      <i class="fa-solid fa-microphone-lines"></i>
-      <input id="clinic-ask-input" placeholder="Ask anything about your pet"/>
-      <button id="clinic-ask-send" class="send" aria-label="Send">
-        <i class="fa-solid fa-paper-plane"></i>
-      </button>
-    </div>
-    <div class="ai-hint">
-      AI-generated advice. Consult a licensed veterinarian.
-      <button id="ai-feature-cta" class="ai-cta" type="button">Download app to use this feature</button>
-    </div>
-  </div>
 
   <div class="modal-backdrop" id="app-download-modal" role="dialog" aria-modal="true" aria-labelledby="app-download-title" aria-describedby="app-download-desc">
     <div class="modal-card">
@@ -275,10 +273,10 @@ label{font-size:.9rem;color:#334155}
         <button class="modal-close" type="button" data-app-modal-close aria-label="Close">×</button>
       </div>
       <p class="muted" id="app-download-desc" style="margin-top:.1rem">
-        Get the SnoutIQ app to continue with video consults, clinic calls, and AI-guided care.
+        Get the SnoutIQ app to continue with bookings, payments, and care updates.
       </p>
       <div class="modal-actions">
-        <a class="btn btn-primary" href="https://play.google.com/store/apps/details?id=com.petai.snoutiq" target="_blank" rel="noopener" id="app-modal-download">
+        <a class="btn btn-primary" href="{{ $appDownloadUrl }}" target="_blank" rel="noopener" id="app-modal-download">
           <i class="fa-solid fa-download"></i> Download App
         </a>
         <button class="btn btn-outline" type="button" data-app-modal-close>Not now</button>
@@ -514,14 +512,11 @@ label{font-size:.9rem;color:#334155}
   }
   </script>
 
-  <!-- Buttons logic (askbar + AI FAB) -->
+  <!-- Buttons logic (AI FAB) -->
   <script>
   (function() {
     const vetSlug = @json($vet->slug);
     const clinicId = @json($vet->clinic_id ?? $vet->id ?? null);
-    const downloadBtn = document.getElementById('download-app-btn');
-    const appDownloadLink = 'https://play.google.com/store/apps/details?id=com.petai.snoutiq';
-    const aiFeatureCta = document.getElementById('ai-feature-cta');
     const appModal = document.getElementById('app-download-modal');
     const appModalCloseEls = Array.from(document.querySelectorAll('[data-app-modal-close]'));
     const appModalOpenEls  = Array.from(document.querySelectorAll('[data-app-modal-open]'));
@@ -563,21 +558,6 @@ label{font-size:.9rem;color:#334155}
 
     const showAppModal = () => toggleModal(true);
 
-    const sendAsk = (id) => {
-      const v = (document.getElementById(id)?.value || '').trim();
-      if (v) {
-        try { sessionStorage.setItem('pendingChatQuestion', v); } catch (_) {}
-      }
-      showAppModal();
-    };
-    document.getElementById('clinic-ask-send')?.addEventListener('click', (e)=>{ e.preventDefault(); sendAsk('clinic-ask-input'); });
-    document.getElementById('clinic-ask-input')?.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); sendAsk('clinic-ask-input'); }});
-
-    downloadBtn?.addEventListener('click', function(event) {
-      event.preventDefault();
-      showAppModal();
-    });
-    aiFeatureCta?.addEventListener('click', function() { showAppModal(); });
     appModalOpenEls.forEach(function(btn){ btn.addEventListener('click', function(){ showAppModal(); }); });
     appModalCloseEls.forEach(function(btn){ btn.addEventListener('click', function(){ toggleModal(false); }); });
     document.addEventListener('keydown', function(e){
