@@ -38,16 +38,7 @@ class VetDashboardController extends Controller
         $weekStart = $now->copy()->startOfWeek(Carbon::MONDAY);
         $weekDates = collect(range(0, 6))->map(fn ($i) => $weekStart->copy()->addDays($i));
 
-        $bookingColumns = ['id', 'customer_id', 'date', 'start_time', 'end_time', 'total', 'paid', 'status', 'services'];
-        $hasDoctorId = Schema::hasColumn('doctor_bookings', 'doctor_id');
-        if ($hasDoctorId) {
-            $bookingColumns[] = 'doctor_id';
-        }
-
-        $todayBookings = DB::table('doctor_bookings')
-            ->where('vet_id', $clinicId)
-            ->whereDate('date', $today)
-            ->get($bookingColumns);
+        $todayBookings = $this->loadTodayBookings($clinicId, $today);
 
         $appointmentStats = $this->buildAppointmentStats($todayBookings, $now);
         $walkInStats = $this->buildWalkInStats($todayBookings, $now);
@@ -468,6 +459,56 @@ class VetDashboardController extends Controller
             'unpaid_amount' => $unpaidAmount,
             'documents_ok' => $documentsOk,
         ];
+    }
+
+    protected function loadTodayBookings(int $clinicId, string $today): Collection
+    {
+        $bookings = collect();
+
+        if (Schema::hasTable('doctor_bookings')) {
+            $bookingColumns = ['id', 'customer_id', 'date', 'start_time', 'end_time', 'total', 'paid', 'status', 'services'];
+            if (Schema::hasColumn('doctor_bookings', 'doctor_id')) {
+                $bookingColumns[] = 'doctor_id';
+            }
+
+            $bookings = DB::table('doctor_bookings')
+                ->where('vet_id', $clinicId)
+                ->whereDate('date', $today)
+                ->get($bookingColumns);
+        }
+
+        if (Schema::hasTable('appointments')) {
+            $appointmentColumns = ['id', 'doctor_id', 'appointment_date', 'appointment_time', 'status', 'notes'];
+
+            $appointmentBookings = DB::table('appointments')
+                ->where('vet_registeration_id', $clinicId)
+                ->whereDate('appointment_date', $today)
+                ->get($appointmentColumns)
+                ->map(function ($row) {
+                    $notes = json_decode($row->notes ?? '[]', true);
+                    $services = $notes['services'] ?? $notes['service'] ?? [];
+                    if (!is_array($services)) {
+                        $services = [$services];
+                    }
+
+                    return (object) [
+                        'id' => $row->id,
+                        'customer_id' => $notes['patient_user_id'] ?? null,
+                        'date' => $row->appointment_date,
+                        'start_time' => $row->appointment_time,
+                        'end_time' => null,
+                        'total' => $notes['amount_paise'] ?? null,
+                        'paid' => null,
+                        'status' => $row->status,
+                        'services' => json_encode($services),
+                        'doctor_id' => $row->doctor_id,
+                    ];
+                });
+
+            $bookings = $bookings->concat($appointmentBookings);
+        }
+
+        return $bookings->values();
     }
 
     protected function formatSlotTime(?string $time): string
