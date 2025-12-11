@@ -1040,7 +1040,12 @@
       await Auth.bootstrap();
       let patientId = patientSelect.value || null;
       let patientName = CURRENT_PATIENT?.name || '';
-      let patientPhone = CURRENT_PATIENT?.phone || STORED_AUTH_FULL?.user?.phone || '';
+      let patientPhone = normalizePhone(
+        CURRENT_PATIENT?.phone,
+        STORED_AUTH_FULL?.user?.phone,
+        CURRENT_PATIENT?.email,
+        STORED_AUTH_FULL?.user?.email
+      );
       let petName = null;
 
       if (PATIENT_MODE === 'new') {
@@ -1072,7 +1077,12 @@
         });
         patientId = patientRes?.data?.user?.id;
         patientName = patientRes?.data?.user?.name || name;
-        patientPhone = patientRes?.data?.user?.phone || phone;
+        patientPhone = normalizePhone(
+          patientRes?.data?.user?.phone,
+          phone,
+          patientRes?.data?.user?.email,
+          email
+        );
         petName = patientRes?.data?.pet?.name || newPetName;
         CURRENT_PATIENT = { id: patientId, name: patientName, phone: patientPhone };
         PREFERRED_PATIENT_ID = patientId;
@@ -1123,6 +1133,15 @@
       return Object.values(list);
     }
     return [];
+  }
+
+  function normalizePhone(...candidates) {
+    for (const value of candidates) {
+      if (typeof value !== 'string') continue;
+      const cleaned = value.replace(/\s+/g, '').trim();
+      if (cleaned) return cleaned.slice(0, 20);
+    }
+    return '0000000000';
   }
 
   function init() {
