@@ -6,15 +6,84 @@
     $snoutiqLogo = 'data:image/webp;base64,UklGRg4IAABXRUJQVlA4WAoAAAAQAAAAewAAFwAAQUxQSIMEAAABoIZt2zE3ukeZaLpp0Nic2HZq2+10bdu1bdu2GU1t23aScvLdPz4Eu/0fERMAsV2Amxa1VvXjxkFOAHRpMSr8J+39nVWQD5t8WSCfbWxuJeVnNpd2k3I0m82TNVX5g+Spprre9/h2ga4qvuvNyteIvjWbzdlydo2X3LVQqNj5qUHi38eUtuxzlDCSvNNZwpVkkbYqD0ny+U6Ku1Ql7A6V3xSNItlKJus05R9/qQWyBJJvLj0WSC5TwCd+1fdCJPuDgrR/DbWg6RMqtfTTYxAplLSOSfvtEVnmqIBT1dV2XFErBTMtHQC/LQcPHjx4h+TlgwcPHtxYlbBdJIXT6ycvNL8keftDrCcfxQPQDCfZWImlW7X9pUAotFXCqYDa3mAwGEaQ7GkwGAz2VVluIV/87qoB7FpcJ3nPcQX54lMrACEfffRRsBLeS5Wzdnb1jUhIiIswelsBrvfkSvwAaFyNEdFJiXNY6mKjgngQyY6QV+D7hnz6lwqSGWUkP+1P8skfblAqEkjudpLYFxZojImPNMZltu3UpVuqHcbIPGwEaJO7dunYPi8ufALPG4OCHWqkLclCF8guIDnL4xFJCsdntbZRtGcKydEaUZEWiv2ad2q8T6KsvS69Y2t/NSQH8jQAVY30Jvkb5NNfkkcQt1ag5LWBegWr7M6SLzvJtUkAVDYeIdGR/o5wCzxA8mVrlb0LDL7h0aHetsAMlkK22saS7KbAeJe8Bvj33v9IxJe91QrQw0IWRktp5n6V2LRdm0Z5ufkNWgRD1fY+OUMLwLVVg7zc/IatOrTdz21WNTWS5EcKoh6SFwCgTnTnWScryTfZSjQzycrdJPf6xqcVfeOigVjl4BtmC02vZxVuAHShAY4aiAOvc3hKop99jXxHcrxarpuF3BmbmhpjBcBjMcnRtgrgVChQvNdTi6UD9IDOOyK/aXZsmC3Q9nWFTiIqu2mjSF8b9KpkCnQuvn51aiCZ5OVGMs7nSfbb9+TJES8AaEFykbMSpN2XKNICI/b462KysuPqQFI1gQyFrE1sdk7GNt6wAgC9ew3oH5JCsZ1UP5LMX0VahmgB1S8kJ9opwudv5RpxbJwtFCY8eLtxjJx4yuvXvSBfbfi1jOSpjn5qp8wVJFmIViR5ZsLoLW9INocy/QI5zZknTaGwXrFleurb7hoFP5FL9bVA27+SYoGSO4OA7W8pv19VBYTdkEH3h9dT1TKBR1jij8IXH1pJvfcTeTsStQC2Cywi6WNBADz73hYkHm0NRlXUrcpk9L+9vDolxdXWziP2n6u8VQCk3iybludbt17E5+a3vNhdXSvg+OeRN1LPxoVBrDGaRi9dMfvHeDtIOphMpjwJoKHJ1EQFANa/P2HZ6f37zz2hcKixCkBCkfD68tGT9wUKRSEaKI03mUx+CpJMJpO3DFSODfvNXHmPvOWIWm39/WlKCqsiIRm7o5Jiy5IA1G7VdJLjAmz0tQhQZfeeunzCz0bIqwM+mTB9cIe6qPXx5yh+U6v+TyNvvcvguuDklWsX31VQO7h7egAAVlA4IGQDAADQEgCdASp8ABgAPikSiEKhoSEUDASsGAKEsTZ5rJAqv4wc8BrX3eycvk4+v/arpQHqA/VX1Afqr+mfsS/4D2AfQB7sHWNegB+m/pO/sp8E37UfuB7On/3utPKznyNd9agsbXnEf2/k7+kf16+AX9S+rN6G36iL/DUiMOq9J9l1WZ0rdDtwBwm4+9B2jljOP/aawCjUwWLzCp38aD59RAAA/v+Gd293E6vWPO9F2kfJfLYUW4uImn6uWpT+acEUS8V5CD/5/yb4wewE/vFuUWjpWV2dSXWXs/rR9kP4ebHHLYM8bzekNNH7W7FobTDNsvs3BRoHFGBsRed4ha+eN2PUs17WBrJY8mJTOLlPAvSOxqX+sHFudIO4258o3SjqaqL8v22nMA2VbAWyEW3vPdLKaO7mdHzwm25+sfyfMMVo9zklo4O7Wf7dR3dT/nf9BjqEpfrVriTbu+8X0lcnb52zjURLtYqd/ZyGYbKPnfHX2ytPYkU6QtHYZB+jLyRV//92JsG55/9DG1H5hnAgR/N08RaReGPin5GXH//huAoF9Lf9lFuRNyh+BVtF2+pw0AcVzz8eL/6ZRZPJj6UB3FYpni1v/hfOBuSoAO9g4dDPKW1n+JU+Bep8K1y6V6AWSzJ/4izRbIRRa25dz33kg/rRaHdLzbusMmgAINoCtRJrWmrP8iNWrZHo+j8E7r3L945LOu8IzPuJfiMfLpwd+dxbgbPdMfJTEHn4SqagEjfAHON2LylrXPl1hic/drfMEPBcunEXobLKtSMUm+PIQ8WNj1GfTg/HcBu8+j3yToP/aPTS+cy6pQhiQ+U5jWgaD1bv5fEAMO4C/4AGUtNJWsP+EP8r3sHly3xjrWLwbkq8Pz3I9Nz72GFoB6j1Ud0OPuB/5SxuvCtdF8CgM9exchC8jJHrGC9QNE7u4T6ZhGewkC6lNvnwJbNJ7yhM4W/1YUoUeuW+1h6XId/7/MbxG0D/RSJiyfGVkl4S3K863rMvPIshgDbCqYz4Yk0JrZfUor8TrBkcqV/jbwfRtpnmfzLdo6GDNxBfzlibwq7eIxAmytZGX1rN5QUrBVQB+Sn+6RvIjkjEe3lp5/wWm/LnPJXY5yuwD/xhFA5y1MzIAptZdNU7RYCYL0pYCJfXTZzR8U5AOAAA';
     $appDownloadUrl = 'https://play.google.com/store/apps/details?id=com.petai.snoutiq';
     $downloadQrSrc  = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' . urlencode($appDownloadUrl);
+    $clinicName     = $vet->name ?? 'SnoutIQ Clinic';
+    $clinicCity     = $vet->city ?? 'Veterinary Clinic';
+    $rawClinicPhone = $vet->mobile ?: '';
+    $cleanDigits    = preg_replace('/\D+/', '', $rawClinicPhone);
+    $clinicPhone    = ($cleanDigits === '1244568900') ? '' : $rawClinicPhone;
+    $phoneHref      = $clinicPhone ? 'tel:' . preg_replace('/[^0-9+]/', '', $clinicPhone) : 'tel:#';
+    $clinicEmail    = $vet->email ?? 'care@snoutiq.com';
+    $services       = $services ?? collect();
   @endphp
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{{ $vet->name }} | SnoutIQ</title>
-  <meta name="description" content="Book appointments at {{ $vet->name }}. Video consults, clinic visits, vaccinations and more."/>
+  <title>{{ $clinicName }} | SnoutIQ</title>
+  <meta name="description" content="Book appointments at {{ $clinicName }}. Video consults, clinic visits, vaccinations and more."/>
   <link rel="icon" href="{{ $snoutiqLogo }}" sizes="32x32" type="image/png"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              200: '#bfdbfe',
+              300: '#93c5fd',
+              400: '#60a5fa',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            },
+            secondary: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              200: '#e2e8f0',
+              300: '#cbd5e1',
+              400: '#94a3b8',
+              500: '#64748b',
+              600: '#475569',
+              700: '#334155',
+              800: '#1e293b',
+              900: '#0f172a',
+            }
+          },
+          fontFamily: {
+            'sans': ['Inter', 'system-ui', 'sans-serif'],
+            'heading': ['Poppins', 'Inter', 'sans-serif'],
+          },
+          spacing: {
+            '18': '4.5rem',
+            '88': '22rem',
+            '128': '32rem',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    .section-padding { padding-top: 5rem; padding-bottom: 5rem; }
+    @media (max-width: 768px) {
+      .section-padding { padding-top: 3rem; padding-bottom: 3rem; }
+    }
+    .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+    .testimonial-card {
+      background: linear-gradient(145deg, #ffffff, #f8fafc);
+      box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.05), -5px -5px 15px rgba(255, 255, 255, 0.8);
+    }
+    .gradient-bg { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%); }
+    .qr-code { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); }
+  </style>
 
-  {{-- Optional: pass user/token from backend if available --}}
   <script>
     window.SNOUTIQ = {
       user: @json($authUser ?? null),
@@ -22,7 +91,6 @@
     };
   </script>
 
-  {{-- Meta Pixel (delayed 7s) --}}
   <script>
     setTimeout(function() {
       !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -32,102 +100,8 @@
       fbq('init','1909812439872823'); fbq('track','PageView');
     },7000);
   </script>
-
-  <!-- SweetAlert2 -->
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <!-- Razorpay Checkout -->
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-
-  <style>
-/* ======== Light Theme ======== */
-:root{
-  --bg:#cfe1ff;--bg-2:#ffffff;--border:#d1ddff;--muted:#55607a;--text:#0f172a;--heading:#0b1220;
-  --accent:#2563eb;--accent-2:#0ea5e9;--ring:rgba(37,99,235,.25);--success:#059669;
-  --sky1:#d7e6ff;--sky2:#d7e6ff;
-}
-*{margin:0;padding:0;box-sizing:border-box}
-body{
-  background:radial-gradient(1000px 500px at 20% -20%,var(--sky1),transparent 60%),
-             radial-gradient(1000px 500px at 120% 10%,var(--sky1),transparent 60%),
-             linear-gradient(180deg,var(--sky2),var(--bg));
-  color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Ubuntu,sans-serif;line-height:1.6
-}
-a{text-decoration:none;color:inherit}
-img{display:block;max-width:100%}
-.container{max-width:1120px;margin:0 auto;padding:1rem}
-.section{padding:3rem 0}
-@media(min-width:768px){.section{padding:4rem 0}}
-.card{background:var(--bg-2);border:1px solid var(--border);border-radius:1rem;box-shadow:0 10px 30px -12px rgba(37,99,235,.15)}
-.pill{display:inline-flex;align-items:center;gap:.5rem;background:#ecf3ff;border:1px solid var(--border);color:var(--accent);border-radius:999px;padding:.35rem .7rem;font-size:.85rem;font-weight:600}
-.tag{display:inline-flex;align-items:center;gap:.5rem;background:#ecf9ff;border:1px solid #c7ebff;color:#0284c7;border-radius:999px;padding:.3rem .75rem;font-weight:700}
-.muted{color:var(--muted)}
-.heading{color:var(--heading)}
-.grid{display:grid;gap:1rem}
-@media(min-width:768px){.grid-2{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:repeat(3,1fr)}.grid-4{grid-template-columns:repeat(4,1fr)}}
-.btn{display:inline-flex;align-items:center;gap:.55rem;border:none;border-radius:.75rem;padding:.8rem 1.2rem;font-weight:700;cursor:pointer;transition:all .15s}
-.btn:focus{outline:2px solid var(--ring);outline-offset:2px}
-.btn-primary{background:linear-gradient(90deg,#3b82f6,#06b6d4);color:#fff}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 12px 30px -10px rgba(59,130,246,.4)}
-.btn-outline{background:#f8fbff;color:var(--accent);border:1px solid var(--border)}
-.btn-outline:hover{background:#eef6ff}
-nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
-.nav-wrap{height:70px;display:flex;align-items:center;justify-content:space-between}
-.logo{display:flex;align-items:center;gap:.5rem;font-weight:800;color:var(--accent);cursor:pointer}
-.logo img{height:20px}
-.input,.select,textarea{width:100%;padding:.85rem 1rem;border-radius:.75rem;border:1px solid var(--border);background:#fbfdff;color:#0f172a}
-.input:focus,.select:focus,textarea:focus{outline:2px solid var(--ring);border-color:transparent}
-label{font-size:.9rem;color:#334155}
-.doc-img{width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid var(--border)}
-/* download & qr */
-.download-wrap{display:flex;justify-content:center}
-.download-card{display:flex;flex-wrap:wrap;align-items:center;gap:1.25rem;justify-content:space-between;background:#fff;border:1px solid #d8e6ff;border-radius:20px;padding:18px 20px;box-shadow:0 18px 40px -26px rgba(37,99,235,.45);max-width:620px;width:100%;margin:0 auto}
-.download-left{display:flex;flex-direction:column;gap:.45rem;flex:1 1 260px;text-align:left}
-.download-chip{display:inline-flex;align-items:center;gap:.45rem;padding:.38rem .75rem;border-radius:999px;background:#e8f1ff;border:1px solid #d7e6ff;font-weight:800;color:#2563eb;font-size:.85rem;width:max-content}
-.download-sub{color:#55607a;font-size:.95rem;max-width:420px}
-.download-actions{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin-top:.15rem}
-.qr-card{display:flex;flex-direction:column;align-items:center;gap:6px;background:#f8fbff;border:1px solid var(--border);padding:14px 16px;border-radius:16px;box-shadow:0 10px 28px -18px rgba(37,99,235,.35)}
-.qr-card img{width:150px;height:150px;border-radius:12px;border:1px solid #dfe7ff}
-.qr-label{font-weight:800;color:#334155;font-size:.95rem}
-.qr-sub{color:#64748b;font-size:.85rem}
-.referral-card{display:flex;align-items:center;justify-content:space-between;gap:.9rem;flex-wrap:wrap;padding:1rem 1.2rem;background:linear-gradient(180deg,#f5f9ff,#e6f1ff);border-radius:16px;border:1px solid #d5e4ff;box-shadow:0 16px 40px -28px rgba(37,99,235,.6);max-width:540px;margin:0 auto}
-.referral-code{font-weight:900;font-size:1.15rem;letter-spacing:.08em;color:#0b1220}
-.referral-chip{display:inline-flex;align-items:center;gap:.45rem;padding:.35rem .75rem;border-radius:999px;background:#ecf3ff;border:1px solid var(--border);color:var(--accent);font-weight:800;font-size:.82rem;text-transform:uppercase}
-.ai-cta{border:none;background:none;color:var(--accent);font-weight:700;cursor:pointer;padding:0 .2rem;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
-.ai-cta:focus{outline:2px solid var(--ring);outline-offset:2px;border-radius:6px}
-.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;padding:1rem;z-index:999}
-.modal-card{background:#fff;border-radius:16px;border:1px solid var(--border);max-width:420px;width:100%;padding:1.5rem;box-shadow:0 18px 45px -20px rgba(15,23,42,.4)}
-.modal-head{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.35rem}
-.modal-title{font-size:1.1rem;font-weight:800;color:var(--heading)}
-.modal-close{border:none;background:transparent;font-size:1.1rem;cursor:pointer;color:#475569}
-.modal-actions{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1rem}
-/* Quick services */
-.qsvc-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
-.qsvc-btn{background:#ecf3ff;border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:10px 12px;text-align:center;font-weight:800;cursor:pointer}
-.qsvc-btn:hover{background:#e6f0ff}
-.qsvc-btn[disabled]{opacity:.55;cursor:not-allowed;filter:grayscale(1)}
-/* reels */
-.reel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
-.reel-card{position:relative;background:#eef4ff;border:1px solid var(--border);border-radius:12px;padding:18px 16px;min-height:120px;display:flex;align-items:flex-end;overflow:hidden}
-.reel-play{position:absolute;top:10px;right:10px;background:#00000012;border:1px solid #0000001a;color:#111;padding:.35rem .55rem;border-radius:8px;font-weight:800}
-.reel-title{font-weight:800;color:#0f172a}
-/* offers */
-.offers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
-.offer-card{position:relative;background:#ffffff;border:1px solid var(--border);border-radius:12px;padding:14px}
-.badge{position:absolute;top:10px;right:10px;border-radius:999px;padding:.25rem .6rem;font-weight:800;font-size:.8rem}
-.badge-pink{background:#ffe4f1;color:#be185d;border:1px solid #fbcfe8}
-.badge-purple{background:#efe9ff;color:#6d28d9;border:1px solid #ddd6fe}
-.badge-blue{background:#e6f5ff;color:#0369a1;border:1px solid #bae6fd}
-.offer-title{font-weight:800;margin-bottom:.1rem}
-.offer-sub{color:#55607a;margin-bottom:.4rem}
-.price-old{text-decoration:line-through;color:#64748b;margin-right:.5rem}
-.price-new{font-weight:900;color:#0ea5e9}
-/* floating AI btn */
-.ai-fab{position:fixed;right:16px;bottom:16px;border:none;border-radius:999px;width:54px;height:54px;display:grid;place-items:center;font-size:22px;background:linear-gradient(90deg,#3b82f6,#06b6d4);color:#fff;box-shadow:0 14px 30px -10px rgba(59,130,246,.45);cursor:pointer}
-.ai-fab:focus{outline:2px solid var(--ring);outline-offset:2px}
-  </style>
 </head>
-<body>
-
+<body class="font-sans text-secondary-800 bg-white">
   @php
     $qrI = request('qr_i');
     $qrCounted = request('qr_counted');
@@ -137,305 +111,1013 @@ label{font-size:.9rem;color:#334155}
   @endif
 
   @if($isDraft)
-  <section class="container" style="padding:4rem 1rem 3rem;text-align:center">
-    <div class="card" style="padding:2.5rem 2rem;max-width:640px;margin:0 auto">
-      <span class="pill" style="margin-bottom:1rem">🚧 Clinic Profile In Draft</span>
-      <h1 class="heading" style="font-size:2.2rem;margin-bottom:.75rem">{{ $vet->name ?? 'SnoutIQ Clinic' }}</h1>
-      <p class="muted" style="margin:0 auto 1.5rem;max-width:480px">
-        This clinic page is being set up with SnoutIQ. Share the QR or short link below so the clinic owner can claim
-        the profile and complete onboarding. Until then, we only show safe placeholder details to the public.
-      </p>
-
-      <div class="card" style="padding:1rem;margin-bottom:1.25rem">
-        <p class="muted" style="font-size:.9rem;margin-bottom:.35rem">Permanent short link</p>
-        <a href="{{ $publicUrl }}" data-permanent-short-link style="font-weight:700;color:var(--accent)">{{ $publicUrl }}</a>
-      </div>
-
-      @if($canClaim)
-        @php $claimToken = request('claim_token'); @endphp
-        <p style="margin-bottom:1rem">Looks like you have the invite link. Claim this clinic to unlock full editing.</p>
-        <a class="btn btn-primary" style="justify-content:center"
-           href="https://snoutiq.com/backend/custom-doctor-register?claim_token={{ urlencode($claimToken) }}&public_id={{ $vet->public_id }}">
-          Claim This Clinic
-        </a>
-      @else
-        <div style="display:flex;flex-wrap:wrap;gap:.75rem;justify-content:center">
-          <a class="btn btn-outline" style="justify-content:center" href="https://snoutiq.com/contact?topic=clinic">
-            Notify Me
-          </a>
-          <a class="btn btn-primary" style="justify-content:center" href="https://snoutiq.com/contact">
-            Talk To SnoutIQ Sales
-          </a>
-        </div>
-      @endif
-    </div>
-  </section>
-
-  @php
-    $draftMapQuery = trim((string)($mapQuery ?? ''));
-    $draftMapSrc = null;
-    if ($draftMapQuery !== '') {
-        $encodedQuery = urlencode($draftMapQuery);
-        if (!empty($mapsEmbedKey)) {
-            $draftMapSrc = 'https://www.google.com/maps/embed/v1/place?key='.urlencode($mapsEmbedKey).'&q='.$encodedQuery;
-        } else {
-            $draftMapSrc = 'https://maps.google.com/maps?q='.$encodedQuery.'&t=&z=13&ie=UTF8&iwloc=&output=embed';
-        }
-    }
-  @endphp
-
-  @if($draftMapSrc)
-  <section class="container" style="padding:0 1rem 3rem">
-    <div class="card" style="padding:1.5rem;max-width:720px;margin:0 auto">
-      <div style="display:flex;flex-direction:column;gap:.65rem;align-items:center;text-align:center">
-        <span class="pill" style="margin-bottom:.25rem">📍 Location Preview</span>
-        <div class="muted" style="max-width:520px">
-          {{ $vet->formatted_address ?? $vet->address ?? $vet->city ?? 'Location coming soon' }}
-        </div>
-        <div style="width:100%;border-radius:1rem;overflow:hidden;border:1px solid var(--border);box-shadow:0 15px 35px -25px rgba(15,23,42,.4)">
-          <iframe
-            src="{{ $draftMapSrc }}"
-            width="100%"
-            height="320"
-            style="border:0"
-            allowfullscreen
-            loading="lazy"
-            referrerpolicy="no-referrer-when-downgrade"></iframe>
-        </div>
-      </div>
-    </div>
-  </section>
-  @endif
-  @endif
-
-  @unless($isDraft)
-
-  <!-- Nav -->
-  <nav>
-    <div class="container nav-wrap">
-      <div class="logo" onclick="location.href='https://snoutiq.com'">
-        <img src="{{ $snoutiqLogo }}" alt="SnoutIQ"/> {{ $vet->name }}
-      </div>
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <button class="btn btn-outline" onclick="location.href='https://snoutiq.com/backend/custom-doctor-login'">Vet Login</button>
-        <!-- <button class="btn btn-primary" onclick="location.href='https://snoutiq.com/vet-register'">Vet Register</button> -->
-      </div>
-    </div>
-  </nav>
-
-  <!-- Clinic profile CTA row -->
-  <header class="container" style="text-align:center;padding:12px 0 8px">
-    <span class="tag">🏥 Clinic Profile • {{ $vet->business_status === 'OPERATIONAL' ? 'Open' : 'Status Unknown' }}</span>
-    <h1 class="heading" style="font-size:2rem;margin:.7rem 0">{{ $vet->name }}</h1>
-    @if(!empty($referralCode))
-      <div class="card referral-card" aria-label="Clinic referral code" style="margin-top:.15rem">
-        <div style="display:flex;flex-direction:column;gap:.2rem;align-items:flex-start">
-          <span class="referral-chip"><i class="fa-solid fa-ticket"></i> Referral code</span>
-          <div class="referral-code">{{ $referralCode }}</div>
-          <div class="muted" style="font-size:.9rem">Share this to book directly at {{ $vet->name }}</div>
-        </div>
-        <button class="btn btn-outline" type="button" id="copy-referral-btn" data-referral="{{ $referralCode }}" style="white-space:nowrap">
-          <i class="fa-solid fa-copy"></i> Copy
-        </button>
-      </div>
-    @endif
-    <p class="muted" style="max-width:820px;margin:0 auto 1rem">
-      {{ $vet->formatted_address ?? $vet->address ?? ($vet->city ?? '') }}
-      @if($vet->pincode) • {{ $vet->pincode }} @endif
-      @if(!is_null($vet->open_now)) • {{ $vet->open_now ? 'Open now' : 'Closed now' }} @endif
-    </p>
-    <div class="download-wrap" style="margin-top:.5rem">
-      <div class="download-card">
-        <div class="download-left">
-          <div class="download-chip"><i class="fa-solid fa-mobile-screen-button"></i> SnoutIQ App</div>
-          <div class="heading" style="font-size:1.4rem;font-weight:900">Download to book visits in 1 tap</div>
-          <div class="download-sub">Skip calls and queues. Book clinic visits, track care, and get reminders directly in the SnoutIQ app.</div>
-          <div class="download-actions">
-            <a class="btn btn-primary" href="{{ $appDownloadUrl }}" target="_blank" rel="noopener" id="download-app-btn">
-              <i class="fa-solid fa-download"></i> Download App
-            </a>
-            <span class="pill" style="background:#ecf9ff;border-color:#c7ebff;color:#0284c7"><i class="fa-brands fa-google-play"></i>&nbsp;Play Store</span>
+    @php
+      $draftMapQuery = trim((string)($mapQuery ?? ''));
+      $draftMapSrc = null;
+      if ($draftMapQuery !== '') {
+          $encodedQuery = urlencode($draftMapQuery);
+          if (!empty($mapsEmbedKey)) {
+              $draftMapSrc = 'https://www.google.com/maps/embed/v1/place?key='.urlencode($mapsEmbedKey).'&q='.$encodedQuery;
+          } else {
+              $draftMapSrc = 'https://maps.google.com/maps?q='.$encodedQuery.'&t=&z=13&ie=UTF8&iwloc=&output=embed';
+          }
+      }
+    @endphp
+    <section class="min-h-screen bg-secondary-50 flex items-center">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="max-w-3xl mx-auto bg-white border border-secondary-200 rounded-2xl shadow-xl p-8">
+          <div class="inline-flex items-center px-3 py-1 rounded-full bg-primary-100 text-primary-700 font-semibold mb-4">
+            <span class="mr-2">🚧</span> Clinic Profile In Draft
           </div>
+          <h1 class="font-heading text-3xl font-bold text-secondary-900 mb-3">{{ $clinicName }}</h1>
+          <p class="text-secondary-600 mb-6">
+            This clinic page is being set up with SnoutIQ. Share the QR or short link below so the clinic owner can claim
+            the profile and complete onboarding. Until then, only safe placeholder details are visible to the public.
+          </p>
+
+          <div class="bg-secondary-50 border border-secondary-200 rounded-xl p-4 mb-6">
+            <p class="text-secondary-600 text-sm mb-2">Permanent short link</p>
+            <a href="{{ $publicUrl }}" data-permanent-short-link class="text-primary-700 font-semibold break-words">{{ $publicUrl }}</a>
+          </div>
+
+          @if($canClaim)
+            @php $claimToken = request('claim_token'); @endphp
+            <p class="text-secondary-700 mb-4">Looks like you have the invite link. Claim this clinic to unlock full editing.</p>
+            <a class="inline-flex items-center justify-center bg-primary-600 hover:bg-primary-700 text-white font-semibold px-5 py-3 rounded-lg transition-colors"
+               href="https://snoutiq.com/backend/custom-doctor-register?claim_token={{ urlencode($claimToken) }}&public_id={{ $vet->public_id }}">
+              Claim This Clinic
+            </a>
+          @else
+            <div class="flex flex-wrap gap-3">
+              <a class="inline-flex items-center justify-center bg-white border border-secondary-200 text-primary-700 font-semibold px-5 py-3 rounded-lg hover:bg-secondary-50 transition-colors"
+                 href="https://snoutiq.com/contact?topic=clinic">
+                Notify Me
+              </a>
+              <a class="inline-flex items-center justify-center bg-primary-600 hover:bg-primary-700 text-white font-semibold px-5 py-3 rounded-lg transition-colors"
+                 href="https://snoutiq.com/contact">
+                Talk To SnoutIQ Sales
+              </a>
+            </div>
+          @endif
         </div>
-        <div class="qr-card" aria-label="Download app QR">
-          <img src="{{ $downloadQrSrc }}" alt="QR code to download the SnoutIQ app"/>
-          <div class="qr-label">Scan to download</div>
-          <div class="qr-sub">Opens the same link</div>
-        </div>
-      </div>
-    </div>
-  </header>
 
-  <div class="modal-backdrop" id="app-download-modal" role="dialog" aria-modal="true" aria-labelledby="app-download-title" aria-describedby="app-download-desc">
-    <div class="modal-card">
-      <div class="modal-head">
-        <div class="modal-title" id="app-download-title">Use this feature in the app</div>
-        <button class="modal-close" type="button" data-app-modal-close aria-label="Close">×</button>
-      </div>
-      <p class="muted" id="app-download-desc" style="margin-top:.1rem">
-        Get the SnoutIQ app to continue with bookings, payments, and care updates.
-      </p>
-      <div class="modal-actions">
-        <a class="btn btn-primary" href="{{ $appDownloadUrl }}" target="_blank" rel="noopener" id="app-modal-download">
-          <i class="fa-solid fa-download"></i> Download App
-        </a>
-        <button class="btn btn-outline" type="button" data-app-modal-close>Not now</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Quick Services (DYNAMIC) -->
-  <section class="container" id="quick-services" style="padding:0 1rem 1.25rem">
-    <div class="card" style="padding:10px">
-      <div class="bar" style="display:flex;align-items:center;gap:.5rem;font-weight:800;background:#e1edff;border:1px solid var(--border);color:var(--accent);border-radius:10px;padding:.6rem .8rem;margin-bottom:.75rem">
-        <span>⚡</span> <span>Quick Services</span>
-      </div>
-      <div id="qsvc-loading" class="muted" style="padding:.5rem 0">Loading services…</div>
-      <div id="qsvc-grid" class="qsvc-grid" style="display:none"></div>
-      <div id="qsvc-empty" class="muted" style="text-align:center;margin-top:.6rem;display:none">No services available right now.</div>
-    </div>
-  </section>
-
-  <!-- Reviews -->
-  <section class="container" id="reviews" style="padding:0 1rem 2rem">
-    <div class="card" style="padding:10px">
-      <div class="bar" style="display:flex;align-items:center;gap:.5rem;font-weight:800;background:#e1edff;border:1px solid var(--border);color:#2563eb;border-radius:10px;padding:.6rem .8rem;margin-bottom:.75rem">
-        <span>⭐</span> <span>Reviews (4.9/5)</span>
-      </div>
-      <div class="rev-item" style="background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:.7rem .9rem;color:#0f172a"><div style="font-weight:800;margin-bottom:.2rem">Priya S.</div><div>"AI diagnosis was perfect! Quick video call saved my cat."</div></div>
-      <div class="rev-item" style="background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:.7rem .9rem;color:#0f172a;margin-top:.6rem"><div style="font-weight:800;margin-bottom:.2rem">Rakesh M.</div><div>"Emergency service at 2 AM. Excellent response time."</div></div>
-    </div>
-  </section>
-
-  <!-- Current Offers -->
-  <section class="container section" id="offers">
-    <h2 class="heading">Current Offers</h2>
-    <div class="offers-grid" style="margin-top:1rem">
-      <div class="offer-card">
-        <div class="badge badge-pink">50% OFF</div>
-        <div class="offer-title">New Pet Package</div>
-        <div class="offer-sub">Complete checkup + vaccines</div>
-        <div><span class="price-old">₹1,998</span><span class="price-new">₹999</span></div>
-      </div>
-      <div class="offer-card">
-        <div class="badge badge-purple">LIMITED</div>
-        <div class="offer-title">Emergency Plan</div>
-        <div class="offer-sub">24/7 support for 1 year</div>
-        <div><span class="price-new">₹1,999/year</span></div>
-      </div>
-      <div class="offer-card">
-        <div class="badge badge-blue">NEW</div>
-        <div class="offer-title">AI Health Monitor</div>
-        <div class="offer-sub">Wearable + monthly reports</div>
-        <div><span class="price-new">₹899/month</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Quick stats -->
-  <section class="container" style="margin-top:-.1rem">
-    <div class="grid grid-3">
-      <div class="card" style="padding:1.1rem;text-align:center">
-        <div style="font-size:1.4rem;font-weight:800;color:var(--success)">{{ number_format((float)($vet->rating ?? 4.7), 1) }}★</div>
-        <div class="muted" style="font-size:.95rem">{{ $vet->user_ratings_total ?? 0 }} reviews</div>
-      </div>
-      <div class="card" style="padding:1.1rem;text-align:center">
-        <div style="font-size:1.4rem;font-weight:800;color:#2563eb">{{ $vet->city ?? '—' }}</div>
-        <div class="muted" style="font-size:.95rem">City</div>
-      </div>
-      <div class="card" style="padding:1.1rem;text-align:center">
-        <div style="font-size:1.4rem;font-weight:800;color:#0ea5e9">Cashless soon</div>
-        <div class="muted" style="font-size:.95rem">Insurance support</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Doctors -->
-  @php
-    $genericDoctorImg = 'data:image/svg+xml;base64,' . base64_encode(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="none"><rect width="96" height="96" rx="16" fill="#E5E7EB"/><circle cx="48" cy="36" r="16" fill="#CBD5E1"/><path d="M24 76c0-13.255 10.745-24 24-24s24 10.745 24 24" stroke="#CBD5E1" stroke-width="8" stroke-linecap="round"/></svg>'
-    );
-  @endphp
-  <section class="container section" id="doctors">
-    <h2 class="heading">Our Doctors</h2>
-    @php $doctors = $vet->doctors()->orderBy('doctor_name')->get(); @endphp
-    @if($doctors->isEmpty())
-      <div class="card" style="padding:1rem;margin-top:1rem"><p class="muted">No doctors listed yet. Please check back soon.</p></div>
-    @else
-      <div class="grid grid-3" style="margin-top:1rem">
-        @foreach($doctors as $doc)
-          <div class="card" style="padding:1rem;display:flex;gap:1rem;align-items:center">
-            <img class="doc-img" src="{{ $doc->doctor_image ?: $genericDoctorImg }}" alt="{{ $doc->doctor_name ?: 'Doctor' }}">
-            <div style="flex:1">
-              <div class="heading" style="font-weight:800">{{ $doc->doctor_name }}</div>
-              <div class="muted" style="margin:.15rem 0">
-                @if($doc->doctor_license) License: {{ $doc->doctor_license }} • @endif
-                @if($doc->doctor_email) <a href="mailto:{{ $doc->doctor_email }}" style="color:var(--accent)">Email</a>@endif
+        @if($draftMapSrc)
+          <div class="max-w-3xl mx-auto mt-8 bg-white border border-secondary-200 rounded-2xl shadow-xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-secondary-100 flex items-center justify-between">
+              <div>
+                <div class="text-sm text-secondary-500 uppercase tracking-wide">Location Preview</div>
+                <div class="text-secondary-800 font-semibold">{{ $vet->formatted_address ?? $vet->address ?? $vet->city ?? 'Location coming soon' }}</div>
               </div>
-              <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
-                <button class="pill" type="button" data-app-modal-open><i class="fa-solid fa-phone"></i>&nbsp;Call</button>
-                <button class="pill" type="button" data-app-modal-open><i class="fa-solid fa-video"></i>&nbsp;Video Consult</button>
+              <div class="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center text-primary-600">
+                <i class="fas fa-map-marker-alt"></i>
+              </div>
+            </div>
+            <div class="aspect-[4/3]">
+              <iframe
+                src="{{ $draftMapSrc }}"
+                width="100%"
+                height="100%"
+                style="border:0"
+                allowfullscreen
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"></iframe>
+            </div>
+          </div>
+        @endif
+      </div>
+    </section>
+  @else
+    @php
+      $mapQuery = ($vet->lat && $vet->lng) ? ($vet->lat.','.$vet->lng) : ($vet->formatted_address ?: ($vet->address ?: $vet->city));
+      $mapSrc = null;
+      if (!empty($mapQuery)) {
+          $encodedQuery = urlencode($mapQuery);
+          if (!empty($mapsEmbedKey)) {
+              $mapSrc = 'https://www.google.com/maps/embed/v1/place?key='.urlencode($mapsEmbedKey).'&q='.$encodedQuery;
+          } else {
+              $mapSrc = 'https://maps.google.com/maps?q='.$encodedQuery.'&t=&z=13&ie=UTF8&iwloc=&output=embed';
+          }
+      }
+      $doctors = $vet->doctors()->orderBy('doctor_name')->get();
+    @endphp
+
+    <!-- Navigation -->
+    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-secondary-100">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-20">
+          <div class="flex items-center">
+            <div class="flex items-center space-x-2">
+              <div class="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center">
+                <i class="fas fa-paw text-white text-xl"></i>
+              </div>
+              <div>
+                <h1 class="font-heading text-xl font-bold text-primary-700">{{ $clinicName }}</h1>
+                <p class="text-xs text-secondary-500">{{ $clinicCity }}</p>
               </div>
             </div>
           </div>
-        @endforeach
-      </div>
-    @endif
-  </section>
 
-  <!-- Location -->
-  @php
-    $mapQuery = ($vet->lat && $vet->lng) ? ($vet->lat.','.$vet->lng) : ($vet->formatted_address ?: ($vet->address ?: $vet->city));
-  @endphp
-  <section class="container section" id="clinic">
-    <h2 class="heading">Location</h2>
-    <div class="card" style="padding:1rem;margin-top:1rem">
-      <div class="muted"><strong class="heading" style="font-size:1rem">Address:</strong> {{ $vet->formatted_address ?? $vet->address ?? '—' }}</div>
-      <div class="muted"><strong class="heading" style="font-size:1rem">Hours:</strong> Mon–Sat 10:00–18:00 • Sun closed</div>
-      <div style="margin-top:1rem;overflow:hidden;border-radius:.75rem;border:1px solid var(--border)">
-        <iframe src="https://maps.google.com/maps?q={{ urlencode($mapQuery) }}&t=&z=13&ie=UTF8&iwloc=&output=embed"
-                width="100%" height="300" style="border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+          <div class="flex items-center space-x-4">
+            @if(!empty($clinicPhone))
+              <a href="{{ $phoneHref }}" class="hidden sm:inline-flex items-center space-x-2 text-secondary-700 hover:text-primary-600">
+                <i class="fas fa-phone"></i>
+                <span class="font-medium">{{ $clinicPhone }}</span>
+              </a>
+            @endif
+            <a href="{{ $appDownloadUrl }}" target="_blank" rel="noopener" class="bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-5 rounded-lg transition-colors shadow-md">
+              <i class="fas fa-mobile-alt mr-2"></i>Get App
+            </a>
+          </div>
+        </div>
       </div>
-    </div>
-  </section>
+    </header>
 
-  <!-- Footer -->
-  <footer>
-    <div class="container section" style="padding:2rem 1rem">
-      <div class="grid grid-3">
-        <div>
-          <div class="logo" onclick="location.href='https://snoutiq.com'">
-            <img src="{{ $snoutiqLogo }}" alt="SnoutIQ"/> SnoutIQ
+    <main>
+      <!-- Hero Section with App Download -->
+      <section id="app-download" class="gradient-bg section-padding">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="grid lg:grid-cols-2 gap-12 items-center">
+            <div class="max-w-xl">
+              <div class="inline-flex items-center px-3 py-1 rounded-full bg-primary-100 text-primary-700 text-sm font-medium mb-6">
+                <i class="fas fa-star mr-2"></i> Partnered with SnoutIQ
+              </div>
+              <h1 class="font-heading text-4xl md:text-5xl font-bold text-secondary-900 mb-6 leading-tight">
+                Premium Care for Your <span class="text-primary-600">Furry Family</span>
+              </h1>
+              <p class="text-lg text-secondary-600 mb-8">
+                At {{ $clinicName }}, we combine expert veterinary medicine with compassionate care.
+                Download the SnoutIQ app for seamless appointment booking, health tracking, and 24/7 pet support.
+              </p>
+
+              <div class="mb-10">
+                <h3 class="font-medium text-secondary-900 mb-4">Download SnoutIQ App</h3>
+                <div class="flex flex-wrap gap-4 mb-6">
+                  <a href="{{ $appDownloadUrl }}" target="_blank" rel="noopener" class="flex items-center bg-secondary-900 hover:bg-secondary-800 text-white px-6 py-3 rounded-lg transition-colors card-hover">
+                    <i class="fab fa-apple text-2xl mr-3"></i>
+                    <div>
+                      <div class="text-xs">Download on the</div>
+                      <div class="font-semibold">App Store</div>
+                    </div>
+                  </a>
+                  <a href="{{ $appDownloadUrl }}" target="_blank" rel="noopener" class="flex items-center bg-secondary-900 hover:bg-secondary-800 text-white px-6 py-3 rounded-lg transition-colors card-hover">
+                    <i class="fab fa-google-play text-xl mr-3"></i>
+                    <div>
+                      <div class="text-xs">Get it on</div>
+                      <div class="font-semibold">Google Play</div>
+                    </div>
+                  </a>
+                </div>
+
+                <div class="flex items-center text-secondary-600">
+                  <i class="fas fa-shield-alt text-primary-500 mr-2"></i>
+                  <span class="text-sm">Secure & HIPAA compliant • Thousands of pet parents trust SnoutIQ</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="relative">
+              <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto">
+                <div class="text-center mb-8">
+                  <h3 class="font-heading text-2xl font-bold text-secondary-900 mb-2">Scan to Download</h3>
+                  <p class="text-secondary-600">Use your phone camera to scan the QR code</p>
+                </div>
+
+                <div class="flex flex-col items-center">
+                  <div class="qr-code p-6 rounded-xl mb-6">
+                    <div class="w-48 h-48 bg-gradient-to-br from-primary-100 to-primary-300 rounded-lg flex items-center justify-center">
+                      <div class="w-40 h-40 bg-white rounded flex items-center justify-center">
+                        <img src="{{ $downloadQrSrc }}" alt="QR code to download the SnoutIQ app" class="w-32 h-32 object-contain rounded"/>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="text-center">
+                    <h4 class="font-medium text-secondary-900 mb-2">App Features</h4>
+                    <div class="grid grid-cols-2 gap-3 text-sm text-secondary-600">
+                      <div class="flex items-center">
+                        <i class="fas fa-calendar-check text-primary-500 mr-2"></i>
+                        <span>Easy Booking</span>
+                      </div>
+                      <div class="flex items-center">
+                        <i class="fas fa-file-medical text-primary-500 mr-2"></i>
+                        <span>Health Records</span>
+                      </div>
+                      <div class="flex items-center">
+                        <i class="fas fa-video text-primary-500 mr-2"></i>
+                        <span>Virtual Visits</span>
+                      </div>
+                      <div class="flex items-center">
+                        <i class="fas fa-bell text-primary-500 mr-2"></i>
+                        <span>Medication Alerts</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-primary-100 rounded-full -z-10"></div>
+              <div class="absolute -top-6 -right-6 w-40 h-40 bg-primary-50 rounded-full -z-10"></div>
+            </div>
           </div>
-          <p class="muted" style="margin-top:.6rem;max-width:420px">
-            Clinic landing powered by SnoutIQ. Book clinic & video consultations seamlessly.
-          </p>
         </div>
-        <div>
-          <div class="heading" style="font-weight:700;margin-bottom:.6rem">Policies</div>
-          <div class="muted" style="display:flex;flex-direction:column;gap:.3rem">
-            <a href="https://snoutiq.com/privacy-policy">Privacy Policy</a>
-            <a href="https://snoutiq.com/terms-of-service">Terms of Service</a>
-            <a href="https://snoutiq.com/cancellation-policy">Refund Policy</a>
-            <a href="https://snoutiq.com/cookie-policy">Cookie Policy</a>
-            <a href="https://snoutiq.com/medical-data-consent">Medical Disclaimer</a>
+      </section>
+
+      <!-- Services Section -->
+      <section id="services" class="section-padding bg-white">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center max-w-3xl mx-auto mb-16">
+            <h2 class="font-heading text-3xl md:text-4xl font-bold text-secondary-900 mb-4">Comprehensive Veterinary Services</h2>
+            <p class="text-lg text-secondary-600">From routine checkups to advanced surgical care, we provide everything your pet needs for a healthy, happy life.</p>
+          </div>
+
+          <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
+              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
+                <i class="fas fa-stethoscope text-primary-600 text-2xl"></i>
+              </div>
+              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Preventive Care</h3>
+              <p class="text-secondary-600 mb-5">Regular checkups, vaccinations, and wellness plans to keep your pet healthy and prevent diseases.</p>
+              <ul class="space-y-2 text-secondary-700">
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Annual Exams</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Vaccinations</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Parasite Prevention</span>
+                </li>
+              </ul>
+            </div>
+
+            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
+              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
+                <i class="fas fa-syringe text-primary-600 text-2xl"></i>
+              </div>
+              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Dental Care</h3>
+              <p class="text-secondary-600 mb-5">Professional dental cleanings, extractions, and oral health assessments to maintain your pet&apos;s dental hygiene.</p>
+              <ul class="space-y-2 text-secondary-700">
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Teeth Cleaning</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Oral Surgery</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Preventive Education</span>
+                </li>
+              </ul>
+            </div>
+
+            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
+              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
+                <i class="fas fa-clinic-medical text-primary-600 text-2xl"></i>
+              </div>
+              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Surgery</h3>
+              <p class="text-secondary-600 mb-5">State-of-the-art surgical suite for spays, neuters, soft tissue, and orthopedic procedures.</p>
+              <ul class="space-y-2 text-secondary-700">
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Spay/Neuter</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Orthopedic Surgery</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Advanced Anesthesia</span>
+                </li>
+              </ul>
+            </div>
+
+            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
+              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
+                <i class="fas fa-heartbeat text-primary-600 text-2xl"></i>
+              </div>
+              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Emergency Care</h3>
+              <p class="text-secondary-600 mb-5">24/7 emergency services for urgent medical situations requiring immediate attention.</p>
+              <ul class="space-y-2 text-secondary-700">
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Critical Care</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Trauma Treatment</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Toxicology</span>
+                </li>
+              </ul>
+            </div>
+
+            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
+              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
+                <i class="fas fa-microscope text-primary-600 text-2xl"></i>
+              </div>
+              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Diagnostics</h3>
+              <p class="text-secondary-600 mb-5">In-house laboratory, digital X-ray, and ultrasound for accurate and timely diagnoses.</p>
+              <ul class="space-y-2 text-secondary-700">
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Digital X-ray</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Ultrasound</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Bloodwork</span>
+                </li>
+              </ul>
+            </div>
+
+            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
+              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
+                <i class="fas fa-home text-primary-600 text-2xl"></i>
+              </div>
+              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Boarding & Grooming</h3>
+              <p class="text-secondary-600 mb-5">Safe, comfortable boarding and professional grooming services while you&apos;re away.</p>
+              <ul class="space-y-2 text-secondary-700">
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Medical Boarding</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Professional Grooming</span>
+                </li>
+                <li class="flex items-center">
+                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
+                  <span>Daycare Services</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="text-center mt-12">
+            <a href="#app-download" class="inline-flex items-center text-primary-600 font-semibold hover:text-primary-700">
+              <span>Book any service through SnoutIQ App</span>
+              <i class="fas fa-arrow-right ml-2"></i>
+            </a>
           </div>
         </div>
-        <div>
-          <div class="heading" style="font-weight:700;margin-bottom:.6rem">Contact</div>
-          <div class="muted">
-            {{ $vet->email ?? 'info@snoutiq.com' }}
-            @if($vet->mobile) • {{ $vet->mobile }} @endif
+      </section>
+
+      <!-- Doctor Showcase -->
+      <section id="doctors" class="section-padding bg-secondary-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center max-w-3xl mx-auto mb-16">
+            <h2 class="font-heading text-3xl md:text-4xl font-bold text-secondary-900 mb-4">Meet Our Veterinary Team</h2>
+            <p class="text-lg text-secondary-600">Our caring team is dedicated to providing exceptional care for your pets.</p>
           </div>
-          <div style="display:flex;gap:.5rem;margin-top:.7rem">
-            <a class="pill" href="https://www.instagram.com/snoutiq_marketplace/"><i class="fa-brands fa-instagram"></i>&nbsp;Instagram</a>
-            <a class="pill" href="https://www.facebook.com/people/Snoutiq/61578226867078/"><i class="fa-brands fa-facebook"></i>&nbsp;Facebook</a>
+
+          @if($doctors->isNotEmpty())
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              @foreach($doctors as $doc)
+                <div class="bg-white rounded-xl overflow-hidden card-hover">
+                  <div class="h-64 bg-gradient-to-r from-primary-100 to-primary-200 flex items-center justify-center">
+                    @if(!empty($doc->doctor_image))
+                      <img src="{{ $doc->doctor_image }}" alt="{{ $doc->doctor_name ?: 'Doctor' }}" class="w-40 h-40 rounded-full object-cover border-4 border-white shadow-md">
+                    @else
+                      <div class="text-center">
+                        <div class="w-40 h-40 rounded-full bg-white mx-auto mb-4 flex items-center justify-center">
+                          <i class="fas fa-user-md text-primary-500 text-6xl"></i>
+                        </div>
+                        <h3 class="font-heading text-2xl font-bold text-secondary-900">{{ $doc->doctor_name ?: 'Doctor' }}</h3>
+                        @if(!empty($doc->doctor_license))
+                          <p class="text-primary-600 font-medium">License {{ $doc->doctor_license }}</p>
+                        @endif
+                      </div>
+                    @endif
+                  </div>
+                  <div class="p-6">
+                    <p class="text-secondary-600 mb-4">
+                      {{ $doc->doctor_description ?? $doc->doctor_email ?? 'Available for consults via SnoutIQ. Connect for appointments and follow-ups.' }}
+                    </p>
+                    <div class="flex items-center text-sm text-secondary-500">
+                      @if(!empty($doc->doctor_email))
+                        <i class="fas fa-envelope mr-2"></i>
+                        <span>{{ $doc->doctor_email }}</span>
+                      @elseif(!empty($doc->doctor_license))
+                        <i class="fas fa-id-card mr-2"></i>
+                        <span>License {{ $doc->doctor_license }}</span>
+                      @else
+                        <i class="fas fa-graduation-cap mr-2"></i>
+                        <span>Clinic veterinarian</span>
+                      @endif
+                    </div>
+                  </div>
+                </div>
+              @endforeach
+            </div>
+          @else
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div class="bg-white rounded-xl overflow-hidden card-hover">
+                <div class="h-64 bg-gradient-to-r from-primary-100 to-primary-200 flex items-center justify-center">
+                  <div class="text-center">
+                    <div class="w-40 h-40 rounded-full bg-white mx-auto mb-4 flex items-center justify-center">
+                      <i class="fas fa-user-md text-primary-500 text-6xl"></i>
+                    </div>
+                    <h3 class="font-heading text-2xl font-bold text-secondary-900">Dr. Sarah Johnson</h3>
+                    <p class="text-primary-600 font-medium">Chief Veterinarian</p>
+                  </div>
+                </div>
+                <div class="p-6">
+                  <p class="text-secondary-600 mb-4">DVM with 15+ years of experience in internal medicine and surgery. Special interest in feline medicine.</p>
+                  <div class="flex items-center text-sm text-secondary-500">
+                    <i class="fas fa-graduation-cap mr-2"></i>
+                    <span>University of California, Davis</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-xl overflow-hidden card-hover">
+                <div class="h-64 bg-gradient-to-r from-primary-100 to-primary-200 flex items-center justify-center">
+                  <div class="text-center">
+                    <div class="w-40 h-40 rounded-full bg-white mx-auto mb-4 flex items-center justify-center">
+                      <i class="fas fa-user-md text-primary-500 text-6xl"></i>
+                    </div>
+                    <h3 class="font-heading text-2xl font-bold text-secondary-900">Dr. Michael Chen</h3>
+                    <p class="text-primary-600 font-medium">Surgical Specialist</p>
+                  </div>
+                </div>
+                <div class="p-6">
+                  <p class="text-secondary-600 mb-4">Expertise in orthopedic and soft tissue surgery. Passionate about pain management and rehabilitation.</p>
+                  <div class="flex items-center text-sm text-secondary-500">
+                    <i class="fas fa-graduation-cap mr-2"></i>
+                    <span>Cornell University College of Veterinary Medicine</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-xl overflow-hidden card-hover">
+                <div class="h-64 bg-gradient-to-r from-primary-100 to-primary-200 flex items-center justify-center">
+                  <div class="text-center">
+                    <div class="w-40 h-40 rounded-full bg-white mx-auto mb-4 flex items-center justify-center">
+                      <i class="fas fa-user-md text-primary-500 text-6xl"></i>
+                    </div>
+                    <h3 class="font-heading text-2xl font-bold text-secondary-900">Dr. Emily Rodriguez</h3>
+                    <p class="text-primary-600 font-medium">Emergency & Critical Care</p>
+                  </div>
+                </div>
+                <div class="p-6">
+                  <p class="text-secondary-600 mb-4">Specializing in emergency medicine and critical care. Available for urgent consultations.</p>
+                  <div class="flex items-center text-sm text-secondary-500">
+                    <i class="fas fa-graduation-cap mr-2"></i>
+                    <span>University of Florida College of Veterinary Medicine</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          @endif
+
+          <div class="text-center mt-12">
+            <a href="#app-download" class="bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 px-8 rounded-lg transition-colors shadow-md inline-flex items-center">
+              <i class="fas fa-calendar-alt mr-2"></i> Schedule Appointment with Our Team
+            </a>
           </div>
+        </div>
+      </section>
+
+      <!-- Testimonials -->
+      <section id="testimonials" class="section-padding bg-white">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center max-w-3xl mx-auto mb-16">
+            <h2 class="font-heading text-3xl md:text-4xl font-bold text-secondary-900 mb-4">What Pet Parents Say</h2>
+            <p class="text-lg text-secondary-600">Here is what our clients have to say about their experience at {{ $clinicName }}.</p>
+          </div>
+
+          <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="testimonial-card rounded-xl p-6">
+              <div class="flex items-center mb-6">
+                <div class="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mr-4">
+                  <i class="fas fa-user text-primary-600"></i>
+                </div>
+                <div>
+                  <h4 class="font-bold text-secondary-900">Jennifer L.</h4>
+                  <div class="flex text-amber-400">
+                    <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                  </div>
+                </div>
+              </div>
+              <p class="text-secondary-600 italic mb-4">"Exceptional care and a seamless experience with the SnoutIQ app for follow-ups and medication reminders."</p>
+              <div class="flex items-center text-sm text-secondary-500">
+                <i class="fas fa-paw mr-2"></i>
+                <span>Cat parent for 3 years</span>
+              </div>
+            </div>
+
+            <div class="testimonial-card rounded-xl p-6">
+              <div class="flex items-center mb-6">
+                <div class="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mr-4">
+                  <i class="fas fa-user text-primary-600"></i>
+                </div>
+                <div>
+                  <h4 class="font-bold text-secondary-900">Robert K.</h4>
+                  <div class="flex text-amber-400">
+                    <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                  </div>
+                </div>
+              </div>
+              <p class="text-secondary-600 italic mb-4">"The team treated our pet like family. App notifications for medication times have been a lifesaver."</p>
+              <div class="flex items-center text-sm text-secondary-500">
+                <i class="fas fa-paw mr-2"></i>
+                <span>Dog parent for 5 years</span>
+              </div>
+            </div>
+
+            <div class="testimonial-card rounded-xl p-6">
+              <div class="flex items-center mb-6">
+                <div class="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mr-4">
+                  <i class="fas fa-user text-primary-600"></i>
+                </div>
+                <div>
+                  <h4 class="font-bold text-secondary-900">Amanda S.</h4>
+                  <div class="flex text-amber-400">
+                    <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                  </div>
+                </div>
+              </div>
+              <p class="text-secondary-600 italic mb-4">"As a first-time pet owner, the SnoutIQ resources and the clinic team helped me feel confident about my rabbit&apos;s care."</p>
+              <div class="flex items-center text-sm text-secondary-500">
+                <i class="fas fa-paw mr-2"></i>
+                <span>Rabbit parent for 1 year</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-center mt-12">
+            <div class="inline-flex items-center space-x-4">
+              <div class="flex items-center text-secondary-700">
+                <i class="fas fa-shield-alt text-primary-500 text-2xl mr-3"></i>
+                <div class="text-left">
+                  <div class="font-bold text-lg">4.9/5</div>
+                  <div class="text-sm">Average Rating</div>
+                </div>
+              </div>
+              <div class="h-8 w-px bg-secondary-200"></div>
+              <div class="flex items-center text-secondary-700">
+                <i class="fas fa-heart text-primary-500 text-2xl mr-3"></i>
+                <div class="text-left">
+                  <div class="font-bold text-lg">2,500+</div>
+                  <div class="text-sm">Happy Pets</div>
+                </div>
+              </div>
+              <div class="h-8 w-px bg-secondary-200"></div>
+              <div class="flex items-center text-secondary-700">
+                <i class="fas fa-award text-primary-500 text-2xl mr-3"></i>
+                <div class="text-left">
+                  <div class="font-bold text-lg">15</div>
+                  <div class="text-sm">Years Experience</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Offers -->
+      @php $serviceCards = $services->take(6); @endphp
+      <section id="offers" class="section-padding bg-gradient-to-r from-primary-50 to-primary-100">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center max-w-3xl mx-auto mb-16">
+            <h2 class="font-heading text-3xl md:text-4xl font-bold text-secondary-900 mb-4">
+              {{ $serviceCards->isNotEmpty() ? 'Clinic Services & Wellness Plans' : 'Special Offers & Wellness Plans' }}
+            </h2>
+            <p class="text-lg text-secondary-600">
+              {{ $serviceCards->isNotEmpty() ? 'Explore the services available at '.$clinicName.' and book them instantly via the SnoutIQ app.' : 'Access exclusive offers and comprehensive wellness plans through the SnoutIQ app.' }}
+            </p>
+          </div>
+
+          @if($serviceCards->isNotEmpty())
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              @foreach($serviceCards as $service)
+                @php
+                  $badge = $service->pet_type ? ucfirst($service->pet_type) : 'Clinic Service';
+                  $durationLabel = $service->duration_label ?? null;
+                  $priceLabel = $service->price_label ?? 'See app for price';
+                  $bullets = !empty($service->description_lines) ? array_slice($service->description_lines, 0, 4) : [];
+                @endphp
+                <div class="bg-white rounded-xl overflow-hidden card-hover border border-primary-100">
+                  <div class="bg-primary-600 text-white p-4 text-center">
+                    <h3 class="font-heading text-xl font-bold">{{ $service->name ?? 'Clinic Service' }}</h3>
+                    <p class="text-primary-100">
+                      {{ $badge }}
+                      @if($durationLabel)
+                        • {{ $durationLabel }}
+                      @endif
+                    </p>
+                  </div>
+                  <div class="p-6 flex flex-col gap-4">
+                    <div class="text-center">
+                      <div class="text-3xl md:text-4xl font-bold text-secondary-900">{{ $priceLabel }}</div>
+                      <p class="text-secondary-600 mt-1">Book with {{ $clinicName }}</p>
+                    </div>
+
+                    @if(!empty($bullets))
+                      <ul class="space-y-3">
+                        @foreach($bullets as $line)
+                          <li class="flex items-center">
+                            <i class="fas fa-check text-primary-500 mr-3"></i>
+                            <span>{{ $line }}</span>
+                          </li>
+                        @endforeach
+                      </ul>
+                    @elseif(!empty($service->description))
+                      <p class="text-secondary-600">{{ \Illuminate\Support\Str::limit($service->description, 140) }}</p>
+                    @else
+                      <p class="text-secondary-600">Details available inside the SnoutIQ app.</p>
+                    @endif
+
+                    <div class="text-center mt-auto">
+                      <a href="{{ $appDownloadUrl }}" class="inline-block w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 rounded-lg transition-colors shadow-md" target="_blank" rel="noopener">
+                        <i class="fas fa-mobile-alt mr-2"></i>Book via SnoutIQ App
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              @endforeach
+            </div>
+          @else
+            <div class="grid lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              <div class="bg-white rounded-xl overflow-hidden card-hover">
+                <div class="bg-primary-600 text-white p-4 text-center">
+                  <h3 class="font-heading text-xl font-bold">First Visit</h3>
+                  <p class="text-primary-100">For New Clients</p>
+                </div>
+                <div class="p-6">
+                  <div class="text-center mb-6">
+                    <div class="text-4xl font-bold text-secondary-900">$25<span class="text-lg text-secondary-500"> OFF</span></div>
+                    <p class="text-secondary-600 mt-2">Your First Examination</p>
+                  </div>
+                  <ul class="space-y-3 mb-6">
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>Comprehensive physical exam</span>
+                    </li>
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>Vaccination consultation</span>
+                    </li>
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>Nutritional assessment</span>
+                    </li>
+                  </ul>
+                  <div class="text-center">
+                    <a href="{{ $appDownloadUrl }}" class="inline-block w-full bg-primary-50 hover:bg-primary-100 text-primary-700 font-medium py-3 rounded-lg transition-colors">
+                      <i class="fas fa-qrcode mr-2"></i>Scan QR to Claim
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-xl overflow-hidden card-hover border-2 border-primary-300 relative">
+                <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                  <span class="bg-primary-600 text-white text-xs font-bold px-4 py-1 rounded-full">MOST POPULAR</span>
+                </div>
+                <div class="bg-primary-700 text-white p-4 text-center">
+                  <h3 class="font-heading text-xl font-bold">Wellness Plan</h3>
+                  <p class="text-primary-200">Annual Preventive Care</p>
+                </div>
+                <div class="p-6">
+                  <div class="text-center mb-6">
+                    <div class="text-4xl font-bold text-secondary-900">$399<span class="text-lg text-secondary-500">/year</span></div>
+                    <p class="text-secondary-600 mt-2">Save 20% on preventive care</p>
+                  </div>
+                  <ul class="space-y-3 mb-6">
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>Two comprehensive exams</span>
+                    </li>
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>All core vaccinations</span>
+                    </li>
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>Dental cleaning (1x)</span>
+                    </li>
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>Unlimited nail trims</span>
+                    </li>
+                  </ul>
+                  <div class="text-center">
+                    <a href="{{ $appDownloadUrl }}" class="inline-block w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 rounded-lg transition-colors shadow-md">
+                      <i class="fas fa-download mr-2"></i>Get via SnoutIQ App
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-xl overflow-hidden card-hover">
+                <div class="bg-primary-600 text-white p-4 text-center">
+                  <h3 class="font-heading text-xl font-bold">Dental Month</h3>
+                  <p class="text-primary-100">Limited Time Offer</p>
+                </div>
+                <div class="p-6">
+                  <div class="text-center mb-6">
+                    <div class="text-4xl font-bold text-secondary-900">15<span class="text-lg text-secondary-500">% OFF</span></div>
+                    <p class="text-secondary-600 mt-2">Professional Dental Cleaning</p>
+                  </div>
+                  <ul class="space-y-3 mb-6">
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>Complete oral examination</span>
+                    </li>
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>Teeth scaling & polishing</span>
+                    </li>
+                    <li class="flex items-center">
+                      <i class="fas fa-check text-primary-500 mr-3"></i>
+                      <span>Dental X-rays (if needed)</span>
+                    </li>
+                  </ul>
+                  <div class="text-center">
+                    <a href="{{ $appDownloadUrl }}" class="inline-block w-full bg-primary-50 hover:bg-primary-100 text-primary-700 font-medium py-3 rounded-lg transition-colors">
+                      <i class="fas fa-calendar-alt mr-2"></i>Book Appointment
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          @endif
+
+          <div class="text-center mt-12">
+            <p class="text-secondary-600">
+              @if($serviceCards->isNotEmpty())
+                All services are bookable through the SnoutIQ app. Download to see live pricing and availability.
+              @else
+                All offers are managed through the SnoutIQ app. Download now to access these exclusive deals.
+              @endif
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Location & Map -->
+      <section id="location" class="section-padding bg-white">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center max-w-3xl mx-auto mb-16">
+            <h2 class="font-heading text-3xl md:text-4xl font-bold text-secondary-900 mb-4">Visit {{ $clinicName }}</h2>
+            <p class="text-lg text-secondary-600">Conveniently located with easy access. We welcome walk-ins for emergencies.</p>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-12">
+            <div>
+              <div class="bg-secondary-50 rounded-xl p-8 mb-8">
+                <h3 class="font-heading text-2xl font-bold text-secondary-900 mb-6">Contact Information</h3>
+
+                <div class="space-y-6">
+                  <div class="flex items-start">
+                    <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center mr-4">
+                      <i class="fas fa-map-marker-alt text-primary-600"></i>
+                    </div>
+                    <div>
+                      <h4 class="font-medium text-secondary-900">Address</h4>
+                      <p class="text-secondary-600">{{ $vet->formatted_address ?? $vet->address ?? 'Address coming soon' }}</p>
+                    </div>
+                  </div>
+
+                  <div class="flex items-start">
+                    <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center mr-4">
+                      <i class="fas fa-clock text-primary-600"></i>
+                    </div>
+                    <div>
+                      <h4 class="font-medium text-secondary-900">Hours</h4>
+                      <p class="text-secondary-600">
+                        <span class="font-medium">Mon-Fri:</span> 8:00 AM - 8:00 PM<br>
+                        <span class="font-medium">Saturday:</span> 9:00 AM - 6:00 PM<br>
+                        <span class="font-medium">Sunday:</span> 10:00 AM - 4:00 PM<br>
+                        @if(!is_null($vet->open_now))
+                          <span class="font-medium">Status:</span> {{ $vet->open_now ? 'Open now' : 'Closed now' }}
+                        @endif
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="flex items-start">
+                    <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center mr-4">
+                      <i class="fas fa-phone text-primary-600"></i>
+                    </div>
+                    <div>
+                      <h4 class="font-medium text-secondary-900">Contact</h4>
+                      <p class="text-secondary-600">
+                        @if(!empty($clinicPhone))
+                          <span class="font-medium">Phone:</span> {{ $clinicPhone }}<br>
+                        @endif
+                        <span class="font-medium">Email:</span> {{ $clinicEmail }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-primary-50 rounded-xl p-6">
+                <h4 class="font-heading text-xl font-bold text-secondary-900 mb-4">Before Your Visit</h4>
+                <p class="text-secondary-600 mb-4">Download the SnoutIQ app to complete new patient forms, upload vaccination records, and check in before arrival.</p>
+                <a href="{{ $appDownloadUrl }}" target="_blank" rel="noopener" class="inline-flex items-center text-primary-600 font-medium hover:text-primary-700">
+                  <i class="fas fa-external-link-alt mr-2"></i>
+                  <span>Get the app for faster check-in</span>
+                </a>
+              </div>
+            </div>
+
+            <div>
+              @if($mapSrc)
+                <div class="rounded-xl overflow-hidden shadow-lg h-full min-h-96 border border-secondary-100">
+                  <iframe
+                    src="{{ $mapSrc }}"
+                    class="w-full h-full min-h-96"
+                    style="border:0"
+                    allowfullscreen
+                    loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade"></iframe>
+                </div>
+              @else
+                <div class="bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl h-full min-h-96 flex items-center justify-center">
+                  <div class="text-center p-8">
+                    <div class="w-20 h-20 rounded-full bg-white flex items-center justify-center mx-auto mb-6">
+                      <i class="fas fa-map-marked-alt text-primary-600 text-3xl"></i>
+                    </div>
+                    <h3 class="font-heading text-2xl font-bold text-secondary-900 mb-4">Our Location</h3>
+                    <p class="text-secondary-700 mb-6">Interactive map will be shown here once the clinic address is finalized.</p>
+                    <div class="inline-flex items-center space-x-2 text-primary-700 bg-white/70 px-4 py-2 rounded-lg">
+                      <i class="fas fa-car"></i>
+                      <span>Free parking available</span>
+                    </div>
+                    <div class="mt-4 inline-flex items-center space-x-2 text-primary-700 bg-white/70 px-4 py-2 rounded-lg">
+                      <i class="fas fa-wheelchair"></i>
+                      <span>Wheelchair accessible</span>
+                    </div>
+                  </div>
+                </div>
+              @endif
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-secondary-900 text-white pt-12 pb-8">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
+          <div class="lg:col-span-2">
+            <div class="flex items-center mb-6">
+              <div class="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center mr-4">
+                <i class="fas fa-paw text-white text-xl"></i>
+              </div>
+              <div>
+                <h2 class="font-heading text-2xl font-bold">{{ $clinicName }}</h2>
+                <p class="text-secondary-300">Veterinary Clinic</p>
+              </div>
+            </div>
+            <p class="text-secondary-300 mb-6 max-w-md">Compassionate, comprehensive veterinary care for your furry family members. Partnered with SnoutIQ for seamless digital pet health management.</p>
+            <div class="flex space-x-4">
+              <a href="#" class="w-10 h-10 rounded-full bg-secondary-800 hover:bg-secondary-700 flex items-center justify-center">
+                <i class="fab fa-facebook-f"></i>
+              </a>
+              <a href="#" class="w-10 h-10 rounded-full bg-secondary-800 hover:bg-secondary-700 flex items-center justify-center">
+                <i class="fab fa-instagram"></i>
+              </a>
+              <a href="#" class="w-10 h-10 rounded-full bg-secondary-800 hover:bg-secondary-700 flex items-center justify-center">
+                <i class="fab fa-twitter"></i>
+              </a>
+              <a href="#" class="w-10 h-10 rounded-full bg-secondary-800 hover:bg-secondary-700 flex items-center justify-center">
+                <i class="fab fa-yelp"></i>
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="font-heading text-lg font-bold mb-6">Quick Links</h3>
+            <ul class="space-y-3">
+              <li><a href="#services" class="text-secondary-300 hover:text-white transition-colors">Services</a></li>
+              <li><a href="#doctors" class="text-secondary-300 hover:text-white transition-colors">Our Team</a></li>
+              <li><a href="#testimonials" class="text-secondary-300 hover:text-white transition-colors">Testimonials</a></li>
+              <li><a href="#offers" class="text-secondary-300 hover:text-white transition-colors">Special Offers</a></li>
+              <li><a href="#location" class="text-secondary-300 hover:text-white transition-colors">Location</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 class="font-heading text-lg font-bold mb-6">Policies</h3>
+            <ul class="space-y-3">
+              <li><a href="https://snoutiq.com/privacy-policy" class="text-secondary-300 hover:text-white transition-colors">Privacy Policy</a></li>
+              <li><a href="https://snoutiq.com/terms-of-service" class="text-secondary-300 hover:text-white transition-colors">Terms of Service</a></li>
+              <li><a href="https://snoutiq.com/cancellation-policy" class="text-secondary-300 hover:text-white transition-colors">Financial Policy</a></li>
+              <li><a href="https://snoutiq.com/terms-of-service" class="text-secondary-300 hover:text-white transition-colors">Appointment Policy</a></li>
+              <li><a href="https://snoutiq.com/medical-data-consent" class="text-secondary-300 hover:text-white transition-colors">Emergency Protocol</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 class="font-heading text-lg font-bold mb-6">SnoutIQ App</h3>
+            <ul class="space-y-3">
+              <li><a href="#app-download" class="text-secondary-300 hover:text-white transition-colors">Download Now</a></li>
+              <li><a href="{{ $appDownloadUrl }}" class="text-secondary-300 hover:text-white transition-colors">App Features</a></li>
+              <li><a href="https://snoutiq.com/contact" class="text-secondary-300 hover:text-white transition-colors">FAQ</a></li>
+              <li><a href="https://snoutiq.com/contact" class="text-secondary-300 hover:text-white transition-colors">Support</a></li>
+              <li><a href="https://snoutiq.com" class="text-secondary-300 hover:text-white transition-colors">Pet Health Resources</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="pt-8 border-t border-secondary-800 flex flex-col md:flex-row justify-between items-center">
+          <div class="text-secondary-400 text-sm mb-4 md:mb-0">
+            &copy; {{ date('Y') }} {{ $clinicName }}. All rights reserved.
+          </div>
+          <div class="flex items-center">
+            <div class="flex items-center mr-6">
+              <i class="fas fa-shield-alt text-primary-400 mr-2"></i>
+              <span class="text-sm text-secondary-300">HIPAA Compliant</span>
+            </div>
+            <div class="flex items-center">
+              <i class="fas fa-award text-primary-400 mr-2"></i>
+              <span class="text-sm text-secondary-300">AAHA Accredited</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 text-center text-secondary-500 text-xs">
+          <p>This website is for demonstration purposes. {{ $clinicName }} showcases the SnoutIQ platform integration.</p>
         </div>
       </div>
-      <div class="muted" style="margin-top:1rem;font-size:.9rem">© 2024 SnoutIQ. All rights reserved.</div>
+    </footer>
+
+    <!-- Fixed App Download CTA (Mobile) -->
+    <div class="fixed bottom-0 left-0 right-0 bg-primary-700 text-white p-4 flex justify-between items-center md:hidden z-40">
+      <div>
+        <div class="font-medium">Get the SnoutIQ App</div>
+        <div class="text-sm text-primary-200">For appointments & pet health tracking</div>
+      </div>
+      <a href="{{ $appDownloadUrl }}" class="bg-white text-primary-700 font-semibold py-2 px-4 rounded-lg">
+        Download
+      </a>
     </div>
-  </footer>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+          anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href');
+            if(targetId === '#') return;
+            const targetElement = document.querySelector(targetId);
+            if(targetElement) {
+              window.scrollTo({
+                top: targetElement.offsetTop - 80,
+                behavior: 'smooth'
+              });
+            }
+          });
+        });
+
+        // Add active state to navigation on scroll
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('nav a');
+
+        window.addEventListener('scroll', function() {
+          let current = '';
+          sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            if(scrollY >= (sectionTop - 100)) {
+              current = section.getAttribute('id');
+            }
+          });
+
+          navLinks.forEach(link => {
+            link.classList.remove('text-primary-600');
+            link.classList.add('text-secondary-700');
+
+            if(link.getAttribute('href').substring(1) === current) {
+              link.classList.remove('text-secondary-700');
+              link.classList.add('text-primary-600');
+            }
+          });
+        });
+      });
+    </script>
+
+    <noscript>
+      <img height="1" width="1" style="display:none"
+           src="https://www.facebook.com/tr?id=1909812439872823&ev=PageView&noscript=1"/>
+    </noscript>
+  @endif
 
   @if(! empty($publicUrl))
   <script>
@@ -493,12 +1175,11 @@ label{font-size:.9rem;color:#334155}
   </script>
   @endif
 
-  <!-- JSON-LD -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "MedicalClinic",
-    "name": "{{ $vet->name }}",
+    "name": "{{ $clinicName }}",
     "image": "{{ $vet->image ?? $snoutiqLogo }}",
     "address": {
       "@type": "PostalAddress",
@@ -507,268 +1188,9 @@ label{font-size:.9rem;color:#334155}
       "postalCode": "{{ $vet->pincode ?? '' }}",
       "addressCountry": "IN"
     },
-    "telephone": "{{ $vet->mobile ?? '' }}",
+    "telephone": "{{ $clinicPhone ?? '' }}",
     "url": "{{ url('/backend/vet/'.$vet->slug) }}"
   }
   </script>
-
-  <!-- Buttons logic (AI FAB) -->
-  <script>
-  (function() {
-    const vetSlug = @json($vet->slug);
-    const clinicId = @json($vet->clinic_id ?? $vet->id ?? null);
-    const appModal = document.getElementById('app-download-modal');
-    const appModalCloseEls = Array.from(document.querySelectorAll('[data-app-modal-close]'));
-    const appModalOpenEls  = Array.from(document.querySelectorAll('[data-app-modal-open]'));
-    const copyReferralBtn = document.getElementById('copy-referral-btn');
-
-    if (copyReferralBtn) {
-      const referralCode = copyReferralBtn.getAttribute('data-referral') || '';
-      const defaultLabel = copyReferralBtn.innerHTML;
-
-      copyReferralBtn.addEventListener('click', async function() {
-        if (!referralCode) return;
-
-        try {
-          await navigator.clipboard.writeText(referralCode);
-          copyReferralBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
-          setTimeout(function(){ copyReferralBtn.innerHTML = defaultLabel; }, 1600);
-        } catch (err) {
-          const input = window.prompt('Copy referral code', referralCode);
-          if (input !== null) {
-            copyReferralBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
-            setTimeout(function(){ copyReferralBtn.innerHTML = defaultLabel; }, 1600);
-          }
-        }
-      });
-    }
-
-    function loginRedirect(prefill = "") {
-      try { if (prefill) localStorage.setItem("pendingChatQuestion", prefill); } catch(_) {}
-      const params = new URLSearchParams({ next: location.href, source: "chat", vet_slug: (typeof vetSlug !== "undefined" ? vetSlug : "") });
-      if (prefill) params.set("prefill", prefill);
-      location.href = `backend/custom-doctor-register?${params.toString()}`;
-    }
-
-    function openChat(){
-      const params = new URLSearchParams({ vet_slug: (vetSlug || '') });
-      location.href = `/backend/pet-dashboard?${params.toString()}`;
-    }
-    window.openChat = openChat;
-
-    const showAppModal = () => toggleModal(true);
-
-    appModalOpenEls.forEach(function(btn){ btn.addEventListener('click', function(){ showAppModal(); }); });
-    appModalCloseEls.forEach(function(btn){ btn.addEventListener('click', function(){ toggleModal(false); }); });
-    document.addEventListener('keydown', function(e){
-      if (e.key === 'Escape') toggleModal(false);
-    });
-
-    function toggleModal(show) {
-      if (!appModal) return;
-      appModal.style.display = show ? 'flex' : 'none';
-    }
-  })();
-  </script>
-
-  <!-- Dynamic Quick Services (fetch by slug) + Request modal + Payment -->
-  <script>
-  (function(){
-    const vetSlug      = @json($vet->slug);
-    const API_SERVICES = 'https://snoutiq.com/backend/api/groomer/services';
-    // Payment endpoints (served from this Laravel app)
-    const ORDER_URL    = @json(url('/api/create-order'));
-    const VERIFY_URL   = @json(url('/api/rzp/verify'));
-    const CLINIC_ID    = @json($vet->clinic_id ?? $vet->id ?? null);
-
-    const grid    = document.getElementById('qsvc-grid');
-    const empty   = document.getElementById('qsvc-empty');
-    const loading = document.getElementById('qsvc-loading');
-
-    const authToken = (window.SNOUTIQ && window.SNOUTIQ.token) || localStorage.getItem('token') || sessionStorage.getItem('token');
-
-    const esc = s => (''+(s??'')).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-    const inr = n => Number.isFinite(Number(n)) ? Number(n).toFixed(0) : '—';
-
-    function chip(svc){
-      const btn = document.createElement('button');
-      btn.className = 'qsvc-btn';
-      const price = inr(svc.price);
-      const dur   = svc.duration ? `${svc.duration}m` : '—';
-      btn.innerHTML = `${esc(svc.name || 'Service')} ₹${price} <small style="font-weight:700;color:#64748b">• ${dur}</small>`;
-
-      const isActive = (svc.status || '').toLowerCase() === 'active';
-      if(!isActive){ btn.disabled = true; btn.title = 'Unavailable'; }
-      btn.addEventListener('click', ()=> { if(isActive) openServiceModal(svc); });
-      return btn;
-    }
-
-    async function fetchServices(){
-      loading.style.display = '';
-      grid.style.display = 'none';
-      empty.style.display = 'none';
-
-      try{
-        const url = new URL(API_SERVICES);
-        if (vetSlug) url.searchParams.set('vet_slug', vetSlug); // <- IMPORTANT
-
-        const res  = await fetch(url.toString(), { headers: { 'Accept':'application/json' }});
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
-
-        renderServices(list);
-      }catch(err){
-        console.error('services.fetch.error', err);
-        empty.textContent = 'Could not load services right now.';
-        empty.style.display = '';
-      }finally{
-        loading.style.display = 'none';
-      }
-    }
-
-    function renderServices(items){
-      grid.innerHTML = '';
-      if(!items || !items.length){
-        empty.textContent = 'No services available right now.';
-        empty.style.display = '';
-        grid.style.display = 'none';
-        return;
-      }
-      items.slice(0,24).forEach(s => grid.appendChild(chip(s))); // show all, inactive disabled
-      grid.style.display = '';
-      empty.style.display = 'none';
-    }
-
-    function formRow(label, value){
-      const v = (value ?? '').toString().trim();
-      return `<div style="display:flex;justify-content:space-between;gap:12px;margin:.25rem 0">
-                <div style="color:#64748b">${label}</div>
-                <div style="font-weight:700">${v || '—'}</div>
-              </div>`;
-    }
-
-    function openServiceModal(svc){
-      const price = inr(svc.price);
-      const dur   = svc.duration ? `${svc.duration} mins` : '—';
-      const pet   = svc.pet_type || '—';
-      const cat   = svc.main_service || '—';
-      const desc  = (svc.description && String(svc.description).trim()) ? esc(svc.description) : 'No description provided.';
-
-      Swal.fire({
-        title: esc(svc.name || 'Service'),
-        html: `
-          <div style="text-align:left">
-            ${formRow('Category', esc(cat))}
-            ${formRow('Pet Type', esc(pet))}
-            ${formRow('Duration', esc(dur))}
-            ${formRow('Price', '₹' + esc(price))}
-            <div style="margin:.5rem 0 .35rem;font-weight:800">Description</div>
-            <div style="background:#f8fbff;border:1px solid #e5edff;border-radius:10px;padding:.6rem .7rem;color:#334155">${desc}</div>
-            <div style="margin:.7rem 0 .3rem;font-weight:800">Notes (optional)</div>
-            <textarea id="svc-notes" rows="3" style="width:100%;padding:.6rem .7rem;border-radius:10px;border:1px solid #e5edff;background:#fbfdff;outline:none"></textarea>
-          </div>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'Request Service',
-        cancelButtonText: 'Close',
-        preConfirm: async ()=>{
-          try{
-            const notes = (document.getElementById('svc-notes')?.value || '').trim();
-            await requestService(svc, notes);
-            return { ok:true };
-          }catch(err){
-            Swal.showValidationMessage(err?.message || 'Failed to request service');
-            return false;
-          }
-        }
-      }).then((res)=>{
-        if (res.isConfirmed){
-          Swal.fire({icon:'success', title:'Payment successful', text:'Your request has been recorded.', timer:1800, showConfirmButton:false});
-        }
-      });
-    }
-
-    // Launch Razorpay checkout; resolve when payment verified and saved to DB
-    async function requestService(svc, notes){
-      if (typeof Razorpay === 'undefined') throw new Error('Payment library not loaded');
-
-      // 1) Create order on server (amount in INR)
-      const amountInInr = parseInt(String(svc.price || '0'), 10);
-      if (!Number.isInteger(amountInInr) || amountInInr < 1) throw new Error('Invalid service price');
-
-      const makeOrder = async () => {
-        const res = await fetch(ORDER_URL, {
-          method: 'POST',
-          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: amountInInr,
-            clinic_id: CLINIC_ID,
-            order_type: 'service',
-          })
-        });
-        if (!res.ok) throw new Error('Order create failed: ' + res.status);
-        return res.json();
-      };
-
-      const orderRes = await makeOrder();
-      if (!orderRes?.success || !orderRes?.order_id || !orderRes?.key) throw new Error('Invalid order response');
-
-      // 2) Open Razorpay checkout and verify
-      return new Promise((resolve, reject) => {
-        const rzp = new Razorpay({
-          key: orderRes.key,
-          order_id: orderRes.order_id,
-          name: 'SnoutIQ',
-          description: (svc.name ? ('Service: ' + svc.name) : 'Clinic Service'),
-          notes: {
-            service_id: String(svc.id || ''),
-            vet_slug: String(vetSlug || ''),
-          },
-          theme: { color: '#3b82f6' },
-          handler: async function (resp) {
-            try {
-              const payload = {
-                razorpay_order_id: resp.razorpay_order_id,
-                razorpay_payment_id: resp.razorpay_payment_id,
-                razorpay_signature: resp.razorpay_signature,
-                vet_slug: String(vetSlug || ''),
-                service_id: String(svc.id || ''),
-                clinic_id: CLINIC_ID,
-                order_type: 'service',
-              };
-              const vres = await fetch(VERIFY_URL, {
-                method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-              });
-              if (!vres.ok) throw new Error('Verify API failed: ' + vres.status);
-              const vjson = await vres.json();
-              if (!(vjson?.success || vjson?.verified)) throw new Error('Payment not verified');
-              resolve(vjson);
-            } catch (e) {
-              reject(e);
-            }
-          }
-        });
-        rzp.on('payment.failed', function (resp) {
-          reject(new Error(resp?.error?.description || 'Payment failed'));
-        });
-        rzp.open();
-      });
-    }
-
-    document.addEventListener('DOMContentLoaded', fetchServices);
-
-  })();
-  </script>
-
-  <!-- Floating AI button -->
-  <button class="ai-fab" onclick="openChat()" aria-label="Open AI Assistant">🎩</button>
-
-  <noscript>
-    <img height="1" width="1" style="display:none"
-         src="https://www.facebook.com/tr?id=1909812439872823&ev=PageView&noscript=1"/>
-  </noscript>
-  @endunless
 </body>
 </html>

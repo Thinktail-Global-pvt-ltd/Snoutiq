@@ -252,6 +252,7 @@
       $isAdminRole = $role === 'admin';
       $isDoctorRole = $role === 'doctor';
       $isReceptionRole = $role === 'receptionist';
+      $isClinicAdminRole = $role === 'clinic_admin';
       $showPetMenu = $isAdminRole || $isPetRole;
       $showClinicMenu = $isAdminRole || (!$isPetRole && !$isDoctorRole && !$isReceptionRole);
       $active = function($patterns){
@@ -313,7 +314,31 @@
       @endif
 
       @if($showClinicMenu)
-        <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2 {{ $showPetMenu ? 'mt-6' : '' }}">
+        @if($isClinicAdminRole)
+          <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2 {{ $showPetMenu ? 'mt-6' : '' }}">
+            Receptionist
+          </div>
+          <a href="{{ route('receptionist.bookings.create') }}" class="{{ $baseItem }} {{ $active(['receptionist.bookings.create']) ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+            <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span class="truncate">Add New Booking</span>
+          </a>
+          <a href="{{ route('receptionist.bookings.schedule') }}" class="{{ $baseItem }} {{ $active('receptionist.bookings.schedule') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+            <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 19h14"/>
+            </svg>
+            <span class="truncate">Doctor Schedule</span>
+          </a>
+          <a href="{{ route('receptionist.bookings.history') }}" class="{{ $baseItem }} {{ $active('receptionist.bookings.history') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+            <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+            <span class="truncate">Patient History</span>
+          </a>
+        @endif
+
+        <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2 {{ ($showPetMenu || $isClinicAdminRole) ? 'mt-6' : '' }}">
           {{ $showPetMenu ? 'Clinic Menu' : 'Menu' }}
         </div>
 
