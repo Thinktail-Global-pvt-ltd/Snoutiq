@@ -6,6 +6,307 @@
 
 @section('head')
 <style>
+  :root {
+    --ops-bg: #f7f8fb;
+    --ops-surface: #ffffff;
+    --ops-muted: #6b7280;
+    --ops-line: #e5e7eb;
+    --ops-blue: #2563eb;
+    --ops-green: #10b981;
+    --ops-red: #ef4444;
+    --ops-radius: 12px;
+    --ops-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+  }
+
+  .ops-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .ops-hero {
+    background: #ffffff;
+    color: #0f172a;
+    border-radius: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--ops-line);
+    box-shadow: var(--ops-shadow);
+  }
+
+  .ops-hero-body {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ops-hero-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #111827;
+  }
+
+  .ops-hero-sub {
+    color: var(--ops-muted);
+    max-width: 520px;
+    margin-top: 6px;
+    line-height: 1.45;
+  }
+
+  .ops-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+  }
+
+  .ops-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--ops-line);
+    background: #f8fafc;
+    font-weight: 700;
+    font-size: 12px;
+    color: #111827;
+  }
+
+  .pill-success {
+    background: #ecfdf3;
+    border-color: #d1fae5;
+    color: #047857;
+  }
+
+  .pill-danger {
+    background: #fef2f2;
+    border-color: #fecdd3;
+    color: #b91c1c;
+  }
+
+  .pill-soft {
+    background: #f8fafc;
+    color: #334155;
+  }
+
+  .ops-hero-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    min-width: 220px;
+  }
+
+  .ops-meta-card {
+    background: #f8fafc;
+    border: 1px solid var(--ops-line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    color: #0f172a;
+  }
+
+  .meta-label {
+    font-size: 11px;
+    color: #6b7280;
+    letter-spacing: .06em;
+  }
+
+  .meta-value {
+    font-weight: 800;
+    font-size: 16px;
+    margin-top: 4px;
+  }
+
+  .ops-panel {
+    background: var(--ops-surface);
+    border-radius: 14px;
+    border: 1px solid var(--ops-line);
+    box-shadow: var(--ops-shadow);
+  }
+
+  .ops-panel-head {
+    padding: 18px 18px 8px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .ops-panel-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #111827;
+  }
+
+  .ops-panel-sub {
+    color: var(--ops-muted);
+    font-size: 14px;
+  }
+
+  .ops-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .ops-filters {
+    padding: 0 18px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f3f6ff;
+    border: 1px solid #e4e8f4;
+    border-radius: 12px;
+    padding: 10px 12px;
+    min-width: 260px;
+    flex: 1;
+  }
+
+  .search-wrap svg {
+    width: 18px;
+    height: 18px;
+    color: #6b7280;
+  }
+
+  .search-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    width: 100%;
+    font-size: 14px;
+    color: #0f172a;
+  }
+
+  .ops-filters-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .ops-btn-primary {
+    background: var(--ops-blue);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-weight: 800;
+    box-shadow: none;
+  }
+
+  .ops-btn-primary:hover {
+    filter: brightness(0.97);
+  }
+
+  .ops-btn-secondary {
+    background: #fff;
+    border: 1px solid #d9dce6;
+    color: #374151;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-weight: 700;
+  }
+
+  .table-card {
+    padding: 0 18px 18px;
+  }
+
+  .services-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    background: transparent;
+    border: 1px solid #edf0f8;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .services-table thead {
+    background: #f8fafc;
+    color: #0f172a;
+  }
+
+  .services-table th {
+    padding: 12px 14px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 700;
+    border-bottom: 1px solid #eaecf5;
+  }
+
+  .services-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f2f7;
+    font-size: 14px;
+  }
+
+  .services-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .services-table tbody tr:hover {
+    background: #f9fafb;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #ecfdf3;
+    color: #047857;
+  }
+
+  .status-pill.status-inactive {
+    background: #f3f4f6;
+    color: #4b5563;
+  }
+
+  .status-pill .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .empty-state {
+    border: 1px dashed #d7ddea;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    background: #fafbff;
+    color: #6b7280;
+    margin: 16px 18px 0;
+    font-weight: 600;
+  }
+
+  .mobile-card {
+    border: 1px solid #e6e8f3;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 12px 28px rgba(17, 24, 39, 0.05);
+  }
+
   /* ===============================
      Global / Utility Styles
   =============================== */
@@ -69,9 +370,6 @@
 
     .mobile-card {
       display: block;
-      background: #fff;
-      border-radius: 0.75rem;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
       margin-bottom: 1rem;
       padding: 1rem;
     }
@@ -163,7 +461,7 @@
 @endphp
 
 @section('content')
-<div class="max-w-6xl mx-auto space-y-6">
+<div class="max-w-6xl mx-auto px-4 lg:px-0 ops-shell">
   @if($isOnboarding)
     @php $stepStatus = $stepStatus ?? []; @endphp
     <div>
@@ -175,7 +473,7 @@
   @endif
 
   @if($sessionRole === 'doctor')
-    <div class="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm text-indigo-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+    <div class="bg-gradient-to-r from-indigo-50 to-white border border-indigo-100 rounded-xl px-4 py-3 text-sm text-indigo-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 shadow-sm">
       <div>
         <div class="font-semibold text-indigo-950">Logged in as Doctor</div>
         <div>{{ $doctorRecord?->doctor_name ?? 'Doctor' }}</div>
@@ -189,38 +487,77 @@
     </div>
   @endif
 
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-    <div class="p-4 border-b flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <input id="search" type="text" placeholder="Search by name..."
-             class="search-input w-full md:w-80 bg-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 border-0">
-      <button id="btn-open-create"
-              class="w-full md:w-auto inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white">
-        + Add Service
-      </button>
+  <div class="ops-hero">
+    <div class="ops-hero-body">
+      <div>
+        <div class="ops-eyebrow">Clinic Operations</div>
+        <div class="ops-hero-title">Services</div>
+        <p class="ops-hero-sub">Manage services, pricing, durations and visibility for your clinic.</p>
+        <div class="ops-chip-row">
+          <span class="pill pill-success">Visible</span>
+          <span class="pill pill-soft">Sync healthy</span>
+        </div>
+      </div>
+      <div class="ops-hero-meta">
+        <div class="ops-meta-card">
+          <div class="meta-label">Role</div>
+          <div class="meta-value">{{ ucfirst($sessionRole ?? 'Clinic admin') }}</div>
+        </div>
+        <div class="ops-meta-card">
+          <div class="meta-label">Clinic ID</div>
+          <div class="meta-value">{{ $sessionClinicId ?? '—' }}</div>
+        </div>
+      </div>
     </div>
-          
-          <!-- Desktop Table View -->
-          <div class="table-container hidden md:block">
-            <table class="min-w-full text-sm">
-              <thead class="bg-gray-100 text-gray-700">
-                <tr>
-                  <th class="text-left px-4 py-3">Name</th>
-                  <th class="text-left px-4 py-3">Pet</th>
-                  <th class="text-left px-4 py-3">Price (₹)</th>
-                  <th class="text-left px-4 py-3">Duration (m)</th>
-                  <th class="text-left px-4 py-3">Category</th>
-                  <th class="text-left px-4 py-3">Status</th>
-                  <th class="text-left px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="rows"></tbody>
-            </table>
-          </div>
-          
-          <!-- Mobile Card View -->
-          <div id="mobile-rows" class="md:hidden p-4 space-y-4"></div>
-          
-    <div id="empty" class="hidden p-8 text-center text-gray-500">No services found.</div>
+  </div>
+
+  <div class="ops-panel">
+    <div class="ops-panel-head">
+      <div>
+        <p class="ops-eyebrow text-slate-500">Service Library</p>
+        <div class="ops-panel-title">Services Management</div>
+        <p class="ops-panel-sub">Organize services into categories. Edit price, duration and status.</p>
+      </div>
+      <div class="ops-head-actions">
+        <span class="pill pill-soft">Prices in ₹</span>
+      </div>
+    </div>
+
+    <div class="ops-filters">
+      <div class="search-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <input id="search" type="text" placeholder="Search service or code..." class="search-input">
+      </div>
+      <div class="ops-filters-right">
+        <button id="btn-open-create" class="ops-btn-primary">
+          + Add Service
+        </button>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-container hidden md:block">
+        <table class="min-w-full text-sm services-table">
+          <thead>
+            <tr>
+              <th class="text-left">Name</th>
+              <th class="text-left">Pet</th>
+              <th class="text-left">Price (₹)</th>
+              <th class="text-left">Duration (m)</th>
+              <th class="text-left">Category</th>
+              <th class="text-left">Status</th>
+              <th class="text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+
+      <div id="mobile-rows" class="md:hidden p-4 space-y-4"></div>
+      <div id="empty" class="hidden empty-state">No services found. Add a service to get started.</div>
+    </div>
   </div>
 </div>
 
@@ -294,8 +631,8 @@
       </div>
 
       <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-        <button type="button" class="btn-close px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold w-full sm:w-auto">Cancel</button>
-        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold w-full sm:w-auto">Create</button>
+        <button type="button" class="btn-close ops-btn-secondary w-full sm:w-auto text-sm font-semibold">Cancel</button>
+        <button type="submit" class="ops-btn-primary w-full sm:w-auto text-sm font-semibold">Create</button>
       </div>
     </form>
   </div>
@@ -363,8 +700,8 @@
       </div>
 
       <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-        <button type="button" class="btn-close px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold w-full sm:w-auto">Cancel</button>
-        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold w-full sm:w-auto">Update</button>
+        <button type="button" class="btn-close ops-btn-secondary w-full sm:w-auto text-sm font-semibold">Cancel</button>
+        <button type="submit" class="ops-btn-primary w-full sm:w-auto text-sm font-semibold">Update</button>
       </div>
     </form>
   </div>
@@ -711,7 +1048,8 @@
         <td class="px-4 py-3">${it.duration}</td>
         <td class="px-4 py-3">${esc(it.main_service || '')}</td>
         <td class="px-4 py-3">
-          <span class="px-2 py-0.5 rounded-full text-xs ${it.status==='Active'?'bg-emerald-100 text-emerald-700':'bg-gray-200 text-gray-700'}">
+          <span class="status-pill ${it.status==='Active'?'':'status-inactive'}">
+            <span class="status-dot"></span>
             ${esc(it.status || '')}
           </span>
         </td>
@@ -751,7 +1089,8 @@
         <div class="card-row">
           <span class="card-label">Status:</span>
           <span class="card-value">
-            <span class="px-2 py-0.5 rounded-full text-xs ${it.status==='Active'?'bg-emerald-100 text-emerald-700':'bg-gray-200 text-gray-700'}">
+            <span class="status-pill ${it.status==='Active'?'':'status-inactive'}">
+              <span class="status-dot"></span>
               ${esc(it.status || '')}
             </span>
           </span>
