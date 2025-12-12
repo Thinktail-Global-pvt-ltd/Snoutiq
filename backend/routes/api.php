@@ -46,11 +46,13 @@ use App\Http\Controllers\Api\RecordingUploadController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\ReceptionistBookingController;
 use App\Http\Controllers\Api\ErrorLogController;
+use App\Http\Controllers\Api\WhatsAppMessageController;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
 Route::post('/call-recordings/upload', [RecordingUploadController::class, 'store']);
 Route::post('/error-logs', [ErrorLogController::class, 'store'])->name('api.error-logs.store');
+Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
 
 use App\Http\Controllers\Api\VetController;
 use App\Http\Controllers\Api\AdminOnboardingStatusController;

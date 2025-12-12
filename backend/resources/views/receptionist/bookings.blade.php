@@ -161,22 +161,17 @@
     <div class="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <div>
         <div class="text-sm font-semibold text-slate-800">Patient History</div>
-        <p class="text-xs text-slate-500">Powered by /api/appointments/by-user</p>
+        <p class="text-xs text-slate-500">Powered by /api/appointments/by-doctor & /api/receptionist/bookings</p>
       </div>
-      <div class="text-xs text-slate-500">Select a patient to view their recent appointments</div>
+      <div class="text-xs text-slate-500">Showing recent bookings for this clinic</div>
     </div>
-    <div class="px-4 pt-3 pb-2 border-b border-slate-100">
-      <label class="text-xs uppercase tracking-wide text-slate-500">Patient</label>
-      <select id="patient-card-select" class="mt-1 w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-        <option value="">Select patient</option>
-      </select>
-    </div>
-    <div id="patient-loading" class="p-6 text-center text-sm text-slate-500">Select a patient to load history…</div>
+    <div id="patient-loading" class="p-6 text-center text-sm text-slate-500">Loading history…</div>
     <div class="overflow-x-auto">
       <table class="w-full text-sm hidden" id="patient-table">
         <thead class="text-xs uppercase text-slate-600">
           <tr>
             <th class="px-4 py-3 text-left">Date</th>
+            <th class="px-4 py-3 text-left">Patient</th>
             <th class="px-4 py-3 text-left">Doctor</th>
             <th class="px-4 py-3 text-left">Clinic</th>
             <th class="px-4 py-3 text-left">Status</th>
@@ -186,7 +181,7 @@
       </table>
     </div>
     <div id="patient-empty" class="hidden p-10 text-center text-slate-500 text-sm">
-      No appointments found for this patient.
+      No appointments found yet.
     </div>
   </div>
   @endif
@@ -515,6 +510,7 @@
     appointmentsByDoctor: (doctorId) => `${CONFIG.API_BASE}/appointments/by-doctor/${doctorId}`,
     appointmentsByUser: (userId) => `${CONFIG.API_BASE}/appointments/by-user/${userId}`,
     createAppointment: `${CONFIG.API_BASE}/appointments/submit`,
+    receptionistBookings: () => `${CONFIG.API_BASE}/receptionist/bookings${targetQuery()}`,
     doctorSlotsSummary: (doctorId, extra = {}) => `${CONFIG.API_BASE}/doctors/${doctorId}/slots/summary${targetQuery(extra)}`,
   };
 
@@ -883,10 +879,13 @@
   }
 
   async function loadPatientAppointments(userId) {
+    if (VIEW_MODE === 'history') {
+      return loadClinicHistory();
+    }
     if (!patientRows || !patientTable || !patientLoading) return;
     if (!userId) {
       patientLoading.classList.remove('hidden');
-      patientLoading.textContent = 'Select a patient to view history…';
+      patientLoading.textContent = 'Loading history…';
       patientTable.classList.add('hidden');
       patientEmpty?.classList.add('hidden');
       return;
@@ -897,8 +896,104 @@
     patientEmpty?.classList.add('hidden');
     try {
       await Auth.bootstrap();
-      const res = await apiFetch(API.appointmentsByUser(userId), { headers: Auth.headers() });
-      PATIENT_APPOINTMENTS = res?.data?.appointments || [];
+      const [apptRes, bookingsRes] = await Promise.all([
+        apiFetch(API.appointmentsByUser(userId), { headers: Auth.headers() }).catch(() => ({ data: { appointments: [] } })),
+        apiFetch(API.receptionistBookings(), { headers: Auth.headers() }).catch(() => ({ data: [] })),
+      ]);
+
+      const appointmentRows = apptRes?.data?.appointments || [];
+      const bookingRows = (bookingsRes?.data || []).filter(b => String(b.user_id) === String(userId));
+
+      const normalizedBookings = bookingRows.map((b) => {
+        const dateTimeRaw = b.scheduled_for || b.booking_created_at || null;
+        let date = '';
+        let time_slot = '';
+        if (dateTimeRaw) {
+          const parsed = new Date(dateTimeRaw);
+          if (!Number.isNaN(parsed.getTime())) {
+            date = parsed.toISOString().slice(0, 10);
+            time_slot = parsed.toTimeString().slice(0, 8);
+          }
+        }
+        return {
+          date,
+          time_slot,
+          status: b.status || 'scheduled',
+          doctor: { name: b.doctor_name || '' },
+          clinic: { name: b.clinic_name || (b.clinic_id ? `Clinic #${b.clinic_id}` : '') },
+        };
+      });
+
+      PATIENT_APPOINTMENTS = [...appointmentRows, ...normalizedBookings];
+      renderPatientAppointments(PATIENT_APPOINTMENTS);
+    } catch (error) {
+      patientLoading.textContent = 'Failed to load history';
+      console.error(error);
+    }
+  }
+
+  async function loadClinicHistory() {
+    if (!patientRows || !patientTable || !patientLoading) return;
+    patientLoading.classList.remove('hidden');
+    patientLoading.textContent = 'Loading history…';
+    patientTable.classList.add('hidden');
+    patientEmpty?.classList.add('hidden');
+    try {
+      await Auth.bootstrap();
+      const doctorList = normalizeDoctorList(INITIAL_DOCTORS);
+      const doctors = doctorList.length ? doctorList : ((await apiFetch(API.doctors(), { headers: Auth.headers() }))?.data || []);
+      const bookingsPromise = apiFetch(API.receptionistBookings(), { headers: Auth.headers() }).catch(() => ({ data: [] }));
+      const appointmentPromises = doctors.map(doc => apiFetch(API.appointmentsByDoctor(doc.id), { headers: Auth.headers() }).catch(() => null));
+      const [bookingsRes, ...appointmentsRes] = await Promise.all([bookingsPromise, ...appointmentPromises]);
+
+      const appointmentRows = appointmentsRes.flatMap(res => res?.data?.appointments || []);
+      const normalizedAppointments = appointmentRows.map(row => ({
+        date: row.date || row.slot_date || row.scheduled_date || row.datetime || '',
+        time_slot: row.time_slot || row.time || row.slot_time || '',
+        status: row.status || 'scheduled',
+        doctor: row.doctor || { name: row.doctor_name || (row.doctor_id ? `Doctor #${row.doctor_id}` : '') },
+        clinic: row.clinic || { name: row.clinic_name || (row.clinic_id ? `Clinic #${row.clinic_id}` : '') },
+        patient: row.patient || {
+          name: row.patient_name || row.name || 'Patient',
+          email: row.patient_email || '',
+          phone: row.patient_phone || '',
+        },
+      }));
+
+      const bookingsData = bookingsRes?.data || [];
+      const normalizedBookings = bookingsData.map(b => {
+        const slot = b.scheduled_for || b.booking_created_at || '';
+        let date = '';
+        let time_slot = '';
+        if (slot) {
+          const parsed = new Date(slot);
+          if (!Number.isNaN(parsed.getTime())) {
+            date = parsed.toISOString().slice(0, 10);
+            time_slot = parsed.toTimeString().slice(0, 8);
+          }
+        }
+        return {
+          date,
+          time_slot,
+          status: b.status || 'scheduled',
+          doctor: { name: b.doctor_name || (b.assigned_doctor_id ? `Doctor #${b.assigned_doctor_id}` : '') },
+          clinic: { name: b.clinic_name || (b.clinic_id ? `Clinic #${b.clinic_id}` : '') },
+          patient: {
+            name: b.patient_name || b.patient_email || b.patient_phone || 'Patient',
+            email: b.patient_email || '',
+            phone: b.patient_phone || '',
+          },
+        };
+      });
+
+      const combined = [...normalizedAppointments, ...normalizedBookings];
+      combined.sort((a, b) => {
+        const timeB = parseAppointmentDate(b)?.getTime() ?? 0;
+        const timeA = parseAppointmentDate(a)?.getTime() ?? 0;
+        return timeB - timeA;
+      });
+
+      PATIENT_APPOINTMENTS = combined;
       renderPatientAppointments(PATIENT_APPOINTMENTS);
     } catch (error) {
       patientLoading.textContent = 'Failed to load history';
@@ -919,9 +1014,23 @@
     patientEmpty?.classList.add('hidden');
     patientLoading.classList.add('hidden');
     rows.forEach(row => {
+      const patientName = row.patient?.name
+        || row.patient_name
+        || row.patient?.email
+        || row.patient_email
+        || 'Patient';
+      const patientMeta = row.patient?.email
+        || row.patient_email
+        || row.patient?.phone
+        || row.patient_phone
+        || '';
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="px-4 py-3">${formatDate(row.date + ' ' + (row.time_slot || ''))}</td>
+        <td class="px-4 py-3">
+          <div class="font-semibold text-slate-900">${patientName}</div>
+          <div class="text-xs text-slate-500">${patientMeta}</div>
+        </td>
         <td class="px-4 py-3">${row.doctor?.name || '—'}</td>
         <td class="px-4 py-3">${row.clinic?.name || '—'}</td>
         <td class="px-4 py-3"><span class="status-pill ${statusClass(row.status)}">${row.status || 'pending'}</span></td>
@@ -1152,6 +1261,9 @@
       fetchDoctors();
     }
     fetchPatients();
+    if (VIEW_MODE === 'history') {
+      loadClinicHistory();
+    }
   }
 
   document.addEventListener('DOMContentLoaded', init);

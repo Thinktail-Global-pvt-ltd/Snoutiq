@@ -48,7 +48,34 @@ class WhatsAppService
         ]);
     }
 
-    private function dispatch(array $payload): void
+    public function sendTextWithResult(string $to, string $body): array
+    {
+        return $this->dispatch([
+            'messaging_product' => 'whatsapp',
+            'to' => $to,
+            'type' => 'text',
+            'text' => [
+                'preview_url' => false,
+                'body' => $body,
+            ],
+        ], true);
+    }
+
+    public function sendTemplateWithResult(string $to, ?string $template = null, array $components = []): array
+    {
+        return $this->dispatch([
+            'messaging_product' => 'whatsapp',
+            'to' => $to,
+            'type' => 'template',
+            'template' => array_filter([
+                'name' => $template ?: $this->defaultTemplate,
+                'language' => ['code' => $this->defaultLanguage],
+                'components' => $components ?: null,
+            ]),
+        ], true);
+    }
+
+    private function dispatch(array $payload, bool $returnResponse = false): array
     {
         if (!$this->isConfigured()) {
             throw new RuntimeException('WhatsApp credentials missing');
@@ -66,5 +93,7 @@ class WhatsAppService
 
             throw new RuntimeException('Failed to send WhatsApp message');
         }
+
+        return $returnResponse ? $response->json() : [];
     }
 }
