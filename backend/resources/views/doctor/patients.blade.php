@@ -113,6 +113,13 @@
     .pm-modalActions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
     .pm-small{font-size:13px;color:var(--pm-muted)}
     @media (max-width:1100px){.pm-content{grid-template-columns:1fr}.pm-left,.pm-right{min-height:unset}.pm-profileHeader{flex-direction:column;align-items:flex-start}.pm-actions{width:100%;justify-content:flex-start}}
+    .modal-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:70}
+    .modal-overlay.active{display:flex}
+    .modal-card{width:100%;max-width:640px;background:#fff;border-radius:24px;box-shadow:0 20px 60px rgba(15,23,42,0.25);padding:30px 32px}
+    .tab-button{padding:0.35rem 0.85rem;border-radius:999px;font-size:0.85rem;font-weight:600;border:1px solid transparent;background:#f8fafc;color:#475569;cursor:pointer;transition:background .2s}
+    .tab-button.active{background:#4f46e5;color:#fff}
+    .tab-button + .tab-button{margin-left:0.5rem}
+    .modal-card form .space-y-4>* + *{margin-top:1rem}
   </style>
 @endsection
 
@@ -125,6 +132,7 @@
     </div>
     <div class="pm-controls">
       <div class="pm-chip">Clinic: {{ $resolvedClinicId ?: 'Not detected' }}</div>
+      <button class="pm-btn pm-primary" type="button" id="pm-booking-open">+ New Booking</button>
       <button class="pm-btn pm-ghost" id="pm-refresh">Refresh</button>
       <button class="pm-btn pm-primary" data-role="open-upload">+ Upload record</button>
     </div>
@@ -194,6 +202,136 @@
         </div>
       </div>
     </div>
+  </div>
+  </div>
+</div>
+
+<div id="booking-modal" class="modal-overlay" hidden aria-hidden="true">
+  <div class="modal-card">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-xs font-semibold tracking-wide text-indigo-600 uppercase">Front Desk</p>
+        <h3 class="text-xl font-semibold text-slate-900">Create Booking</h3>
+      </div>
+      <button type="button" data-close class="text-slate-500 hover:text-slate-700 text-lg">&times;</button>
+    </div>
+
+    <div class="bg-slate-50 rounded-xl p-2 flex items-center gap-2 mt-4">
+      <button type="button" class="tab-button active" data-patient-mode="existing">Existing Patient</button>
+      <button type="button" class="tab-button" data-patient-mode="new">New Patient</button>
+    </div>
+
+    <form id="booking-form" class="space-y-5 mt-3">
+      <div id="existing-patient-section" class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold mb-1">Patient</label>
+          <div class="flex flex-col gap-2">
+            <input id="patient-search" type="text" placeholder="Search patient..." class="bg-slate-50 rounded-lg px-3 py-2 text-sm border border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500">
+            <select id="patient-select" name="patient_id" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500"></select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1">Pet</label>
+          <select id="pet-select" name="pet_id" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500"></select>
+          <p class="text-xs text-slate-500 mt-1">Need a new pet? Fill details below and we'll add it automatically.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">New Pet Name</label>
+            <input name="inline_pet_name" type="text" placeholder="Pet name" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Pet Type</label>
+            <input name="inline_pet_type" type="text" placeholder="Dog, Cat..." class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Breed</label>
+            <input name="inline_pet_breed" type="text" placeholder="Breed" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Gender</label>
+            <input name="inline_pet_gender" type="text" placeholder="Male/Female" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+      </div>
+
+      <div id="new-patient-section" class="hidden space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Patient Name</label>
+            <input name="new_patient_name" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Phone</label>
+            <input name="new_patient_phone" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Email</label>
+            <input name="new_patient_email" type="email" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Pet Name</label>
+            <input name="new_pet_name" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Pet Type</label>
+            <input name="new_pet_type" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Breed</label>
+            <input name="new_pet_breed" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Gender</label>
+            <input name="new_pet_gender" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+        <p class="text-xs text-slate-500">Provide at least a phone number or email for the patient, and pet details so we can attach the booking.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-semibold mb-1">Doctor</label>
+          <select id="booking-doctor-select" name="doctor_id" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+            <option value="">Any available doctor</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1">Service Type</label>
+          <select name="service_type" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+            <option value="in_clinic">In Clinic</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-semibold mb-1">Date</label>
+          <input name="scheduled_date" type="date" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1">Available Slots</label>
+          <select name="scheduled_time" id="slot-select" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+            <option value="">Select a time slot</option>
+          </select>
+          <p id="slot-hint" class="text-xs text-slate-500 mt-1">
+            Select a doctor and date first to load available slots.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold mb-1">Notes</label>
+        <textarea name="notes" rows="3" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500" placeholder="Any reason or context for this visit"></textarea>
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+        <button type="button" data-close class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">Cancel</button>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Save Booking</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -700,4 +838,421 @@
   loadDoctors();
 })();
 </script>
+
+<script>
+(() => {
+  const CLINIC_ID = Number(@json($resolvedClinicId ?? null)) || null;
+  const CURRENT_USER_ID = Number(@json(auth()->id() ?? session('user_id') ?? data_get(session('user'),'id') ?? null)) || null;
+  const CONFIG = {
+    API_BASE: @json(url('/api')),
+    CSRF_URL: @json(url('/sanctum/csrf-cookie')),
+  };
+
+  const STORED_AUTH_FULL = (() => {
+    try {
+      const raw = sessionStorage.getItem('auth_full') || localStorage.getItem('auth_full');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  })();
+
+  function getCookie(name) {
+    return document.cookie.split('; ').find(row => row.startsWith(name + '='))?.split('=')[1] ?? '';
+  }
+
+  const Auth = {
+    mode: 'unknown',
+    async bootstrap() {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (token) {
+        this.mode = 'bearer';
+        return { mode: 'bearer' };
+      }
+      try {
+        await fetch(CONFIG.CSRF_URL, { credentials: 'include' });
+        const xsrf = getCookie('XSRF-TOKEN');
+        if (xsrf) {
+          this.mode = 'cookie';
+          return { mode: 'cookie', xsrf };
+        }
+      } catch (_) {}
+      this.mode = 'none';
+      return { mode: 'none' };
+    },
+    headers(base = {}) {
+      const headers = { Accept: 'application/json', ...base };
+      if (CLINIC_ID) {
+        headers['X-Clinic-Id'] = String(CLINIC_ID);
+        headers['X-User-Id'] = String(CLINIC_ID);
+      } else if (CURRENT_USER_ID) {
+        headers['X-User-Id'] = String(CURRENT_USER_ID);
+      }
+      if (this.mode === 'bearer') {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+      } else if (this.mode === 'cookie') {
+        headers['X-Requested-With'] = 'XMLHttpRequest';
+        const xsrf = decodeURIComponent(getCookie('XSRF-TOKEN') || '');
+        if (xsrf) headers['X-XSRF-TOKEN'] = xsrf;
+      }
+      return headers;
+    },
+  };
+
+  function targetQuery(extra = {}) {
+    const params = new URLSearchParams();
+    if (CLINIC_ID) {
+      params.set('clinic_id', String(CLINIC_ID));
+      params.set('user_id', String(CLINIC_ID));
+    } else if (CURRENT_USER_ID) {
+      params.set('user_id', String(CURRENT_USER_ID));
+    }
+    Object.entries(extra).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      params.set(key, String(value));
+    });
+    const qs = params.toString();
+    return qs ? `?${qs}` : '';
+  }
+
+  function appendTarget(formData) {
+    if (CLINIC_ID) {
+      formData.append('clinic_id', String(CLINIC_ID));
+      formData.append('user_id', String(CLINIC_ID));
+    } else if (CURRENT_USER_ID) {
+      formData.append('user_id', String(CURRENT_USER_ID));
+    }
+  }
+
+  async function apiFetch(url, opts = {}) {
+    const res = await fetch(url, { credentials: 'include', ...opts });
+    const contentType = res.headers.get('content-type') || '';
+    const data = contentType.includes('application/json') ? await res.json() : await res.text();
+    if (!res.ok) {
+      const message = typeof data === 'string' ? data : data?.message || 'Request failed';
+      throw new Error(message);
+    }
+    return data;
+  }
+
+  const API = {
+    patients: (query = '') => `${CONFIG.API_BASE}/receptionist/patients${targetQuery(query ? { q: query } : {})}`,
+    patientPets: (userId) => `${CONFIG.API_BASE}/receptionist/patients/${userId}/pets${targetQuery()}`,
+    doctors: () => `${CONFIG.API_BASE}/receptionist/doctors${targetQuery()}`,
+    doctorSlotsSummary: (doctorId, extra = {}) => `${CONFIG.API_BASE}/doctors/${doctorId}/slots/summary${targetQuery(extra)}`,
+    createPatient: `${CONFIG.API_BASE}/receptionist/patients`,
+    createAppointment: `${CONFIG.API_BASE}/appointments/submit`,
+  };
+
+  const bookingModal = document.getElementById('booking-modal');
+  const bookingForm = document.getElementById('booking-form');
+  const patientSelect = document.getElementById('patient-select');
+  const patientSearchInput = document.getElementById('patient-search');
+  const petSelect = document.getElementById('pet-select');
+  const doctorSelect = document.getElementById('booking-doctor-select');
+  const slotSelect = document.getElementById('slot-select');
+  const slotHint = document.getElementById('slot-hint');
+  const modeButtons = Array.from(document.querySelectorAll('[data-patient-mode]'));
+  const existingSection = document.getElementById('existing-patient-section');
+  const newSection = document.getElementById('new-patient-section');
+  const bookingOpen = document.getElementById('pm-booking-open');
+
+  const STORED_FULL = STORED_AUTH_FULL || {};
+
+  let PATIENTS = [];
+  let CURRENT_PATIENT = null;
+  let PATIENT_MODE = 'existing';
+  let PREFERRED_PATIENT_ID = null;
+
+  const closeButtons = bookingModal ? Array.from(bookingModal.querySelectorAll('[data-close]')) : [];
+
+  function openBooking() {
+    if (!bookingModal) return;
+    if (!CLINIC_ID && !CURRENT_USER_ID) {
+      Swal.fire({ icon: 'warning', title: 'Clinic missing', text: 'Open this page from the clinic dashboard.' });
+      return;
+    }
+    bookingModal.classList.add('active');
+    bookingModal.removeAttribute('hidden');
+    bookingModal.setAttribute('aria-hidden', 'false');
+    if (!PATIENTS.length) fetchPatients();
+    if (!doctorSelect?.value) fetchDoctors();
+  }
+
+  function closeBooking() {
+    if (!bookingModal) return;
+    bookingModal.classList.remove('active');
+    bookingModal.setAttribute('hidden', 'hidden');
+    bookingModal.setAttribute('aria-hidden', 'true');
+    bookingForm?.reset();
+    petSelect.innerHTML = '';
+    slotSelect.innerHTML = '<option value="">Select a time slot</option>';
+    slotHint.textContent = 'Select a doctor and date first to load available slots.';
+    setPatientMode('existing');
+  }
+
+  function setPatientMode(mode) {
+    PATIENT_MODE = mode;
+    modeButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.patientMode === mode));
+    existingSection?.classList.toggle('hidden', mode !== 'existing');
+    newSection?.classList.toggle('hidden', mode !== 'new');
+  }
+
+  modeButtons.forEach((btn) => btn.addEventListener('click', () => setPatientMode(btn.dataset.patientMode)));
+  closeButtons.forEach((btn) => btn.addEventListener('click', closeBooking));
+  bookingOpen?.addEventListener('click', openBooking);
+
+  function normalizePhone(...candidates) {
+    for (const value of candidates) {
+      if (typeof value !== 'string') continue;
+      const cleaned = value.replace(/\s+/g, '').trim();
+      if (cleaned) return cleaned.slice(0, 20);
+    }
+    return null;
+  }
+
+  async function fetchPatients(query = '') {
+    try {
+      await Auth.bootstrap();
+      const res = await apiFetch(API.patients(query), { headers: Auth.headers() });
+      PATIENTS = res?.data || [];
+      populatePatientSelect();
+    } catch (error) {
+      console.error('Failed to load patients', error);
+    }
+  }
+
+  function populatePatientSelect() {
+    if (!patientSelect) return;
+    patientSelect.innerHTML = '';
+    PATIENTS.forEach((patient) => {
+      const option = document.createElement('option');
+      option.value = patient.id;
+      option.textContent = `${patient.name || 'Patient'} • ${patient.phone || patient.email || ''}`;
+      patientSelect.appendChild(option);
+    });
+    const targetId = PREFERRED_PATIENT_ID || (PATIENTS[0]?.id ?? null);
+    if (targetId) {
+      patientSelect.value = targetId;
+      CURRENT_PATIENT = PATIENTS.find((p) => String(p.id) === String(targetId)) || null;
+      PREFERRED_PATIENT_ID = null;
+      handlePatientChange();
+    }
+  }
+
+  async function fetchPatientPets(userId) {
+    if (!userId || !petSelect) {
+      petSelect.innerHTML = '';
+      return;
+    }
+    try {
+      await Auth.bootstrap();
+      const res = await apiFetch(API.patientPets(userId), { headers: Auth.headers() });
+      renderPetOptions(res?.data || []);
+    } catch (error) {
+      console.error('Failed to load pets', error);
+      petSelect.innerHTML = '';
+    }
+  }
+
+  function renderPetOptions(pets) {
+    petSelect.innerHTML = '';
+    if (!pets.length) {
+      petSelect.innerHTML = '<option value="">No pets found</option>';
+      return;
+    }
+    pets.forEach((pet) => {
+      const option = document.createElement('option');
+      option.value = pet.id;
+      option.textContent = `${pet.pet_name || pet.name || 'Pet'} • ${pet.pet_type || pet.species || ''}`;
+      option.dataset.petName = pet.pet_name || pet.name || '';
+      petSelect.appendChild(option);
+    });
+  }
+
+  async function fetchDoctors() {
+    if (!doctorSelect) return;
+    try {
+      await Auth.bootstrap();
+      const res = await apiFetch(API.doctors(), { headers: Auth.headers() });
+      const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      renderDoctorOptions(list);
+    } catch (error) {
+      console.error('Failed to load doctors', error);
+    }
+  }
+
+  function renderDoctorOptions(list) {
+    if (!doctorSelect) return;
+    doctorSelect.innerHTML = '<option value="">Any available doctor</option>';
+    list.forEach((doc) => {
+      const option = document.createElement('option');
+      option.value = doc.id;
+      option.textContent = doc.doctor_name || doc.name || `Doctor ${doc.id}`;
+      doctorSelect.appendChild(option);
+    });
+  }
+
+  async function fetchDoctorSlots(doctorId) {
+    if (!slotSelect) return;
+    if (!doctorId) {
+      slotSelect.innerHTML = '<option value="">Select a time slot</option>';
+      slotHint.textContent = 'Select a doctor and date first to load available slots.';
+      return;
+    }
+    const date = bookingForm.elements['scheduled_date'].value;
+    if (!date) {
+      slotSelect.innerHTML = '<option value="">Select a time slot</option>';
+      slotHint.textContent = 'Select a doctor and date first to load available slots.';
+      return;
+    }
+    try {
+      await Auth.bootstrap();
+      const res = await apiFetch(API.doctorSlotsSummary(doctorId, { date, service_type: bookingForm.elements['service_type'].value || 'in_clinic' }), { headers: Auth.headers() });
+      const slots = res?.free_slots || [];
+      slotSelect.innerHTML = '<option value="">Select a time slot</option>';
+      slots.forEach((slot) => {
+        const opt = document.createElement('option');
+        const time = typeof slot === 'string' ? slot : (slot.time || slot.time_slot || slot.slot || '');
+        const status = typeof slot === 'string' ? 'free' : (slot.status || 'free');
+        opt.value = time;
+        opt.textContent = `${time} (${status})`;
+        slotSelect.appendChild(opt);
+      });
+      slotHint.textContent = slots.length ? `${slots.length} slots available` : 'No slots available for this date';
+    } catch (error) {
+      console.error('Failed to load slots', error);
+      slotSelect.innerHTML = '<option value="">Select a time slot</option>';
+      slotHint.textContent = 'Failed to load slots';
+    }
+  }
+
+  function handleDoctorChange() {
+    const doctorId = doctorSelect?.value;
+    fetchDoctorSlots(doctorId);
+  }
+
+  function handlePatientChange() {
+    const patientId = patientSelect?.value;
+    CURRENT_PATIENT = PATIENTS.find((p) => String(p.id) === String(patientId)) || null;
+    fetchPatientPets(patientId);
+  }
+
+  patientSelect?.addEventListener('change', handlePatientChange);
+  doctorSelect?.addEventListener('change', handleDoctorChange);
+  bookingForm?.elements['scheduled_date']?.addEventListener('change', () => handleDoctorChange());
+
+  let searchTimer;
+  patientSearchInput?.addEventListener('input', (event) => {
+    const query = event.target.value.trim();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => fetchPatients(query), 350);
+  });
+
+  bookingForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!CLINIC_ID && !CURRENT_USER_ID) {
+      Swal.fire({ icon: 'warning', title: 'Clinic missing', text: 'Reload from clinic dashboard.' });
+      return;
+    }
+    const doctorId = bookingForm.elements['doctor_id'].value;
+    const date = bookingForm.elements['scheduled_date'].value;
+    const timeSlot = bookingForm.elements['scheduled_time'].value;
+    if (!doctorId || !date || !timeSlot) {
+      Swal.fire({ icon: 'warning', title: 'Required fields missing', text: 'Doctor, date and slot are mandatory.' });
+      return;
+    }
+    try {
+      await Auth.bootstrap();
+      let patientId = patientSelect?.value || null;
+      let patientName = CURRENT_PATIENT?.name || '';
+      let patientPhone = normalizePhone(
+        CURRENT_PATIENT?.phone,
+        CURRENT_PATIENT?.email,
+        STORED_FULL?.user?.phone,
+        STORED_FULL?.user?.email
+      );
+      let petName = null;
+      if (!patientPhone) {
+        patientPhone = normalizePhone(STORED_FULL?.user?.phone, STORED_FULL?.user?.email);
+      }
+      if (PATIENT_MODE === 'new') {
+        const name = bookingForm.elements['new_patient_name'].value.trim();
+        const phone = bookingForm.elements['new_patient_phone'].value.trim();
+        const email = bookingForm.elements['new_patient_email'].value.trim();
+        const newPetName = bookingForm.elements['new_pet_name'].value.trim();
+        if (!name || (!phone && !email)) {
+          Swal.fire({ icon: 'warning', title: 'Patient details required', text: 'Provide name and phone or email.' });
+          return;
+        }
+        if (!newPetName) {
+          Swal.fire({ icon: 'warning', title: 'Pet name required' });
+          return;
+        }
+        const payload = new FormData();
+        payload.append('name', name);
+        if (phone) payload.append('phone', phone);
+        if (email) payload.append('email', email);
+        payload.append('pet_name', newPetName);
+        payload.append('pet_type', bookingForm.elements['new_pet_type'].value.trim() || 'pet');
+        payload.append('pet_breed', bookingForm.elements['new_pet_breed'].value.trim() || 'Unknown');
+        payload.append('pet_gender', bookingForm.elements['new_pet_gender'].value.trim() || 'unknown');
+        appendTarget(payload);
+        const patientRes = await apiFetch(API.createPatient, {
+          method: 'POST',
+          headers: Auth.headers(),
+          body: payload,
+        });
+        patientId = patientRes?.data?.user?.id;
+        patientName = patientRes?.data?.user?.name || name;
+        patientPhone = normalizePhone(patientRes?.data?.user?.phone, phone, patientRes?.data?.user?.email, email);
+        petName = patientRes?.data?.pet?.name || newPetName;
+        CURRENT_PATIENT = { id: patientId, name: patientName, phone: patientPhone };
+        PREFERRED_PATIENT_ID = patientId;
+        fetchPatients();
+      } else {
+        if (!patientId) {
+          Swal.fire({ icon: 'warning', title: 'Select a patient' });
+          return;
+        }
+        const selectedPetOption = petSelect?.options[petSelect.selectedIndex];
+        petName = selectedPetOption?.dataset?.petName || selectedPetOption?.textContent || null;
+        const inlinePetName = bookingForm.elements['inline_pet_name']?.value.trim();
+        if (inlinePetName) petName = inlinePetName;
+      }
+      const payload = new FormData();
+      if (patientId) payload.append('user_id', patientId);
+      if (CLINIC_ID) payload.append('clinic_id', String(CLINIC_ID));
+      payload.append('doctor_id', doctorId);
+      payload.append('patient_name', patientName);
+      if (patientPhone) payload.append('patient_phone', patientPhone);
+      if (petName) payload.append('pet_name', petName);
+      payload.append('date', date);
+      payload.append('time_slot', timeSlot);
+      if (bookingForm.elements['notes'].value.trim()) {
+        payload.append('notes', bookingForm.elements['notes'].value.trim());
+      }
+      appendTarget(payload);
+      await apiFetch(API.createAppointment, {
+        method: 'POST',
+        headers: Auth.headers(),
+        body: payload,
+      });
+      Swal.fire({ icon: 'success', title: 'Appointment saved', timer: 1500, showConfirmButton: false });
+      closeBooking();
+      handleDoctorChange();
+      handlePatientChange();
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Unable to save appointment', text: error.message || 'Unknown error' });
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchDoctors();
+    fetchPatients();
+  });
+})();
+</script>
+
 @endsection
