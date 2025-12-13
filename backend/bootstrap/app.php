@@ -27,7 +27,16 @@ return Application::configure(basePath: dirname(__DIR__))
             ]);
         })->everyMinute();
 
-        // ✅ Har minute test ke liye
+        // Notification / push pipelines
+        $schedule->command('push:process-scheduled')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command('notifications:consult-reminders')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        // Weather fetch every 4 hours
         $schedule->command('weather:fetch 28.6139 77.2090')->everyFourHours();
     })
     ->withExceptions()
