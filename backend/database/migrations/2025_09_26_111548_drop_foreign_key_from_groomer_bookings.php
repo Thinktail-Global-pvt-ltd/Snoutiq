@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -10,11 +11,13 @@ return new class extends Migration {
 
     public function up(): void
     {
-        Schema::table(self::TABLE, function (Blueprint $table) {
-            $foreignKeyName = $this->resolveForeignKeyName();
-            if ($foreignKeyName) {
-                $table->dropForeign($foreignKeyName);
-            }
+        $foreignKeyName = $this->resolveForeignKeyName();
+        if (!$foreignKeyName) {
+            return;
+        }
+
+        Schema::table(self::TABLE, function (Blueprint $table) use ($foreignKeyName) {
+            $table->dropForeign($foreignKeyName);
         });
     }
 
@@ -24,7 +27,7 @@ return new class extends Migration {
             return;
         }
 
-        if ($this->resolveForeignKeyName()) {
+        if ($this->hasForeignKey()) {
             return;
         }
 
@@ -47,16 +50,17 @@ return new class extends Migration {
             return null;
         }
 
-        $schemaManager = Schema::getConnection()->getDoctrineSchemaManager();
-        $tableDetails = $schemaManager->listTableDetails(self::TABLE);
-
-        /** @var \Doctrine\DBAL\Schema\ForeignKeyConstraint $constraint */
-        foreach ($tableDetails->getForeignKeys() as $constraint) {
-            if ($constraint->getLocalColumns() === ['groomer_employees_id']) {
-                return $constraint->getName();
-            }
+        $database = DB::connection()->getDatabaseName();
+        if (!$database) {
+            return null;
         }
 
-        return null;
+        $result = DB::selectOne(
+            'SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? AND REFERENCED_TABLE_NAME = ?',
+            [$database, self::TABLE, 'groomer_employees_id', 'groomer_employees']
+        );
+
+        return $result->CONSTRAINT_NAME ?? null;
     }
 };
