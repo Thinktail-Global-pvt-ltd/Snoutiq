@@ -28,6 +28,11 @@ class AppointmentReminderService
         $now = now();
         $count = 0;
 
+        Log::info('Reminder run started', [
+            'appointments_to_check' => $appointments->count(),
+            'at' => $now->toDateTimeString(),
+        ]);
+
         foreach ($appointments as $appointment) {
             $startTime = $this->resolveStartTime($appointment);
             if (! $startTime) {
@@ -38,6 +43,11 @@ class AppointmentReminderService
                 $count += $this->handleReminder($appointment, $startTime, $reminder, $now);
             }
         }
+
+        Log::info('Reminder run finished', [
+            'dispatched' => $count,
+            'at' => now()->toDateTimeString(),
+        ]);
 
         return $count;
     }
