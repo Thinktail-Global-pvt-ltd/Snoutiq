@@ -5,6 +5,12 @@ const HB_TTL_SEC = 70;
 
 export async function setDoctorOnline(doctorId, socketId, extra = {}) {
   try {
+    // ✅ FIX: Check Redis connection status before operations
+    if (redis.status !== "ready" && redis.status !== "connecting") {
+      // Silently skip if Redis is not connected (enableOfflineQueue is false)
+      return;
+    }
+    
     const key = `doctor:${doctorId}`;
     await redis
       .multi()
@@ -19,12 +25,21 @@ export async function setDoctorOnline(doctorId, socketId, extra = {}) {
       .set(`doctor:${doctorId}:hb`, "1", "EX", HB_TTL_SEC)
       .exec();
   } catch (e) {
-    console.warn("[Redis] setDoctorOnline failed:", e?.message || e);
+    // ✅ FIX: Only log if it's not a connection/writeable error (expected when offline queue disabled)
+    if (!e?.message?.includes("writeable") && !e?.message?.includes("Stream")) {
+      console.warn("[Redis] setDoctorOnline failed:", e?.message || e);
+    }
   }
 }
 
 export async function heartbeatDoctor(doctorId, source = "foreground") {
   try {
+    // ✅ FIX: Check Redis connection status before operations
+    if (redis.status !== "ready" && redis.status !== "connecting") {
+      // Silently skip if Redis is not connected (enableOfflineQueue is false)
+      return;
+    }
+    
     await redis
       .multi()
       .hset(`doctor:${doctorId}`, {
@@ -35,6 +50,9 @@ export async function heartbeatDoctor(doctorId, source = "foreground") {
       .set(`doctor:${doctorId}:hb`, "1", "EX", HB_TTL_SEC)
       .exec();
   } catch (e) {
-    console.warn("[Redis] heartbeatDoctor failed:", e?.message || e);
+    // ✅ FIX: Only log if it's not a connection/writeable error (expected when offline queue disabled)
+    if (!e?.message?.includes("writeable") && !e?.message?.includes("Stream")) {
+      console.warn("[Redis] heartbeatDoctor failed:", e?.message || e);
+    }
   }
 }

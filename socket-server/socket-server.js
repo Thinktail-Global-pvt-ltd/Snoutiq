@@ -19,6 +19,9 @@ import {
   subscribeRedis,
   isRedisEnabled,
 } from "./redisClients.js";
+
+
+
 // -------------------- PATH + CONSTANTS --------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -549,8 +552,19 @@ const removeDoctorPresence = async (doctorId) => {
 
 const persistActiveCallState = async (callSession) => {
   if (!callSession?.callId) return;
+  
+  // ✅ FIX: Exclude timer objects and other non-serializable fields to prevent circular structure errors
+  const {
+    timeoutTimerId,        // Timer object - cannot be serialized
+    timeoutExpiresAt,      // May contain timer reference
+    timer,                 // Generic timer reference
+    _idlePrev,             // Timer internal properties
+    _idleNext,             // Timer internal properties
+    ...serializableSession  // Everything else is safe to serialize
+  } = callSession;
+  
   const payload = {
-    ...callSession,
+    ...serializableSession,
     callId: callSession.callId,
     createdAt: callSession.createdAt
       ? new Date(callSession.createdAt).toISOString()
@@ -570,14 +584,28 @@ const persistActiveCallState = async (callSession) => {
     disconnectedAt: callSession.disconnectedAt
       ? new Date(callSession.disconnectedAt).toISOString()
       : undefined,
+    // Store timeout expiration as timestamp string instead of timer object
+    timeoutExpiresAt: callSession.timeoutExpiresAt
+      ? (typeof callSession.timeoutExpiresAt === 'number' 
+          ? callSession.timeoutExpiresAt.toString()
+          : new Date(callSession.timeoutExpiresAt).getTime().toString())
+      : undefined,
   };
 
-  await setHashWithTtl(
-    REDIS_ACTIVE_CALLS_KEY,
-    callSession.callId,
-    payload,
-    REDIS_CALL_TTL_SECONDS,
-  );
+  try {
+    await setHashWithTtl(
+      REDIS_ACTIVE_CALLS_KEY,
+      callSession.callId,
+      payload,
+      REDIS_CALL_TTL_SECONDS,
+    );
+  } catch (error) {
+    // Log error but don't throw - Redis persistence is non-critical
+    console.warn(
+      `[redis:state] Failed to persist call state for ${callSession.callId}:`,
+      error?.message || error
+    );
+  }
 };
 
 const removeActiveCallState = async (callId) => {
