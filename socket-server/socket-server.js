@@ -3870,8 +3870,13 @@ io.on("connection", (socket) => {
         timestamp: new Date().toISOString(),
       });
 
+      // ✅ FIX: Emit available doctors immediately when call ends (don't wait 10 seconds)
+      // This ensures doctor becomes available in modal right away
+      emitAvailableDoctors();
+
       setTimeout(() => {
         deleteActiveCallSession(normalizedCallId);
+        // Emit again after cleanup to ensure final state is broadcast
         emitAvailableDoctors();
         console.log(`🗑️ Cleaned up ended call ${normalizedCallId}`);
         
