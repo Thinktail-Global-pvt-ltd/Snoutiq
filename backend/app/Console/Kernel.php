@@ -4,13 +4,27 @@ declare(strict_types=1);
 
 namespace App\Console;
 
+use App\Console\Commands\DispatchConsultationReminders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use Illuminate\Support\Facades\Log;
 
 class Kernel extends ConsoleKernel
 {
+    protected $commands = [
+        DispatchConsultationReminders::class,
+    ];
+
     protected function schedule(Schedule $schedule): void
     {
+        // Heartbeat to verify scheduler is running
+        $schedule->call(function () {
+            Log::info('Scheduler heartbeat', [
+                'ts' => now()->toDateTimeString(),
+                'env' => app()->environment(),
+            ]);
+        })->everyMinute();
+
         // 12:05 IST daily: publishNightSlots(today IST)
         $schedule->command('video:publish-tonight')
             ->timezone('Asia/Kolkata')
@@ -65,6 +79,10 @@ class Kernel extends ConsoleKernel
         })->timezone('Asia/Kolkata')->dailyAt('06:59');
 
         $schedule->command('push:process-scheduled')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command('notifications:consult-reminders')
             ->everyMinute()
             ->withoutOverlapping();
     }
