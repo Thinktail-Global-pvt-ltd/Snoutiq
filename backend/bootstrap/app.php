@@ -3,6 +3,7 @@
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Support\Facades\Log;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -18,6 +19,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withSchedule(function (Schedule $schedule) {
+        // Heartbeat to verify scheduler is running
+        $schedule->call(function () {
+            Log::info('Scheduler heartbeat', [
+                'ts' => now()->toDateTimeString(),
+                'env' => app()->environment(),
+            ]);
+        })->everyMinute();
+
         // ✅ Har minute test ke liye
         $schedule->command('weather:fetch 28.6139 77.2090')->everyFourHours();
     })
