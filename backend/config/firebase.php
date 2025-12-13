@@ -1,26 +1,22 @@
 <?php
 
-$credentialsPath = env('FIREBASE_CREDENTIALS');
-if (empty($credentialsPath)) {
-    $credentialsPath = storage_path('app/firebase/service-account.json');
-}
-
-$projectId = env('FIREBASE_PROJECT_ID', 'snoutiqapp');
+// Hardcode Firebase configuration to avoid .env influence for FCM
+$credentialsPath = storage_path('app/firebase/service-account.json');
 
 return [
-    'default' => env('FIREBASE_PROJECT', 'app'),
+    'default' => 'app',
 
     'projects' => [
         'app' => [
             'credentials' => [
                 'file' => $credentialsPath,
             ],
-            'project_id' => $projectId,
+            'project_id' => 'snoutiqapp',
             'database' => [
-                'url' => env('FIREBASE_DATABASE_URL'),
+                'url' => 'https://snoutiqapp-default-rtdb.firebaseio.com',
             ],
             'storage' => [
-                'default_bucket' => env('FIREBASE_STORAGE_BUCKET'),
+                'default_bucket' => 'snoutiqapp.firebasestorage.app',
             ],
         ],
     ],

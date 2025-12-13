@@ -38,12 +38,20 @@
 
 <div class="row">
     <label>Device FCM Token</label>
-    <textarea id="token" rows="4" readonly></textarea>
+    <textarea id="token" rows="4" placeholder="Generate a token above or paste any token to test push delivery"></textarea>
+    @if(config('push.web_test_default_token'))
+        <p class="small">Prefilled with <code>PUSH_WEB_TEST_DEFAULT_TOKEN</code> for quick testing.</p>
+    @endif
 </div>
 
 <h2>Server API Tests</h2>
 <div class="row">
-    <label>Bearer token (optional, to bind FCM token to a user)</label>
+    <label>User ID (optional, to bind FCM token to a user)</label>
+    <input type="number" id="user_id" placeholder="Enter user ID (e.g., 1)" />
+    <p class="small">Manually enter user ID to register token for that user</p>
+</div>
+<div class="row">
+    <label>Bearer token (optional, alternative way to bind FCM token to a user)</label>
     <input id="bearer" placeholder="Paste API token here if available" />
 </div>
 
@@ -89,11 +97,16 @@
 
     const configTextarea = document.getElementById('config');
     const vapidInput = document.getElementById('vapid');
+    const tokenTextarea = document.getElementById('token');
     if (!configTextarea.value.trim()) {
         configTextarea.value = JSON.stringify(DEFAULT_CONFIG, null, 2);
     }
     if (!vapidInput.value.trim() && DEFAULT_VAPID) {
         vapidInput.value = DEFAULT_VAPID;
+    }
+    const DEFAULT_DEVICE_TOKEN = @json(config('push.web_test_default_token'));
+    if (tokenTextarea && !tokenTextarea.value.trim() && DEFAULT_DEVICE_TOKEN) {
+        tokenTextarea.value = DEFAULT_DEVICE_TOKEN;
     }
 
     function getConfig() {
@@ -110,6 +123,11 @@
 
     function getBearer() {
         return document.getElementById('bearer').value.trim();
+    }
+
+    function getUserId() {
+        const userIdInput = document.getElementById('user_id').value.trim();
+        return userIdInput ? parseInt(userIdInput, 10) : null;
     }
 
     let messagingInstance = null;
@@ -141,7 +159,7 @@
 
             const registration = await navigator.serviceWorker.getRegistration(swScopeUrl) || await navigator.serviceWorker.register(swUrl, { scope: swScope });
             const token = await messaging.getToken({ vapidKey: getVapid(), serviceWorkerRegistration: registration });
-            document.getElementById('token').value = token || '';
+            tokenTextarea.value = token || '';
             display({ token });
 
             if (!messageHandlerAttached) {
@@ -175,14 +193,19 @@
 
     document.getElementById('btn-register').onclick = async () => {
         try {
-            const token = document.getElementById('token').value.trim();
-            if (!token) throw new Error('Generate FCM token first');
-            const res = await callApi('/api/push/register-token', 'POST', {
+            const token = tokenTextarea.value.trim();
+            if (!token) throw new Error('Generate FCM token first or paste token manually');
+            const userId = getUserId();
+            const payload = {
                 token,
                 platform: 'web',
                 device_id: 'web-local',
                 meta: { app: 'snoutiq', env: 'local' },
-            });
+            };
+            if (userId) {
+                payload.user_id = userId;
+            }
+            const res = await callApi('/api/push/register-token', 'POST', payload);
             display(res);
         } catch (e) {
             display({ error: String(e) });
@@ -191,7 +214,7 @@
 
     document.getElementById('btn-push').onclick = async () => {
         try {
-            const token = document.getElementById('token').value.trim();
+            const token = tokenTextarea.value.trim();
             const payload = token
                 ? { token, title: 'Snoutiq', body: 'Hello from web test' }
                 : { title: 'Snoutiq', body: 'Hello to all your devices' };
@@ -204,7 +227,7 @@
 
     document.getElementById('btn-delete').onclick = async () => {
         try {
-            const token = document.getElementById('token').value.trim();
+            const token = tokenTextarea.value.trim();
             if (!token) throw new Error('Generate FCM token first');
             const res = await callApi('/api/push/register-token', 'DELETE', { token });
             display(res);
