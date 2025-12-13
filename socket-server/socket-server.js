@@ -257,6 +257,171 @@ let redisPrescriptionUnsub = null;
 // simple dedupe set: `${callId}:${doctorId}`
 const sentCallNotifications = new Set();
 
+// -------------------- RATE LIMITING --------------------
+// Rate limiter: patientId -> { timestamps: number[], window: number }
+const callRequestRateLimiter = new Map();
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 5; // Max 5 calls per minute per patient
+
+const checkRateLimit = (patientId) => {
+  const now = Date.now();
+  const limiter = callRequestRateLimiter.get(patientId) || { timestamps: [], window: RATE_LIMIT_WINDOW_MS };
+  
+  // Remove timestamps outside the window
+  limiter.timestamps = limiter.timestamps.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
+  
+  if (limiter.timestamps.length >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0, resetAt: limiter.timestamps[0] + RATE_LIMIT_WINDOW_MS };
+  }
+  
+  limiter.timestamps.push(now);
+  callRequestRateLimiter.set(patientId, limiter);
+  
+  return { 
+    allowed: true, 
+    remaining: RATE_LIMIT_MAX_REQUESTS - limiter.timestamps.length,
+    resetAt: limiter.timestamps[0] + RATE_LIMIT_WINDOW_MS
+  };
+};
+
+// -------------------- PAYMENT IDEMPOTENCY LOCK --------------------
+const PAYMENT_IDEMPOTENCY_TTL = 3600; // 1 hour (sufficient for payment processing)
+
+// Atomically claim payment processing (prevents duplicate payment processing)
+const claimPaymentProcessing = async (paymentId, callId) => {
+  if (!paymentId || !callId) {
+    console.warn("[payment:idempotency] Missing paymentId or callId");
+    return { claimed: false, reason: "missing_params" };
+  }
+
+  if (!isRedisStateReady()) {
+    console.warn("[payment:idempotency] Redis unavailable, allowing payment (degraded mode)");
+    return { claimed: true, degraded: true };
+  }
+
+  const idempotencyKey = `payment:${callId}:${paymentId}`;
+  try {
+    // SET key value NX EX ttl - only sets if key doesn't exist (atomic operation)
+    const result = await coreRedis.set(
+      idempotencyKey,
+      JSON.stringify({
+        callId,
+        paymentId,
+        claimedAt: new Date().toISOString(),
+      }),
+      'EX',
+      PAYMENT_IDEMPOTENCY_TTL,
+      'NX' // Only set if not exists
+    );
+
+    if (result === 'OK') {
+      // Successfully claimed payment processing
+      console.log(`🔒 [payment:idempotency] Payment ${paymentId} locked for call ${callId}`);
+      return { claimed: true, idempotencyKey };
+    }
+
+    // Payment already being processed or already processed
+    const existingData = await coreRedis.get(idempotencyKey);
+    console.log(`⚠️ [payment:idempotency] Payment ${paymentId} already processed for call ${callId}`);
+    
+    try {
+      const parsed = existingData ? JSON.parse(existingData) : null;
+      return {
+        claimed: false,
+        reason: "duplicate",
+        existingData: parsed,
+        idempotencyKey,
+      };
+    } catch (e) {
+      return { claimed: false, reason: "duplicate", idempotencyKey };
+    }
+  } catch (error) {
+    console.warn(`[payment:idempotency] Failed to claim payment ${paymentId}:`, error?.message || error);
+    // On Redis error, allow payment but log warning (fail-open for availability)
+    return { claimed: true, degraded: true, error: error.message };
+  }
+};
+
+// Check if payment was already processed (without claiming)
+const checkPaymentProcessed = async (paymentId, callId) => {
+  if (!paymentId || !callId || !isRedisStateReady()) {
+    return { processed: false };
+  }
+
+  const idempotencyKey = `payment:${callId}:${paymentId}`;
+  try {
+    const exists = await coreRedis.exists(idempotencyKey);
+    if (exists) {
+      const data = await coreRedis.get(idempotencyKey);
+      return {
+        processed: true,
+        data: data ? JSON.parse(data) : null,
+      };
+    }
+    return { processed: false };
+  } catch (error) {
+    console.warn(`[payment:idempotency] Failed to check payment ${paymentId}:`, error?.message || error);
+    return { processed: false, error: error.message };
+  }
+};
+
+// -------------------- ATOMIC DOCTOR BUSY LOCK --------------------
+const DOCTOR_BUSY_LOCK_TTL = 300; // 5 minutes
+
+// Atomically claim doctor for a call (prevents race conditions)
+const claimDoctorForCall = async (doctorId, callId) => {
+  if (!isRedisStateReady()) {
+    // Fallback to in-memory check if Redis unavailable
+    return !isDoctorBusy(doctorId);
+  }
+  
+  const lockKey = `doctor:${doctorId}:busy_lock`;
+  try {
+    // SET key value NX EX ttl - only sets if key doesn't exist (atomic operation)
+    const result = await coreRedis.set(
+      lockKey,
+      callId,
+      'EX',
+      DOCTOR_BUSY_LOCK_TTL,
+      'NX' // Only set if not exists
+    );
+    
+    if (result === 'OK') {
+      // Successfully claimed doctor
+      console.log(`🔒 Doctor ${doctorId} locked for call ${callId}`);
+      return true;
+    }
+    
+    // Doctor is already busy (lock exists)
+    const existingCallId = await coreRedis.get(lockKey);
+    console.log(`⚠️ Doctor ${doctorId} is busy (locked by call ${existingCallId})`);
+    return false;
+  } catch (error) {
+    console.warn(`[redis:lock] Failed to claim doctor ${doctorId}:`, error?.message || error);
+    // Fallback to in-memory check on Redis error
+    return !isDoctorBusy(doctorId);
+  }
+};
+
+// Release doctor lock (called when call ends or is rejected)
+const releaseDoctorLock = async (doctorId, callId) => {
+  if (!isRedisStateReady()) return;
+  
+  const lockKey = `doctor:${doctorId}:busy_lock`;
+  try {
+    // Only delete if the lock is held by this call (prevents releasing other call's lock)
+    const existingCallId = await coreRedis.get(lockKey);
+    if (existingCallId === callId) {
+      await coreRedis.del(lockKey);
+      console.log(`🔓 Doctor ${doctorId} lock released for call ${callId}`);
+    } else if (existingCallId) {
+      console.log(`⚠️ Lock for doctor ${doctorId} held by different call ${existingCallId}, not releasing`);
+    }
+  } catch (error) {
+    console.warn(`[redis:lock] Failed to release doctor ${doctorId} lock:`, error?.message || error);
+  }
+};
+
 // -------------------- LOGGING / NOTIFICATION HELPERS --------------------
 const logFlow = (stage, payload = {}) => {
   const {
@@ -661,6 +826,187 @@ const sendPushNotification = async (doctorId, payload) => {
   }
 };
 
+const getRazorpayAuthHeader = () => {
+  const keyId = process.env.RAZORPAY_KEY_ID || process.env.RZP_KEY_ID;
+  const keySecret =
+    process.env.RAZORPAY_KEY_SECRET || process.env.RZP_KEY_SECRET;
+
+  if (!keyId || !keySecret) {
+    console.warn(
+      "[payment] Razorpay credentials missing - cannot manage Razorpay orders",
+    );
+    return null;
+  }
+
+  const token = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+  return `Basic ${token}`;
+};
+
+const cancelRazorpayOrder = async (orderId) => {
+  if (!orderId) return false;
+  const authHeader = getRazorpayAuthHeader();
+  if (!authHeader) return false;
+
+  try {
+    const orderDetails = await fetch(
+      `https://api.razorpay.com/v1/orders/${orderId}`,
+      {
+        method: "GET",
+        headers: { Authorization: authHeader },
+      },
+    );
+
+    if (!orderDetails.ok) {
+      console.warn(
+        `[payment] Unable to fetch Razorpay order ${orderId} for cancellation`,
+        orderDetails.status,
+      );
+      return false;
+    }
+
+    const order = await orderDetails.json();
+    const status = String(order?.status || "").toLowerCase();
+    if (status === "paid" || status === "captured") {
+      console.log(
+        `[payment] Order ${orderId} already paid/captured, skipping cancellation`,
+      );
+      return false;
+    }
+
+    if (status === "cancelled") {
+      console.log(`[payment] Order ${orderId} already cancelled (idempotent)`);
+      return true;
+    }
+
+    const cancelResponse = await fetch(
+      `https://api.razorpay.com/v1/orders/${orderId}/cancel`,
+      {
+        method: "POST",
+        headers: { Authorization: authHeader },
+      },
+    );
+
+    if (!cancelResponse.ok) {
+      const text = await cancelResponse.text().catch(() => "");
+      console.warn(
+        `[payment] Razorpay order cancel failed for ${orderId}`,
+        cancelResponse.status,
+        text,
+      );
+      return false;
+    }
+
+    console.log(`[payment] Razorpay order ${orderId} cancelled successfully`);
+    return true;
+  } catch (error) {
+    console.warn(
+      `[payment] Failed to cancel Razorpay order ${orderId}`,
+      error?.message || error,
+    );
+    return false;
+  }
+};
+
+const sendMissedCallFCM = async (callSession) => {
+  try {
+    if (!callSession) return;
+    const { callId, doctorId, patientId } = callSession;
+    if (!callId || !doctorId) return;
+
+    // If doctor is connected in foreground, rely on socket events
+    if (callSession.doctorSocketId) {
+      console.log(
+        `[push] Skipping missed_call push for call ${callId} - doctor socket active`,
+      );
+      return;
+    }
+
+    const payload = {
+      type: "missed_call",
+      callId,
+      patientId: patientId ?? "",
+      patientName:
+        callSession.patientName ||
+        callSession.patientFullName ||
+        callSession.patient ||
+        (patientId ? `Patient ${patientId}` : "Patient"),
+      petName:
+        callSession.petName ||
+        callSession.pet_name ||
+        callSession.pet ||
+        callSession.petNameFallback ||
+        "",
+      timestamp: new Date().toISOString(),
+      dataOnly: true,
+      message: "You missed a consultation request.",
+      title: "Missed Consultation",
+      body: "Patient missed consultation request",
+      channel: callSession.channel,
+      agoraToken: callSession.agoraToken || callSession.token || null,
+    };
+
+    await sendPushNotification(doctorId, payload);
+    console.log(`[push] Missed call push sent to doctor for call ${callId}`);
+  } catch (error) {
+    console.warn(
+      "[push] Missed call FCM send failed",
+      error?.message || error,
+    );
+  }
+};
+
+// ✅ Send FCM notification to patient when call is missed
+// Note: This uses sendPushNotification which is designed for doctors
+// Patient token support may need to be added separately
+const sendPatientMissedCallFCM = async (callSession) => {
+  try {
+    if (!callSession) return;
+    const { callId, doctorId, patientId } = callSession;
+    if (!callId || !patientId) return;
+
+    // If patient is connected in foreground, rely on socket events
+    if (callSession.patientSocketId) {
+      console.log(
+        `[push] Skipping missed_call push for call ${callId} - patient socket active`,
+      );
+      return;
+    }
+
+    // Note: sendPushNotification is designed for doctors, but we'll try it
+    // Patient push token support may need to be implemented separately
+    const payload = {
+      type: "missed_call",
+      callId,
+      doctorId: doctorId ?? "",
+      doctorName:
+        callSession.doctorName ||
+        callSession.doctor?.name ||
+        (doctorId ? `Doctor ${doctorId}` : "Doctor"),
+      timestamp: new Date().toISOString(),
+      dataOnly: true,
+      message: "Call was missed. You can rejoin the call.",
+      title: "Call Missed",
+      body: "Doctor didn't respond. Tap to rejoin call.",
+      channel: callSession.channel,
+      agoraToken: callSession.agoraToken || callSession.token || null,
+    };
+
+    // Try to send notification (may fail if patient token system not implemented)
+    try {
+      await sendPushNotification(patientId, payload);
+      console.log(`[push] Missed call push sent to patient for call ${callId}`);
+    } catch (error) {
+      // Patient notification may not work if token system is doctor-only
+      console.log(`[push] Patient notification skipped (may need patient token support): ${error?.message || error}`);
+    }
+  } catch (error) {
+    console.warn(
+      "[push] Patient missed call FCM send failed",
+      error?.message || error,
+    );
+  }
+};
+
 // -------------------- WHATSAPP CONFIGURATION --------------------
 const DOCTOR_ALERT_ENDPOINT =
   process.env.DOCTOR_ALERT_ENDPOINT ||
@@ -830,8 +1176,19 @@ const DOCTOR_HEARTBEAT_INTERVAL_MS = 15_000;
 const DOCTOR_STALE_TIMEOUT_MS = 70 * 1000;
 
 const PENDING_CALL_TIMEOUT_MS = 45_000;
+const CALL_RINGING_TIMEOUT_MS = 30_000; // 30 seconds timeout for RINGING status
 const ACTIVE_DOCTOR_LOG_INTERVAL_MS = 5_000;
 const ACTIVE_DOCTOR_REQUEST_LOG_INTERVAL_MS = 5_000;
+const CALL_RESUME_GRACE_MS = Number(
+  process.env.CALL_RESUME_GRACE_MS || 5 * 60 * 1000,
+);
+const CALL_CLEANUP_GRACE_MS = Math.max(30_000, CALL_RESUME_GRACE_MS + 10_000);
+const RESUMABLE_STATUSES = new Set([
+  "payment_completed",
+  "active",
+  "disconnected",
+  "awaiting_resume",
+]);
 
 let lastAvailableDoctorLog = {
   timestamp: 0,
@@ -845,10 +1202,52 @@ let lastActiveDoctorRequestLog = {
 };
 
 // -------------------- HELPERS --------------------
+// Helper to clear timeout timer from call session
+const clearCallTimeoutTimer = async (callSession, callId = null) => {
+  if (callSession?.timeoutTimerId) {
+    clearTimeout(callSession.timeoutTimerId);
+    callSession.timeoutTimerId = null;
+  }
+  
+  // Clear timer expiration timestamp
+  if (callSession?.timeoutExpiresAt) {
+    callSession.timeoutExpiresAt = null;
+  }
+  
+  // Clear timer from Redis if callId provided
+  if (callId && isRedisStateReady()) {
+    try {
+      await coreRedis.del(`call:${callId}:timer`);
+    } catch (error) {
+      console.warn(`[redis:timer] Failed to clear timer for call ${callId}:`, error?.message || error);
+    }
+  }
+};
+
 const setActiveCallSession = (callId, callSession) => {
   const normalizedCallId = normalizeCallId(callId);
   if (!normalizedCallId || !callSession) return null;
   const session = { ...callSession, callId: normalizedCallId };
+
+  const getAnchorMs = (value) => {
+    if (value instanceof Date) return value.getTime();
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : Date.now();
+  };
+
+  const computedResumeUntil =
+    session.resumableUntil ??
+    new Date(
+      getAnchorMs(
+        session.paidAt ||
+          session.acceptedAt ||
+          session.createdAt ||
+          session.disconnectedAt,
+      ) + CALL_RESUME_GRACE_MS,
+    );
+
+  session.resumableUntil = computedResumeUntil;
+  session.status = session.status || "requested";
   activeCalls.set(normalizedCallId, session);
   persistActiveCallState(session).catch(() => {});
   return session;
@@ -1249,7 +1648,7 @@ const enqueuePendingCall = (callSession) => {
   });
 };
 
-const deliverNextPendingCall = (doctorId) => {
+const deliverNextPendingCall = async (doctorId) => {
   const queue = pendingCalls.get(doctorId);
   if (!queue || queue.length === 0) return;
 
@@ -1259,7 +1658,15 @@ const deliverNextPendingCall = (doctorId) => {
   const status = doctorEntry.connectionStatus || "disconnected";
   if (status !== "connected") return;
 
-  if (isDoctorBusy(doctorId)) {
+  // Check both in-memory busy status and atomic lock
+  const inMemoryBusy = isDoctorBusy(doctorId);
+  const nextCall = queue[0];
+  if (!nextCall) return;
+
+  // Try to claim doctor atomically for the next pending call
+  const claimed = await claimDoctorForCall(doctorId, nextCall.callId);
+  
+  if (!claimed || inMemoryBusy) {
     console.log(
       `⛔ Doctor ${doctorId} still busy. Pending calls remain queued.`
     );
@@ -1287,9 +1694,114 @@ const deliverNextPendingCall = (doctorId) => {
     return;
   }
 
-  session.status = "requested";
+  // Initialize timeout timer if not exists
+  if (!session.timeoutTimerId) {
+    session.timeoutTimerId = null;
+  }
+  if (!session.ringingStartedAt) {
+    session.ringingStartedAt = null;
+  }
+
+  // Update status to RINGING when delivered to doctor
+  session.status = "RINGING";
+  session.ringingStartedAt = new Date();
   session.requestedAt = new Date();
   session.doctorSocketId = doctorEntry.socketId;
+  session.timeoutExpiresAt = new Date(Date.now() + CALL_RINGING_TIMEOUT_MS);
+  setActiveCallSession(session.callId, session);
+
+  // Persist timeout expiration timestamp
+  if (isRedisStateReady()) {
+    try {
+      await coreRedis.hset(
+        `call:${entry.callId}:timer`,
+        'expiresAt',
+        session.timeoutExpiresAt.getTime().toString(),
+        'callId',
+        entry.callId,
+        'doctorId',
+        String(doctorId)
+      );
+      await coreRedis.expire(`call:${entry.callId}:timer`, Math.ceil(CALL_RINGING_TIMEOUT_MS / 1000) + 60);
+    } catch (error) {
+      console.warn(`[redis:timer] Failed to persist timer for call ${entry.callId}:`, error?.message || error);
+    }
+  }
+
+  // Start 30-second timeout timer
+  session.timeoutTimerId = setTimeout(async () => {
+    const currentSession = activeCalls.get(entry.callId);
+    if (!currentSession || currentSession.status !== "RINGING") {
+      return; // Status changed, timer already cleared
+    }
+
+    console.log(`⏰ Call ${entry.callId} timed out after 30 seconds`);
+    
+    // Update status to MISSED
+    currentSession.status = "MISSED";
+    currentSession.missedAt = new Date();
+    currentSession.timeoutTimerId = null;
+    currentSession.timeoutExpiresAt = null;
+    setActiveCallSession(entry.callId, currentSession);
+
+    // Release doctor lock
+    releaseDoctorLock(doctorId, entry.callId).catch(() => {});
+
+    // Clear timer from Redis
+    if (isRedisStateReady()) {
+      try {
+        await coreRedis.del(`call:${entry.callId}:timer`);
+      } catch (error) {
+        console.warn(`[redis:timer] Failed to clear timer for call ${entry.callId}:`, error?.message || error);
+      }
+    }
+
+    const orderIdToCancel =
+      currentSession.razorpayOrderId ||
+      currentSession.orderId ||
+      currentSession.order_id;
+    if (orderIdToCancel) {
+      cancelRazorpayOrder(orderIdToCancel).catch(() => {});
+    }
+    sendMissedCallFCM(currentSession).catch(() => {});
+
+    // Emit call-missed event to both patient and doctor
+    const missedPayload = {
+      callId: entry.callId,
+      doctorId,
+      patientId: currentSession.patientId,
+      status: "MISSED",
+      previousStatus: "RINGING",
+      reason: "timeout",
+      message: "Doctor didn't respond in time",
+      timestamp: new Date().toISOString(),
+      channel: currentSession.channel,
+      agoraToken: currentSession.agoraToken || currentSession.token || null,
+      doctorName: currentSession.doctorName || currentSession.doctor?.name || null,
+      patientName: currentSession.patientName || currentSession.patientFullName || null,
+      petName: currentSession.petName || currentSession.pet_name || null,
+    };
+
+    if (currentSession.patientSocketId) {
+      io.to(currentSession.patientSocketId).emit("call-missed", missedPayload);
+    }
+    io.to(`doctor-${doctorId}`).emit("call-missed", missedPayload);
+    
+    // ✅ Send FCM notification to patient if app is in background/killed
+    if (currentSession.patientId) {
+      sendPatientMissedCallFCM(currentSession).catch(() => {});
+    }
+
+    // Emit call-status-update
+    io.emit("call-status-update", {
+      callId: entry.callId,
+      status: "MISSED",
+      previousStatus: "RINGING",
+      reason: "timeout",
+      timestamp: new Date().toISOString(),
+    });
+  }, CALL_RINGING_TIMEOUT_MS);
+
   setActiveCallSession(session.callId, session);
 
   io.to(`doctor-${doctorId}`).emit("call-requested", {
@@ -1297,6 +1809,7 @@ const deliverNextPendingCall = (doctorId) => {
     doctorId: session.doctorId,
     patientId: session.patientId,
     channel: session.channel,
+    status: "RINGING",
     queued: true,
     timestamp: new Date().toISOString(),
   });
@@ -1305,8 +1818,16 @@ const deliverNextPendingCall = (doctorId) => {
     io.to(session.patientSocketId).emit("call-queued", {
       callId: session.callId,
       doctorId: session.doctorId,
-      status: "delivered",
+      status: "RINGING",
       message: "Doctor is now online. Alerting them to join your call.",
+      timestamp: new Date().toISOString(),
+    });
+
+    // Emit status update to patient
+    io.to(session.patientSocketId).emit("call-status-update", {
+      callId: session.callId,
+      status: "RINGING",
+      previousStatus: session.status === "queued" ? "queued" : "INITIATED",
       timestamp: new Date().toISOString(),
     });
   }
@@ -1324,9 +1845,10 @@ const buildActiveDoctorSnapshot = () => {
     const status = info.connectionStatus || "connected";
     const isConnected = status === "connected";
     const isReconnecting = status === "reconnecting";
+
     if (isConnected || isReconnecting) {
       allOnline.push(doctorId);
-      if (isConnected && !isDoctorBusy(doctorId)) {
+      if (!isDoctorBusy(doctorId)) {
         available.push(doctorId);
       }
     }
@@ -1493,6 +2015,103 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
   deliverNextPendingCall(doctorId);
 };
 
+const recoverCallTimers = async () => {
+  if (!isRedisStateReady()) return;
+  try {
+    // Scan for all timer keys
+    const timerKeys = [];
+    let cursor = 0;
+    do {
+      const result = await coreRedis.scan(
+        cursor,
+        'MATCH',
+        'call:*:timer',
+        'COUNT',
+        100
+      );
+      cursor = Number(result[0]);
+      timerKeys.push(...result[1]);
+    } while (cursor !== 0);
+
+    for (const timerKey of timerKeys) {
+      try {
+        const timerData = await coreRedis.hgetall(timerKey);
+        const callId = timerData.callId;
+        const expiresAtStr = timerData.expiresAt;
+        const doctorId = timerData.doctorId;
+
+        if (!callId || !expiresAtStr) continue;
+
+        const expiresAt = Number(expiresAtStr);
+        const now = Date.now();
+        const remaining = expiresAt - now;
+
+        if (remaining <= 0) {
+          // Timer already expired, handle timeout
+          const callSession = activeCalls.get(callId);
+          if (callSession && callSession.status === "RINGING") {
+            console.log(`⏰ Recovered expired timer for call ${callId}, handling timeout`);
+            // Trigger timeout handler (simplified - just update status)
+            callSession.status = "MISSED";
+            callSession.missedAt = new Date();
+            setActiveCallSession(callId, callSession);
+            releaseDoctorLock(Number(doctorId), callId).catch(() => {});
+            await coreRedis.del(timerKey);
+          }
+        } else {
+          // Restart timer
+          const callSession = activeCalls.get(callId);
+          if (callSession && callSession.status === "RINGING") {
+            console.log(`⏰ Recovering timer for call ${callId}, ${Math.ceil(remaining / 1000)}s remaining`);
+            callSession.timeoutExpiresAt = new Date(expiresAt);
+            callSession.timeoutTimerId = setTimeout(async () => {
+              const currentSession = activeCalls.get(callId);
+              if (!currentSession || currentSession.status !== "RINGING") {
+                return;
+              }
+              console.log(`⏰ Recovered timer expired for call ${callId}`);
+              currentSession.status = "MISSED";
+              currentSession.missedAt = new Date();
+              currentSession.timeoutTimerId = null;
+              currentSession.timeoutExpiresAt = null;
+              setActiveCallSession(callId, currentSession);
+              await releaseDoctorLock(Number(doctorId), callId);
+              await coreRedis.del(timerKey);
+              // Emit missed call events (same as normal timeout)
+              const missedPayload = {
+                callId,
+                doctorId: Number(doctorId),
+                patientId: currentSession.patientId,
+                status: "MISSED",
+                previousStatus: "RINGING",
+                reason: "timeout",
+                message: "Doctor didn't respond in time",
+                timestamp: new Date().toISOString(),
+              };
+              if (currentSession.patientSocketId) {
+                io.to(currentSession.patientSocketId).emit("call-missed", missedPayload);
+              }
+              io.to(`doctor-${doctorId}`).emit("call-missed", missedPayload);
+              io.emit("call-status-update", {
+                callId,
+                status: "MISSED",
+                previousStatus: "RINGING",
+                reason: "timeout",
+                timestamp: new Date().toISOString(),
+              });
+            }, remaining);
+            setActiveCallSession(callId, callSession);
+          }
+        }
+      } catch (error) {
+        console.warn(`[redis:timer] Failed to recover timer ${timerKey}:`, error?.message || error);
+      }
+    }
+  } catch (error) {
+    console.warn(`[redis:timer] Timer recovery failed:`, error?.message || error);
+  }
+};
+
 const rehydrateStateFromRedis = async () => {
   if (!isRedisStateReady()) return;
   try {
@@ -1611,24 +2230,354 @@ const rehydrateStateFromRedis = async () => {
   }
 };
 
+const sendJson = (res, status, payload) => {
+  res.writeHead(status, {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.end(JSON.stringify(payload));
+};
+
+const parseJsonBody = async (req) => {
+  try {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const raw = Buffer.concat(chunks).toString("utf8");
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn("[http] Failed to parse JSON body", error?.message || error);
+    return {};
+  }
+};
+
 // -------------------- HTTP SERVER (health + debug APIs) --------------------
-const httpServer = createServer((req, res) => {
+const httpServer = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
+    const pathname = (url.pathname || "/").replace(/\/+$/, "") || "/";
 
     // CORS preflight
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
       });
       res.end();
       return;
     }
 
+    const isCreateOrderPath =
+      pathname === "/create-order" || pathname === "/backend/api/create-order";
+    const isVerifyPaymentPath =
+      pathname === "/rzp/verify" || pathname === "/backend/api/rzp/verify";
+
+    if (req.method === "POST" && isCreateOrderPath) {
+      const body = await parseJsonBody(req);
+      const normalizedCallId = normalizeCallId(body?.callId);
+      const callSession = normalizedCallId
+        ? activeCalls.get(normalizedCallId)
+        : null;
+
+      if (!normalizedCallId || !callSession) {
+        console.warn(
+          `[payment] Rejecting create-order: call not found (${body?.callId})`,
+        );
+        sendJson(res, 400, {
+          success: false,
+          message: "Invalid or unknown callId",
+        });
+        return;
+      }
+
+      if (callSession.status !== "ACCEPTED") {
+        console.warn(
+          `[payment] Rejecting create-order for call ${normalizedCallId} - status=${callSession.status}`,
+        );
+        sendJson(res, 409, {
+          success: false,
+          message: "Call is not in ACCEPTED state",
+        });
+        return;
+      }
+
+      const amountNumber = Number(body?.amount);
+      const amountPaise = Math.round(amountNumber * 100);
+      if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+        sendJson(res, 400, {
+          success: false,
+          message: "Invalid amount",
+        });
+        return;
+      }
+
+      const authHeader = getRazorpayAuthHeader();
+      if (!authHeader) {
+        sendJson(res, 500, {
+          success: false,
+          message: "Payment gateway not configured",
+        });
+        return;
+      }
+
+      try {
+        const orderResponse = await fetch(
+          "https://api.razorpay.com/v1/orders",
+          {
+            method: "POST",
+            headers: {
+              Authorization: authHeader,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              amount: amountPaise,
+              currency: "INR",
+              receipt: normalizedCallId,
+              notes: {
+                callId: normalizedCallId,
+                doctorId:
+                  body?.doctorId ??
+                  body?.doctor_id ??
+                  callSession.doctorId ??
+                  "",
+                patientId:
+                  body?.patientId ??
+                  body?.patient_id ??
+                  callSession.patientId ??
+                  "",
+                channel: body?.channel ?? callSession.channel ?? "",
+              },
+            }),
+          },
+        );
+
+        if (!orderResponse.ok) {
+          const text = await orderResponse.text().catch(() => "");
+          console.warn(
+            `[payment] Razorpay create-order failed for call ${normalizedCallId}`,
+            orderResponse.status,
+            text,
+          );
+          sendJson(res, 502, {
+            success: false,
+            message: "Failed to create order",
+          });
+          return;
+        }
+
+        const order = await orderResponse.json();
+        callSession.razorpayOrderId = order?.id || order?.order_id;
+        setActiveCallSession(normalizedCallId, callSession);
+
+        sendJson(res, 200, {
+          success: true,
+          order_id: order?.id || order?.order_id,
+          id: order?.id || order?.order_id,
+          key: process.env.RAZORPAY_KEY_ID || process.env.RZP_KEY_ID || null,
+          amount: order?.amount,
+          currency: order?.currency || "INR",
+        });
+      } catch (error) {
+        console.warn(
+          `[payment] create-order exception for call ${normalizedCallId}`,
+          error?.message || error,
+        );
+        sendJson(res, 500, {
+          success: false,
+          message: "Order creation failed",
+        });
+      }
+      return;
+    }
+
+    if (req.method === "POST" && isVerifyPaymentPath) {
+      const body = await parseJsonBody(req);
+      const normalizedCallId = normalizeCallId(body?.callId);
+      const callSession = normalizedCallId
+        ? activeCalls.get(normalizedCallId)
+        : null;
+
+      if (!normalizedCallId || !callSession) {
+        console.warn(
+          `[payment] Rejecting verification: call not found (${body?.callId})`,
+        );
+        sendJson(res, 400, {
+          success: false,
+          message: "Invalid or unknown callId",
+        });
+        return;
+      }
+
+      // Check if call was missed/rejected/ended - reject payment
+      if (["MISSED", "REJECTED", "ENDED"].includes(callSession.status)) {
+        console.warn(
+          `[payment] Rejecting verification for call ${normalizedCallId} - status=${callSession.status}`,
+        );
+        sendJson(res, 409, {
+          success: false,
+          message: `Call was ${callSession.status.toLowerCase()}. Payment cannot be processed.`,
+          callStatus: callSession.status,
+        });
+        return;
+      }
+
+      if (callSession.status !== "ACCEPTED") {
+        console.warn(
+          `[payment] Rejecting verification for call ${normalizedCallId} - status=${callSession.status}`,
+        );
+        sendJson(res, 409, {
+          success: false,
+          message: "Call is not in ACCEPTED state",
+          callStatus: callSession.status,
+        });
+        return;
+      }
+
+      const orderId =
+        body?.razorpay_order_id || body?.orderId || callSession.razorpayOrderId;
+      const paymentId = body?.razorpay_payment_id || body?.paymentId;
+      const signature = body?.razorpay_signature || body?.signature;
+
+      // ========== PAYMENT IDEMPOTENCY CHECK ==========
+      if (paymentId) {
+        const idempotencyCheck = await claimPaymentProcessing(paymentId, normalizedCallId);
+        
+        if (!idempotencyCheck.claimed && idempotencyCheck.reason === "duplicate") {
+          console.log(
+            `[payment] Payment ${paymentId} already processed for call ${normalizedCallId}. Returning success (idempotent).`
+          );
+          
+          // If payment was already processed, return success (idempotent behavior)
+          // Check if call status is already payment_completed or active
+          if (["payment_completed", "active"].includes(callSession.status)) {
+            sendJson(res, 200, {
+              success: true,
+              status: "already_processed",
+              message: "Payment already processed",
+              callId: normalizedCallId,
+              paymentId,
+              callStatus: callSession.status,
+            });
+            return;
+          }
+          
+          // Payment was processed but call status not updated (edge case)
+          // Still return success to avoid double charging
+          sendJson(res, 200, {
+            success: true,
+            status: "duplicate_ignored",
+            message: "Payment already processed",
+            callId: normalizedCallId,
+            paymentId,
+          });
+          return;
+        }
+        
+        if (idempotencyCheck.degraded) {
+          console.warn(
+            `[payment] Payment idempotency check degraded (Redis unavailable). Processing payment anyway.`
+          );
+        }
+      }
+
+      const keySecret =
+        process.env.RAZORPAY_KEY_SECRET || process.env.RZP_KEY_SECRET;
+      if (!keySecret) {
+        sendJson(res, 500, {
+          success: false,
+          message: "Payment gateway not configured",
+        });
+        return;
+      }
+
+      if (!orderId || !paymentId || !signature) {
+        sendJson(res, 400, {
+          success: false,
+          message: "Missing payment parameters",
+        });
+        return;
+      }
+
+      const expectedSignature = crypto
+        .createHmac("sha256", keySecret)
+        .update(`${orderId}|${paymentId}`)
+        .digest("hex");
+
+      if (expectedSignature !== signature) {
+        console.warn(
+          `[payment] Invalid Razorpay signature for call ${normalizedCallId}`,
+        );
+        
+        // Release idempotency lock on signature failure
+        if (paymentId) {
+          const idempotencyKey = `payment:${normalizedCallId}:${paymentId}`;
+          await coreRedis.del(idempotencyKey).catch(() => {});
+        }
+        
+        sendJson(res, 400, {
+          success: false,
+          message: "Invalid signature",
+        });
+        return;
+      }
+
+      // Re-check call status after signature verification (race condition protection)
+      const currentCallSession = activeCalls.get(normalizedCallId);
+      if (!currentCallSession) {
+        console.warn(
+          `[payment] Call session ${normalizedCallId} disappeared during payment verification`
+        );
+        sendJson(res, 404, {
+          success: false,
+          message: "Call session not found",
+        });
+        return;
+      }
+
+      if (["MISSED", "REJECTED", "ENDED"].includes(currentCallSession.status)) {
+        console.warn(
+          `[payment] Call ${normalizedCallId} status changed to ${currentCallSession.status} during payment verification`
+        );
+        
+        // Release idempotency lock
+        if (paymentId) {
+          const idempotencyKey = `payment:${normalizedCallId}:${paymentId}`;
+          await coreRedis.del(idempotencyKey).catch(() => {});
+        }
+        
+        sendJson(res, 409, {
+          success: false,
+          message: `Call was ${currentCallSession.status.toLowerCase()}. Payment cannot be processed.`,
+          callStatus: currentCallSession.status,
+        });
+        return;
+      }
+
+      // Update call session with payment info
+      callSession.razorpayOrderId = orderId;
+      callSession.paymentId = paymentId;
+      callSession.paymentVerifiedAt = new Date();
+      setActiveCallSession(normalizedCallId, callSession);
+
+      // Idempotency key already set above, no need to set again
+      console.log(
+        `✅ [payment] Payment ${paymentId} verified successfully for call ${normalizedCallId}`
+      );
+
+      sendJson(res, 200, {
+        success: true,
+        status: "verified",
+        callId: normalizedCallId,
+        paymentId,
+      });
+      return;
+    }
+
     // health check
-    if (req.method === "GET" && url.pathname === "/health") {
+    if (req.method === "GET" && pathname === "/health") {
       res.writeHead(200, {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
@@ -1644,7 +2593,7 @@ const httpServer = createServer((req, res) => {
     }
 
     // list active doctors (not busy) – counts both connected + disconnected (always-online mode)
-    if (req.method === "GET" && url.pathname === "/active-doctors") {
+    if (req.method === "GET" && pathname === "/active-doctors") {
       const available = [];
       for (const [doctorId, info] of activeDoctors.entries()) {
         const status = info.connectionStatus || "disconnected";
@@ -1703,6 +2652,7 @@ const io = new Server(httpServer, {
 });
 
 await rehydrateStateFromRedis();
+await recoverCallTimers(); // Recover any pending timeout timers
 emitAvailableDoctors();
 
 if (isRedisEnabled() && isRedisStateReady()) {
@@ -1971,6 +2921,32 @@ io.on("connection", (socket) => {
       console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
 
       doctorId = Number(doctorId);
+      patientId = Number(patientId);
+
+      // ========== RATE LIMITING ==========
+      const rateLimitResult = checkRateLimit(patientId);
+      if (!rateLimitResult.allowed) {
+        const resetIn = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
+        console.log(`🚫 Rate limit exceeded for patient ${patientId}. Reset in ${resetIn}s`);
+        socket.emit("call-status-update", {
+          callId: null,
+          doctorId,
+          patientId,
+          status: "rate_limited",
+          message: `Too many call requests. Please wait ${resetIn} seconds before trying again.`,
+          resetIn,
+          timestamp: new Date().toISOString(),
+        });
+        socket.emit("call-rejected", {
+          callId: null,
+          doctorId,
+          patientId,
+          reason: "rate_limit",
+          message: `Rate limit exceeded. Please wait ${resetIn} seconds.`,
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
 
       const generatedCallId = `call_${Date.now()}_${Math.random()
         .toString(36)
@@ -1992,7 +2968,10 @@ io.on("connection", (socket) => {
       const doctorHasSocket = Boolean(doctorEntry?.socketId);
       const doctorConnected =
         doctorHasSocket && connectionStatus === "connected";
-      const doctorBusy = isDoctorBusy(doctorId);
+      
+      // ========== ATOMIC DOCTOR BUSY CHECK ==========
+      const doctorClaimed = await claimDoctorForCall(doctorId, callId);
+      const doctorBusy = !doctorClaimed; // If not claimed, doctor is busy
       const shouldQueue = !doctorConnected || doctorBusy;
       const existingQueue = pendingCalls.get(doctorId) || [];
 
@@ -2001,11 +2980,13 @@ io.on("connection", (socket) => {
         doctorId,
         patientId,
         channel,
-        status: shouldQueue ? "queued" : "requested",
+        status: shouldQueue ? "queued" : "INITIATED",
         createdAt: new Date(),
         queuedAt: shouldQueue ? new Date() : null,
         patientSocketId: socket.id,
         doctorSocketId: doctorEntry?.socketId || null,
+        timeoutTimerId: null,
+        ringingStartedAt: null,
       };
 
       logFlow("call-requested", {
@@ -2075,11 +3056,102 @@ io.on("connection", (socket) => {
       }
 
       // Direct ring to connected doctor
+      // Update status to RINGING when delivered to doctor
+      callSession.status = "RINGING";
+      callSession.ringingStartedAt = new Date();
+      callSession.timeoutExpiresAt = new Date(Date.now() + CALL_RINGING_TIMEOUT_MS);
+      setActiveCallSession(callId, callSession);
+
+      // Persist timeout expiration timestamp
+      if (isRedisStateReady()) {
+        try {
+          await coreRedis.hset(
+            `call:${callId}:timer`,
+            'expiresAt',
+            callSession.timeoutExpiresAt.getTime().toString(),
+            'callId',
+            callId,
+            'doctorId',
+            String(doctorId)
+          );
+          await coreRedis.expire(`call:${callId}:timer`, Math.ceil(CALL_RINGING_TIMEOUT_MS / 1000) + 60); // Extra 60s buffer
+        } catch (error) {
+          console.warn(`[redis:timer] Failed to persist timer for call ${callId}:`, error?.message || error);
+        }
+      }
+
+      // Start 30-second timeout timer
+      callSession.timeoutTimerId = setTimeout(async () => {
+        const currentSession = activeCalls.get(callId);
+        if (!currentSession || currentSession.status !== "RINGING") {
+          return; // Status changed, timer already cleared
+        }
+
+        console.log(`⏰ Call ${callId} timed out after 30 seconds`);
+        
+        // Update status to MISSED
+        currentSession.status = "MISSED";
+        currentSession.missedAt = new Date();
+        currentSession.timeoutTimerId = null;
+        currentSession.timeoutExpiresAt = null;
+        setActiveCallSession(callId, currentSession);
+
+        // Release doctor lock
+        releaseDoctorLock(doctorId, callId).catch(() => {});
+
+        // Clear timer from Redis
+        if (isRedisStateReady()) {
+          try {
+            await coreRedis.del(`call:${callId}:timer`);
+          } catch (error) {
+            console.warn(`[redis:timer] Failed to clear timer for call ${callId}:`, error?.message || error);
+          }
+        }
+
+        const orderIdToCancel =
+          currentSession.razorpayOrderId ||
+          currentSession.orderId ||
+          currentSession.order_id;
+        if (orderIdToCancel) {
+          cancelRazorpayOrder(orderIdToCancel).catch(() => {});
+        }
+        sendMissedCallFCM(currentSession).catch(() => {});
+
+        // Emit call-missed event to both patient and doctor
+        const missedPayload = {
+          callId,
+          doctorId,
+          patientId: currentSession.patientId,
+          status: "MISSED",
+          previousStatus: "RINGING",
+          reason: "timeout",
+          message: "Doctor didn't respond in time",
+          timestamp: new Date().toISOString(),
+        };
+
+        if (currentSession.patientSocketId) {
+          io.to(currentSession.patientSocketId).emit("call-missed", missedPayload);
+        }
+        io.to(`doctor-${doctorId}`).emit("call-missed", missedPayload);
+
+        // Emit call-status-update
+        io.emit("call-status-update", {
+          callId,
+          status: "MISSED",
+          previousStatus: "RINGING",
+          reason: "timeout",
+          timestamp: new Date().toISOString(),
+        });
+      }, CALL_RINGING_TIMEOUT_MS);
+
+      setActiveCallSession(callId, callSession);
+
       io.to(`doctor-${doctorId}`).emit("call-requested", {
         callId,
         doctorId,
         patientId,
         channel,
+        status: "RINGING",
         timestamp: new Date().toISOString(),
         queued: false,
       });
@@ -2092,9 +3164,18 @@ io.on("connection", (socket) => {
         doctorId,
         patientId,
         channel,
-        status: "sent",
+        status: "RINGING",
         queued: false,
         message: "Ringing the doctor now…",
+        timestamp: new Date().toISOString(),
+      });
+
+      // Emit status update to patient
+      socket.emit("call-status-update", {
+        callId,
+        status: "RINGING",
+        previousStatus: "INITIATED",
+        timestamp: new Date().toISOString(),
       });
 
       emitAvailableDoctors();
@@ -2102,7 +3183,7 @@ io.on("connection", (socket) => {
   );
 
   // ========== DOCTOR ACCEPTS CALL ==========
-  socket.on("call-accepted", (data) => {
+  socket.on("call-accepted", async (data) => {
     const { callId: rawCallId, doctorId, patientId, channel } = data;
     const normalizedCallId = normalizeCallId(rawCallId);
     console.log(`✅ Call ${normalizedCallId} accepted by doctor ${doctorId}`);
@@ -2114,7 +3195,14 @@ io.on("connection", (socket) => {
       return socket.emit("error", { message: "Call session not found" });
     }
 
-    callSession.status = "accepted";
+    // Clear timeout timer if exists
+    await clearCallTimeoutTimer(callSession, normalizedCallId);
+    
+    // NOTE: We do NOT release doctor lock here because call is now ACTIVE
+    // Lock will be released when call ends
+
+    const previousStatus = callSession.status;
+    callSession.status = "ACCEPTED";
     callSession.acceptedAt = new Date();
     callSession.doctorSocketId = socket.id;
     setActiveCallSession(normalizedCallId, callSession);
@@ -2125,6 +3213,7 @@ io.on("connection", (socket) => {
         doctorId,
         patientId,
         channel,
+        status: "ACCEPTED",
         agoraToken:
           callSession.agoraToken ||
           callSession.token ||
@@ -2138,11 +3227,19 @@ io.on("connection", (socket) => {
       });
     }
 
+    // Emit call-status-update
+    io.emit("call-status-update", {
+      callId: normalizedCallId,
+      status: "ACCEPTED",
+      previousStatus,
+      timestamp: new Date().toISOString(),
+    });
+
     emitAvailableDoctors();
   });
 
   // ========== DOCTOR REJECTS CALL ==========
-  socket.on("call-rejected", (data) => {
+  socket.on("call-rejected", async (data) => {
     const { callId: rawCallId, reason = "rejected", doctorId, patientId } = data;
     const normalizedCallId = normalizeCallId(rawCallId);
     console.log(
@@ -2161,7 +3258,14 @@ io.on("connection", (socket) => {
       return;
     }
 
-    callSession.status = "rejected";
+    // Clear timeout timer if exists
+    await clearCallTimeoutTimer(callSession, normalizedCallId);
+    
+    // Release doctor lock since call is being rejected
+    await releaseDoctorLock(doctorId, normalizedCallId);
+
+    const previousStatus = callSession.status;
+    callSession.status = "REJECTED";
     callSession.rejectedAt = new Date();
     callSession.rejectionReason = reason;
 
@@ -2173,10 +3277,11 @@ io.on("connection", (socket) => {
         callId: normalizedCallId,
         doctorId: callSession.doctorId,
         patientId: callSession.patientId,
+        status: "REJECTED",
         reason,
         message:
           reason === "timeout"
-            ? "Doctor did not respond within 5 minutes"
+            ? "Doctor did not respond within 30 seconds"
             : "Doctor is currently unavailable",
         timestamp: new Date().toISOString(),
       });
@@ -2190,10 +3295,11 @@ io.on("connection", (socket) => {
         callId: normalizedCallId,
         doctorId: callSession.doctorId,
         patientId: callSession.patientId,
+        status: "REJECTED",
         reason,
         message:
           reason === "timeout"
-            ? "Doctor did not respond within 5 minutes"
+            ? "Doctor did not respond within 30 seconds"
             : "Doctor is currently unavailable",
         timestamp: new Date().toISOString(),
       });
@@ -2201,7 +3307,8 @@ io.on("connection", (socket) => {
 
     io.emit("call-status-update", {
       callId: normalizedCallId,
-      status: "rejected",
+      status: "REJECTED",
+      previousStatus,
       rejectedBy: "doctor",
       reason,
       timestamp: new Date().toISOString(),
@@ -2215,22 +3322,100 @@ io.on("connection", (socket) => {
   });
 
   // ========== PATIENT PAYMENT COMPLETED ==========
-  socket.on("payment-completed", (data) => {
+  socket.on("payment-completed", async (data, ack) => {
     const { callId: rawCallId, patientId, doctorId, channel, paymentId } = data;
     const normalizedCallId = normalizeCallId(rawCallId);
-    console.log(`💰 Payment completed for call ${normalizedCallId}`);
+    console.log(`💰 Payment completed for call ${normalizedCallId}, paymentId: ${paymentId}`);
 
     const callSession = activeCalls.get(normalizedCallId);
     if (!callSession) {
       console.log(`❌ Call session ${normalizedCallId} not found`);
-      return socket.emit("error", { message: "Call session not found" });
+      const errorResponse = { success: false, message: "Call session not found" };
+      socket.emit("error", errorResponse);
+      if (ack) ack(errorResponse);
+      return;
     }
 
+    // ========== PAYMENT IDEMPOTENCY CHECK ==========
+    if (paymentId) {
+      const idempotencyCheck = await claimPaymentProcessing(paymentId, normalizedCallId);
+      
+      if (!idempotencyCheck.claimed && idempotencyCheck.reason === "duplicate") {
+        console.log(
+          `[payment-completed] Payment ${paymentId} already processed for call ${normalizedCallId}. Ignoring duplicate.`
+        );
+        
+        // Payment already processed - return success (idempotent behavior)
+        const successResponse = {
+          success: true,
+          message: "Payment already processed",
+          callId: normalizedCallId,
+          paymentId,
+          duplicate: true,
+        };
+        
+        if (ack) ack(successResponse);
+        
+        // If call status is already payment_completed or active, emit current state
+        if (["payment_completed", "active"].includes(callSession.status)) {
+          socket.emit("payment-verified", {
+            callId: normalizedCallId,
+            channel: callSession.channel,
+            patientId,
+            doctorId,
+            status: callSession.status,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        return;
+      }
+    }
+
+    // Check if call was missed/rejected/ended - reject payment
+    if (["MISSED", "REJECTED", "ENDED"].includes(callSession.status)) {
+      console.warn(
+        `[payment-completed] Rejecting payment for call ${normalizedCallId} - status=${callSession.status}`
+      );
+      const errorResponse = {
+        success: false,
+        message: `Call was ${callSession.status.toLowerCase()}. Payment cannot be processed.`,
+        callStatus: callSession.status,
+      };
+      socket.emit("error", errorResponse);
+      if (ack) ack(errorResponse);
+      
+      // Release idempotency lock if set
+      if (paymentId) {
+        const idempotencyKey = `payment:${normalizedCallId}:${paymentId}`;
+        await coreRedis.del(idempotencyKey).catch(() => {});
+      }
+      return;
+    }
+
+    // Validate call is in correct state for payment
+    if (callSession.status !== "ACCEPTED" && callSession.status !== "payment_completed") {
+      console.warn(
+        `[payment-completed] Call ${normalizedCallId} status is ${callSession.status}, expected ACCEPTED`
+      );
+    }
+
+    // Update call session
+    const previousStatus = callSession.status;
     callSession.status = "payment_completed";
     callSession.paymentId = paymentId;
     callSession.paidAt = new Date();
     if (channel) callSession.channel = channel;
     setActiveCallSession(normalizedCallId, callSession);
+
+    // Acknowledge payment received
+    if (ack) {
+      ack({
+        success: true,
+        message: "Payment received",
+        callId: normalizedCallId,
+        paymentId,
+      });
+    }
 
     logFlow("payment-completed", {
       callId: normalizedCallId,
@@ -2280,16 +3465,155 @@ io.on("connection", (socket) => {
     };
 
     // Tell doctor: join now (host)
+    // IMPORTANT: Emit to both doctorSocketId and doctor room for reliability
     if (callSession.doctorSocketId) {
+      console.log(`📤 [payment-completed] Emitting patient-paid to doctor socket: ${callSession.doctorSocketId}`);
       io.to(callSession.doctorSocketId).emit("patient-paid", patientPaidData);
-    } else {
-      io.to(`doctor-${doctorId}`).emit("patient-paid", {
-        ...patientPaidData,
-        queued: true,
+    }
+    
+    // Also emit to doctor room as fallback
+    console.log(`📤 [payment-completed] Emitting patient-paid to doctor room: doctor-${doctorId}`);
+    io.to(`doctor-${doctorId}`).emit("patient-paid", {
+      ...patientPaidData,
+      queued: !callSession.doctorSocketId,
+    });
+    
+    // Also emit payment-verified to doctor as additional fallback
+    if (callSession.doctorSocketId) {
+      io.to(callSession.doctorSocketId).emit("payment-verified", {
+        callId: normalizedCallId,
+        channel: callSession.channel,
+        doctorId,
+        patientId,
+        role: "host",
+        uid: Number(doctorId),
+        timestamp: new Date().toISOString(),
       });
     }
+    io.to(`doctor-${doctorId}`).emit("payment-verified", {
+      callId: normalizedCallId,
+      channel: callSession.channel,
+      doctorId,
+      patientId,
+      role: "host",
+      uid: Number(doctorId),
+      timestamp: new Date().toISOString(),
+    });
+
+    // ✅ CRITICAL: Emit call-status-update so doctor can detect payment_completed status
+    io.emit("call-status-update", {
+      callId: normalizedCallId,
+      status: "payment_completed",
+      previousStatus: callSession.status,
+      doctorId,
+      patientId,
+      paymentId,
+      message: "Patient payment completed - doctor should join call",
+      timestamp: new Date().toISOString(),
+    });
 
     emitAvailableDoctors();
+  });
+
+  // ========== CALL RESUME REQUEST ==========
+  socket.on("call-resume", (payload = {}, ack) => {
+    const normalizedCallId = normalizeCallId(payload.callId);
+    const requesterRole = payload.requester || payload.role || "unknown";
+    const requesterDoctorId = Number(payload.doctorId || payload.doctor_id);
+    const requesterPatientId = Number(payload.patientId || payload.patient_id);
+    const now = Date.now();
+
+    if (!normalizedCallId) {
+      const response = { ok: false, reason: "missing_call_id" };
+      socket.emit("call-resume-denied", response);
+      ack?.(response);
+      return;
+    }
+
+    const callSession = activeCalls.get(normalizedCallId);
+    if (!callSession) {
+      const response = { ok: false, reason: "not_found", callId: normalizedCallId };
+      socket.emit("call-resume-denied", response);
+      ack?.(response);
+      return;
+    }
+
+    const resumableUntil =
+      callSession.resumableUntil instanceof Date
+        ? callSession.resumableUntil.getTime()
+        : Number(callSession.resumableUntil) || 0;
+    const withinWindow =
+      (RESUMABLE_STATUSES.has(callSession.status) || callSession.status === "active") &&
+      (!resumableUntil || now <= resumableUntil);
+
+    if (!withinWindow) {
+      callSession.status = "ended";
+      callSession.endedAt = new Date();
+      setActiveCallSession(normalizedCallId, callSession);
+
+      const response = {
+        ok: false,
+        reason: "expired",
+        callId: normalizedCallId,
+        resumableUntil: callSession.resumableUntil,
+      };
+      socket.emit("call-resume-denied", response);
+      ack?.(response);
+
+      if (callSession.patientSocketId) {
+        io.to(callSession.patientSocketId).emit("call-resume-denied", response);
+      }
+      if (callSession.doctorSocketId) {
+        io.to(callSession.doctorSocketId).emit("call-resume-denied", response);
+      }
+      return;
+    }
+
+    // Update socket bindings so we can notify both sides
+    if (requesterRole === "doctor" || requesterDoctorId === callSession.doctorId) {
+      callSession.doctorSocketId = socket.id;
+    } else if (requesterRole === "patient" || requesterPatientId === callSession.patientId) {
+      callSession.patientSocketId = socket.id;
+    }
+    if (payload.channel) callSession.channel = payload.channel;
+    if (payload.agoraToken) {
+      callSession.agoraToken = payload.agoraToken;
+    }
+
+    callSession.status = "awaiting_resume";
+    callSession.disconnectedAt = callSession.disconnectedAt || new Date();
+    setActiveCallSession(normalizedCallId, callSession);
+
+    const resumePayload = {
+      ok: true,
+      callId: normalizedCallId,
+      channel: callSession.channel,
+      doctorId: callSession.doctorId,
+      patientId: callSession.patientId,
+      agoraToken:
+        payload.agoraToken ||
+        callSession.agoraToken ||
+        callSession.token ||
+        callSession.agora_token ||
+        null,
+      resumableUntil: callSession.resumableUntil,
+      status: callSession.status,
+    };
+
+    socket.emit("call-resume-allowed", resumePayload);
+    ack?.(resumePayload);
+
+    if (callSession.patientSocketId && callSession.patientSocketId !== socket.id) {
+      io.to(callSession.patientSocketId).emit("call-resume-allowed", resumePayload);
+    } else if (callSession.patientId) {
+      io.to(`patient-${callSession.patientId}`).emit("call-resume-allowed", resumePayload);
+    }
+
+    if (callSession.doctorSocketId && callSession.doctorSocketId !== socket.id) {
+      io.to(callSession.doctorSocketId).emit("call-resume-allowed", resumePayload);
+    } else if (callSession.doctorId) {
+      io.to(`doctor-${callSession.doctorId}`).emit("call-resume-allowed", resumePayload);
+    }
   });
 
   // ========== PATIENT PAYMENT CANCELLED ==========
@@ -2388,15 +3712,25 @@ io.on("connection", (socket) => {
   // ========== CALL ENDED ==========
   socket.on(
     "call-ended",
-    ({ callId: rawCallId, userId, role, doctorId, patientId, channel }) => {
+    async ({ callId: rawCallId, userId, role, doctorId, patientId, channel }) => {
       const normalizedCallId = normalizeCallId(rawCallId);
       console.log(`🔚 Call ${normalizedCallId} ended by ${userId} (${role})`);
 
       const callSession = activeCalls.get(normalizedCallId);
+      let previousStatusForUpdate = "UNKNOWN";
 
       if (callSession) {
+        // Clear timeout timer if exists
+        await clearCallTimeoutTimer(callSession, normalizedCallId);
+        
+        // Release doctor lock
+        if (callSession.doctorId) {
+          await releaseDoctorLock(callSession.doctorId, normalizedCallId);
+        }
+
         clearNotificationSent(normalizedCallId, callSession.doctorId);
-        callSession.status = "ended";
+        previousStatusForUpdate = callSession.status || "UNKNOWN";
+        callSession.status = "ENDED";
         callSession.endedAt = new Date();
         callSession.endedBy = userId;
 
@@ -2475,19 +3809,35 @@ io.on("connection", (socket) => {
         }
 
         if (callSession.doctorSocketId) {
+          // Send force-disconnect ONLY to cleanup Agora call, NOT to disconnect socket
+          // Doctor should remain online and connected after call ends
           io.to(callSession.doctorSocketId).emit("force-disconnect", {
             callId: normalizedCallId,
             reason: "ended",
             endedBy: isDoctorEnding ? "doctor" : "patient",
             timestamp: new Date().toISOString(),
+            // IMPORTANT: This is only for Agora cleanup, NOT socket disconnection
+            keepSocketConnected: true,
           });
+          
+          // Ensure doctor remains in activeDoctors after call ends
+          if (doctorId && activeDoctors.has(doctorId)) {
+            const doctor = activeDoctors.get(doctorId);
+            console.log(`✅ Doctor ${doctorId} will remain online after call end. Socket: ${doctor.socketId}`);
+          }
         }
       }
 
+      // ✅ CRITICAL: Emit call-status-update so doctor can detect call ended
       io.emit("call-status-update", {
         callId: normalizedCallId,
-        status: "ended",
+        status: "ENDED",
+        previousStatus: previousStatusForUpdate,
         endedBy: role,
+        endedByUserId: userId,
+        message: isPatientEnding 
+          ? "Patient ended the call" 
+          : "Doctor ended the call",
         timestamp: new Date().toISOString(),
       });
 
@@ -2495,6 +3845,14 @@ io.on("connection", (socket) => {
         deleteActiveCallSession(normalizedCallId);
         emitAvailableDoctors();
         console.log(`🗑️ Cleaned up ended call ${normalizedCallId}`);
+        
+        // IMPORTANT: Ensure doctor remains online after call ends
+        // Only remove doctor from activeDoctors if they explicitly go offline
+        // Do NOT remove doctor here - they should stay online for next call
+        if (doctorId && activeDoctors.has(doctorId)) {
+          const doctor = activeDoctors.get(doctorId);
+          console.log(`✅ Doctor ${doctorId} remains online after call end. Socket: ${doctor.socketId}`);
+        }
       }, 10_000);
     }
   );
@@ -2591,6 +3949,8 @@ io.on("connection", (socket) => {
           socketId: socket.id,
         });
 
+        setActiveCallSession(callId, callSession);
+
         if (wasCallActive) {
           const otherSocketId = isDoctor
             ? callSession.patientSocketId
@@ -2669,7 +4029,7 @@ io.on("connection", (socket) => {
           deleteActiveCallSession(callId);
           emitAvailableDoctors();
           console.log(`🗑️ Cleaned up disconnected call ${callId}`);
-        }, 30_000);
+        }, CALL_CLEANUP_GRACE_MS);
       }
     }
   });
