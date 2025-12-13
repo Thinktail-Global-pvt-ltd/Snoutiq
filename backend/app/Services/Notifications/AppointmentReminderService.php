@@ -77,6 +77,19 @@ class AppointmentReminderService
         }
 
         $reminderAt = $startTime->copy()->subMinutes($reminder['minutes']);
+        $minutesUntilStart = $now->diffInMinutes($startTime, false);
+        $minutesUntilReminder = $now->diffInMinutes($reminderAt, false);
+
+        Log::info('Reminder window check', [
+            'appointment_id' => $appointment->id,
+            'reminder_label' => $reminder['label'],
+            'field' => $field,
+            'start_time' => $startTime->toDateTimeString(),
+            'reminder_at' => $reminderAt->toDateTimeString(),
+            'now' => $now->toDateTimeString(),
+            'minutes_until_start' => $minutesUntilStart,
+            'minutes_until_reminder' => $minutesUntilReminder,
+        ]);
         
         // Check if we're in the reminder window: now >= reminderAt AND now < startTime
         // Send reminder if current time is at or after reminder time, but before appointment start
