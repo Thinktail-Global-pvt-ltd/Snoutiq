@@ -19,7 +19,6 @@ import {
   subscribeRedis,
   isRedisEnabled,
 } from "./redisClients.js";
-
 // -------------------- PATH + CONSTANTS --------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -3716,6 +3715,10 @@ io.on("connection", (socket) => {
       const normalizedCallId = normalizeCallId(rawCallId);
       console.log(`🔚 Call ${normalizedCallId} ended by ${userId} (${role})`);
 
+      // ✅ FIX: Define isPatientEnding and isDoctorEnding outside if block so they're always available
+      const isDoctorEnding = role === "host";
+      const isPatientEnding = role === "audience";
+
       const callSession = activeCalls.get(normalizedCallId);
       let previousStatusForUpdate = "UNKNOWN";
 
@@ -3734,9 +3737,7 @@ io.on("connection", (socket) => {
         callSession.endedAt = new Date();
         callSession.endedBy = userId;
 
-        const isDoctorEnding = role === "host";
-        const isPatientEnding = role === "audience";
-
+        // ✅ FIX: Variables already defined above, no need to redeclare
         logFlow("call-ended", {
           callId: normalizedCallId,
           doctorId: doctorId ?? callSession.doctorId,
