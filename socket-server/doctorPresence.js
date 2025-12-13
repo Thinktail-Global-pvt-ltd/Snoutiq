@@ -1,6 +1,7 @@
 import { redis } from "./redisClient.js";
 
-const HB_TTL_SEC = 30;
+// Extend TTL to match production-grade presence window and allow BG heartbeats to keep doctors online
+const HB_TTL_SEC = 70;
 
 export async function setDoctorOnline(doctorId, socketId, extra = {}) {
   try {
