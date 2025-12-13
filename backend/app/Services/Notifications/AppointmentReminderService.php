@@ -27,6 +27,11 @@ class AppointmentReminderService
         $appointments = $this->upcomingAppointments();
         $now = now();
         $count = 0;
+        $buckets = [
+            '24h' => ['threshold' => 24 * 60, 'appointments' => []],
+            '3h' => ['threshold' => 3 * 60, 'appointments' => []],
+            '30m' => ['threshold' => 30, 'appointments' => []],
+        ];
 
         Log::info('Reminder run started', [
             'appointments_to_check' => $appointments->count(),
@@ -39,6 +44,20 @@ class AppointmentReminderService
                 continue;
             }
 
+            $minutesUntilStart = $now->diffInMinutes($startTime, false);
+            if ($minutesUntilStart >= 0) {
+                foreach ($buckets as $label => &$bucket) {
+                    if ($minutesUntilStart <= $bucket['threshold']) {
+                        $bucket['appointments'][] = [
+                            'id' => $appointment->id,
+                            'start_time' => $startTime->toDateTimeString(),
+                            'minutes_until_start' => $minutesUntilStart,
+                        ];
+                    }
+                }
+                unset($bucket);
+            }
+
             foreach ($this->reminders as $reminder) {
                 $count += $this->handleReminder($appointment, $startTime, $reminder, $now);
             }
@@ -48,6 +67,14 @@ class AppointmentReminderService
             'dispatched' => $count,
             'at' => now()->toDateTimeString(),
         ]);
+
+        foreach ($buckets as $label => $bucket) {
+            Log::info('Reminder bucket snapshot', [
+                'bucket' => $label,
+                'count' => count($bucket['appointments']),
+                'appointments' => $bucket['appointments'],
+            ]);
+        }
 
         return $count;
     }
