@@ -274,6 +274,12 @@
         </svg>
         <span class="truncate">Add New Booking</span>
       </a>
+      <a href="{{ route('receptionist.front-desk') }}" class="{{ $baseItem }} {{ $active('receptionist.front-desk') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+        </svg>
+        <span class="truncate">Front Desk Search</span>
+      </a>
       <a href="{{ route('receptionist.bookings.schedule') }}" class="{{ $baseItem }} {{ $active('receptionist.bookings.schedule') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 19h14"/>
@@ -314,7 +320,7 @@
       @endif
 
       @if($showClinicMenu)
-        @if($isClinicAdminRole)
+        @if($sessionRole === 'receptionist')
           <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2 {{ $showPetMenu ? 'mt-6' : '' }}">
             Receptionist
           </div>

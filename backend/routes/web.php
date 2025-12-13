@@ -339,11 +339,15 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     // Clinic dashboard shell (links to doctor console)
     Route::view('/clinic-dashboard', 'clinic-dashboard')->name('clinic.dashboard');
     Route::view('/clinic/doctors', 'clinic.doctors')->name('clinic.doctors');
-    Route::get('/dashboard/services', function (Request $request, OnboardingProgressService $progressService) {
+    $staffServicesPage = function (Request $request, OnboardingProgressService $progressService) {
         $stepStatus = $progressService->getStatusForRequest($request);
-        return view('groomer.services.index', compact('stepStatus'));
-    })->name('groomer.services.index');
-    Route::view('/dashboard/staff', 'clinic.staff')->name('clinic.staff');
+        return view('clinic.staff-services', compact('stepStatus'));
+    };
+    Route::get('/dashboard/services', $staffServicesPage)->name('groomer.services.index');
+    Route::get('/dashboard/staff', $staffServicesPage)->name('clinic.staff');
+    Route::get('/receptionist/front-desk', function () {
+        return view('receptionist.front-desk');
+    })->name('receptionist.front-desk');
     Route::get('/receptionist/bookings', function(){
         return view('receptionist.bookings', ['viewMode' => 'create']);
     })->name('receptionist.bookings.create');
