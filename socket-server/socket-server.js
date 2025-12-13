@@ -2944,8 +2944,28 @@ io.on("connection", (socket) => {
   // IMPORTANT: We DO NOT block if doctor is offline/busy – we queue + notify.
   socket.on(
     "call-requested",
-    async ({ doctorId, patientId, channel, callId: incomingCallId }) => {
+    async ({ doctorId, patientId, channel, callId: incomingCallId, timestamp }) => {
       console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
+
+      // ✅ FIX: Validate timestamp
+      const now = Date.now();
+      const callTime = timestamp ? new Date(timestamp).getTime() : now;
+      const ageInSeconds = (now - callTime) / 1000;
+      
+      if (ageInSeconds > 60) {
+        console.warn(`⚠️ Rejecting stale call request (age: ${ageInSeconds}s)`);
+        
+        io.to(`patient-${patientId}`).emit("call-rejected", {
+          callId: incomingCallId || null,
+          doctorId,
+          patientId,
+          reason: "stale_request",
+          message: "Call request expired",
+          timestamp: new Date().toISOString(),
+        });
+        
+        return;
+      }
 
       doctorId = Number(doctorId);
       patientId = Number(patientId);
@@ -4139,6 +4159,50 @@ setInterval(() => {
   );
   console.log(`👨‍⚕️ Active Doctor IDs:`, Array.from(activeDoctors.keys()));
 }, 30_000);
+
+// ✅ FIX: Periodic cleanup of expired calls (older than 2 minutes, not active)
+setInterval(() => {
+  const now = Date.now();
+  const expiredThreshold = 2 * 60 * 1000; // 2 minutes
+  
+  for (const [callId, callSession] of activeCalls.entries()) {
+    const createdAt = callSession.createdAt ? new Date(callSession.createdAt).getTime() : now;
+    const age = now - createdAt;
+    
+    // ✅ FIX: Auto-expire calls older than 2 minutes that aren't active
+    if (age > expiredThreshold && callSession.status !== "active" && callSession.status !== "payment_completed") {
+      console.log(`🧹 Auto-expiring stale call ${callId} (age: ${Math.round(age / 1000)}s, status: ${callSession.status})`);
+      
+      // Clear timeout timer
+      clearCallTimeoutTimer(callSession, callId).catch(() => {});
+      
+      // Delete call session
+      deleteActiveCallSession(callId);
+      
+      // Release doctor lock
+      if (callSession.doctorId) {
+        releaseDoctorLock(callSession.doctorId, callId).catch(() => {});
+      }
+      
+      // Notify parties
+      if (callSession.patientSocketId) {
+        io.to(callSession.patientSocketId).emit("call-timeout", {
+          callId,
+          message: "Call request expired",
+          timestamp: new Date().toISOString(),
+        });
+      }
+      
+      if (callSession.doctorSocketId) {
+        io.to(callSession.doctorSocketId).emit("call-timeout", {
+          callId,
+          message: "Call request expired",
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+  }
+}, 60000); // Run every minute
 
 // -------------------- START SERVER --------------------
 const PORT = Number(process.env.PORT || process.env.SOCKET_PORT || 4000);
