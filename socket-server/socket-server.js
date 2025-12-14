@@ -22,6 +22,7 @@ import {
 
 
 
+
 // -------------------- PATH + CONSTANTS --------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -3771,12 +3772,13 @@ io.on("connection", (socket) => {
       let previousStatusForUpdate = "UNKNOWN";
 
       if (callSession) {
-        // Clear timeout timer if exists
+        // ✅ CRITICAL: Clear timeout and release lock IMMEDIATELY
         await clearCallTimeoutTimer(callSession, normalizedCallId);
         
-        // Release doctor lock
+        // ✅ Release doctor lock RIGHT AWAY
         if (callSession.doctorId) {
           await releaseDoctorLock(callSession.doctorId, normalizedCallId);
+          console.log(`🔓 Doctor ${callSession.doctorId} lock released immediately`);
         }
 
         clearNotificationSent(normalizedCallId, callSession.doctorId);
@@ -3877,37 +3879,32 @@ io.on("connection", (socket) => {
         }
       }
 
-      // ✅ CRITICAL: Emit call-status-update so doctor can detect call ended
+      // ✅ Emit immediately
       io.emit("call-status-update", {
         callId: normalizedCallId,
         status: "ENDED",
         previousStatus: previousStatusForUpdate,
         endedBy: role,
         endedByUserId: userId,
-        message: isPatientEnding 
-          ? "Patient ended the call" 
-          : "Doctor ended the call",
+        message: isPatientEnding ? "Patient ended the call" : "Doctor ended the call",
         timestamp: new Date().toISOString(),
       });
 
-      // ✅ FIX: Emit available doctors immediately when call ends (don't wait 10 seconds)
-      // This ensures doctor becomes available in modal right away
+      // ✅ Emit available doctors IMMEDIATELY
       emitAvailableDoctors();
 
+      // ✅ Clean up after 2 seconds (reduced from 10)
       setTimeout(() => {
         deleteActiveCallSession(normalizedCallId);
-        // Emit again after cleanup to ensure final state is broadcast
         emitAvailableDoctors();
         console.log(`🗑️ Cleaned up ended call ${normalizedCallId}`);
         
         // IMPORTANT: Ensure doctor remains online after call ends
-        // Only remove doctor from activeDoctors if they explicitly go offline
-        // Do NOT remove doctor here - they should stay online for next call
         if (doctorId && activeDoctors.has(doctorId)) {
           const doctor = activeDoctors.get(doctorId);
-          console.log(`✅ Doctor ${doctorId} remains online after call end. Socket: ${doctor.socketId}`);
+          console.log(`✅ Doctor ${doctorId} remains online. Socket: ${doctor.socketId}`);
         }
-      }, 10_000);
+      }, 2000);
     }
   );
 
