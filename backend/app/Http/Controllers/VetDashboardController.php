@@ -49,29 +49,6 @@ class VetDashboardController extends Controller
         $alerts = $this->buildAlerts($now, $doctorIds, $revenueData['unpaid_amount'], $repeatRate);
         $snapshot = $this->buildSnapshot($clinicId, $doctorIds, $todayBookings, $revenueData['unpaid_amount']);
 
-        $quickActions = [
-            [
-                'label' => 'Add Walk-in Patient',
-                'icon' => '➕',
-                'url' => route('receptionist.bookings.create'),
-            ],
-            [
-                'label' => 'Book Appointment',
-                'icon' => '📅',
-                'url' => route('booking.clinics'),
-            ],
-            [
-                'label' => 'Start Tele-Consult',
-                'icon' => '🎥',
-                'url' => route('doctor.live'),
-            ],
-            [
-                'label' => 'Add New Pet Parent',
-                'icon' => '🐶',
-                'url' => route('dashboard.profile'),
-            ],
-        ];
-
         $queue = $this->buildQueue($todayBookings, $doctorIds);
         $cohortChart = $this->buildCohortChart($clinicId, $weekDates);
 
@@ -79,7 +56,6 @@ class VetDashboardController extends Controller
             'clinic' => $clinic,
             'today' => $now,
             'alerts' => $alerts,
-            'quickActions' => $quickActions,
             'stats' => [
                 'telemedicine' => $telemedicineStats,
                 'appointments' => $appointmentStats,

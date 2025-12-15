@@ -614,18 +614,6 @@
         @endforeach
       </div>
 
-      <div class="quick-actions">
-        <h3>Quick Actions</h3>
-        <div class="actions-grid">
-          @foreach($quickActions as $action)
-            <a class="action-btn" href="{{ $action['url'] }}">
-              <span class="icon">{{ $action['icon'] ?? '•' }}</span>
-              {{ $action['label'] }}
-            </a>
-          @endforeach
-        </div>
-      </div>
-
       <div class="snapshot">
         <div class="snapshot-card">
           <div class="snapshot-label">Services</div>

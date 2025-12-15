@@ -42,10 +42,17 @@
 @section('content')
 <div class="max-w-5xl mx-auto space-y-6">
   <div class="bg-white border border-slate-100 rounded-2xl shadow p-6 space-y-5">
-    <div>
-      <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Front Desk</p>
-      <h2 class="text-2xl font-semibold text-slate-900 mt-1">Search & prepare bookings</h2>
-      <p class="text-sm text-slate-500 mt-1">Look up patients by name, phone or email before creating a booking.</p>
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Front Desk</p>
+        <h2 class="text-2xl font-semibold text-slate-900 mt-1">Search & prepare bookings</h2>
+        <p class="text-sm text-slate-500 mt-1">Look up patients by name, phone or email before creating a booking.</p>
+      </div>
+      <button
+        id="front-desk-new-patient"
+        type="button"
+        class="inline-flex items-center justify-center px-5 py-3 rounded-lg bg-emerald-600 text-white text-sm font-semibold shadow hover:bg-emerald-700 focus-visible:outline-emerald-500"
+      >New Patient</button>
     </div>
     <form id="receptionist-patient-search" class="space-y-3">
       <label class="text-xs uppercase tracking-wide text-slate-500">Patient lookup</label>
@@ -104,6 +111,7 @@
     const noteEl = document.getElementById('patient-search-empty');
     const existingBtn = document.getElementById('patient-search-existing');
     const newBtn = document.getElementById('patient-search-new');
+    const frontDeskNewPatientBtn = document.getElementById('front-desk-new-patient');
     let currentPatient = null;
     let searchTimer;
 
@@ -217,6 +225,12 @@
     });
 
     searchInput?.addEventListener('input', triggerSearch);
+
+    frontDeskNewPatientBtn?.addEventListener('click', () => {
+      PREFERRED_PATIENT_ID = null;
+      setPatientMode('new');
+      openModal();
+    });
 
     function initialize() {
       safelySet(statusEl, 'Enter a search term to check patient records.');
