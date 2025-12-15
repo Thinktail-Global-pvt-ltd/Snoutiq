@@ -95,7 +95,7 @@ class NotificationChannelService
         throw new RuntimeException('WhatsApp channel not implemented yet.');
     }
 
-    protected function sendPush(Notification $notification): void
+    public function sendPush(Notification $notification): void
     {
         if (! $notification->user_id) {
             throw new RuntimeException('Cannot send push without user.');
