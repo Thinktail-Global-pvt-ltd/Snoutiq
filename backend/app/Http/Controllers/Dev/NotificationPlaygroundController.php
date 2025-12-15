@@ -45,7 +45,7 @@ class NotificationPlaygroundController extends Controller
             'status' => Notification::STATUS_PENDING,
         ]);
 
-        SendNotificationJob::dispatch($notification->id);
+        SendNotificationJob::dispatchSync($notification->id);
 
         return redirect()
             ->route('dev.notify')

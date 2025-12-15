@@ -17,6 +17,13 @@ class NotificationChannelService
 
     public function send(Notification $notification): void
     {
+        Log::info('Notification send started', [
+            'notification_id' => $notification->id,
+            'user_id' => $notification->user_id,
+            'type' => $notification->type,
+            'status' => $notification->status,
+        ]);
+
         $channels = [
             Notification::CHANNEL_WHATSAPP,
             Notification::CHANNEL_PUSH,
@@ -34,6 +41,14 @@ class NotificationChannelService
                     'sent_at' => now(),
                 ])->save();
 
+                Log::info('Notification send completed', [
+                    'notification_id' => $notification->id,
+                    'user_id' => $notification->user_id,
+                    'type' => $notification->type,
+                    'channel' => $channel,
+                    'status' => $notification->status,
+                ]);
+
                 return;
             } catch (Throwable $e) {
                 Log::warning('Notification channel failed', [
@@ -49,6 +64,12 @@ class NotificationChannelService
             'status' => Notification::STATUS_FAILED,
             'channel' => null,
         ])->save();
+
+        Log::error('Notification send failed (all channels)', [
+            'notification_id' => $notification->id,
+            'user_id' => $notification->user_id,
+            'type' => $notification->type,
+        ]);
     }
 
     /**
@@ -98,7 +119,40 @@ class NotificationChannelService
         $title = $notification->title ?? 'Snoutiq';
         $body = $notification->body ?? 'You have an update from Snoutiq.';
 
-        $this->fcm->sendMulticast($tokens, $title, $body, $data);
+        Log::info('Push send attempt', [
+            'notification_id' => $notification->id,
+            'user_id' => $notification->user_id,
+            'token_count' => count($tokens),
+            'sample_tokens' => array_slice(array_map([$this, 'maskToken'], $tokens), 0, 3),
+            'tokens' => $tokens,
+            'title' => $title,
+            'data_keys' => array_keys($data),
+        ]);
+
+        $result = $this->fcm->sendMulticast($tokens, $title, $body, $data);
+
+        Log::info('Push send result', [
+            'notification_id' => $notification->id,
+            'user_id' => $notification->user_id,
+            'success' => $result['success'] ?? null,
+            'failure' => $result['failure'] ?? null,
+        ]);
+
+        if (($result['success'] ?? 0) <= 0) {
+            $firstError = null;
+            foreach (($result['results'] ?? []) as $token => $details) {
+                if (!($details['ok'] ?? false)) {
+                    $firstError = [
+                        'token' => $this->maskToken((string) $token),
+                        'error' => $details['error'] ?? null,
+                        'code' => $details['code'] ?? null,
+                    ];
+                    break;
+                }
+            }
+
+            throw new RuntimeException('FCM multicast had 0 successes'.($firstError ? ('; first_error='.json_encode($firstError)) : ''));
+        }
     }
 
     protected function sendSms(Notification $notification): void
@@ -130,5 +184,19 @@ class NotificationChannelService
         }
 
         return $stringPayload;
+    }
+
+    private function maskToken(string $token): string
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return '';
+        }
+
+        if (strlen($token) <= 12) {
+            return str_repeat('*', strlen($token));
+        }
+
+        return substr($token, 0, 6).'…'.substr($token, -6);
     }
 }

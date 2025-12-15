@@ -157,7 +157,7 @@ class AppointmentReminderService
         ]);
 
         $notification = $this->createNotification($appointment, $startTime, $reminder, $userId);
-        SendNotificationJob::dispatch($notification->id);
+        SendNotificationJob::dispatchSync($notification->id);
 
         $appointment->forceFill([$field => $now])->save();
 
