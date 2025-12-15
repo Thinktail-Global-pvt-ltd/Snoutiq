@@ -268,12 +268,12 @@
       <div class="px-3 py-6 text-sm text-white/70">Sidebar hidden for doctor role.</div>
     @elseif($isReceptionRole)
       <div class="px-3 text-xs font-semibold tracking-wider text-white/70 uppercase mb-2">Receptionist</div>
-      <a href="{{ route('receptionist.bookings.create') }}" class="{{ $baseItem }} {{ $active(['receptionist.bookings.create']) ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+      <!-- <a href="{{ route('receptionist.bookings.create') }}" class="{{ $baseItem }} {{ $active(['receptionist.bookings.create']) ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
         <span class="truncate">Add New Booking</span>
-      </a>
+      </a> -->
       <a href="{{ route('receptionist.front-desk') }}" class="{{ $baseItem }} {{ $active('receptionist.front-desk') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>

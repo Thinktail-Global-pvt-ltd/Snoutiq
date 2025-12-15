@@ -320,6 +320,7 @@
   const POST_LOGIN_REDIRECT = IS_LOCAL
     ? `${ORIGIN}/dashboard/services?open=create&onboarding=1&step=1`
     : `${ORIGIN}/backend/dashboard/services?open=create&onboarding=1&step=1`;
+  const RECEPTIONIST_REDIRECT = `${WEB_BASE}/receptionist/front-desk`;
 
   const ROUTES = {
     login:        `${API_BASE}/auth/login`,
@@ -461,7 +462,10 @@
       dump({ loginDataRaw, loginDataParsed, payload, sessionSync }, 'Vet Login + Session');
 
       if (sessionSync.ok) {
-        const target = POST_LOGIN_REDIRECT;
+        const target =
+          resolvedRole === 'receptionist'
+            ? RECEPTIONIST_REDIRECT
+            : POST_LOGIN_REDIRECT;
         setTimeout(()=> window.location.replace(target), 150);
       }
     }catch(err){
