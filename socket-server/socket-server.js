@@ -22,7 +22,6 @@ import {
 
 
 
-
 // -------------------- PATH + CONSTANTS --------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -408,17 +407,58 @@ const claimDoctorForCall = async (doctorId, callId) => {
 
 // Release doctor lock (called when call ends or is rejected)
 const releaseDoctorLock = async (doctorId, callId) => {
-  if (!isRedisStateReady()) return;
+  if (!isRedisStateReady()) {
+    console.log(`🔓 Redis not ready, clearing in-memory busy status for doctor ${doctorId}`);
+    return;
+  }
   
   const lockKey = `doctor:${doctorId}:busy_lock`;
   try {
     // Only delete if the lock is held by this call (prevents releasing other call's lock)
     const existingCallId = await coreRedis.get(lockKey);
+    
     if (existingCallId === callId) {
+      // ✅ FIX 1: Use DEL + VERIFY pattern
       await coreRedis.del(lockKey);
-      console.log(`🔓 Doctor ${doctorId} lock released for call ${callId}`);
+      console.log(`🔓 Doctor ${doctorId} Redis lock released for call ${callId}`);
+      
+      // ✅ FIX 2: Verify deletion succeeded
+      const stillExists = await coreRedis.exists(lockKey);
+      
+      if (stillExists) {
+        console.error(`❌ Lock still exists for doctor ${doctorId} after delete!`);
+        
+        // ✅ FIX 3: Force delete with pipeline for atomic operation
+        await coreRedis
+          .pipeline()
+          .del(lockKey)
+          .del(`doctor:${doctorId}:busy_lock:backup`) // Clear backup key too
+          .exec();
+        
+        // ✅ FIX 4: Final verification
+        const finalCheck = await coreRedis.exists(lockKey);
+        if (finalCheck) {
+          console.error(`❌ CRITICAL: Lock persists after forced delete for doctor ${doctorId}`);
+          // Last resort: set very short TTL to auto-expire
+          await coreRedis.expire(lockKey, 5); // 5 seconds
+        } else {
+          console.log(`✅ Verified: Doctor ${doctorId} lock successfully released`);
+        }
+      } else {
+        console.log(`✅ Verified: Doctor ${doctorId} lock successfully released`);
+      }
+      
+      // ✅ FIX 5: Emit availability change event to update clients
+      io.emit("doctors-availability-changed", {
+        timestamp: new Date().toISOString(),
+        reason: "lock_released",
+        doctorId: doctorId,
+      });
+      
     } else if (existingCallId) {
       console.log(`⚠️ Lock for doctor ${doctorId} held by different call ${existingCallId}, not releasing`);
+    } else {
+      console.log(`ℹ️ No lock found for doctor ${doctorId} (already released)`);
     }
   } catch (error) {
     console.warn(`[redis:lock] Failed to release doctor ${doctorId} lock:`, error?.message || error);
@@ -2764,7 +2804,6 @@ io.on("connection", (socket) => {
     });
     await setDoctorOnline(doctorId, socket.id, { mode: "always_online" });
 
-
     console.log(
       `✅ Doctor ${doctorId} joined (Total active: ${activeDoctors.size})`
     );
@@ -2777,7 +2816,31 @@ io.on("connection", (socket) => {
       });
     }
 
+    // ✅ NEW: Check and clear any stale locks for this doctor
+    if (isRedisStateReady()) {
+      try {
+        const lockKey = `doctor:${doctorId}:busy_lock`;
+        const existingLock = await coreRedis.get(lockKey);
+        if (existingLock) {
+          // Check if the locked call still exists
+          const callExists = activeCalls.has(existingLock);
+          if (!callExists) {
+            // Stale lock - clear it
+            await coreRedis.del(lockKey);
+            console.log(`🧹 Cleared stale lock for doctor ${doctorId} on rejoin`);
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to check stale lock for doctor ${doctorId}:`, error?.message || error);
+      }
+    }
+
+    // ✅ CRITICAL: Emit available doctors IMMEDIATELY after doctor joins
     emitAvailableDoctors();
+    
+    // ✅ NEW: Emit multiple times to ensure clients receive update
+    setTimeout(() => emitAvailableDoctors(), 500);
+    setTimeout(() => emitAvailableDoctors(), 1500);
 
     // If there were queued / in-progress calls for this doctor, replay them
     deliverPendingSessionsToDoctor(doctorId, socket);
@@ -3512,23 +3575,21 @@ io.on("connection", (socket) => {
       timestamp: new Date().toISOString(),
     };
 
-    // Tell doctor: join now (host)
-    // IMPORTANT: Emit to both doctorSocketId and doctor room for reliability
-    if (callSession.doctorSocketId) {
-      console.log(`📤 [payment-completed] Emitting patient-paid to doctor socket: ${callSession.doctorSocketId}`);
-      io.to(callSession.doctorSocketId).emit("patient-paid", patientPaidData);
+    // ✅ FIX 1: Get fresh doctor socket ID from activeDoctors map
+    const doctorEntry = activeDoctors.get(doctorId);
+    const currentDoctorSocketId = doctorEntry?.socketId || callSession.doctorSocketId;
+    
+    if (!currentDoctorSocketId) {
+      console.warn(`⚠️ No socket ID for doctor ${doctorId}, using room emit only`);
     }
     
-    // Also emit to doctor room as fallback
-    console.log(`📤 [payment-completed] Emitting patient-paid to doctor room: doctor-${doctorId}`);
-    io.to(`doctor-${doctorId}`).emit("patient-paid", {
-      ...patientPaidData,
-      queued: !callSession.doctorSocketId,
-    });
-    
-    // Also emit payment-verified to doctor as additional fallback
-    if (callSession.doctorSocketId) {
-      io.to(callSession.doctorSocketId).emit("payment-verified", {
+    // ✅ FIX 2: Emit to BOTH socket ID and room (triple redundancy)
+    if (currentDoctorSocketId) {
+      console.log(`📤 [payment-completed] Emitting patient-paid to doctor socket: ${currentDoctorSocketId}`);
+      io.to(currentDoctorSocketId).emit("patient-paid", patientPaidData);
+      
+      // ✅ FIX 3: Also emit payment-verified as fallback
+      io.to(currentDoctorSocketId).emit("payment-verified", {
         callId: normalizedCallId,
         channel: callSession.channel,
         doctorId,
@@ -3538,6 +3599,10 @@ io.on("connection", (socket) => {
         timestamp: new Date().toISOString(),
       });
     }
+    
+    // ✅ FIX 4: Emit to doctor room (always)
+    console.log(`📤 [payment-completed] Emitting patient-paid to doctor room: doctor-${doctorId}`);
+    io.to(`doctor-${doctorId}`).emit("patient-paid", patientPaidData);
     io.to(`doctor-${doctorId}`).emit("payment-verified", {
       callId: normalizedCallId,
       channel: callSession.channel,
@@ -3547,18 +3612,34 @@ io.on("connection", (socket) => {
       uid: Number(doctorId),
       timestamp: new Date().toISOString(),
     });
-
-    // ✅ CRITICAL: Emit call-status-update so doctor can detect payment_completed status
+    
+    // ✅ FIX 5: Emit call-status-update for additional visibility
     io.emit("call-status-update", {
       callId: normalizedCallId,
       status: "payment_completed",
-      previousStatus: callSession.status,
+      previousStatus: previousStatus,
       doctorId,
       patientId,
       paymentId,
-      message: "Patient payment completed - doctor should join call",
+      message: "Payment completed - doctor should join",
       timestamp: new Date().toISOString(),
     });
+    
+    // ✅ FIX 6: If doctor socket exists, verify receipt with ACK timeout
+    if (currentDoctorSocketId) {
+      const doctorSocket = io.sockets.sockets.get(currentDoctorSocketId);
+      if (doctorSocket) {
+        doctorSocket.timeout(5000).emit("patient-paid-ack", patientPaidData, (err) => {
+          if (err) {
+            console.warn(`⚠️ Doctor ${doctorId} did not acknowledge patient-paid within 5s`);
+            // Retry emit one more time
+            io.to(`doctor-${doctorId}`).emit("patient-paid", patientPaidData);
+          } else {
+            console.log(`✅ Doctor ${doctorId} acknowledged patient-paid`);
+          }
+        });
+      }
+    }
 
     emitAvailableDoctors();
   });
@@ -3775,10 +3856,18 @@ io.on("connection", (socket) => {
         // ✅ CRITICAL: Clear timeout and release lock IMMEDIATELY
         await clearCallTimeoutTimer(callSession, normalizedCallId);
         
-        // ✅ Release doctor lock RIGHT AWAY
+        // ✅ FIX: Release doctor lock RIGHT AWAY - THIS IS CRITICAL
         if (callSession.doctorId) {
           await releaseDoctorLock(callSession.doctorId, normalizedCallId);
           console.log(`🔓 Doctor ${callSession.doctorId} lock released immediately`);
+          
+          // ✅ NEW: Ensure doctor is still in activeDoctors map
+          const doctor = activeDoctors.get(callSession.doctorId);
+          if (doctor) {
+            console.log(`✅ Doctor ${callSession.doctorId} remains online. Socket: ${doctor.socketId}`);
+          } else {
+            console.warn(`⚠️ Doctor ${callSession.doctorId} not in activeDoctors - may need rejoin`);
+          }
         }
 
         clearNotificationSent(normalizedCallId, callSession.doctorId);
@@ -3879,7 +3968,27 @@ io.on("connection", (socket) => {
         }
       }
 
-      // ✅ Emit immediately
+      // ✅ NEW FIX: Emit immediately AND schedule follow-up emissions
+      console.log("📢 Emitting available doctors immediately after call end");
+      emitAvailableDoctors();
+      
+      // ✅ NEW: Emit multiple times to ensure clients receive update
+      setTimeout(() => {
+        console.log("📢 Emitting available doctors (1s delay)");
+        emitAvailableDoctors();
+      }, 1000);
+      
+      setTimeout(() => {
+        console.log("📢 Emitting available doctors (3s delay)");
+        emitAvailableDoctors();
+      }, 3000);
+      
+      setTimeout(() => {
+        console.log("📢 Emitting available doctors (5s delay)");
+        emitAvailableDoctors();
+      }, 5000);
+
+      // ✅ Emit status update
       io.emit("call-status-update", {
         callId: normalizedCallId,
         status: "ENDED",
@@ -3890,19 +3999,29 @@ io.on("connection", (socket) => {
         timestamp: new Date().toISOString(),
       });
 
-      // ✅ Emit available doctors IMMEDIATELY
-      emitAvailableDoctors();
+      // ✅ NEW: Emit to all connected clients (broadcast)
+      io.emit("doctors-availability-changed", {
+        timestamp: new Date().toISOString(),
+        reason: "call_ended",
+        callId: normalizedCallId,
+      });
 
       // ✅ Clean up after 2 seconds (reduced from 10)
       setTimeout(() => {
         deleteActiveCallSession(normalizedCallId);
+        
+        // ✅ NEW: Emit again after cleanup
+        console.log("📢 Emitting available doctors after cleanup");
         emitAvailableDoctors();
+        
         console.log(`🗑️ Cleaned up ended call ${normalizedCallId}`);
         
-        // IMPORTANT: Ensure doctor remains online after call ends
+        // ✅ NEW: IMPORTANT - Ensure doctor remains online after call ends
         if (doctorId && activeDoctors.has(doctorId)) {
           const doctor = activeDoctors.get(doctorId);
-          console.log(`✅ Doctor ${doctorId} remains online. Socket: ${doctor.socketId}`);
+          console.log(`✅ Doctor ${doctorId} still online after cleanup. Socket: ${doctor.socketId}`);
+        } else if (doctorId) {
+          console.warn(`⚠️ Doctor ${doctorId} missing from activeDoctors after call end`);
         }
       }, 2000);
     }
@@ -4085,6 +4204,53 @@ io.on("connection", (socket) => {
     }
   });
 });
+
+// ========== KEY FIX 3: Periodic cleanup of stale locks (every 30 seconds) ==========
+setInterval(async () => {
+  if (!isRedisStateReady()) return;
+  
+  try {
+    // Scan for all doctor locks
+    const lockKeys = [];
+    let cursor = 0;
+    do {
+      const result = await coreRedis.scan(
+        cursor,
+        'MATCH',
+        'doctor:*:busy_lock',
+        'COUNT',
+        100
+      );
+      cursor = Number(result[0]);
+      lockKeys.push(...result[1]);
+    } while (cursor !== 0);
+
+    for (const lockKey of lockKeys) {
+      try {
+        const callId = await coreRedis.get(lockKey);
+        if (!callId) continue;
+        
+        // Check if this call still exists
+        const callExists = activeCalls.has(callId);
+        if (!callExists) {
+          // Call doesn't exist, release lock
+          const doctorId = lockKey.match(/doctor:(\d+):busy_lock/)?.[1];
+          if (doctorId) {
+            await coreRedis.del(lockKey);
+            console.log(`🧹 Cleaned up stale lock for doctor ${doctorId} (call ${callId} no longer exists)`);
+            
+            // Emit available doctors to update clients
+            emitAvailableDoctors();
+          }
+        }
+      } catch (error) {
+        console.warn(`[redis:lock] Failed to check lock ${lockKey}:`, error?.message || error);
+      }
+    }
+  } catch (error) {
+    console.warn(`[redis:lock] Lock cleanup failed:`, error?.message || error);
+  }
+}, 30000); // Run every 30 seconds
 
 // Stale cleanup: remove doctors after inactivity/reconnect grace
 setInterval(() => {
