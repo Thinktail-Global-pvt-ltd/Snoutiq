@@ -131,11 +131,22 @@ class NotificationChannelService
 
         $result = $this->fcm->sendMulticast($tokens, $title, $body, $data);
 
+        $results = $result['results'] ?? [];
+        $maskedResults = [];
+        foreach ($results as $token => $details) {
+            $maskedResults[$this->maskToken((string) $token)] = [
+                'ok' => $details['ok'] ?? false,
+                'code' => $details['code'] ?? null,
+                'error' => $details['error'] ?? null,
+            ];
+        }
+
         Log::info('Push send result', [
             'notification_id' => $notification->id,
             'user_id' => $notification->user_id,
             'success' => $result['success'] ?? null,
             'failure' => $result['failure'] ?? null,
+            'result_summary' => $maskedResults,
         ]);
 
         if (($result['success'] ?? 0) <= 0) {
