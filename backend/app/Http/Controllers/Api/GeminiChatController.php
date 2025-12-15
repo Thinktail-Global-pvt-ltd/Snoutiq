@@ -14,7 +14,7 @@ use App\Support\GeminiConfig;
 class GeminiChatController extends Controller
 {
     // Hardcoded Gemini API key per request (bypasses env/config)
-    private const HARDCODED_GEMINI_API_KEY = 'AIzaSyBpPcK2nf7xMYhzn62HE66PE5vKumpQkO8';
+    private const HARDCODED_GEMINI_API_KEY = 'AIzaSyAsvyJcfj1OAP0tY9pChGmIw_PPqhcsUI4';
     private const UNIFIED_SESSION_TTL_MIN = 1440; // 24h
 
     public function sendMessage(Request $request)

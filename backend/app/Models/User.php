@@ -15,7 +15,7 @@ class User extends Authenticatable
         'name','email','phone','role','referral_code','last_vet_slug','last_vet_id','password',
         'pet_name','pet_gender','pet_age','pet_doc1','pet_doc2',
         'api_token_hash','summary','google_token','breed','latitude','longitude',
-        'qr_scanner_id',
+        'qr_scanner_id','feedback',
     ];
 
     protected $hidden = ['password','remember_token','api_token_hash'];

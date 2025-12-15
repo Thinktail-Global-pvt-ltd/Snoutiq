@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\RazorpayController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
+use App\Http\Controllers\Api\UserFeedbackController;
 use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
@@ -697,6 +698,7 @@ Route::get('/razorpay-ping', function () {
   Route::get('/user-chats/{user_id}', [GeminiChatController::class, 'getUserChats']);
 
   Route::post('/chats/{chat_id}/feedback', [GeminiChatController::class, 'setFeedback']);
+  Route::post('/users/feedback', [UserFeedbackController::class, 'store']);
 
 
 Route::prefix('unified')->group(function () {
