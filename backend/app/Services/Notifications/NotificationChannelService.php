@@ -129,40 +129,44 @@ class NotificationChannelService
             'data_keys' => array_keys($data),
         ]);
 
-        $result = $this->fcm->sendMulticast($tokens, $title, $body, $data);
+        $success = 0;
+        $results = [];
+        foreach ($tokens as $token) {
+            $normalizedToken = $this->normalizeToken($token);
+            if (!$this->looksLikeFcmToken($normalizedToken)) {
+                $results[$this->maskToken($normalizedToken)] = [
+                    'ok' => false,
+                    'error' => 'invalid_token_format',
+                    'code' => null,
+                ];
+                continue;
+            }
 
-        $results = $result['results'] ?? [];
-        $maskedResults = [];
-        foreach ($results as $token => $details) {
-            $maskedResults[$this->maskToken((string) $token)] = [
-                'ok' => $details['ok'] ?? false,
-                'code' => $details['code'] ?? null,
-                'error' => $details['error'] ?? null,
-            ];
+            try {
+                $this->fcm->sendToToken($normalizedToken, $title, $body, $data);
+                $success++;
+                $results[$this->maskToken($normalizedToken)] = ['ok' => true];
+            } catch (Throwable $e) {
+                $results[$this->maskToken($normalizedToken)] = [
+                    'ok' => false,
+                    'error' => $e->getMessage(),
+                    'code' => $e->getCode(),
+                ];
+            }
         }
+
+        $failure = count($tokens) - $success;
 
         Log::info('Push send result', [
             'notification_id' => $notification->id,
             'user_id' => $notification->user_id,
-            'success' => $result['success'] ?? null,
-            'failure' => $result['failure'] ?? null,
-            'result_summary' => $maskedResults,
+            'success' => $success,
+            'failure' => $failure,
+            'result_summary' => $results,
         ]);
 
-        if (($result['success'] ?? 0) <= 0) {
-            $firstError = null;
-            foreach (($result['results'] ?? []) as $token => $details) {
-                if (!($details['ok'] ?? false)) {
-                    $firstError = [
-                        'token' => $this->maskToken((string) $token),
-                        'error' => $details['error'] ?? null,
-                        'code' => $details['code'] ?? null,
-                    ];
-                    break;
-                }
-            }
-
-            throw new RuntimeException('FCM multicast had 0 successes'.($firstError ? ('; first_error='.json_encode($firstError)) : ''));
+        if ($success <= 0) {
+            throw new RuntimeException('FCM push attempts failed for every token');
         }
     }
 
@@ -209,5 +213,23 @@ class NotificationChannelService
         }
 
         return substr($token, 0, 6).'…'.substr($token, -6);
+    }
+
+    private function normalizeToken(string $token): string
+    {
+        return trim(trim($token), "\"'");
+    }
+
+    private function looksLikeFcmToken(string $token): bool
+    {
+        if ($token === '') {
+            return false;
+        }
+
+        if (strlen($token) < 80 || preg_match('/\\s/', $token)) {
+            return false;
+        }
+
+        return true;
     }
 }
