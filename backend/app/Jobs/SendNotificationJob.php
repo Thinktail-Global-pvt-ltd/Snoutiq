@@ -29,6 +29,21 @@ class SendNotificationJob implements ShouldQueue
             return;
         }
 
+        \Log::info('SendNotificationJob starting', [
+            'notification_id' => $notification->id,
+            'user_id' => $notification->user_id,
+            'status' => $notification->status,
+            'type' => $notification->type,
+        ]);
+
         $service->send($notification);
+
+        \Log::info('SendNotificationJob finished', [
+            'notification_id' => $notification->id,
+            'user_id' => $notification->user_id,
+            'status' => $notification->status,
+            'type' => $notification->type,
+            'channel' => $notification->channel,
+        ]);
     }
 }
