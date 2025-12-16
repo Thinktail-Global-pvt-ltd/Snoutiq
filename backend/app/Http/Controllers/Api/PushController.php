@@ -225,10 +225,16 @@ class PushController extends Controller
             'token' => ['nullable', 'string'],
             'title' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
+            'data' => ['nullable', 'array'],
+            'data.*' => ['nullable'],
         ]);
 
         $title = $validated['title'] ?? 'Snoutiq Alert';
         $body = $validated['body'] ?? 'Test push from API';
+        $data = $this->normalizeData($request->input('data', []));
+        if (!isset($data['type'])) {
+            $data['type'] = 'test';
+        }
 
         try {
             if (!empty($validated['token'])) {
@@ -239,7 +245,7 @@ class PushController extends Controller
                     ], 422);
                 }
                 // Send immediately for testing
-                $push->sendToToken($normalizedToken, $title, $body, ['type' => 'test']);
+                $push->sendToToken($normalizedToken, $title, $body, $data);
             } else {
                 // If token not provided, try sending to the current user's registered devices
                 $userId = Auth::id();
@@ -248,11 +254,14 @@ class PushController extends Controller
                 }
                 $tokens = DeviceToken::where('user_id', $userId)->pluck('token')->all();
                 foreach ($tokens as $t) {
-                    $push->sendToToken($t, $title, $body, ['type' => 'test']);
+                    $push->sendToToken($t, $title, $body, $data);
                 }
             }
 
-            return response()->json(['sent' => true]);
+            return response()->json([
+                'sent' => true,
+                'success' => true,
+            ]);
         } catch (MessagingException $e) {
             \Log::error('FCM test push failed', [
                 'token' => $validated['token'] ?? null,
@@ -281,6 +290,37 @@ class PushController extends Controller
     private function normalizeToken(string $token): string
     {
         return trim(trim($token), "\"'");
+    }
+
+    /**
+     * @param mixed $data
+     * @return array<string,string>
+     */
+    private function normalizeData(mixed $data): array
+    {
+        if (!is_array($data)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($data as $key => $value) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            if (is_array($value) || is_object($value)) {
+                $normalized[$key] = json_encode($value);
+                continue;
+            }
+
+            if ($value === null) {
+                continue;
+            }
+
+            $normalized[$key] = (string) $value;
+        }
+
+        return $normalized;
     }
 
     private function isLikelyFcmToken(string $token): bool
