@@ -105,7 +105,7 @@ class AppointmentReminderService
         $minutesUntilStart = $now->diffInMinutes($startTime, false);
         $minutesUntilReminder = $now->diffInMinutes($reminderAt, false);
 
-        Log::info('Reminder window check', [
+        Log::debug('Reminder window check', [
             'appointment_id' => $appointment->id,
             'reminder_label' => $reminder['label'],
             'field' => $field,
@@ -122,17 +122,6 @@ class AppointmentReminderService
         $isTooLate = $now->gte($startTime);
         
         if ($isTooEarly || $isTooLate) {
-            Log::debug("Reminder not in window", [
-                'appointment_id' => $appointment->id,
-                'field' => $field,
-                'now' => $now->toDateTimeString(),
-                'reminder_at' => $reminderAt->toDateTimeString(),
-                'start_time' => $startTime->toDateTimeString(),
-                'minutes_until_reminder' => $now->diffInMinutes($reminderAt, false),
-                'minutes_until_start' => $now->diffInMinutes($startTime, false),
-                'is_too_early' => $isTooEarly,
-                'is_too_late' => $isTooLate,
-            ]);
             return 0;
         }
 
