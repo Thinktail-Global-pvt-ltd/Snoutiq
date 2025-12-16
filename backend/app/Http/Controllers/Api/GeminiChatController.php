@@ -964,7 +964,7 @@ PROMPT;
         $symptomLine = $symptoms !== '' ? "We'll focus on {$symptoms} during the session so the veterinarian can see everything first-hand.\n\n" : "";
 
         return "💻 VIDEO CONSULTATION RECOMMENDATION:\n\n".
-               "Quick heads-up: our AI model is at capacity, but you still get immediate guidance.\n\n".
+               
                "Connecting with a SnoutIQ veterinarian over a secure video call is the best next step for {$petName} based on what you've described.\n\n".
                $symptomLine .
                "During the consultation the vet will:\n".
