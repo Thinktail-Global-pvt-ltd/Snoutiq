@@ -236,6 +236,14 @@ class PushController extends Controller
             $data['type'] = 'test';
         }
 
+        \Log::info('PushController@testToToken received', [
+            'has_token' => !empty($validated['token']),
+            'token' => isset($validated['token']) ? $this->maskToken($validated['token']) : null,
+            'title' => $title,
+            'body_len' => strlen($body),
+            'data_keys' => array_keys($data),
+        ]);
+
         try {
             if (!empty($validated['token'])) {
                 $normalizedToken = $this->normalizeToken($validated['token']);
@@ -290,6 +298,20 @@ class PushController extends Controller
     private function normalizeToken(string $token): string
     {
         return trim(trim($token), "\"'");
+    }
+
+    private function maskToken(string $token): string
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return '';
+        }
+
+        if (strlen($token) <= 12) {
+            return str_repeat('*', strlen($token));
+        }
+
+        return substr($token, 0, 6).'…'.substr($token, -6);
     }
 
     /**
