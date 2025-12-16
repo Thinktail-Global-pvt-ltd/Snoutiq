@@ -68,13 +68,11 @@ class AppointmentReminderService
             'at' => now()->toDateTimeString(),
         ]);
 
-        foreach ($buckets as $label => $bucket) {
-            Log::info('Reminder bucket snapshot', [
-                'bucket' => $label,
-                'count' => count($bucket['appointments']),
-                'appointments' => $bucket['appointments'],
-            ]);
-        }
+        Log::info('Reminder buckets summary', [
+            '24h' => count($buckets['24h']['appointments']),
+            '3h' => count($buckets['3h']['appointments']),
+            '30m' => count($buckets['30m']['appointments']),
+        ]);
 
         return $count;
     }
