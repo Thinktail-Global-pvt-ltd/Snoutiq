@@ -72,11 +72,21 @@ class FcmService
             return;
         }
 
+        \Log::info('FCM send to token attempt', [
+            'token' => $this->maskToken($normalizedToken),
+            'title' => $title,
+            'data_keys' => array_keys($data),
+        ]);
+
         $message = CloudMessage::withTarget('token', $normalizedToken)
             ->withNotification(Notification::create($title, $body))
             ->withData($data);
 
         $this->sendMessage($message, $normalizedToken);
+
+        \Log::info('FCM send to token success', [
+            'token' => $this->maskToken($normalizedToken),
+        ]);
     }
 
     /**
@@ -195,5 +205,19 @@ class FcmService
         }
 
         return $results;
+    }
+
+    private function maskToken(string $token): string
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return '';
+        }
+
+        if (strlen($token) <= 12) {
+            return str_repeat('*', strlen($token));
+        }
+
+        return substr($token, 0, 6).'…'.substr($token, -6);
     }
 }
