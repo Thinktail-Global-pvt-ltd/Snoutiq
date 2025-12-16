@@ -45,13 +45,21 @@ class SendNotificationJob implements ShouldQueue
             'type' => $notification->type,
         ]);
 
-        // Gather tokens for the user (same as /api/push/test path)
-        $tokens = DeviceToken::query()
-            ->where('user_id', $notification->user_id)
-            ->pluck('token')
-            ->filter()
-            ->values()
-            ->all();
+        // Prefer explicit token in payload for debugging; otherwise use stored device tokens.
+        $payload = $notification->payload ?? [];
+        $explicitToken = is_array($payload) ? ($payload['fcm_token'] ?? null) : null;
+
+        $tokens = [];
+        if ($explicitToken) {
+            $tokens[] = $explicitToken;
+        } else {
+            $tokens = DeviceToken::query()
+                ->where('user_id', $notification->user_id)
+                ->pluck('token')
+                ->filter()
+                ->values()
+                ->all();
+        }
 
         if (empty($tokens)) {
             $notification->forceFill([
@@ -69,6 +77,16 @@ class SendNotificationJob implements ShouldQueue
 
         $title = $notification->title ?? 'Snoutiq';
         $body = $notification->body ?? 'You have an update from Snoutiq.';
+        $data = ['type' => $notification->type ?? 'notification'];
+        if (is_array($payload)) {
+            foreach ($payload as $key => $value) {
+                if (is_array($value) || is_object($value)) {
+                    $data[$key] = json_encode($value);
+                    continue;
+                }
+                $data[$key] = (string) $value;
+            }
+        }
 
         $success = 0;
         $failures = [];
@@ -77,6 +95,7 @@ class SendNotificationJob implements ShouldQueue
                 'token' => $token,
                 'title' => $title,
                 'body' => $body,
+                'data' => $data,
             ]);
 
             try {
