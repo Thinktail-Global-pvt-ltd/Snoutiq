@@ -1171,7 +1171,7 @@ PROMPT;
         $data = $request->validate([
             'user_id'         => 'required|integer',
             // chat_room_token no longer required; optional for backward compatibility
-            'chat_room_token' => 'sometimes|string',
+            //'chat_room_token' => 'sometimes|string',
         ]);
 
         $token = $data['chat_room_token'] ?? null;
