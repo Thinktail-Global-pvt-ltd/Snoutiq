@@ -177,11 +177,14 @@ class AppointmentReminderService
         $errors = [];
         foreach ($tokens as $token) {
             try {
+                // Override the notification type to 'test' for all reminders. This ensures
+                // that the client treats reminder pushes as generic test notifications
+                // instead of the default 'consult_pre_reminder'.
                 $this->fcm->sendToToken(
                     $token,
                     $title,
                     $body,
-                    array_merge(['type' => 'consult_pre_reminder'], $this->stringifyPayload($payload))
+                    array_merge(['type' => 'test'], $this->stringifyPayload($payload))
                 );
                 $success++;
             } catch (\Throwable $e) {
