@@ -127,6 +127,26 @@ class AppointmentReminderService
             return 0;
         }
 
+        $payload = [
+            'appointment_id' => $appointment->id,
+            'clinic_id' => $appointment->vet_registeration_id,
+            'doctor_id' => $appointment->doctor_id,
+            'start_time' => $startTime->toIso8601String(),
+            'offset_minutes' => $reminder['minutes'],
+        ];
+
+        $clinicName = $appointment->clinic->name ?? $this->extractFromNotes($appointment, 'clinic_name') ?? 'your clinic';
+        $doctorName = $appointment->doctor->name ?? $this->extractFromNotes($appointment, 'doctor_name') ?? 'your vet';
+
+        Log::info('Reminder data snapshot', [
+            'appointment_id' => $appointment->id,
+            'user_id' => $userId,
+            'clinic_name' => $clinicName,
+            'doctor_name' => $doctorName,
+            'start_time' => $payload['start_time'],
+            'offset_minutes' => $payload['offset_minutes'],
+        ]);
+
         $tokens = DeviceToken::query()
             ->where('user_id', $userId)
             ->pluck('token')
@@ -143,17 +163,7 @@ class AppointmentReminderService
             return 0;
         }
 
-        $payload = [
-            'appointment_id' => $appointment->id,
-            'clinic_id' => $appointment->vet_registeration_id,
-            'doctor_id' => $appointment->doctor_id,
-            'start_time' => $startTime->toIso8601String(),
-            'offset_minutes' => $reminder['minutes'],
-        ];
-
         $label = $reminder['label'];
-        $clinicName = $appointment->clinic->name ?? $this->extractFromNotes($appointment, 'clinic_name') ?? 'your clinic';
-        $doctorName = $appointment->doctor->name ?? $this->extractFromNotes($appointment, 'doctor_name') ?? 'your vet';
 
         $title = sprintf('Consultation in %s', $label);
         $body = sprintf(
