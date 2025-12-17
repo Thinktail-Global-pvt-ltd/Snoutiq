@@ -74,7 +74,7 @@ const resolveServiceAccountPath = () => {
 
   for (const candidate of candidates) {
     if (candidate && existsSync(candidate)) {
-      return candidate;
+      return candidate; 
     }
   }
   return candidates[0] || null;
@@ -3101,10 +3101,20 @@ io.on("connection", (socket) => {
     }
 
     const availableKey = available.slice().sort((a, b) => a - b).join(",");
-    if (socket._lastActiveDoctorsKey === availableKey) {
+    
+    // ✅ FIX: Always emit on explicit requests, but throttle rapid duplicate requests
+    // Only skip if this is the exact same list AND it was sent very recently (< 500ms ago)
+    const lastEmitTime = socket._lastActiveDoctorsEmitTime || 0;
+    const timeSinceLastEmit = now - lastEmitTime;
+    const isDuplicate = socket._lastActiveDoctorsKey === availableKey;
+    
+    if (isDuplicate && timeSinceLastEmit < 500) {
+      // Skip duplicate request within 500ms window
       return;
     }
+    
     socket._lastActiveDoctorsKey = availableKey;
+    socket._lastActiveDoctorsEmitTime = now;
 
     socket.emit("active-doctors", available);
   });

@@ -41,11 +41,11 @@ const GurugramPage = () => {
     {
       icon: 'MapPin',
       title: 'Trusted Across Gurugram',
-      description: 'Supporting premium veterinary practices across DLF, Golf Course Road, Sector 14, and Cyber City.',
+      description: 'Supporting  veterinary practices across DLF, Golf Course Road, Sector 14, and Cyber City.',
     },
     {
       icon: 'Users',
-      title: 'Premium Client Experience',
+      title: ' Client Experience',
       description: 'Tailored for Gurugram\'s discerning pet owners who expect world-class veterinary care and service.',
     },
     {
@@ -104,15 +104,15 @@ const GurugramPage = () => {
 //     {
 //       name: 'Dr. Kavita Desai',
 //       role: 'Lead Veterinarian',
-//       company: 'Premium Pet Care, Golf Course Road',
-//       content: 'SnoutIQ helped us position as Gurugram\'s most tech-forward clinic. We saw significant growth while maintaining our premium service standards.',
+//       company: ' Pet Care, Golf Course Road',
+//       content: 'SnoutIQ helped us position as Gurugram\'s most tech-forward clinic. We saw significant growth while maintaining our  service standards.',
 //       rating: 5,
 //     },
 //     {
 //       name: 'Dr. Arjun Kapoor',
 //       role: 'Practice Manager',
 //       company: 'Cyber City Vet Clinic, Gurugram',
-//       content: 'The level of support is exceptional. Our dedicated account manager understands our premium practice needs and ensures everything runs perfectly.',
+//       content: 'The level of support is exceptional. Our dedicated account manager understands our  practice needs and ensures everything runs perfectly.',
 //       rating: 5,
 //     },
 //   ], []);
@@ -187,10 +187,10 @@ const GurugramPage = () => {
     <>
     <Header/>
       <Hero
-        badge="Trusted by Premium Gurugram Professionals"
-        title="Gurugram's Premium Veterinary Practice Management Software"
-        subtitle="Elevate your Gurugram clinic with enterprise-grade technology. AI-powered triage, luxury video consultations, and premium client experience."
-        ctaPrimary={{ text: 'Schedule Premium Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
+        badge="Trusted by  Gurugram Professionals"
+        title="Gurugram's  Veterinary Practice Management Software"
+        subtitle="Elevate your Gurugram clinic with enterprise-grade technology. AI-powered triage, luxury video consultations, and  client experience."
+        ctaPrimary={{ text: 'Schedule  Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         // ctaSecondary={{ text: 'Call: +91-124-567-8900', href: 'tel:+911245678900' }}
       />
 
@@ -204,7 +204,7 @@ const GurugramPage = () => {
               className="text-3xl sm:text-4xl md:text-5xl font-bold text-slate-900 mb-4 leading-tight"
               style={{ transitionDelay: isInView ? '100ms' : '0ms' }}
             >
-              Built for <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Premium Gurugram Practices</span>
+              Built for <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600"> Gurugram Practices</span>
             </h2>
             <p 
               className="text-lg sm:text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed"
@@ -233,7 +233,7 @@ const GurugramPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-slate-900 mb-4 leading-tight">
-              Serving Premium Clinics <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Across Gurugram</span>
+              Serving  Clinics <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Across Gurugram</span>
             </h2>
             <p className="text-lg sm:text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
               Trusted by leading veterinary practices in Gurugram's premier locations
@@ -266,7 +266,7 @@ const GurugramPage = () => {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-slate-900 mb-4 leading-tight">
-              Why Premium Gurugram Clinics <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Choose SnoutIQ</span>
+              Why  Gurugram Clinics <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Choose SnoutIQ</span>
             </h2>
           </div>
           <div className="space-y-6 md:space-y-8">
@@ -274,17 +274,17 @@ const GurugramPage = () => {
               {
                 icon: '🏆',
                 title: 'Premium Positioning',
-                content: 'SnoutIQ helps Gurugram clinics maintain their premium brand positioning. Our sophisticated platform impresses discerning clients and sets you apart from competition.'
+                content: 'SnoutIQ helps Gurugram clinics maintain their Premium brand positioning. Our sophisticated platform impresses discerning clients and sets you apart from competition.'
               },
               {
                 icon: '💎',
                 title: 'Enterprise Features',
-                content: 'Access to advanced features like custom integrations, white-label options, and API access. Everything a premium Gurugram practice needs to stay ahead.'
+                content: 'Access to advanced features like custom integrations, white-label options, and API access. Everything a  Gurugram practice needs to stay ahead.'
               },
               {
                 icon: '🤝',
                 title: 'Dedicated Support',
-                content: 'Every Gurugram clinic gets a dedicated account manager who understands your premium practice needs. Priority support with fast response times.'
+                content: 'Every Gurugram clinic gets a dedicated account manager who understands your  practice needs. Priority support with fast response times.'
               },
               {
                 icon: '🔒',
@@ -294,7 +294,7 @@ const GurugramPage = () => {
               {
                 icon: '📊',
                 title: 'Advanced Analytics',
-                content: 'Deep insights into practice performance, client behavior, and revenue optimization. Make data-driven decisions to grow your premium practice.'
+                content: 'Deep insights into practice performance, client behavior, and revenue optimization. Make data-driven decisions to grow your  practice.'
               }
             ].map((item, index) => (
               <div
@@ -312,12 +312,12 @@ const GurugramPage = () => {
         </div>
       </section>
 
-      {/* Premium Package Features */}
+      {/*  Package Features */}
       <section className="py-16 md:py-20 lg:py-24 bg-gradient-to-br from-blue-50 to-purple-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-slate-900 mb-4 leading-tight">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Gurugram Premium</span> Package
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Gurugram </span> Package
             </h2>
             <p className="text-lg sm:text-xl md:text-2xl text-slate-600 leading-relaxed">
               Exclusive features for Gurugram's leading veterinary practices
@@ -361,12 +361,12 @@ const GurugramPage = () => {
               ))}
             </div>
             <div className="text-center pt-6 border-t border-gray-200">
-              <p className="text-slate-600 mb-4 text-base">Contact us for premium pricing</p>
+              <p className="text-slate-600 mb-4 text-base">Contact us for  pricing</p>
               <Link
                 to="https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform"
                 className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all text-base"
               >
-                Schedule Premium Consultation
+                Schedule  Consultation
               </Link>
             </div>
           </div>
@@ -379,7 +379,7 @@ const GurugramPage = () => {
           <div className="bg-gradient-to-br from-slate-50 to-blue-50 p-6 md:p-8 lg:p-12 rounded-3xl shadow-xl max-w-4xl mx-auto border border-gray-200">
             <div className="text-center mb-8 md:mb-10">
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-slate-900 mb-4 leading-tight">
-                Experience the <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Premium Difference</span>
+                Experience the <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600"> Difference</span>
               </h2>
               <p className="text-lg sm:text-xl md:text-2xl text-slate-600 leading-relaxed">
                 Schedule a personalized demo at your Gurugram clinic
@@ -401,7 +401,7 @@ const GurugramPage = () => {
     {
       icon: 'Clock',
       title: 'Dedicated Support',
-      content: '24/7 Premium\nPriority Response'
+      content: '24/7 \nPriority Response'
     }
   ].map((item, index) => {
     const Icon = Icons[item.icon];
@@ -434,8 +434,8 @@ const GurugramPage = () => {
 
       <CTA
         title="Ready to Join Leading Gurugram Clinics?"
-        subtitle="Transform your practice with SnoutIQ Premium today"
-        primaryButton={{ text: 'Schedule Premium Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
+        subtitle="Transform your practice with SnoutIQ  today"
+        primaryButton={{ text: 'Schedule  Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         secondaryButton={{ text: 'View Demo', href: 'https://docs.google.com/forms/d/e/1FAIpQLSeQkcn7C8oSvoN4_eMRwWjN4nLfc0IPQT_ZKuwMKMAKzh4SSQ/viewform' }}
         variant="gradient"
       />
