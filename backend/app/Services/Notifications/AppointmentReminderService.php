@@ -2,15 +2,18 @@
 
 namespace App\Services\Notifications;
 
-use App\Jobs\SendNotificationJob;
 use App\Models\Appointment;
-use App\Models\Notification;
+use App\Models\DeviceToken;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
+use App\Services\Push\FcmService;
 
 class AppointmentReminderService
 {
+    public function __construct(private readonly FcmService $fcm)
+    {
+    }
     /**
      * Reminder offsets in minutes.
      *
@@ -124,24 +127,30 @@ class AppointmentReminderService
             return 0;
         }
 
-        Log::info("Dispatching reminder", [
+        $tokens = DeviceToken::query()
+            ->where('user_id', $userId)
+            ->pluck('token')
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($tokens)) {
+            Log::warning('Reminder push skipped; no tokens', [
+                'appointment_id' => $appointment->id,
+                'field' => $field,
+                'user_id' => $userId,
+            ]);
+            return 0;
+        }
+
+        $payload = [
             'appointment_id' => $appointment->id,
-            'field' => $field,
-            'user_id' => $userId,
-            'reminder_at' => $reminderAt->toDateTimeString(),
-            'start_time' => $startTime->toDateTimeString(),
-        ]);
+            'clinic_id' => $appointment->vet_registeration_id,
+            'doctor_id' => $appointment->doctor_id,
+            'start_time' => $startTime->toIso8601String(),
+            'offset_minutes' => $reminder['minutes'],
+        ];
 
-        $notification = $this->createNotification($appointment, $startTime, $reminder, $userId);
-        SendNotificationJob::dispatchSync($notification->id);
-
-        $appointment->forceFill([$field => $now])->save();
-
-        return 1;
-    }
-
-    protected function createNotification(Appointment $appointment, Carbon $startTime, array $reminder, int $userId): Notification
-    {
         $label = $reminder['label'];
         $clinicName = $appointment->clinic->name ?? $this->extractFromNotes($appointment, 'clinic_name') ?? 'your clinic';
         $doctorName = $appointment->doctor->name ?? $this->extractFromNotes($appointment, 'doctor_name') ?? 'your vet';
@@ -154,20 +163,41 @@ class AppointmentReminderService
             $startTime->timezone(config('app.timezone'))->format('d M Y h:i A')
         );
 
-        return Notification::create([
+        $success = 0;
+        $errors = [];
+        foreach ($tokens as $token) {
+            try {
+                $this->fcm->sendToToken(
+                    $token,
+                    $title,
+                    $body,
+                    array_merge(['type' => 'consult_pre_reminder'], $this->stringifyPayload($payload))
+                );
+                $success++;
+            } catch (\Throwable $e) {
+                $errors[] = [
+                    'token' => $token,
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        Log::info('Reminder push results', [
+            'appointment_id' => $appointment->id,
+            'field' => $field,
             'user_id' => $userId,
-            'type' => 'consult_pre_reminder',
-            'title' => $title,
-            'body' => $body,
-            'payload' => [
-                'appointment_id' => $appointment->id,
-                'clinic_id' => $appointment->vet_registeration_id,
-                'doctor_id' => $appointment->doctor_id,
-                'start_time' => $startTime->toIso8601String(),
-                'offset_minutes' => $reminder['minutes'],
-            ],
-            'status' => Notification::STATUS_PENDING,
+            'token_count' => count($tokens),
+            'success' => $success,
+            'errors' => $errors,
         ]);
+
+        if ($success <= 0) {
+            return 0;
+        }
+
+        $appointment->forceFill([$field => $now])->save();
+
+        return 1;
     }
 
     protected function resolveStartTime(Appointment $appointment): ?Carbon
@@ -208,5 +238,23 @@ class AppointmentReminderService
         }
 
         return $decoded[$key] ?? null;
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array<string,string>
+     */
+    private function stringifyPayload(array $payload): array
+    {
+        $stringPayload = [];
+        foreach ($payload as $key => $value) {
+            if (is_array($value) || is_object($value)) {
+                $stringPayload[(string) $key] = json_encode($value);
+                continue;
+            }
+            $stringPayload[(string) $key] = (string) $value;
+        }
+
+        return $stringPayload;
     }
 }
