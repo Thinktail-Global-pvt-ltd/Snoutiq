@@ -108,6 +108,8 @@ Route::get('/dev/fcm-monitor/status', [FcmMonitorController::class, 'status'])->
 Route::get('/dev/notify', [NotificationPlaygroundController::class, 'index'])->name('dev.notify');
 Route::post('/dev/notify', [NotificationPlaygroundController::class, 'send'])->name('dev.notify.send');
 Route::get('/dev/notify/next', [NotificationPlaygroundController::class, 'nextAppointment'])->name('dev.notify.next');
+Route::get('/dev/push-console', [\App\Http\Controllers\Dev\PushConsoleController::class, 'index'])->name('dev.push-console');
+Route::post('/dev/push-console', [\App\Http\Controllers\Dev\PushConsoleController::class, 'send'])->name('dev.push-console.send');
 Route::get('/dev/api-documentation', function () {
     $docPath = resource_path('docs/api_documentation.md');
 
