@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class ReceptionistBookingController extends Controller
 {
@@ -190,6 +191,83 @@ class ReceptionistBookingController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/receptionist/doctors/available
+     * Returns doctors for the clinic who have at least one free slot for the given date
+     * (default: today) and flags whether the current time hits a free slot.
+     */
+    public function availableDoctors(Request $request)
+    {
+        $clinicId = $this->resolveClinicId($request);
+        if (!$clinicId) {
+            return response()->json(['success' => false, 'message' => 'clinic_id or vet_slug required'], 422);
+        }
+
+        $tz = config('app.timezone') ?? 'UTC';
+        // Always derive date/time on the server so clients don't need to send them.
+        $now = now($tz);
+        $date = $now->toDateString();
+        $timeNow = $now->format('H:i:s');
+        $serviceType = $request->query('service_type', 'in_clinic');
+
+        try {
+            $parsedDate = Carbon::parse($date, $tz);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Invalid date. Use YYYY-MM-DD'], 422);
+        }
+
+        $doctors = Doctor::query()
+            ->where('vet_registeration_id', $clinicId)
+            ->orderBy('doctor_name')
+            ->get([
+                'id',
+                'doctor_name',
+                'doctor_email',
+                'doctor_mobile',
+                'doctor_image',
+                'doctors_price',
+                'toggle_availability',
+            ]);
+
+        $payload = [];
+        foreach ($doctors as $doctor) {
+            try {
+                $freeSlots = $this->buildFreeSlotsForDate((int) $doctor->id, $parsedDate->toDateString(), $serviceType);
+            } catch (\InvalidArgumentException $e) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+
+            if (empty($freeSlots)) {
+                continue; // no availability for this doctor today
+            }
+
+            $availableNow = $this->isTimeAvailable($timeNow, $freeSlots);
+            $nextSlot = $this->nextSlotAfter($timeNow, $freeSlots);
+
+            $payload[] = [
+                'id' => (int) $doctor->id,
+                'name' => $doctor->doctor_name,
+                'email' => $doctor->doctor_email,
+                'phone' => $doctor->doctor_mobile,
+                'image' => $doctor->doctor_image,
+                'price' => $doctor->doctors_price !== null ? (float) $doctor->doctors_price : null,
+                'toggle_availability' => (bool) $doctor->toggle_availability,
+                'available_now' => $availableNow,
+                'next_available_slot' => $nextSlot,
+                'available_count' => count($freeSlots),
+                'free_slots' => $freeSlots,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'date' => $parsedDate->toDateString(),
+            'time_checked' => $timeNow,
+            'service_type' => $serviceType,
+            'available_doctors' => $payload,
+        ]);
+    }
+
     public function storePatient(Request $request)
     {
         $data = $request->validate([
@@ -365,5 +443,134 @@ class ReceptionistBookingController extends Controller
         }
 
         return $date . ' 10:00:00';
+    }
+
+    private function buildFreeSlotsForDate(int $doctorId, string $date, string $serviceType): array
+    {
+        try {
+            $parsed = Carbon::parse($date, config('app.timezone'));
+        } catch (\Exception $e) {
+            throw new \InvalidArgumentException('Invalid date provided. Use YYYY-MM-DD.');
+        }
+
+        $dow = (int) $parsed->dayOfWeek;
+
+        $rows = DB::table('doctor_availability')
+            ->where('doctor_id', $doctorId)
+            ->where('service_type', $serviceType)
+            ->where('day_of_week', $dow)
+            ->where('is_active', 1)
+            ->orderBy('start_time')
+            ->get();
+
+        $allSlots = [];
+        foreach ($rows as $r) {
+            $step = max(5, (int) ($r->avg_consultation_mins ?? 20));
+            $start = $this->timeToMinutes($r->start_time);
+            $end   = $this->timeToMinutes($r->end_time);
+            $bStart = $r->break_start ? $this->timeToMinutes($r->break_start) : null;
+            $bEnd   = $r->break_end   ? $this->timeToMinutes($r->break_end)   : null;
+            for ($t = $start; $t + $step <= $end; $t += $step) {
+                if ($bStart !== null && $bEnd !== null && $t >= $bStart && $t < $bEnd) {
+                    continue;
+                }
+                $hh = str_pad((int) floor($t / 60), 2, '0', STR_PAD_LEFT);
+                $mm = str_pad($t % 60, 2, '0', STR_PAD_LEFT);
+                $allSlots[] = "$hh:$mm:00";
+            }
+        }
+
+        $booked = $this->getBookedTimesForDate($doctorId, $parsed, $serviceType);
+
+        return array_values(array_diff($allSlots, $booked));
+    }
+
+    private function getBookedTimesForDate(int $doctorId, Carbon $parsed, string $serviceType): array
+    {
+        $times = [];
+
+        if (Schema::hasTable('bookings')) {
+            $bookingsQuery = DB::table('bookings')
+                ->where('assigned_doctor_id', $doctorId)
+                ->whereDate('scheduled_for', $parsed->toDateString())
+                ->whereNotNull('scheduled_for')
+                ->whereNotIn('status', ['cancelled', 'failed']);
+
+            if ($serviceType) {
+                $bookingsQuery->where('service_type', $serviceType);
+            }
+
+            $times = array_merge($times, $bookingsQuery
+                ->pluck('scheduled_for')
+                ->map(function ($dt) {
+                    return date('H:i:00', strtotime($dt));
+                })
+                ->all());
+        }
+
+        if ($serviceType === 'in_clinic' && Schema::hasTable('appointments')) {
+            $times = array_merge($times, DB::table('appointments')
+                ->where('doctor_id', $doctorId)
+                ->whereDate('appointment_date', $parsed->toDateString())
+                ->whereNotIn('status', ['cancelled'])
+                ->pluck('appointment_time')
+                ->map(function ($time) {
+                    return $this->normalizeSlotTime($time);
+                })
+                ->filter()
+                ->all());
+        }
+
+        return array_values(array_unique(array_filter($times)));
+    }
+
+    private function normalizeSlotTime(?string $time): ?string
+    {
+        if (!$time) {
+            return null;
+        }
+
+        if (preg_match('/^\d{2}:\d{2}:\d{2}$/', $time)) {
+            return $time;
+        }
+
+        if (preg_match('/^\d{2}:\d{2}$/', $time)) {
+            return $time . ':00';
+        }
+
+        $ts = strtotime($time);
+        return $ts ? date('H:i:00', $ts) : null;
+    }
+
+    private function timeToMinutes(string $time): int
+    {
+        $hh = (int) substr($time, 0, 2);
+        $mm = (int) substr($time, 3, 2);
+        return $hh * 60 + $mm;
+    }
+
+    private function isTimeAvailable(string $time, array $freeSlots): bool
+    {
+        $normalized = $this->normalizeSlotTime($time);
+        return $normalized ? in_array($normalized, $freeSlots, true) : false;
+    }
+
+    private function nextSlotAfter(string $time, array $freeSlots): ?string
+    {
+        $normalized = $this->normalizeSlotTime($time);
+        if (!$normalized || empty($freeSlots)) {
+            return null;
+        }
+        $currentMinutes = $this->timeToMinutes($normalized);
+        $next = null;
+        foreach ($freeSlots as $slot) {
+            $slotMinutes = $this->timeToMinutes($slot);
+            if ($slotMinutes >= $currentMinutes) {
+                if ($next === null || $slotMinutes < $this->timeToMinutes($next)) {
+                    $next = $slot;
+                }
+            }
+        }
+        return $next;
     }
 }

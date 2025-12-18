@@ -744,6 +744,7 @@ Route::prefix('receptionist')->group(function () {
     Route::post('/patients', [ReceptionistBookingController::class, 'storePatient']);
     Route::get('/patients/{user}/pets', [ReceptionistBookingController::class, 'patientPets']);
     Route::get('/doctors', [ReceptionistBookingController::class, 'doctors']);
+    Route::get('/doctors/available', [ReceptionistBookingController::class, 'availableDoctors']);
 });
 
 
