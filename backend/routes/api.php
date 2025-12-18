@@ -634,7 +634,7 @@ Route::prefix('user')->middleware('auth:sanctum')->group(function () {
           /* --------- EMERGENCY Routes ---------*/
 
   Route::post('/booking/getRatings', [RatingController::class, 'getRatings']);
-  Route::post('/booking/postBooking', [RatingController::class, 'postBooking']);
+          Route::post('/booking/postBooking', [RatingController::class, 'postBooking']);
 
 
 
@@ -879,6 +879,9 @@ Route::middleware('web')->group(function () {
     Route::get('/my_bookings', [\App\Http\Controllers\Api\UserController::class, 'my_bookings']);
     Route::get('/my_booking/{id}', [\App\Http\Controllers\Api\UserController::class, 'my_booking']);
 });
+
+// Open pet extras update (no auth)
+Route::put('/pets/{id}/extras', [\App\Http\Controllers\Api\UserController::class, 'petExtrasUpdate']);
 
 use App\Http\Controllers\Api\UserOrdersController;
 
