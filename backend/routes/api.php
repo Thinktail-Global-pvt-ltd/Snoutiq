@@ -614,6 +614,7 @@ Route::prefix('user')->middleware('auth:sanctum')->group(function () {
      Route::get('/my_pets', [UserController::class, 'my_pets']);
      Route::get('/pet/{id}', [UserController::class, 'pet_profile']);
      Route::post('/pet/{id}', [UserController::class, 'pet_update']);
+     Route::put('/pets/{id}/extras', [UserController::class, 'petExtrasUpdate']);
 
      Route::post('/ai/start',[UserAiController::class,'start']);
      Route::get('/ai/chats',[UserAiController::class,'history']);

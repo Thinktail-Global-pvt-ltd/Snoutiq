@@ -409,6 +409,40 @@ public function pet_update(Request $request, $id)
         'pet'     => $petData
     ]);
 } 
-}
 
+    /**
+     * PUT /api/pets/{id}/extras
+     * Stores extra pet details (weight, temprature, vaccination status/date).
+     */
+    public function petExtrasUpdate(Request $request, int $id)
+    {
+        $data = $request->validate([
+            'weight' => 'sometimes|numeric',
+            'temprature' => 'sometimes|numeric',
+            'vaccenated_yes_no' => 'sometimes|boolean',
+            'last_vaccenated_date' => 'sometimes|date',
+        ]);
+
+        $pet = UserPet::find($id);
+        if (!$pet) {
+            return response()->json(['message' => 'Pet not found'], 404);
+        }
+
+        foreach ($data as $key => $value) {
+            $pet->{$key} = $value;
+        }
+        $pet->save();
+
+        return response()->json([
+            'message' => 'Pet details updated',
+            'pet' => [
+                'id' => $pet->id,
+                'weight' => $pet->weight,
+                'temprature' => $pet->temprature,
+                'vaccenated_yes_no' => (bool) $pet->vaccenated_yes_no,
+                'last_vaccenated_date' => $pet->last_vaccenated_date,
+            ],
+        ]);
+    }
+}
 
