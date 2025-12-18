@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console;
 
 use App\Console\Commands\DispatchConsultationReminders;
+use App\Console\Commands\SendVaccineReminders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use Illuminate\Support\Facades\Log;
@@ -13,6 +14,7 @@ class Kernel extends ConsoleKernel
 {
     protected $commands = [
         DispatchConsultationReminders::class,
+        SendVaccineReminders::class,
     ];
 
     protected function schedule(Schedule $schedule): void
@@ -23,7 +25,10 @@ class Kernel extends ConsoleKernel
                 'ts' => now()->toDateTimeString(),
                 'env' => app()->environment(),
             ]);
-        })->everyMinute();
+        })
+            ->name('scheduler-heartbeat')
+            ->description('Logs a heartbeat each minute to confirm scheduler is running')
+            ->everyMinute();
 
         // 12:05 IST daily: publishNightSlots(today IST)
         $schedule->command('video:publish-tonight')
@@ -83,6 +88,10 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping();
 
         $schedule->command('notifications:consult-reminders')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command('vaccines:send-reminders')
             ->everyMinute()
             ->withoutOverlapping();
     }

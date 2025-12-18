@@ -12,6 +12,7 @@ class Pet extends Model
         'name',
         'breed',
         'pet_age',
+        'pet_age_months',
         'pet_gender',
         'microchip_number',
         'mcd_registration_number',
@@ -22,11 +23,15 @@ class Pet extends Model
         'temprature',
         'vaccenated_yes_no',
         'last_vaccenated_date',
+        'vaccination_date',
     ];
 
     protected $casts = [
+        'pet_age' => 'integer',
+        'pet_age_months' => 'integer',
         'vaccenated_yes_no' => 'boolean',
         'last_vaccenated_date' => 'date',
+        'vaccination_date' => 'date',
     ];
 
     public function owner(): BelongsTo
