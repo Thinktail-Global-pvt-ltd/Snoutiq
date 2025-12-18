@@ -269,6 +269,46 @@ class ReceptionistBookingController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/receptionist/appointments/today
+     * Lists today's appointments for the clinic (ordered by time).
+     */
+    public function appointmentsToday(Request $request)
+    {
+        $clinicId = $this->resolveClinicId($request);
+        if (!$clinicId) {
+            return response()->json(['success' => false, 'message' => 'clinic_id or vet_slug required'], 422);
+        }
+
+        $tz = config('app.timezone') ?? 'UTC';
+        $date = $request->query('date', now($tz)->toDateString());
+
+        $rows = DB::table('appointments as a')
+            ->leftJoin('doctors as d', 'a.doctor_id', '=', 'd.id')
+            ->where('a.vet_registeration_id', $clinicId)
+            ->whereDate('a.appointment_date', $date)
+            ->orderBy('a.appointment_time')
+            ->select(
+                'a.id',
+                'a.name as patient_name',
+                'a.mobile as patient_phone',
+                'a.pet_name',
+                'a.appointment_date',
+                'a.appointment_time',
+                'a.status',
+                'a.doctor_id',
+                DB::raw('COALESCE(d.doctor_name, "") as doctor_name')
+            )
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'date' => $date,
+            'count' => $rows->count(),
+            'appointments' => $rows,
+        ]);
+    }
+
     public function storePatient(Request $request)
     {
         $data = $request->validate([
