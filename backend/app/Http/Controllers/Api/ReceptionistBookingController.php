@@ -7,6 +7,7 @@ use App\Models\Doctor;
 use App\Models\User;
 use App\Models\UserPet;
 use App\Models\Receptionist;
+use App\Models\Appointment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -351,8 +352,8 @@ class ReceptionistBookingController extends Controller
             'doctor_id' => 'nullable|integer|exists:doctors,id',
             'service_type' => 'required|string|in:video,in_clinic,home_visit',
             'urgency' => 'nullable|string|in:low,medium,high,emergency',
-            'scheduled_date' => 'nullable|date',
-            'scheduled_time' => 'nullable',
+            'scheduled_date' => 'required|date',
+            'scheduled_time' => 'required',
             'notes' => 'nullable|string',
             'quoted_price' => 'nullable|numeric',
         ]);
@@ -392,6 +393,7 @@ class ReceptionistBookingController extends Controller
                 'vaccination_log' => '[]',
             ]);
             $petId = $pet->id;
+            $petName = $pet->name;
         } else {
             return response()->json(['success' => false, 'message' => 'Select a pet or provide pet details'], 422);
         }
@@ -400,35 +402,41 @@ class ReceptionistBookingController extends Controller
             $data['scheduled_date'] ?? null,
             $data['scheduled_time'] ?? null
         );
+        if (!$scheduledFor) {
+            return response()->json(['success' => false, 'message' => 'scheduled_date and scheduled_time are required'], 422);
+        }
+
+        $appointmentDate = $data['scheduled_date'];
+        $appointmentTime = $this->normalizeSlotTime($data['scheduled_time']) ?? $data['scheduled_time'];
 
         $now = now();
-        $bookingId = DB::table('bookings')->insertGetId([
-            'user_id' => $patient->id,
-            'pet_id' => $petId,
-            'service_type' => $data['service_type'],
-            'urgency' => $data['urgency'] ?? 'medium',
-            'ai_summary' => $data['notes'] ?? null,
-            'ai_urgency_score' => null,
-            'symptoms' => null,
-            'user_latitude' => null,
-            'user_longitude' => null,
-            'user_address' => null,
-            'status' => 'scheduled',
-            'clinic_id' => $clinicId,
-            'assigned_doctor_id' => $doctorId,
-            'scheduled_for' => $scheduledFor,
-            'quoted_price' => $data['quoted_price'] ?? null,
-            'final_price' => $data['quoted_price'] ?? null,
-            'payment_status' => 'pending',
-            'booking_created_at' => $now,
+        $petName = $petName
+            ?? DB::table('user_pets')->where('id', $petId)->value('name')
+            ?? $data['pet_name']
+            ?? null;
+
+        $mobile = $patient->phone
+            ?? DB::table('users')->where('id', $patient->id)->value('phone')
+            ?? 'N/A';
+
+        $appointmentId = DB::table('appointments')->insertGetId([
+            'vet_registeration_id' => $clinicId,
+            'doctor_id' => $doctorId,
+            'name' => $patient->name ?? 'Patient',
+            'mobile' => $mobile,
+            'pet_name' => $petName,
+            'appointment_date' => $appointmentDate,
+            'appointment_time' => $appointmentTime,
+            'status' => 'pending',
+            'notes' => $data['notes'] ?? null,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
 
         return response()->json([
             'success' => true,
-            'booking_id' => $bookingId,
-            'message' => 'Booking created successfully.',
+            'appointment_id' => $appointmentId,
+            'message' => 'Appointment created successfully.',
         ], 201);
     }
 
