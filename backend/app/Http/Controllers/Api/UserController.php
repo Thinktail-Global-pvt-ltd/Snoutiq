@@ -423,7 +423,8 @@ public function pet_update(Request $request, $id)
             'last_vaccenated_date' => 'sometimes|date',
         ]);
 
-        $pet = UserPet::find($id);
+        // Prefer pets table; fallback to user_pets for legacy data
+        $pet = \App\Models\Pet::find($id) ?? UserPet::find($id);
         if (!$pet) {
             return response()->json(['message' => 'Pet not found'], 404);
         }
@@ -445,4 +446,3 @@ public function pet_update(Request $request, $id)
         ]);
     }
 }
-

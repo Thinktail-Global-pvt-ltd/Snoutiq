@@ -18,6 +18,15 @@ class Pet extends Model
         'is_neutered',
         'pet_doc1',
         'pet_doc2',
+        'weight',
+        'temprature',
+        'vaccenated_yes_no',
+        'last_vaccenated_date',
+    ];
+
+    protected $casts = [
+        'vaccenated_yes_no' => 'boolean',
+        'last_vaccenated_date' => 'date',
     ];
 
     public function owner(): BelongsTo
