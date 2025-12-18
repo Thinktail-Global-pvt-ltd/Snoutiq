@@ -20,6 +20,7 @@ class DoctorController extends Controller
                 'doctor_mobile',
                 'doctor_license',
                 'vet_registeration_id',
+                'doctor_status',
                 'doctors_price'
             )
             ->orderBy('doctor_name');
@@ -53,6 +54,7 @@ class DoctorController extends Controller
                 'doctor_mobile',
                 'doctor_license',
                 'vet_registeration_id',
+                'doctor_status',
                 'doctors_price'
             )
             ->where('id', $id)

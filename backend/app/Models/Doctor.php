@@ -19,6 +19,7 @@ class Doctor extends Model
         'doctor_document',
         'doctor_image',
         'toggle_availability',
+        'doctor_status',
         'doctors_price',
         'video_day_rate',
         'video_night_rate',

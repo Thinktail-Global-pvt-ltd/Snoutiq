@@ -228,6 +228,7 @@ class ReceptionistBookingController extends Controller
                 'doctor_image',
                 'doctors_price',
                 'toggle_availability',
+                'doctor_status',
             ]);
 
         $payload = [];
@@ -252,7 +253,8 @@ class ReceptionistBookingController extends Controller
                 'phone' => $doctor->doctor_mobile,
                 'image' => $doctor->doctor_image,
                 'price' => $doctor->doctors_price !== null ? (float) $doctor->doctors_price : null,
-                'toggle_availability' => (bool) $doctor->toggle_availability,
+                'toggle_availability' => (bool) $doctor->toggle_availability, // deprecated: prefer doctor_status
+                'doctor_status' => $doctor->doctor_status ?? null,
                 'available_now' => $availableNow,
                 'next_available_slot' => $nextSlot,
                 'available_count' => count($freeSlots),

@@ -450,6 +450,7 @@ Route::post('/reviews', [ReviewController::class, 'store']);
 
 // ---- Doctor status/availability updates by vet_registerations_temp.id ----
 Route::post('/doctor/update-status', [DoctorStatusController::class, 'updateByVet']);
+Route::patch('/doctors/{doctor}/status', [DoctorStatusController::class, 'updateDoctor']);
 
 Route::delete('/chat-rooms/{chat_room_token}', [GeminiChatController::class, 'deleteRoom']);
 Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);

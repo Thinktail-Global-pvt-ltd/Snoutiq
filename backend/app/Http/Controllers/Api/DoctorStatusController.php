@@ -15,6 +15,7 @@ class DoctorStatusController extends Controller
         $data = $request->validate([
             'vet_id'             => 'required|integer|min:1',
             'toggle_availability'=> 'sometimes|boolean',
+            'doctor_status'      => 'sometimes|string|in:available,busy,on_leave,absent,in_surgery',
         ]);
 
         $vetId = (int) $data['vet_id'];
@@ -30,6 +31,9 @@ class DoctorStatusController extends Controller
         if (array_key_exists('toggle_availability', $data)) {
             $updates['toggle_availability'] = (bool) $data['toggle_availability'];
         }
+        if (array_key_exists('doctor_status', $data)) {
+            $updates['doctor_status'] = $data['doctor_status'];
+        }
 
         $count = 0;
         foreach ($doctors as $doc) {
@@ -42,6 +46,37 @@ class DoctorStatusController extends Controller
             'message'         => 'Doctor records updated',
             'updated_records' => $count,
             'updates'         => $updates,
+        ]);
+    }
+
+    // PATCH /api/doctors/{doctor}/status
+    public function updateDoctor(Request $request, Doctor $doctor)
+    {
+        $data = $request->validate([
+            'toggle_availability'=> 'sometimes|boolean',
+            'doctor_status'      => 'sometimes|string|in:available,busy,on_leave,absent,in_surgery',
+        ]);
+
+        if (empty($data)) {
+            return response()->json(['message' => 'No fields provided'], 422);
+        }
+
+        if (array_key_exists('toggle_availability', $data)) {
+            $doctor->toggle_availability = (bool) $data['toggle_availability'];
+        }
+        if (array_key_exists('doctor_status', $data)) {
+            $doctor->doctor_status = $data['doctor_status'];
+        }
+
+        $doctor->save();
+
+        return response()->json([
+            'message' => 'Doctor status updated',
+            'doctor'  => [
+                'id' => $doctor->id,
+                'toggle_availability' => (bool) $doctor->toggle_availability,
+                'doctor_status' => $doctor->doctor_status,
+            ],
         ]);
     }
 }
