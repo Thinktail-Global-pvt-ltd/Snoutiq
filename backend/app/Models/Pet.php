@@ -24,6 +24,7 @@ class Pet extends Model
         'vaccenated_yes_no',
         'last_vaccenated_date',
         'vaccination_date',
+        'vaccine_reminder_status',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class Pet extends Model
         'vaccenated_yes_no' => 'boolean',
         'last_vaccenated_date' => 'date',
         'vaccination_date' => 'date',
+        'vaccine_reminder_status' => 'array',
     ];
 
     public function owner(): BelongsTo

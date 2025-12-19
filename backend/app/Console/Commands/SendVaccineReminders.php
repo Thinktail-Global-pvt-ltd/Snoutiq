@@ -10,6 +10,7 @@ use App\Services\Notifications\NotificationChannelService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Arr;
 
 class SendVaccineReminders extends Command
 {
@@ -80,6 +81,16 @@ class SendVaccineReminders extends Command
                         continue;
                     }
 
+                    Log::info('vaccination.reminder.event', [
+                        'pet_id' => $pet->id,
+                        'user_id' => $pet->user_id,
+                        'milestone' => $event['milestone'],
+                        'stage' => $event['stage'],
+                        'pet_age_weeks' => $event['payload']['pet_age_weeks'] ?? null,
+                        'vaccination_date' => $event['payload']['vaccination_date'] ?? null,
+                        'due_date' => $event['payload']['due_date'] ?? null,
+                    ]);
+
                     $notification = Notification::create([
                         'user_id' => $pet->user_id,
                         'pet_id' => $pet->id,
@@ -93,6 +104,15 @@ class SendVaccineReminders extends Command
                     try {
                         $channelService->send($notification);
                         $sent++;
+                        Log::info('vaccination.reminder.push_result', [
+                            'notification_id' => $notification->id,
+                            'pet_id' => $pet->id,
+                            'user_id' => $pet->user_id,
+                            'milestone' => $event['milestone'],
+                            'stage' => $event['stage'],
+                            'status' => 'sent',
+                        ]);
+                        $this->markReminderSent($pet, $event['milestone'], $event['stage']);
                         if (count($sentSamples) < 5) {
                             $sentSamples[] = [
                                 'notification_id' => $notification->id,
@@ -104,6 +124,15 @@ class SendVaccineReminders extends Command
                         }
                     } catch (\Throwable $e) {
                         $errors++;
+                        Log::warning('vaccination.reminder.push_result', [
+                            'notification_id' => $notification->id ?? null,
+                            'pet_id' => $pet->id,
+                            'user_id' => $pet->user_id,
+                            'milestone' => $event['milestone'],
+                            'stage' => $event['stage'],
+                            'status' => 'error',
+                            'error' => $e->getMessage(),
+                        ]);
                         if (count($errorSamples) < 5) {
                             $errorSamples[] = [
                                 'notification_id' => $notification->id ?? null,
@@ -315,5 +344,26 @@ class SendVaccineReminders extends Command
                 Notification::STATUS_FAILED,
             ])
             ->exists();
+    }
+
+    private function markReminderSent(Pet $pet, string $milestone, string $stage): void
+    {
+        $key = $stage === 'due' ? 'due_sent' : 'upcoming_sent';
+        $status = $pet->vaccine_reminder_status ?? [];
+
+        if (!is_array($status)) {
+            $status = [];
+        }
+
+        $status[$milestone] = array_merge(
+            [
+                'upcoming_sent' => false,
+                'due_sent' => false,
+            ],
+            Arr::only($status[$milestone] ?? [], ['upcoming_sent', 'due_sent']),
+            [$key => true]
+        );
+
+        $pet->forceFill(['vaccine_reminder_status' => $status])->saveQuietly();
     }
 }
