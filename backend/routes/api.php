@@ -48,9 +48,13 @@ use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\ReceptionistBookingController;
 use App\Http\Controllers\Api\ErrorLogController;
 use App\Http\Controllers\Api\WhatsAppMessageController;
+use App\Http\Controllers\Api\CallSessionCrudController;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
+Route::get('/call-sessions', [CallSessionCrudController::class, 'index']);
+Route::post('/call-sessions', [CallSessionCrudController::class, 'store']);
+Route::get('/call-sessions/{callSession}', [CallSessionCrudController::class, 'show'])->whereNumber('callSession');
 Route::post('/call-recordings/upload', [RecordingUploadController::class, 'store']);
 Route::post('/error-logs', [ErrorLogController::class, 'store'])->name('api.error-logs.store');
 Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
