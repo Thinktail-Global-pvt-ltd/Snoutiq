@@ -41,6 +41,10 @@ class SendVaccineReminders extends Command
         $sent = 0;
         $skipped = 0;
         $errors = 0;
+        $missingAge = 0;
+        $duplicates = 0;
+        $sentSamples = [];
+        $errorSamples = [];
 
         $query = Pet::query()
             ->whereNotNull('user_id')
@@ -58,30 +62,21 @@ class SendVaccineReminders extends Command
             'total_candidates' => $total,
         ]);
 
-        $query->chunkById(200, function ($pets) use ($channelService, &$sent, &$skipped, &$errors) {
+        $query->chunkById(200, function ($pets) use ($channelService, &$sent, &$skipped, &$errors, &$missingAge, &$duplicates, &$sentSamples, &$errorSamples) {
             /** @var Pet $pet */
             foreach ($pets as $pet) {
                 $ageWeeks = $this->calculateAgeInWeeks($pet);
                 if ($ageWeeks === null) {
-                    Log::info('vaccination.reminder.skip_age_missing', [
-                        'pet_id' => $pet->id,
-                        'user_id' => $pet->user_id,
-                        'reason' => 'missing_age',
-                    ]);
                     $skipped++;
+                    $missingAge++;
                     continue;
                 }
 
                 $events = $this->collectEventsForPet($pet, $ageWeeks, Carbon::now());
                 foreach ($events as $event) {
                     if ($this->alreadyNotified($pet->id, $event['milestone'], $event['stage'])) {
-                        Log::info('vaccination.reminder.skip_duplicate', [
-                            'pet_id' => $pet->id,
-                            'user_id' => $pet->user_id,
-                            'milestone' => $event['milestone'],
-                            'stage' => $event['stage'],
-                        ]);
                         $skipped++;
+                        $duplicates++;
                         continue;
                     }
 
@@ -97,25 +92,28 @@ class SendVaccineReminders extends Command
 
                     try {
                         $channelService->send($notification);
-                        Log::info('vaccination.reminder.sent', [
-                            'notification_id' => $notification->id,
-                            'pet_id' => $pet->id,
-                            'user_id' => $pet->user_id,
-                            'milestone' => $event['milestone'],
-                            'stage' => $event['stage'],
-                            'title' => $event['title'],
-                        ]);
                         $sent++;
+                        if (count($sentSamples) < 5) {
+                            $sentSamples[] = [
+                                'notification_id' => $notification->id,
+                                'pet_id' => $pet->id,
+                                'user_id' => $pet->user_id,
+                                'milestone' => $event['milestone'],
+                                'stage' => $event['stage'],
+                            ];
+                        }
                     } catch (\Throwable $e) {
                         $errors++;
-                        Log::error('vaccination.reminder.error', [
-                            'notification_id' => $notification->id,
-                            'pet_id' => $pet->id,
-                            'user_id' => $pet->user_id,
-                            'milestone' => $event['milestone'],
-                            'stage' => $event['stage'],
-                            'error' => $e->getMessage(),
-                        ]);
+                        if (count($errorSamples) < 5) {
+                            $errorSamples[] = [
+                                'notification_id' => $notification->id ?? null,
+                                'pet_id' => $pet->id,
+                                'user_id' => $pet->user_id,
+                                'milestone' => $event['milestone'],
+                                'stage' => $event['stage'],
+                                'error' => $e->getMessage(),
+                            ];
+                        }
                         $this->error(sprintf(
                             'Failed to send notification for pet %d (milestone %s): %s',
                             $pet->id,
@@ -132,6 +130,10 @@ class SendVaccineReminders extends Command
             'sent' => $sent,
             'skipped' => $skipped,
             'errors' => $errors,
+            'missing_age' => $missingAge,
+            'duplicates' => $duplicates,
+            'sent_samples' => $sentSamples,
+            'error_samples' => $errorSamples,
         ]);
 
         return self::SUCCESS;
