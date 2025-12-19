@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\RazorpayController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\UserAiController;
 use App\Http\Controllers\Api\UserFeedbackController;
+use App\Http\Controllers\Api\UserObservationController;
 use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
@@ -661,6 +662,11 @@ Route::prefix('public')->group(function(){
     Route::middleware('auth:sanctum')->post('/support/sendMessage', [SupportController::class, 'store']);
     Route::middleware('auth:sanctum')->post('/support/mydata', [SupportController::class, 'mydata']);
 
+});
+
+Route::prefix('user')->group(function () {
+    Route::get('/observations', [UserObservationController::class, 'index']);
+    Route::post('/observations', [UserObservationController::class, 'store']);
 });
 
 
