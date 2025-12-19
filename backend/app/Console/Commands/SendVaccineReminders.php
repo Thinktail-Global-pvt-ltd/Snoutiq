@@ -75,7 +75,7 @@ class SendVaccineReminders extends Command
 
                 $events = $this->collectEventsForPet($pet, $ageWeeks, Carbon::now());
                 foreach ($events as $event) {
-                    if ($this->alreadyNotified($pet->id, $event['milestone'], $event['stage'])) {
+                    if ($this->alreadySentToPet($pet, $event['milestone'], $event['stage'])) {
                         $skipped++;
                         $duplicates++;
                         continue;
@@ -330,20 +330,15 @@ class SendVaccineReminders extends Command
         return sprintf('weeks %.1f-%.1f', $startWeeks, $endWeeks);
     }
 
-    private function alreadyNotified(int $petId, string $milestone, string $stage): bool
+    private function alreadySentToPet(Pet $pet, string $milestone, string $stage): bool
     {
-        return Notification::query()
-            ->where('pet_id', $petId)
-            ->where('type', 'vaccination_milestone')
-            ->where('payload->milestone', $milestone)
-            ->where('payload->stage', $stage)
-            ->whereIn('status', [
-                Notification::STATUS_PENDING,
-                Notification::STATUS_SENT,
-                Notification::STATUS_DELIVERED,
-                Notification::STATUS_FAILED,
-            ])
-            ->exists();
+        $status = $pet->vaccine_reminder_status ?? [];
+        if (!is_array($status)) {
+            return false;
+        }
+
+        $key = $stage === 'due' ? 'due_sent' : 'upcoming_sent';
+        return !empty($status[$milestone][$key]);
     }
 
     private function markReminderSent(Pet $pet, string $milestone, string $stage): void
