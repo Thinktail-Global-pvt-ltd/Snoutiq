@@ -46,9 +46,17 @@ class SendVaccineReminders extends Command
             ->whereNotNull('user_id')
             ->orderBy('id');
 
-        if ($this->option('pet_id')) {
-            $query->whereKey((int) $this->option('pet_id'));
+        $petId = $this->option('pet_id');
+        if ($petId) {
+            $query->whereKey((int) $petId);
         }
+
+        $total = (clone $query)->count();
+
+        Log::info('vaccination.reminder.run_start', [
+            'pet_filter' => $petId ? (int) $petId : null,
+            'total_candidates' => $total,
+        ]);
 
         $query->chunkById(200, function ($pets) use ($channelService, &$sent, &$skipped, &$errors) {
             /** @var Pet $pet */
