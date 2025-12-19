@@ -30,7 +30,7 @@ const __dirname = dirname(__filename);
 
 const DEFAULT_SERVICE_ACCOUNT_FILE = "snoutiqapp-9cacc4ece358.json";
 const ACTIVE_DOCTOR_DEBOUNCE_MS = 5000;
-const DISCONNECT_GRACE_MS = 30_000;
+const DISCONNECT_GRACE_MS = 60_000; // Increased to 60s to handle ping timeouts better
 const PENDING_CALL_MAX_PER_DOCTOR = Number(
   process.env.PENDING_CALL_MAX_PER_DOCTOR || 3,
 );
@@ -51,6 +51,10 @@ const REDIS_PUSH_TOKEN_TTL_SECONDS = Number(
   process.env.REDIS_PUSH_TOKEN_TTL_SECONDS || 30 * 24 * 60 * 60,
 );
 const REDIS_PRESCRIPTION_CHANNEL = "prescription-created";
+const REDIS_DOCTOR_BUSY_LOCK_KEY = "doctor";
+const REDIS_PAYMENT_IDEMPOTENCY_KEY = "payment";
+const REDIS_CALL_PAID_KEY = "call";
+const REDIS_REJOIN_LOCK_KEY = "rejoin";
 const SERVER_INSTANCE_ID = `${process.pid}-${Date.now()}-${Math.random()
   .toString(36)
   .slice(2, 8)}`;
@@ -74,47 +78,73 @@ const resolveServiceAccountPath = () => {
 
   for (const candidate of candidates) {
     if (candidate && existsSync(candidate)) {
-      return candidate; 
+      return candidate;
     }
   }
   return candidates[0] || null;
 };
 
 const loadServiceAccountFromCommonFiles = () => {
-  try {
-    const root = process.cwd();
-    const entries = readdirSync(root, { withFileTypes: true });
-    const jsonFiles = entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-      .map((entry) => entry.name);
+  const searchPaths = [
+    process.cwd(), // Project root
+    __dirname, // socket-server directory
+    join(__dirname, ".."), // src directory
+  ];
 
-    const preferredNames = [
-      "serviceAccountKey.json",
-      "credentials.json",
-      "firebase-adminsdk.json",
-      "api-0000000000000000000-111111-aaaaaabbbbbb.json",
-    ];
+  const preferredNames = [
+    "serviceAccountKey.json",
+    "credentials.json",
+    "firebase-adminsdk.json",
+    "api-0000000000000000000-111111-aaaaaabbbbbb.json",
+    "snoutiqapp-9cacc4ece358.json",
+  ];
 
-    const ordered = [
-      ...preferredNames.filter((name) => jsonFiles.includes(name)),
-      ...jsonFiles.filter((name) => !preferredNames.includes(name)),
-    ];
+  console.log(`🔍 Searching in paths: ${searchPaths.join(", ")}`);
 
-    for (const fileName of ordered) {
-      const fullPath = join(root, fileName);
-      try {
-        const parsed = JSON.parse(readFileSync(fullPath, "utf8"));
-        if (parsed?.type === "service_account") {
-          console.log(`✅ Loaded Firebase service account from ${fileName}`);
-          return parsed;
-        }
-      } catch {
-        /* ignore bad files */
+  for (const searchPath of searchPaths) {
+    try {
+      if (!existsSync(searchPath)) {
+        console.log(`ℹ️ Path does not exist: ${searchPath}`);
+        continue;
       }
+      
+      console.log(`🔍 Scanning directory: ${searchPath}`);
+      const entries = readdirSync(searchPath, { withFileTypes: true });
+      const jsonFiles = entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .map((entry) => entry.name);
+
+      console.log(`🔍 Found ${jsonFiles.length} JSON files: ${jsonFiles.slice(0, 5).join(", ")}${jsonFiles.length > 5 ? "..." : ""}`);
+
+      const ordered = [
+        ...preferredNames.filter((name) => jsonFiles.includes(name)),
+        ...jsonFiles.filter((name) => !preferredNames.includes(name)),
+      ];
+
+      for (const fileName of ordered) {
+        const fullPath = join(searchPath, fileName);
+        try {
+          console.log(`🔍 Checking file: ${fullPath}`);
+          const parsed = JSON.parse(readFileSync(fullPath, "utf8"));
+          if (parsed?.type === "service_account") {
+            console.log(`✅ Loaded Firebase service account from ${fullPath}`);
+            return parsed;
+          } else {
+            console.log(`ℹ️ File ${fileName} is not a service account (type: ${parsed?.type || "unknown"})`);
+          }
+        } catch (error) {
+          // Log error for debugging but continue searching
+          if (fileName.includes("api-") || fileName.includes("service") || fileName.includes("credential")) {
+            console.log(`⚠️ Error reading ${fullPath}: ${error?.message || "unknown error"}`);
+          }
+        }
+      }
+    } catch (error) {
+      // Continue to next search path
+      console.warn(`⚠️ Error scanning ${searchPath}:`, error?.message || error);
     }
-  } catch {
-    /* ignore scan errors */
   }
+  console.log("🔍 No service account file found in common locations");
   return null;
 };
 
@@ -163,36 +193,111 @@ const loadServiceAccountFromEnv = () => {
 };
 
 // ==================== FIREBASE ADMIN SDK INITIALIZATION ====================
+console.log("🔍 Starting Firebase Admin SDK initialization...");
+console.log(`🔍 Current working directory: ${process.cwd()}`);
+console.log(`🔍 Socket server directory: ${__dirname}`);
+
 try {
-  let serviceAccount =
-    loadServiceAccountFromEnv() || loadServiceAccountFromCommonFiles();
+  let serviceAccount = null;
+  
+  // FIRST: Try direct path to known file (most reliable)
+  const knownFile = join(process.cwd(), "api-0000000000000000000-111111-aaaaaabbbbbb.json");
+  console.log(`🔍 Checking for known file at: ${knownFile}`);
+  console.log(`🔍 File exists: ${existsSync(knownFile)}`);
+  
+  if (existsSync(knownFile)) {
+    try {
+      console.log(`🔍 Reading file: ${knownFile}`);
+      const parsed = JSON.parse(readFileSync(knownFile, "utf8"));
+      console.log(`🔍 File parsed, type: ${parsed?.type}`);
+      if (parsed?.type === "service_account") {
+        console.log(`✅ Loaded Firebase service account from ${knownFile}`);
+        serviceAccount = parsed;
+      } else {
+        console.log(`⚠️ File exists but type is not 'service_account': ${parsed?.type}`);
+      }
+    } catch (error) {
+      console.error(`⚠️ Error loading known file ${knownFile}:`, error.message);
+      console.error(`   Error stack:`, error.stack);
+    }
+  } else {
+    console.log(`ℹ️ Known file not found at: ${knownFile}`);
+    // Also try in socket-server directory
+    const altPath = join(__dirname, "api-0000000000000000000-111111-aaaaaabbbbbb.json");
+    console.log(`🔍 Trying alternative path: ${altPath}`);
+    if (existsSync(altPath)) {
+      try {
+        const parsed = JSON.parse(readFileSync(altPath, "utf8"));
+        if (parsed?.type === "service_account") {
+          console.log(`✅ Loaded Firebase service account from ${altPath}`);
+          serviceAccount = parsed;
+        }
+      } catch (error) {
+        console.error(`⚠️ Error loading from alt path:`, error.message);
+      }
+    }
+  }
+  
+  // SECOND: Try environment variables
+  if (!serviceAccount) {
+    serviceAccount = loadServiceAccountFromEnv();
+    console.log(`🔍 Environment variables check: ${serviceAccount ? "✅ Found" : "❌ Not found"}`);
+  }
+  
+  // THIRD: Try loading from common files
+  if (!serviceAccount) {
+    console.log("🔍 Searching for service account files in common locations...");
+    serviceAccount = loadServiceAccountFromCommonFiles();
+    console.log(`🔍 Common files check: ${serviceAccount ? "✅ Found" : "❌ Not found"}`);
+  }
+  
+  // Try direct path resolution as fallback
   const resolvedPath = resolveServiceAccountPath();
+  console.log(`🔍 Resolved path: ${resolvedPath || "none"}`);
 
   if (!serviceAccount && resolvedPath) {
     try {
-      serviceAccount = JSON.parse(readFileSync(resolvedPath, "utf8"));
-      console.log(`✅ Loaded Firebase service account from ${resolvedPath}`);
+      if (existsSync(resolvedPath)) {
+        console.log(`🔍 Attempting to load from resolved path: ${resolvedPath}`);
+        serviceAccount = JSON.parse(readFileSync(resolvedPath, "utf8"));
+        if (serviceAccount?.type === "service_account") {
+          console.log(`✅ Loaded Firebase service account from ${resolvedPath}`);
+        } else {
+          console.warn(`⚠️ File ${resolvedPath} exists but is not a valid service account`);
+          serviceAccount = null;
+        }
+      } else {
+        console.log(`ℹ️ Service account path resolved but file not found: ${resolvedPath}`);
+        serviceAccount = null;
+      }
     } catch (error) {
       console.error("⚠️ Could not load service account key:", error.message);
-      console.log(
-        "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory."
-      );
       serviceAccount = null;
     }
-  } else if (!serviceAccount) {
-    console.log("⚠️ No service account path resolved.");
-    console.log(
-      "💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory."
-    );
+  }
+
+  if (!serviceAccount) {
+    console.log("⚠️ No service account found.");
+    console.log("💡 Tried to load from:");
+    console.log("   - Environment variables (FIREBASE_SERVICE_ACCOUNT_JSON, SERVICE_ACCOUNT_JSON, etc.)");
+    console.log("   - Common file names in project root");
+    console.log("   - SERVICE_ACCOUNT_PATH environment variable");
+    console.log("   - Default path: snoutiqapp-9cacc4ece358.json");
+    console.log("💡 Please set SERVICE_ACCOUNT_PATH or place the service account JSON in the project root or src/socket-server directory.");
     serviceAccount = null;
   }
 
   if (serviceAccount) {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: "https://snoutiqapp-default-rtdb.firebaseio.com",
-    });
-    console.log("✅ Firebase Admin SDK initialized successfully");
+    try {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: "https://snoutiqapp-default-rtdb.firebaseio.com",
+      });
+      console.log("✅ Firebase Admin SDK initialized successfully");
+    } catch (initError) {
+      console.error("❌ Failed to initialize Firebase Admin SDK:", initError.message);
+      console.error("   Stack:", initError.stack);
+    }
   } else {
     console.log(
       "⚠️ Firebase Admin SDK not initialized - push notifications will fail"
@@ -200,6 +305,7 @@ try {
   }
 } catch (error) {
   console.error("❌ Firebase Admin SDK initialization error:", error.message);
+  console.error("   Stack:", error.stack);
 }
 
 const isFirebaseReady = () => Boolean(admin?.apps?.length);
@@ -239,6 +345,89 @@ const removeHashField = async (key, field) => {
   }
 };
 
+// -------------------- REDIS DISTRIBUTED LOCKS --------------------
+// Doctor busy lock: doctor:{doctorId}:busy -> callId
+const acquireDoctorBusyLock = async (doctorId, callId, ttlSeconds = 300) => {
+  if (!isRedisStateReady()) return false;
+  try {
+    const lockKey = `${REDIS_DOCTOR_BUSY_LOCK_KEY}:${doctorId}:busy`;
+    const result = await coreRedis.set(lockKey, String(callId), "EX", ttlSeconds, "NX");
+    return result === "OK";
+  } catch (error) {
+    console.warn(`[redis:lock] Failed to acquire doctor busy lock for ${doctorId}:`, error?.message || error);
+    return false;
+  }
+};
+
+const releaseDoctorBusyLock = async (doctorId, callId) => {
+  if (!isRedisStateReady()) return false;
+  try {
+    const lockKey = `${REDIS_DOCTOR_BUSY_LOCK_KEY}:${doctorId}:busy`;
+    // Lua script to ensure we only delete if we own the lock
+    const luaScript = `
+      local lockKey = KEYS[1]
+      local expectedCallId = ARGV[1]
+      local currentCallId = redis.call('GET', lockKey)
+      if currentCallId == expectedCallId then
+        return redis.call('DEL', lockKey)
+      end
+      return 0
+    `;
+    const result = await coreRedis.eval(luaScript, 1, lockKey, String(callId));
+    return result === 1;
+  } catch (error) {
+    console.warn(`[redis:lock] Failed to release doctor busy lock for ${doctorId}:`, error?.message || error);
+    return false;
+  }
+};
+
+const isDoctorBusyRedis = async (doctorId) => {
+  if (!isRedisStateReady()) return false;
+  try {
+    const lockKey = `${REDIS_DOCTOR_BUSY_LOCK_KEY}:${doctorId}:busy`;
+    const callId = await coreRedis.get(lockKey);
+    return Boolean(callId);
+  } catch (error) {
+    console.warn(`[redis:lock] Failed to check doctor busy lock for ${doctorId}:`, error?.message || error);
+    return false;
+  }
+};
+
+const getDoctorBusyCallId = async (doctorId) => {
+  if (!isRedisStateReady()) return null;
+  try {
+    const lockKey = `${REDIS_DOCTOR_BUSY_LOCK_KEY}:${doctorId}:busy`;
+    const callId = await coreRedis.get(lockKey);
+    return callId;
+  } catch (error) {
+    console.warn(`[redis:lock] Failed to get doctor busy callId for ${doctorId}:`, error?.message || error);
+    return null;
+  }
+};
+
+// Rejoin lock: rejoin:{callId}:{role} -> timestamp
+const acquireRejoinLock = async (callId, role, ttlSeconds = 30) => {
+  if (!isRedisStateReady()) return false;
+  try {
+    const lockKey = `${REDIS_REJOIN_LOCK_KEY}:${callId}:${role}`;
+    const result = await coreRedis.set(lockKey, String(Date.now()), "EX", ttlSeconds, "NX");
+    return result === "OK";
+  } catch (error) {
+    console.warn(`[redis:lock] Failed to acquire rejoin lock for ${callId}:${role}:`, error?.message || error);
+    return false;
+  }
+};
+
+const releaseRejoinLock = async (callId, role) => {
+  if (!isRedisStateReady()) return;
+  try {
+    const lockKey = `${REDIS_REJOIN_LOCK_KEY}:${callId}:${role}`;
+    await coreRedis.del(lockKey);
+  } catch (error) {
+    console.warn(`[redis:lock] Failed to release rejoin lock for ${callId}:${role}:`, error?.message || error);
+  }
+};
+
 // -------------------- IN-MEMORY STATE --------------------
 // activeDoctors: doctorId -> { socketId, joinedAt, lastSeen, connectionStatus, ... }
 const activeDoctors = new Map();
@@ -260,315 +449,6 @@ let redisPrescriptionUnsub = null;
 
 // simple dedupe set: `${callId}:${doctorId}`
 const sentCallNotifications = new Set();
-
-// -------------------- RATE LIMITING --------------------
-// Rate limiter: patientId -> { timestamps: number[], window: number }
-const callRequestRateLimiter = new Map();
-const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 5; // Max 5 calls per minute per patient
-
-const checkRateLimit = (patientId) => {
-  const now = Date.now();
-  const limiter = callRequestRateLimiter.get(patientId) || { timestamps: [], window: RATE_LIMIT_WINDOW_MS };
-  
-  // Remove timestamps outside the window
-  limiter.timestamps = limiter.timestamps.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
-  
-  if (limiter.timestamps.length >= RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, remaining: 0, resetAt: limiter.timestamps[0] + RATE_LIMIT_WINDOW_MS };
-  }
-  
-  limiter.timestamps.push(now);
-  callRequestRateLimiter.set(patientId, limiter);
-  
-  return { 
-    allowed: true, 
-    remaining: RATE_LIMIT_MAX_REQUESTS - limiter.timestamps.length,
-    resetAt: limiter.timestamps[0] + RATE_LIMIT_WINDOW_MS
-  };
-};
-
-// -------------------- PAYMENT IDEMPOTENCY LOCK --------------------
-const PAYMENT_IDEMPOTENCY_TTL = 3600; // 1 hour (sufficient for payment processing)
-
-// Atomically claim payment processing (prevents duplicate payment processing)
-const claimPaymentProcessing = async (paymentId, callId) => {
-  if (!paymentId || !callId) {
-    console.warn("[payment:idempotency] Missing paymentId or callId");
-    return { claimed: false, reason: "missing_params" };
-  }
-
-  if (!isRedisStateReady()) {
-    console.warn("[payment:idempotency] Redis unavailable, allowing payment (degraded mode)");
-    return { claimed: true, degraded: true };
-  }
-
-  const idempotencyKey = `payment:${callId}:${paymentId}`;
-  try {
-    // SET key value NX EX ttl - only sets if key doesn't exist (atomic operation)
-    const result = await coreRedis.set(
-      idempotencyKey,
-      JSON.stringify({
-        callId,
-        paymentId,
-        claimedAt: new Date().toISOString(),
-      }),
-      'EX',
-      PAYMENT_IDEMPOTENCY_TTL,
-      'NX' // Only set if not exists
-    );
-
-    if (result === 'OK') {
-      // Successfully claimed payment processing
-      console.log(`🔒 [payment:idempotency] Payment ${paymentId} locked for call ${callId}`);
-      return { claimed: true, idempotencyKey };
-    }
-
-    // Payment already being processed or already processed
-    const existingData = await coreRedis.get(idempotencyKey);
-    console.log(`⚠️ [payment:idempotency] Payment ${paymentId} already processed for call ${callId}`);
-    
-    try {
-      const parsed = existingData ? JSON.parse(existingData) : null;
-      return {
-        claimed: false,
-        reason: "duplicate",
-        existingData: parsed,
-        idempotencyKey,
-      };
-    } catch (e) {
-      return { claimed: false, reason: "duplicate", idempotencyKey };
-    }
-  } catch (error) {
-    console.warn(`[payment:idempotency] Failed to claim payment ${paymentId}:`, error?.message || error);
-    // On Redis error, allow payment but log warning (fail-open for availability)
-    return { claimed: true, degraded: true, error: error.message };
-  }
-};
-
-// Check if payment was already processed (without claiming)
-const checkPaymentProcessed = async (paymentId, callId) => {
-  if (!paymentId || !callId || !isRedisStateReady()) {
-    return { processed: false };
-  }
-
-  const idempotencyKey = `payment:${callId}:${paymentId}`;
-  try {
-    const exists = await coreRedis.exists(idempotencyKey);
-    if (exists) {
-      const data = await coreRedis.get(idempotencyKey);
-      return {
-        processed: true,
-        data: data ? JSON.parse(data) : null,
-      };
-    }
-    return { processed: false };
-  } catch (error) {
-    console.warn(`[payment:idempotency] Failed to check payment ${paymentId}:`, error?.message || error);
-    return { processed: false, error: error.message };
-  }
-};
-
-// -------------------- ATOMIC DOCTOR BUSY LOCK --------------------
-const DOCTOR_BUSY_LOCK_TTL = 300; // 5 minutes
-const BUSY_LOCK_WATCHDOG_INTERVAL_MS = 10_000; // 10 seconds (reduced from 60s for faster cleanup)
-
-// Atomically claim doctor for a call (prevents race conditions)
-const claimDoctorForCall = async (doctorId, callId) => {
-  if (!isRedisStateReady()) {
-    // Fallback to in-memory check if Redis unavailable
-    return !isDoctorBusy(doctorId);
-  }
-  
-  const lockKey = `doctor:${doctorId}:busy_lock`;
-  try {
-    // SET key value NX EX ttl - only sets if key doesn't exist (atomic operation)
-    const result = await coreRedis.set(
-      lockKey,
-      callId,
-      "EX",
-      DOCTOR_BUSY_LOCK_TTL,
-      "NX" // Only set if not exists
-    );
-    
-    if (result === "OK") {
-      // Successfully claimed doctor
-      console.log(`🔒 Doctor ${doctorId} locked for call ${callId}`);
-      return true;
-    }
-    
-    // Doctor is already busy (lock exists)
-    const existingCallId = await coreRedis.get(lockKey);
-    console.log(`⚠️ Doctor ${doctorId} is busy (locked by call ${existingCallId})`);
-    return false;
-  } catch (error) {
-    console.warn(
-      `[redis:lock] Failed to claim doctor ${doctorId}:`,
-      error?.message || error,
-    );
-    // Fallback to in-memory check on Redis error
-    return !isDoctorBusy(doctorId);
-  }
-};
-
-// Release doctor lock (called when call ends or is rejected)
-// ✅ FIX: Use Lua script for atomic check-and-delete operation
-const releaseDoctorLock = async (doctorId, callId) => {
-  if (!isRedisStateReady()) {
-    console.log(
-      `🔓 Redis not ready, clearing in-memory busy status for doctor ${doctorId}`,
-    );
-    return;
-  }
-  
-  const lockKey = `doctor:${doctorId}:busy_lock`;
-  
-  try {
-    // ✅ FIX: Use Lua script for atomic check-and-delete
-    // This executes atomically on Redis server, preventing race conditions
-    const luaScript = `
-      if redis.call("GET", KEYS[1]) == ARGV[1] then
-        return redis.call("DEL", KEYS[1])
-      else
-        return 0
-      end
-    `;
-    
-    const result = await coreRedis.eval(
-      luaScript,
-      1,           // number of keys
-      lockKey,     // KEYS[1]
-      callId       // ARGV[1]
-    );
-    
-    if (result === 1) {
-      console.log(`🔓 Doctor ${doctorId} lock released atomically for call ${callId}`);
-      
-      // ✅ Emit availability change event
-      io.emit("doctors-availability-changed", {
-        timestamp: new Date().toISOString(),
-        reason: "lock_released",
-        doctorId: doctorId,
-      });
-    } else {
-      const existingCallId = await coreRedis.get(lockKey);
-      if (existingCallId) {
-        console.log(
-          `⚠️ Lock for doctor ${doctorId} held by different call ${existingCallId}, not releasing`,
-        );
-      } else {
-        console.log(
-          `ℹ️ No lock found for doctor ${doctorId} (already released)`,
-        );
-      }
-    }
-  } catch (error) {
-    console.warn(
-      `[redis:lock] Failed to release doctor ${doctorId} lock:`,
-      error?.message || error,
-    );
-  }
-};
-
-// Periodic safety net: clear orphan busy locks that no longer have an active call session
-// ✅ FIX: Aggressive watchdog with batch processing and immediate startup execution
-const startBusyLockWatchdog = () => {
-  // Guard against environments without Redis / coreRedis
-  if (typeof setInterval !== "function") return;
-
-  const runWatchdog = async () => {
-    try {
-      if (!isRedisStateReady()) return;
-
-      let cursor = "0";
-      do {
-        const [nextCursor, keys] = await coreRedis.scan(
-          cursor,
-          "MATCH",
-          "doctor:*:busy_lock",
-          "COUNT",
-          100,
-        );
-
-        cursor = nextCursor;
-
-        if (Array.isArray(keys) && keys.length) {
-          // ✅ FIX: Use pipeline for batch processing
-          const pipeline = coreRedis.pipeline();
-          
-          for (const lockKey of keys) {
-            // ✅ Get lock value (callId) and check active calls in one go
-            pipeline.get(lockKey);
-          }
-          
-          const results = await pipeline.exec();
-          
-          results.forEach(([err, callId], index) => {
-            if (err || !callId) return;
-            
-            const lockKey = keys[index];
-            const doctorId = lockKey.match(/doctor:(\d+):busy_lock/)?.[1];
-            if (!doctorId) return;
-            
-            const normalizedCallId = normalizeCallId(callId);
-            const callSession = normalizedCallId ? activeCalls.get(normalizedCallId) : null;
-
-            const terminalStatuses = new Set([
-              "ENDED",
-              "MISSED",
-              "REJECTED",
-              "FAILED",
-            ]);
-            
-            const isOrphan =
-              !callSession ||
-              !callSession.status ||
-              terminalStatuses.has(String(callSession.status).toUpperCase());
-
-            if (isOrphan) {
-              // ✅ Force delete orphan lock
-              coreRedis.del(lockKey).then(() => {
-                console.log(
-                  `[busy-lock-watchdog] Cleared orphan lock ${lockKey} (callId=${callId})`,
-                );
-                
-                // ✅ Emit availability changed
-                io.emit("doctors-availability-changed", {
-                  timestamp: new Date().toISOString(),
-                  reason: "watchdog_cleanup",
-                  doctorId: doctorId,
-                });
-              }).catch((delError) => {
-                console.warn(
-                  "[busy-lock-watchdog] Failed to delete orphan lock",
-                  lockKey,
-                  delError?.message || delError,
-                );
-              });
-            }
-          });
-        }
-      } while (cursor !== "0");
-    } catch (error) {
-      console.warn(
-        "[busy-lock-watchdog] Unexpected error",
-        error?.message || error,
-      );
-    }
-  };
-
-  // ✅ Run IMMEDIATELY on startup (clears stale locks from crashes)
-  runWatchdog();
-  
-  // ✅ Run every 10 seconds (not 60!) - fast enough for UX
-  const timer = setInterval(runWatchdog, BUSY_LOCK_WATCHDOG_INTERVAL_MS);
-  if (typeof timer.unref === "function") {
-    timer.unref();
-  }
-};
-
-// Start watchdog as part of server boot – safe no-op if Redis not ready
-startBusyLockWatchdog();
 
 // -------------------- LOGGING / NOTIFICATION HELPERS --------------------
 const logFlow = (stage, payload = {}) => {
@@ -698,19 +578,8 @@ const removeDoctorPresence = async (doctorId) => {
 
 const persistActiveCallState = async (callSession) => {
   if (!callSession?.callId) return;
-  
-  // ✅ FIX: Exclude timer objects and other non-serializable fields to prevent circular structure errors
-  const {
-    timeoutTimerId,        // Timer object - cannot be serialized
-    timeoutExpiresAt,      // May contain timer reference
-    timer,                 // Generic timer reference
-    _idlePrev,             // Timer internal properties
-    _idleNext,             // Timer internal properties
-    ...serializableSession  // Everything else is safe to serialize
-  } = callSession;
-  
   const payload = {
-    ...serializableSession,
+    ...callSession,
     callId: callSession.callId,
     createdAt: callSession.createdAt
       ? new Date(callSession.createdAt).toISOString()
@@ -730,28 +599,14 @@ const persistActiveCallState = async (callSession) => {
     disconnectedAt: callSession.disconnectedAt
       ? new Date(callSession.disconnectedAt).toISOString()
       : undefined,
-    // Store timeout expiration as timestamp string instead of timer object
-    timeoutExpiresAt: callSession.timeoutExpiresAt
-      ? (typeof callSession.timeoutExpiresAt === 'number' 
-          ? callSession.timeoutExpiresAt.toString()
-          : new Date(callSession.timeoutExpiresAt).getTime().toString())
-      : undefined,
   };
 
-  try {
-    await setHashWithTtl(
-      REDIS_ACTIVE_CALLS_KEY,
-      callSession.callId,
-      payload,
-      REDIS_CALL_TTL_SECONDS,
-    );
-  } catch (error) {
-    // Log error but don't throw - Redis persistence is non-critical
-    console.warn(
-      `[redis:state] Failed to persist call state for ${callSession.callId}:`,
-      error?.message || error
-    );
-  }
+  await setHashWithTtl(
+    REDIS_ACTIVE_CALLS_KEY,
+    callSession.callId,
+    payload,
+    REDIS_CALL_TTL_SECONDS,
+  );
 };
 
 const removeActiveCallState = async (callId) => {
@@ -999,187 +854,6 @@ const sendPushNotification = async (doctorId, payload) => {
   }
 };
 
-const getRazorpayAuthHeader = () => {
-  const keyId = process.env.RAZORPAY_KEY_ID || process.env.RZP_KEY_ID;
-  const keySecret =
-    process.env.RAZORPAY_KEY_SECRET || process.env.RZP_KEY_SECRET;
-
-  if (!keyId || !keySecret) {
-    console.warn(
-      "[payment] Razorpay credentials missing - cannot manage Razorpay orders",
-    );
-    return null;
-  }
-
-  const token = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-  return `Basic ${token}`;
-};
-
-const cancelRazorpayOrder = async (orderId) => {
-  if (!orderId) return false;
-  const authHeader = getRazorpayAuthHeader();
-  if (!authHeader) return false;
-
-  try {
-    const orderDetails = await fetch(
-      `https://api.razorpay.com/v1/orders/${orderId}`,
-      {
-        method: "GET",
-        headers: { Authorization: authHeader },
-      },
-    );
-
-    if (!orderDetails.ok) {
-      console.warn(
-        `[payment] Unable to fetch Razorpay order ${orderId} for cancellation`,
-        orderDetails.status,
-      );
-      return false;
-    }
-
-    const order = await orderDetails.json();
-    const status = String(order?.status || "").toLowerCase();
-    if (status === "paid" || status === "captured") {
-      console.log(
-        `[payment] Order ${orderId} already paid/captured, skipping cancellation`,
-      );
-      return false;
-    }
-
-    if (status === "cancelled") {
-      console.log(`[payment] Order ${orderId} already cancelled (idempotent)`);
-      return true;
-    }
-
-    const cancelResponse = await fetch(
-      `https://api.razorpay.com/v1/orders/${orderId}/cancel`,
-      {
-        method: "POST",
-        headers: { Authorization: authHeader },
-      },
-    );
-
-    if (!cancelResponse.ok) {
-      const text = await cancelResponse.text().catch(() => "");
-      console.warn(
-        `[payment] Razorpay order cancel failed for ${orderId}`,
-        cancelResponse.status,
-        text,
-      );
-      return false;
-    }
-
-    console.log(`[payment] Razorpay order ${orderId} cancelled successfully`);
-    return true;
-  } catch (error) {
-    console.warn(
-      `[payment] Failed to cancel Razorpay order ${orderId}`,
-      error?.message || error,
-    );
-    return false;
-  }
-};
-
-const sendMissedCallFCM = async (callSession) => {
-  try {
-    if (!callSession) return;
-    const { callId, doctorId, patientId } = callSession;
-    if (!callId || !doctorId) return;
-
-    // If doctor is connected in foreground, rely on socket events
-    if (callSession.doctorSocketId) {
-      console.log(
-        `[push] Skipping missed_call push for call ${callId} - doctor socket active`,
-      );
-      return;
-    }
-
-    const payload = {
-      type: "missed_call",
-      callId,
-      patientId: patientId ?? "",
-      patientName:
-        callSession.patientName ||
-        callSession.patientFullName ||
-        callSession.patient ||
-        (patientId ? `Patient ${patientId}` : "Patient"),
-      petName:
-        callSession.petName ||
-        callSession.pet_name ||
-        callSession.pet ||
-        callSession.petNameFallback ||
-        "",
-      timestamp: new Date().toISOString(),
-      dataOnly: true,
-      message: "You missed a consultation request.",
-      title: "Missed Consultation",
-      body: "Patient missed consultation request",
-      channel: callSession.channel,
-      agoraToken: callSession.agoraToken || callSession.token || null,
-    };
-
-    await sendPushNotification(doctorId, payload);
-    console.log(`[push] Missed call push sent to doctor for call ${callId}`);
-  } catch (error) {
-    console.warn(
-      "[push] Missed call FCM send failed",
-      error?.message || error,
-    );
-  }
-};
-
-// ✅ Send FCM notification to patient when call is missed
-// Note: This uses sendPushNotification which is designed for doctors
-// Patient token support may need to be added separately
-const sendPatientMissedCallFCM = async (callSession) => {
-  try {
-    if (!callSession) return;
-    const { callId, doctorId, patientId } = callSession;
-    if (!callId || !patientId) return;
-
-    // If patient is connected in foreground, rely on socket events
-    if (callSession.patientSocketId) {
-      console.log(
-        `[push] Skipping missed_call push for call ${callId} - patient socket active`,
-      );
-      return;
-    }
-
-    // Note: sendPushNotification is designed for doctors, but we'll try it
-    // Patient push token support may need to be implemented separately
-    const payload = {
-      type: "missed_call",
-      callId,
-      doctorId: doctorId ?? "",
-      doctorName:
-        callSession.doctorName ||
-        callSession.doctor?.name ||
-        (doctorId ? `Doctor ${doctorId}` : "Doctor"),
-      timestamp: new Date().toISOString(),
-      dataOnly: true,
-      message: "Call was missed. You can rejoin the call.",
-      title: "Call Missed",
-      body: "Doctor didn't respond. Tap to rejoin call.",
-      channel: callSession.channel,
-      agoraToken: callSession.agoraToken || callSession.token || null,
-    };
-
-    // Try to send notification (may fail if patient token system not implemented)
-    try {
-      await sendPushNotification(patientId, payload);
-      console.log(`[push] Missed call push sent to patient for call ${callId}`);
-    } catch (error) {
-      // Patient notification may not work if token system is doctor-only
-      console.log(`[push] Patient notification skipped (may need patient token support): ${error?.message || error}`);
-    }
-  } catch (error) {
-    console.warn(
-      "[push] Patient missed call FCM send failed",
-      error?.message || error,
-    );
-  }
-};
-
 // -------------------- WHATSAPP CONFIGURATION --------------------
 const DOCTOR_ALERT_ENDPOINT =
   process.env.DOCTOR_ALERT_ENDPOINT ||
@@ -1349,11 +1023,11 @@ const DOCTOR_HEARTBEAT_INTERVAL_MS = 15_000;
 const DOCTOR_STALE_TIMEOUT_MS = 70 * 1000;
 
 const PENDING_CALL_TIMEOUT_MS = 45_000;
-const CALL_RINGING_TIMEOUT_MS = 30_000; // 30 seconds timeout for RINGING status
 const ACTIVE_DOCTOR_LOG_INTERVAL_MS = 5_000;
 const ACTIVE_DOCTOR_REQUEST_LOG_INTERVAL_MS = 5_000;
+// Rejoin is available for MAX 1 HOUR after disconnect/end
 const CALL_RESUME_GRACE_MS = Number(
-  process.env.CALL_RESUME_GRACE_MS || 5 * 60 * 1000,
+  process.env.CALL_RESUME_GRACE_MS || 60 * 60 * 1000, // 1 hour default
 );
 const CALL_CLEANUP_GRACE_MS = Math.max(30_000, CALL_RESUME_GRACE_MS + 10_000);
 const RESUMABLE_STATUSES = new Set([
@@ -1375,28 +1049,6 @@ let lastActiveDoctorRequestLog = {
 };
 
 // -------------------- HELPERS --------------------
-// Helper to clear timeout timer from call session
-const clearCallTimeoutTimer = async (callSession, callId = null) => {
-  if (callSession?.timeoutTimerId) {
-    clearTimeout(callSession.timeoutTimerId);
-    callSession.timeoutTimerId = null;
-  }
-  
-  // Clear timer expiration timestamp
-  if (callSession?.timeoutExpiresAt) {
-    callSession.timeoutExpiresAt = null;
-  }
-  
-  // Clear timer from Redis if callId provided
-  if (callId && isRedisStateReady()) {
-    try {
-      await coreRedis.del(`call:${callId}:timer`);
-    } catch (error) {
-      console.warn(`[redis:timer] Failed to clear timer for call ${callId}:`, error?.message || error);
-    }
-  }
-};
-
 const setActiveCallSession = (callId, callSession) => {
   const normalizedCallId = normalizeCallId(callId);
   if (!normalizedCallId || !callSession) return null;
@@ -1434,6 +1086,167 @@ const deleteActiveCallSession = (callId) => {
   return removed;
 };
 
+// -------------------- UNIFIED CALL FINALIZATION --------------------
+// All terminal call paths must go through this function (idempotent)
+const finalizeCall = async (callId, reason, endedBy = null) => {
+  const normalizedCallId = normalizeCallId(callId);
+  if (!normalizedCallId) return false;
+
+  // Idempotency check: if already finalized, skip
+  const session = activeCalls.get(normalizedCallId);
+  if (!session) {
+    // Check Redis to see if already finalized
+    if (isRedisStateReady()) {
+      try {
+        const redisSession = await coreRedis.hget(REDIS_ACTIVE_CALLS_KEY, normalizedCallId);
+        if (redisSession) {
+          const parsed = JSON.parse(redisSession);
+          if (["ended", "rejected", "expired", "payment_cancelled"].includes(parsed.status)) {
+            console.log(`[finalizeCall] Call ${normalizedCallId} already finalized, skipping`);
+            return false;
+          }
+        }
+      } catch (error) {
+        // Continue with finalization
+      }
+    } else {
+      console.log(`[finalizeCall] Call ${normalizedCallId} not found in memory`);
+      return false;
+    }
+  }
+
+  const callSession = session || {};
+  const doctorId = callSession.doctorId;
+  const patientId = callSession.patientId;
+  const channel = callSession.channel;
+
+  // Update status
+  callSession.status = reason;
+  callSession.endedAt = callSession.endedAt || new Date();
+  if (endedBy) callSession.endedBy = endedBy;
+  
+  // Set rejoin expiry to 1 hour from end (for grace period after call ends)
+  const endTime = callSession.endedAt instanceof Date 
+    ? callSession.endedAt.getTime() 
+    : new Date(callSession.endedAt).getTime();
+  callSession.resumableUntil = new Date(endTime + CALL_RESUME_GRACE_MS);
+
+  // Release doctor busy lock
+  if (doctorId) {
+    await releaseDoctorBusyLock(doctorId, normalizedCallId);
+  }
+
+  // Release rejoin locks
+  await releaseRejoinLock(normalizedCallId, "doctor");
+  await releaseRejoinLock(normalizedCallId, "patient");
+
+  // Clear notification sent flag
+  if (doctorId) {
+    clearNotificationSent(normalizedCallId, doctorId);
+  }
+
+  // Remove from pending queue
+  if (doctorId) {
+    removePendingCallEntry(doctorId, normalizedCallId);
+  }
+
+  // Persist to Redis (source of truth)
+  await persistActiveCallState(callSession).catch(() => {});
+  
+  // Update in-memory cache
+  if (session) {
+    activeCalls.set(normalizedCallId, callSession);
+  }
+
+  // Notify both parties
+  const isDoctorEnding = endedBy === "doctor" || (endedBy && String(endedBy) === String(doctorId));
+  const isPatientEnding = endedBy === "patient" || (endedBy && String(endedBy) === String(patientId));
+
+  if (callSession.patientSocketId) {
+    io.to(callSession.patientSocketId).emit("call-ended-by-other", {
+      callId: normalizedCallId,
+      endedBy: isDoctorEnding ? "doctor" : "patient",
+      reason,
+      message: reason === "ended" 
+        ? (isDoctorEnding ? "Doctor has ended the call" : "Patient has ended the call")
+        : `Call ${reason}`,
+      timestamp: new Date().toISOString(),
+    });
+    io.to(callSession.patientSocketId).emit("force-disconnect", {
+      callId: normalizedCallId,
+      reason,
+      endedBy: isDoctorEnding ? "doctor" : "patient",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  if (callSession.doctorSocketId) {
+    io.to(callSession.doctorSocketId).emit("call-ended-by-other", {
+      callId: normalizedCallId,
+      endedBy: isDoctorEnding ? "doctor" : "patient",
+      reason,
+      message: reason === "ended"
+        ? (isDoctorEnding ? "Doctor has ended the call" : "Patient has ended the call")
+        : `Call ${reason}`,
+      timestamp: new Date().toISOString(),
+    });
+    io.to(callSession.doctorSocketId).emit("force-disconnect", {
+      callId: normalizedCallId,
+      reason,
+      endedBy: isDoctorEnding ? "doctor" : "patient",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Room-based notifications (fallback)
+  if (doctorId) {
+    io.to(`doctor-${doctorId}`).emit("call-ended-by-other", {
+      callId: normalizedCallId,
+      endedBy: isDoctorEnding ? "doctor" : "patient",
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  if (patientId) {
+    io.to(`patient-${patientId}`).emit("call-ended-by-other", {
+      callId: normalizedCallId,
+      endedBy: isDoctorEnding ? "doctor" : "patient",
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Broadcast status update
+  io.emit("call-status-update", {
+    callId: normalizedCallId,
+    status: reason,
+    endedBy,
+    timestamp: new Date().toISOString(),
+  });
+
+  // Cleanup after delay (allow time for notifications)
+  setTimeout(async () => {
+    deleteActiveCallSession(normalizedCallId);
+    emitAvailableDoctors();
+    if (doctorId) {
+      deliverNextPendingCall(doctorId);
+    }
+    console.log(`🗑️ [finalizeCall] Cleaned up ${reason} call ${normalizedCallId}`);
+  }, 2000);
+
+  logFlow("call-finalized", {
+    callId: normalizedCallId,
+    doctorId,
+    patientId,
+    channel,
+    reason,
+    endedBy,
+  });
+
+  return true;
+};
+
 // Reconnect grace: mark reconnecting immediately, drop after grace if no return.
 const markDoctorDisconnected = (doctorId, socketId) => {
   const entry = activeDoctors.get(doctorId);
@@ -1445,19 +1258,28 @@ const markDoctorDisconnected = (doctorId, socketId) => {
     return;
   }
 
-  entry.connectionStatus = "reconnecting";
-  entry.disconnectedAt = new Date();
-  entry.socketId = null; // clear active socket but KEEP doctor entry during grace
+  // Only mark as reconnecting if not already connected (avoid overwriting reconnection)
+  if (entry.connectionStatus !== "connected") {
+    entry.connectionStatus = "reconnecting";
+    entry.disconnectedAt = new Date();
+    entry.socketId = null; // clear active socket but KEEP doctor entry during grace
 
-  activeDoctors.set(doctorId, entry);
-  persistDoctorPresence(doctorId).catch(() => {});
-  console.log(`Doctor ${doctorId} marked as reconnecting (grace window)`);
+    activeDoctors.set(doctorId, entry);
+    persistDoctorPresence(doctorId).catch(() => {});
+    console.log(`Doctor ${doctorId} marked as reconnecting (grace window: ${DISCONNECT_GRACE_MS}ms)`);
+  } else {
+    console.log(`Doctor ${doctorId} already connected on new socket, skipping disconnect mark`);
+  }
 };
 
 const scheduleDoctorDisconnect = (doctorId, socketId) => {
   if (!doctorId) return;
   const existingTimer = doctorDisconnectTimers.get(doctorId);
-  if (existingTimer) clearTimeout(existingTimer);
+  if (existingTimer) {
+    // If timer exists, doctor is already in grace period - just update socketId check
+    console.log(`Doctor ${doctorId} already in grace period, extending...`);
+    return;
+  }
 
   // Immediately mark reconnecting and emit
   markDoctorDisconnected(doctorId, socketId);
@@ -1466,12 +1288,21 @@ const scheduleDoctorDisconnect = (doctorId, socketId) => {
   const timer = setTimeout(() => {
     doctorDisconnectTimers.delete(doctorId);
     const current = activeDoctors.get(doctorId);
-    if (current && current.connectionStatus === "reconnecting") {
+    // Only remove if still reconnecting (not reconnected)
+    if (current && current.connectionStatus === "reconnecting" && !current.socketId) {
       activeDoctors.delete(doctorId);
       removeDoctorPresence(doctorId).catch(() => {});
+      // Release any busy locks for this doctor
+      getDoctorBusyCallId(doctorId).then((callId) => {
+        if (callId) {
+          releaseDoctorBusyLock(doctorId, callId).catch(() => {});
+        }
+      });
       console.log(
-        `Removing stale doctor ${doctorId} after reconnect grace elapsed`,
+        `Removing stale doctor ${doctorId} after reconnect grace elapsed (${DISCONNECT_GRACE_MS}ms)`,
       );
+    } else if (current && current.connectionStatus === "connected") {
+      console.log(`Doctor ${doctorId} reconnected during grace period, keeping online`);
     }
     emitAvailableDoctors();
   }, DISCONNECT_GRACE_MS);
@@ -1502,15 +1333,20 @@ const upsertDoctorEntry = (doctorId, fields = {}) => {
   return updated;
 };
 
-// NOTE: doctor "busy" means there's already a call in requested/accepted/payment_completed/active with him.
-const isDoctorBusy = (doctorId) => {
+// NOTE: doctor "busy" means there's a Redis lock for them (source of truth)
+// In-memory check is fallback only
+const isDoctorBusy = async (doctorId) => {
+  // Redis is source of truth
+  if (isRedisStateReady()) {
+    const busy = await isDoctorBusyRedis(doctorId);
+    if (busy) return true;
+  }
+  // Fallback to in-memory check (for backwards compatibility during transition)
   for (const [, call] of activeCalls.entries()) {
     if (
       call.doctorId === doctorId &&
       call.status &&
-      ["requested", "accepted", "payment_completed", "active"].includes(
-        call.status
-      )
+      !["ended", "rejected", "expired", "payment_cancelled"].includes(call.status)
     ) {
       return true;
     }
@@ -1539,16 +1375,17 @@ const removePendingCallEntry = (doctorId, callId) => {
   return true;
 };
 
-const expirePendingCall = (doctorId, callId, reason = "timeout") => {
+const expirePendingCall = async (doctorId, callId, reason = "timeout") => {
   const normalizedCallId = normalizeCallId(callId);
   removePendingCallEntry(doctorId, normalizedCallId);
 
   const session = activeCalls.get(normalizedCallId);
   if (!session) return;
 
-  deleteActiveCallSession(normalizedCallId);
-  clearNotificationSent(normalizedCallId, doctorId);
+  // Use unified finalization
+  await finalizeCall(normalizedCallId, "expired", "system");
 
+  // Send specific failure message to patient
   if (session.patientSocketId) {
     io.to(session.patientSocketId).emit("call-failed", {
       callId: normalizedCallId,
@@ -1559,17 +1396,6 @@ const expirePendingCall = (doctorId, callId, reason = "timeout") => {
       timestamp: new Date().toISOString(),
     });
   }
-
-  io.emit("call-status-update", {
-    callId: normalizedCallId,
-    doctorId,
-    status: "expired",
-    reason,
-    timestamp: new Date().toISOString(),
-  });
-
-  emitAvailableDoctors();
-  deliverNextPendingCall(doctorId);
 };
 
 const sendDoctorPendingCallWebhook = async (callSession) => {
@@ -1813,6 +1639,30 @@ const enqueuePendingCall = (callSession) => {
     `🕒 Queued call ${callSession.callId} for doctor ${doctorId}. Pending count: ${queue.length}`
   );
 
+  // 🔴 P1-2 FIX: Notify all queued patients about their updated position
+  queue.forEach((qEntry, index) => {
+    if (qEntry.patientSocketId) {
+      const position = index + 1;
+      io.to(qEntry.patientSocketId).emit("queue-position-update", {
+        callId: qEntry.callId,
+        doctorId,
+        queuePosition: position,
+        queueLength: queue.length,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // 🔴 P1-2 FIX: Notify doctor about queue count
+  const doctorEntry = activeDoctors.get(doctorId);
+  if (doctorEntry?.socketId) {
+    io.to(doctorEntry.socketId).emit("queue-updated", {
+      doctorId,
+      queueLength: queue.length,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   notifyDoctorPendingCall(callSession).catch((error) => {
     console.warn(
       "⚠️ Failed to send doctor notification",
@@ -1821,7 +1671,7 @@ const enqueuePendingCall = (callSession) => {
   });
 };
 
-const deliverNextPendingCall = async (doctorId) => {
+const deliverNextPendingCall = (doctorId) => {
   const queue = pendingCalls.get(doctorId);
   if (!queue || queue.length === 0) return;
 
@@ -1831,15 +1681,7 @@ const deliverNextPendingCall = async (doctorId) => {
   const status = doctorEntry.connectionStatus || "disconnected";
   if (status !== "connected") return;
 
-  // Check both in-memory busy status and atomic lock
-  const inMemoryBusy = isDoctorBusy(doctorId);
-  const nextCall = queue[0];
-  if (!nextCall) return;
-
-  // Try to claim doctor atomically for the next pending call
-  const claimed = await claimDoctorForCall(doctorId, nextCall.callId);
-  
-  if (!claimed || inMemoryBusy) {
+  if (isDoctorBusy(doctorId)) {
     console.log(
       `⛔ Doctor ${doctorId} still busy. Pending calls remain queued.`
     );
@@ -1867,114 +1709,9 @@ const deliverNextPendingCall = async (doctorId) => {
     return;
   }
 
-  // Initialize timeout timer if not exists
-  if (!session.timeoutTimerId) {
-    session.timeoutTimerId = null;
-  }
-  if (!session.ringingStartedAt) {
-    session.ringingStartedAt = null;
-  }
-
-  // Update status to RINGING when delivered to doctor
-  session.status = "RINGING";
-  session.ringingStartedAt = new Date();
+  session.status = "requested";
   session.requestedAt = new Date();
   session.doctorSocketId = doctorEntry.socketId;
-  session.timeoutExpiresAt = new Date(Date.now() + CALL_RINGING_TIMEOUT_MS);
-  setActiveCallSession(session.callId, session);
-
-  // Persist timeout expiration timestamp
-  if (isRedisStateReady()) {
-    try {
-      await coreRedis.hset(
-        `call:${entry.callId}:timer`,
-        'expiresAt',
-        session.timeoutExpiresAt.getTime().toString(),
-        'callId',
-        entry.callId,
-        'doctorId',
-        String(doctorId)
-      );
-      await coreRedis.expire(`call:${entry.callId}:timer`, Math.ceil(CALL_RINGING_TIMEOUT_MS / 1000) + 60);
-    } catch (error) {
-      console.warn(`[redis:timer] Failed to persist timer for call ${entry.callId}:`, error?.message || error);
-    }
-  }
-
-  // Start 30-second timeout timer
-  session.timeoutTimerId = setTimeout(async () => {
-    const currentSession = activeCalls.get(entry.callId);
-    if (!currentSession || currentSession.status !== "RINGING") {
-      return; // Status changed, timer already cleared
-    }
-
-    console.log(`⏰ Call ${entry.callId} timed out after 30 seconds`);
-    
-    // Update status to MISSED
-    currentSession.status = "MISSED";
-    currentSession.missedAt = new Date();
-    currentSession.timeoutTimerId = null;
-    currentSession.timeoutExpiresAt = null;
-    setActiveCallSession(entry.callId, currentSession);
-
-    // Release doctor lock
-    releaseDoctorLock(doctorId, entry.callId).catch(() => {});
-
-    // Clear timer from Redis
-    if (isRedisStateReady()) {
-      try {
-        await coreRedis.del(`call:${entry.callId}:timer`);
-      } catch (error) {
-        console.warn(`[redis:timer] Failed to clear timer for call ${entry.callId}:`, error?.message || error);
-      }
-    }
-
-    const orderIdToCancel =
-      currentSession.razorpayOrderId ||
-      currentSession.orderId ||
-      currentSession.order_id;
-    if (orderIdToCancel) {
-      cancelRazorpayOrder(orderIdToCancel).catch(() => {});
-    }
-    sendMissedCallFCM(currentSession).catch(() => {});
-
-    // Emit call-missed event to both patient and doctor
-    const missedPayload = {
-      callId: entry.callId,
-      doctorId,
-      patientId: currentSession.patientId,
-      status: "MISSED",
-      previousStatus: "RINGING",
-      reason: "timeout",
-      message: "Doctor didn't respond in time",
-      timestamp: new Date().toISOString(),
-      channel: currentSession.channel,
-      agoraToken: currentSession.agoraToken || currentSession.token || null,
-      doctorName: currentSession.doctorName || currentSession.doctor?.name || null,
-      patientName: currentSession.patientName || currentSession.patientFullName || null,
-      petName: currentSession.petName || currentSession.pet_name || null,
-    };
-
-    if (currentSession.patientSocketId) {
-      io.to(currentSession.patientSocketId).emit("call-missed", missedPayload);
-    }
-    io.to(`doctor-${doctorId}`).emit("call-missed", missedPayload);
-    
-    // ✅ Send FCM notification to patient if app is in background/killed
-    if (currentSession.patientId) {
-      sendPatientMissedCallFCM(currentSession).catch(() => {});
-    }
-
-    // Emit call-status-update
-    io.emit("call-status-update", {
-      callId: entry.callId,
-      status: "MISSED",
-      previousStatus: "RINGING",
-      reason: "timeout",
-      timestamp: new Date().toISOString(),
-    });
-  }, CALL_RINGING_TIMEOUT_MS);
-
   setActiveCallSession(session.callId, session);
 
   io.to(`doctor-${doctorId}`).emit("call-requested", {
@@ -1982,25 +1719,20 @@ const deliverNextPendingCall = async (doctorId) => {
     doctorId: session.doctorId,
     patientId: session.patientId,
     channel: session.channel,
-    status: "RINGING",
     queued: true,
     timestamp: new Date().toISOString(),
   });
 
   if (session.patientSocketId) {
+    // 🔴 P1-2 FIX: Include queue position when call is delivered
+    const remainingQueue = pendingCalls.get(doctorId) || [];
     io.to(session.patientSocketId).emit("call-queued", {
       callId: session.callId,
       doctorId: session.doctorId,
-      status: "RINGING",
+      status: "delivered",
+      queuePosition: 1, // This call is being delivered, so position is 1
+      queueLength: remainingQueue.length + 1, // +1 for this call being delivered
       message: "Doctor is now online. Alerting them to join your call.",
-      timestamp: new Date().toISOString(),
-    });
-
-    // Emit status update to patient
-    io.to(session.patientSocketId).emit("call-status-update", {
-      callId: session.callId,
-      status: "RINGING",
-      previousStatus: session.status === "queued" ? "queued" : "INITIATED",
       timestamp: new Date().toISOString(),
     });
   }
@@ -2010,7 +1742,7 @@ const deliverNextPendingCall = async (doctorId) => {
   );
 };
 
-const buildActiveDoctorSnapshot = () => {
+const buildActiveDoctorSnapshot = async () => {
   const available = [];
   const allOnline = [];
 
@@ -2021,7 +1753,7 @@ const buildActiveDoctorSnapshot = () => {
 
     if (isConnected || isReconnecting) {
       allOnline.push(doctorId);
-      if (!isDoctorBusy(doctorId)) {
+      if (!(await isDoctorBusy(doctorId))) {
         available.push(doctorId);
       }
     }
@@ -2036,7 +1768,10 @@ const buildActiveDoctorSnapshot = () => {
 };
 
 // Broadcast list of available doctors (not busy) + "live" doctors (connected/reconnecting)
-const emitAvailableDoctorsInternal = (snapshot = buildActiveDoctorSnapshot()) => {
+const emitAvailableDoctorsInternal = async (snapshot = null) => {
+  if (!snapshot) {
+    snapshot = await buildActiveDoctorSnapshot();
+  }
   const { available, allOnline, availableKey, onlineKey } = snapshot;
   const hasChanged =
     availableKey !== lastActiveDoctorSignature.available ||
@@ -2068,8 +1803,8 @@ const emitAvailableDoctorsInternal = (snapshot = buildActiveDoctorSnapshot()) =>
   io.emit("live-doctors", allOnline);
 };
 
-const emitAvailableDoctors = () => {
-  const snapshot = buildActiveDoctorSnapshot();
+const emitAvailableDoctors = async () => {
+  const snapshot = await buildActiveDoctorSnapshot();
   const hasChanged =
     snapshot.availableKey !== lastActiveDoctorSignature.available ||
     snapshot.onlineKey !== lastActiveDoctorSignature.all;
@@ -2080,14 +1815,14 @@ const emitAvailableDoctors = () => {
     return;
   }
 
-  const triggerEmit = () => {
+  const triggerEmit = async () => {
     pendingActiveDoctorsEmit = false;
     lastActiveDoctorsEmit = Date.now();
-    emitAvailableDoctorsInternal();
+    await emitAvailableDoctorsInternal();
   };
 
   if (elapsed >= ACTIVE_DOCTOR_DEBOUNCE_MS && !pendingActiveDoctorsEmit) {
-    triggerEmit();
+    await triggerEmit();
     return;
   }
 
@@ -2186,103 +1921,6 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
   }
 
   deliverNextPendingCall(doctorId);
-};
-
-const recoverCallTimers = async () => {
-  if (!isRedisStateReady()) return;
-  try {
-    // Scan for all timer keys
-    const timerKeys = [];
-    let cursor = 0;
-    do {
-      const result = await coreRedis.scan(
-        cursor,
-        'MATCH',
-        'call:*:timer',
-        'COUNT',
-        100
-      );
-      cursor = Number(result[0]);
-      timerKeys.push(...result[1]);
-    } while (cursor !== 0);
-
-    for (const timerKey of timerKeys) {
-      try {
-        const timerData = await coreRedis.hgetall(timerKey);
-        const callId = timerData.callId;
-        const expiresAtStr = timerData.expiresAt;
-        const doctorId = timerData.doctorId;
-
-        if (!callId || !expiresAtStr) continue;
-
-        const expiresAt = Number(expiresAtStr);
-        const now = Date.now();
-        const remaining = expiresAt - now;
-
-        if (remaining <= 0) {
-          // Timer already expired, handle timeout
-          const callSession = activeCalls.get(callId);
-          if (callSession && callSession.status === "RINGING") {
-            console.log(`⏰ Recovered expired timer for call ${callId}, handling timeout`);
-            // Trigger timeout handler (simplified - just update status)
-            callSession.status = "MISSED";
-            callSession.missedAt = new Date();
-            setActiveCallSession(callId, callSession);
-            releaseDoctorLock(Number(doctorId), callId).catch(() => {});
-            await coreRedis.del(timerKey);
-          }
-        } else {
-          // Restart timer
-          const callSession = activeCalls.get(callId);
-          if (callSession && callSession.status === "RINGING") {
-            console.log(`⏰ Recovering timer for call ${callId}, ${Math.ceil(remaining / 1000)}s remaining`);
-            callSession.timeoutExpiresAt = new Date(expiresAt);
-            callSession.timeoutTimerId = setTimeout(async () => {
-              const currentSession = activeCalls.get(callId);
-              if (!currentSession || currentSession.status !== "RINGING") {
-                return;
-              }
-              console.log(`⏰ Recovered timer expired for call ${callId}`);
-              currentSession.status = "MISSED";
-              currentSession.missedAt = new Date();
-              currentSession.timeoutTimerId = null;
-              currentSession.timeoutExpiresAt = null;
-              setActiveCallSession(callId, currentSession);
-              await releaseDoctorLock(Number(doctorId), callId);
-              await coreRedis.del(timerKey);
-              // Emit missed call events (same as normal timeout)
-              const missedPayload = {
-                callId,
-                doctorId: Number(doctorId),
-                patientId: currentSession.patientId,
-                status: "MISSED",
-                previousStatus: "RINGING",
-                reason: "timeout",
-                message: "Doctor didn't respond in time",
-                timestamp: new Date().toISOString(),
-              };
-              if (currentSession.patientSocketId) {
-                io.to(currentSession.patientSocketId).emit("call-missed", missedPayload);
-              }
-              io.to(`doctor-${doctorId}`).emit("call-missed", missedPayload);
-              io.emit("call-status-update", {
-                callId,
-                status: "MISSED",
-                previousStatus: "RINGING",
-                reason: "timeout",
-                timestamp: new Date().toISOString(),
-              });
-            }, remaining);
-            setActiveCallSession(callId, callSession);
-          }
-        }
-      } catch (error) {
-        console.warn(`[redis:timer] Failed to recover timer ${timerKey}:`, error?.message || error);
-      }
-    }
-  } catch (error) {
-    console.warn(`[redis:timer] Timer recovery failed:`, error?.message || error);
-  }
 };
 
 const rehydrateStateFromRedis = async () => {
@@ -2403,354 +2041,24 @@ const rehydrateStateFromRedis = async () => {
   }
 };
 
-const sendJson = (res, status, payload) => {
-  res.writeHead(status, {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-  });
-  res.end(JSON.stringify(payload));
-};
-
-const parseJsonBody = async (req) => {
-  try {
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    const raw = Buffer.concat(chunks).toString("utf8");
-    if (!raw) return {};
-    return JSON.parse(raw);
-  } catch (error) {
-    console.warn("[http] Failed to parse JSON body", error?.message || error);
-    return {};
-  }
-};
-
 // -------------------- HTTP SERVER (health + debug APIs) --------------------
 const httpServer = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const pathname = (url.pathname || "/").replace(/\/+$/, "") || "/";
 
     // CORS preflight
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
       });
       res.end();
       return;
     }
 
-    const isCreateOrderPath =
-      pathname === "/create-order" || pathname === "/backend/api/create-order";
-    const isVerifyPaymentPath =
-      pathname === "/rzp/verify" || pathname === "/backend/api/rzp/verify";
-
-    if (req.method === "POST" && isCreateOrderPath) {
-      const body = await parseJsonBody(req);
-      const normalizedCallId = normalizeCallId(body?.callId);
-      const callSession = normalizedCallId
-        ? activeCalls.get(normalizedCallId)
-        : null;
-
-      if (!normalizedCallId || !callSession) {
-        console.warn(
-          `[payment] Rejecting create-order: call not found (${body?.callId})`,
-        );
-        sendJson(res, 400, {
-          success: false,
-          message: "Invalid or unknown callId",
-        });
-        return;
-      }
-
-      if (callSession.status !== "ACCEPTED") {
-        console.warn(
-          `[payment] Rejecting create-order for call ${normalizedCallId} - status=${callSession.status}`,
-        );
-        sendJson(res, 409, {
-          success: false,
-          message: "Call is not in ACCEPTED state",
-        });
-        return;
-      }
-
-      const amountNumber = Number(body?.amount);
-      const amountPaise = Math.round(amountNumber * 100);
-      if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
-        sendJson(res, 400, {
-          success: false,
-          message: "Invalid amount",
-        });
-        return;
-      }
-
-      const authHeader = getRazorpayAuthHeader();
-      if (!authHeader) {
-        sendJson(res, 500, {
-          success: false,
-          message: "Payment gateway not configured",
-        });
-        return;
-      }
-
-      try {
-        const orderResponse = await fetch(
-          "https://api.razorpay.com/v1/orders",
-          {
-            method: "POST",
-            headers: {
-              Authorization: authHeader,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              amount: amountPaise,
-              currency: "INR",
-              receipt: normalizedCallId,
-              notes: {
-                callId: normalizedCallId,
-                doctorId:
-                  body?.doctorId ??
-                  body?.doctor_id ??
-                  callSession.doctorId ??
-                  "",
-                patientId:
-                  body?.patientId ??
-                  body?.patient_id ??
-                  callSession.patientId ??
-                  "",
-                channel: body?.channel ?? callSession.channel ?? "",
-              },
-            }),
-          },
-        );
-
-        if (!orderResponse.ok) {
-          const text = await orderResponse.text().catch(() => "");
-          console.warn(
-            `[payment] Razorpay create-order failed for call ${normalizedCallId}`,
-            orderResponse.status,
-            text,
-          );
-          sendJson(res, 502, {
-            success: false,
-            message: "Failed to create order",
-          });
-          return;
-        }
-
-        const order = await orderResponse.json();
-        callSession.razorpayOrderId = order?.id || order?.order_id;
-        setActiveCallSession(normalizedCallId, callSession);
-
-        sendJson(res, 200, {
-          success: true,
-          order_id: order?.id || order?.order_id,
-          id: order?.id || order?.order_id,
-          key: process.env.RAZORPAY_KEY_ID || process.env.RZP_KEY_ID || null,
-          amount: order?.amount,
-          currency: order?.currency || "INR",
-        });
-      } catch (error) {
-        console.warn(
-          `[payment] create-order exception for call ${normalizedCallId}`,
-          error?.message || error,
-        );
-        sendJson(res, 500, {
-          success: false,
-          message: "Order creation failed",
-        });
-      }
-      return;
-    }
-
-    if (req.method === "POST" && isVerifyPaymentPath) {
-      const body = await parseJsonBody(req);
-      const normalizedCallId = normalizeCallId(body?.callId);
-      const callSession = normalizedCallId
-        ? activeCalls.get(normalizedCallId)
-        : null;
-
-      if (!normalizedCallId || !callSession) {
-        console.warn(
-          `[payment] Rejecting verification: call not found (${body?.callId})`,
-        );
-        sendJson(res, 400, {
-          success: false,
-          message: "Invalid or unknown callId",
-        });
-        return;
-      }
-
-      // Check if call was missed/rejected/ended - reject payment
-      if (["MISSED", "REJECTED", "ENDED"].includes(callSession.status)) {
-        console.warn(
-          `[payment] Rejecting verification for call ${normalizedCallId} - status=${callSession.status}`,
-        );
-        sendJson(res, 409, {
-          success: false,
-          message: `Call was ${callSession.status.toLowerCase()}. Payment cannot be processed.`,
-          callStatus: callSession.status,
-        });
-        return;
-      }
-
-      if (callSession.status !== "ACCEPTED") {
-        console.warn(
-          `[payment] Rejecting verification for call ${normalizedCallId} - status=${callSession.status}`,
-        );
-        sendJson(res, 409, {
-          success: false,
-          message: "Call is not in ACCEPTED state",
-          callStatus: callSession.status,
-        });
-        return;
-      }
-
-      const orderId =
-        body?.razorpay_order_id || body?.orderId || callSession.razorpayOrderId;
-      const paymentId = body?.razorpay_payment_id || body?.paymentId;
-      const signature = body?.razorpay_signature || body?.signature;
-
-      // ========== PAYMENT IDEMPOTENCY CHECK ==========
-      if (paymentId) {
-        const idempotencyCheck = await claimPaymentProcessing(paymentId, normalizedCallId);
-        
-        if (!idempotencyCheck.claimed && idempotencyCheck.reason === "duplicate") {
-          console.log(
-            `[payment] Payment ${paymentId} already processed for call ${normalizedCallId}. Returning success (idempotent).`
-          );
-          
-          // If payment was already processed, return success (idempotent behavior)
-          // Check if call status is already payment_completed or active
-          if (["payment_completed", "active"].includes(callSession.status)) {
-            sendJson(res, 200, {
-              success: true,
-              status: "already_processed",
-              message: "Payment already processed",
-              callId: normalizedCallId,
-              paymentId,
-              callStatus: callSession.status,
-            });
-            return;
-          }
-          
-          // Payment was processed but call status not updated (edge case)
-          // Still return success to avoid double charging
-          sendJson(res, 200, {
-            success: true,
-            status: "duplicate_ignored",
-            message: "Payment already processed",
-            callId: normalizedCallId,
-            paymentId,
-          });
-          return;
-        }
-        
-        if (idempotencyCheck.degraded) {
-          console.warn(
-            `[payment] Payment idempotency check degraded (Redis unavailable). Processing payment anyway.`
-          );
-        }
-      }
-
-      const keySecret =
-        process.env.RAZORPAY_KEY_SECRET || process.env.RZP_KEY_SECRET;
-      if (!keySecret) {
-        sendJson(res, 500, {
-          success: false,
-          message: "Payment gateway not configured",
-        });
-        return;
-      }
-
-      if (!orderId || !paymentId || !signature) {
-        sendJson(res, 400, {
-          success: false,
-          message: "Missing payment parameters",
-        });
-        return;
-      }
-
-      const expectedSignature = crypto
-        .createHmac("sha256", keySecret)
-        .update(`${orderId}|${paymentId}`)
-        .digest("hex");
-
-      if (expectedSignature !== signature) {
-        console.warn(
-          `[payment] Invalid Razorpay signature for call ${normalizedCallId}`,
-        );
-        
-        // Release idempotency lock on signature failure
-        if (paymentId) {
-          const idempotencyKey = `payment:${normalizedCallId}:${paymentId}`;
-          await coreRedis.del(idempotencyKey).catch(() => {});
-        }
-        
-        sendJson(res, 400, {
-          success: false,
-          message: "Invalid signature",
-        });
-        return;
-      }
-
-      // Re-check call status after signature verification (race condition protection)
-      const currentCallSession = activeCalls.get(normalizedCallId);
-      if (!currentCallSession) {
-        console.warn(
-          `[payment] Call session ${normalizedCallId} disappeared during payment verification`
-        );
-        sendJson(res, 404, {
-          success: false,
-          message: "Call session not found",
-        });
-        return;
-      }
-
-      if (["MISSED", "REJECTED", "ENDED"].includes(currentCallSession.status)) {
-        console.warn(
-          `[payment] Call ${normalizedCallId} status changed to ${currentCallSession.status} during payment verification`
-        );
-        
-        // Release idempotency lock
-        if (paymentId) {
-          const idempotencyKey = `payment:${normalizedCallId}:${paymentId}`;
-          await coreRedis.del(idempotencyKey).catch(() => {});
-        }
-        
-        sendJson(res, 409, {
-          success: false,
-          message: `Call was ${currentCallSession.status.toLowerCase()}. Payment cannot be processed.`,
-          callStatus: currentCallSession.status,
-        });
-        return;
-      }
-
-      // Update call session with payment info
-      callSession.razorpayOrderId = orderId;
-      callSession.paymentId = paymentId;
-      callSession.paymentVerifiedAt = new Date();
-      setActiveCallSession(normalizedCallId, callSession);
-
-      // Idempotency key already set above, no need to set again
-      console.log(
-        `✅ [payment] Payment ${paymentId} verified successfully for call ${normalizedCallId}`
-      );
-
-      sendJson(res, 200, {
-        success: true,
-        status: "verified",
-        callId: normalizedCallId,
-        paymentId,
-      });
-      return;
-    }
-
     // health check
-    if (req.method === "GET" && pathname === "/health") {
+    if (req.method === "GET" && url.pathname === "/health") {
       res.writeHead(200, {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
@@ -2766,34 +2074,233 @@ const httpServer = createServer(async (req, res) => {
     }
 
     // list active doctors (not busy) – counts both connected + disconnected (always-online mode)
-    if (req.method === "GET" && pathname === "/active-doctors") {
-      const available = [];
-      for (const [doctorId, info] of activeDoctors.entries()) {
-        const status = info.connectionStatus || "disconnected";
-        if (
-          ["connected", "disconnected"].includes(status) &&
-          !isDoctorBusy(doctorId)
-        ) {
-          available.push({
-            doctorId,
-            status,
-            lastSeen: info.lastSeen,
-            socketId: info.socketId || null,
-          });
+    if (req.method === "GET" && url.pathname === "/active-doctors") {
+      // Make handler async
+      (async () => {
+        const available = [];
+        for (const [doctorId, info] of activeDoctors.entries()) {
+          const status = info.connectionStatus || "disconnected";
+          if (["connected", "disconnected"].includes(status)) {
+            const busy = await isDoctorBusy(doctorId);
+            if (!busy) {
+              available.push({
+                doctorId,
+                status,
+                lastSeen: info.lastSeen,
+                socketId: info.socketId || null,
+              });
+            }
+          }
         }
-      }
 
-      res.writeHead(200, {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(
+          JSON.stringify({
+            activeDoctors: available,
+            count: available.length,
+            updatedAt: new Date().toISOString(),
+          })
+        );
+      })().catch((error) => {
+        console.error("Error in /active-doctors:", error);
+        res.writeHead(500, {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(JSON.stringify({ error: "Server error" }));
       });
-      res.end(
-        JSON.stringify({
-          activeDoctors: available,
-          count: available.length,
-          updatedAt: new Date().toISOString(),
-        })
-      );
+      return;
+    }
+
+    // POST /api/call-sessions - Create or update call session
+    if (req.method === "POST" && url.pathname === "/api/call-sessions") {
+      (async () => {
+        let body = "";
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+
+        try {
+          const data = JSON.parse(body);
+          const { doctor_id, patient_id, call_session: callId } = data;
+
+          if (!callId) {
+            res.writeHead(400, {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*",
+            });
+            res.end(JSON.stringify({ error: "call_session (callId) is required" }));
+            return;
+          }
+
+          const normalizedCallId = normalizeCallId(callId);
+          const session = activeCalls.get(normalizedCallId) || {};
+
+          // Update session with provided data
+          const updatedSession = {
+            ...session,
+            callId: normalizedCallId,
+            doctorId: doctor_id || session.doctorId,
+            patientId: patient_id || session.patientId,
+            createdAt: session.createdAt || new Date(),
+          };
+
+          // Store in Redis (source of truth)
+          await persistActiveCallState(updatedSession);
+          activeCalls.set(normalizedCallId, updatedSession);
+
+          res.writeHead(200, {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end(JSON.stringify({
+            success: true,
+            callId: normalizedCallId,
+            message: "Call session updated",
+          }));
+        } catch (error) {
+          console.error("Error in POST /api/call-sessions:", error);
+          res.writeHead(500, {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end(JSON.stringify({ error: "Server error" }));
+        }
+      })();
+      return;
+    }
+
+    // GET /api/call-sessions - Get active call session for rejoin
+    if (req.method === "GET" && url.pathname === "/api/call-sessions") {
+      (async () => {
+        try {
+          const doctorId = url.searchParams.get("doctor_id");
+          const patientId = url.searchParams.get("patient_id");
+
+          if (!doctorId && !patientId) {
+            res.writeHead(400, {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*",
+            });
+            res.end(JSON.stringify({ error: "doctor_id or patient_id is required" }));
+            return;
+          }
+
+          // Search in Redis (source of truth) and memory
+          let foundSession = null;
+          const now = Date.now();
+
+          // Check Redis first
+          if (isRedisStateReady()) {
+            try {
+              const allCalls = await coreRedis.hgetall(REDIS_ACTIVE_CALLS_KEY);
+              for (const [callIdKey, raw] of Object.entries(allCalls)) {
+                try {
+                  const parsed = JSON.parse(raw || "{}");
+                  const matchesDoctor = doctorId && Number(parsed.doctorId) === Number(doctorId);
+                  const matchesPatient = patientId && Number(parsed.patientId) === Number(patientId);
+                  
+                  if ((matchesDoctor || matchesPatient) && parsed.status) {
+                    const resumableUntil = parsed.resumableUntil 
+                      ? new Date(parsed.resumableUntil).getTime() 
+                      : 0;
+                    const isResumable = ["active", "disconnected", "awaiting_resume", "payment_completed"].includes(parsed.status) &&
+                      (!resumableUntil || now <= resumableUntil);
+                    
+                    if (isResumable) {
+                      // Calculate rejoinAllowed and rejoinExpiresAt for UI
+                      const rejoinExpiresAt = parsed.resumableUntil 
+                        ? new Date(parsed.resumableUntil).toISOString()
+                        : null;
+                      const rejoinAllowed = rejoinExpiresAt && now <= new Date(rejoinExpiresAt).getTime();
+                      
+                      foundSession = {
+                        callId: parsed.callId || callIdKey,
+                        doctorId: Number(parsed.doctorId),
+                        patientId: Number(parsed.patientId),
+                        channel: parsed.channel,
+                        status: parsed.status,
+                        paidAt: parsed.paidAt,
+                        resumableUntil: rejoinExpiresAt,
+                        rejoinExpiresAt: rejoinExpiresAt, // Explicit field for UI
+                        rejoinAllowed: rejoinAllowed, // Boolean for easy UI check
+                        agoraToken: parsed.agoraToken,
+                        tokenExpiresAt: parsed.tokenExpiresAt,
+                        disconnectedAt: parsed.disconnectedAt,
+                        endedAt: parsed.endedAt,
+                      };
+                      break;
+                    }
+                  }
+                } catch (parseError) {
+                  // Skip invalid entries
+                }
+              }
+            } catch (error) {
+              console.warn("Error reading from Redis:", error?.message || error);
+            }
+          }
+
+          // Fallback to memory
+          if (!foundSession) {
+            for (const [callId, session] of activeCalls.entries()) {
+              const matchesDoctor = doctorId && Number(session.doctorId) === Number(doctorId);
+              const matchesPatient = patientId && Number(session.patientId) === Number(patientId);
+              
+              if ((matchesDoctor || matchesPatient) && session.status) {
+                const resumableUntil = session.resumableUntil instanceof Date
+                  ? session.resumableUntil.getTime()
+                  : Number(session.resumableUntil) || 0;
+                const isResumable = ["active", "disconnected", "awaiting_resume", "payment_completed"].includes(session.status) &&
+                  (!resumableUntil || now <= resumableUntil);
+                
+                if (isResumable) {
+                  // Calculate rejoinAllowed and rejoinExpiresAt for UI
+                  const rejoinExpiresAt = session.resumableUntil instanceof Date
+                    ? session.resumableUntil.toISOString()
+                    : session.resumableUntil 
+                      ? new Date(session.resumableUntil).toISOString()
+                      : null;
+                  const rejoinAllowed = rejoinExpiresAt && now <= new Date(rejoinExpiresAt).getTime();
+                  
+                  foundSession = {
+                    callId: session.callId,
+                    doctorId: Number(session.doctorId),
+                    patientId: Number(session.patientId),
+                    channel: session.channel,
+                    status: session.status,
+                    paidAt: session.paidAt ? session.paidAt.toISOString() : undefined,
+                    resumableUntil: rejoinExpiresAt,
+                    rejoinExpiresAt: rejoinExpiresAt, // Explicit field for UI
+                    rejoinAllowed: rejoinAllowed, // Boolean for easy UI check
+                    agoraToken: session.agoraToken,
+                    tokenExpiresAt: session.tokenExpiresAt,
+                    disconnectedAt: session.disconnectedAt ? (session.disconnectedAt instanceof Date ? session.disconnectedAt.toISOString() : session.disconnectedAt) : undefined,
+                    endedAt: session.endedAt ? (session.endedAt instanceof Date ? session.endedAt.toISOString() : session.endedAt) : undefined,
+                  };
+                  break;
+                }
+              }
+            }
+          }
+
+          res.writeHead(200, {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end(JSON.stringify(foundSession || null));
+        } catch (error) {
+          console.error("Error in GET /api/call-sessions:", error);
+          res.writeHead(500, {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end(JSON.stringify({ error: "Server error" }));
+        }
+      })();
       return;
     }
 
@@ -2820,12 +2327,11 @@ const io = new Server(httpServer, {
     credentials: false,
   },
   path: "/socket.io/",
-  pingTimeout: 25000,
-  pingInterval: 10000,
+  pingTimeout: 60000, // Increased to 60s to reduce false disconnects
+  pingInterval: 25000, // Increased to 25s to reduce ping frequency
 });
 
 await rehydrateStateFromRedis();
-await recoverCallTimers(); // Recover any pending timeout timers
 emitAvailableDoctors();
 
 if (isRedisEnabled() && isRedisStateReady()) {
@@ -2897,17 +2403,22 @@ io.on("connection", (socket) => {
     cancelDoctorDisconnect(doctorId);
     if (existing && existing.socketId && existing.socketId !== socket.id) {
       console.log(
-        `⚠️ Doctor ${doctorId} reconnecting (old socket: ${existing.socketId})`
+        `⚠️ Doctor ${doctorId} reconnecting (old socket: ${existing.socketId} → new socket: ${socket.id})`
       );
     }
 
+    // Update entry - mark as connected and clear any reconnecting state
     const updated = upsertDoctorEntry(doctorId, {
       socketId: socket.id,
-      joinedAt: new Date(),
+      joinedAt: existing?.joinedAt || new Date(),
       lastSeen: new Date(),
       connectionStatus: "connected",
+      disconnectedAt: null, // Clear disconnect timestamp
     });
     await setDoctorOnline(doctorId, socket.id, { mode: "always_online" });
+    
+    console.log(`✅ Doctor ${doctorId} connection restored (socket: ${socket.id})`);
+
 
     console.log(
       `✅ Doctor ${doctorId} joined (Total active: ${activeDoctors.size})`
@@ -2921,31 +2432,7 @@ io.on("connection", (socket) => {
       });
     }
 
-    // ✅ NEW: Check and clear any stale locks for this doctor
-    if (isRedisStateReady()) {
-      try {
-        const lockKey = `doctor:${doctorId}:busy_lock`;
-        const existingLock = await coreRedis.get(lockKey);
-        if (existingLock) {
-          // Check if the locked call still exists
-          const callExists = activeCalls.has(existingLock);
-          if (!callExists) {
-            // Stale lock - clear it
-            await coreRedis.del(lockKey);
-            console.log(`🧹 Cleared stale lock for doctor ${doctorId} on rejoin`);
-          }
-        }
-      } catch (error) {
-        console.warn(`Failed to check stale lock for doctor ${doctorId}:`, error?.message || error);
-      }
-    }
-
-    // ✅ CRITICAL: Emit available doctors IMMEDIATELY after doctor joins
     emitAvailableDoctors();
-    
-    // ✅ NEW: Emit multiple times to ensure clients receive update
-    setTimeout(() => emitAvailableDoctors(), 500);
-    setTimeout(() => emitAvailableDoctors(), 1500);
 
     // If there were queued / in-progress calls for this doctor, replay them
     deliverPendingSessionsToDoctor(doctorId, socket);
@@ -3073,12 +2560,12 @@ io.on("connection", (socket) => {
   });
 
   // ========== PATIENT ASKS: WHO'S ACTIVE? ==========
-  socket.on("get-active-doctors", () => {
+  socket.on("get-active-doctors", async () => {
     const available = [];
     const busy = [];
 
     for (const [doctorId] of activeDoctors.entries()) {
-      if (isDoctorBusy(doctorId)) busy.push(doctorId);
+      if (await isDoctorBusy(doctorId)) busy.push(doctorId);
       else available.push(doctorId);
     }
 
@@ -3101,20 +2588,10 @@ io.on("connection", (socket) => {
     }
 
     const availableKey = available.slice().sort((a, b) => a - b).join(",");
-    
-    // ✅ FIX: Always emit on explicit requests, but throttle rapid duplicate requests
-    // Only skip if this is the exact same list AND it was sent very recently (< 500ms ago)
-    const lastEmitTime = socket._lastActiveDoctorsEmitTime || 0;
-    const timeSinceLastEmit = now - lastEmitTime;
-    const isDuplicate = socket._lastActiveDoctorsKey === availableKey;
-    
-    if (isDuplicate && timeSinceLastEmit < 500) {
-      // Skip duplicate request within 500ms window
+    if (socket._lastActiveDoctorsKey === availableKey) {
       return;
     }
-    
     socket._lastActiveDoctorsKey = availableKey;
-    socket._lastActiveDoctorsEmitTime = now;
 
     socket.emit("active-doctors", available);
   });
@@ -3123,56 +2600,10 @@ io.on("connection", (socket) => {
   // IMPORTANT: We DO NOT block if doctor is offline/busy – we queue + notify.
   socket.on(
     "call-requested",
-    async ({ doctorId, patientId, channel, callId: incomingCallId, timestamp }) => {
+    async ({ doctorId, patientId, channel, callId: incomingCallId }) => {
       console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
 
-      // ✅ FIX: Validate timestamp
-      const now = Date.now();
-      const callTime = timestamp ? new Date(timestamp).getTime() : now;
-      const ageInSeconds = (now - callTime) / 1000;
-      
-      if (ageInSeconds > 60) {
-        console.warn(`⚠️ Rejecting stale call request (age: ${ageInSeconds}s)`);
-        
-        io.to(`patient-${patientId}`).emit("call-rejected", {
-          callId: incomingCallId || null,
-          doctorId,
-          patientId,
-          reason: "stale_request",
-          message: "Call request expired",
-          timestamp: new Date().toISOString(),
-        });
-        
-        return;
-      }
-
       doctorId = Number(doctorId);
-      patientId = Number(patientId);
-
-      // ========== RATE LIMITING ==========
-      const rateLimitResult = checkRateLimit(patientId);
-      if (!rateLimitResult.allowed) {
-        const resetIn = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
-        console.log(`🚫 Rate limit exceeded for patient ${patientId}. Reset in ${resetIn}s`);
-        socket.emit("call-status-update", {
-          callId: null,
-          doctorId,
-          patientId,
-          status: "rate_limited",
-          message: `Too many call requests. Please wait ${resetIn} seconds before trying again.`,
-          resetIn,
-          timestamp: new Date().toISOString(),
-        });
-        socket.emit("call-rejected", {
-          callId: null,
-          doctorId,
-          patientId,
-          reason: "rate_limit",
-          message: `Rate limit exceeded. Please wait ${resetIn} seconds.`,
-          timestamp: new Date().toISOString(),
-        });
-        return;
-      }
 
       const generatedCallId = `call_${Date.now()}_${Math.random()
         .toString(36)
@@ -3194,11 +2625,19 @@ io.on("connection", (socket) => {
       const doctorHasSocket = Boolean(doctorEntry?.socketId);
       const doctorConnected =
         doctorHasSocket && connectionStatus === "connected";
+      const doctorBusy = await isDoctorBusy(doctorId);
       
-      // ========== ATOMIC DOCTOR BUSY CHECK ==========
-      const doctorClaimed = await claimDoctorForCall(doctorId, callId);
-      const doctorBusy = !doctorClaimed; // If not claimed, doctor is busy
-      const shouldQueue = !doctorConnected || doctorBusy;
+      // Try to acquire doctor busy lock (only if doctor is available)
+      let lockAcquired = false;
+      if (doctorConnected && !doctorBusy) {
+        lockAcquired = await acquireDoctorBusyLock(doctorId, callId, 600); // 10min TTL
+        if (!lockAcquired) {
+          console.log(`⚠️ Failed to acquire doctor busy lock for ${doctorId}, will queue`);
+          // Doctor became busy between check and lock acquisition
+        }
+      }
+      
+      let shouldQueue = !doctorConnected || doctorBusy || !lockAcquired;
       const existingQueue = pendingCalls.get(doctorId) || [];
 
       const callSession = {
@@ -3206,13 +2645,11 @@ io.on("connection", (socket) => {
         doctorId,
         patientId,
         channel,
-        status: shouldQueue ? "queued" : "INITIATED",
+        status: shouldQueue ? "queued" : "requested",
         createdAt: new Date(),
         queuedAt: shouldQueue ? new Date() : null,
         patientSocketId: socket.id,
         doctorSocketId: doctorEntry?.socketId || null,
-        timeoutTimerId: null,
-        ringingStartedAt: null,
       };
 
       logFlow("call-requested", {
@@ -3254,6 +2691,10 @@ io.on("connection", (socket) => {
 
       if (shouldQueue) {
         enqueuePendingCall(callSession);
+        
+        // 🔴 P1-2 FIX: Calculate queue position for patient
+        const queue = pendingCalls.get(doctorId) || [];
+        const queuePosition = queue.findIndex(entry => entry.callId === callId) + 1;
 
         socket.emit("call-status-update", {
           callId,
@@ -3261,6 +2702,8 @@ io.on("connection", (socket) => {
           patientId,
           status: "pending",
           queued: true,
+          queuePosition, // 🔴 P1-2: Include queue position
+          queueLength: queue.length,
           timestamp: new Date().toISOString(),
         });
 
@@ -3271,128 +2714,52 @@ io.on("connection", (socket) => {
           channel,
           status: "pending",
           queued: true,
+          queuePosition, // 🔴 P1-2: Include queue position
+          queueLength: queue.length,
           message:
             doctorBusy && doctorConnected
-              ? "Doctor is finishing another call. We've queued yours and will alert them immediately."
+              ? queuePosition > 1
+                ? `Doctor is busy. You are #${queuePosition} in queue. We'll connect you when available.`
+                : "Doctor is finishing another call. You're next in line. We'll connect you when available."
               : "Doctor is currently offline/away. We've queued your call and will alert them as soon as they come online.",
         });
+        
+        // 🔴 P1-2 FIX: Notify doctor about queue count
+        if (doctorEntry?.socketId) {
+          io.to(doctorEntry.socketId).emit("queue-updated", {
+            doctorId,
+            queueLength: queue.length,
+            timestamp: new Date().toISOString(),
+          });
+        }
 
         emitAvailableDoctors();
         return;
       }
 
-      // Direct ring to connected doctor
-      // Update status to RINGING when delivered to doctor
-      callSession.status = "RINGING";
-      callSession.ringingStartedAt = new Date();
-      callSession.timeoutExpiresAt = new Date(Date.now() + CALL_RINGING_TIMEOUT_MS);
-      setActiveCallSession(callId, callSession);
-
-      // Persist timeout expiration timestamp
-      if (isRedisStateReady()) {
-        try {
-          await coreRedis.hset(
-            `call:${callId}:timer`,
-            'expiresAt',
-            callSession.timeoutExpiresAt.getTime().toString(),
-            'callId',
-            callId,
-            'doctorId',
-            String(doctorId)
-          );
-          await coreRedis.expire(`call:${callId}:timer`, Math.ceil(CALL_RINGING_TIMEOUT_MS / 1000) + 60); // Extra 60s buffer
-        } catch (error) {
-          console.warn(`[redis:timer] Failed to persist timer for call ${callId}:`, error?.message || error);
-        }
-      }
-
-      // Start 30-second timeout timer
-      callSession.timeoutTimerId = setTimeout(async () => {
-        const currentSession = activeCalls.get(callId);
-        if (!currentSession || currentSession.status !== "RINGING") {
-          return; // Status changed, timer already cleared
-        }
-
-        console.log(`⏰ Call ${callId} timed out after 30 seconds`);
-        
-        // Update status to MISSED
-        currentSession.status = "MISSED";
-        currentSession.missedAt = new Date();
-        currentSession.timeoutTimerId = null;
-        currentSession.timeoutExpiresAt = null;
-        setActiveCallSession(callId, currentSession);
-
-        // ✅ PHASE 3: Use finalizeCall for guaranteed cleanup
-        await finalizeCall(callId, doctorId, "missed");
-
-        const orderIdToCancel =
-          currentSession.razorpayOrderId ||
-          currentSession.orderId ||
-          currentSession.order_id;
-        if (orderIdToCancel) {
-          cancelRazorpayOrder(orderIdToCancel).catch(() => {});
-        }
-        sendMissedCallFCM(currentSession).catch(() => {});
-
-        // Emit call-missed event to both patient and doctor
-        const missedPayload = {
+      // Direct ring to connected doctor (lock acquired)
+      if (lockAcquired) {
+        io.to(`doctor-${doctorId}`).emit("call-requested", {
           callId,
           doctorId,
-          patientId: currentSession.patientId,
-          status: "MISSED",
-          previousStatus: "RINGING",
-          reason: "timeout",
-          message: "Doctor didn't respond in time",
+          patientId,
+          channel,
           timestamp: new Date().toISOString(),
-        };
-
-        if (currentSession.patientSocketId) {
-          io.to(currentSession.patientSocketId).emit("call-missed", missedPayload);
-        }
-        io.to(`doctor-${doctorId}`).emit("call-missed", missedPayload);
-
-        // Emit call-status-update
-        io.emit("call-status-update", {
-          callId,
-          status: "MISSED",
-          previousStatus: "RINGING",
-          reason: "timeout",
-          timestamp: new Date().toISOString(),
+          queued: false,
         });
-      }, CALL_RINGING_TIMEOUT_MS);
 
-      setActiveCallSession(callId, callSession);
-
-      io.to(`doctor-${doctorId}`).emit("call-requested", {
-        callId,
-        doctorId,
-        patientId,
-        channel,
-        status: "RINGING",
-        timestamp: new Date().toISOString(),
-        queued: false,
-      });
-
-      // Also send push notification in case app is backgrounded / killed
-      notifyDoctorPendingCall(callSession).catch(() => {});
+        // Also send push notification in case app is backgrounded / killed
+        notifyDoctorPendingCall(callSession).catch(() => {});
+      }
 
       socket.emit("call-sent", {
         callId,
         doctorId,
         patientId,
         channel,
-        status: "RINGING",
+        status: "sent",
         queued: false,
         message: "Ringing the doctor now…",
-        timestamp: new Date().toISOString(),
-      });
-
-      // Emit status update to patient
-      socket.emit("call-status-update", {
-        callId,
-        status: "RINGING",
-        previousStatus: "INITIATED",
-        timestamp: new Date().toISOString(),
       });
 
       emitAvailableDoctors();
@@ -3412,17 +2779,67 @@ io.on("connection", (socket) => {
       return socket.emit("error", { message: "Call session not found" });
     }
 
-    // Clear timeout timer if exists
-    await clearCallTimeoutTimer(callSession, normalizedCallId);
-    
-    // NOTE: We do NOT release doctor lock here because call is now ACTIVE
-    // Lock will be released when call ends
+    // Ensure doctor busy lock is acquired (should already be from call-requested, but double-check)
+    const lockAcquired = await acquireDoctorBusyLock(doctorId, normalizedCallId, 600);
+    if (!lockAcquired) {
+      const existingCallId = await getDoctorBusyCallId(doctorId);
+      if (existingCallId !== normalizedCallId) {
+        console.warn(`⚠️ Doctor ${doctorId} busy with another call ${existingCallId}, rejecting accept`);
+        socket.emit("error", { message: "Doctor is busy with another call" });
+        return;
+      }
+      // Lock already exists for this call, continue
+    }
 
-    const previousStatus = callSession.status;
-    callSession.status = "ACCEPTED";
+    callSession.status = "accepted";
     callSession.acceptedAt = new Date();
     callSession.doctorSocketId = socket.id;
     setActiveCallSession(normalizedCallId, callSession);
+
+    // 🔴 P1-3 FIX: Set payment timeout (5 minutes)
+    // WHY: If patient doesn't pay within 5 minutes, auto-cancel call to free doctor
+    const PAYMENT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    const paymentTimeoutId = setTimeout(async () => {
+      const currentSession = activeCalls.get(normalizedCallId);
+      // Only cancel if still in "accepted" status and no payment received
+      if (
+        currentSession &&
+        currentSession.status === "accepted" &&
+        !currentSession.paymentId
+      ) {
+        console.log(
+          `⏰ Payment timeout for call ${normalizedCallId} - auto-cancelling`
+        );
+
+        // Notify both parties
+        if (currentSession.patientSocketId) {
+          io.to(currentSession.patientSocketId).emit("payment-timeout", {
+            callId: normalizedCallId,
+            doctorId,
+            patientId,
+            message:
+              "Payment timeout. The call was cancelled because payment was not completed within 5 minutes.",
+            timestamp: new Date().toISOString(),
+          });
+        }
+        if (currentSession.doctorSocketId) {
+          io.to(currentSession.doctorSocketId).emit("payment-timeout", {
+            callId: normalizedCallId,
+            doctorId,
+            patientId,
+            message:
+              "Payment timeout. The call was cancelled because patient did not complete payment within 5 minutes.",
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Finalize call with payment_timeout reason
+        await finalizeCall(normalizedCallId, "payment_timeout", "system");
+      }
+    }, PAYMENT_TIMEOUT_MS);
+
+    // Store timeout ID so we can clear it if payment is received
+    callSession.paymentTimeoutId = paymentTimeoutId;
 
     if (callSession.patientSocketId) {
       io.to(callSession.patientSocketId).emit("call-accepted", {
@@ -3430,7 +2847,6 @@ io.on("connection", (socket) => {
         doctorId,
         patientId,
         channel,
-        status: "ACCEPTED",
         agoraToken:
           callSession.agoraToken ||
           callSession.token ||
@@ -3440,17 +2856,10 @@ io.on("connection", (socket) => {
         message:
           "Doctor accepted your call. Please complete payment to proceed.",
         paymentAmount: 499,
+        paymentTimeoutMs: PAYMENT_TIMEOUT_MS, // 🔴 P1-3: Inform patient of timeout
         timestamp: new Date().toISOString(),
       });
     }
-
-    // Emit call-status-update
-    io.emit("call-status-update", {
-      callId: normalizedCallId,
-      status: "ACCEPTED",
-      previousStatus,
-      timestamp: new Date().toISOString(),
-    });
 
     emitAvailableDoctors();
   });
@@ -3474,33 +2883,22 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // ✅ PHASE 3: Use finalizeCall for guaranteed cleanup
-    await finalizeCall(normalizedCallId, doctorId, "rejected");
+    // Use unified finalization
+    await finalizeCall(normalizedCallId, "rejected", "doctor");
 
-    const previousStatus = callSession.status;
-    callSession.status = "REJECTED";
-    callSession.rejectedAt = new Date();
-    callSession.rejectionReason = reason;
-
-    // Ensure any queued instance for this doctor is removed immediately
-    removePendingCallEntry(doctorId, normalizedCallId);
-
+    // Send specific rejection message to patient
     if (callSession.patientSocketId) {
       io.to(callSession.patientSocketId).emit("call-rejected", {
         callId: normalizedCallId,
         doctorId: callSession.doctorId,
         patientId: callSession.patientId,
-        status: "REJECTED",
         reason,
         message:
           reason === "timeout"
-            ? "Doctor did not respond within 30 seconds"
+            ? "Doctor did not respond within 5 minutes"
             : "Doctor is currently unavailable",
         timestamp: new Date().toISOString(),
       });
-      console.log(
-        `📤 Notified patient via socket: ${callSession.patientSocketId}`
-      );
     }
 
     if (callSession.patientId) {
@@ -3508,124 +2906,107 @@ io.on("connection", (socket) => {
         callId: normalizedCallId,
         doctorId: callSession.doctorId,
         patientId: callSession.patientId,
-        status: "REJECTED",
         reason,
         message:
           reason === "timeout"
-            ? "Doctor did not respond within 30 seconds"
+            ? "Doctor did not respond within 5 minutes"
             : "Doctor is currently unavailable",
         timestamp: new Date().toISOString(),
       });
     }
-
-    io.emit("call-status-update", {
-      callId: normalizedCallId,
-      status: "REJECTED",
-      previousStatus,
-      rejectedBy: "doctor",
-      reason,
-      timestamp: new Date().toISOString(),
-    });
-
-    // finalizeCall already removed active call and emitted available doctors
-    deliverNextPendingCall(doctorId);
-    console.log(`🗑️ Cleaned up rejected call ${normalizedCallId}`);
   });
 
   // ========== PATIENT PAYMENT COMPLETED ==========
-  socket.on("payment-completed", async (data, ack) => {
+  socket.on("payment-completed", async (data) => {
     const { callId: rawCallId, patientId, doctorId, channel, paymentId } = data;
     const normalizedCallId = normalizeCallId(rawCallId);
-    console.log(`💰 Payment completed for call ${normalizedCallId}, paymentId: ${paymentId}`);
+    console.log(`💰 Payment completed for call ${normalizedCallId}`);
+
+    // Idempotency check: payment already processed?
+    if (isRedisStateReady() && paymentId) {
+      try {
+        const paymentKey = `${REDIS_PAYMENT_IDEMPOTENCY_KEY}:${paymentId}`;
+        const existing = await coreRedis.get(paymentKey);
+        if (existing) {
+          console.log(`[payment] Payment ${paymentId} already processed, returning cached result`);
+          const cached = JSON.parse(existing);
+          socket.emit("payment-verified", cached.patientPayload);
+          if (cached.doctorPayload && callSession?.doctorSocketId) {
+            io.to(callSession.doctorSocketId).emit("patient-paid", cached.doctorPayload);
+          }
+          return;
+        }
+      } catch (error) {
+        console.warn(`[payment] Failed to check payment idempotency:`, error?.message || error);
+      }
+    }
 
     const callSession = activeCalls.get(normalizedCallId);
     if (!callSession) {
       console.log(`❌ Call session ${normalizedCallId} not found`);
-      const errorResponse = { success: false, message: "Call session not found" };
-      socket.emit("error", errorResponse);
-      if (ack) ack(errorResponse);
+      return socket.emit("error", { message: "Call session not found" });
+    }
+
+    // Validate call status - payment not allowed if call already ended
+    if (["ended", "rejected", "expired", "payment_cancelled"].includes(callSession.status)) {
+      console.log(`❌ Payment attempted for ${callSession.status} call ${normalizedCallId}`);
+      socket.emit("error", { 
+        message: "Call has ended. Payment cannot be processed.",
+        callStatus: callSession.status 
+      });
+      // TODO: Trigger refund logic hook here
       return;
     }
 
-    // ========== PAYMENT IDEMPOTENCY CHECK ==========
-    if (paymentId) {
-      const idempotencyCheck = await claimPaymentProcessing(paymentId, normalizedCallId);
-      
-      if (!idempotencyCheck.claimed && idempotencyCheck.reason === "duplicate") {
-        console.log(
-          `[payment-completed] Payment ${paymentId} already processed for call ${normalizedCallId}. Ignoring duplicate.`
-        );
-        
-        // Payment already processed - return success (idempotent behavior)
-        const successResponse = {
-          success: true,
-          message: "Payment already processed",
-          callId: normalizedCallId,
-          paymentId,
-          duplicate: true,
-        };
-        
-        if (ack) ack(successResponse);
-        
-        // If call status is already payment_completed or active, emit current state
-        if (["payment_completed", "active"].includes(callSession.status)) {
-          socket.emit("payment-verified", {
-            callId: normalizedCallId,
-            channel: callSession.channel,
-            patientId,
-            doctorId,
-            status: callSession.status,
-            timestamp: new Date().toISOString(),
-          });
-        }
-        return;
-      }
-    }
-
-    // Check if call was missed/rejected/ended - reject payment
-    if (["MISSED", "REJECTED", "ENDED"].includes(callSession.status)) {
-      console.warn(
-        `[payment-completed] Rejecting payment for call ${normalizedCallId} - status=${callSession.status}`
-      );
-      const errorResponse = {
-        success: false,
-        message: `Call was ${callSession.status.toLowerCase()}. Payment cannot be processed.`,
-        callStatus: callSession.status,
-      };
-      socket.emit("error", errorResponse);
-      if (ack) ack(errorResponse);
-      
-      // Release idempotency lock if set
-      if (paymentId) {
-        const idempotencyKey = `payment:${normalizedCallId}:${paymentId}`;
-        await coreRedis.del(idempotencyKey).catch(() => {});
-      }
-      return;
-    }
-
-    // Validate call is in correct state for payment
-    if (callSession.status !== "ACCEPTED" && callSession.status !== "payment_completed") {
-      console.warn(
-        `[payment-completed] Call ${normalizedCallId} status is ${callSession.status}, expected ACCEPTED`
-      );
-    }
-
-    // Update call session
-    const previousStatus = callSession.status;
     callSession.status = "payment_completed";
     callSession.paymentId = paymentId;
     callSession.paidAt = new Date();
     if (channel) callSession.channel = channel;
+    
+    // 🔴 P1-3 FIX: Clear payment timeout since payment was received
+    if (callSession.paymentTimeoutId) {
+      clearTimeout(callSession.paymentTimeoutId);
+      delete callSession.paymentTimeoutId;
+      console.log(`✅ Payment received for call ${normalizedCallId}, cleared timeout`);
+    }
+    
     setActiveCallSession(normalizedCallId, callSession);
 
-    // Acknowledge payment received
-    if (ack) {
-      ack({
-        success: true,
-        message: "Payment received",
-        callId: normalizedCallId,
-        paymentId,
-      });
+    // Mark payment as processed (idempotency)
+    if (isRedisStateReady() && paymentId) {
+      try {
+        const paymentKey = `${REDIS_PAYMENT_IDEMPOTENCY_KEY}:${paymentId}`;
+        const callPaidKey = `${REDIS_CALL_PAID_KEY}:${normalizedCallId}:paid`;
+        const patientPayload = {
+          callId: normalizedCallId,
+          channel: callSession.channel,
+          patientId,
+          doctorId,
+          status: "ready_to_connect",
+          message: "Payment successful!",
+          videoUrl: `/call-page/${callSession.channel}?uid=${patientId}&role=audience&callId=${normalizedCallId}`,
+          role: "audience",
+          uid: Number(patientId),
+          timestamp: new Date().toISOString(),
+        };
+        const doctorPayload = {
+          callId: normalizedCallId,
+          channel: callSession.channel,
+          patientId,
+          doctorId,
+          paymentId,
+          status: "ready_to_connect",
+          message: "Patient payment confirmed!",
+          videoUrl: `/call-page/${callSession.channel}?uid=${doctorId}&role=host&callId=${normalizedCallId}&doctorId=${doctorId}&patientId=${patientId}`,
+          role: "host",
+          uid: Number(doctorId),
+          timestamp: new Date().toISOString(),
+        };
+        await coreRedis.set(paymentKey, JSON.stringify({ patientPayload, doctorPayload }), "EX", 86400); // 24h
+        await coreRedis.set(callPaidKey, paymentId, "EX", 86400); // 24h
+      } catch (error) {
+        console.warn(`[payment] Failed to store payment idempotency:`, error?.message || error);
+      }
     }
 
     logFlow("payment-completed", {
@@ -3675,77 +3056,26 @@ io.on("connection", (socket) => {
       timestamp: new Date().toISOString(),
     };
 
-    // ✅ FIX 1: Get fresh doctor socket ID from activeDoctors map
-    const doctorEntry = activeDoctors.get(doctorId);
-    const currentDoctorSocketId = doctorEntry?.socketId || callSession.doctorSocketId;
-    
-    if (!currentDoctorSocketId) {
-      console.warn(`⚠️ No socket ID for doctor ${doctorId}, using room emit only`);
+    // 🔴 FIX: Tell doctor: join now (host)
+    // WHY: Doctor must navigate to video call after payment
+    // Send to both socket ID and room to ensure delivery (doctor might have reconnected)
+    if (callSession.doctorSocketId) {
+      io.to(callSession.doctorSocketId).emit("patient-paid", patientPaidData);
+      console.log(`📨 [payment] Sent patient-paid to doctor socket ${callSession.doctorSocketId}`);
     }
     
-    // ✅ FIX 2: Emit to BOTH socket ID and room (triple redundancy)
-    if (currentDoctorSocketId) {
-      console.log(`📤 [payment-completed] Emitting patient-paid to doctor socket: ${currentDoctorSocketId}`);
-      io.to(currentDoctorSocketId).emit("patient-paid", patientPaidData);
-      
-      // ✅ FIX 3: Also emit payment-verified as fallback
-      io.to(currentDoctorSocketId).emit("payment-verified", {
-        callId: normalizedCallId,
-        channel: callSession.channel,
-        doctorId,
-        patientId,
-        role: "host",
-        uid: Number(doctorId),
-        timestamp: new Date().toISOString(),
-      });
-    }
-    
-    // ✅ FIX 4: Emit to doctor room (always)
-    console.log(`📤 [payment-completed] Emitting patient-paid to doctor room: doctor-${doctorId}`);
-    io.to(`doctor-${doctorId}`).emit("patient-paid", patientPaidData);
-    io.to(`doctor-${doctorId}`).emit("payment-verified", {
-      callId: normalizedCallId,
-      channel: callSession.channel,
-      doctorId,
-      patientId,
-      role: "host",
-      uid: Number(doctorId),
-      timestamp: new Date().toISOString(),
+    // 🔴 FIX: Always emit to room as fallback (in case socket ID changed or doctor reconnected)
+    io.to(`doctor-${doctorId}`).emit("patient-paid", {
+      ...patientPaidData,
+      queued: !callSession.doctorSocketId, // Mark as queued if no socket ID
     });
-    
-    // ✅ FIX 5: Emit call-status-update for additional visibility
-    io.emit("call-status-update", {
-      callId: normalizedCallId,
-      status: "payment_completed",
-      previousStatus: previousStatus,
-      doctorId,
-      patientId,
-      paymentId,
-      message: "Payment completed - doctor should join",
-      timestamp: new Date().toISOString(),
-    });
-    
-    // ✅ FIX 6: If doctor socket exists, verify receipt with ACK timeout
-    if (currentDoctorSocketId) {
-      const doctorSocket = io.sockets.sockets.get(currentDoctorSocketId);
-      if (doctorSocket) {
-        doctorSocket.timeout(5000).emit("patient-paid-ack", patientPaidData, (err) => {
-          if (err) {
-            console.warn(`⚠️ Doctor ${doctorId} did not acknowledge patient-paid within 5s`);
-            // Retry emit one more time
-            io.to(`doctor-${doctorId}`).emit("patient-paid", patientPaidData);
-          } else {
-            console.log(`✅ Doctor ${doctorId} acknowledged patient-paid`);
-          }
-        });
-      }
-    }
+    console.log(`📨 [payment] Sent patient-paid to doctor room doctor-${doctorId} (fallback)`);
 
     emitAvailableDoctors();
   });
 
   // ========== CALL RESUME REQUEST ==========
-  socket.on("call-resume", (payload = {}, ack) => {
+  socket.on("call-resume", async (payload = {}, ack) => {
     const normalizedCallId = normalizeCallId(payload.callId);
     const requesterRole = payload.requester || payload.role || "unknown";
     const requesterDoctorId = Number(payload.doctorId || payload.doctor_id);
@@ -3759,7 +3089,32 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const callSession = activeCalls.get(normalizedCallId);
+    // Check Redis first (source of truth), then memory
+    let callSession = null;
+    if (isRedisStateReady()) {
+      try {
+        const redisSession = await coreRedis.hget(REDIS_ACTIVE_CALLS_KEY, normalizedCallId);
+        if (redisSession) {
+          const parsed = JSON.parse(redisSession);
+          callSession = {
+            ...parsed,
+            doctorId: Number(parsed.doctorId),
+            patientId: Number(parsed.patientId),
+            createdAt: parsed.createdAt ? new Date(parsed.createdAt) : new Date(),
+            paidAt: parsed.paidAt ? new Date(parsed.paidAt) : undefined,
+            resumableUntil: parsed.resumableUntil ? new Date(parsed.resumableUntil) : undefined,
+          };
+        }
+      } catch (error) {
+        console.warn(`[call-resume] Failed to read from Redis:`, error?.message || error);
+      }
+    }
+
+    // Fallback to memory
+    if (!callSession) {
+      callSession = activeCalls.get(normalizedCallId);
+    }
+
     if (!callSession) {
       const response = { ok: false, reason: "not_found", callId: normalizedCallId };
       socket.emit("call-resume-denied", response);
@@ -3767,6 +3122,20 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // Validate call not ended
+    if (["ended", "rejected", "expired", "payment_cancelled"].includes(callSession.status)) {
+      const response = {
+        ok: false,
+        reason: "call_ended",
+        callId: normalizedCallId,
+        status: callSession.status,
+      };
+      socket.emit("call-resume-denied", response);
+      ack?.(response);
+      return;
+    }
+
+    // Validate resumableUntil
     const resumableUntil =
       callSession.resumableUntil instanceof Date
         ? callSession.resumableUntil.getTime()
@@ -3776,9 +3145,8 @@ io.on("connection", (socket) => {
       (!resumableUntil || now <= resumableUntil);
 
     if (!withinWindow) {
-      callSession.status = "ended";
-      callSession.endedAt = new Date();
-      setActiveCallSession(normalizedCallId, callSession);
+      // Auto-finalize expired call
+      await finalizeCall(normalizedCallId, "expired", "system");
 
       const response = {
         ok: false,
@@ -3788,65 +3156,140 @@ io.on("connection", (socket) => {
       };
       socket.emit("call-resume-denied", response);
       ack?.(response);
-
-      if (callSession.patientSocketId) {
-        io.to(callSession.patientSocketId).emit("call-resume-denied", response);
-      }
-      if (callSession.doctorSocketId) {
-        io.to(callSession.doctorSocketId).emit("call-resume-denied", response);
-      }
       return;
     }
 
-    // Update socket bindings so we can notify both sides
-    if (requesterRole === "doctor" || requesterDoctorId === callSession.doctorId) {
-      callSession.doctorSocketId = socket.id;
-    } else if (requesterRole === "patient" || requesterPatientId === callSession.patientId) {
-      callSession.patientSocketId = socket.id;
-    }
-    if (payload.channel) callSession.channel = payload.channel;
-    if (payload.agoraToken) {
-      callSession.agoraToken = payload.agoraToken;
+    // Acquire rejoin lock (prevent duplicate rejoins)
+    const lockAcquired = await acquireRejoinLock(normalizedCallId, requesterRole, 30);
+    if (!lockAcquired) {
+      const response = {
+        ok: false,
+        reason: "already_rejoining",
+        callId: normalizedCallId,
+        message: "Rejoin already in progress",
+      };
+      socket.emit("call-resume-denied", response);
+      ack?.(response);
+      return;
     }
 
-    callSession.status = "awaiting_resume";
-    callSession.disconnectedAt = callSession.disconnectedAt || new Date();
-    setActiveCallSession(normalizedCallId, callSession);
+    try {
+      // Update socket bindings
+      if (requesterRole === "doctor" || requesterDoctorId === callSession.doctorId) {
+        callSession.doctorSocketId = socket.id;
+      } else if (requesterRole === "patient" || requesterPatientId === callSession.patientId) {
+        callSession.patientSocketId = socket.id;
+      }
+      if (payload.channel) callSession.channel = payload.channel;
 
-    const resumePayload = {
-      ok: true,
-      callId: normalizedCallId,
-      channel: callSession.channel,
-      doctorId: callSession.doctorId,
-      patientId: callSession.patientId,
-      agoraToken:
-        payload.agoraToken ||
+      // Regenerate Agora token if expired (placeholder - actual token generation should be in backend API)
+      let agoraToken = payload.agoraToken ||
         callSession.agoraToken ||
         callSession.token ||
         callSession.agora_token ||
-        null,
-      resumableUntil: callSession.resumableUntil,
-      status: callSession.status,
-    };
+        null;
 
-    socket.emit("call-resume-allowed", resumePayload);
-    ack?.(resumePayload);
+      // TODO: Check token expiry and regenerate if needed
+      // if (callSession.tokenExpiresAt && new Date(callSession.tokenExpiresAt).getTime() < now) {
+      //   agoraToken = await generateAgoraToken(callSession.channel, ...);
+      // }
 
-    if (callSession.patientSocketId && callSession.patientSocketId !== socket.id) {
-      io.to(callSession.patientSocketId).emit("call-resume-allowed", resumePayload);
-    } else if (callSession.patientId) {
-      io.to(`patient-${callSession.patientId}`).emit("call-resume-allowed", resumePayload);
-    }
+      if (agoraToken) {
+        callSession.agoraToken = agoraToken;
+      }
 
-    if (callSession.doctorSocketId && callSession.doctorSocketId !== socket.id) {
-      io.to(callSession.doctorSocketId).emit("call-resume-allowed", resumePayload);
-    } else if (callSession.doctorId) {
-      io.to(`doctor-${callSession.doctorId}`).emit("call-resume-allowed", resumePayload);
+      callSession.status = "awaiting_resume";
+      callSession.disconnectedAt = callSession.disconnectedAt || new Date();
+      setActiveCallSession(normalizedCallId, callSession);
+
+      const resumePayload = {
+        ok: true,
+        callId: normalizedCallId,
+        channel: callSession.channel,
+        doctorId: callSession.doctorId,
+        patientId: callSession.patientId,
+        agoraToken,
+        resumableUntil: callSession.resumableUntil instanceof Date
+          ? callSession.resumableUntil.toISOString()
+          : callSession.resumableUntil,
+        status: callSession.status,
+      };
+
+      socket.emit("call-resume-allowed", resumePayload);
+      ack?.(resumePayload);
+
+      // ✅ Send push notification to doctor when patient rejoins
+      if (requesterRole === "patient" && callSession.doctorId) {
+        try {
+          const patientName = callSession.patientName || 
+            callSession.patientFullName || 
+            `Patient ${callSession.patientId}`;
+          
+          await sendPushNotification(callSession.doctorId, {
+            callId: normalizedCallId,
+            doctorId: callSession.doctorId,
+            patientId: callSession.patientId,
+            channel: callSession.channel,
+            timestamp: new Date().toISOString(),
+            type: "call_rejoin",
+            message: `${patientName} wants to rejoin the call`,
+            title: "Patient Rejoining Call",
+            body: `${patientName} is rejoining the call. Please join to continue.`,
+            callerName: patientName,
+            deepLink: `snoutiq://call/${normalizedCallId}?channel=${callSession.channel}&patientId=${callSession.patientId}`,
+            sound: DEFAULT_RINGTONE,
+          });
+          console.log(`📨 [call-resume] Sent rejoin notification to doctor ${callSession.doctorId}`);
+        } catch (error) {
+          console.error(`❌ [call-resume] Failed to send rejoin notification:`, error);
+          // Don't fail the rejoin if notification fails
+        }
+      }
+
+      // ✅ Notify other party via socket
+      const otherSocketId = requesterRole === "doctor"
+        ? callSession.patientSocketId
+        : callSession.doctorSocketId;
+
+      if (otherSocketId && otherSocketId !== socket.id) {
+        io.to(otherSocketId).emit("other-party-rejoining", {
+          callId: normalizedCallId,
+          rejoiningBy: requesterRole,
+          timestamp: new Date().toISOString(),
+        });
+        io.to(otherSocketId).emit("call-resume-allowed", resumePayload);
+      } else {
+        // Fallback to room-based notification
+        if (requesterRole === "doctor" && callSession.patientId) {
+          io.to(`patient-${callSession.patientId}`).emit("other-party-rejoining", {
+            callId: normalizedCallId,
+            rejoiningBy: "doctor",
+            timestamp: new Date().toISOString(),
+          });
+        } else if (requesterRole === "patient" && callSession.doctorId) {
+          io.to(`doctor-${callSession.doctorId}`).emit("other-party-rejoining", {
+            callId: normalizedCallId,
+            rejoiningBy: "patient",
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
+      // Release lock after 30s (rejoin should complete by then)
+      setTimeout(() => {
+        releaseRejoinLock(normalizedCallId, requesterRole).catch(() => {});
+      }, 30000);
+    } catch (error) {
+      console.error(`[call-resume] Error processing resume for ${normalizedCallId}:`, error);
+      await releaseRejoinLock(normalizedCallId, requesterRole);
+      const response = { ok: false, reason: "server_error", callId: normalizedCallId };
+      socket.emit("call-resume-denied", response);
+      ack?.(response);
     }
   });
 
   // ========== PATIENT PAYMENT CANCELLED ==========
-  socket.on("payment-cancelled", (data) => {
+  socket.on("payment-cancelled", async (data) => {
     const { callId: rawCallId, patientId, doctorId, channel, reason } = data;
     const normalizedCallId = normalizeCallId(rawCallId);
     console.log(
@@ -3859,24 +3302,10 @@ io.on("connection", (socket) => {
       return;
     }
 
-    callSession.status = "payment_cancelled";
-    callSession.cancelledAt = new Date();
-    callSession.cancellationReason =
-      reason || "patient_cancelled_payment";
+    // Use unified finalization
+    await finalizeCall(normalizedCallId, "payment_cancelled", "patient");
 
-    clearNotificationSent(normalizedCallId, doctorId);
-    removePendingCallEntry(doctorId, normalizedCallId);
-
-    logFlow("payment-cancelled", {
-      callId: normalizedCallId,
-      doctorId,
-      patientId,
-      channel,
-      reason,
-      patientSocketId: socket.id,
-      doctorSocketId: callSession.doctorSocketId,
-    });
-
+    // Send specific cancellation message
     if (callSession.doctorSocketId) {
       io.to(callSession.doctorSocketId).emit("payment-cancelled", {
         callId: normalizedCallId,
@@ -3896,21 +3325,6 @@ io.on("connection", (socket) => {
       message: "Patient cancelled the payment",
       timestamp: new Date().toISOString(),
     });
-
-    io.emit("call-status-update", {
-      callId: normalizedCallId,
-      status: "payment_cancelled",
-      cancelledBy: "patient",
-      reason,
-      timestamp: new Date().toISOString(),
-    });
-
-    setTimeout(() => {
-      deleteActiveCallSession(normalizedCallId);
-      emitAvailableDoctors();
-      deliverNextPendingCall(doctorId);
-      console.log(`Cleaned up cancelled call ${normalizedCallId}`);
-    }, 2000);
   });
 
   // ========== CALL STARTED ==========
@@ -3938,43 +3352,6 @@ io.on("connection", (socket) => {
     emitAvailableDoctors();
   });
 
-  // ✅ PHASE 3: Unified cleanup function for all call termination scenarios
-  const finalizeCall = async (callId, doctorId, reason = "ended") => {
-    const normalizedCallId = normalizeCallId(callId);
-    const callSession = activeCalls.get(normalizedCallId);
-    
-    console.log(`🔚 Finalizing call ${normalizedCallId} (reason: ${reason})`);
-    
-    // ✅ STEP 1: Clear timeout timer (MUST be first)
-    if (callSession) {
-      await clearCallTimeoutTimer(callSession, normalizedCallId);
-    }
-    
-    // ✅ STEP 2: Release doctor lock (atomic)
-    if (doctorId) {
-      await releaseDoctorLock(doctorId, normalizedCallId);
-    }
-    
-    // ✅ STEP 3: Delete active call session (IMMEDIATE, not delayed)
-    deleteActiveCallSession(normalizedCallId);
-    
-    // ✅ STEP 4: Clear notification sent tracking
-    if (callSession) {
-      clearNotificationSent(normalizedCallId, callSession.doctorId);
-    }
-    
-    // ✅ STEP 5: Emit availability changed
-    io.emit("doctors-availability-changed", {
-      timestamp: new Date().toISOString(),
-      reason: "call_finalized",
-      callId: normalizedCallId,
-      doctorId: doctorId,
-    });
-    
-    // ✅ STEP 6: Emit availability update
-    emitAvailableDoctors();
-  };
-
   // ========== CALL ENDED ==========
   socket.on(
     "call-ended",
@@ -3982,151 +3359,17 @@ io.on("connection", (socket) => {
       const normalizedCallId = normalizeCallId(rawCallId);
       console.log(`🔚 Call ${normalizedCallId} ended by ${userId} (${role})`);
 
-      // ✅ PHASE 5: Acknowledge IMMEDIATELY (before any async work)
-      // This prevents client from disconnecting before server processes
-      socket.emit("call-ended-ack", {
-        callId: normalizedCallId,
-        received: true,
-        timestamp: new Date().toISOString(),
-      });
-
-      // ✅ FIX: Define isPatientEnding and isDoctorEnding outside if block so they're always available
-      const isDoctorEnding = role === "host";
-      const isPatientEnding = role === "audience";
-
       const callSession = activeCalls.get(normalizedCallId);
-      let previousStatusForUpdate = "UNKNOWN";
-
-      // ✅ PHASE 3: Use finalizeCall for guaranteed cleanup
-      const callDoctorId = doctorId ?? callSession?.doctorId;
-      await finalizeCall(normalizedCallId, callDoctorId, "ended");
-
-      if (callSession) {
-        previousStatusForUpdate = callSession.status || "UNKNOWN";
-        callSession.status = "ENDED";
-        callSession.endedAt = new Date();
-        callSession.endedBy = userId;
-
-        // ✅ FIX: Variables already defined above, no need to redeclare
-        logFlow("call-ended", {
-          callId: normalizedCallId,
-          doctorId: doctorId ?? callSession.doctorId,
-          patientId: patientId ?? callSession.patientId,
-          channel: channel ?? callSession.channel,
-          userId,
-          role,
-          reason: "ended",
-          doctorSocketId: callSession.doctorSocketId,
-          patientSocketId: callSession.patientSocketId,
-        });
-
-        if (isDoctorEnding && callSession.patientSocketId) {
-          io.to(callSession.patientSocketId).emit("call-ended-by-other", {
-            callId: normalizedCallId,
-            endedBy: "doctor",
-            reason: "ended",
-            message: "Doctor has ended the call",
-            timestamp: new Date().toISOString(),
-          });
-          console.log(
-            `📤 Notified patient via socket: ${callSession.patientSocketId}`
-          );
-        }
-
-        if (isPatientEnding && callSession.doctorSocketId) {
-          io.to(callSession.doctorSocketId).emit("call-ended-by-other", {
-            callId: normalizedCallId,
-            endedBy: "patient",
-            reason: "ended",
-            message: "Patient has ended the call",
-            timestamp: new Date().toISOString(),
-          });
-          console.log(
-            `📤 Notified doctor via socket: ${callSession.doctorSocketId}`
-          );
-        }
-
-        if (callSession.doctorId) {
-          io.to(`doctor-${callSession.doctorId}`).emit("call-ended-by-other", {
-            callId: normalizedCallId,
-            endedBy: isDoctorEnding ? "doctor" : "patient",
-            reason: "ended",
-            message: isDoctorEnding
-              ? "Doctor has ended the call"
-              : "Patient has ended the call",
-            timestamp: new Date().toISOString(),
-          });
-        }
-
-        if (callSession.patientId) {
-          io.to(`patient-${callSession.patientId}`).emit("call-ended-by-other", {
-            callId: normalizedCallId,
-            endedBy: isDoctorEnding ? "doctor" : "patient",
-            reason: "ended",
-            message: isDoctorEnding
-              ? "Doctor has ended the call"
-              : "Patient has ended the call",
-            timestamp: new Date().toISOString(),
-          });
-        }
-
-        if (callSession.patientSocketId) {
-          io.to(callSession.patientSocketId).emit("force-disconnect", {
-            callId: normalizedCallId,
-            reason: "ended",
-            endedBy: isDoctorEnding ? "doctor" : "patient",
-            timestamp: new Date().toISOString(),
-          });
-        }
-
-        if (callSession.doctorSocketId) {
-          // Send force-disconnect ONLY to cleanup Agora call, NOT to disconnect socket
-          // Doctor should remain online and connected after call ends
-          io.to(callSession.doctorSocketId).emit("force-disconnect", {
-            callId: normalizedCallId,
-            reason: "ended",
-            endedBy: isDoctorEnding ? "doctor" : "patient",
-            timestamp: new Date().toISOString(),
-            // IMPORTANT: This is only for Agora cleanup, NOT socket disconnection
-            keepSocketConnected: true,
-          });
-          
-          // Ensure doctor remains in activeDoctors after call ends
-          if (doctorId && activeDoctors.has(doctorId)) {
-            const doctor = activeDoctors.get(doctorId);
-            console.log(`✅ Doctor ${doctorId} will remain online after call end. Socket: ${doctor.socketId}`);
-          }
-        }
+      if (!callSession) {
+        console.log(`⚠️ Call session ${normalizedCallId} not found for ending`);
+        return;
       }
 
-      // ✅ Emit status update
-      io.emit("call-status-update", {
-        callId: normalizedCallId,
-        status: "ENDED",
-        previousStatus: previousStatusForUpdate,
-        endedBy: role,
-        endedByUserId: userId,
-        message: isPatientEnding ? "Patient ended the call" : "Doctor ended the call",
-        timestamp: new Date().toISOString(),
-      });
+      const isDoctorEnding = role === "host";
+      const endedBy = isDoctorEnding ? "doctor" : "patient";
 
-      // ✅ NEW: Emit to all connected clients (broadcast) - finalizeCall already emitted, but emit again for redundancy
-      io.emit("doctors-availability-changed", {
-        timestamp: new Date().toISOString(),
-        reason: "call_ended",
-        callId: normalizedCallId,
-      });
-
-      // ✅ NEW FIX: Emit multiple times to ensure clients receive update (covers race conditions)
-      setTimeout(() => {
-        console.log("📢 Emitting available doctors (1s delay)");
-        emitAvailableDoctors();
-      }, 1000);
-      
-      setTimeout(() => {
-        console.log("📢 Emitting available doctors (3s delay)");
-        emitAvailableDoctors();
-      }, 3000);
+      // Use unified finalization
+      await finalizeCall(normalizedCallId, "ended", endedBy);
     }
   );
 
@@ -4174,7 +3417,7 @@ io.on("connection", (socket) => {
   });
 
   // ========== SOCKET DISCONNECT ==========
-  socket.on("disconnect", (reason) => {
+  socket.on("disconnect", async (reason) => {
     console.log(`❌ Disconnected: ${socket.id}, reason: ${reason}`);
 
     // Mark any doctor with this socket as "disconnected" but keep them in map
@@ -4204,10 +3447,6 @@ io.on("connection", (socket) => {
           callSession.status === "active" ||
           (callSession.doctorJoinedAt && callSession.patientJoinedAt);
 
-        callSession.status = "disconnected";
-        callSession.disconnectedAt = new Date();
-        callSession.disconnectedBy = isDoctor ? "doctor" : "patient";
-
         logFlow("socket-disconnect", {
           callId,
           doctorId: callSession.doctorId,
@@ -4222,9 +3461,18 @@ io.on("connection", (socket) => {
           socketId: socket.id,
         });
 
-        setActiveCallSession(callId, callSession);
-
         if (wasCallActive) {
+          // Mark as disconnected (temporary state, allows rejoin)
+          callSession.status = "disconnected";
+          callSession.disconnectedAt = new Date();
+          callSession.disconnectedBy = isDoctor ? "doctor" : "patient";
+          
+          // Set rejoin expiry to 1 hour from disconnect
+          const disconnectTime = callSession.disconnectedAt.getTime();
+          callSession.resumableUntil = new Date(disconnectTime + CALL_RESUME_GRACE_MS);
+          
+          setActiveCallSession(callId, callSession);
+
           const otherSocketId = isDoctor
             ? callSession.patientSocketId
             : callSession.doctorSocketId;
@@ -4244,116 +3492,18 @@ io.on("connection", (socket) => {
                 isDoctor ? "patient" : "doctor"
               } (socket: ${otherSocketId})`
             );
-
-            io.to(otherSocketId).emit("force-disconnect", {
-              callId,
-              reason: "peer_disconnected",
-              disconnectedBy: isDoctor ? "doctor" : "patient",
-              timestamp: new Date().toISOString(),
-            });
-
-            const otherSocket = io.sockets.sockets.get(otherSocketId);
-            if (otherSocket) {
-              otherSocket.disconnect(true);
-              logFlow("force-disconnect-counterpart", {
-                callId,
-                doctorId: callSession.doctorId,
-                patientId: callSession.patientId,
-                channel: callSession.channel,
-                socketId: otherSocketId,
-                reason: "peer_disconnected",
-              });
-            }
           }
 
-          if (callSession.doctorId) {
-            socket
-              .to(`doctor-${callSession.doctorId}`)
-              .emit("call-ended-by-other", {
-                callId,
-                endedBy: isDoctor ? "doctor" : "patient",
-                reason: "disconnect",
-                message: "Call ended due to connection loss",
-                timestamp: new Date().toISOString(),
-              });
-          }
-
-          if (callSession.patientId) {
-            socket
-              .to(`patient-${callSession.patientId}`)
-              .emit("call-ended-by-other", {
-                callId,
-                endedBy: isDoctor ? "doctor" : "patient",
-                reason: "disconnect",
-                message: "Call ended due to connection loss",
-                timestamp: new Date().toISOString(),
-              });
-          }
-
-          io.emit("call-status-update", {
-            callId,
-            status: "disconnected",
-            disconnectedBy: isDoctor ? "doctor" : "patient",
-            timestamp: new Date().toISOString(),
-          });
+          // Don't auto-finalize - allow rejoin within grace period
+          // Finalization will happen on timeout or explicit end
+        } else {
+          // Call not active yet, finalize immediately
+          await finalizeCall(callId, "disconnected", isDoctor ? "doctor" : "patient");
         }
-
-        setTimeout(() => {
-          deleteActiveCallSession(callId);
-          emitAvailableDoctors();
-          console.log(`🗑️ Cleaned up disconnected call ${callId}`);
-        }, CALL_CLEANUP_GRACE_MS);
       }
     }
   });
 });
-
-// ========== KEY FIX 3: Periodic cleanup of stale locks (every 30 seconds) ==========
-setInterval(async () => {
-  if (!isRedisStateReady()) return;
-  
-  try {
-    // Scan for all doctor locks
-    const lockKeys = [];
-    let cursor = 0;
-    do {
-      const result = await coreRedis.scan(
-        cursor,
-        'MATCH',
-        'doctor:*:busy_lock',
-        'COUNT',
-        100
-      );
-      cursor = Number(result[0]);
-      lockKeys.push(...result[1]);
-    } while (cursor !== 0);
-
-    for (const lockKey of lockKeys) {
-      try {
-        const callId = await coreRedis.get(lockKey);
-        if (!callId) continue;
-        
-        // Check if this call still exists
-        const callExists = activeCalls.has(callId);
-        if (!callExists) {
-          // Call doesn't exist, release lock
-          const doctorId = lockKey.match(/doctor:(\d+):busy_lock/)?.[1];
-          if (doctorId) {
-            await coreRedis.del(lockKey);
-            console.log(`🧹 Cleaned up stale lock for doctor ${doctorId} (call ${callId} no longer exists)`);
-            
-            // Emit available doctors to update clients
-            emitAvailableDoctors();
-          }
-        }
-      } catch (error) {
-        console.warn(`[redis:lock] Failed to check lock ${lockKey}:`, error?.message || error);
-      }
-    }
-  } catch (error) {
-    console.warn(`[redis:lock] Lock cleanup failed:`, error?.message || error);
-  }
-}, 30000); // Run every 30 seconds
 
 // Stale cleanup: remove doctors after inactivity/reconnect grace
 setInterval(() => {
@@ -4365,15 +3515,29 @@ setInterval(() => {
     const disconnectedAt = info.disconnectedAt
       ? new Date(info.disconnectedAt).getTime()
       : 0;
+    
+    // Only mark as stale if lastSeen is very old (not just ping timeout)
     const stale = lastSeen && now - lastSeen > DOCTOR_STALE_TIMEOUT_MS;
+    
+    // Only remove if reconnecting AND no socket AND grace period expired
     const reconnectExpired =
       info.connectionStatus === "reconnecting" &&
+      !info.socketId && // No active socket
       disconnectedAt &&
       now - disconnectedAt > DISCONNECT_GRACE_MS;
+    
     if (stale || reconnectExpired) {
+      // Release busy lock if exists
+      getDoctorBusyCallId(doctorId).then((callId) => {
+        if (callId) {
+          releaseDoctorBusyLock(doctorId, callId).catch(() => {});
+        }
+      });
+      
       activeDoctors.delete(doctorId);
       removeDoctorPresence(doctorId).catch(() => {});
       removedCount++;
+      console.log(`Cleanup: Removed stale doctor ${doctorId} (stale: ${stale}, reconnectExpired: ${reconnectExpired})`);
     }
   }
 
@@ -4393,7 +3557,7 @@ setInterval(() => {
     const age = now - callSession.createdAt;
     if (
       age > threshold &&
-      !["payment_completed", "ended", "active"].includes(callSession.status)
+      !["payment_completed", "ended", "active", "disconnected", "awaiting_resume"].includes(callSession.status)
     ) {
       console.log(
         `⏰ Auto-ending call ${callId} after 5 minutes timeout (no payment / not ended)`
@@ -4412,8 +3576,10 @@ setInterval(() => {
         });
       }
 
-      deleteActiveCallSession(callId);
-      emitAvailableDoctors();
+      // Use unified finalization (fire and forget)
+      finalizeCall(callId, "expired", "system").catch((error) => {
+        console.warn(`[timeout] Failed to finalize call ${callId}:`, error?.message || error);
+      });
     }
   }
 }, 5 * 60 * 1000);
@@ -4425,50 +3591,6 @@ setInterval(() => {
   );
   console.log(`👨‍⚕️ Active Doctor IDs:`, Array.from(activeDoctors.keys()));
 }, 30_000);
-
-// ✅ FIX: Periodic cleanup of expired calls (older than 2 minutes, not active)
-setInterval(() => {
-  const now = Date.now();
-  const expiredThreshold = 2 * 60 * 1000; // 2 minutes
-  
-  for (const [callId, callSession] of activeCalls.entries()) {
-    const createdAt = callSession.createdAt ? new Date(callSession.createdAt).getTime() : now;
-    const age = now - createdAt;
-    
-    // ✅ FIX: Auto-expire calls older than 2 minutes that aren't active
-    if (age > expiredThreshold && callSession.status !== "active" && callSession.status !== "payment_completed") {
-      console.log(`🧹 Auto-expiring stale call ${callId} (age: ${Math.round(age / 1000)}s, status: ${callSession.status})`);
-      
-      // Clear timeout timer
-      clearCallTimeoutTimer(callSession, callId).catch(() => {});
-      
-      // Delete call session
-      deleteActiveCallSession(callId);
-      
-      // Release doctor lock
-      if (callSession.doctorId) {
-        releaseDoctorLock(callSession.doctorId, callId).catch(() => {});
-      }
-      
-      // Notify parties
-      if (callSession.patientSocketId) {
-        io.to(callSession.patientSocketId).emit("call-timeout", {
-          callId,
-          message: "Call request expired",
-          timestamp: new Date().toISOString(),
-        });
-      }
-      
-      if (callSession.doctorSocketId) {
-        io.to(callSession.doctorSocketId).emit("call-timeout", {
-          callId,
-          message: "Call request expired",
-          timestamp: new Date().toISOString(),
-        });
-      }
-    }
-  }
-}, 60000); // Run every minute
 
 // -------------------- START SERVER --------------------
 const PORT = Number(process.env.PORT || process.env.SOCKET_PORT || 4000);
