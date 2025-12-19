@@ -9,6 +9,7 @@ use App\Models\Pet;
 use App\Services\Notifications\NotificationChannelService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class SendVaccineReminders extends Command
 {
@@ -54,6 +55,11 @@ class SendVaccineReminders extends Command
             foreach ($pets as $pet) {
                 $ageWeeks = $this->calculateAgeInWeeks($pet);
                 if ($ageWeeks === null) {
+                    Log::info('vaccination.reminder.skip_age_missing', [
+                        'pet_id' => $pet->id,
+                        'user_id' => $pet->user_id,
+                        'reason' => 'missing_age',
+                    ]);
                     $skipped++;
                     continue;
                 }
@@ -61,6 +67,12 @@ class SendVaccineReminders extends Command
                 $events = $this->collectEventsForPet($pet, $ageWeeks, Carbon::now());
                 foreach ($events as $event) {
                     if ($this->alreadyNotified($pet->id, $event['milestone'], $event['stage'])) {
+                        Log::info('vaccination.reminder.skip_duplicate', [
+                            'pet_id' => $pet->id,
+                            'user_id' => $pet->user_id,
+                            'milestone' => $event['milestone'],
+                            'stage' => $event['stage'],
+                        ]);
                         $skipped++;
                         continue;
                     }
@@ -77,9 +89,25 @@ class SendVaccineReminders extends Command
 
                     try {
                         $channelService->send($notification);
+                        Log::info('vaccination.reminder.sent', [
+                            'notification_id' => $notification->id,
+                            'pet_id' => $pet->id,
+                            'user_id' => $pet->user_id,
+                            'milestone' => $event['milestone'],
+                            'stage' => $event['stage'],
+                            'title' => $event['title'],
+                        ]);
                         $sent++;
                     } catch (\Throwable $e) {
                         $errors++;
+                        Log::error('vaccination.reminder.error', [
+                            'notification_id' => $notification->id,
+                            'pet_id' => $pet->id,
+                            'user_id' => $pet->user_id,
+                            'milestone' => $event['milestone'],
+                            'stage' => $event['stage'],
+                            'error' => $e->getMessage(),
+                        ]);
                         $this->error(sprintf(
                             'Failed to send notification for pet %d (milestone %s): %s',
                             $pet->id,
@@ -92,6 +120,11 @@ class SendVaccineReminders extends Command
         });
 
         $this->info(sprintf('Vaccination reminders — sent: %d, skipped: %d, errors: %d', $sent, $skipped, $errors));
+        Log::info('vaccination.reminder.summary', [
+            'sent' => $sent,
+            'skipped' => $skipped,
+            'errors' => $errors,
+        ]);
 
         return self::SUCCESS;
     }
