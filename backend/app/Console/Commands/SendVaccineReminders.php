@@ -16,6 +16,7 @@ class SendVaccineReminders extends Command
 {
     private const PRE_NOTICE_DAYS = 7;
     private const WEEKS_PER_MONTH = 4.345;
+    private const DUE_TOLERANCE_WEEKS = 1.0; // cushion for coarse month→week conversion
 
     /**
      * Age-based puppy milestones expressed in weeks.
@@ -181,7 +182,7 @@ class SendVaccineReminders extends Command
                 $events[] = $this->buildMilestoneEvent($pet, $milestone, 'upcoming', $ageWeeks, $today);
             }
 
-            if ($ageWeeks >= $windowStart && $ageWeeks <= $windowEnd + 0.25) {
+            if ($ageWeeks >= $windowStart && $ageWeeks <= $windowEnd + self::DUE_TOLERANCE_WEEKS) {
                 $events[] = $this->buildMilestoneEvent($pet, $milestone, 'due', $ageWeeks, $today);
             }
         }
