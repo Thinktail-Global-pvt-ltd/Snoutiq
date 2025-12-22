@@ -75,6 +75,7 @@ class PrescriptionController extends Controller
                 'doctor_id',
                 'user_id',
                 'content_html',
+                'image_path',
                 'next_medicine_day',
                 'next_visit_day',
                 'created_at',

@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Groomer\ServiceController as GroomerServiceControll
 use App\Http\Controllers\Api\Groomer\GroomerEmployeeController as GroomerEmployeeController;
 use App\Http\Controllers\Api\Groomer\CalenderController as GroomerCalenderController;
 use App\Http\Controllers\Api\Groomer\ClientController as GroomerClientController;
+use App\Http\Controllers\Api\Groomer\ClinicReelController;
 use App\Http\Controllers\Api\Groomer\MarketingController as GroomerMarketingController;
 use App\Http\Controllers\Api\Groomer\DashboardController;
 use App\Http\Controllers\Api\EmergencyController;
@@ -391,6 +392,7 @@ use App\Http\Controllers\Api\GeminiChatController;
 use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\VideoCallingController;
 use App\Http\Controllers\Api\WeatherController;
+use App\Http\Controllers\Api\WeatherLogController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\DoctorStatusController;
