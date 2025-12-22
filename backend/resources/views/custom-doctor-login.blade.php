@@ -217,6 +217,16 @@
     .debug {
       display: none !important;
     }
+    .alert {
+      margin: 0 0 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      background: rgba(248, 113, 113, 0.12);
+      color: #fee2e2;
+      font-weight: 600;
+      display: none;
+    }
     .debug h3 {
       margin: 0 0 8px;
       font-size: 14px;
@@ -270,6 +280,8 @@
       </div>
     </div>
     <p class="sub">Sign in to continue to your SnoutIQ veterinarian dashboard and manage pet care with confidence.</p>
+
+    <div id="errorBox" class="alert" role="alert" aria-live="polite"></div>
 
     <!-- Vet form only -->
     <form id="vetForm">
@@ -402,7 +414,15 @@
     pwBtn: document.getElementById('pwBtn'),
     loginBtn: document.getElementById('loginBtn'),
     dump: document.getElementById('dump'),
+    errorBox: document.getElementById('errorBox'),
   };
+
+  function setError(message) {
+    if (!els.errorBox) return;
+    const msg = (message || '').toString().trim();
+    els.errorBox.textContent = msg;
+    els.errorBox.style.display = msg ? 'block' : 'none';
+  }
 
   els.pwBtn.addEventListener('click', ()=>{
     const isText = els.password.type === 'text';
@@ -413,11 +433,20 @@
   // ---------- Vet login (redirect after session OK) ----------
   els.vetForm.addEventListener('submit', async (e)=>{
     e.preventDefault();
+    setError('');
+
+    const emailVal = els.email.value.trim();
+    const pwVal = els.password.value.trim();
+    if (!emailVal || !pwVal) {
+      setError('Email and password are required.');
+      return;
+    }
+
     els.loginBtn.disabled = true; els.loginBtn.textContent = 'Logging in...';
     try{
       const res = await axios.post(ROUTES.login, {
-        login: els.email.value,
-        password: els.password.value,
+        login: emailVal,
+        password: pwVal,
         role: 'vet',
       }, { withCredentials: true });
 
@@ -467,10 +496,18 @@
             ? RECEPTIONIST_REDIRECT
             : POST_LOGIN_REDIRECT;
         setTimeout(()=> window.location.replace(target), 150);
+      } else {
+        setError('Login succeeded but session could not be established. Please retry.');
       }
     }catch(err){
       const data = err?.response?.data || { error:String(err) };
       dump({ error:'Vet login failed', detail:data }, 'Vet Login Error');
+      const msg =
+        data?.message ||
+        data?.error ||
+        (typeof data === 'string' ? data : null) ||
+        'Unable to log in. Please check your credentials.';
+      setError(msg);
     }finally{
       els.loginBtn.disabled = false; els.loginBtn.textContent = 'Login';
     }

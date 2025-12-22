@@ -69,6 +69,19 @@ class AuthController extends Controller
         return User::where('api_token_hash', $hash)->first();
     }
 
+    private function passwordMatches(?string $storedPassword, string $providedPassword): bool
+    {
+        if ($storedPassword === null || $storedPassword === '') {
+            return false;
+        }
+
+        if (Str::startsWith($storedPassword, '$2y$') || Str::startsWith($storedPassword, '$argon2')) {
+            return Hash::check($providedPassword, $storedPassword);
+        }
+
+        return hash_equals((string) $storedPassword, $providedPassword);
+    }
+
     private function shouldCheckUniqueness(Request $request): bool
     {
         $flag = $request->input('unique');
@@ -857,13 +870,20 @@ public function login(Request $request)
 {
   //  dd($request->all());
     try {
+        $request->validate([
+            'role'     => ['required', 'string'],
+            'password' => ['required', 'string'],
+            'email'    => ['nullable', 'string'],
+            'login'    => ['nullable', 'string'],
+        ]);
+
         $email = $request->input('email') ?? $request->input('login');
         $role  = $request->input('role'); // 👈 role pick karo
         $password = (string) $request->input('password', '');
         $roomTitle = $request->input('room_title');
 
         if (empty($email) || empty($role)) {
-            return response()->json(['message' => 'Email or role missing'], 422);
+            return response()->json(['message' => 'Email/login or role missing'], 422);
         }
 
         $room = null;
@@ -880,7 +900,7 @@ public function login(Request $request)
         }
 
         if ($role === 'vet' && $adminEmail && strtolower(trim((string) $email)) === $adminEmail) {
-            if (!hash_equals($adminPassword, (string) $password)) {
+            if (!$this->passwordMatches($adminPassword, $password)) {
                 return response()->json([
                     'message' => 'Invalid admin credentials',
                 ], 401);
@@ -908,6 +928,10 @@ public function login(Request $request)
 
             if (!$user) {
                 return response()->json(['message' => 'User not found'], 404);
+            }
+
+            if (!$this->passwordMatches($user->password, $password)) {
+                return response()->json(['message' => 'Invalid credentials'], 401);
             }
 
             DB::transaction(function () use (&$plainToken, &$room, $user, $roomTitle) {
@@ -964,6 +988,11 @@ public function login(Request $request)
                 ->first();
 
             if ($clinicRow) {
+                $clinicPassword = data_get($clinicRow, 'password');
+                if (!$this->passwordMatches($clinicPassword, $password)) {
+                    return response()->json(['message' => 'Invalid credentials'], 401);
+                }
+
                 DB::transaction(function () use (&$plainToken, &$room, $clinicRow, $roomTitle) {
                     $plainToken = bin2hex(random_bytes(32));
 
@@ -1047,6 +1076,11 @@ public function login(Request $request)
                 ->first();
 
             if ($doctorRow) {
+                $doctorPassword = data_get($doctorRow, 'password') ?? data_get($doctorRow, 'doctor_password');
+                if (!$this->passwordMatches($doctorPassword, $password)) {
+                    return response()->json(['message' => 'Invalid credentials'], 401);
+                }
+
                 $clinicId = (int) ($doctorRow->vet_registeration_id ?? 0);
                 $clinicForDoctor = $clinicId > 0
                     ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
@@ -1134,6 +1168,11 @@ public function login(Request $request)
             $receptionistRow = Receptionist::where('email', $email)->first();
 
             if ($receptionistRow) {
+                $receptionistPassword = data_get($receptionistRow, 'password') ?? data_get($receptionistRow, 'receptionist_password');
+                if (!$this->passwordMatches($receptionistPassword, $password)) {
+                    return response()->json(['message' => 'Invalid credentials'], 401);
+                }
+
                 $clinicId = (int) ($receptionistRow->vet_registeration_id ?? 0);
                 $clinicRecord = $clinicId > 0
                     ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
