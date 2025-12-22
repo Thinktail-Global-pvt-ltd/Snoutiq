@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Http\Controllers\Api\DashboardProfileController;
 use App\Http\Controllers\Api\MedicalRecordController;
+use App\Http\Controllers\Api\VetRegistrationReportController;
 use App\Models\User;
 use App\Models\DeviceToken;
 use App\Models\Doctor;
@@ -76,6 +77,12 @@ Route::prefix('admin/onboarding')->group(function () {
     Route::get('/clinic-hours', [AdminOnboardingStatusController::class, 'clinicHours']);
     Route::get('/emergency', [AdminOnboardingStatusController::class, 'emergency']);
 });
+
+Route::get('/admin/vet-registrations/report', [VetRegistrationReportController::class, 'summary'])
+    ->name('api.admin.vet-registrations.report');
+// Public alias for the same report (no admin guard)
+Route::get('/vet-registrations/report', [VetRegistrationReportController::class, 'summary'])
+    ->name('api.vet-registrations.report.public');
 
 
 Route::get('/agora/appid', function () {
