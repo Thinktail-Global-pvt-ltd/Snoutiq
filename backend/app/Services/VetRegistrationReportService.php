@@ -63,6 +63,7 @@ class VetRegistrationReportService
                 'name',
                 'status',
                 'owner_user_id',
+                'email',
                 'claimed_at',
                 'created_at',
                 'city',

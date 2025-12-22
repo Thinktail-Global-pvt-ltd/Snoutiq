@@ -49,9 +49,11 @@ class VetRegistrationReportController extends Controller
 
     public function transformRow($row): array
     {
+        $displayName = $row->name ?: ($row->email ?? 'Unnamed clinic');
+
         return [
             'id' => (int) $row->id,
-            'name' => $row->name ?: 'Unnamed clinic',
+            'name' => $displayName,
             'status' => $row->status,
             'owner_user_id' => $row->owner_user_id ? (int) $row->owner_user_id : null,
             'claimed_at' => $row->claimed_at ? $row->claimed_at->toDateTimeString() : null,
