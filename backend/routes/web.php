@@ -31,6 +31,7 @@ use App\Http\Controllers\Admin\TagController;
 use App\Http\Controllers\SalesDraftClinicPageController;
 use App\Http\Controllers\Admin\LegacyQrRedirectAdminController;
 use App\Http\Controllers\LegacyQrRedirectController;
+use App\Http\Controllers\Admin\VetRegistrationReportPageController;
 use App\Http\Controllers\SalesCrmController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Middleware\EnsureSalesAuthenticated;
@@ -90,6 +91,10 @@ Route::post('/sales/logout', function (Request $request) {
 
     return redirect()->route('sales.login')->with('status', 'Logged out successfully.');
 })->name('sales.logout');
+
+// Public view for vet registration report (no admin auth)
+Route::get('/vet-registration-report', VetRegistrationReportPageController::class)
+    ->name('vet-registration-report.public');
 
 Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
     Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
@@ -170,7 +175,8 @@ Route::prefix('admin')->group(function () {
         Route::get('/pets', [AdminPanelController::class, 'pets'])->name('admin.pets');
         Route::get('/doctors', [AdminPanelController::class, 'doctors'])->name('admin.doctors');
         Route::get('/online-doctors', [AdminPanelController::class, 'onlineDoctors'])->name('admin.online-doctors');
-        Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
+    Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
+        Route::get('/vet-registration-report', VetRegistrationReportPageController::class)->name('admin.vet-registration-report');
         Route::get('/clinic-report', [ClinicDataReportController::class, 'index'])->name('admin.clinic-report');
         Route::get('/clinic-report/export', [ClinicDataReportController::class, 'export'])->name('admin.clinic-report.export');
         Route::get('/bookings', [AdminPanelController::class, 'bookings'])->name('admin.bookings');
