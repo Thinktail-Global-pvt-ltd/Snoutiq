@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use App\Models\User;
 
 class PrescriptionController extends Controller
 {
@@ -50,6 +51,53 @@ class PrescriptionController extends Controller
         }
 
         return response()->json($query->paginate(20));
+    }
+
+    // GET /api/users/medical-summary?user_id=
+    public function userData(Request $request)
+    {
+        $payload = $request->validate([
+            'user_id' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $user = User::find($payload['user_id']);
+        if (!$user) {
+            return response()->json([
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        $prescriptions = Prescription::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->get([
+                'id',
+                'doctor_id',
+                'user_id',
+                'content_html',
+                'next_medicine_day',
+                'next_visit_day',
+                'created_at',
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'summary' => $user->summary,
+                    'pet_doc' => $user->pet_doc ?? $user->pet_doc1 ?? $user->pet_doc2 ?? null,
+                    'pet_doc1' => $user->pet_doc1,
+                    'pet_doc2' => $user->pet_doc2,
+                    'pet_name' => $user->pet_name,
+                    'pet_gender' => $user->pet_gender,
+                    'pet_age' => $user->pet_age,
+                    'breed' => $user->breed,
+                ],
+                'prescriptions' => $prescriptions,
+            ],
+        ]);
     }
 
     // POST /api/prescriptions
