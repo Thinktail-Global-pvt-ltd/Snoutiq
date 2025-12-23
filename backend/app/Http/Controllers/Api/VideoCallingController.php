@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class VideoCallingController extends Controller
 {
@@ -199,10 +200,17 @@ class VideoCallingController extends Controller
             return true;
         });
 
-        $dataPayload = $filteredVets->values();
+        $referralByVet = $this->buildReferralByVet($filteredVets);
+
+        $dataPayload = $filteredVets
+            ->values()
+            ->map(function ($vet) use ($referralByVet) {
+                $vet->referral_code = $referralByVet[$vet->id] ?? null;
+                return $vet;
+            });
 
         if ($mode === 'doctor') {
-            $dataPayload = $this->transformToDoctorPayload($filteredVets, $availableDoctorsByVet, $doctors);
+            $dataPayload = $this->transformToDoctorPayload($filteredVets, $availableDoctorsByVet, $doctors, $referralByVet);
         }
 
         return response()->json([
@@ -211,6 +219,7 @@ class VideoCallingController extends Controller
             'day'    => $normalizedDay,
             'data'   => $dataPayload,
             'available_doctors_by_vet' => (object) $availableDoctorsByVet,
+            'referral_by_vet' => (object) $referralByVet,
         ]);
     }
 
@@ -224,7 +233,7 @@ class VideoCallingController extends Controller
         return in_array($normalized, $valid, true) ? $normalized : null;
     }
 
-    private function transformToDoctorPayload(Collection $vets, array $availableDoctorsByVet, Collection $doctors): Collection
+    private function transformToDoctorPayload(Collection $vets, array $availableDoctorsByVet, Collection $doctors, array $referralByVet): Collection
     {
         $vetIndex = $vets->keyBy('id');
         $doctorIndex = $doctors->keyBy('id');
@@ -249,6 +258,7 @@ class VideoCallingController extends Controller
                 $entry = $vetArray;
                 $entry['clinic_id'] = $clinicId;
                 $entry['id'] = $doctor->id;
+                $entry['referral_code'] = $referralByVet[$clinicId] ?? null;
                 $entry['doctor'] = [
                     'id' => $doctor->id,
                     'name' => $doctor->doctor_name,
@@ -266,5 +276,33 @@ class VideoCallingController extends Controller
         }
 
         return $payload->values();
+    }
+
+    private function buildReferralByVet(Collection $vets): array
+    {
+        $map = [];
+
+        foreach ($vets as $vet) {
+            if (isset($vet->id)) {
+                $map[$vet->id] = $this->referralCodeForClinic($vet);
+            }
+        }
+
+        return $map;
+    }
+
+    private function referralCodeForClinic($clinic): string
+    {
+        $idSeed = isset($clinic->id) ? max(1, (int) $clinic->id) : 1;
+        $base36 = strtoupper(str_pad(base_convert((string) $idSeed, 10, 36), 5, '0', STR_PAD_LEFT));
+
+        $slug = $clinic->slug ?? $clinic->name ?? '';
+        $slugFragment = strtoupper(Str::substr(Str::slug($slug), 0, 2));
+
+        if ($slugFragment === '') {
+            $slugFragment = 'CL';
+        }
+
+        return 'SN-'.$slugFragment.$base36;
     }
 }
