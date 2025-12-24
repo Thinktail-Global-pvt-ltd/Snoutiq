@@ -8,6 +8,7 @@ use App\Models\Receptionist;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
@@ -196,14 +197,24 @@ class StaffController extends Controller
             ], 201);
         }
 
-        $receptionist = Receptionist::create([
+        $receptionistAttributes = [
             'vet_registeration_id' => $clinicId,
             'name' => $validated['name'],
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
             'role' => $role,
             'status' => 'active',
-        ]);
+        ];
+
+        // Default receptionist password set to 123456 (hashed) when columns exist.
+        if (Schema::hasColumn('receptionists', 'password')) {
+            $receptionistAttributes['password'] = Hash::make('123456');
+        }
+        if (Schema::hasColumn('receptionists', 'receptionist_password')) {
+            $receptionistAttributes['receptionist_password'] = Hash::make('123456');
+        }
+
+        $receptionist = Receptionist::create($receptionistAttributes);
 
         return response()->json([
             'status' => true,

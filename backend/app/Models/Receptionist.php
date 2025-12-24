@@ -17,6 +17,8 @@ class Receptionist extends Model
         'role',
         'status',
         'meta',
+        'password',
+        'receptionist_password',
     ];
 
     protected $casts = [
