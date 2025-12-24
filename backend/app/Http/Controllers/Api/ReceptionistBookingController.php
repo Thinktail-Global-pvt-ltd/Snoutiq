@@ -117,6 +117,16 @@ class ReceptionistBookingController extends Controller
 
     public function patients(Request $request)
     {
+        $clinicId = $this->resolveClinicId($request);
+        $hasLastVetColumn = Schema::hasColumn('users', 'last_vet_id');
+
+        if ($hasLastVetColumn && !$clinicId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'clinic_id or vet context is required to list patients.',
+            ], 422);
+        }
+
         $query = trim((string) $request->query('q', ''));
 
         $selectColumns = ['id', 'name', 'email', 'phone'];
@@ -131,6 +141,10 @@ class ReceptionistBookingController extends Controller
 
         if ($filterByRole) {
             $builder->whereIn('role', self::PATIENT_ROLES);
+        }
+
+        if ($hasLastVetColumn && $clinicId) {
+            $builder->where('last_vet_id', $clinicId);
         }
 
         if ($query !== '') {
