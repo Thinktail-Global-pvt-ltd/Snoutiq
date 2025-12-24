@@ -8,7 +8,6 @@ use App\Models\Receptionist;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
@@ -206,12 +205,12 @@ class StaffController extends Controller
             'status' => 'active',
         ];
 
-        // Default receptionist password set to 123456 (hashed) when columns exist.
+        // Default receptionist password set to plain 123456 when columns exist.
         if (Schema::hasColumn('receptionists', 'password')) {
-            $receptionistAttributes['password'] = Hash::make('123456');
+            $receptionistAttributes['password'] = '123456';
         }
         if (Schema::hasColumn('receptionists', 'receptionist_password')) {
-            $receptionistAttributes['receptionist_password'] = Hash::make('123456');
+            $receptionistAttributes['receptionist_password'] = '123456';
         }
 
         $receptionist = Receptionist::create($receptionistAttributes);
