@@ -324,6 +324,7 @@ class ReceptionistBookingController extends Controller
             'last_vet_id' => 'nullable|integer|exists:vet_registerations_temp,id',
         ]);
 
+        $clinicId = $this->resolveClinicId($request);
         $hasRoleColumn = Schema::hasColumn('users', 'role');
         $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
 
@@ -344,7 +345,16 @@ class ReceptionistBookingController extends Controller
             $userPayload['role'] = 'pet';
         }
         if ($hasLastVetIdColumn) {
-            $userPayload['last_vet_id'] = $data['last_vet_id'] ?? null;
+            $lastVetId = $data['last_vet_id'] ?? null;
+
+            if (!$lastVetId && $clinicId && Schema::hasTable('vet_registerations_temp')) {
+                $clinicExists = DB::table('vet_registerations_temp')->where('id', $clinicId)->exists();
+                if ($clinicExists) {
+                    $lastVetId = $clinicId;
+                }
+            }
+
+            $userPayload['last_vet_id'] = $lastVetId;
         }
 
         $user = User::create($userPayload);
@@ -408,9 +418,15 @@ class ReceptionistBookingController extends Controller
             'quoted_price' => 'nullable|numeric',
         ]);
 
+        $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
         $patient = User::find($data['patient_id']);
         if (!$patient) {
             return response()->json(['success' => false, 'message' => 'Patient not found'], 404);
+        }
+
+        if ($hasLastVetIdColumn && (int) $patient->last_vet_id !== (int) $clinicId) {
+            $patient->last_vet_id = $clinicId;
+            $patient->save();
         }
 
         $doctorId = $data['doctor_id'] ?? null;
