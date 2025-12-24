@@ -321,7 +321,11 @@ class ReceptionistBookingController extends Controller
             'pet_type' => 'nullable|string|max:120',
             'pet_breed' => 'nullable|string|max:120',
             'pet_gender' => 'nullable|string|max:50',
+            'last_vet_id' => 'nullable|integer|exists:vet_registerations_temp,id',
         ]);
+
+        $hasRoleColumn = Schema::hasColumn('users', 'role');
+        $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
 
         if (empty($data['email']) && empty($data['phone'])) {
             return response()->json([
@@ -336,8 +340,11 @@ class ReceptionistBookingController extends Controller
             'phone' => $data['phone'] ?? null,
             'password' => Hash::make(Str::random(16)),
         ];
-        if (Schema::hasColumn('users', 'role')) {
+        if ($hasRoleColumn) {
             $userPayload['role'] = 'pet';
+        }
+        if ($hasLastVetIdColumn) {
+            $userPayload['last_vet_id'] = $data['last_vet_id'] ?? null;
         }
 
         $user = User::create($userPayload);
@@ -366,6 +373,7 @@ class ReceptionistBookingController extends Controller
                     'email' => $user->email,
                     'phone' => $user->phone,
                     'role' => $user->role,
+                    'last_vet_id' => $hasLastVetIdColumn ? $user->last_vet_id : null,
                 ],
                 'pet' => $pet ? [
                     'id' => $pet->id,
