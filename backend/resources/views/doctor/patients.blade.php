@@ -918,10 +918,10 @@
 
   function appendTarget(formData) {
     if (CLINIC_ID) {
-      formData.append('clinic_id', String(CLINIC_ID));
-      formData.append('user_id', String(CLINIC_ID));
+      if (!formData.has('clinic_id')) formData.append('clinic_id', String(CLINIC_ID));
+      if (!formData.has('user_id')) formData.append('user_id', String(CLINIC_ID));
     } else if (CURRENT_USER_ID) {
-      formData.append('user_id', String(CURRENT_USER_ID));
+      if (!formData.has('user_id')) formData.append('user_id', String(CURRENT_USER_ID));
     }
   }
 

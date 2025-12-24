@@ -159,11 +159,11 @@
 
   function appendTarget(formData) {
     if (CLINIC_CONTEXT_ID) {
-      formData.append('user_id', String(CLINIC_CONTEXT_ID));
-      formData.append('clinic_id', String(CLINIC_CONTEXT_ID));
+      if (!formData.has('clinic_id')) formData.append('clinic_id', String(CLINIC_CONTEXT_ID));
+      if (!formData.has('user_id')) formData.append('user_id', String(CLINIC_CONTEXT_ID));
       if (RECEPTIONIST_ID) formData.append('receptionist_id', String(RECEPTIONIST_ID));
     } else if (CURRENT_USER_ID) {
-      formData.append('user_id', String(CURRENT_USER_ID));
+      if (!formData.has('user_id')) formData.append('user_id', String(CURRENT_USER_ID));
     } else if (CLINIC_SLUG) {
       formData.append('vet_slug', CLINIC_SLUG);
     }
