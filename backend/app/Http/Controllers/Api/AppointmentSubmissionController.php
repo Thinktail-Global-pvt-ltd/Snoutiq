@@ -11,17 +11,22 @@ use App\Models\VetRegisterationTemp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class AppointmentSubmissionController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'user_id' => ['nullable', 'integer'],
+            'patient_id' => ['nullable', 'integer'],
             'clinic_id' => ['required', 'integer', 'exists:vet_registerations_temp,id'],
             'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
             'patient_name' => ['required', 'string', 'max:255'],
             'patient_phone' => ['nullable', 'string', 'max:20'],
+            'patient_email' => ['nullable', 'email', 'max:191'],
             'pet_name' => ['nullable', 'string', 'max:255'],
             'date' => ['required', 'date'],
             'time_slot' => ['required', 'string', 'max:50'],
@@ -30,11 +35,58 @@ class AppointmentSubmissionController extends Controller
             'razorpay_payment_id' => ['nullable', 'string', 'max:191'],
             'razorpay_order_id' => ['nullable', 'string', 'max:191'],
             'razorpay_signature' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
         ]);
 
         $clinic = VetRegisterationTemp::findOrFail($validated['clinic_id']);
         $doctor = Doctor::findOrFail($validated['doctor_id']);
-        $user = User::findOrFail($validated['user_id']);
+
+        $patientId = $request->input('user_id') ?? $request->input('patient_id');
+        $user = $patientId ? User::find((int) $patientId) : null;
+
+        if (!$user) {
+            $phone = $validated['patient_phone'] ?? null;
+            $email = $validated['patient_email'] ?? null;
+
+            if ($phone) {
+                $user = User::where('phone', $phone)->first();
+            }
+
+            if (!$user && $email) {
+                $user = User::where('email', $email)->first();
+            }
+
+            if (!$user) {
+                $payload = [
+                    'name' => $validated['patient_name'],
+                    'email' => $email,
+                    'phone' => $phone,
+                    'password' => Hash::make(Str::random(16)),
+                ];
+
+                if (Schema::hasColumn('users', 'role')) {
+                    $payload['role'] = 'pet';
+                }
+
+                if (Schema::hasColumn('users', 'last_vet_id')) {
+                    $payload['last_vet_id'] = $clinic->id;
+                }
+
+                $user = User::create($payload);
+            }
+        } elseif (Schema::hasColumn('users', 'last_vet_id') && (int) $user->last_vet_id !== (int) $clinic->id) {
+            $user->last_vet_id = $clinic->id;
+            $user->save();
+        }
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to resolve patient. Please select a patient or provide phone/email.',
+            ], 422);
+        }
+
+        $clinic = VetRegisterationTemp::findOrFail($validated['clinic_id']);
 
         $notesPayload = [
             'clinic_name' => $clinic->name,
@@ -47,6 +99,10 @@ class AppointmentSubmissionController extends Controller
             'razorpay_order_id' => $validated['razorpay_order_id'] ?? null,
             'razorpay_signature' => $validated['razorpay_signature'] ?? null,
         ];
+
+        if (!empty($validated['notes'])) {
+            $notesPayload['text'] = $validated['notes'];
+        }
 
         $appointment = Appointment::create([
             'vet_registeration_id' => $clinic->id,
@@ -240,10 +296,11 @@ class AppointmentSubmissionController extends Controller
         ], $status);
     }
 
-    private function formatAppointment(Appointment $appointment): array
+    private function formatAppointment(Appointment $appointment, array $userLookup = []): array
     {
         $appointment->loadMissing(['clinic', 'doctor']);
         $notes = $this->decodeNotes($appointment->notes);
+        $patientUserId = $this->resolvePatientUserId($appointment, $notes, $userLookup);
 
         return [
             'id' => $appointment->id,
@@ -256,7 +313,7 @@ class AppointmentSubmissionController extends Controller
                 'name' => $appointment->doctor?->doctor_name ?? $appointment->doctor?->name ?? ($notes['doctor_name'] ?? null),
             ],
             'patient' => [
-                'user_id' => $notes['patient_user_id'] ?? null,
+                'user_id' => $patientUserId,
                 'name' => $appointment->name,
                 'phone' => $appointment->mobile,
                 'email' => $notes['patient_email'] ?? null,
@@ -274,8 +331,10 @@ class AppointmentSubmissionController extends Controller
      */
     private function formatAppointments(Collection $appointments): array
     {
-        return $appointments->map(function (Appointment $appointment) {
-            return $this->formatAppointment($appointment);
+        $userLookup = $this->buildUserLookup($appointments);
+
+        return $appointments->map(function (Appointment $appointment) use ($userLookup) {
+            return $this->formatAppointment($appointment, $userLookup);
         })->all();
     }
 
@@ -284,6 +343,124 @@ class AppointmentSubmissionController extends Controller
         $decoded = json_decode($notes ?? '{}', true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function resolvePatientUserId(Appointment $appointment, array $notes = [], array $userLookup = []): ?int
+    {
+        $fromNotes = $notes['patient_user_id'] ?? null;
+        if (is_numeric($fromNotes)) {
+            return (int) $fromNotes;
+        }
+
+        $fromColumn = $appointment->patient_user_id ?? null;
+        if (is_numeric($fromColumn)) {
+            return (int) $fromColumn;
+        }
+
+        $phoneKey = $this->normalizePhone($appointment->mobile ?? null);
+        $emailKey = $this->normalizeEmail($notes['patient_email'] ?? null);
+
+        if ($phoneKey && isset($userLookup['phone'][$phoneKey])) {
+            return (int) $userLookup['phone'][$phoneKey];
+        }
+
+        if ($emailKey && isset($userLookup['email'][$emailKey])) {
+            return (int) $userLookup['email'][$emailKey];
+        }
+
+        if (empty($userLookup) && ($phoneKey || $emailKey)) {
+            $userId = User::query()
+                ->when($phoneKey, fn ($q) => $q->where('phone', $phoneKey))
+                ->when($emailKey, function ($q) use ($phoneKey, $emailKey) {
+                    return $phoneKey ? $q->orWhere('email', $emailKey) : $q->where('email', $emailKey);
+                })
+                ->value('id');
+
+            return $userId ? (int) $userId : null;
+        }
+
+        return null;
+    }
+
+    private function buildUserLookup(Collection $appointments): array
+    {
+        $phones = [];
+        $emails = [];
+
+        foreach ($appointments as $appointment) {
+            $phone = $this->normalizePhone($appointment->mobile ?? null);
+            if ($phone) {
+                $phones[] = $phone;
+            }
+
+            $notes = $this->decodeNotes($appointment->notes);
+            $email = $this->normalizeEmail($notes['patient_email'] ?? null);
+            if ($email) {
+                $emails[] = $email;
+            }
+        }
+
+        $phones = array_values(array_unique(array_filter($phones)));
+        $emails = array_values(array_unique(array_filter($emails)));
+
+        if (empty($phones) && empty($emails)) {
+            return ['phone' => [], 'email' => []];
+        }
+
+        $users = User::query()
+            ->select(['id', 'phone', 'email'])
+            ->where(function ($q) use ($phones, $emails) {
+                if ($phones) {
+                    $q->whereIn('phone', $phones);
+                }
+
+                if ($emails) {
+                    if ($phones) {
+                        $q->orWhereIn('email', $emails);
+                    } else {
+                        $q->whereIn('email', $emails);
+                    }
+                }
+            })
+            ->get();
+
+        $lookup = ['phone' => [], 'email' => []];
+
+        foreach ($users as $user) {
+            $phone = $this->normalizePhone($user->phone ?? null);
+            if ($phone) {
+                $lookup['phone'][$phone] = $user->id;
+            }
+
+            $email = $this->normalizeEmail($user->email ?? null);
+            if ($email) {
+                $lookup['email'][$email] = $user->id;
+            }
+        }
+
+        return $lookup;
+    }
+
+    private function normalizePhone(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\\D+/', '', $value);
+
+        return $digits !== '' ? $digits : null;
+    }
+
+    private function normalizeEmail($value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $email = strtolower(trim($value));
+
+        return $email !== '' ? $email : null;
     }
 
     /**
