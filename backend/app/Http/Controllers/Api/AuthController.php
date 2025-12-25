@@ -240,9 +240,13 @@ class AuthController extends Controller
             }
 
             if (! $this->whatsApp->isConfigured()) {
-                return response()->json([
-                    'message' => 'WhatsApp channel is temporarily unavailable',
-                ], 503);
+                if (!config('app.debug')) {
+                    return response()->json([
+                        'message' => 'WhatsApp channel is temporarily unavailable',
+                    ], 503);
+                }
+
+                Log::warning('otp.whatsapp.unconfigured', ['phone' => $normalizedPhone]);
             }
 
             if ($this->shouldCheckUniqueness($request)) {
@@ -258,7 +262,22 @@ class AuthController extends Controller
                 }
             }
 
-            $this->whatsApp->sendOtpTemplate($normalizedPhone, $otp);
+            try {
+                $this->whatsApp->sendOtpTemplate($normalizedPhone, $otp);
+            } catch (\Throwable $e) {
+                Log::error('otp.whatsapp.failed', [
+                    'phone' => $normalizedPhone,
+                    'error' => $e->getMessage(),
+                ]);
+
+                // In non-debug environments, return a clear failure instead of a 500
+                if (!config('app.debug')) {
+                    return response()->json([
+                        'message' => 'Unable to send OTP at this time. Please try again shortly.',
+                    ], 503);
+                }
+            }
+
             $otpUser = User::where('phone', $normalizedPhone)
                 ->orWhere('phone', $rawValue)
                 ->first();
