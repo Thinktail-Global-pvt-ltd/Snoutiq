@@ -516,6 +516,7 @@ Route::post('/google-login', [AuthController::class, 'googleLogin']);
 Route::post('/auth/register',   [AuthController::class, 'register']);
 Route::post('/auth/register-via-mobile', [AuthController::class, 'registerViaMobile']);
 Route::post('/auth/initial-register', [AuthController::class, 'createInitialRegistration']);
+Route::post('/auth/initial-register-mobile', [AuthController::class, 'createInitialRegistrationMobile']);
 Route::post('/auth/login',      [AuthController::class, 'login']);
 Route::post('/auth/pet-summary', [AuthController::class, 'generatePetSummary']);
 Route::get('/clinics/{clinic}/payments', [AuthController::class, 'clinicPayments']);

@@ -421,6 +421,53 @@ public function createInitialRegistration(Request $request)
     }
 }
 
+    public function createInitialRegistrationMobile(Request $request)
+    {
+        try {
+            $request->validate([
+                'mobileNumber' => ['required', 'string'],
+            ]);
+
+            $mobile = (string) $request->mobileNumber;
+
+            $mobileExists = DB::table('users')
+                ->where('phone', $mobile)
+                ->orWhere('email', $mobile)
+                ->exists();
+
+            if ($mobileExists) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'enter unique mobile number'
+                ], 422);
+            }
+
+            $user = User::create([
+                'name'         => $request->fullName,
+                'email'        => $mobile,
+                'phone'        => $mobile,
+                'password'     => null,
+                'google_token' => $request->google_token,
+                'latitude'     => $request->latitude,
+                'longitude'    => $request->longitude,
+            ]);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Initial registration (mobile) created',
+                'user_id' => $user->id,
+                'user'    => $user,
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Something went wrong while creating initial registration via mobile',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
+
 public function register(Request $request)
 {
     // ✅ user find karo id se jo initial step me aayi thi
