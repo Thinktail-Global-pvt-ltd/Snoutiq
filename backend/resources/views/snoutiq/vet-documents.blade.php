@@ -162,9 +162,6 @@
                 </p>
               </div>
               <div class="flex flex-col items-end gap-2">
-                <span class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                  ID: {{ $doctor->id }}
-                </span>
                 @if($doctor->doctor_document)
                   <a href="{{ asset($doctor->doctor_document) }}" target="_blank" rel="noopener noreferrer"
                      class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">

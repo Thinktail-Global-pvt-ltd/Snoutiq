@@ -171,12 +171,6 @@
       @if($clinicEmail)
         <p class="text-xs text-white/70 break-all truncate">{{ $clinicEmail }}</p>
       @endif
-      @if($clinicId && !in_array($sessionRole, ['pet','patient','user'], true))
-        <p class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/15 text-[11px] text-white/80">
-          <span class="opacity-70">ID</span>
-          <span class="font-semibold">{{ $clinicId }}</span>
-        </p>
-      @endif
     </div>
     <div class="mt-3 text-[11px] uppercase tracking-wide text-white/60">
       Role · {{ ucfirst(str_replace('_',' ',$sessionRole ?? 'user')) }}

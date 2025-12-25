@@ -131,7 +131,6 @@
       <div class="pm-subtitle">Patient list, pet profile, medical records & documents</div>
     </div>
     <div class="pm-controls">
-      <div class="pm-chip">Clinic: {{ $resolvedClinicId ?: 'Not detected' }}</div>
       <button class="pm-btn pm-primary" type="button" id="pm-booking-open">+ New Booking</button>
       <button class="pm-btn pm-ghost" id="pm-refresh">Refresh</button>
       <button class="pm-btn pm-primary" data-role="open-upload">+ Upload record</button>

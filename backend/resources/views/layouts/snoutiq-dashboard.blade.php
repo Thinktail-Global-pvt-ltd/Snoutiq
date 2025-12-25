@@ -98,11 +98,6 @@
           </div>
           <div class="text-xs text-gray-500">
             {{ ucfirst(str_replace('_',' ',$sessionRole)) }}
-            @if($sessionRole === 'doctor' && ($resolvedDoctor?->vet_registeration_id ?? $sessionClinicId))
-              · Clinic #{{ $resolvedDoctor?->vet_registeration_id ?? $sessionClinicId }}
-            @elseif($sessionRole !== 'pet' && $sessionClinicId)
-              · Clinic #{{ $sessionClinicId }}
-            @endif
           </div>
         </div>
         <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">

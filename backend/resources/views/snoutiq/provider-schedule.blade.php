@@ -30,7 +30,9 @@
         <select id="doctor_id" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
           @if(isset($doctors) && $doctors->count())
             @foreach($doctors as $doc)
-              <option value="{{ $doc->id }}" data-price="{{ $doc->doctors_price ?? '' }}">{{ $doc->doctor_name }} (ID: {{ $doc->id }})</option>
+              <option value="{{ $doc->id }}" data-price="{{ $doc->doctors_price ?? '' }}">
+                {{ $doc->doctor_name ?? $doc->name ?? 'Doctor' }}
+              </option>
             @endforeach
           @else
             <option value="">No doctors found for your account</option>

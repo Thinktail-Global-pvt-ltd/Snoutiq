@@ -1459,6 +1459,14 @@
               }
             }else{
               await loadExisting();
+              if (window.Swal) {
+                Swal.fire({
+                  icon: 'success',
+                  title: 'Weekly availability saved',
+                  timer: 1400,
+                  showConfirmButton: false,
+                });
+              }
             }
           }
           else { out('#saveOut', json ?? text ?? 'Failed to save', false); }
