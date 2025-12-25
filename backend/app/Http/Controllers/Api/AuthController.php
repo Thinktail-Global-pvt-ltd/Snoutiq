@@ -480,6 +480,26 @@ public function register(Request $request)
         ], 404);
     }
 
+    if ($user->phone && ! $user->phone_verified_at) {
+        $normalizedPhone = $this->normalizePhone($user->phone);
+        $hasVerifiedOtp = $normalizedPhone && Otp::query()
+            ->where('type', 'whatsapp')
+            ->where('value', $normalizedPhone)
+            ->where('is_verified', 1)
+            ->where('expires_at', '>', now())
+            ->exists();
+
+        if (! $hasVerifiedOtp) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Please verify your mobile number via OTP before completing registration',
+            ], 422);
+        }
+
+        $user->phone_verified_at = now();
+        $user->save();
+    }
+
     $existingDoc1 = $user->pet_doc1;
     $existingDoc2 = $user->pet_doc2;
     $existingSummary = $user->summary;
@@ -632,6 +652,13 @@ public function register(Request $request)
         ]);
 
         $mobileNumber = (string) $request->mobileNumber;
+        $normalizedPhone = $this->normalizePhone($mobileNumber);
+        if (! $normalizedPhone) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Invalid mobile number format',
+            ], 422);
+        }
 
         $mobileExists = DB::table('users')
             ->where('phone', $mobileNumber)
@@ -642,6 +669,21 @@ public function register(Request $request)
             return response()->json([
                 'status'  => 'error',
                 'message' => 'enter unique mobile number'
+            ], 422);
+        }
+
+        $verifiedOtp = Otp::query()
+            ->where('type', 'whatsapp')
+            ->where('value', $normalizedPhone)
+            ->where('is_verified', 1)
+            ->where('expires_at', '>', now())
+            ->latest()
+            ->first();
+
+        if (! $verifiedOtp) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Please verify OTP for this mobile number before registering',
             ], 422);
         }
 
@@ -664,6 +706,7 @@ public function register(Request $request)
             'email'       => $mobileNumber,
             'phone'       => $mobileNumber,
             'password'    => $request->password, // ⚠ plain text (unsafe in prod)
+            'phone_verified_at' => now(),
             'pet_name'    => $request->pet_name,
             'pet_gender'  => $request->pet_gender,
             'pet_age'     => $request->pet_age,
