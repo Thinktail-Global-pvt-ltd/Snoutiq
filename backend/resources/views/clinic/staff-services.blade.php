@@ -1335,6 +1335,13 @@
     if (!hasTarget()){ alertMissingTarget(); return; }
 
     const fd = new FormData(e.target);
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn?.textContent;
+    if (submitBtn){
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating...';
+    }
+
     const priceAfter = !!e.target.elements['price_after_service']?.checked;
     const rawPrice = fd.get('price');
     const priceVal = rawPrice === null || rawPrice === '' ? null : Number(rawPrice);
@@ -1391,9 +1398,27 @@
         }
       }catch(_){ }
     }catch(err){
-      Swal.fire({icon:'error', title:'Create failed', text: err.message || 'Error'});
-      ClientLog?.error('service.create.failed', err.message||String(err));
+      const body = err?.body || {};
+      const validationMsg = body?.errors ? Object.values(body.errors).flat().join(' ') : '';
+      const detail = body?.message || body?.error || err?.message || 'Error';
+      const combined = [detail, validationMsg].filter(Boolean).join(' ');
+      Swal.fire({
+        icon:'error',
+        title:'Create failed',
+        text: combined,
+        footer: err?.status ? `HTTP ${err.status}` : undefined,
+      });
+      ClientLog?.error('service.create.failed', JSON.stringify({
+        message: detail,
+        status: err?.status ?? null,
+        body,
+      }).slice(0, 800));
       ClientLog?.open();
+    } finally {
+      if (submitBtn){
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText || 'Create';
+      }
     }
   });
 

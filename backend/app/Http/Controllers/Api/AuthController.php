@@ -518,23 +518,18 @@ public function register(Request $request)
 
     public function register_latest_backup(Request $request)
     {
-        
-        // check email
-        $emailExists = DB::table('users')
-        ->where('email', $request->email)
-        ->exists();
+        // check mobile (phone/email columns) instead of email
+        $mobileExists = DB::table('users')
+            ->where('phone', $request->mobileNumber)
+            ->orWhere('email', $request->mobileNumber)
+            ->exists();
 
-    // check mobile (phone column)
-    $mobileExists = DB::table('users')
-        ->where('phone', $request->mobileNumber)
-        ->exists();
-
-    if ($emailExists || $mobileExists) {
-        return response()->json([
-            'status'  => 'error',
-            'message' => 'enter unique mobile or email'
-        ], 422);
-    }
+        if ($mobileExists) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'enter unique mobile number'
+            ], 422);
+        }
 
     $doc1Path = null;
     $doc2Path = null;
@@ -554,7 +549,7 @@ public function register(Request $request)
     // ✅ user create (password bina hash)
     $user = User::create([
         'name'        => $request->fullName,
-        'email'       => $request->email,
+        'email'       => $request->mobileNumber,
         'phone'       => $request->mobileNumber,
         'password'    => $request->password, // ⚠ plain text (unsafe in prod)
         'pet_name'    => $request->pet_name,
@@ -582,6 +577,69 @@ public function register(Request $request)
         'token_type' => 'Bearer',
     ], 201);
 }
+
+    public function registerViaMobile(Request $request)
+    {
+        $request->validate([
+            'mobileNumber' => ['required', 'string'],
+        ]);
+
+        $mobileNumber = (string) $request->mobileNumber;
+
+        $mobileExists = DB::table('users')
+            ->where('phone', $mobileNumber)
+            ->orWhere('email', $mobileNumber)
+            ->exists();
+
+        if ($mobileExists) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'enter unique mobile number'
+            ], 422);
+        }
+
+        $doc1Path = null;
+        $doc2Path = null;
+        $summaryText = null;
+        $doc1AbsolutePath = null;
+        $doc2AbsolutePath = null;
+
+        [$doc1Path, $doc1AbsolutePath] = $this->storePetDocument($request, 'pet_doc1');
+        [$doc2Path, $doc2AbsolutePath] = $this->storePetDocument($request, 'pet_doc2');
+
+        $imagePath = $doc1AbsolutePath ?? $doc2AbsolutePath;
+        if ($imagePath) {
+            $summaryText = $this->describePetImageDynamic($imagePath);
+        }
+
+        $user = User::create([
+            'name'        => $request->fullName,
+            'email'       => $mobileNumber,
+            'phone'       => $mobileNumber,
+            'password'    => $request->password, // ⚠ plain text (unsafe in prod)
+            'pet_name'    => $request->pet_name,
+            'pet_gender'  => $request->pet_gender,
+            'pet_age'     => $request->pet_age,
+            'pet_doc1'    => $doc1Path,
+            'pet_doc2'    => $doc2Path,
+            'summary'     => $summaryText,
+            'google_token'=> $request->google_token,
+            'breed'       => $request->breed,
+            'latitude'    => $request->latitude,
+            'longitude'   => $request->longitude,
+        ]);
+
+        $plainToken = bin2hex(random_bytes(32));
+        $user->api_token_hash = $plainToken;
+        $user->save();
+
+        return response()->json([
+            'message'    => 'User registered successfully (mobile)',
+            'user'       => $user,
+            'token'      => $plainToken,
+            'token_type' => 'Bearer',
+        ], 201);
+    }
 
     public function generatePetSummary(Request $request)
     {

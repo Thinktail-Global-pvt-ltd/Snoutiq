@@ -514,6 +514,7 @@ Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
 
 Route::post('/google-login', [AuthController::class, 'googleLogin']);
 Route::post('/auth/register',   [AuthController::class, 'register']);
+Route::post('/auth/register-via-mobile', [AuthController::class, 'registerViaMobile']);
 Route::post('/auth/initial-register', [AuthController::class, 'createInitialRegistration']);
 Route::post('/auth/login',      [AuthController::class, 'login']);
 Route::post('/auth/pet-summary', [AuthController::class, 'generatePetSummary']);
