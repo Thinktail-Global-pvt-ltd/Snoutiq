@@ -243,6 +243,7 @@ class AuthController extends Controller
                 if (!config('app.debug')) {
                     return response()->json([
                         'message' => 'WhatsApp channel is temporarily unavailable',
+                        'code'    => 'WHATSAPP_UNCONFIGURED',
                     ], 503);
                 }
 
@@ -274,6 +275,7 @@ class AuthController extends Controller
                 if (!config('app.debug')) {
                     return response()->json([
                         'message' => 'Unable to send OTP at this time. Please try again shortly.',
+                        'code'    => 'WHATSAPP_SEND_FAILED',
                     ], 503);
                 }
             }
@@ -311,6 +313,7 @@ class AuthController extends Controller
                 'message' => config('app.debug')
                     ? ('OTP send failed: ' . $e->getMessage())
                     : 'Unable to send OTP at this time. Please try again shortly.',
+                'code' => 'OTP_SEND_FAILED',
             ], 503);
         }
     }
