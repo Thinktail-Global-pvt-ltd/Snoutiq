@@ -357,17 +357,52 @@ class AuthController extends Controller
         }
 
         if ($otpEntry->is_verified) {
-            return response()->json(['message' => 'OTP already verified'], 200);
+            $existingUser = User::where('phone', $normalizedPhone)
+                ->orWhere('email', $normalizedPhone)
+                ->first();
+
+            return response()->json([
+                'message' => 'OTP already verified',
+                'user_id' => $existingUser?->id,
+                'user'    => $existingUser,
+            ], 200);
         }
 
         $otpUser = User::where('phone', $normalizedPhone)
+            ->orWhere('email', $normalizedPhone)
             ->orWhere('phone', $request->phone)
             ->first();
 
         $otpEntry->update(['is_verified' => 1]);
-        $this->markPhoneVerified($otpUser, $normalizedPhone, $otpEntry);
 
-        return response()->json(['message' => 'OTP verified successfully']);
+        $user = $otpUser;
+
+        if (! $user) {
+            $user = User::create([
+                'name'              => $request->fullName ?? $normalizedPhone,
+                'email'             => $normalizedPhone,
+                'phone'             => $normalizedPhone,
+                'password'          => null,
+                'google_token'      => $request->google_token,
+                'latitude'          => $request->latitude,
+                'longitude'         => $request->longitude,
+                'phone_verified_at' => now(),
+            ]);
+        } else {
+            $user->forceFill([
+                'phone_verified_at' => $user->phone_verified_at ?? now(),
+                'phone'             => $user->phone ?: $normalizedPhone,
+                'email'             => $user->email ?: $normalizedPhone,
+            ])->save();
+        }
+
+        $this->markPhoneVerified($user, $normalizedPhone, $otpEntry);
+
+        return response()->json([
+            'message' => 'OTP verified successfully',
+            'user_id' => $user->id,
+            'user'    => $user,
+        ]);
     }
 
     // --------------------------- REGISTER -----------------------------------
