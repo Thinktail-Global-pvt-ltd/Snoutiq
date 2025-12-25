@@ -302,9 +302,16 @@ class AuthController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
+            Log::error('otp.send.failed', [
+                'phone'   => $request->input('value'),
+                'error'   => $e->getMessage(),
+            ]);
+
             return response()->json([
-                'message' => 'Something went wrong while sending OTP',
-            ], 500);
+                'message' => config('app.debug')
+                    ? ('OTP send failed: ' . $e->getMessage())
+                    : 'Unable to send OTP at this time. Please try again shortly.',
+            ], 503);
         }
     }
 
