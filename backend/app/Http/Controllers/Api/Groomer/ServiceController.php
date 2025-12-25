@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 
 class ServiceController extends Controller
@@ -68,6 +69,53 @@ class ServiceController extends Controller
 
         $sid = session('user_id') ?? data_get(session('user'), 'id');
         return $sid ? (int) $sid : null;
+    }
+
+    /**
+     * Normalize min/max price inputs and ensure a valid range is provided.
+     *
+     * @return array{0: float|null, 1: float|null, 2: float}
+     *
+     * @throws ValidationException
+     */
+    private function resolvePriceRange(Request $request, bool $priceAfterService = false): array
+    {
+        if ($priceAfterService) {
+            return [null, null, null];
+        }
+
+        $price = $request->input('price');
+        $priceMin = $request->input('price_min', $price);
+        $priceMax = $request->input('price_max', $price);
+
+        $price    = $price === '' ? null : $price;
+        $priceMin = $priceMin === '' ? null : $priceMin;
+        $priceMax = $priceMax === '' ? null : $priceMax;
+
+        if ($priceMin === null && $priceMax === null) {
+            throw ValidationException::withMessages([
+                'price_min' => ['Price range is required.'],
+            ]);
+        }
+
+        $priceMin = $priceMin !== null ? (float) $priceMin : null;
+        $priceMax = $priceMax !== null ? (float) $priceMax : null;
+
+        if ($priceMin !== null && $priceMax === null) {
+            $priceMax = $priceMin;
+        } elseif ($priceMax !== null && $priceMin === null) {
+            $priceMin = $priceMax;
+        }
+
+        if ($priceMin !== null && $priceMax !== null && $priceMax < $priceMin) {
+            throw ValidationException::withMessages([
+                'price_max' => ['Max price must be greater than or equal to min price.'],
+            ]);
+        }
+
+        $priceValue = $priceMax ?? $priceMin ?? 0;
+
+        return [$priceMin, $priceMax, $priceValue];
     }
 
  public function get(Request $request)
@@ -193,8 +241,11 @@ class ServiceController extends Controller
             $request->validate([
                 'serviceName'     => 'required|string',
                 'petType'         => 'required|string',
-                'price'           => 'required|numeric',
-                'duration'        => 'required|integer',
+                'price'           => 'nullable|numeric|min:0',
+                'price_min'       => 'nullable|numeric|min:0',
+                'price_max'       => 'nullable|numeric|min:0',
+                'price_after_service' => 'nullable|boolean',
+                'duration'        => 'required|integer|min:1',
                 'main_service'    => 'required|string',
                 'status'          => 'required|string',
                 'serviceCategory' => 'nullable|integer',
@@ -211,15 +262,21 @@ class ServiceController extends Controller
                 ], 422);
             }
 
+            $priceAfterService = $request->boolean('price_after_service');
+            [$priceMin, $priceMax, $priceValue] = $this->resolvePriceRange($request, $priceAfterService);
+
             $data = [
                 'user_id'       => $uid,
                 'name'          => $request->serviceName,
                 'description'   => $request->description,
                 'pet_type'      => $request->petType,
-                'price'         => $request->price,
+                'price'         => $priceAfterService ? null : $priceValue,
+                'price_min'     => $priceAfterService ? null : $priceMin,
+                'price_max'     => $priceAfterService ? null : $priceMax,
                 'duration'      => $request->duration,
                 'main_service'  => $request->main_service,
                 'status'        => $request->status,
+                'price_after_service' => $priceAfterService,
             ];
 
             if ($request->hasFile('servicePic')) {
@@ -240,7 +297,7 @@ class ServiceController extends Controller
                 'message' => 'Service created successfully',
                 'data'    => $service,
             ], 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json([
                 'status'  => false,
                 'message' => 'Validation error',
@@ -317,7 +374,10 @@ class ServiceController extends Controller
                 'serviceCategory' => 'nullable|integer',
                 'description'     => 'nullable|string',
                 'petType'         => 'required',
-                'price'           => 'required|numeric|min:0',
+                'price'           => 'nullable|numeric|min:0',
+                'price_min'       => 'nullable|numeric|min:0',
+                'price_max'       => 'nullable|numeric|min:0',
+                'price_after_service' => 'nullable|boolean',
                 'duration'        => 'required|integer|min:1',
                 'status'          => 'required',
                 'main_service'    => 'required',
@@ -335,14 +395,20 @@ class ServiceController extends Controller
 
             $service = GroomerService::where('user_id', $uid)->findOrFail($id);
 
+            $priceAfterService = $request->boolean('price_after_service');
+            [$priceMin, $priceMax, $priceValue] = $this->resolvePriceRange($request, $priceAfterService);
+
             $data = [
                 'name'          => $request->serviceName,
                 'description'   => $request->description,
                 'pet_type'      => $request->petType,
-                'price'         => $request->price,
+                'price'         => $priceAfterService ? null : $priceValue,
+                'price_min'     => $priceAfterService ? null : $priceMin,
+                'price_max'     => $priceAfterService ? null : $priceMax,
                 'duration'      => $request->duration,
                 'main_service'  => $request->main_service,
                 'status'        => $request->status,
+                'price_after_service' => $priceAfterService,
             ];
 
             if ($request->hasFile('servicePic')) {
@@ -367,6 +433,12 @@ class ServiceController extends Controller
                 'message' => 'Service updated successfully',
                 'data'    => $service,
             ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation error',
+                'errors'  => $e->errors(),
+            ], 422);
         } catch (\Throwable $e) {
             return response()->json([
                 'status'  => false,

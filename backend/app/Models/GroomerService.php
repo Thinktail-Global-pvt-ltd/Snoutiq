@@ -13,10 +13,18 @@ class GroomerService extends Model
         'name',
         'description',
         'pet_type',
-        'price',
+       'price',
+       'price_min',
+        'price_max',
+        'price_after_service',
         'duration',
         'status',
-        'service_pic','main_service'
+        'service_pic',
+        'main_service'
+    ];
+
+    protected $casts = [
+        'price_after_service' => 'boolean',
     ];
 
     // Relationships

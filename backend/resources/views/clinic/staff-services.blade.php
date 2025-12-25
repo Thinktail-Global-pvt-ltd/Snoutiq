@@ -717,9 +717,16 @@
           <label class="block text-sm font-semibold mb-1">Service Name</label>
           <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
-        <div>
+        <div data-price-wrapper>
           <label class="block text-sm font-semibold mb-1">Price (₹)</label>
           <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
+        </div>
+        <div class="flex items-start gap-2 pt-1">
+          <input id="create-price-after" name="price_after_service" type="checkbox" class="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded">
+          <label for="create-price-after" class="text-sm font-semibold text-gray-700">
+            Price after service
+            <span class="block text-xs font-normal text-gray-500">Hide price field and collect payment after service.</span>
+          </label>
         </div>
         @unless($isOnboarding)
           <div>
@@ -795,9 +802,16 @@
           <label class="block text-sm font-semibold mb-1">Service Name</label>
           <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
         </div>
-        <div>
+        <div data-price-wrapper>
           <label class="block text-sm font-semibold mb-1">Price (₹)</label>
           <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
+        </div>
+        <div class="flex items-start gap-2 pt-1">
+          <input id="edit-price-after" name="price_after_service" type="checkbox" class="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded">
+          <label for="edit-price-after" class="text-sm font-semibold text-gray-700">
+            Price after service
+            <span class="block text-xs font-normal text-gray-500">Hide price field and collect payment after service.</span>
+          </label>
         </div>
         <div>
           <label class="block text-sm font-semibold mb-1">Duration (mins)</label>
@@ -1124,6 +1138,8 @@
   const createForm  = document.getElementById('create-form');
   const editModal   = $('#edit-modal');
   const editForm    = document.getElementById('edit-form');
+  let applyCreatePriceState = () => {};
+  let applyEditPriceState = () => {};
   const open = el => el.classList.remove('hidden');
   const close = el => el.classList.add('hidden');
   const resetCreateForm = () => {
@@ -1134,10 +1150,49 @@
       const field = createForm.elements[name];
       if (field && field.tagName === 'SELECT') field.value = '';
     });
+    applyCreatePriceState();
   };
   const openCreate = () => { resetCreateForm(); open(createModal); };
   const closeCreate = () => { resetCreateForm(); close(createModal); };
   function esc(s){ return (''+(s??'')).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+  function initPriceToggle(form){
+    if (!form) return () => {};
+    const checkbox = form.elements['price_after_service'];
+    const priceWrapper = form.querySelector('[data-price-wrapper]');
+    const priceInput = form.elements['price'];
+    const update = () => {
+      const after = !!checkbox?.checked;
+      priceWrapper?.classList.toggle('hidden', after);
+      if (priceInput) {
+        priceInput.required = !after;
+        if (after) priceInput.value = '';
+      }
+    };
+    checkbox?.addEventListener('change', update);
+    return update;
+  }
+
+  applyCreatePriceState = initPriceToggle(createForm);
+  applyEditPriceState = initPriceToggle(editForm);
+  applyCreatePriceState();
+  applyEditPriceState();
+
+  const parsePrice = (val) => {
+    if (val === null || typeof val === 'undefined' || val === '') return null;
+    const num = Number(val);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  function isAfterService(service){
+    const flag = service?.price_after_service === true
+      || service?.price_after_service === 1
+      || service?.price_after_service === '1';
+    const hasPrice = [service?.price, service?.price_min, service?.price_max]
+      .map(parsePrice)
+      .some(v => v !== null);
+    return flag || !hasPrice;
+  }
 
   // ===== List + Render =====
   let ALL = [];
@@ -1167,6 +1222,23 @@
     }
   }
 
+  function formatPriceRange(service){
+    if (isAfterService(service)) return 'Price after service';
+
+    const min = parsePrice(service.price ?? service.price_min ?? service.priceMin);
+    const max = parsePrice(service.price ?? service.price_max ?? service.priceMax ?? min);
+
+    if (min !== null && max !== null && Math.abs(max - min) < 0.001){
+      return `₹${min.toFixed(2)}`;
+    }
+    if (min !== null && max !== null){
+      return `₹${min.toFixed(2)} - ₹${max.toFixed(2)}`;
+    }
+    if (min !== null) return `₹${min.toFixed(2)}`;
+    if (max !== null) return `₹${max.toFixed(2)}`;
+    return '₹0.00';
+  }
+
   function render(list){
     rows.innerHTML = '';
     mobileRows.innerHTML = '';
@@ -1184,7 +1256,7 @@
       tr.innerHTML = `
         <td class="px-4 py-3 font-medium">${esc(it.name)}</td>
         <td class="px-4 py-3">${esc(it.pet_type || it.petType || '')}</td>
-        <td class="px-4 py-3">${Number(it.price).toFixed(2)}</td>
+        <td class="px-4 py-3">${formatPriceRange(it)}</td>
         <td class="px-4 py-3">${it.duration}</td>
         <td class="px-4 py-3">${esc(it.main_service || '')}</td>
         <td class="px-4 py-3">
@@ -1216,7 +1288,7 @@
         </div>
         <div class="card-row">
           <span class="card-label">Price:</span>
-          <span class="card-value">₹${Number(it.price).toFixed(2)}</span>
+          <span class="card-value">${formatPriceRange(it)}</span>
         </div>
         <div class="card-row">
           <span class="card-label">Duration:</span>
@@ -1263,11 +1335,34 @@
     if (!hasTarget()){ alertMissingTarget(); return; }
 
     const fd = new FormData(e.target);
+    const priceAfter = !!e.target.elements['price_after_service']?.checked;
+    const rawPrice = fd.get('price');
+    const priceVal = rawPrice === null || rawPrice === '' ? null : Number(rawPrice);
+    if (!priceAfter){
+      if (!Number.isFinite(priceVal)){
+        Swal.fire({icon:'warning', title:'Enter a valid price or choose “price after service”.', timer:1800, showConfirmButton:false});
+        return;
+      }
+      if (priceVal < 0){
+        Swal.fire({icon:'warning', title:'Price must be zero or more', timer:1500, showConfirmButton:false});
+        return;
+      }
+    }
+
     const payload = new FormData();
     payload.append('serviceName',  fd.get('serviceName'));
     payload.append('description',  fd.get('description') || '');
     payload.append('petType',      fd.get('petType'));
-    payload.append('price',        fd.get('price'));
+    payload.append('price_after_service', priceAfter ? '1' : '0');
+    if (priceAfter){
+      payload.append('price',     '');
+      payload.append('price_min', '');
+      payload.append('price_max', '');
+    } else {
+      payload.append('price',     priceVal);
+      payload.append('price_min', priceVal);
+      payload.append('price_max', priceVal);
+    }
     payload.append('duration',     fd.get('duration'));
     payload.append('main_service', fd.get('main_service'));
     payload.append('status',       fd.get('status'));
@@ -1375,10 +1470,16 @@
     f.elements['serviceName'].value = s.name || '';
     f.elements['description'].value = s.description || '';
     f.elements['petType'].value = s.pet_type || s.petType || '';
-    f.elements['price'].value = s.price || 0;
+    const afterService = isAfterService(s);
+    const priceValue = parsePrice(s.price ?? s.price_max ?? s.price_min);
+    if (f.elements['price_after_service']) {
+      f.elements['price_after_service'].checked = afterService;
+    }
+    f.elements['price'].value = afterService ? '' : (priceValue ?? '');
     f.elements['duration'].value = s.duration || 0;
     f.elements['main_service'].value = s.main_service || '';
     f.elements['status'].value = s.status || 'Active';
+    applyEditPriceState();
   }
 
   $$('.btn-close', editModal).forEach(b=> b.addEventListener('click', ()=> close(editModal)));
@@ -1389,11 +1490,34 @@
 
     const f = e.target;
     const id = f.elements['id'].value;
+    const priceAfter = !!f.elements['price_after_service']?.checked;
+    const rawPrice = f.elements['price'].value;
+    const priceVal = rawPrice === null || rawPrice === '' ? null : Number(rawPrice);
+    if (!priceAfter){
+      if (!Number.isFinite(priceVal)){
+        Swal.fire({icon:'warning', title:'Enter a valid price or choose “price after service”.', timer:1800, showConfirmButton:false});
+        return;
+      }
+      if (priceVal < 0){
+        Swal.fire({icon:'warning', title:'Price must be zero or more', timer:1500, showConfirmButton:false});
+        return;
+      }
+    }
+
     const payload = new FormData();
     payload.append('serviceName',  f.elements['serviceName'].value);
     payload.append('description',  f.elements['description'].value || '');
     payload.append('petType',      f.elements['petType'].value);
-    payload.append('price',        f.elements['price'].value);
+    payload.append('price_after_service', priceAfter ? '1' : '0');
+    if (priceAfter){
+      payload.append('price',     '');
+      payload.append('price_min', '');
+      payload.append('price_max', '');
+    } else {
+      payload.append('price',     priceVal);
+      payload.append('price_min', priceVal);
+      payload.append('price_max', priceVal);
+    }
     payload.append('duration',     f.elements['duration'].value);
     payload.append('main_service', f.elements['main_service'].value);
     payload.append('status',       f.elements['status'].value);

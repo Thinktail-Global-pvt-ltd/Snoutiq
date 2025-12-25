@@ -21,7 +21,7 @@ class WhatsAppService
         return !empty($this->phoneNumberId) && !empty($this->accessToken);
     }
 
-    public function sendTemplate(string $to, ?string $template = null, array $components = []): void
+    public function sendTemplate(string $to, ?string $template = null, array $components = [], ?string $language = null): void
     {
         $this->dispatch([
             'messaging_product' => 'whatsapp',
@@ -29,7 +29,7 @@ class WhatsAppService
             'type' => 'template',
             'template' => array_filter([
                 'name' => $template ?: $this->defaultTemplate,
-                'language' => ['code' => $this->defaultLanguage],
+                'language' => ['code' => $language ?: $this->defaultLanguage],
                 'components' => $components ?: null,
             ]),
         ]);
@@ -61,7 +61,7 @@ class WhatsAppService
         ], true);
     }
 
-    public function sendTemplateWithResult(string $to, ?string $template = null, array $components = []): array
+    public function sendTemplateWithResult(string $to, ?string $template = null, array $components = [], ?string $language = null): array
     {
         return $this->dispatch([
             'messaging_product' => 'whatsapp',
@@ -69,10 +69,32 @@ class WhatsAppService
             'type' => 'template',
             'template' => array_filter([
                 'name' => $template ?: $this->defaultTemplate,
-                'language' => ['code' => $this->defaultLanguage],
+                'language' => ['code' => $language ?: $this->defaultLanguage],
                 'components' => $components ?: null,
             ]),
         ], true);
+    }
+
+    public function sendOtpTemplate(string $to, string $otp, string $template = 'whatsapp_authentication', string $language = 'en'): void
+    {
+        $components = [
+            [
+                'type' => 'body',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $otp],
+                ],
+            ],
+            [
+                'type' => 'button',
+                'sub_type' => 'url',
+                'index' => '0',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $otp],
+                ],
+            ],
+        ];
+
+        $this->sendTemplate($to, $template, $components, $language);
     }
 
     private function dispatch(array $payload, bool $returnResponse = false): array

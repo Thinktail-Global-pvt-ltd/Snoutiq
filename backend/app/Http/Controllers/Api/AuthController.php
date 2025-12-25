@@ -124,6 +124,45 @@ class AuthController extends Controller
         return $digits;
     }
 
+    private function snapshotPhoneOtp(?User $user, string $otp, Carbon $expiresAt): void
+    {
+        if (!$user) {
+            return;
+        }
+
+        $user->forceFill([
+            'last_otp' => $otp,
+            'last_otp_expires_at' => $expiresAt,
+            'last_otp_verified_at' => null,
+        ])->save();
+    }
+
+    private function markPhoneVerified(?User $user, string $phone, ?Otp $otpEntry = null): void
+    {
+        if (!$user) {
+            return;
+        }
+
+        $now = Carbon::now();
+
+        $updates = [
+            'phone_verified_at' => $now,
+            'last_otp_verified_at' => $now,
+        ];
+
+        // Only override phone if it is empty; avoid collisions on unique constraint
+        if (empty($user->phone)) {
+            $updates['phone'] = $phone;
+        }
+
+        if ($otpEntry) {
+            $updates['last_otp'] = $otpEntry->otp;
+            $updates['last_otp_expires_at'] = $otpEntry->expires_at;
+        }
+
+        $user->forceFill($updates)->save();
+    }
+
     // -------------------------- OTP SEND -----------------------------------
     // public function send_otp(Request $request){
     //     $request->validate([
@@ -180,69 +219,60 @@ class AuthController extends Controller
     {
         try {
             $request->validate([
-                'type' => ['nullable', Rule::in(['email', 'whatsapp'])],
+                'type' => ['nullable', Rule::in(['whatsapp'])],
                 'value' => 'required|string',
             ]);
 
-            $type = $request->input('type', 'email');
+            $type = 'whatsapp';
             $rawValue = trim((string) $request->input('value'));
-            $otp = random_int(1000, 9999);
+            $otp = (string) random_int(1000, 9999);
             $token = (string) Str::uuid();
             $expiresAt = Carbon::now()->addMinutes(10);
             $normalizedPhone = null;
+            $otpUser = null;
 
-            if ($type === 'email') {
-                $request->merge(['value' => $rawValue]);
-                $request->validate(['value' => 'email']);
-            } else {
-                $normalizedPhone = $this->normalizePhone($rawValue);
+            $normalizedPhone = $this->normalizePhone($rawValue);
 
-                if (! $normalizedPhone) {
-                    return response()->json([
-                        'message' => 'Invalid phone number for WhatsApp verification',
-                    ], 422);
-                }
+            if (! $normalizedPhone) {
+                return response()->json([
+                    'message' => 'Invalid phone number for WhatsApp verification',
+                ], 422);
+            }
 
-                if (! $this->whatsApp->isConfigured()) {
-                    return response()->json([
-                        'message' => 'WhatsApp channel is temporarily unavailable',
-                    ], 503);
-                }
+            if (! $this->whatsApp->isConfigured()) {
+                return response()->json([
+                    'message' => 'WhatsApp channel is temporarily unavailable',
+                ], 503);
             }
 
             if ($this->shouldCheckUniqueness($request)) {
-                $column = $type === 'email' ? 'email' : 'phone';
-                $valueToCheck = $type === 'email' ? $rawValue : $normalizedPhone;
-
                 $exists = User::query()
-                    ->where($column, $valueToCheck)
-                    ->when($type === 'whatsapp' && $normalizedPhone !== $rawValue, function ($query) use ($column, $rawValue) {
-                        $query->orWhere($column, $rawValue);
-                    })
+                    ->where('phone', $normalizedPhone)
+                    ->orWhere('phone', $rawValue)
                     ->exists();
 
                 if ($exists) {
                     return response()->json([
-                        'message' => ucfirst($column).' is already registered with us',
+                        'message' => 'Phone is already registered with us',
                     ], 401);
                 }
             }
 
-            if ($type === 'email') {
-                Mail::to($rawValue)->send(new OtpMail($otp));
-            } else {
-                $message = "Your SnoutIQ verification code is {$otp}. It expires in 10 minutes.";
-                $this->whatsApp->sendText($normalizedPhone, $message);
-            }
+            $this->whatsApp->sendOtpTemplate($normalizedPhone, $otp);
+            $otpUser = User::where('phone', $normalizedPhone)
+                ->orWhere('phone', $rawValue)
+                ->first();
 
             Otp::create([
                 'token'       => $token,
                 'type'        => $type,
-                'value'       => $type === 'email' ? $rawValue : $normalizedPhone,
+                'value'       => $normalizedPhone,
                 'otp'         => $otp,
                 'expires_at'  => $expiresAt,
                 'is_verified' => 0,
             ]);
+
+            $this->snapshotPhoneOtp($otpUser, $otp, $expiresAt);
 
             return response()->json([
                 'message' => 'OTP sent successfully',
@@ -305,12 +335,19 @@ class AuthController extends Controller
     {
         $request->validate([
             'token' => 'required|string',
-          //'value' => 'required|string',
-            'otp'   => 'required',
+            'otp'   => 'required|string',
+            'phone' => 'required|string',
         ]);
 
-        $otpEntry = Otp::where('token', $request->token)
-          
+        $normalizedPhone = $this->normalizePhone($request->phone);
+        if (! $normalizedPhone) {
+            return response()->json(['error' => 'Invalid phone number'], 422);
+        }
+
+        $otpEntry = Otp::query()
+            ->where('token', $request->token)
+            ->where('type', 'whatsapp')
+            ->where('value', $normalizedPhone)
             ->where('otp', $request->otp)
             ->where('expires_at', '>', now())
             ->first();
@@ -323,7 +360,13 @@ class AuthController extends Controller
             return response()->json(['message' => 'OTP already verified'], 200);
         }
 
+        $otpUser = User::where('phone', $normalizedPhone)
+            ->orWhere('phone', $request->phone)
+            ->first();
+
         $otpEntry->update(['is_verified' => 1]);
+        $this->markPhoneVerified($otpUser, $normalizedPhone, $otpEntry);
+
         return response()->json(['message' => 'OTP verified successfully']);
     }
 
