@@ -248,7 +248,7 @@ class ServiceController extends Controller
                 'duration'        => 'required|integer|min:1',
                 'main_service'    => 'required|string',
                 'status'          => 'required|string',
-                'serviceCategory' => 'nullable|integer',
+                'serviceCategory' => 'required|integer|exists:groomer_service_categories,id',
                 'description'     => 'nullable|string',
                 'servicePic'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
                 'user_id'         => 'nullable|integer',
@@ -274,6 +274,7 @@ class ServiceController extends Controller
                 'price_min'     => $priceAfterService ? null : $priceMin,
                 'price_max'     => $priceAfterService ? null : $priceMax,
                 'duration'      => $request->duration,
+                'groomer_service_category_id' => $request->serviceCategory,
                 'main_service'  => $request->main_service,
                 'status'        => $request->status,
                 'price_after_service' => $priceAfterService,
@@ -371,7 +372,7 @@ class ServiceController extends Controller
         try {
             $request->validate([
                 'serviceName'     => 'required|string|max:255',
-                'serviceCategory' => 'nullable|integer',
+                'serviceCategory' => 'required|integer|exists:groomer_service_categories,id',
                 'description'     => 'nullable|string',
                 'petType'         => 'required',
                 'price'           => 'nullable|numeric|min:0',
@@ -406,6 +407,7 @@ class ServiceController extends Controller
                 'price_min'     => $priceAfterService ? null : $priceMin,
                 'price_max'     => $priceAfterService ? null : $priceMax,
                 'duration'      => $request->duration,
+                'groomer_service_category_id' => $request->serviceCategory,
                 'main_service'  => $request->main_service,
                 'status'        => $request->status,
                 'price_after_service' => $priceAfterService,
