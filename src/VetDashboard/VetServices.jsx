@@ -11,6 +11,7 @@ const emptyForm = {
   duration: "",
   main_service: "in_clinic",
   status: "active",
+  serviceCategory: "",
 };
 
 const VetServices = () => {
@@ -25,6 +26,9 @@ const VetServices = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoriesError, setCategoriesError] = useState("");
 
   const resolvedUserId = useMemo(() => {
     return (
@@ -64,8 +68,44 @@ const VetServices = () => {
     }
   };
 
+  const fetchCategories = async () => {
+    if (!resolvedUserId && !resolvedVetSlug) {
+      setCategories([]);
+      setCategoriesError("Missing clinic/user id to load service categories.");
+      return;
+    }
+
+    setCategoriesLoading(true);
+    setCategoriesError("");
+    try {
+      const res = await axios.get("https://snoutiq.com/backend/api/groomer/service_categroy", {
+        params: {
+          user_id: resolvedUserId || undefined,
+          vet_slug: resolvedVetSlug || undefined,
+        },
+        withCredentials: true,
+      });
+      const data = res?.data?.data;
+      const nextCategories = Array.isArray(data) ? data : [];
+      setCategories(nextCategories);
+
+      if (nextCategories.length > 0) {
+        setForm((prev) => {
+          if (prev.serviceCategory) return prev;
+          return { ...prev, serviceCategory: String(nextCategories[0].id) };
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load service categories", err);
+      setCategoriesError("Unable to load service categories.");
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchServices();
+    fetchCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedUserId, resolvedVetSlug]);
 
@@ -74,12 +114,15 @@ const VetServices = () => {
   };
 
   const resetForm = () => {
-    setForm(emptyForm);
+    setForm({ ...emptyForm, serviceCategory: categories[0]?.id ? String(categories[0].id) : "" });
     setEditingId(null);
     setIsModalOpen(false);
   };
 
   const openModal = () => {
+    // Always start with a clean slate when opening for a new service
+    setForm({ ...emptyForm, serviceCategory: categories[0]?.id ? String(categories[0].id) : "" });
+    setEditingId(null);
     setIsModalOpen(true);
   };
 
@@ -98,12 +141,18 @@ const VetServices = () => {
       ...form,
       price: Number(form.price || 0),
       duration: Number(form.duration || 0),
+      serviceCategory: form.serviceCategory ? Number(form.serviceCategory) : null,
       user_id: resolvedUserId,
       vet_slug: resolvedVetSlug,
     };
 
     if (!payload.serviceName || !payload.petType || !payload.price || !payload.duration || !payload.main_service) {
       toast.error("Please fill all required fields.");
+      return;
+    }
+
+    if (!payload.serviceCategory) {
+      toast.error("Please select a service category.");
       return;
     }
 
@@ -142,6 +191,7 @@ const VetServices = () => {
       duration: svc.duration || "",
       main_service: svc.main_service || "in_clinic",
       status: svc.status || "active",
+      serviceCategory: svc.groomer_service_category_id ? String(svc.groomer_service_category_id) : "",
     });
     setIsModalOpen(true);
   };
@@ -582,6 +632,37 @@ const VetServices = () => {
                       <option value="online">Online</option>
                       <option value="home_visit">Home Visit</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="serviceCategory" className="block text-sm font-medium text-gray-700">
+                      Service Category *
+                    </label>
+                    <select
+                      id="serviceCategory"
+                      value={form.serviceCategory}
+                      onChange={(e) => handleChange("serviceCategory", e.target.value)}
+                      disabled={categoriesLoading || categories.length === 0}
+                      className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    >
+                      {categoriesLoading && <option value="">Loading categories...</option>}
+                      {!categoriesLoading && categories.length === 0 && (
+                        <option value="">No categories found</option>
+                      )}
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    {categoriesError && (
+                      <p className="mt-2 text-sm text-red-600">{categoriesError}</p>
+                    )}
+                    {!categoriesLoading && categories.length === 0 && !categoriesError && (
+                      <p className="mt-2 text-sm text-gray-500">
+                        Create a category first to add services.
+                      </p>
+                    )}
                   </div>
 
                   <div>

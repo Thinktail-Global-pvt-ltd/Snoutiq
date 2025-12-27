@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 
 class ServiceController extends Controller
@@ -299,12 +300,27 @@ class ServiceController extends Controller
                 'data'    => $service,
             ], 201);
         } catch (ValidationException $e) {
+            Log::warning('Groomer service validation failed', [
+                'errors' => $e->errors(),
+                'user_id' => $this->resolveUserId($request),
+                'inputs' => $request->except(['servicePic']),
+                'ip' => $request->ip(),
+                'route' => $request->path(),
+            ]);
             return response()->json([
                 'status'  => false,
                 'message' => 'Validation error',
                 'errors'  => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
+            Log::error('Groomer service creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $this->resolveUserId($request),
+                'inputs' => $request->except(['servicePic']),
+                'ip' => $request->ip(),
+                'route' => $request->path(),
+            ]);
             return response()->json([
                 'status'  => false,
                 'message' => 'Failed to create service',
