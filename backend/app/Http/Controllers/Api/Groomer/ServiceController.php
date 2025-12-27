@@ -271,9 +271,10 @@ class ServiceController extends Controller
             $hasPriceMin = Schema::hasColumn('groomer_services', 'price_min');
             $hasPriceMax = Schema::hasColumn('groomer_services', 'price_max');
             $hasPriceAfterService = Schema::hasColumn('groomer_services', 'price_after_service');
+            $hasCategoryColumn = Schema::hasColumn('groomer_services', 'groomer_service_category_id');
 
             $serviceCategoryId = $request->input('serviceCategory');
-            if (!$serviceCategoryId) {
+            if ($hasCategoryColumn && !$serviceCategoryId) {
                 // if no category passed, pick the first for this user
                 $serviceCategoryId = GroomerServiceCategory::where('user_id', $uid)->value('id');
                 if (!$serviceCategoryId) {
@@ -304,10 +305,13 @@ class ServiceController extends Controller
                 'pet_type'      => $request->petType,
                 'price'         => $priceAfterService ? null : $priceValue,
                 'duration'      => $request->duration,
-                'groomer_service_category_id' => $serviceCategoryId,
                 'main_service'  => $request->main_service,
                 'status'        => $request->status,
             ];
+
+            if ($hasCategoryColumn) {
+                $data['groomer_service_category_id'] = $serviceCategoryId;
+            }
 
             // Only set optional pricing columns if the table has them
             if ($hasPriceMin) {
@@ -457,6 +461,7 @@ class ServiceController extends Controller
             $hasPriceMin = Schema::hasColumn('groomer_services', 'price_min');
             $hasPriceMax = Schema::hasColumn('groomer_services', 'price_max');
             $hasPriceAfterService = Schema::hasColumn('groomer_services', 'price_after_service');
+            $hasCategoryColumn = Schema::hasColumn('groomer_services', 'groomer_service_category_id');
 
             $data = [
                 'name'          => $request->serviceName,
@@ -479,7 +484,7 @@ class ServiceController extends Controller
             }
 
             // Only override category if explicitly provided; otherwise keep current value
-            if ($request->filled('serviceCategory')) {
+            if ($hasCategoryColumn && $request->filled('serviceCategory')) {
                 $data['groomer_service_category_id'] = $request->serviceCategory;
             }
 
