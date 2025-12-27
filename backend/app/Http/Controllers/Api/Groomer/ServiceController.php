@@ -269,14 +269,23 @@ class ServiceController extends Controller
 
             $serviceCategoryId = $request->input('serviceCategory');
             if (!$serviceCategoryId) {
-                // if no category passed, pick the first for this user or create a default bucket
+                // if no category passed, pick the first for this user
                 $serviceCategoryId = GroomerServiceCategory::where('user_id', $uid)->value('id');
                 if (!$serviceCategoryId) {
-                    $defaultCategory = GroomerServiceCategory::firstOrCreate(
-                        ['user_id' => $uid, 'name' => 'Default'],
-                        ['name' => 'Default']
-                    );
-                    $serviceCategoryId = $defaultCategory->id;
+                    // if user does not exist (common for public slug-based create), avoid FK errors
+                    $userExists = DB::table('users')->where('id', $uid)->exists();
+                    if ($userExists) {
+                        $defaultCategory = GroomerServiceCategory::firstOrCreate(
+                            ['user_id' => $uid, 'name' => 'Default'],
+                            ['name' => 'Default']
+                        );
+                        $serviceCategoryId = $defaultCategory->id;
+                    } else {
+                        return response()->json([
+                            'status' => false,
+                            'message' => 'Service category missing and no category found for this clinic/user. Please create one first.',
+                        ], 422);
+                    }
                 }
             }
 
