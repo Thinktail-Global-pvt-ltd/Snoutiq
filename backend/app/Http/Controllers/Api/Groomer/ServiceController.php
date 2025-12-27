@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use App\Models\GroomerServiceCategory;
+use Illuminate\Support\Facades\Schema;
 
 
 class ServiceController extends Controller
@@ -267,6 +268,10 @@ class ServiceController extends Controller
             $priceAfterService = $request->boolean('price_after_service');
             [$priceMin, $priceMax, $priceValue] = $this->resolvePriceRange($request, $priceAfterService);
 
+            $hasPriceMin = Schema::hasColumn('groomer_services', 'price_min');
+            $hasPriceMax = Schema::hasColumn('groomer_services', 'price_max');
+            $hasPriceAfterService = Schema::hasColumn('groomer_services', 'price_after_service');
+
             $serviceCategoryId = $request->input('serviceCategory');
             if (!$serviceCategoryId) {
                 // if no category passed, pick the first for this user
@@ -298,14 +303,22 @@ class ServiceController extends Controller
                 'description'   => $request->description,
                 'pet_type'      => $request->petType,
                 'price'         => $priceAfterService ? null : $priceValue,
-                'price_min'     => $priceAfterService ? null : $priceMin,
-                'price_max'     => $priceAfterService ? null : $priceMax,
                 'duration'      => $request->duration,
                 'groomer_service_category_id' => $serviceCategoryId,
                 'main_service'  => $request->main_service,
                 'status'        => $request->status,
-                'price_after_service' => $priceAfterService,
             ];
+
+            // Only set optional pricing columns if the table has them
+            if ($hasPriceMin) {
+                $data['price_min'] = $priceAfterService ? null : $priceMin;
+            }
+            if ($hasPriceMax) {
+                $data['price_max'] = $priceAfterService ? null : $priceMax;
+            }
+            if ($hasPriceAfterService) {
+                $data['price_after_service'] = $priceAfterService;
+            }
 
             if ($request->hasFile('servicePic')) {
                 $directory = public_path('service_pics');
@@ -441,18 +454,29 @@ class ServiceController extends Controller
             $priceAfterService = $request->boolean('price_after_service');
             [$priceMin, $priceMax, $priceValue] = $this->resolvePriceRange($request, $priceAfterService);
 
+            $hasPriceMin = Schema::hasColumn('groomer_services', 'price_min');
+            $hasPriceMax = Schema::hasColumn('groomer_services', 'price_max');
+            $hasPriceAfterService = Schema::hasColumn('groomer_services', 'price_after_service');
+
             $data = [
                 'name'          => $request->serviceName,
                 'description'   => $request->description,
                 'pet_type'      => $request->petType,
                 'price'         => $priceAfterService ? null : $priceValue,
-                'price_min'     => $priceAfterService ? null : $priceMin,
-                'price_max'     => $priceAfterService ? null : $priceMax,
                 'duration'      => $request->duration,
                 'main_service'  => $request->main_service,
                 'status'        => $request->status,
-                'price_after_service' => $priceAfterService,
             ];
+
+            if ($hasPriceMin) {
+                $data['price_min'] = $priceAfterService ? null : $priceMin;
+            }
+            if ($hasPriceMax) {
+                $data['price_max'] = $priceAfterService ? null : $priceMax;
+            }
+            if ($hasPriceAfterService) {
+                $data['price_after_service'] = $priceAfterService;
+            }
 
             // Only override category if explicitly provided; otherwise keep current value
             if ($request->filled('serviceCategory')) {
