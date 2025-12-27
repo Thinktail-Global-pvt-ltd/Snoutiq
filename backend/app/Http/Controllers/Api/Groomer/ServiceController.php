@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
+use App\Models\GroomerServiceCategory;
 
 
 class ServiceController extends Controller
@@ -249,7 +250,7 @@ class ServiceController extends Controller
                 'duration'        => 'required|integer|min:1',
                 'main_service'    => 'required|string',
                 'status'          => 'required|string',
-                'serviceCategory' => 'required|integer|exists:groomer_service_categories,id',
+                'serviceCategory' => 'sometimes|nullable|integer|exists:groomer_service_categories,id',
                 'description'     => 'nullable|string',
                 'servicePic'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
                 'user_id'         => 'nullable|integer',
@@ -266,6 +267,19 @@ class ServiceController extends Controller
             $priceAfterService = $request->boolean('price_after_service');
             [$priceMin, $priceMax, $priceValue] = $this->resolvePriceRange($request, $priceAfterService);
 
+            $serviceCategoryId = $request->input('serviceCategory');
+            if (!$serviceCategoryId) {
+                // if no category passed, pick the first for this user or create a default bucket
+                $serviceCategoryId = GroomerServiceCategory::where('user_id', $uid)->value('id');
+                if (!$serviceCategoryId) {
+                    $defaultCategory = GroomerServiceCategory::firstOrCreate(
+                        ['user_id' => $uid, 'name' => 'Default'],
+                        ['name' => 'Default']
+                    );
+                    $serviceCategoryId = $defaultCategory->id;
+                }
+            }
+
             $data = [
                 'user_id'       => $uid,
                 'name'          => $request->serviceName,
@@ -275,7 +289,7 @@ class ServiceController extends Controller
                 'price_min'     => $priceAfterService ? null : $priceMin,
                 'price_max'     => $priceAfterService ? null : $priceMax,
                 'duration'      => $request->duration,
-                'groomer_service_category_id' => $request->serviceCategory,
+                'groomer_service_category_id' => $serviceCategoryId,
                 'main_service'  => $request->main_service,
                 'status'        => $request->status,
                 'price_after_service' => $priceAfterService,
@@ -388,7 +402,7 @@ class ServiceController extends Controller
         try {
             $request->validate([
                 'serviceName'     => 'required|string|max:255',
-                'serviceCategory' => 'required|integer|exists:groomer_service_categories,id',
+                'serviceCategory' => 'sometimes|nullable|integer|exists:groomer_service_categories,id',
                 'description'     => 'nullable|string',
                 'petType'         => 'required',
                 'price'           => 'nullable|numeric|min:0',
@@ -423,11 +437,15 @@ class ServiceController extends Controller
                 'price_min'     => $priceAfterService ? null : $priceMin,
                 'price_max'     => $priceAfterService ? null : $priceMax,
                 'duration'      => $request->duration,
-                'groomer_service_category_id' => $request->serviceCategory,
                 'main_service'  => $request->main_service,
                 'status'        => $request->status,
                 'price_after_service' => $priceAfterService,
             ];
+
+            // Only override category if explicitly provided; otherwise keep current value
+            if ($request->filled('serviceCategory')) {
+                $data['groomer_service_category_id'] = $request->serviceCategory;
+            }
 
             if ($request->hasFile('servicePic')) {
                 if ($service->service_pic && File::exists(public_path($service->service_pic))) {

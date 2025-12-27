@@ -151,11 +151,6 @@ const VetServices = () => {
       return;
     }
 
-    if (!payload.serviceCategory) {
-      toast.error("Please select a service category.");
-      return;
-    }
-
     setSaving(true);
     try {
       if (editingId) {
@@ -636,7 +631,7 @@ const VetServices = () => {
 
                   <div>
                     <label htmlFor="serviceCategory" className="block text-sm font-medium text-gray-700">
-                      Service Category *
+                      Service Category (optional)
                     </label>
                     <select
                       id="serviceCategory"
@@ -645,6 +640,7 @@ const VetServices = () => {
                       disabled={categoriesLoading || categories.length === 0}
                       className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
+                      <option value="">No category</option>
                       {categoriesLoading && <option value="">Loading categories...</option>}
                       {!categoriesLoading && categories.length === 0 && (
                         <option value="">No categories found</option>
