@@ -173,6 +173,114 @@ const posts = [
     category: "Client Relations",
     slug: "Vets-Increase-Monthly-Revenue",
   },
+  {
+    image: "", // Using dog winter image as placeholder - can be updated later
+    title: "Top Friendly Dog Breeds in India for Home and Family",
+    excerpt:
+      "Discover the top friendly dog breeds in India for home and family. Compare dog breeds in India with price, temperament, care tips, and expert guidance for choosing the best dog.",
+    author: "Snoutiq Editer",
+    date: "December 28, 2025",
+    readTime: "8 min read",
+    category: "Client Relations",
+    slug: "top-friendly-dog-breeds-in-india",
+    trending: true,
+  },
+  {
+    image: "", // Using dog winter image as placeholder - can be updated later
+    title: "Best Cat Breeds in India for Home With Price and Lifespan",
+    excerpt:
+      "Discover the best cat breeds in India with price, lifespan, and care tips. Learn which cat is best for home, families, and apartments in India.",
+    author: "Snoutiq Editer",
+    date: "December 28, 2025",
+    readTime: "10 min read",
+    category: "Client Relations",
+    slug: "best-cat-breeds-in-india",
+    trending: true,
+  },
+  {
+    image: "", // Using dog winter image as placeholder - can be updated later
+    title: "Cat Vaccination Schedule India | Kitten, Rabies & Feligen Vaccine Guide",
+    excerpt:
+      "Complete cat vaccination schedule India with kitten vaccine timeline, Feligen CRP, rabies injection for cats, booster doses and expert vet tips.",
+    author: "Snoutiq Editer",
+    date: "December 28, 2025",
+    readTime: "12 min read",
+    category: "Client Relations",
+    slug: "cat-vaccination-schedule-india",
+    trending: true,
+  },
+  {
+    image: "", // Using dog winter image as placeholder - can be updated later
+    title: "Cats Diseases and Symptoms | Common Cat Infections & Health Guide",
+    excerpt:
+      "Learn about cats diseases and symptoms including common cat infections, ailments, causes, treatment options, medicines and prevention tips every cat parent should know.",
+    author: "Snoutiq Editer",
+    date: "December 28, 2025",
+    readTime: "14 min read",
+    category: "Client Relations",
+    slug: "cats-diseases-and-symptoms",
+    trending: true,
+  },
+  {
+    image: "", // Using dog winter image as placeholder - can be updated later
+    title: "Best Cat Food in India 2025 | Top 10 Cat Food Brands & Buying Guide",
+    excerpt:
+      "Looking for the best cat food in India? Discover the top 10 cat food brands, best kitten food, dry cat food, premium options, Whiskas 3kg and expert feeding tips for healthy cats.",
+    author: "Snoutiq Editer",
+    date: "December 28, 2025",
+    readTime: "15 min read",
+    category: "Client Relations",
+    slug: "best-cat-food-in-india",
+    trending: true,
+  },
+  {
+    image: "", // Using dog winter image as placeholder - can be updated later
+    title: "Foods Golden Retrievers Should Never Eat | Toxic Dog Foods Guide",
+    excerpt:
+      "Learn which foods golden retrievers should never eat, including chocolate, onions, garlic, and other toxic human foods that are dangerous for dogs.",
+    author: "Snoutiq Editer",
+    date: "December 28, 2025",
+    readTime: "12 min read",
+    category: "Client Relations",
+    slug: "foods-golden-retrievers-should-never-eat",
+    trending: true,
+  },
+  {
+    image: "", // Using dog winter image as placeholder - can be updated later
+    title: "Best Dog Food for Golden Retrievers | Puppy & Adult Diet Guide",
+    excerpt:
+      "Discover the best dog food for Golden Retrievers. Complete puppy and adult diet guide with food charts, feeding tips, and nutrition advice for India.",
+    author: "Snoutiq Editer",
+    date: "December 28, 2025",
+    readTime: "14 min read",
+    category: "Client Relations",
+    slug: "best-dog-food-for-golden-retrievers",
+    trending: true,
+  },
+  {
+    image: "", // Using dog winter image as placeholder - can be updated later
+    title: "Golden Retriever Vaccination Schedule India Complete Guide",
+    excerpt:
+      "Complete Golden Retriever vaccination schedule for puppies, adults and seniors with rabies, deworming, price chart and FAQs for Indian pet parents.",
+    author: "Snoutiq Editer",
+    date: "December 28, 2025",
+    readTime: "13 min read",
+    category: "Client Relations",
+    slug: "golden-retriever-vaccination-schedule-india",
+    trending: true,
+  },
+  {
+    image: "", // Using dog winter image as placeholder - can be updated later
+    title: "Why Winter Grooming Is Important for Cats | Winter Cat Care Guide",
+    excerpt:
+      "Discover why winter grooming is important for cats, including grooming routines, winter skin care, charts, FAQs and expert winter cat care tips.",
+    author: "Snoutiq Editer",
+    date: "December 28, 2025",
+    readTime: "12 min read",
+    category: "Client Relations",
+    slug: "why-winter-grooming-is-important-for-cats",
+    trending: true,
+  },
 
 ];
 

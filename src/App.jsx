@@ -531,6 +531,15 @@ import DoctorMobileApp from "./DoctorMobileApp";
 import RegisterAsAnOnlineVet from "./blog/RegisterAsAnOnlineVet";
 import OnlineVetConsultation from "./blog/OnlineVetConsultation";
 import VetsIncreaseMonthlyRevenue from "./blog/VetsIncreaseMonthlyRevenue";
+import TopFriendlyDogBreeds from "./blog/TopFriendlyDogBreeds";
+import BestCatBreedsInIndia from "./blog/BestCatBreedsInIndia";
+import CatVaccinationScheduleIndia from "./blog/CatVaccinationScheduleIndia";
+import CatsDiseasesAndSymptoms from "./blog/CatsDiseasesAndSymptoms";
+import BestCatFoodInIndia from "./blog/BestCatFoodInIndia";
+import FoodsGoldenRetrieversShouldNeverEat from "./blog/FoodsGoldenRetrieversShouldNeverEat";
+import BestDogFoodForGoldenRetrievers from "./blog/BestDogFoodForGoldenRetrievers";
+import GoldenRetrieverVaccinationScheduleIndia from "./blog/GoldenRetrieverVaccinationScheduleIndia";
+import WhyWinterGroomingIsImportantForCats from "./blog/WhyWinterGroomingIsImportantForCats";
 const Ratingpop = lazy(() => import("./PetDashboard/RatingPopup"));
 
 function App() {
@@ -1070,6 +1079,15 @@ function App() {
             <Route path="/blog/vaccination-schedule-for-pets-in-india" element={<VaccinationSchedule/>}/>
             <Route path="/blog/best-food-for-dogs-in-winter" element={<BestFoodForDog/>}/>
             <Route path="/blog/how-vets-grow-with-online-consultations" element={<HowVetsGrow/>}/>
+            <Route path="/blog/top-friendly-dog-breeds-in-india" element={<TopFriendlyDogBreeds/>}/>
+            <Route path="/blog/best-cat-breeds-in-india" element={<BestCatBreedsInIndia/>}/>
+            <Route path="/blog/cat-vaccination-schedule-india" element={<CatVaccinationScheduleIndia/>}/>
+            <Route path="/blog/cats-diseases-and-symptoms" element={<CatsDiseasesAndSymptoms/>}/>
+            <Route path="/blog/best-cat-food-in-india" element={<BestCatFoodInIndia/>}/>
+            <Route path="/blog/foods-golden-retrievers-should-never-eat" element={<FoodsGoldenRetrieversShouldNeverEat/>}/>
+            <Route path="/blog/best-dog-food-for-golden-retrievers" element={<BestDogFoodForGoldenRetrievers/>}/>
+            <Route path="/blog/golden-retriever-vaccination-schedule-india" element={<GoldenRetrieverVaccinationScheduleIndia/>}/>
+            <Route path="/blog/why-winter-grooming-is-important-for-cats" element={<WhyWinterGroomingIsImportantForCats/>}/>
             {/* <Route path="/pricing" element={<PricingPage />} /> */}
             <Route path="/delhi" element={<DelhiPage />} />
             <Route path="/gurugram" element={<GurugramPage />} />
