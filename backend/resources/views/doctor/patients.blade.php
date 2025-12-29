@@ -105,6 +105,15 @@
     .pm-record-detail{margin-top:8px;font-size:13px;line-height:1.5;color:#111827}
     .pm-record-detail dt{font-weight:700;color:#0b1220}
     .pm-record-detail dd{margin:0 0 6px 0}
+    .pm-record-card{padding:14px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fbff;box-shadow:0 6px 20px rgba(15,23,42,0.05)}
+    .pm-record-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .pm-record-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+    .pm-tag-soft{padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid #e5e7eb;background:#fff;color:#334155}
+    .pm-record-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:10px}
+    .pm-record-row{padding:10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+    .pm-record-label{font-size:12px;font-weight:700;color:#0f172a;margin-bottom:4px}
+    .pm-record-value{font-size:13px;color:#111827;line-height:1.4}
+    .pm-record-actions{display:flex;justify-content:flex-end;margin-top:10px}
     .pm-empty{color:var(--pm-muted);font-size:13px;padding:8px 0}
     .pm-alert{background:#fff1f2;border:1px solid #fecdd3;color:#b91c1c;padding:12px;border-radius:12px;margin:10px 0;font-size:14px}
     .pm-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.45);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:12px;overflow-y:auto}
@@ -811,7 +820,7 @@
     els.recordEmpty.style.display = 'none';
     records.forEach((rec) => {
       const wrap = document.createElement('div');
-      wrap.className = 'pm-record';
+      wrap.className = 'pm-record pm-record-card';
       const prescription = rec.prescription || {};
       const detailPairs = [];
       if (prescription.visit_category || prescription.case_severity) {
@@ -846,14 +855,23 @@
         detailPairs.push({ label: 'Follow-up', value: fuParts.join(' • ') });
       }
       const detailHtml = detailPairs.length
-        ? `<dl class="pm-record-detail">${detailPairs.map(pair => `<dt>${pair.label}</dt><dd>${pair.value}</dd>`).join('')}</dl>`
+        ? `<div class="pm-record-details">${detailPairs.map(pair => `<div class="pm-record-row"><div class="pm-record-label">${pair.label}</div><div class="pm-record-value">${pair.value}</div></div>`).join('')}</div>`
         : '';
+      const tags = [];
+      if (prescription.case_severity) tags.push(`<span class="pm-tag-soft">${escapeHtml(prescription.case_severity)}</span>`);
+      if (prescription.visit_category) tags.push(`<span class="pm-tag-soft">${escapeHtml(prescription.visit_category)}</span>`);
+
       wrap.innerHTML = `
-        <div class="pm-record-title">${escapeHtml(rec.file_name || 'Medical file')}</div>
-        <div class="pm-record-meta">${formatDate(rec.uploaded_at)}${rec.doctor_id ? ` • Doctor #${rec.doctor_id}` : ''}</div>
+        <div class="pm-record-head">
+          <div>
+            <div class="pm-record-title">${escapeHtml(rec.file_name || 'Medical file')}</div>
+            <div class="pm-record-meta">${formatDate(rec.uploaded_at)}${rec.doctor_id ? ` • Doctor #${rec.doctor_id}` : ''}</div>
+          </div>
+          ${tags.length ? `<div class="pm-record-tags">${tags.join('')}</div>` : ''}
+        </div>
         <div class="pm-record-notes">${escapeHtml(rec.notes || 'No notes')}</div>
         ${detailHtml}
-        <div style="margin-top:8px"><a href="${rec.url}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a></div>
+        <div class="pm-record-actions"><a href="${rec.url}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a></div>
       `;
       els.recordList.appendChild(wrap);
     });

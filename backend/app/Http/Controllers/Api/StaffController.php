@@ -247,6 +247,41 @@ class StaffController extends Controller
                 ], 404);
             }
 
+            // Move doctor -> receptionist when role changes to receptionist
+            if ($role === 'receptionist') {
+                $payload = [
+                    'vet_registeration_id' => $clinicId,
+                    'name' => $doctor->doctor_name,
+                    'email' => $doctor->doctor_email,
+                    'phone' => $doctor->doctor_mobile,
+                    'role' => 'receptionist',
+                    'status' => 'active',
+                ];
+
+                if (Schema::hasColumn('receptionists', 'password')) {
+                    $payload['password'] = '123456';
+                }
+                if (Schema::hasColumn('receptionists', 'receptionist_password')) {
+                    $payload['receptionist_password'] = '123456';
+                }
+
+                $newReceptionist = DB::transaction(function () use ($doctor, $payload) {
+                    $created = Receptionist::create($payload);
+                    $doctor->delete();
+                    return $created;
+                });
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Doctor moved to receptionist',
+                    'data' => [
+                        'id' => $newReceptionist->id,
+                        'role' => $newReceptionist->role ?? 'receptionist',
+                        'type' => 'receptionist',
+                    ],
+                ]);
+            }
+
             $doctor->staff_role = $role;
             $doctor->save();
 
@@ -256,6 +291,7 @@ class StaffController extends Controller
                 'data' => [
                     'id' => $doctor->id,
                     'role' => $doctor->staff_role,
+                    'type' => 'doctor',
                 ],
             ]);
         }
@@ -269,6 +305,36 @@ class StaffController extends Controller
                 ], 404);
             }
 
+            // Move receptionist -> doctor when role changes to doctor
+            if ($role === 'doctor') {
+                $payload = [
+                    'vet_registeration_id' => $clinicId,
+                    'doctor_name' => $receptionist->name,
+                    'doctor_email' => $receptionist->email,
+                    'doctor_mobile' => $receptionist->phone,
+                ];
+
+                if (Schema::hasColumn('doctors', 'staff_role')) {
+                    $payload['staff_role'] = 'doctor';
+                }
+
+                $newDoctor = DB::transaction(function () use ($receptionist, $payload) {
+                    $created = Doctor::create($payload);
+                    $receptionist->delete();
+                    return $created;
+                });
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Receptionist moved to doctor',
+                    'data' => [
+                        'id' => $newDoctor->id,
+                        'role' => $newDoctor->staff_role ?? 'doctor',
+                        'type' => 'doctor',
+                    ],
+                ]);
+            }
+
             $receptionist->role = $role;
             $receptionist->save();
 
@@ -278,6 +344,7 @@ class StaffController extends Controller
                 'data' => [
                     'id' => $receptionist->id,
                     'role' => $receptionist->role,
+                    'type' => 'receptionist',
                 ],
             ]);
         }
