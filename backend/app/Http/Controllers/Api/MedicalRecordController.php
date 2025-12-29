@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Doctor;
 use App\Models\MedicalRecord;
+use App\Models\Prescription;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -33,6 +34,19 @@ class MedicalRecordController extends Controller
             'doctor_id' => ['nullable', 'integer', 'exists:doctors,id'],
             'clinic_id' => ['required', 'integer', 'exists:vet_registerations_temp,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'visit_category' => ['nullable', 'string', 'max:255'],
+            'case_severity' => ['nullable', 'string', 'max:255'],
+            'temperature' => ['nullable', 'numeric'],
+            'weight' => ['nullable', 'numeric'],
+            'heart_rate' => ['nullable', 'numeric'],
+            'exam_notes' => ['nullable', 'string'],
+            'diagnosis' => ['nullable', 'string', 'max:255'],
+            'diagnosis_status' => ['nullable', 'string', 'max:255'],
+            'treatment_plan' => ['nullable', 'string'],
+            'home_care' => ['nullable', 'string'],
+            'follow_up_date' => ['nullable', 'date'],
+            'follow_up_type' => ['nullable', 'string', 'max:255'],
+            'follow_up_notes' => ['nullable', 'string'],
             'record_file' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
 
@@ -83,6 +97,29 @@ class MedicalRecordController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
+        // Persist consultation detail into prescriptions for downstream use
+        $prescriptionPayload = [
+            'medical_record_id' => $record->id,
+            'user_id' => $user->id,
+            'doctor_id' => $doctorId ?? 0,
+            'content_html' => $validated['notes'] ?? 'Uploaded medical record',
+            'visit_category' => $validated['visit_category'] ?? null,
+            'case_severity' => $validated['case_severity'] ?? null,
+            'visit_notes' => $validated['notes'] ?? null,
+            'temperature' => $validated['temperature'] ?? null,
+            'weight' => $validated['weight'] ?? null,
+            'heart_rate' => $validated['heart_rate'] ?? null,
+            'exam_notes' => $validated['exam_notes'] ?? null,
+            'diagnosis' => $validated['diagnosis'] ?? null,
+            'diagnosis_status' => $validated['diagnosis_status'] ?? null,
+            'treatment_plan' => $validated['treatment_plan'] ?? null,
+            'home_care' => $validated['home_care'] ?? null,
+            'follow_up_date' => $validated['follow_up_date'] ?? null,
+            'follow_up_type' => $validated['follow_up_type'] ?? null,
+            'follow_up_notes' => $validated['follow_up_notes'] ?? null,
+        ];
+        $prescription = Prescription::create($prescriptionPayload);
+
         return response()->json([
             'success' => true,
             'record' => [
@@ -96,6 +133,7 @@ class MedicalRecordController extends Controller
                 'uploaded_at' => optional($record->created_at)->toIso8601String(),
                 'url' => $this->buildRecordUrl($record->file_path),
             ],
+            'prescription' => $prescription,
         ], 201);
     }
 
@@ -117,8 +155,21 @@ class MedicalRecordController extends Controller
             ->where('user_id', $user->id)
             ->when($clinicId, fn ($query) => $query->where('vet_registeration_id', $clinicId))
             ->orderByDesc('created_at')
+            ->get();
+
+        $prescriptions = Prescription::query()
+            ->whereIn('medical_record_id', $records->pluck('id')->filter()->all())
             ->get()
-            ->map(fn (MedicalRecord $record) => [
+            ->keyBy('medical_record_id');
+
+        $latestUserPrescription = Prescription::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->first();
+
+        $recordsMapped = $records->map(function (MedicalRecord $record) use ($prescriptions, $latestUserPrescription) {
+            $prescription = $prescriptions->get($record->id) ?? $latestUserPrescription;
+            return [
                 'id' => $record->id,
                 'user_id' => $record->user_id,
                 'doctor_id' => $record->doctor_id,
@@ -128,7 +179,9 @@ class MedicalRecordController extends Controller
                 'notes' => $record->notes,
                 'uploaded_at' => optional($record->created_at)->toIso8601String(),
                 'url' => $this->buildRecordUrl($record->file_path),
-            ]);
+                'prescription' => $prescription,
+            ];
+        });
 
         return response()->json([
             'success' => true,
@@ -137,7 +190,7 @@ class MedicalRecordController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                 ],
-                'records' => $records,
+                'records' => $recordsMapped,
             ],
         ]);
     }

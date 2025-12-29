@@ -122,6 +122,19 @@ class PrescriptionController extends Controller
             'next_visit_day'    => 'nullable|date',
             'temperature'       => 'nullable|numeric',
             'temperature_unit'  => 'nullable|string|in:C,F,c,f',
+            'visit_category'    => 'nullable|string|max:255',
+            'case_severity'     => 'nullable|string|max:255',
+            'visit_notes'       => 'nullable|string',
+            'weight'            => 'nullable|numeric',
+            'heart_rate'        => 'nullable|numeric',
+            'exam_notes'        => 'nullable|string',
+            'diagnosis'         => 'nullable|string|max:255',
+            'diagnosis_status'  => 'nullable|string|max:255',
+            'treatment_plan'    => 'nullable|string',
+            'home_care'         => 'nullable|string',
+            'follow_up_date'    => 'nullable|date',
+            'follow_up_type'    => 'nullable|string|max:255',
+            'follow_up_notes'   => 'nullable|string',
         ]);
 
         if ($validator->fails()) {

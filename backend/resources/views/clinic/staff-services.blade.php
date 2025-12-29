@@ -647,7 +647,7 @@
               <th class="text-left px-4 py-3">Name</th>
               <th class="text-left px-4 py-3">Contact</th>
               <th class="text-left px-4 py-3">Role</th>
-              <th class="text-left px-4 py-3 w-48">Actions</th>
+              <th class="text-left px-4 py-3 w-56">Actions</th>
             </tr>
           </thead>
           <tbody id="staff-rows" class="divide-y divide-gray-100 bg-white"></tbody>
@@ -665,8 +665,8 @@
   <div class="staff-modal-content bg-white rounded-2xl shadow-2xl p-6">
     <div class="flex items-center justify-between mb-4">
       <div>
-        <p class="text-xs font-semibold tracking-wide text-indigo-600 uppercase">Add Staff Member</p>
-        <h3 class="text-lg font-semibold text-gray-900">Create a receptionist profile</h3>
+        <p class="text-xs font-semibold tracking-wide text-indigo-600 uppercase" data-staff-modal-heading>Add Staff Member</p>
+        <h3 class="text-lg font-semibold text-gray-900" data-staff-modal-title>Create a receptionist profile</h3>
       </div>
       <button type="button" data-close class="text-gray-500 hover:text-gray-700 text-lg">&times;</button>
     </div>
@@ -694,7 +694,7 @@
       </div>
       <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
         <button type="button" data-close class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold w-full sm:w-auto">Cancel</button>
-        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold w-full sm:w-auto">Save Staff</button>
+        <button type="submit" data-staff-submit class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold w-full sm:w-auto">Save Staff</button>
       </div>
     </form>
   </div>
@@ -1788,6 +1788,8 @@
     list: () => `${CONFIG.API_BASE}/staff${targetQuery()}`,
     addReceptionist: `${CONFIG.API_BASE}/staff/receptionists`,
     updateRole: (type, id) => `${CONFIG.API_BASE}/staff/${type}/${id}/role${targetQuery()}`,
+    updateStaff: (type, id) => `${CONFIG.API_BASE}/staff/${type}/${id}${targetQuery()}`,
+    deleteStaff: (type, id) => `${CONFIG.API_BASE}/staff/${type}/${id}${targetQuery()}`,
   };
 
   const staffRows = document.getElementById('staff-rows');
@@ -1798,14 +1800,38 @@
   const addModal = document.getElementById('staff-modal');
   const addForm = document.getElementById('staff-form');
   const addBtn = document.getElementById('btn-open-staff-modal');
+  const staffModalHeading = document.querySelector('[data-staff-modal-heading]');
+  const staffModalTitle = document.querySelector('[data-staff-modal-title]');
+  const staffSubmitBtn = document.querySelector('[data-staff-submit]');
+  const staffNameInput = addForm.querySelector('input[name=\"name\"]');
+  const staffEmailInput = addForm.querySelector('input[name=\"email\"]');
+  const staffPhoneInput = addForm.querySelector('input[name=\"phone\"]');
+  const staffRoleInput = addForm.querySelector('select[name=\"role\"]');
   let ALL_STAFF = [];
-  let ALLOWED_ROLES = ['doctor', 'receptionist'];
+  let editContext = null;
 
   function formatRole(role) {
     if (role === 'doctor') return 'Doctor';
     if (role === 'receptionist') return 'Receptionist';
     if (role === 'clinic_admin') return 'Clinic Admin';
     return role ? role.replace(/_/g, ' ') : '—';
+  }
+
+  function renderActionsCell(item) {
+    if (!item.editable) {
+      return '<span class="text-xs text-gray-400">Locked</span>';
+    }
+
+    return `
+      <div class="flex items-center gap-2">
+        <button type="button" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800" data-edit-staff data-id="${item.id}" data-type="${item.type}">
+          Edit
+        </button>
+        <button type="button" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-50 hover:bg-red-100 text-red-600" data-delete-staff data-id="${item.id}" data-type="${item.type}">
+          Delete
+        </button>
+      </div>
+    `;
   }
 
   function renderStaff(list) {
@@ -1833,26 +1859,11 @@
           <span class="role-pill ${item.type === 'clinic' ? 'clinic' : (item.role || '').toLowerCase()}">${formatRole(item.role)}</span>
         </td>
         <td class="px-4 py-4 align-top">
-          ${item.editable ? renderRoleSelect(item) : '<span class="text-xs text-gray-400">Locked</span>'}
+          ${renderActionsCell(item)}
         </td>
       `;
       staffRows.appendChild(tr);
     });
-  }
-
-  function renderRoleSelect(item) {
-    const options = (ALLOWED_ROLES || ['doctor', 'receptionist'])
-      .map((role) => {
-        const selected = role === item.role ? 'selected' : '';
-        const label = role === 'doctor' ? 'Doctor' : 'Receptionist';
-        return `<option value="${role}" ${selected}>${label}</option>`;
-      })
-      .join('');
-    return `
-      <select data-role-picker data-id="${item.id}" data-type="${item.type}" data-prev="${item.role}" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
-        ${options}
-      </select>
-    `;
   }
 
   function normalizeStaff(data) {
@@ -1890,7 +1901,6 @@
       await Auth.bootstrap();
       const res = await apiFetch(API.list(), { headers: Auth.headers() });
       const payload = res?.data ?? res;
-      ALLOWED_ROLES = payload?.editable_roles ?? ['doctor', 'receptionist'];
       ALL_STAFF = normalizeStaff(payload);
       renderStaff(ALL_STAFF);
     } catch (err) {
@@ -1905,7 +1915,21 @@
     }
   }
 
-  function openModal() {
+  function setModalMode(mode = 'add', record = null) {
+    editContext = mode === 'edit' && record ? { id: record.id, type: record.type } : null;
+    staffModalHeading.textContent = mode === 'edit' ? 'Edit Staff Member' : 'Add Staff Member';
+    staffModalTitle.textContent = mode === 'edit' ? 'Update staff details and role' : 'Create a receptionist profile';
+    staffSubmitBtn.textContent = mode === 'edit' ? 'Save Changes' : 'Save Staff';
+    addForm.dataset.mode = mode;
+    addForm.dataset.type = record?.type || '';
+    staffNameInput.value = record?.name || '';
+    staffEmailInput.value = record?.email || '';
+    staffPhoneInput.value = record?.phone || '';
+    staffRoleInput.value = record?.role || (record?.type === 'doctor' ? 'doctor' : 'receptionist');
+  }
+
+  function openModal(mode = 'add', record = null) {
+    setModalMode(mode, record);
     addModal.style.display = 'flex';
     addModal.classList.remove('hidden');
     addModal.removeAttribute('hidden');
@@ -1913,11 +1937,12 @@
   }
 
   function closeModal() {
+    setModalMode('add');
+    addForm.reset();
     addModal.style.display = 'none';
     addModal.classList.add('hidden');
     addModal.setAttribute('hidden', 'hidden');
     addModal.setAttribute('aria-hidden', 'true');
-    addForm.reset();
   }
 
   addBtn.addEventListener('click', () => {
@@ -1925,7 +1950,7 @@
       alertMissingTarget();
       return;
     }
-    openModal();
+    openModal('add');
   });
 
   addModal.querySelectorAll('[data-close]').forEach((btn) => {
@@ -1955,65 +1980,109 @@
     }
     const formData = new FormData(addForm);
     appendTarget(formData);
+    const isEdit = addForm.dataset.mode === 'edit' && editContext;
+    const targetType = isEdit ? editContext?.type : null;
+    const targetId = isEdit ? editContext?.id : null;
     try {
       await Auth.bootstrap();
-      await apiFetch(API.addReceptionist, {
-        method: 'POST',
-        headers: Auth.headers(),
-        body: formData,
-      });
-      Swal.fire({
-        icon: 'success',
-        title: 'Staff added',
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      if (isEdit && targetId && targetType) {
+        try {
+          await apiFetch(API.updateStaff(targetType, targetId), {
+            method: 'PATCH',
+            headers: Auth.headers(),
+            body: formData,
+          });
+        } catch (err) {
+          await apiFetch(API.updateStaff(targetType, targetId), {
+            method: 'POST',
+            headers: Auth.headers({ 'X-HTTP-Method-Override': 'PATCH' }),
+            body: formData,
+          });
+        }
+        Swal.fire({
+          icon: 'success',
+          title: 'Staff updated',
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } else {
+        await apiFetch(API.addReceptionist, {
+          method: 'POST',
+          headers: Auth.headers(),
+          body: formData,
+        });
+        Swal.fire({
+          icon: 'success',
+          title: 'Staff added',
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
       closeModal();
       await fetchStaff();
     } catch (err) {
       Swal.fire({
         icon: 'error',
-        title: 'Unable to add staff',
+        title: isEdit ? 'Unable to update staff' : 'Unable to add staff',
         text: err.message || 'Unknown error',
       });
     }
   });
 
-  staffRows.addEventListener('change', async (e) => {
-    const select = e.target.closest('select[data-role-picker]');
-    if (!select) return;
-    const { id, type } = select.dataset;
-    const newRole = select.value;
-    const prevRole = select.getAttribute('data-prev') || '';
-    if (!id || !type) return;
-    try {
-      await Auth.bootstrap();
-      const payload = new FormData();
-      payload.append('role', newRole);
-      appendTarget(payload);
-      try {
-        await apiFetch(API.updateRole(type, id), {
-          method: 'PATCH',
-          headers: Auth.headers(),
-          body: payload,
-        });
-      } catch (err) {
-        await apiFetch(API.updateRole(type, id), {
-          method: 'POST',
-          headers: Auth.headers({ 'X-HTTP-Method-Override': 'PATCH' }),
-          body: payload,
-        });
+  staffRows.addEventListener('click', async (e) => {
+    const editBtn = e.target.closest('[data-edit-staff]');
+    if (editBtn) {
+      const { id, type } = editBtn.dataset;
+      const staff = ALL_STAFF.find((row) => String(row.id) === String(id) && row.type === type);
+      if (staff) {
+        openModal('edit', staff);
       }
-      select.setAttribute('data-prev', newRole);
-      await fetchStaff();
-    } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Role update failed',
-        text: err.message || 'Unknown error',
+      return;
+    }
+
+    const deleteBtn = e.target.closest('[data-delete-staff]');
+    if (deleteBtn) {
+      const { id, type } = deleteBtn.dataset;
+      const staff = ALL_STAFF.find((row) => String(row.id) === String(id) && row.type === type);
+      if (!staff) return;
+
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Delete staff member?',
+        text: `This will remove ${staff.name || 'this staff member'} from the clinic.`,
+        showCancelButton: true,
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#dc2626',
       });
-      if (prevRole) {
-        select.value = prevRole;
+
+      if (!result.isConfirmed) return;
+
+      try {
+        await Auth.bootstrap();
+        const payload = new FormData();
+        appendTarget(payload);
+        try {
+          await apiFetch(API.deleteStaff(type, id), {
+            method: 'DELETE',
+            headers: Auth.headers(),
+            body: payload,
+          });
+        } catch (err) {
+          await apiFetch(API.deleteStaff(type, id), {
+            method: 'POST',
+            headers: Auth.headers({ 'X-HTTP-Method-Override': 'DELETE' }),
+            body: payload,
+          });
+        }
+        Swal.fire({ icon: 'success', title: 'Removed', timer: 1200, showConfirmButton: false });
+        await fetchStaff();
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Delete failed',
+          text: err.message || 'Unknown error',
+        });
       }
     }
   });

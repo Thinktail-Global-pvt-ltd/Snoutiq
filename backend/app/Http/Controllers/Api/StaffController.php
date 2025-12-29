@@ -287,4 +287,230 @@ class StaffController extends Controller
             'message' => 'Unsupported staff type. Allowed: doctor or receptionist.',
         ], 422);
     }
+
+    public function update(Request $request, string $type, int $id)
+    {
+        $clinicId = $this->resolveClinicId($request);
+        if (!$clinicId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'clinic_id or vet_slug is required',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'email' => ['sometimes', 'nullable', 'email', 'max:255'],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'role' => ['sometimes', 'string', Rule::in(self::EDITABLE_ROLES)],
+        ]);
+
+        $name = $validated['name'] ?? null;
+        $email = $validated['email'] ?? null;
+        $phone = $validated['phone'] ?? null;
+
+        if ($type === 'doctor') {
+            $doctor = Doctor::where('vet_registeration_id', $clinicId)->find($id);
+            if (!$doctor) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Doctor not found for this clinic',
+                ], 404);
+            }
+
+            $targetRole = $validated['role'] ?? ($doctor->staff_role ?? 'doctor');
+
+            if ($targetRole === 'receptionist') {
+                $payload = [
+                    'vet_registeration_id' => $clinicId,
+                    'name' => $name ?? $doctor->doctor_name,
+                    'email' => $email ?? $doctor->doctor_email,
+                    'phone' => $phone ?? $doctor->doctor_mobile,
+                    'role' => 'receptionist',
+                    'status' => 'active',
+                ];
+
+                if (Schema::hasColumn('receptionists', 'password')) {
+                    $payload['password'] = '123456';
+                }
+                if (Schema::hasColumn('receptionists', 'receptionist_password')) {
+                    $payload['receptionist_password'] = '123456';
+                }
+
+                $newReceptionist = DB::transaction(function () use ($doctor, $payload) {
+                    $created = Receptionist::create($payload);
+                    $doctor->delete();
+                    return $created;
+                });
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Doctor moved to receptionist',
+                    'data' => [
+                        'id' => $newReceptionist->id,
+                        'name' => $newReceptionist->name,
+                        'email' => $newReceptionist->email,
+                        'phone' => $newReceptionist->phone,
+                        'role' => $newReceptionist->role ?? 'receptionist',
+                        'type' => 'receptionist',
+                    ],
+                ]);
+            }
+
+            if ($name !== null) {
+                $doctor->doctor_name = $name;
+            }
+            if ($email !== null) {
+                $doctor->doctor_email = $email;
+            }
+            if ($phone !== null) {
+                $doctor->doctor_mobile = $phone;
+            }
+            if (array_key_exists('role', $validated)) {
+                $doctor->staff_role = $validated['role'];
+            }
+
+            $doctor->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Doctor updated',
+                'data' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->doctor_name,
+                    'email' => $doctor->doctor_email,
+                    'phone' => $doctor->doctor_mobile,
+                    'role' => $doctor->staff_role ?? 'doctor',
+                    'type' => 'doctor',
+                ],
+            ]);
+        }
+
+        if ($type === 'receptionist') {
+            $receptionist = Receptionist::where('vet_registeration_id', $clinicId)->find($id);
+            if (!$receptionist) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Receptionist not found for this clinic',
+                ], 404);
+            }
+
+            $targetRole = $validated['role'] ?? ($receptionist->role ?? 'receptionist');
+
+            if ($targetRole === 'doctor') {
+                $payload = [
+                    'vet_registeration_id' => $clinicId,
+                    'doctor_name' => $name ?? $receptionist->name,
+                    'doctor_email' => $email ?? $receptionist->email,
+                    'doctor_mobile' => $phone ?? $receptionist->phone,
+                ];
+
+                if (Schema::hasColumn('doctors', 'staff_role')) {
+                    $payload['staff_role'] = 'doctor';
+                }
+
+                $newDoctor = DB::transaction(function () use ($receptionist, $payload) {
+                    $created = Doctor::create($payload);
+                    $receptionist->delete();
+                    return $created;
+                });
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Receptionist moved to doctor',
+                    'data' => [
+                        'id' => $newDoctor->id,
+                        'name' => $newDoctor->doctor_name,
+                        'email' => $newDoctor->doctor_email,
+                        'phone' => $newDoctor->doctor_mobile,
+                        'role' => $newDoctor->staff_role ?? 'doctor',
+                        'type' => 'doctor',
+                    ],
+                ]);
+            }
+
+            if ($name !== null) {
+                $receptionist->name = $name;
+            }
+            if ($email !== null) {
+                $receptionist->email = $email;
+            }
+            if ($phone !== null) {
+                $receptionist->phone = $phone;
+            }
+            if (array_key_exists('role', $validated)) {
+                $receptionist->role = $validated['role'];
+            }
+
+            $receptionist->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Receptionist updated',
+                'data' => [
+                    'id' => $receptionist->id,
+                    'name' => $receptionist->name,
+                    'email' => $receptionist->email,
+                    'phone' => $receptionist->phone,
+                    'role' => $receptionist->role ?? 'receptionist',
+                    'type' => 'receptionist',
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'status' => false,
+            'message' => 'Unsupported staff type. Allowed: doctor or receptionist.',
+        ], 422);
+    }
+
+    public function destroy(Request $request, string $type, int $id)
+    {
+        $clinicId = $this->resolveClinicId($request);
+        if (!$clinicId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'clinic_id or vet_slug is required',
+            ], 422);
+        }
+
+        if ($type === 'doctor') {
+            $doctor = Doctor::where('vet_registeration_id', $clinicId)->find($id);
+            if (!$doctor) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Doctor not found for this clinic',
+                ], 404);
+            }
+
+            $doctor->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Doctor deleted',
+            ]);
+        }
+
+        if ($type === 'receptionist') {
+            $receptionist = Receptionist::where('vet_registeration_id', $clinicId)->find($id);
+            if (!$receptionist) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Receptionist not found for this clinic',
+                ], 404);
+            }
+
+            $receptionist->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Receptionist deleted',
+            ]);
+        }
+
+        return response()->json([
+            'status' => false,
+            'message' => 'Unsupported staff type. Allowed: doctor or receptionist.',
+        ], 422);
+    }
 }

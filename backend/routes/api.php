@@ -746,6 +746,10 @@ Route::prefix('staff')->group(function () {
     Route::post('/receptionists', [StaffController::class, 'storeReceptionist']);
     Route::patch('/{type}/{id}/role', [StaffController::class, 'updateRole'])
         ->whereIn('type', ['doctor', 'receptionist']);
+    Route::patch('/{type}/{id}', [StaffController::class, 'update'])
+        ->whereIn('type', ['doctor', 'receptionist']);
+    Route::delete('/{type}/{id}', [StaffController::class, 'destroy'])
+        ->whereIn('type', ['doctor', 'receptionist']);
 });
 
 Route::prefix('receptionist')->group(function () {
