@@ -23,6 +23,7 @@ use Illuminate\Validation\Rule;
 use App\Services\WhatsAppService;
 
 use App\Models\ChatRoom;
+use App\Models\Chat;
 use App\Models\Pet;
 use App\Models\Doctor;
 use App\Models\Receptionist;
@@ -430,11 +431,15 @@ class AuthController extends Controller
             $existingUser = User::where('phone', $normalizedPhone)
                 ->orWhere('email', $normalizedPhone)
                 ->first();
+            $pets = $existingUser ? Pet::where('user_id', $existingUser->id)->get() : collect();
+            $latestChat = $existingUser ? Chat::where('user_id', $existingUser->id)->latest()->first() : null;
 
             return response()->json([
                 'message' => 'OTP already verified',
                 'user_id' => $existingUser?->id,
                 'user'    => $existingUser,
+                'pets'    => $pets,
+                'latest_chat' => $latestChat,
             ], 200);
         }
 
@@ -467,11 +472,15 @@ class AuthController extends Controller
         }
 
         $this->markPhoneVerified($user, $normalizedPhone, $otpEntry);
+        $pets = Pet::where('user_id', $user->id)->get();
+        $latestChat = Chat::where('user_id', $user->id)->latest()->first();
 
         return response()->json([
             'message' => 'OTP verified successfully',
             'user_id' => $user->id,
             'user'    => $user,
+            'pets'    => $pets,
+            'latest_chat' => $latestChat,
         ]);
     }
 
