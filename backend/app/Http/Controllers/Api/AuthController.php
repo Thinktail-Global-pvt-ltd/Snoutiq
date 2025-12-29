@@ -31,6 +31,7 @@ use App\Models\Transaction;
 
 use Illuminate\Support\Facades\Http;
 use App\Support\GeminiConfig;
+use Illuminate\Support\Facades\Schema;
 
 class AuthController extends Controller
 {
@@ -66,7 +67,47 @@ class AuthController extends Controller
         $auth = $request->header('Authorization');
         if (!$auth || !preg_match('/^Bearer\s+(.+)$/i', $auth, $m)) return null;
         $hash = hash('sha256', $m[1]);
-        return User::where('api_token_hash', $hash)->first();
+        if (! $this->hasTokenColumns('users')) {
+            Log::warning('api_token_* columns missing on users; skipping bearer lookup');
+            return null;
+        }
+        return User::where('api_token_hash', $hash)
+            ->where('api_token_expires_at', '>', now())
+            ->first();
+    }
+
+    private function hasTokenColumns(string $table): bool
+    {
+        return Schema::hasColumn($table, 'api_token_hash')
+            && Schema::hasColumn($table, 'api_token_expires_at');
+    }
+
+    private function assignTokenToModel($model, string $hash, $expiresAt): void
+    {
+        $table = $model->getTable();
+        if (!$this->hasTokenColumns($table)) {
+            Log::warning("Skipping api_token_* set for {$table}: columns missing");
+            return;
+        }
+
+        $model->api_token_hash = $hash;
+        $model->api_token_expires_at = $expiresAt;
+        $model->save();
+    }
+
+    private function persistTokenToTable(string $table, int $id, string $hash, $expiresAt): void
+    {
+        if (!$this->hasTokenColumns($table)) {
+            Log::warning("Skipping api_token_* update for {$table}: columns missing");
+            return;
+        }
+
+        DB::table($table)
+            ->where('id', $id)
+            ->update([
+                'api_token_hash' => $hash,
+                'api_token_expires_at' => $expiresAt,
+            ]);
     }
 
     private function passwordMatches(?string $storedPassword, string $providedPassword): bool
@@ -590,9 +631,11 @@ public function register(Request $request)
     $summaryText = $summaryText ?? $existingSummary;
 
     $plainToken = bin2hex(random_bytes(32));
+    $tokenHash  = hash('sha256', $plainToken);
+    $tokenExpiresAt = now()->addDays(30);
 
     try {
-        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $plainToken) {
+        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt) {
             // ✅ Update user with final details
             $user->fill([
                 'pet_name'    => $request->pet_name,
@@ -602,10 +645,11 @@ public function register(Request $request)
                 'pet_doc2'    => $doc2Path,
                 'summary'     => $summaryText,
                 'breed'       => $request->breed,
+                'latitude'    => $request->latitude ?? $user->latitude,
+                'longitude'   => $request->longitude ?? $user->longitude,
             ]);
 
-            $user->api_token_hash = $plainToken;
-            $user->save();
+            $this->assignTokenToModel($user, $tokenHash, $tokenExpiresAt);
 
             $petAttributes = [
                 'name'       => $request->pet_name,
@@ -698,8 +742,8 @@ public function register(Request $request)
 
     // ✅ plain token generate and save
     $plainToken = bin2hex(random_bytes(32));
-    $user->api_token_hash = $plainToken;
-    $user->save();
+    $tokenExpiresAt = now()->addDays(30);
+    $this->assignTokenToModel($user, hash('sha256', $plainToken), $tokenExpiresAt);
 
     return response()->json([
         'message'    => 'User registered successfully',
@@ -784,8 +828,7 @@ public function register(Request $request)
         ]);
 
         $plainToken = bin2hex(random_bytes(32));
-        $user->api_token_hash = $plainToken;
-        $user->save();
+        $this->assignTokenToModel($user, hash('sha256', $plainToken), now()->addDays(30));
 
         return response()->json([
             'message'    => 'User registered successfully (mobile)',
@@ -1143,6 +1186,7 @@ public function login(Request $request)
 
         $room = null;
         $plainToken = null;
+        $tokenExpiresAt = now()->addDays(30);
 
         $adminEmail = strtolower(trim((string) config('admin.email', 'admin@snoutiq.com')));
         if ($adminEmail === '') {
@@ -1189,10 +1233,9 @@ public function login(Request $request)
                 return response()->json(['message' => 'Invalid credentials'], 401);
             }
 
-            DB::transaction(function () use (&$plainToken, &$room, $user, $roomTitle) {
+            DB::transaction(function () use (&$plainToken, &$room, $user, $roomTitle, $tokenExpiresAt) {
                 $plainToken = bin2hex(random_bytes(32));
-                $user->api_token_hash = $plainToken;
-                $user->save();
+                $this->assignTokenToModel($user, hash('sha256', $plainToken), $tokenExpiresAt);
 
                 $room = ChatRoom::create([
                     'user_id'         => $user->id,
@@ -1248,12 +1291,11 @@ public function login(Request $request)
                     return response()->json(['message' => 'Invalid credentials'], 401);
                 }
 
-                DB::transaction(function () use (&$plainToken, &$room, $clinicRow, $roomTitle) {
+                DB::transaction(function () use (&$plainToken, &$room, $clinicRow, $roomTitle, $tokenExpiresAt) {
                     $plainToken = bin2hex(random_bytes(32));
+                    $tokenHash = hash('sha256', $plainToken);
 
-                    DB::table('vet_registerations_temp')
-                        ->where('id', $clinicRow->id)
-                        ->update(['api_token_hash' => $plainToken]);
+                    $this->persistTokenToTable('vet_registerations_temp', (int) $clinicRow->id, $tokenHash, $tokenExpiresAt);
 
                     $room = ChatRoom::create([
                         'user_id'         => $clinicRow->id,
@@ -1358,8 +1400,11 @@ public function login(Request $request)
                     ->values()
                     ->toArray();
 
-                DB::transaction(function () use (&$plainToken, &$room, $doctorRow, $roomTitle) {
+                DB::transaction(function () use (&$plainToken, &$room, $doctorRow, $roomTitle, $tokenExpiresAt) {
                     $plainToken = bin2hex(random_bytes(32));
+                    $tokenHash = hash('sha256', $plainToken);
+
+                    $this->persistTokenToTable('doctors', (int) $doctorRow->id, $tokenHash, $tokenExpiresAt);
 
                     $room = ChatRoom::create([
                         'user_id'         => $doctorRow->id,
@@ -1450,8 +1495,11 @@ public function login(Request $request)
                     ->values()
                     ->toArray();
 
-                DB::transaction(function () use (&$plainToken, &$room, $receptionistRow, $roomTitle) {
+                DB::transaction(function () use (&$plainToken, &$room, $receptionistRow, $roomTitle, $tokenExpiresAt) {
                     $plainToken = bin2hex(random_bytes(32));
+                    $tokenHash = hash('sha256', $plainToken);
+
+                    $this->persistTokenToTable('receptionists', (int) $receptionistRow->id, $tokenHash, $tokenExpiresAt);
 
                     $room = ChatRoom::create([
                         'user_id'         => $receptionistRow->id,
@@ -1541,6 +1589,7 @@ public function login_bkp(Request $request)
 
     $room = null;
     $plainToken = null;
+    $tokenExpiresAt = now()->addDays(30);
 
     if ($role === 'pet') {
         // 🔹 Search in users table
@@ -1550,10 +1599,9 @@ public function login_bkp(Request $request)
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        DB::transaction(function () use (&$plainToken, &$room, $user, $roomTitle) {
+        DB::transaction(function () use (&$plainToken, &$room, $user, $roomTitle, $tokenExpiresAt) {
             $plainToken = bin2hex(random_bytes(32));
-            $user->api_token_hash = $plainToken;
-            $user->save();
+            $this->assignTokenToModel($user, hash('sha256', $plainToken), $tokenExpiresAt);
 
             $room = ChatRoom::create([
                 'user_id'         => $user->id,
@@ -1665,6 +1713,7 @@ public function googleLogin(Request $request)
         $room = null;
         $plainToken = null;
         $role = $request->role;
+        $tokenExpiresAt = now()->addDays(30);
 
         if ($role === 'pet') {
             // 🔹 Pet users table check
@@ -1673,29 +1722,18 @@ public function googleLogin(Request $request)
                         ->first();
 
             if (!$user) {
-                // Fallback: locate by email and attach token; if still not found, create a minimal user
-                $user = User::where('email', $request->email)->first();
-                if ($user) {
-                    $user->google_token = $request->google_token;
-                    $user->save();
-                } else {
-                    $name = explode('@', $request->email)[0] ?? 'Pet User';
-                    $user = User::create([
-                        'name'         => $name,
-                        'email'        => $request->email,
-                        'password'     => null,
-                        'google_token' => $request->google_token,
-                    ]);
-                }
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid Google credentials',
+                ], 401);
             }
 
             // ✅ Laravel login
             Auth::login($user);
 
-            DB::transaction(function () use (&$plainToken, &$room, $user, $request) {
+            DB::transaction(function () use (&$plainToken, &$room, $user, $request, $tokenExpiresAt) {
                 $plainToken = bin2hex(random_bytes(32));
-                $user->api_token_hash = $plainToken;
-                $user->save();
+                $this->assignTokenToModel($user, hash('sha256', $plainToken), $tokenExpiresAt);
 
                 $room = ChatRoom::create([
                     'user_id'         => $user->id,
@@ -1751,16 +1789,15 @@ public function googleLogin(Request $request)
             if (!$tempVet) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid vet credentials',
+                    'message' => 'Invalid Google credentials',
                 ], 401);
             }
 
-            DB::transaction(function () use (&$plainToken, &$room, $tempVet, $request) {
+            DB::transaction(function () use (&$plainToken, &$room, $tempVet, $request, $tokenExpiresAt) {
                 $plainToken = bin2hex(random_bytes(32));
+                $tokenHash = hash('sha256', $plainToken);
 
-                DB::table('vet_registerations_temp')
-                    ->where('id', $tempVet->id)
-                    ->update(['api_token_hash' => $plainToken]);
+                $this->persistTokenToTable('vet_registerations_temp', (int) $tempVet->id, $tokenHash, $tokenExpiresAt);
 
                 $room = ChatRoom::create([
                     'user_id'         => $tempVet->id,
@@ -1972,12 +2009,12 @@ public function googleLogin_bkp(Request $request)
 
         $plainToken = null;
         $room = null;
+        $tokenExpiresAt = now()->addDays(30);
 
-        DB::transaction(function () use (&$plainToken, &$room, $user, $request) {
+        DB::transaction(function () use (&$plainToken, &$room, $user, $request, $tokenExpiresAt) {
             // ✅ API token regenerate
             $plainToken = bin2hex(random_bytes(32));
-            $user->api_token_hash = $plainToken; // (prod: hash store karein)
-            $user->save();
+            $this->assignTokenToModel($user, hash('sha256', $plainToken), $tokenExpiresAt);
 
             // ✅ Create NEW chat room on login
             $room = ChatRoom::create([
@@ -2027,8 +2064,13 @@ public function googleLogin_bkp(Request $request)
         $user = $this->userFromBearer($request);
         if (!$user) return response()->json(['message' => 'Unauthorized'], 401);
 
-        $user->api_token_hash = null; // invalidate
-        $user->save();
+        if ($this->hasTokenColumns($user->getTable())) {
+            $user->api_token_hash = null; // invalidate
+            $user->api_token_expires_at = null;
+            $user->save();
+        } else {
+            Log::warning("Skipping logout token clear for {$user->getTable()}: columns missing");
+        }
 
         return response()->json(['message' => 'Logged out']);
     }
