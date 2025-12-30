@@ -784,6 +784,7 @@ Route::delete('/backend/groomer/reel/{id}',     [ClinicReelController::class, 'd
 
 
 Route::get('/users',            [AdminController::class, 'getUsers']);
+Route::delete('/users/by-phone', [AdminController::class, 'deleteUserByPhone']);
 Route::get('/users/{id}',       [AdminController::class, 'getUser']);
 Route::put('/users/{id}',       [AdminController::class, 'updateUser']);
 Route::delete('/users/{id}',    [AdminController::class, 'deleteUser']);

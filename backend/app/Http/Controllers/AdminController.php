@@ -112,6 +112,30 @@ class AdminController extends Controller
         return response()->json(['status'=>'success','message'=>'User deleted']);
     }
 
+    /**
+     * Delete user(s) by phone query parameter.
+     * Example: DELETE /api/users/by-phone?phone=9999999999
+     */
+    public function deleteUserByPhone(Request $request)
+    {
+        $phone = trim((string) $request->query('phone', ''));
+        if ($phone === '') {
+            return response()->json(['status' => 'error', 'message' => 'phone is required'], 422);
+        }
+
+        $deleted = DB::delete('DELETE FROM users WHERE phone = ?', [$phone]);
+
+        if (!$deleted) {
+            return response()->json(['status' => 'error', 'message' => 'User not found'], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'User deleted',
+            'deleted' => $deleted,
+        ]);
+    }
+
     /* ============== VETS (raw SQL) ============== */
 
     public function getVets(Request $request)
