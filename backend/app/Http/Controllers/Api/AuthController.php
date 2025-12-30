@@ -166,6 +166,31 @@ class AuthController extends Controller
         return $digits;
     }
 
+    private function extractGeo(Request $request): array
+    {
+        $latKeys = ['latitude', 'lat', 'lattitude', 'laititude'];
+        $lngKeys = ['longitude', 'lng', 'lon', 'long', 'longtitude'];
+
+        $fetch = static function (array $keys) use ($request) {
+            foreach ($keys as $key) {
+                $value = $request->input($key);
+                if ($value === null || $value === '') {
+                    continue;
+                }
+                if (is_string($value)) {
+                    $value = trim($value);
+                    if ($value === '') {
+                        continue;
+                    }
+                }
+                return is_numeric($value) ? (float) $value : $value;
+            }
+            return null;
+        };
+
+        return [$fetch($latKeys), $fetch($lngKeys)];
+    }
+
     private function snapshotPhoneOtp(?User $user, string $otp, Carbon $expiresAt): void
     {
         if (!$user) {
@@ -451,6 +476,7 @@ class AuthController extends Controller
         $otpEntry->update(['is_verified' => 1]);
 
         $user = $otpUser;
+        [$latitude, $longitude] = $this->extractGeo($request);
 
         if (! $user) {
             $user = User::create([
@@ -459,8 +485,8 @@ class AuthController extends Controller
                 'phone'             => $normalizedPhone,
                 'password'          => null,
                 'google_token'      => $request->google_token,
-                'latitude'          => $request->latitude,
-                'longitude'         => $request->longitude,
+                'latitude'          => $latitude ?? $request->latitude,
+                'longitude'         => $longitude ?? $request->longitude,
                 'phone_verified_at' => now(),
             ]);
         } else {
@@ -489,6 +515,7 @@ class AuthController extends Controller
 public function createInitialRegistration(Request $request)
 {
     try {
+        [$latitude, $longitude] = $this->extractGeo($request);
         // ✅ check agar email ya phone already exist hai
         $emailExists = DB::table('users')
             ->where('email', $request->email)
@@ -513,8 +540,8 @@ public function createInitialRegistration(Request $request)
             //'phone'      => $request->mobileNumber, // agar phone chahiye toh uncomment karo
             'password'     => null, // abhi blank rakho
             'google_token' => $request->google_token,
-         'latitude'    => $request->latitude,
-        'longitude'   => $request->longitude,
+         'latitude'    => $latitude ?? $request->latitude,
+        'longitude'   => $longitude ?? $request->longitude,
         ]);
 
 
@@ -538,6 +565,7 @@ public function createInitialRegistration(Request $request)
     public function createInitialRegistrationMobile(Request $request)
     {
         try {
+            [$latitude, $longitude] = $this->extractGeo($request);
             $request->validate([
                 'mobileNumber' => ['required', 'string'],
             ]);
@@ -562,8 +590,8 @@ public function createInitialRegistration(Request $request)
                 'phone'        => $mobile,
                 'password'     => null,
                 'google_token' => $request->google_token,
-                'latitude'     => $request->latitude,
-                'longitude'    => $request->longitude,
+                'latitude'     => $latitude ?? $request->latitude,
+                'longitude'    => $longitude ?? $request->longitude,
             ]);
 
             return response()->json([
@@ -642,9 +670,10 @@ public function register(Request $request)
     $plainToken = bin2hex(random_bytes(32));
     $tokenHash  = hash('sha256', $plainToken);
     $tokenExpiresAt = now()->addDays(30);
+    [$latitude, $longitude] = $this->extractGeo($request);
 
     try {
-        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt) {
+        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude) {
             // ✅ Update user with final details
             $user->fill([
                 'pet_name'    => $request->pet_name,
@@ -654,9 +683,12 @@ public function register(Request $request)
                 'pet_doc2'    => $doc2Path,
                 'summary'     => $summaryText,
                 'breed'       => $request->breed,
-                'latitude'    => $request->latitude ?? $user->latitude,
-                'longitude'   => $request->longitude ?? $user->longitude,
+                'latitude'    => $latitude ?? $request->latitude ?? $user->latitude,
+                'longitude'   => $longitude ?? $request->longitude ?? $user->longitude,
             ]);
+
+            // Persist core fields even if api_token_* columns are missing
+            $user->save();
 
             $this->assignTokenToModel($user, $tokenHash, $tokenExpiresAt);
 
@@ -1294,12 +1326,24 @@ public function login(Request $request)
                 ->where('email', $email)
                 ->first();
 
-            if ($clinicRow) {
-                $clinicPassword = data_get($clinicRow, 'password');
-                if (!$this->passwordMatches($clinicPassword, $password)) {
-                    return response()->json(['message' => 'Invalid credentials'], 401);
-                }
+            $doctorRow = DB::table('doctors')
+                ->where('doctor_email', $email)
+                ->first();
 
+            $receptionistRow = Receptionist::where('email', $email)->first();
+            $receptionistRow = Receptionist::where('email', $email)->first();
+
+            $clinicPasswordOk = $clinicRow && $this->passwordMatches(data_get($clinicRow, 'password'), $password);
+            $doctorPasswordOk = $doctorRow && $this->passwordMatches(
+                data_get($doctorRow, 'password') ?? data_get($doctorRow, 'doctor_password'),
+                $password
+            );
+            $receptionistPasswordOk = $receptionistRow && $this->passwordMatches(
+                data_get($receptionistRow, 'password') ?? data_get($receptionistRow, 'receptionist_password'),
+                $password
+            );
+
+            if ($clinicPasswordOk) {
                 DB::transaction(function () use (&$plainToken, &$room, $clinicRow, $roomTitle, $tokenExpiresAt) {
                     $plainToken = bin2hex(random_bytes(32));
                     $tokenHash = hash('sha256', $plainToken);
@@ -1377,16 +1421,7 @@ public function login(Request $request)
                 return response()->json($response, 200);
             }
 
-            $doctorRow = DB::table('doctors')
-                ->where('doctor_email', $email)
-                ->first();
-
-            if ($doctorRow) {
-                $doctorPassword = data_get($doctorRow, 'password') ?? data_get($doctorRow, 'doctor_password');
-                if (!$this->passwordMatches($doctorPassword, $password)) {
-                    return response()->json(['message' => 'Invalid credentials'], 401);
-                }
-
+            if ($doctorPasswordOk) {
                 $clinicId = (int) ($doctorRow->vet_registeration_id ?? 0);
                 $clinicForDoctor = $clinicId > 0
                     ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
@@ -1474,14 +1509,7 @@ public function login(Request $request)
                 return response()->json($response, 200);
             }
 
-            $receptionistRow = Receptionist::where('email', $email)->first();
-
-            if ($receptionistRow) {
-                $receptionistPassword = data_get($receptionistRow, 'password') ?? data_get($receptionistRow, 'receptionist_password');
-                if (!$this->passwordMatches($receptionistPassword, $password)) {
-                    return response()->json(['message' => 'Invalid credentials'], 401);
-                }
-
+            if ($receptionistPasswordOk) {
                 $clinicId = (int) ($receptionistRow->vet_registeration_id ?? 0);
                 $clinicRecord = $clinicId > 0
                     ? DB::table('vet_registerations_temp')->where('id', $clinicId)->first()
@@ -1567,6 +1595,10 @@ public function login(Request $request)
                 ]);
 
                 return response()->json($response, 200);
+            }
+
+            if ($clinicRow || $doctorRow || $receptionistRow) {
+                return response()->json(['message' => 'Invalid credentials'], 401);
             }
 
             return response()->json(['message' => 'Doctor or receptionist not found'], 404);
