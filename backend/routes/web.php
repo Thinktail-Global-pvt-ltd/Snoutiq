@@ -32,6 +32,7 @@ use App\Http\Controllers\SalesDraftClinicPageController;
 use App\Http\Controllers\Admin\LegacyQrRedirectAdminController;
 use App\Http\Controllers\LegacyQrRedirectController;
 use App\Http\Controllers\Admin\VetRegistrationReportPageController;
+use App\Http\Controllers\Admin\PetParentController as AdminPetParentController;
 use App\Http\Controllers\SalesCrmController;
 use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Middleware\EnsureSalesAuthenticated;
@@ -173,6 +174,7 @@ Route::prefix('admin')->group(function () {
     Route::middleware([EnsureAdminAuthenticated::class])->group(function () {
         Route::get('/dashboard', [AdminPanelController::class, 'index'])->name('admin.dashboard');
         Route::get('/users', [AdminPanelController::class, 'users'])->name('admin.users');
+        Route::get('/pet-parents', [AdminPetParentController::class, 'index'])->name('admin.pet-parents');
         Route::get('/pets', [AdminPanelController::class, 'pets'])->name('admin.pets');
         Route::get('/doctors', [AdminPanelController::class, 'doctors'])->name('admin.doctors');
         Route::get('/online-doctors', [AdminPanelController::class, 'onlineDoctors'])->name('admin.online-doctors');

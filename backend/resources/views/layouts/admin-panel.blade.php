@@ -62,6 +62,7 @@
             <a href="{{ route('admin.onboarding.panel') }}" class="{{ request()->routeIs('admin.onboarding.panel') ? 'active' : '' }}">Onboarding Panel</a>
             <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">Dashboard</a>
             <a href="{{ route('admin.users') }}" class="{{ request()->routeIs('admin.users') ? 'active' : '' }}">Users</a>
+            <a href="{{ route('admin.pet-parents') }}" class="{{ request()->routeIs('admin.pet-parents') ? 'active' : '' }}">Pet Parents</a>
             <a href="{{ route('admin.pets') }}" class="{{ request()->routeIs('admin.pets') ? 'active' : '' }}">Pets</a>
             <a href="{{ route('admin.doctors') }}" class="{{ request()->routeIs('admin.doctors') ? 'active' : '' }}">Doctors</a>
             <a href="{{ route('admin.online-doctors') }}" class="{{ request()->routeIs('admin.online-doctors') ? 'active' : '' }}">Online Doctors</a>
