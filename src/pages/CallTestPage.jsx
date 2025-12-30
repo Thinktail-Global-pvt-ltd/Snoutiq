@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate, useParams, useLocation, useSearchParams } from "react-router-dom";
 import AgoraRTC from "agora-rtc-sdk-ng";
+import axios from "axios";
 
 const APP_ID = "e20a4d60afd8494eab490563ad2e61d1";
+const BACKEND_BASE_URL =
+  import.meta.env.VITE_BACKEND_BASE_URL || "https://snoutiq.com/backend";
 
 export default function CallPage() {
   const navigate = useNavigate();
@@ -61,6 +64,8 @@ export default function CallPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingUrl, setRecordingUrl] = useState("");
   const [recordingError, setRecordingError] = useState("");
+  const [uploadState, setUploadState] = useState("idle");
+  const [uploadMessage, setUploadMessage] = useState("");
 
   // Initialize Agora client
   useEffect(() => {
@@ -305,6 +310,62 @@ export default function CallPage() {
     audioMixingRef.current = { context: null, sources: [], streams: [] };
   };
 
+  const uploadRecordingBlob = async (blob) => {
+    if (!blob) return;
+
+    setUploadState("uploading");
+    setUploadMessage("Uploading recording…");
+
+    const filename = `snoutiq-call-${callId || safeChannel}-${Date.now()}.webm`;
+    const formData = new FormData();
+    formData.append("recording", blob, filename);
+
+    if (callId) {
+      formData.append("call_id", callId);
+      formData.append("call_identifier", callId);
+    }
+    formData.append("channel_name", safeChannel);
+    if (doctorId) formData.append("doctor_id", doctorId);
+    if (patientId) formData.append("patient_id", patientId);
+    if (uid) formData.append("uid", uid);
+    if (role) formData.append("role", role);
+
+    const metadata = {
+      source: "call_page",
+      page_url: typeof window !== "undefined" ? window.location.href : "",
+      doctor_id: doctorId,
+      patient_id: patientId,
+      call_id: callId,
+      channel: safeChannel,
+      role,
+    };
+    formData.append("metadata", JSON.stringify(metadata));
+
+    try {
+      await axios.post(
+        `${BACKEND_BASE_URL}/api/call-recordings/upload`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      setUploadState("success");
+      setUploadMessage("Recording saved to SnoutIQ.");
+    } catch (error) {
+      console.error("Recording upload failed", error);
+      const serverMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "Recording upload failed.";
+      setUploadState("error");
+      setUploadMessage(serverMessage);
+      setRecordingError(serverMessage);
+    }
+  };
+
   const stopRecording = () => {
     const recorder = mediaRecorderRef.current;
     if (!recorder || recorder.state === "inactive") {
@@ -401,6 +462,9 @@ export default function CallPage() {
       return;
     }
 
+    setUploadState("idle");
+    setUploadMessage("");
+
     const setup = buildRecordingStream();
     if (!setup) {
       setRecordingError("Media tracks are not ready yet. Try again in a moment.");
@@ -434,17 +498,22 @@ export default function CallPage() {
       });
 
       recorder.addEventListener("stop", () => {
+        let finalBlob = null;
         if (recordedChunksRef.current.length) {
-          const blob = new Blob(recordedChunksRef.current, {
+          finalBlob = new Blob(recordedChunksRef.current, {
             type: recorder.mimeType || "video/webm",
           });
-          const url = URL.createObjectURL(blob);
+          const url = URL.createObjectURL(finalBlob);
           setRecordingUrl(url);
         }
         recordedChunksRef.current = [];
         setIsRecording(false);
         mediaRecorderRef.current = null;
         releaseAudioResources();
+
+        if (finalBlob) {
+          uploadRecordingBlob(finalBlob);
+        }
       });
 
       recorder.addEventListener("error", (event) => {
@@ -869,6 +938,19 @@ export default function CallPage() {
             >
               {isRecording ? "Stop Recording" : "Start Recording"}
             </button>
+
+            {uploadMessage && (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: uploadState === "error" ? "#f87171" : "#cbd5f5",
+                  fontWeight: 500,
+                  textAlign: "right",
+                }}
+              >
+                {uploadMessage}
+              </div>
+            )}
           </div>
 
           {recordingError && (

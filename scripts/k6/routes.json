@@ -1,0 +1,3952 @@
+[
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/alerts",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/analytics",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/onboarding/clinic-hours",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/onboarding/emergency",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/onboarding/services",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/onboarding/video",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/providers-queue",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/admin/resolve-alert/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/tasks",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/vet-registrations/report",
+    "name": "api.admin.vet-registrations.report",
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/admin/video/pincode-slots",
+    "name": null,
+    "middleware": [
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/agora/appid",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/agora/token",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/ai-stats",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/ai/send-summary",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/ai/summary",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/app/video/heatmap",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/appointments/{appointment}",
+    "name": "api.appointments.show",
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT",
+      "PATCH"
+    ],
+    "uri": "/api/appointments/{appointment}",
+    "name": "api.appointments.update",
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/appointments/{appointment}/edit",
+    "name": "api.appointments.edit",
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/appointments/by-doctor/{doctor}",
+    "name": "api.appointments.by-doctor",
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/appointments/by-user/{user}",
+    "name": "api.appointments.by-user",
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/appointments/submit",
+    "name": "api.appointments.submit",
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/auth/initial-register",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/auth/initial-register-mobile",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/auth/login",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/auth/logout",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/auth/me",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/auth/pet-summary",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/auth/register",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/auth/register-via-mobile",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/backend/groomer/reel",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/backend/groomer/reel/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "DELETE"
+    ],
+    "uri": "/api/backend/groomer/reel/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/backend/groomer/reel/{id}/update",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/backend/groomer/reels",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/block_time",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/bookings",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/bookings-v2",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/bookings/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/bookings/{id}/rate",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/bookings/{id}/status",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/bookings/{id}/verify-payment",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/bookings/create",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/bookings/details/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call-recordings/upload",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/call-sessions",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call-sessions",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/call-sessions/{callSession}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/call/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/{id}/accept",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/{id}/end",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/{id}/payment-success",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/{id}/recordings/start",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/call/{id}/recordings/status",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/{id}/recordings/stop",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/{id}/recordings/transcript",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/{id}/start",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/create",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/request",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/call/test",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "DELETE"
+    ],
+    "uri": "/api/chat-rooms/{chat_room_token}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/chat-rooms/{chat_room_token}/chats",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/chat-rooms/{chat_room_token}/summarize",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/chat-rooms/new",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/chat/listRooms",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/chat/send",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/chat/unified",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/chat/unified/reset",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/chat/unified/status",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/chats",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/chats/{chat_id}/feedback",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinic/emergency-hours",
+    "name": "api.clinic.emergency-hours.show",
+    "middleware": [
+      "web",
+      "App\\Http\\Middleware\\EnsureSessionUser"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/clinic/emergency-hours",
+    "name": "api.clinic.emergency-hours.upsert",
+    "middleware": [
+      "web",
+      "App\\Http\\Middleware\\EnsureSessionUser"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinics",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinics/{clinic}/payments",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinics/{id}/availability",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinics/{id}/doctors",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/clinics/{id}/doctors",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinics/{id}/patients",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinics/{id}/services",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/clinics/drafts",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinics/drafts",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinics/payments",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/clinics/services",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/contact-request",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/coverage/dashboard",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/coverage/zone/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/create-order",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/dashboard/profile",
+    "name": "api.dashboard.profile.show",
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/dashboard/profile/clinic",
+    "name": "api.dashboard.profile.clinic",
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/dashboard/profile/doctor/{doctor}",
+    "name": "api.dashboard.profile.doctor",
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/debug/pusher",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/debug/user-location",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/device-tokens/issue",
+    "name": "api.device-tokens.issue",
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/doctor/availability",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctor/availability/suggestions",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/doctor/bookings",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctor/bookings",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctor/profile",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT",
+      "PATCH"
+    ],
+    "uri": "/api/doctor/profile",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/doctor/update-status",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/{doctor_id}/prescriptions",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PATCH"
+    ],
+    "uri": "/api/doctors/{doctor}/status",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/doctors/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/doctors/{id}/availability",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/{id}/availability",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/{id}/bookings",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/{id}/free-slots",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/doctors/{id}/price",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/{id}/schedules/combined",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/{id}/slots",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/{id}/slots/summary",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/featured",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/doctors/slots",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/doctors/slots",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/dog-breed/{breed}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/dog-breeds/all",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/downloads/track",
+    "name": "api.downloads.track",
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/error-logs",
+    "name": "api.error-logs.store",
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/fetchNearbyPlaces",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/founder/alerts",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PATCH"
+    ],
+    "uri": "/api/founder/alerts/{alert}/read",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PATCH"
+    ],
+    "uri": "/api/founder/alerts/read-all",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/founder/clinics",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/founder/clinics/{clinic}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/founder/dashboard",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/founder/revenue",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/founder/sales",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/founder/settings",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PATCH"
+    ],
+    "uri": "/api/founder/settings",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\FounderRequestLogger"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/gemini/describe-pet",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/geo/nearest-pincode",
+    "name": null,
+    "middleware": [
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/geo/pincodes",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/geo/strips",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/google-login",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/booked_times",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/bookings/{id}/assignEmployee",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/bookings/{id}/delete",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/bookings/{id}/payment",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/bookings/{id}/prescription",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/bookings/{id}/status",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/clients",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/clients",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/clients/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/groomer/clients/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/coupons",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/coupons",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/dashboard",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/dashboard-v2",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/employees",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/employees",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/employees/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/groomer/employees/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/featured-services",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/featured-services",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/notifications",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/notifications",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/offers",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/offers",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/onboarding-tasks",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/profile",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/profile",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/ratings",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/service",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/service_categroy",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/service_categroy",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/service_categroy/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/service_categroy/{id}/delete",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/service/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "DELETE"
+    ],
+    "uri": "/api/groomer/service/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/service/{id}/edit",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/groomer/service/{id}/update",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/groomer/services",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/internal/doctor-call-alert",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/medical-records",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/medical-records/slug/{slug}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/medical-records/user/{user}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/ml/demand-prediction",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/ml/provider-performance/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/ml/train",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/my_booking/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/my_bookings",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/nearby-doctors",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/nearby-vets",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/petparents/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "DELETE"
+    ],
+    "uri": "/api/petparents/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/pets/{id}/extras",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/pets/{petId}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/pets/{petId}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "DELETE"
+    ],
+    "uri": "/api/pets/{petId}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/prescriptions",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/prescriptions",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/prescriptions/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/prompt-test-v2",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/providers/{id}/availability",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/providers/{id}/status",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/providers/complete-profile",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/providers/register",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/public/chats/chatHistory",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/public/chats/myMessages",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/public/chats/sendMessage",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/public/chats/startChat",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/public/groomers",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/public/single_groomer/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/public/support/mydata",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/public/support/sendMessage",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/push/edit-token",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/push/register-token",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "DELETE"
+    ],
+    "uri": "/api/push/register-token",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/push/test",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/razorpay-ping",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/receptionist/appointments/today",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/receptionist/bookings",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/receptionist/bookings",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/receptionist/doctors",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/receptionist/doctors/available",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/receptionist/patients",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/receptionist/patients",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/receptionist/patients/{user}/pets",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/referrals/{code}",
+    "name": "api.referrals.lookup",
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/referrals/download",
+    "name": "api.referrals.download",
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/reviews",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/reviews",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/rzp-test",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/rzp/verify",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/sales/dashboard",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/sales/qr-scanners",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/sales/qr-scanners/{scanner}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/sales/qr-scanners/{scanner}/notify",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/sales/vet-registrations",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/send-otp",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/session/clear",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/session/get",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/session/login",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/session/login",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/session/save",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/socket/doctors/{doctor}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/staff",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PATCH"
+    ],
+    "uri": "/api/staff/{type}/{id}/role",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/staff/receptionists",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/store_booking",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/summary",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/test-cors",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/test-dd",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/unified/process",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/unified/reset",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/unified/status",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user-chats/{user_id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/add_pet",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user/ai/chats",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user/ai/chats/{token}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/ai/chats/{token}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/ai/rated/{hist_id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/ai/start",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/book_grooming",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/booking/getRatings",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/booking/postBooking",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user/data",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/emergency/acceptEmergancy",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/emergency/amtPaid",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/emergency/isAccepted",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/emergency/searchForRequest",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/emergency/sendRequest",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user/my_booking/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user/my_bookings",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user/my_pets",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user/observations",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/observations",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user/pet/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/pet/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/user/pets/{id}/extras",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/user/profile",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/profile",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/user/razorpay/create-order",
+    "name": null,
+    "middleware": [
+      "api",
+      "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/users",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/users-db",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/users/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/users/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "DELETE"
+    ],
+    "uri": "/api/users/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/users/{id}/orders",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/users/{id}/pets",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/users/{user}/medical-records",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/users/{userId}/pets",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/users/{userId}/pets",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/users/feedback",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/users/last-vet-details",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/users/medical-summary",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/users/phone",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/verify-otp",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/vet-leads",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/vet-registerations/{vet}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/vet-registerations/store",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/vet-registrations/report",
+    "name": "api.vet-registrations.report.public",
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/vets",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/vets/{id}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "DELETE"
+    ],
+    "uri": "/api/vets/{id}",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/vets/by-referral/{code}",
+    "name": "api.vets.by-referral",
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "uri": "/api/video-schedule/doctors/{id}/availability",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video-schedule/doctors/{id}/availability",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video-schedule/doctors/{id}/free-slots",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/video/admin/publish",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/video/admin/reset",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/coverage",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/coverage/pincode",
+    "name": null,
+    "middleware": [
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/nearest-strip",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/pincode-coverage",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/video/route",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/schedule/{doctor}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/video/schedule/{doctor}",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/video/schedule/{doctor}/toggle-247",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/video/slots/{slot}/checkin",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/video/slots/{slot}/commit",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "DELETE"
+    ],
+    "uri": "/api/video/slots/{slot}/release",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/slots/doctor",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/slots/doctor-test",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/slots/nearby",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/slots/nearby/pincode",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/slots/open",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/video/strip-for-pincode",
+    "name": null,
+    "middleware": [
+      "api",
+      "web"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/weather/by-coords",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/weather/cities",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/weather/detail",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/weather/history",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/weather/hourly-schedule",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "uri": "/api/weather/latest",
+    "name": null,
+    "middleware": [
+      "api",
+      "App\\Http\\Middleware\\EnsureApiToken"
+    ],
+    "domain": null
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "uri": "/api/whatsapp/send",
+    "name": null,
+    "middleware": [
+      "api"
+    ],
+    "domain": null
+  }
+]

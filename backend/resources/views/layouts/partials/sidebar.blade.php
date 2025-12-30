@@ -411,6 +411,13 @@
           </svg>
           <span class="truncate">Financials</span>
         </a>
+
+        <a href="{{ route('clinic.csv-upload') }}" class="{{ $baseItem }} {{ $active('clinic.csv-upload') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m0 0l-4-4m4 4l4-4M8 4h8m-8 4h8"/>
+          </svg>
+          <span class="truncate">Upload CSV</span>
+        </a>
         
         <!-- <a href="{{ route('clinic.booking.payments') }}" class="{{ $baseItem }} {{ $active('clinic.booking.payments') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
           <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -453,6 +453,7 @@ const PetMedicationTracker = lazy(() =>
 const CallPage = lazy(() => import("../src/pages/CallTestPage"));
 const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
 const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
+const CsvUploadPage = lazy(() => import("./pages/CsvUploadPage"));
 // App.js mein yeh component replace karo:
 
 const ScrollToTopAndHash = () => {
@@ -1031,6 +1032,7 @@ function App() {
               }
             />
             <Route path="/call" element={<CallPage />} />
+            <Route path="/csv-upload" element={<CsvUploadPage />} />
             <Route path="/s3-upload-test" element={<S3UploadTest />} />
             <Route
               path="/prescription/:doctorId?/:patientId?"

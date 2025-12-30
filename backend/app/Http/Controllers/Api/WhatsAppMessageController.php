@@ -22,6 +22,7 @@ class WhatsAppMessageController extends Controller
             'type' => ['nullable', Rule::in(['text', 'template'])],
             'message' => ['required_if:type,text', 'string', 'max:1000'],
             'template_name' => ['required_if:type,template', 'string', 'max:255'],
+            'components' => ['nullable', 'array'],
         ]);
 
         $type = $data['type'] ?? 'template';
@@ -36,7 +37,11 @@ class WhatsAppMessageController extends Controller
             if ($type === 'text') {
                 $result = $this->whatsApp->sendTextWithResult($data['mobile_number'], $data['message']);
             } else {
-                $result = $this->whatsApp->sendTemplateWithResult($data['mobile_number'], $data['template_name'] ?? null);
+                $result = $this->whatsApp->sendTemplateWithResult(
+                    $data['mobile_number'],
+                    $data['template_name'] ?? null,
+                    $data['components'] ?? []
+                );
             }
         } catch (RuntimeException $e) {
             return response()->json([

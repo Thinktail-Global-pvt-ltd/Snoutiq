@@ -10,7 +10,8 @@ class StoreScheduleRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null; // policy/guard hook if needed
+        // Allow third-party access without authentication (explicit request)
+        return true;
     }
 
     public function rules(): array
@@ -29,4 +30,3 @@ class StoreScheduleRequest extends FormRequest
         ];
     }
 }
-

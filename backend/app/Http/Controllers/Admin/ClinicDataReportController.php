@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessHour;
 use App\Models\ClinicEmergencyHour;
+use App\Models\GroomerService;
 use App\Models\Transaction;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Contracts\View\View;
@@ -34,6 +35,7 @@ class ClinicDataReportController extends Controller
                 'Doctors',
                 'In-Clinic Availability',
                 'Video Availability',
+                'Related Services',
                 'Clinic Business Hours',
                 'Emergency Coverage',
                 'Payments (₹)',
@@ -49,6 +51,7 @@ class ClinicDataReportController extends Controller
                     $row['doctors_count'],
                     $row['in_clinic_summary'],
                     $row['video_summary'],
+                    $row['services_summary'],
                     $row['business_hours_summary'],
                     $row['emergency_summary'],
                     $row['payment_total_display'],
@@ -80,6 +83,11 @@ class ClinicDataReportController extends Controller
             ->orderBy('day_of_week')
             ->get()
             ->groupBy('vet_registeration_id');
+
+        $services = GroomerService::whereIn('user_id', $clinicIds)
+            ->orderBy('name')
+            ->get()
+            ->groupBy('user_id');
 
         $inClinicRows = collect(DB::table('doctor_availability as da')
             ->select('d.vet_registeration_id', 'da.day_of_week', 'da.start_time', 'da.end_time', 'da.break_start', 'da.break_end', 'da.max_bookings_per_hour')
@@ -113,13 +121,15 @@ class ClinicDataReportController extends Controller
             $videoByClinic,
             $businessHours,
             $emergencyHours,
-            $payments
+            $payments,
+            $services
         ) {
             $inClinic = $inClinicByClinic->get($clinic->id, collect());
             $video = $videoByClinic->get($clinic->id, collect());
             $business = $businessHours->get($clinic->id, collect());
             $emergency = $emergencyHours->get($clinic->id);
             $paymentRow = $payments->get($clinic->id);
+            $clinicServices = $services->get($clinic->id, collect());
 
             $totalPaise = $paymentRow->total_paise ?? 0;
 
@@ -128,6 +138,8 @@ class ClinicDataReportController extends Controller
                 'doctors_count' => $clinic->doctors_count,
                 'in_clinic_summary' => $this->formatAvailabilitySummary($inClinic, 'availability'),
                 'video_summary' => $this->formatAvailabilitySummary($video, 'video'),
+                'services_summary' => $this->formatServicesSummary($clinicServices),
+                'services_count' => $clinicServices->count(),
                 'business_hours_summary' => $this->formatBusinessHours($business),
                 'emergency_summary' => $this->formatEmergencySummary($emergency),
                 'payment_total_display' => $this->formatCurrency($totalPaise),
@@ -157,6 +169,54 @@ class ClinicDataReportController extends Controller
         });
 
         return $parts->values()->implode(' | ');
+    }
+
+    private function formatServicesSummary(Collection $rows, int $limit = 6): string
+    {
+        if ($rows->isEmpty()) {
+            return 'Not configured';
+        }
+
+        $descriptions = $rows->map(function ($service) {
+            $name = trim((string) ($service->name ?? ''));
+
+            if ($name === '') {
+                $main = trim((string) ($service->main_service ?? ''));
+                if ($main !== '') {
+                    $name = ucwords(str_replace(['_', '-'], ' ', $main));
+                } else {
+                    $name = 'Service #'.$service->id;
+                }
+            }
+
+            $meta = [];
+            if ($service->price !== null && $service->price !== '') {
+                $meta[] = '₹'.number_format((float) $service->price, 2);
+            }
+            if (! empty($service->duration)) {
+                $meta[] = (int) $service->duration.' min';
+            }
+            if (! empty($service->status) && ! in_array(strtolower($service->status), ['active', 'published'])) {
+                $meta[] = ucfirst($service->status);
+            }
+
+            if ($meta) {
+                $name .= ' ('.implode(', ', $meta).')';
+            }
+
+            return $name;
+        })->filter();
+
+        if ($descriptions->isEmpty()) {
+            return 'Configured but unnamed';
+        }
+
+        $preview = $descriptions->take($limit)->implode(' | ');
+        if ($descriptions->count() > $limit) {
+            $preview .= ' | +'.($descriptions->count() - $limit).' more';
+        }
+
+        return $preview;
     }
 
     private function formatBusinessHours(Collection $rows): string

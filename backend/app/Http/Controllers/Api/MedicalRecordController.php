@@ -27,6 +27,105 @@ class MedicalRecordController extends Controller
         return $this->recordsForUser($this->resolveUser((string) $userId), null, true);
     }
 
+    public function update(Request $request, MedicalRecord $record)
+    {
+        $validated = $request->validate([
+            'doctor_id' => ['nullable', 'integer', 'exists:doctors,id'],
+            'clinic_id' => ['required', 'integer', 'exists:vet_registerations_temp,id'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'visit_category' => ['nullable', 'string', 'max:255'],
+            'case_severity' => ['nullable', 'string', 'max:255'],
+            'temperature' => ['nullable', 'numeric'],
+            'weight' => ['nullable', 'numeric'],
+            'heart_rate' => ['nullable', 'numeric'],
+            'exam_notes' => ['nullable', 'string'],
+            'diagnosis' => ['nullable', 'string', 'max:255'],
+            'diagnosis_status' => ['nullable', 'string', 'max:255'],
+            'treatment_plan' => ['nullable', 'string'],
+            'home_care' => ['nullable', 'string'],
+            'follow_up_date' => ['nullable', 'date'],
+            'follow_up_type' => ['nullable', 'string', 'max:255'],
+            'follow_up_notes' => ['nullable', 'string'],
+            'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
+        ]);
+
+        $clinicId = (int) $validated['clinic_id'];
+        if ((int) $record->vet_registeration_id !== $clinicId) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Record not linked to this clinic',
+            ], 422);
+        }
+
+        $doctorId = $validated['doctor_id'] ?? null;
+        if ($doctorId) {
+            $doctor = Doctor::query()->select('id', 'vet_registeration_id')->find($doctorId);
+            if (!$doctor) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Doctor not found',
+                ], 404);
+            }
+            if ((int) $doctor->vet_registeration_id !== $clinicId) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Doctor is not part of this clinic',
+                ], 422);
+            }
+        }
+
+        if ($request->hasFile('record_file')) {
+            $file = $request->file('record_file');
+            $storedPath = $file->store('medical-records', 'public');
+            $record->file_path = $storedPath;
+            $record->file_name = $file->getClientOriginalName();
+            $record->mime_type = $file->getClientMimeType();
+        }
+
+        $record->notes = $validated['notes'] ?? $record->notes;
+        $record->doctor_id = $doctorId ?? $record->doctor_id;
+        $record->save();
+
+        $prescription = Prescription::firstOrNew(['medical_record_id' => $record->id]);
+        $prescription->fill([
+            'medical_record_id' => $record->id,
+            'user_id' => $record->user_id,
+            'doctor_id' => $record->doctor_id ?? 0,
+            'visit_category' => $validated['visit_category'] ?? $prescription->visit_category,
+            'case_severity' => $validated['case_severity'] ?? $prescription->case_severity,
+            'visit_notes' => $validated['notes'] ?? $prescription->visit_notes,
+            'content_html' => $validated['notes'] ?? $prescription->content_html ?? 'Updated medical record',
+            'temperature' => $validated['temperature'] ?? $prescription->temperature,
+            'weight' => $validated['weight'] ?? $prescription->weight,
+            'heart_rate' => $validated['heart_rate'] ?? $prescription->heart_rate,
+            'exam_notes' => $validated['exam_notes'] ?? $prescription->exam_notes,
+            'diagnosis' => $validated['diagnosis'] ?? $prescription->diagnosis,
+            'diagnosis_status' => $validated['diagnosis_status'] ?? $prescription->diagnosis_status,
+            'treatment_plan' => $validated['treatment_plan'] ?? $prescription->treatment_plan,
+            'home_care' => $validated['home_care'] ?? $prescription->home_care,
+            'follow_up_date' => $validated['follow_up_date'] ?? $prescription->follow_up_date,
+            'follow_up_type' => $validated['follow_up_type'] ?? $prescription->follow_up_type,
+            'follow_up_notes' => $validated['follow_up_notes'] ?? $prescription->follow_up_notes,
+        ]);
+        $prescription->save();
+
+        return response()->json([
+            'success' => true,
+            'record' => [
+                'id' => $record->id,
+                'user_id' => $record->user_id,
+                'doctor_id' => $record->doctor_id,
+                'clinic_id' => $record->vet_registeration_id,
+                'file_name' => $record->file_name,
+                'mime_type' => $record->mime_type,
+                'notes' => $record->notes,
+                'uploaded_at' => optional($record->created_at)->toIso8601String(),
+                'url' => $this->buildRecordUrl($record->file_path),
+            ],
+            'prescription' => $prescription,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([

@@ -7,7 +7,10 @@ use App\Events\PaymentDone;
 use App\Helpers\RtcTokenBuilder;
 use App\Models\CallSession;
 use App\Models\Payment;
+use App\Services\CallRecordingManager;
 use App\Support\CallSessionUrlBuilder;
+use Razorpay\Api\Api;
+use Razorpay\Api\Errors\Error as RazorpayError;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -16,6 +19,13 @@ use Illuminate\Support\Str;
 
 class CallController extends Controller
 {
+    protected CallRecordingManager $recordingManager;
+
+    public function __construct(CallRecordingManager $recordingManager)
+    {
+        $this->recordingManager = $recordingManager;
+    }
+
     public function createSession(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -89,10 +99,10 @@ class CallController extends Controller
         $data = $request->validate([
             'payment_db_id'        => 'nullable|integer',
             'payment_id'           => 'nullable|string',
-            'razorpay_payment_id'  => 'nullable|string',
-            'razorpay_order_id'    => 'nullable|string|max:191',
+            'razorpay_payment_id'  => 'required|string',
+            'razorpay_order_id'    => 'required|string|max:191',
             'order_id'             => 'nullable|string|max:191',
-            'razorpay_signature'   => 'nullable|string|max:191',
+            'razorpay_signature'   => 'required|string|max:191',
             'signature'            => 'nullable|string|max:191',
             'amount'               => 'nullable|integer|min:0',
             'currency'             => 'nullable|string|max:10',
@@ -119,6 +129,32 @@ class CallController extends Controller
         $currency = strtoupper($data['currency'] ?? $session->currency ?? 'INR');
         $orderId = $data['razorpay_order_id'] ?? $data['order_id'] ?? null;
         $signature = $data['razorpay_signature'] ?? $data['signature'] ?? null;
+
+        if (! $paymentIdentifier || ! $orderId || ! $signature) {
+            return response()->json(['message' => 'Missing Razorpay verification fields'], 422);
+        }
+
+        try {
+            $api = new Api(
+                trim((string) (config('services.razorpay.key') ?? '')),
+                trim((string) (config('services.razorpay.secret') ?? ''))
+            );
+            $api->utility->verifyPaymentSignature([
+                'razorpay_order_id'   => $orderId,
+                'razorpay_payment_id' => $paymentIdentifier,
+                'razorpay_signature'  => $signature,
+            ]);
+        } catch (RazorpayError $e) {
+            return response()->json([
+                'message' => 'Payment signature verification failed',
+                'error'   => $e->getMessage(),
+            ], 401);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Payment verification failed',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
 
         $paymentPayload = [];
         if (array_key_exists('amount', $data) && $data['amount'] !== null) {
@@ -207,6 +243,8 @@ class CallController extends Controller
         }
         $session->save();
 
+        $this->attemptAutoStartRecording($session);
+
         return response()->json($this->sessionPayload($session));
     }
 
@@ -240,6 +278,8 @@ class CallController extends Controller
 
         $session->status = 'ended';
         $session->save();
+
+        $this->attemptAutoStopRecording($session);
 
         return response()->json($this->sessionPayload($session));
     }
@@ -276,6 +316,46 @@ class CallController extends Controller
             'uid'         => $uid,
             'expiresIn'   => $expireTimeInSeconds,
         ]);
+    }
+
+    protected function attemptAutoStartRecording(CallSession $session): void
+    {
+        if (!config('services.agora.recording.auto_start', false)) {
+            return;
+        }
+
+        if ($session->hasActiveRecording()) {
+            return;
+        }
+
+        try {
+            $this->recordingManager->start($session);
+        } catch (\Throwable $e) {
+            Log::error('Auto recording start failed', [
+                'session_id' => $session->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    protected function attemptAutoStopRecording(CallSession $session): void
+    {
+        if (!config('services.agora.recording.auto_stop', true)) {
+            return;
+        }
+
+        if (!$session->recording_resource_id || !$session->recording_sid) {
+            return;
+        }
+
+        try {
+            $this->recordingManager->stop($session);
+        } catch (\Throwable $e) {
+            Log::error('Auto recording stop failed', [
+                'session_id' => $session->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function sessionPayload(CallSession $session, array $extra = []): array

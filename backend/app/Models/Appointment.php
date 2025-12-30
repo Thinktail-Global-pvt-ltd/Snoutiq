@@ -19,6 +19,15 @@ class Appointment extends Model
         'appointment_time',
         'status',
         'notes',
+        'reminder_24h_sent_at',
+        'reminder_3h_sent_at',
+        'reminder_30m_sent_at',
+    ];
+
+    protected $casts = [
+        'reminder_24h_sent_at' => 'datetime',
+        'reminder_3h_sent_at' => 'datetime',
+        'reminder_30m_sent_at' => 'datetime',
     ];
 
     public function clinic()
@@ -31,4 +40,3 @@ class Appointment extends Model
         return $this->belongsTo(Doctor::class, 'doctor_id');
     }
 }
-

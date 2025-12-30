@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (Schema::hasTable('doctor_weekly_video_schedule_days')) {
+            return;
+        }
+
         Schema::create('doctor_weekly_video_schedule_days', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->unsignedBigInteger('schedule_id');
@@ -30,4 +34,3 @@ return new class extends Migration {
         Schema::dropIfExists('doctor_weekly_video_schedule_days');
     }
 };
-

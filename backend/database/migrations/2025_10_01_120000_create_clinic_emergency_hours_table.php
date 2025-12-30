@@ -11,10 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('clinic_emergency_hours')) {
+            return;
+        }
+
         Schema::create('clinic_emergency_hours', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('clinic_id');
             $table->json('doctor_ids')->nullable();
+            $table->json('doctor_slot_map')->nullable();
             $table->json('night_slots')->nullable();
             $table->decimal('consultation_price', 10, 2)->nullable();
             $table->timestamps();

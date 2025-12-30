@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\CallController as ApiCallController; // handles lig
 use App\Http\Controllers\CallController as CoreCallController;    // handles sessions + token
 use App\Http\Controllers\Api\CallRecordingController;
 use App\Http\Controllers\Api\RecordingUploadController;
+use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\ReceptionistBookingController;
 use App\Http\Controllers\Api\ErrorLogController;
@@ -59,6 +60,7 @@ Route::get('/call-sessions', [CallSessionCrudController::class, 'index']);
 Route::post('/call-sessions', [CallSessionCrudController::class, 'store']);
 Route::get('/call-sessions/{callSession}', [CallSessionCrudController::class, 'show'])->whereNumber('callSession');
 Route::post('/call-recordings/upload', [RecordingUploadController::class, 'store']);
+Route::post('/csv/upload', [CsvUploadController::class, 'store']);
 Route::post('/error-logs', [ErrorLogController::class, 'store'])->name('api.error-logs.store');
 Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
 
@@ -866,6 +868,7 @@ Route::get('/users/{id}/pets', [\App\Http\Controllers\Api\PetsController::class,
 Route::get('/users/{user}/medical-records', [MedicalRecordController::class, 'index']);
 Route::get('/medical-records/user/{user}', [MedicalRecordController::class, 'userRecords']);
 Route::post('/medical-records', [MedicalRecordController::class, 'store']);
+Route::match(['put','patch'], '/medical-records/{record}', [MedicalRecordController::class, 'update']);
 Route::get('/medical-records/slug/{slug}', [MedicalRecordController::class, 'indexBySlug']);
 
   // AI Summary from chats

@@ -42,6 +42,7 @@ use App\Http\Controllers\MarketingNotificationController;
 use App\Http\Controllers\Dev\NotificationPlaygroundController;
 use App\Models\LegacyQrRedirect;
 use App\Services\OnboardingProgressService;
+use App\Http\Controllers\Api\CsvUploadController;
 
 
 // Public routes
@@ -509,6 +510,11 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
 
     // Booking payments from bookings table (filtered by this clinic)
     Route::view('/clinic/booking-payments', 'clinic.booking-payments')->name('clinic.booking.payments');
+
+    // CSV upload utility (stores file to storage/app/csv-uploads)
+    Route::get('/csv-upload', [CsvUploadController::class, 'form'])->name('clinic.csv-upload');
+    Route::post('/csv-upload', [CsvUploadController::class, 'storeWeb'])->name('clinic.csv-upload.store');
+    Route::get('/csv-upload/show', [CsvUploadController::class, 'show'])->name('clinic.csv-upload.show');
 });
 
 use Illuminate\Support\Facades\DB;

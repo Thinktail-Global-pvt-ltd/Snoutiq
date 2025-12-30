@@ -7,6 +7,7 @@ use App\Services\Snoutiq\RoutingEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Razorpay\Api\Api;
 use Razorpay\Api\Errors\Error as RazorpayError;
 
@@ -174,20 +175,42 @@ class BookingsController extends Controller
         }
 
         // Fetch selected pet + all pets for the user (prefer `pets`, fallback to `user_pets`)
-        $pet = null; $pets = collect(); $user = null; $petParentName = null;
+        $pet = null;
+        $pets = collect();
+        $user = null;
+        $petParentName = null;
+        $userDocuments = [];
+        $userSummary = null;
+        $userHistory = collect();
         try {
             // User (pet parent)
             if (Schema::hasTable('users')) {
-                $user = DB::table('users')
-                    ->where('id', $booking->user_id)
-                    ->select('id','name','email')
-                    ->first();
-                if ($user) { $petParentName = $user->name ?? null; }
+                $userColumns = $this->discoverUserColumns();
+                if ($userColumns) {
+                    $user = DB::table('users')
+                        ->where('id', $booking->user_id)
+                        ->select($userColumns)
+                        ->first();
+                }
+                if ($user) {
+                    $petParentName = $user->name ?? null;
+                    $userSummary = $user->summary ?? null;
+                    $userDocuments = array_merge($userDocuments, $this->extractDocumentPayloads($user, [
+                        'pet_doc1' => 'Medical Upload 1',
+                        'pet_doc2' => 'Medical Upload 2',
+                    ], 'user'));
+                }
             }
 
             if (Schema::hasTable('pets')) {
                 if (!empty($booking->pet_id)) {
                     $pet = DB::table('pets')->where('id', $booking->pet_id)->first();
+                    if ($pet) {
+                        $userDocuments = array_merge($userDocuments, $this->extractDocumentPayloads($pet, [
+                            'pet_doc1' => 'Pet Document 1',
+                            'pet_doc2' => 'Pet Document 2',
+                        ], 'pet'));
+                    }
                 }
                 $petsQ = DB::table('pets');
                 if (Schema::hasColumn('pets', 'user_id')) {
@@ -199,8 +222,38 @@ class BookingsController extends Controller
             } elseif (Schema::hasTable('user_pets')) {
                 if (!empty($booking->pet_id)) {
                     $pet = DB::table('user_pets')->where('id', $booking->pet_id)->first();
+                    if ($pet) {
+                        $userDocuments = array_merge($userDocuments, $this->extractDocumentPayloads($pet, [
+                            'pet_doc1' => 'Pet Document 1',
+                            'pet_doc2' => 'Pet Document 2',
+                        ], 'pet'));
+                    }
                 }
                 $pets = DB::table('user_pets')->where('user_id', $booking->user_id)->orderByDesc('id')->get();
+            }
+
+            if ($booking->user_id && Schema::hasTable('bookings')) {
+                $history = DB::table('bookings')
+                    ->select(
+                        'id',
+                        'service_type',
+                        'status',
+                        'scheduled_for',
+                        'booking_created_at',
+                        'ai_summary',
+                        'urgency',
+                        'assigned_doctor_id',
+                        'pet_id'
+                    )
+                    ->where('user_id', $booking->user_id)
+                    ->orderByRaw('COALESCE(scheduled_for, booking_created_at) DESC')
+                    ->limit(25)
+                    ->get();
+                $userHistory = $history->map(function ($row) use ($booking) {
+                    $row->is_current = ((int) $row->id) === ((int) $booking->id);
+                    $row->timeline_label = $row->scheduled_for ?? $row->booking_created_at;
+                    return $row;
+                });
             }
         } catch (\Throwable $e) { /* ignore */ }
 
@@ -210,6 +263,9 @@ class BookingsController extends Controller
             'pet_parent_name' => $petParentName,
             'pet'     => $pet,
             'pets'    => $pets,
+            'documents' => $userDocuments,
+            'user_summary' => $userSummary,
+            'user_history' => $userHistory,
         ]);
     }
 
@@ -233,10 +289,33 @@ class BookingsController extends Controller
         }
         $rows = $q->orderByRaw('COALESCE(b.scheduled_for, b.booking_created_at) DESC')->limit(200)->get();
 
+        $userProfiles = collect();
+        if ($rows->isNotEmpty() && Schema::hasTable('users')) {
+            $ids = $rows->pluck('user_id')->filter()->unique()->all();
+            if (!empty($ids)) {
+                $userColumns = $this->discoverUserColumns();
+                if ($userColumns) {
+                    $userProfiles = DB::table('users')
+                        ->select($userColumns)
+                        ->whereIn('id', $ids)
+                        ->get()
+                        ->keyBy('id');
+                }
+            }
+        }
+
         // Decode JSON symptoms to array for convenience
-        $rows = $rows->map(function($r){
+        $rows = $rows->map(function($r) use ($userProfiles){
             if (isset($r->symptoms) && $r->symptoms) {
                 try { $r->symptoms = is_array($r->symptoms) ? $r->symptoms : json_decode($r->symptoms, true); } catch (\Throwable $e) { /* ignore */ }
+            }
+            $profile = $userProfiles[$r->user_id] ?? null;
+            if ($profile) {
+                $r->pet_parent_name  = $profile->name ?? null;
+                $r->pet_parent_phone = $profile->phone ?? null;
+                $r->pet_parent_city  = $profile->city ?? null;
+                $r->pet_parent_state = $profile->state ?? null;
+                $r->user_summary     = $profile->summary ?? null;
             }
             return $r;
         });
@@ -258,5 +337,104 @@ class BookingsController extends Controller
         $data = $request->validate(['rating' => 'required|integer|min:1|max:5', 'review' => 'nullable|string']);
         DB::table('bookings')->where('id', $id)->update(['rating' => $data['rating'], 'review' => $data['review'] ?? null]);
         return response()->json(['message' => 'Thanks for your feedback']);
+    }
+
+    /**
+     * Discover available user columns once (guards against missing schema fields).
+     */
+    protected function discoverUserColumns(): array
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        if (!Schema::hasTable('users')) {
+            return $cache = [];
+        }
+        $base = ['id', 'name', 'email'];
+        $optional = [
+            'phone',
+            'pet_name',
+            'pet_gender',
+            'pet_age',
+            'pet_doc1',
+            'pet_doc2',
+            'summary',
+            'address',
+            'city',
+            'state',
+            'pincode',
+            'latitude',
+            'longitude',
+        ];
+        $columns = [];
+        foreach (array_merge($base, $optional) as $column) {
+            if (Schema::hasColumn('users', $column)) {
+                $columns[] = $column;
+            }
+        }
+
+        return $cache = $columns;
+    }
+
+    /**
+     * Extract normalized document metadata from a model/stdClass instance.
+     */
+    protected function extractDocumentPayloads($source, array $fieldMap, string $category): array
+    {
+        if (!$source) {
+            return [];
+        }
+        $documents = [];
+        foreach ($fieldMap as $field => $label) {
+            $value = data_get($source, $field);
+            $payload = $this->formatDocumentPayload($value, $label, $category);
+            if ($payload) {
+                $documents[] = $payload;
+            }
+        }
+        return $documents;
+    }
+
+    /**
+     * Build a single document payload with helpful metadata.
+     */
+    protected function formatDocumentPayload(?string $path, string $label, string $category = 'user'): ?array
+    {
+        if (!$path) {
+            return null;
+        }
+        $url = $this->normalizeDocumentUrl($path);
+        $rawPath = $path;
+        $parsedPath = parse_url($rawPath, PHP_URL_PATH);
+        $ext = strtolower(pathinfo($parsedPath ?: $rawPath, PATHINFO_EXTENSION));
+        if ($ext === '' && str_contains($rawPath, '.')) {
+            $ext = strtolower(pathinfo($rawPath, PATHINFO_EXTENSION));
+        }
+        $imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'heic', 'heif'];
+
+        return [
+            'label' => $label,
+            'category' => $category,
+            'path' => $path,
+            'url' => $url,
+            'extension' => $ext,
+            'is_image' => in_array($ext, $imageExts, true),
+        ];
+    }
+
+    /**
+     * Turn any stored relative asset path into an absolute URL for the dashboard.
+     */
+    protected function normalizeDocumentUrl(string $value): string
+    {
+        if ($value === '') {
+            return $value;
+        }
+        if (preg_match('#^https?://#i', $value) || str_starts_with($value, '//')) {
+            return $value;
+        }
+        $clean = ltrim($value, '/');
+        return url($clean);
     }
 }

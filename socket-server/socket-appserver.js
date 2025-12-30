@@ -919,6 +919,7 @@ io.on("connection", (socket) => {
 
   // ========== CALL ENDED ==========
   socket.on("call-ended", ({ callId, userId, role }) => {
+    console.log("call-ended event received");
     console.log(`Call ${callId} ended by ${userId} (${role})`);
 
     const call = activeCalls.get(callId);

@@ -14,7 +14,6 @@ class DoctorStatusController extends Controller
     {
         $data = $request->validate([
             'vet_id'             => 'required|integer|min:1',
-            'toggle_availability'=> 'sometimes|boolean',
             'doctor_status'      => 'sometimes|string|in:available,busy,on_leave,absent,in_surgery',
         ]);
 
@@ -28,9 +27,6 @@ class DoctorStatusController extends Controller
         }
 
         $updates = [];
-        if (array_key_exists('toggle_availability', $data)) {
-            $updates['toggle_availability'] = (bool) $data['toggle_availability'];
-        }
         if (array_key_exists('doctor_status', $data)) {
             $updates['doctor_status'] = $data['doctor_status'];
         }
@@ -53,7 +49,6 @@ class DoctorStatusController extends Controller
     public function updateDoctor(Request $request, Doctor $doctor)
     {
         $data = $request->validate([
-            'toggle_availability'=> 'sometimes|boolean',
             'doctor_status'      => 'sometimes|string|in:available,busy,on_leave,absent,in_surgery',
         ]);
 
@@ -61,9 +56,6 @@ class DoctorStatusController extends Controller
             return response()->json(['message' => 'No fields provided'], 422);
         }
 
-        if (array_key_exists('toggle_availability', $data)) {
-            $doctor->toggle_availability = (bool) $data['toggle_availability'];
-        }
         if (array_key_exists('doctor_status', $data)) {
             $doctor->doctor_status = $data['doctor_status'];
         }
@@ -74,7 +66,6 @@ class DoctorStatusController extends Controller
             'message' => 'Doctor status updated',
             'doctor'  => [
                 'id' => $doctor->id,
-                'toggle_availability' => (bool) $doctor->toggle_availability,
                 'doctor_status' => $doctor->doctor_status,
             ],
         ]);

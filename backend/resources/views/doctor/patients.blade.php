@@ -128,7 +128,7 @@
     .pm-record-row{padding:12px;border:1px solid #dfe4ff;border-radius:12px;background:rgba(255,255,255,0.9);box-shadow:0 6px 18px rgba(15,23,42,0.06)}
     .pm-record-label{font-size:12px;font-weight:800;color:#111827;margin-bottom:6px;letter-spacing:.01em;text-transform:uppercase}
     .pm-record-value{font-size:13px;color:#0b1220;line-height:1.45}
-    .pm-record-actions{display:flex;justify-content:flex-end;margin-top:10px}
+    .pm-record-actions{display:flex;justify-content:flex-end;margin-top:10px;gap:8px;flex-wrap:wrap}
     .pm-empty{color:var(--pm-muted);font-size:13px;padding:8px 0}
     .pm-alert{background:#fff1f2;border:1px solid #fecdd3;color:#b91c1c;padding:12px;border-radius:12px;margin:10px 0;font-size:14px}
     .pm-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.45);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:12px;overflow-y:auto}
@@ -416,6 +416,7 @@
     </div>
     <form id="record-form" class="space-y-2" enctype="multipart/form-data">
       <input type="hidden" name="user_id" id="record-user-id">
+      <input type="hidden" name="record_id" id="record-id">
 
       <div class="record-section">
         <div class="record-sectionTitle">Visit Overview</div>
@@ -556,6 +557,7 @@
     records: new Map(),
     loadingPatients: false,
     loadingRecords: false,
+    editingRecordId: null,
   };
 
   const TAGS = [
@@ -898,8 +900,19 @@
         </div>
         <div class="pm-record-notes">${escapeHtml(rec.notes || 'No notes')}</div>
         ${detailHtml}
-        <div class="pm-record-actions"><a href="${rec.url}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a></div>
+        <div class="pm-record-actions">
+          <button type="button" class="pm-btn pm-primary" data-role="edit-record" data-id="${rec.id}" style="padding:6px 12px">Edit</button>
+          <a href="${rec.url}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a>
+        </div>
       `;
+      const editBtn = wrap.querySelector('[data-role="edit-record"]');
+      if (editBtn) {
+        editBtn.addEventListener('click', () => {
+          selectPatient(rec.user_id);
+          openUploadModal();
+          fillRecordFormFromRecord(rec);
+        });
+      }
       els.recordList.appendChild(wrap);
     });
     els.recordCount.textContent = `${records.length} file${records.length === 1 ? '' : 's'}`;
@@ -985,6 +998,51 @@
     loadRecords(patientId);
   }
 
+  function resetRecordForm() {
+    state.editingRecordId = null;
+    els.recordForm?.reset();
+    if (els.caseSeverity) {
+      els.caseSeverity.value = 'general';
+    }
+    toggleCriticalSections(els.caseSeverity?.value || 'general');
+    const recordIdInput = document.getElementById('record-id');
+    if (recordIdInput) recordIdInput.value = '';
+    const recordFile = document.getElementById('record-file');
+    if (recordFile) recordFile.required = true;
+  }
+
+  function fillRecordFormFromRecord(rec) {
+    if (!rec) return;
+    const prescription = rec.prescription || {};
+    state.editingRecordId = rec.id;
+    const recordIdInput = document.getElementById('record-id');
+    if (recordIdInput) recordIdInput.value = rec.id;
+    const recordUserInput = document.getElementById('record-user-id');
+    if (recordUserInput) recordUserInput.value = rec.user_id;
+    const recordFile = document.getElementById('record-file');
+    if (recordFile) recordFile.required = false;
+    const mapValue = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value ?? '';
+    };
+    mapValue('record-notes', rec.notes ?? prescription.visit_notes ?? '');
+    mapValue('visit-category', prescription.visit_category ?? '');
+    mapValue('case-severity', prescription.case_severity ?? '');
+    mapValue('doctor-select', rec.doctor_id ?? prescription.doctor_id ?? DEFAULT_DOCTOR_ID ?? '');
+    mapValue('temperature', prescription.temperature ?? '');
+    mapValue('weight', prescription.weight ?? '');
+    mapValue('heart-rate', prescription.heart_rate ?? '');
+    mapValue('exam-notes', prescription.exam_notes ?? '');
+    mapValue('diagnosis', prescription.diagnosis ?? '');
+    mapValue('diagnosis-status', prescription.diagnosis_status ?? '');
+    mapValue('treatment-plan', prescription.treatment_plan ?? '');
+    mapValue('home-care', prescription.home_care ?? '');
+    mapValue('follow-up-date', prescription.follow_up_date ?? '');
+    mapValue('follow-up-type', prescription.follow_up_type ?? '');
+    mapValue('follow-up-notes', prescription.follow_up_notes ?? '');
+    toggleCriticalSections(els.caseSeverity?.value || 'general');
+  }
+
   function openUploadModal() {
     if (!state.selectedId) {
       Swal.fire({ icon: 'info', title: 'Select a patient', text: 'Pick a patient from the list before uploading.' });
@@ -1004,23 +1062,19 @@
     if (els.doctorSelect && DEFAULT_DOCTOR_ID) {
       els.doctorSelect.value = DEFAULT_DOCTOR_ID;
     }
-    if (els.caseSeverity) {
-      els.caseSeverity.value = 'general';
-    }
-    toggleCriticalSections(els.caseSeverity?.value || 'general');
+    resetRecordForm();
     els.modal.classList.add('is-visible');
   }
 
   function closeModal() {
     els.modal.classList.remove('is-visible');
-    els.recordForm?.reset();
+    resetRecordForm();
     if (els.doctorSelect) {
       els.doctorSelect.value = DEFAULT_DOCTOR_ID || '';
     }
     if (els.modalPet) {
       els.modalPet.textContent = '';
     }
-    toggleCriticalSections(els.caseSeverity?.value || 'general');
   }
 
   function wireEvents() {
@@ -1055,9 +1109,19 @@
       if (!formData.get('doctor_id')) {
         formData.delete('doctor_id');
       }
+      let url = `${API_BASE}/medical-records`;
+      if (state.editingRecordId || formData.get('record_id')) {
+        const recId = state.editingRecordId || formData.get('record_id');
+        formData.append('_method', 'PUT');
+        url = `${API_BASE}/medical-records/${recId}`;
+        const file = formData.get('record_file');
+        if (!(file instanceof File) || !file?.size) {
+          formData.delete('record_file');
+        }
+      }
       try {
-        await request(`${API_BASE}/medical-records`, { method: 'POST', body: formData });
-        Swal.fire({ icon: 'success', title: 'Uploaded', timer: 1500, showConfirmButton: false });
+        await request(url, { method: 'POST', body: formData });
+        Swal.fire({ icon: 'success', title: state.editingRecordId ? 'Updated' : 'Uploaded', timer: 1500, showConfirmButton: false });
         closeModal();
         await loadPatients();
         if (state.selectedId === Number(patientId)) {

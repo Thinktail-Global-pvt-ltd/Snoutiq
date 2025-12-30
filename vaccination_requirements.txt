@@ -1,0 +1,8 @@
+Vaccination reminder requirements (per conversation):
+- Add pets.vaccination_date to store the last completed vaccine date.
+- pet_age stores years and pet_age_months stores months; convert total age to months/weeks for scheduling.
+- Use puppy schedule: 6–8w DHP; 8–10w DHPPiL; 10–12w DHPPiL; 12w Rabies; 14–16w Rabies booster; 16w DHPPiL booster; 6m DHPPiL booster; 12m DHPPiL + Rabies.
+- Adult schedule: annual boosters based on last vaccination_date; if missing history, start adult reminders after ~60w.
+- Notification cadence: send upcoming (~7 days before window) and due reminders; dedupe so scheduler (every minute) doesn’t spam.
+- Channel: push via Notification/NotificationChannelService; skip/mark failed if no device tokens.
+- Command: vaccines:send-reminders (optional --pet_id) scheduled every minute.
