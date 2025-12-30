@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 
 class PetParentController extends Controller
 {
@@ -67,32 +68,48 @@ class PetParentController extends Controller
 
     private function buildPetParentProfile(int $userId): ?array
     {
-        $user = User::with(['qrScanner'])->find($userId);
+        try {
+            $user = User::with(['qrScanner'])->find($userId);
+        } catch (\Throwable $e) {
+            Log::error('PetParentProfile: failed to load user', ['user_id' => $userId, 'error' => $e->getMessage()]);
+            return null;
+        }
 
         if (! $user) {
             return null;
         }
 
-        $userPets = UserPet::where('user_id', $user->id)->orderByDesc('created_at')->get();
-        $pets = $user->pets()->orderByDesc('created_at')->get();
+        $userPets = Schema::hasTable('user_pets')
+            ? UserPet::where('user_id', $user->id)->orderByDesc('created_at')->get()
+            : collect();
 
-        $callSessions = CallSession::with(['doctor', 'payment', 'qrScanner'])
-            ->where('patient_id', $user->id)
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get();
+        $pets = Schema::hasTable('pets')
+            ? $user->pets()->orderByDesc('created_at')->get()
+            : collect();
 
-        $consultations = Consultation::with(['doctor', 'pet'])
-            ->where('user_id', $user->id)
-            ->orderByDesc('start_time')
-            ->limit(50)
-            ->get();
+        $callSessions = Schema::hasTable('call_sessions')
+            ? CallSession::with(['doctor', 'payment', 'qrScanner'])
+                ->where('patient_id', $user->id)
+                ->orderByDesc('created_at')
+                ->limit(50)
+                ->get()
+            : collect();
 
-        $transactions = Transaction::with(['doctor', 'clinic'])
-            ->where('user_id', $user->id)
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get();
+        $consultations = Schema::hasTable('consultations')
+            ? Consultation::with(['doctor', 'pet'])
+                ->where('user_id', $user->id)
+                ->orderByDesc('start_time')
+                ->limit(50)
+                ->get()
+            : collect();
+
+        $transactions = Schema::hasTable('transactions')
+            ? Transaction::with(['doctor', 'clinic'])
+                ->where('user_id', $user->id)
+                ->orderByDesc('created_at')
+                ->limit(50)
+                ->get()
+            : collect();
 
         $bookings = Schema::hasTable('bookings')
             ? DB::table('bookings')
@@ -111,37 +128,49 @@ class PetParentController extends Controller
                 ->get()
             : collect();
 
-        $observations = UserObservation::where('user_id', $user->id)
-            ->orderByDesc('observed_at')
-            ->limit(25)
-            ->get();
+        $observations = Schema::hasTable('user_observations')
+            ? UserObservation::where('user_id', $user->id)
+                ->orderByDesc('observed_at')
+                ->limit(25)
+                ->get()
+            : collect();
 
-        $medicalRecords = MedicalRecord::with(['doctor', 'clinic'])
-            ->where('user_id', $user->id)
-            ->orderByDesc('created_at')
-            ->limit(25)
-            ->get();
+        $medicalRecords = Schema::hasTable('medical_records')
+            ? MedicalRecord::with(['doctor', 'clinic'])
+                ->where('user_id', $user->id)
+                ->orderByDesc('created_at')
+                ->limit(25)
+                ->get()
+            : collect();
 
-        $prescriptions = Prescription::with(['doctor'])
-            ->where('user_id', $user->id)
-            ->orderByDesc('created_at')
-            ->limit(25)
-            ->get();
+        $prescriptions = Schema::hasTable('prescriptions')
+            ? Prescription::with(['doctor'])
+                ->where('user_id', $user->id)
+                ->orderByDesc('created_at')
+                ->limit(25)
+                ->get()
+            : collect();
 
-        $aiChats = DB::table('user_ai_chats')
-            ->where('user_id', $user->id)
-            ->orderByDesc('created_at')
-            ->limit(25)
-            ->get();
+        $aiChats = Schema::hasTable('user_ai_chats')
+            ? DB::table('user_ai_chats')
+                ->where('user_id', $user->id)
+                ->orderByDesc('created_at')
+                ->limit(25)
+                ->get()
+            : collect();
 
-        $aiChatMessages = DB::table('user_ai_chat_histories')
-            ->where('user_id', $user->id)
-            ->count();
+        $aiChatMessages = Schema::hasTable('user_ai_chat_histories')
+            ? DB::table('user_ai_chat_histories')
+                ->where('user_id', $user->id)
+                ->count()
+            : 0;
 
-        $supportTickets = DB::table('customer_tickets')
-            ->where('user_id', $user->id)
-            ->orderByDesc('created_at')
-            ->get();
+        $supportTickets = Schema::hasTable('customer_tickets')
+            ? DB::table('customer_tickets')
+                ->where('user_id', $user->id)
+                ->orderByDesc('created_at')
+                ->get()
+            : collect();
 
         $metrics = $this->buildMetrics(
             $user,
