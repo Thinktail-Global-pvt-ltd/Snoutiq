@@ -356,6 +356,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     Route::get('/receptionist/front-desk', function () {
         return view('receptionist.front-desk');
     })->name('receptionist.front-desk');
+    Route::view('/receptionist/patients', 'doctor.patients')->name('receptionist.patients');
     Route::get('/receptionist/bookings', function(){
         return view('receptionist.bookings', ['viewMode' => 'create']);
     })->name('receptionist.bookings.create');
