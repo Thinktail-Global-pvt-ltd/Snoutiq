@@ -94,18 +94,22 @@ class PetParentController extends Controller
             ->limit(50)
             ->get();
 
-        $bookings = DB::table('bookings')
-            ->where('user_id', $user->id)
-            ->orderByDesc('id')
-            ->limit(50)
-            ->get();
+        $bookings = Schema::hasTable('bookings')
+            ? DB::table('bookings')
+                ->where('user_id', $user->id)
+                ->orderByDesc('id')
+                ->limit(50)
+                ->get()
+            : collect();
 
-        $groomerBookings = GroomerBooking::with(['groomerEmployee'])
-            ->where('customer_type', 'online')
-            ->where('customer_id', $user->id)
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get();
+        $groomerBookings = Schema::hasTable('groomer_bookings')
+            ? GroomerBooking::with(['groomerEmployee'])
+                ->where('customer_type', 'online')
+                ->where('customer_id', $user->id)
+                ->orderByDesc('created_at')
+                ->limit(50)
+                ->get()
+            : collect();
 
         $observations = UserObservation::where('user_id', $user->id)
             ->orderByDesc('observed_at')
