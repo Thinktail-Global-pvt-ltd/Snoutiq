@@ -515,6 +515,12 @@
               <option value="">Select doctor</option>
             </select>
           </div>
+          <div class="record-field">
+            <label class="record-label" for="record-pet">Pet</label>
+            <select name="pet_id" id="record-pet" class="record-input">
+              <option value="">Select pet</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -668,6 +674,7 @@
     modalUserInput: document.getElementById('record-user-id'),
     recordForm: document.getElementById('record-form'),
     doctorSelect: document.getElementById('doctor-select'),
+    recordPet: document.getElementById('record-pet'),
     caseSeverity: document.getElementById('case-severity'),
     criticalSections: Array.from(document.querySelectorAll('[data-critical]')),
     petModal: document.getElementById('pet-modal'),
@@ -730,6 +737,33 @@
       };
     }
     return null;
+  }
+
+  function getPatientPets(patient) {
+    if (!patient) return [];
+    if (Array.isArray(patient.pets) && patient.pets.length) {
+      return patient.pets;
+    }
+    if (patient.pet_name || patient.breed || patient.pet_gender || patient.pet_age) {
+      return [{
+        id: 'legacy',
+        name: patient.pet_name,
+        breed: patient.breed,
+        gender: patient.pet_gender,
+        pet_age: patient.pet_age,
+      }];
+    }
+    return [];
+  }
+
+  function getPetLabel(patient, petId) {
+    if (!petId) return null;
+    const pets = getPatientPets(patient);
+    const match = pets.find((pet) => String(pet.id ?? pet.pet_id) === String(petId));
+    if (match) {
+      return match.name || match.pet_name || `Pet #${petId}`;
+    }
+    return `Pet #${petId}`;
   }
 
   function renderTagFilters() {
@@ -883,6 +917,7 @@
       els.statContact.textContent = '—';
       els.statEmail.textContent = '—';
       els.recordCount.textContent = '—';
+      renderPetSelect(null);
       renderRecords();
       renderPets();
       return;
@@ -906,6 +941,7 @@
     els.statLastRecord.textContent = latestRecord ? `Last upload ${formatDate(latestRecord)}` : 'No uploads yet';
     els.statContact.textContent = patient.phone || '—';
     els.statEmail.textContent = patient.email || '—';
+    renderPetSelect(patient, primaryPet?.id);
     renderPets(patient);
     renderRecords();
   }
@@ -974,6 +1010,7 @@
   function renderRecords() {
     if (!els.recordList || !els.recordEmpty) return;
     els.recordList.innerHTML = '';
+    const activePatient = state.patients.find((p) => Number(p.id) === Number(state.selectedId));
 
     if (!state.selectedId) {
       els.recordEmpty.textContent = 'Select a patient to see uploaded files.';
@@ -1025,6 +1062,8 @@
       const wrap = document.createElement('div');
       wrap.className = 'pm-record pm-record-card';
       const prescription = rec.prescription || {};
+      const petId = rec.pet_id ?? prescription.pet_id ?? null;
+      const petLabel = activePatient ? getPetLabel(activePatient, petId) : null;
       const detailPairs = [];
       if (prescription.visit_category || prescription.case_severity) {
         detailPairs.push({ label: 'Visit', value: `${escapeHtml(prescription.visit_category || '—')} • ${escapeHtml(prescription.case_severity || '—')}` });
@@ -1057,6 +1096,9 @@
         if (prescription.follow_up_notes) fuParts.push(`Notes: ${escapeHtml(prescription.follow_up_notes)}`);
         detailPairs.push({ label: 'Follow-up', value: fuParts.join(' • ') });
       }
+      if (petLabel) {
+        detailPairs.unshift({ label: 'Pet', value: escapeHtml(petLabel) });
+      }
       const detailHtml = detailPairs.length
         ? `<div class="pm-record-details">${detailPairs.map(pair => `<div class="pm-record-row"><div class="pm-record-label">${pair.label}</div><div class="pm-record-value">${pair.value}</div></div>`).join('')}</div>`
         : '';
@@ -1068,7 +1110,7 @@
         <div class="pm-record-head">
           <div>
             <div class="pm-record-title">${escapeHtml(rec.file_name || 'Medical file')}</div>
-            <div class="pm-record-meta">${formatDate(rec.uploaded_at)}${rec.doctor_id ? ` • Doctor #${rec.doctor_id}` : ''}</div>
+            <div class="pm-record-meta">${formatDate(rec.uploaded_at)}${rec.doctor_id ? ` • Doctor #${rec.doctor_id}` : ''}${petLabel ? ` • Pet: ${escapeHtml(petLabel)}` : ''}</div>
           </div>
           ${tags.length ? `<div class="pm-record-tags">${tags.join('')}</div>` : ''}
         </div>
@@ -1092,6 +1134,42 @@
     els.recordCount.textContent = `${records.length} file${records.length === 1 ? '' : 's'}`;
     if (els.statRecords) {
       els.statRecords.textContent = `${records.length}`;
+    }
+  }
+
+  function renderPetSelect(patient, selectedPetId = null) {
+    if (!els.recordPet) return;
+    const pets = getPatientPets(patient);
+    els.recordPet.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = pets.length ? 'Select pet' : 'No pets found';
+    els.recordPet.appendChild(placeholder);
+    pets.forEach((pet) => {
+      const petValue = pet.id ?? pet.pet_id;
+      const numericValue = Number(petValue);
+      const hasId = petValue !== null && petValue !== undefined && petValue !== '' && Number.isFinite(numericValue);
+      const opt = document.createElement('option');
+      opt.value = hasId ? petValue : '';
+      opt.textContent = `${pet.name || pet.pet_name || 'Pet'}${pet.breed ? ` • ${pet.breed}` : ''}`;
+      if (pet.gender) opt.textContent += ` • ${pet.gender}`;
+      opt.dataset.petName = pet.name || pet.pet_name || '';
+      if (!hasId) {
+        opt.disabled = true;
+        opt.textContent += ' (link pet to use)';
+      }
+      els.recordPet.appendChild(opt);
+    });
+    if (selectedPetId) {
+      els.recordPet.value = String(selectedPetId);
+    } else if (pets.length === 1) {
+      const onlyValue = pets[0].id ?? pets[0].pet_id;
+      const onlyNumeric = Number(onlyValue);
+      if (onlyValue !== null && onlyValue !== undefined && onlyValue !== '' && Number.isFinite(onlyNumeric)) {
+        els.recordPet.value = String(onlyValue);
+      }
+    } else {
+      els.recordPet.value = '';
     }
   }
 
@@ -1223,6 +1301,7 @@
     mapValue('follow-up-date', prescription.follow_up_date ?? '');
     mapValue('follow-up-type', prescription.follow_up_type ?? '');
     mapValue('follow-up-notes', prescription.follow_up_notes ?? '');
+    mapValue('record-pet', prescription.pet_id ?? rec.pet_id ?? '');
     toggleCriticalSections(els.caseSeverity?.value || 'general');
   }
 
@@ -1242,10 +1321,11 @@
       }
       els.modalUserInput.value = patient.id;
     }
+    resetRecordForm();
+    renderPetSelect(patient);
     if (els.doctorSelect && DEFAULT_DOCTOR_ID) {
       els.doctorSelect.value = DEFAULT_DOCTOR_ID;
     }
-    resetRecordForm();
     els.modal.classList.add('is-visible');
   }
 
@@ -1323,6 +1403,9 @@
       formData.append('clinic_id', CLINIC_ID);
       if (!formData.get('doctor_id')) {
         formData.delete('doctor_id');
+      }
+      if (!formData.get('pet_id')) {
+        formData.delete('pet_id');
       }
       let url = `${API_BASE}/medical-records`;
       if (state.editingRecordId || formData.get('record_id')) {

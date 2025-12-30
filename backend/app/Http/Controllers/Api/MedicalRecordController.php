@@ -8,6 +8,8 @@ use App\Models\MedicalRecord;
 use App\Models\Prescription;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class MedicalRecordController extends Controller
@@ -46,6 +48,7 @@ class MedicalRecordController extends Controller
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
+            'pet_id' => ['nullable', 'integer'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
 
@@ -58,6 +61,7 @@ class MedicalRecordController extends Controller
         }
 
         $doctorId = $validated['doctor_id'] ?? null;
+        $petId = $validated['pet_id'] ?? null;
         if ($doctorId) {
             $doctor = Doctor::query()->select('id', 'vet_registeration_id')->find($doctorId);
             if (!$doctor) {
@@ -70,6 +74,16 @@ class MedicalRecordController extends Controller
                 return response()->json([
                     'success' => false,
                     'error' => 'Doctor is not part of this clinic',
+                ], 422);
+            }
+        }
+
+        if ($petId !== null) {
+            $petId = $this->ensurePetBelongsToUser($record->user_id, $petId);
+            if ($petId === null) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Pet not found for this patient',
                 ], 422);
             }
         }
@@ -106,6 +120,7 @@ class MedicalRecordController extends Controller
             'follow_up_date' => $validated['follow_up_date'] ?? $prescription->follow_up_date,
             'follow_up_type' => $validated['follow_up_type'] ?? $prescription->follow_up_type,
             'follow_up_notes' => $validated['follow_up_notes'] ?? $prescription->follow_up_notes,
+            'pet_id' => $petId ?? $prescription->pet_id,
         ]);
         $prescription->save();
 
@@ -146,6 +161,7 @@ class MedicalRecordController extends Controller
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
+            'pet_id' => ['nullable', 'integer'],
             'record_file' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
 
@@ -166,6 +182,7 @@ class MedicalRecordController extends Controller
         }
 
         $doctorId = $validated['doctor_id'] ?? null;
+        $petId = $validated['pet_id'] ?? null;
         if ($doctorId) {
             $doctor = Doctor::query()->select('id', 'vet_registeration_id')->find($doctorId);
             if (!$doctor) {
@@ -179,6 +196,16 @@ class MedicalRecordController extends Controller
                 return response()->json([
                     'success' => false,
                     'error' => 'Doctor is not part of this clinic',
+                ], 422);
+            }
+        }
+
+        if ($petId !== null) {
+            $petId = $this->ensurePetBelongsToUser($user->id, $petId);
+            if ($petId === null) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Pet not found for this patient',
                 ], 422);
             }
         }
@@ -216,6 +243,7 @@ class MedicalRecordController extends Controller
             'follow_up_date' => $validated['follow_up_date'] ?? null,
             'follow_up_type' => $validated['follow_up_type'] ?? null,
             'follow_up_notes' => $validated['follow_up_notes'] ?? null,
+            'pet_id' => $petId,
         ];
         $prescription = Prescription::create($prescriptionPayload);
 
@@ -273,6 +301,7 @@ class MedicalRecordController extends Controller
                 'user_id' => $record->user_id,
                 'doctor_id' => $record->doctor_id,
                 'clinic_id' => $record->vet_registeration_id,
+                'pet_id' => $prescription?->pet_id,
                 'file_name' => $record->file_name,
                 'mime_type' => $record->mime_type,
                 'notes' => $record->notes,
@@ -292,6 +321,34 @@ class MedicalRecordController extends Controller
                 'records' => $recordsMapped,
             ],
         ]);
+    }
+
+    protected function ensurePetBelongsToUser(int $userId, int $petId): ?int
+    {
+        $tables = [];
+        if (Schema::hasTable('user_pets')) {
+            $tables[] = ['user_pets', 'user_id'];
+        }
+        if (Schema::hasTable('pets')) {
+            $userColumn = Schema::hasColumn('pets', 'user_id')
+                ? 'user_id'
+                : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+            if ($userColumn) {
+                $tables[] = ['pets', $userColumn];
+            }
+        }
+
+        foreach ($tables as [$table, $userColumn]) {
+            $exists = DB::table($table)
+                ->where('id', $petId)
+                ->where($userColumn, $userId)
+                ->exists();
+            if ($exists) {
+                return $petId;
+            }
+        }
+
+        return null;
     }
 
     protected function resolveUser(string $identifier): ?User
