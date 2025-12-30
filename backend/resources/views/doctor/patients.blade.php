@@ -21,7 +21,8 @@
       data_get(session('auth_full'), 'user.vet_registeration_id'),
   ];
 
-  if ($sessionRole !== 'doctor') {
+  // For receptionists, keep clinic context (avoid overriding with their own user_id)
+  if (!in_array($sessionRole, ['doctor', 'receptionist'], true)) {
       array_unshift(
           $clinicCandidates,
           session('user_id'),
@@ -46,6 +47,20 @@
       ?? data_get(session('auth_full'), 'doctor_id')
       ?? data_get(session('auth_full'), 'user.doctor_id')
       ?? ($sessionRole === 'doctor' ? (session('user_id') ?? data_get(session('user'), 'id')) : null);
+
+  // Receptionist: fallback to clinic from receptionist record when session misses it
+  if (!$resolvedClinicId && $sessionRole === 'receptionist') {
+      $receptionistId = session('receptionist_id')
+          ?? data_get(session('auth_full'), 'receptionist_id')
+          ?? data_get(session('auth_full'), 'user_id')
+          ?? session('user_id');
+      if ($receptionistId) {
+          $rec = \App\Models\Receptionist::find((int) $receptionistId);
+          if ($rec && (int) $rec->vet_registeration_id > 0) {
+              $resolvedClinicId = (int) $rec->vet_registeration_id;
+          }
+      }
+  }
 @endphp
 
 @section('head')
@@ -152,6 +167,18 @@
       padding-top:10px;
       padding-bottom:6px;
       border-top:1px solid #e5e7eb;
+    }
+    /* Make long filenames/notes wrap so content fits without horizontal scroll */
+    .pm-records,
+    .pm-card,
+    .pm-right{
+      overflow-x: visible;
+    }
+    .pm-record-head{flex-wrap:wrap}
+    .pm-record-title,
+    .pm-record-notes{
+      word-break: break-word;
+      white-space: normal;
     }
     .pm-small{font-size:13px;color:var(--pm-muted)}
     @media (max-width:1100px){.pm-content{grid-template-columns:1fr}.pm-left,.pm-right{min-height:unset}.pm-profileHeader{flex-direction:column;align-items:flex-start}.pm-actions{width:100%;justify-content:flex-start}}
