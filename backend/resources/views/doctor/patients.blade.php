@@ -168,6 +168,13 @@
       padding-bottom:6px;
       border-top:1px solid #e5e7eb;
     }
+    .pm-petList{display:flex;flex-direction:column;gap:10px}
+    .pm-petRow{display:flex;align-items:flex-start;gap:10px;padding:10px;border-radius:12px;border:1px solid #eef6ff;background:#f8fafc}
+    .pm-petAvatar{width:40px;height:40px;border-radius:10px;background:#e0e7ff;color:#1f2937;font-weight:800;display:flex;align-items:center;justify-content:center}
+    .pm-petBody{flex:1}
+    .pm-petName{font-weight:800}
+    .pm-petMeta{font-size:12px;color:var(--pm-muted);margin-top:2px}
+    .pm-pill{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700;background:#eef2ff;color:#4338ca;border:1px solid #e0e7ff;margin-right:6px}
     /* Make long filenames/notes wrap so content fits without horizontal scroll */
     .pm-records,
     .pm-card,
@@ -242,6 +249,7 @@
         </div>
         <div class="pm-actions">
           <button class="pm-btn pm-ghost" id="pm-refresh-profile">Reload</button>
+          <button class="pm-btn pm-primary" data-role="open-pet">+ Add Pet</button>
           <button class="pm-btn pm-primary" data-role="open-upload">Upload</button>
         </div>
       </div>
@@ -256,6 +264,20 @@
           <div class="pm-statLabel">Contact</div>
           <div class="pm-statValue" id="pm-stat-contact">—</div>
           <div class="pm-statHint" id="pm-stat-email">—</div>
+        </div>
+      </div>
+
+      <div class="pm-section">
+        <div class="pm-sectionTitle">
+          <div>Pets</div>
+          <div class="pm-actions">
+            <div class="pm-small" id="pm-pet-count">—</div>
+            <button class="pm-btn pm-primary" data-role="open-pet">+ Add Pet</button>
+          </div>
+        </div>
+        <div class="pm-card">
+          <div id="pm-pets-empty" class="pm-empty">Select a patient to see pets.</div>
+          <div id="pm-pets-list" class="pm-petList"></div>
         </div>
       </div>
 
@@ -398,6 +420,55 @@
       <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
         <button type="button" data-close class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">Cancel</button>
         <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Save Booking</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="pet-modal" class="pm-overlay">
+  <div class="pm-modal" role="dialog" aria-modal="true">
+    <div class="record-header">
+      <div>
+        <div class="record-title">Add Pet</div>
+        <div id="pet-modal-patient" class="record-patient">Patient • —</div>
+      </div>
+      <button type="button" class="pm-btn pm-ghost" data-role="close-pet-modal">Close</button>
+    </div>
+    <form id="pet-form" class="space-y-2">
+      <input type="hidden" id="pet-user-id" name="user_id">
+      <div class="pm-formRow">
+        <div class="pm-formField">
+          <label class="record-label" for="pet-name">Pet Name</label>
+          <input id="pet-name" name="name" type="text" class="pm-input" placeholder="E.g. Max" required>
+        </div>
+        <div class="pm-formField">
+          <label class="record-label" for="pet-breed">Breed</label>
+          <input id="pet-breed" name="breed" type="text" class="pm-input" placeholder="Breed" required>
+        </div>
+      </div>
+      <div class="pm-formRow">
+        <div class="pm-formField">
+          <label class="record-label" for="pet-age">Age (years)</label>
+          <input id="pet-age" name="pet_age" type="number" min="0" class="pm-input" placeholder="Age in years" required>
+        </div>
+        <div class="pm-formField">
+          <label class="record-label" for="pet-gender">Gender</label>
+          <input id="pet-gender" name="pet_gender" type="text" class="pm-input" placeholder="Male / Female" required>
+        </div>
+      </div>
+      <div class="pm-formRow">
+        <div class="pm-formField">
+          <label class="record-label" for="pet-microchip">Microchip # (optional)</label>
+          <input id="pet-microchip" name="microchip_number" type="text" class="pm-input" placeholder="Microchip number">
+        </div>
+        <div class="pm-formField">
+          <label class="record-label" for="pet-mcd">MCD Registration (optional)</label>
+          <input id="pet-mcd" name="mcd_registration_number" type="text" class="pm-input" placeholder="Registration number">
+        </div>
+      </div>
+      <div class="pm-modalActions">
+        <button type="button" class="pm-btn pm-ghost" data-role="close-pet-modal">Cancel</button>
+        <button type="submit" class="pm-btn pm-primary">Save Pet</button>
       </div>
     </form>
   </div>
@@ -584,9 +655,13 @@
     recordCount: document.getElementById('pm-record-count'),
     recordEmpty: document.getElementById('pm-records-empty'),
     recordList: document.getElementById('pm-records-list'),
+    petCount: document.getElementById('pm-pet-count'),
+    petEmpty: document.getElementById('pm-pets-empty'),
+    petList: document.getElementById('pm-pets-list'),
     refreshBtn: document.getElementById('pm-refresh'),
     refreshProfile: document.getElementById('pm-refresh-profile'),
     openUploadBtns: Array.from(document.querySelectorAll('[data-role="open-upload"]')),
+    openPetBtns: Array.from(document.querySelectorAll('[data-role="open-pet"]')),
     modal: document.getElementById('record-modal'),
     modalPatient: document.getElementById('record-modal-patient'),
     modalPet: document.getElementById('record-modal-pet'),
@@ -595,6 +670,10 @@
     doctorSelect: document.getElementById('doctor-select'),
     caseSeverity: document.getElementById('case-severity'),
     criticalSections: Array.from(document.querySelectorAll('[data-critical]')),
+    petModal: document.getElementById('pet-modal'),
+    petForm: document.getElementById('pet-form'),
+    petPatient: document.getElementById('pet-modal-patient'),
+    petUserInput: document.getElementById('pet-user-id'),
   };
 
   let lastRecordError = null;
@@ -637,6 +716,22 @@
     return data;
   }
 
+  function getPrimaryPet(patient) {
+    if (!patient) return null;
+    if (Array.isArray(patient.pets) && patient.pets.length) {
+      return patient.pets[0];
+    }
+    if (patient.pet_name || patient.breed || patient.pet_gender || patient.pet_age) {
+      return {
+        name: patient.pet_name,
+        breed: patient.breed,
+        gender: patient.pet_gender,
+        pet_age: patient.pet_age,
+      };
+    }
+    return null;
+  }
+
   function renderTagFilters() {
     if (!els.tagFilters) return;
     els.tagFilters.innerHTML = '';
@@ -662,7 +757,12 @@
           || (p.email || '').toLowerCase().includes(q)
           || (p.phone || '').toLowerCase().includes(q)
           || (p.pet_name || '').toLowerCase().includes(q)
-          || (p.breed || '').toLowerCase().includes(q);
+          || (p.breed || '').toLowerCase().includes(q)
+          || (Array.isArray(p.pets) && p.pets.some((pet) => {
+            const petName = (pet.name || pet.pet_name || '').toLowerCase();
+            const petBreed = (pet.breed || '').toLowerCase();
+            return petName.includes(q) || petBreed.includes(q);
+          }));
       });
     }
 
@@ -724,9 +824,11 @@
       row.className = 'pm-row' + (Number(patient.id) === Number(state.selectedId) ? ' is-active' : '');
       row.onclick = () => selectPatient(patient.id);
 
+      const primaryPet = getPrimaryPet(patient) || {};
+
       const avatar = document.createElement('div');
       avatar.className = 'pm-avatar';
-      avatar.textContent = (patient.pet_name || patient.name || '?').charAt(0).toUpperCase();
+      avatar.textContent = String(primaryPet.name || patient.pet_name || patient.name || '?').charAt(0).toUpperCase();
 
       const info = document.createElement('div');
       info.className = 'pm-info';
@@ -735,7 +837,9 @@
       name.textContent = `${patient.name || 'Patient'}  #${patient.id}`;
       const meta = document.createElement('div');
       meta.className = 'pm-meta';
-      meta.innerHTML = `${escapeHtml(patient.pet_name || 'Pet —')} • ${escapeHtml(patient.breed || 'Breed —')}<br>${escapeHtml(patient.phone || 'Phone —')} • ${escapeHtml(patient.email || 'Email —')}`;
+      const petName = primaryPet.name || patient.pet_name || 'Pet —';
+      const petBreed = primaryPet.breed || patient.breed || 'Breed —';
+      meta.innerHTML = `${escapeHtml(petName)} • ${escapeHtml(petBreed)}<br>${escapeHtml(patient.phone || 'Phone —')} • ${escapeHtml(patient.email || 'Email —')}`;
       const badges = document.createElement('div');
       badges.className = 'pm-badges';
       const recBadge = document.createElement('span');
@@ -780,12 +884,20 @@
       els.statEmail.textContent = '—';
       els.recordCount.textContent = '—';
       renderRecords();
+      renderPets();
       return;
     }
 
-    els.profileAvatar.textContent = (patient.pet_name || patient.name || '?').charAt(0).toUpperCase();
+    const primaryPet = getPrimaryPet(patient) || {};
+
+    els.profileAvatar.textContent = String(primaryPet.name || patient.pet_name || patient.name || '?').charAt(0).toUpperCase();
     els.profileName.textContent = patient.name || 'Patient';
-    els.profileSub.textContent = `${patient.pet_name || 'Pet —'} • ${patient.breed || 'Breed —'} • ${patient.pet_gender || 'Gender —'} • Age: ${patient.pet_age ?? '—'}`;
+    const petName = primaryPet.name || patient.pet_name || 'Pet —';
+    const petBreed = primaryPet.breed || patient.breed || 'Breed —';
+    const petGender = primaryPet.gender || patient.pet_gender || 'Gender —';
+    const petAge = primaryPet.pet_age ?? primaryPet.age ?? patient.pet_age;
+    const petAgeLabel = (petAge || petAge === 0) ? petAge : '—';
+    els.profileSub.textContent = `${petName} • ${petBreed} • ${petGender} • Age: ${petAgeLabel}`;
     els.profileMeta.textContent = `Phone: ${patient.phone || '—'} • Email: ${patient.email || '—'}`;
     const cachedRecords = state.records.get(Number(patient.id));
     const recordTotal = Array.isArray(cachedRecords) ? cachedRecords.length : (patient.records_count || 0);
@@ -794,7 +906,69 @@
     els.statLastRecord.textContent = latestRecord ? `Last upload ${formatDate(latestRecord)}` : 'No uploads yet';
     els.statContact.textContent = patient.phone || '—';
     els.statEmail.textContent = patient.email || '—';
+    renderPets(patient);
     renderRecords();
+  }
+
+  function renderPets(patient = null) {
+    if (!els.petList || !els.petEmpty) return;
+    els.petList.innerHTML = '';
+
+    if (!patient) {
+      els.petEmpty.textContent = 'Select a patient to see pets.';
+      els.petEmpty.style.display = 'block';
+      if (els.petCount) els.petCount.textContent = '—';
+      return;
+    }
+
+    const pets = Array.isArray(patient.pets) ? patient.pets : [];
+    const hasLegacyPet = patient.pet_name || patient.breed || patient.pet_gender || patient.pet_age;
+    const combinedPets = pets.length ? pets : (hasLegacyPet ? [{
+      id: 'legacy',
+      name: patient.pet_name,
+      breed: patient.breed,
+      gender: patient.pet_gender,
+      pet_age: patient.pet_age,
+    }] : []);
+
+    if (!combinedPets.length) {
+      els.petEmpty.textContent = 'No pets yet for this patient.';
+      els.petEmpty.style.display = 'block';
+      if (els.petCount) els.petCount.textContent = '0 pets';
+      return;
+    }
+
+    els.petEmpty.style.display = 'none';
+    combinedPets.forEach((pet) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'pm-petRow';
+      const avatar = document.createElement('div');
+      avatar.className = 'pm-petAvatar';
+      avatar.textContent = String(pet.name || pet.pet_name || 'P').charAt(0).toUpperCase();
+      const body = document.createElement('div');
+      body.className = 'pm-petBody';
+      const title = document.createElement('div');
+      title.className = 'pm-petName';
+      title.textContent = pet.name || pet.pet_name || 'Pet';
+      const meta = document.createElement('div');
+      meta.className = 'pm-petMeta';
+      const metaParts = [];
+      if (pet.type) metaParts.push(pet.type);
+      if (pet.breed) metaParts.push(pet.breed);
+      const gender = pet.gender || pet.pet_gender;
+      if (gender) metaParts.push(`Gender: ${gender}`);
+      const age = pet.pet_age ?? pet.age;
+      if (age || age === 0) metaParts.push(`Age: ${age}`);
+      meta.textContent = metaParts.join(' • ') || 'Details not provided';
+      body.appendChild(title);
+      body.appendChild(meta);
+      wrap.appendChild(avatar);
+      wrap.appendChild(body);
+      els.petList.appendChild(wrap);
+    });
+    if (els.petCount) {
+      els.petCount.textContent = `${combinedPets.length} pet${combinedPets.length === 1 ? '' : 's'}`;
+    }
   }
 
   function renderRecords() {
@@ -1011,6 +1185,15 @@
     if (recordFile) recordFile.required = true;
   }
 
+  function resetPetForm() {
+    if (els.petForm) {
+      els.petForm.reset();
+    }
+    if (els.petUserInput) {
+      els.petUserInput.value = state.selectedId || '';
+    }
+  }
+
   function fillRecordFormFromRecord(rec) {
     if (!rec) return;
     const prescription = rec.prescription || {};
@@ -1077,6 +1260,36 @@
     }
   }
 
+  function openPetModal() {
+    if (!state.selectedId) {
+      Swal.fire({ icon: 'info', title: 'Select a patient', text: 'Pick a patient before adding a pet.' });
+      return;
+    }
+    resetPetForm();
+    const patient = state.patients.find((p) => Number(p.id) === Number(state.selectedId));
+    if (patient) {
+      if (els.petPatient) {
+        els.petPatient.textContent = `${patient.name || 'Patient'} • #${patient.id}`;
+      }
+      if (els.petUserInput) {
+        els.petUserInput.value = patient.id;
+      }
+    }
+    if (els.petModal) {
+      els.petModal.classList.add('is-visible');
+    }
+  }
+
+  function closePetModal() {
+    if (els.petModal) {
+      els.petModal.classList.remove('is-visible');
+    }
+    if (els.petPatient) {
+      els.petPatient.textContent = 'Patient • —';
+    }
+    resetPetForm();
+  }
+
   function wireEvents() {
     els.search?.addEventListener('input', (e) => { state.search = e.target.value || ''; renderPatientList(); });
     els.sort?.addEventListener('change', (e) => { state.sort = e.target.value; renderPatientList(); });
@@ -1088,7 +1301,9 @@
       loadPatients();
     });
     els.openUploadBtns.forEach((btn) => btn.addEventListener('click', openUploadModal));
+    els.openPetBtns.forEach((btn) => btn.addEventListener('click', openPetModal));
     document.querySelectorAll('[data-role="close-record-modal"]').forEach((btn) => btn.addEventListener('click', closeModal));
+    document.querySelectorAll('[data-role="close-pet-modal"]').forEach((btn) => btn.addEventListener('click', closePetModal));
     els.caseSeverity?.addEventListener('change', (event) => {
       toggleCriticalSections(event.target.value || 'general');
     });
@@ -1129,6 +1344,51 @@
         }
       } catch (error) {
         Swal.fire({ icon: 'error', title: 'Upload failed', text: error.message || 'Could not upload file' });
+      }
+    });
+
+    els.petForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const patientId = state.selectedId || els.petUserInput?.value;
+      if (!patientId) {
+        Swal.fire({ icon: 'info', title: 'Select a patient', text: 'Choose a patient before adding a pet.' });
+        return;
+      }
+      const formData = new FormData(els.petForm);
+      const name = (formData.get('name') || '').trim();
+      const breed = (formData.get('breed') || '').trim();
+      const gender = (formData.get('pet_gender') || '').trim();
+      const ageRaw = formData.get('pet_age');
+      const age = Number(ageRaw);
+      if (!name || !breed || !gender || ageRaw === null || ageRaw === undefined || ageRaw === '') {
+        Swal.fire({ icon: 'warning', title: 'Missing details', text: 'Name, breed, age and gender are required.' });
+        return;
+      }
+      if (Number.isNaN(age) || age < 0) {
+        Swal.fire({ icon: 'warning', title: 'Check age', text: 'Please enter a valid age (0 or higher).' });
+        return;
+      }
+      formData.set('name', name);
+      formData.set('breed', breed);
+      formData.set('pet_gender', gender);
+      formData.set('pet_age', String(age));
+      formData.set('user_id', patientId);
+      ['microchip_number', 'mcd_registration_number'].forEach((key) => {
+        const val = (formData.get(key) || '').toString().trim();
+        if (val) {
+          formData.set(key, val);
+        } else {
+          formData.delete(key);
+        }
+      });
+      try {
+        await request(`${API_BASE}/users/${patientId}/pets`, { method: 'POST', body: formData });
+        Swal.fire({ icon: 'success', title: 'Pet added', timer: 1500, showConfirmButton: false });
+        closePetModal();
+        await loadPatients();
+        selectPatient(patientId);
+      } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Could not add pet', text: error.message || 'Request failed' });
       }
     });
   }
