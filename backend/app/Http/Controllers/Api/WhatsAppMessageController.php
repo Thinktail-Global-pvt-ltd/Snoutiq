@@ -208,6 +208,8 @@ class WhatsAppMessageController extends Controller
         $data = $request->validate([
             'language' => ['nullable', 'string', 'max:10'],
             'fallback_pet_name' => ['nullable', 'string', 'max:120'],
+            'user_ids' => ['nullable', 'array'],
+            'user_ids.*' => ['integer', 'min:1'],
         ]);
 
         if (!$this->whatsApp->isConfigured()) {
@@ -222,10 +224,15 @@ class WhatsAppMessageController extends Controller
             'failed' => [],
         ];
 
-        User::query()
+        $query = User::query()
             ->whereNotNull('phone')
-            ->where('phone', '!=', '')
-            ->orderBy('id')
+            ->where('phone', '!=', '');
+
+        if (!empty($data['user_ids'])) {
+            $query->whereIn('id', $data['user_ids']);
+        }
+
+        $query->orderBy('id')
             ->chunkById(200, function ($users) use (&$stats, $data) {
                 $petNames = Pet::query()
                     ->whereIn('user_id', $users->pluck('id'))
