@@ -108,12 +108,26 @@ class WhatsAppService
             ->post("https://graph.facebook.com/v22.0/{$this->phoneNumberId}/messages", $payload);
 
         if (!$response->successful()) {
+            $body = $response->json();
+            $errorMessage = data_get($body, 'error.message') ?? $response->body();
+            $errorDetails = data_get($body, 'error.error_data.details') ?? null;
+
             Log::error('whatsapp.send.failed', [
                 'status' => $response->status(),
                 'body' => $response->body(),
+                'error_message' => $errorMessage,
+                'error_details' => $errorDetails,
             ]);
 
-            throw new RuntimeException('Failed to send WhatsApp message');
+            $message = 'Failed to send WhatsApp message';
+            if ($errorMessage) {
+                $message .= ': ' . $errorMessage;
+            }
+            if ($errorDetails) {
+                $message .= ' (' . $errorDetails . ')';
+            }
+
+            throw new RuntimeException($message);
         }
 
         return $returnResponse ? $response->json() : [];

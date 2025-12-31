@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\RecordingUploadController;
 use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\ReceptionistBookingController;
+use App\Http\Controllers\Api\PetVaccinationRecordController;
 use App\Http\Controllers\Api\ErrorLogController;
 use App\Http\Controllers\Api\WhatsAppMessageController;
 use App\Http\Controllers\Api\CallSessionCrudController;
@@ -63,6 +64,9 @@ Route::post('/call-recordings/upload', [RecordingUploadController::class, 'store
 Route::post('/csv/upload', [CsvUploadController::class, 'store']);
 Route::post('/error-logs', [ErrorLogController::class, 'store'])->name('api.error-logs.store');
 Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
+Route::post('/whatsapp/broadcast/users', [WhatsAppMessageController::class, 'broadcastToUsers']);
+Route::post('/whatsapp/send/new-year', [WhatsAppMessageController::class, 'sendNewYearTemplate']);
+Route::post('/whatsapp/broadcast/new-year', [WhatsAppMessageController::class, 'broadcastNewYearTemplate']);
 
 use App\Http\Controllers\Api\VetController;
 use App\Http\Controllers\Api\AdminOnboardingStatusController;
@@ -763,6 +767,8 @@ Route::prefix('receptionist')->group(function () {
     Route::get('/doctors', [ReceptionistBookingController::class, 'doctors']);
     Route::get('/doctors/available', [ReceptionistBookingController::class, 'availableDoctors']);
     Route::get('/appointments/today', [ReceptionistBookingController::class, 'appointmentsToday']);
+    Route::get('/vaccination-records', [PetVaccinationRecordController::class, 'index']);
+    Route::post('/vaccination-records', [PetVaccinationRecordController::class, 'store']);
 });
 
 
