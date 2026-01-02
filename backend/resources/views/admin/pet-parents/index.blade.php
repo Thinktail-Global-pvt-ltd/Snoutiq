@@ -24,6 +24,7 @@
 @php
     $selected = $selectedPetParent ?? null;
     $profile = $selected['user'] ?? null;
+    $clinicReferralCode = $selected['clinicReferralCode'] ?? null;
     $lifeEvents = $selected['lifecycle'] ?? [];
     $metrics = $selected['metrics'] ?? [];
     $formatDate = static fn ($value) => $value ? \Carbon\Carbon::parse($value)->timezone('Asia/Kolkata')->format('d M Y, H:i') : '—';
@@ -127,7 +128,7 @@
                                 <dt class="col-5 text-muted">Location</dt>
                                 <dd class="col-7">{{ ($profile->latitude && $profile->longitude) ? ($profile->latitude.', '.$profile->longitude) : '—' }}</dd>
                                 <dt class="col-5 text-muted">Referral code</dt>
-                                <dd class="col-7">{{ $profile->referral_code ?? '—' }}</dd>
+                                <dd class="col-7">{{ $clinicReferralCode ?? $profile->referral_code ?? '—' }}</dd>
                                 <dt class="col-5 text-muted">Source QR</dt>
                                 <dd class="col-7">
                                     @if($profile->qrScanner)

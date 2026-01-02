@@ -12,6 +12,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserObservation;
 use App\Models\UserPet;
+use App\Models\VetRegisterationTemp;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -19,6 +20,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PetParentController extends Controller
 {
@@ -69,7 +71,7 @@ class PetParentController extends Controller
     private function buildPetParentProfile(int $userId): ?array
     {
         try {
-            $user = User::with(['qrScanner'])->find($userId);
+            $user = User::with(['qrScanner.clinic'])->find($userId);
         } catch (\Throwable $e) {
             Log::error('PetParentProfile: failed to load user', ['user_id' => $userId, 'error' => $e->getMessage()]);
             return null;
@@ -184,6 +186,8 @@ class PetParentController extends Controller
             $observations
         );
 
+        $clinicReferralCode = $this->clinicReferralCode($this->resolveClinicForUser($user));
+
         return [
             'user' => $user,
             'pets' => $pets,
@@ -212,6 +216,7 @@ class PetParentController extends Controller
                 'prescriptions' => $prescriptions,
             ]),
             'metrics' => $metrics,
+            'clinicReferralCode' => $clinicReferralCode,
         ];
     }
 
@@ -476,5 +481,57 @@ class PetParentController extends Controller
         if ($event !== null) {
             $events->push($event);
         }
+    }
+
+    private function resolveClinicForUser(User $user): ?VetRegisterationTemp
+    {
+        if (! Schema::hasTable('vet_registerations_temp')) {
+            return null;
+        }
+
+        try {
+            $user->loadMissing('qrScanner.clinic');
+        } catch (\Throwable $e) {
+            Log::warning('PetParentProfile: failed to eager-load clinic', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        if ($user->qrScanner && $user->qrScanner->clinic) {
+            return $user->qrScanner->clinic;
+        }
+
+        if (! empty($user->last_vet_id)) {
+            $clinic = VetRegisterationTemp::find($user->last_vet_id);
+            if ($clinic) {
+                return $clinic;
+            }
+        }
+
+        if (! empty($user->last_vet_slug)) {
+            $clinic = VetRegisterationTemp::where('slug', $user->last_vet_slug)->first();
+            if ($clinic) {
+                return $clinic;
+            }
+        }
+
+        return null;
+    }
+
+    private function clinicReferralCode(?VetRegisterationTemp $clinic): ?string
+    {
+        if (! $clinic) {
+            return null;
+        }
+
+        $idSeed = max(1, (int) $clinic->id);
+        $base36 = strtoupper(str_pad(base_convert((string) $idSeed, 10, 36), 5, '0', STR_PAD_LEFT));
+        $slugFragment = strtoupper(Str::substr(Str::slug($clinic->slug ?: $clinic->name), 0, 2));
+        if ($slugFragment === '') {
+            $slugFragment = 'CL';
+        }
+
+        return 'SN-'.$slugFragment.$base36;
     }
 }
