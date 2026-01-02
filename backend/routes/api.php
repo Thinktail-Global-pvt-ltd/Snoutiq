@@ -2,6 +2,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
 // use App
 use App\Http\Controllers\Api\UnifiedIntelligenceController;
 use App\Http\Controllers\Api\AuthController;
@@ -340,6 +341,32 @@ Route::get('/users/last-vet-details', function (Request $request) {
             'last_vet_id' => $user->last_vet_id,
             'clinic' => $clinic,
             'doctors' => $doctors->values(),
+        ],
+    ]);
+});
+
+Route::post('/users/last-vet', function (Request $request) {
+    $payload = $request->validate([
+        'user_id' => ['required', 'integer', 'exists:users,id'],
+        'vet_id' => ['required', 'integer', 'exists:vet_registerations_temp,id'],
+    ]);
+
+    if (! Schema::hasColumn('users', 'last_vet_id')) {
+        return response()->json([
+            'success' => false,
+            'message' => 'last_vet_id column missing on users table',
+        ], 500);
+    }
+
+    $user = User::find($payload['user_id']);
+    $user->last_vet_id = $payload['vet_id'];
+    $user->save();
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'user_id' => $user->id,
+            'last_vet_id' => $payload['vet_id'],
         ],
     ]);
 });
