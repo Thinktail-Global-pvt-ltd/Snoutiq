@@ -38,7 +38,9 @@
           </div>
           <div>
             <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Breed</label>
-            <input name="inline_pet_breed" type="text" placeholder="Breed" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+            <select name="inline_pet_breed" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+              <option value="">Select breed</option>
+            </select>
           </div>
           <div>
             <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Gender</label>
@@ -73,7 +75,9 @@
           </div>
           <div>
             <label class="block text-sm font-semibold mb-1">Breed</label>
-            <input name="new_pet_breed" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+            <select name="new_pet_breed" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+              <option value="">Select breed</option>
+            </select>
           </div>
           <div>
             <label class="block text-sm font-semibold mb-1">Gender</label>

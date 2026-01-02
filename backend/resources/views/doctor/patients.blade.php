@@ -336,7 +336,9 @@
           </div>
           <div>
             <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Breed</label>
-            <input name="inline_pet_breed" type="text" placeholder="Breed" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+            <select name="inline_pet_breed" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+              <option value="">Select breed</option>
+            </select>
           </div>
           <div>
             <label class="block text-xs font-semibold mb-1 uppercase tracking-wide text-slate-500">Gender</label>
@@ -371,7 +373,9 @@
           </div>
           <div>
             <label class="block text-sm font-semibold mb-1">Breed</label>
-            <input name="new_pet_breed" type="text" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+            <select name="new_pet_breed" class="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
+              <option value="">Select breed</option>
+            </select>
           </div>
           <div>
             <label class="block text-sm font-semibold mb-1">Gender</label>
@@ -1591,6 +1595,8 @@
     createPatient: `${CONFIG.API_BASE}/receptionist/patients`,
     createAppointment: `${CONFIG.API_BASE}/appointments/submit`,
   };
+  const BREEDS_API_URL_PRIMARY = `${CONFIG.API_BASE}/dog-breeds/all`;
+  const BREEDS_API_URL_FALLBACK = 'https://snoutiq.com/backend/api/dog-breeds/all';
 
   const bookingModal = document.getElementById('booking-modal');
   const bookingForm = document.getElementById('booking-form');
@@ -1600,6 +1606,8 @@
   const doctorSelect = document.getElementById('booking-doctor-select');
   const slotSelect = document.getElementById('slot-select');
   const slotHint = document.getElementById('slot-hint');
+  const inlineBreedSelect = bookingForm?.elements['inline_pet_breed'];
+  const newBreedSelect = bookingForm?.elements['new_pet_breed'];
   const modeButtons = Array.from(document.querySelectorAll('[data-patient-mode]'));
   const existingSection = document.getElementById('existing-patient-section');
   const newSection = document.getElementById('new-patient-section');
@@ -1716,6 +1724,80 @@
       option.dataset.petName = pet.pet_name || pet.name || '';
       petSelect.appendChild(option);
     });
+  }
+
+  function toTitleCase(value) {
+    return String(value || '')
+      .split(/[\s_-]+/)
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  function buildBreedList(data) {
+    const list = new Set();
+    Object.entries(data || {}).forEach(([breed, subBreeds]) => {
+      const breedName = toTitleCase(breed);
+      if (Array.isArray(subBreeds) && subBreeds.length) {
+        subBreeds.forEach((sub) => list.add(`${toTitleCase(sub)} ${breedName}`.trim()));
+      } else {
+        list.add(breedName);
+      }
+    });
+    return Array.from(list).sort((a, b) => a.localeCompare(b));
+  }
+
+  function populateBreedSelect(select, breeds, placeholderText = 'Select breed') {
+    if (!select) return;
+    const previous = select.value;
+    select.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = placeholderText;
+    select.appendChild(placeholder);
+    breeds.forEach((breed) => {
+      const opt = document.createElement('option');
+      opt.value = breed;
+      opt.textContent = breed;
+      select.appendChild(opt);
+    });
+    if (previous && breeds.includes(previous)) {
+      select.value = previous;
+    }
+  }
+
+  async function fetchDogBreeds() {
+    if (!inlineBreedSelect && !newBreedSelect) return;
+    populateBreedSelect(inlineBreedSelect, [], 'Loading breeds...');
+    populateBreedSelect(newBreedSelect, [], 'Loading breeds...');
+    try {
+      const res = await fetch(BREEDS_API_URL_PRIMARY, { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error(`Failed to fetch breeds (${res.status})`);
+      const data = await res.json();
+      const breeds = buildBreedList(data?.breeds || {});
+      if (!breeds.length && BREEDS_API_URL_FALLBACK) {
+        throw new Error('Empty breeds list');
+      }
+      populateBreedSelect(inlineBreedSelect, breeds);
+      populateBreedSelect(newBreedSelect, breeds);
+    } catch (error) {
+      console.error('Failed to load dog breeds from primary', error);
+      if (BREEDS_API_URL_FALLBACK && BREEDS_API_URL_FALLBACK !== BREEDS_API_URL_PRIMARY) {
+        try {
+          const res = await fetch(BREEDS_API_URL_FALLBACK, { headers: { Accept: 'application/json' } });
+          if (!res.ok) throw new Error(`Failed to fetch breeds (${res.status})`);
+          const data = await res.json();
+          const breeds = buildBreedList(data?.breeds || {});
+          populateBreedSelect(inlineBreedSelect, breeds);
+          populateBreedSelect(newBreedSelect, breeds);
+          return;
+        } catch (fallbackErr) {
+          console.error('Fallback breed fetch failed', fallbackErr);
+        }
+      }
+      populateBreedSelect(inlineBreedSelect, [], 'Breeds unavailable');
+      populateBreedSelect(newBreedSelect, [], 'Breeds unavailable');
+    }
   }
 
   async function fetchDoctors() {
@@ -1898,6 +1980,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     fetchDoctors();
     fetchPatients();
+    fetchDogBreeds();
   });
 })();
 </script>
