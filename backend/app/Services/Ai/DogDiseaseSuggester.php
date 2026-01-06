@@ -10,8 +10,28 @@ class DogDiseaseSuggester
     public function suggest(string $input, array $petContext = []): string
     {
         $prompt = $this->buildPrompt($input, $petContext);
-        $raw = $this->callGemini($prompt);
-        return $this->extractDiseaseName($raw) ?: 'Unknown dog disease';
+
+        $models = array_values(array_unique([
+            GeminiConfig::chatModel() ?: GeminiConfig::defaultModel(),
+            GeminiConfig::defaultModel(),
+        ]));
+
+        $lastError = null;
+        foreach ($models as $model) {
+            try {
+                $raw = $this->callGemini($prompt, $model);
+                $name = $this->extractDiseaseName($raw);
+                if ($name !== '') {
+                    return $name;
+                }
+            } catch (\Throwable $e) {
+                $lastError = $e;
+                continue; // try next model
+            }
+        }
+
+        // If all models fail, degrade gracefully
+        return 'Unknown dog disease';
     }
 
     private function buildPrompt(string $symptom, array $pet): string
@@ -44,14 +64,14 @@ User text: "{$symptom}"
 PROMPT;
     }
 
-    private function callGemini(string $prompt): string
+    private function callGemini(string $prompt, ?string $modelOverride = null): string
     {
         $apiKey = trim(GeminiConfig::apiKey());
         if ($apiKey === '') {
             throw new \RuntimeException('Gemini API key is not configured.');
         }
 
-        $model = GeminiConfig::chatModel() ?: GeminiConfig::defaultModel();
+        $model = $modelOverride ?: (GeminiConfig::chatModel() ?: GeminiConfig::defaultModel());
         $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent', $model);
 
         $payload = [
