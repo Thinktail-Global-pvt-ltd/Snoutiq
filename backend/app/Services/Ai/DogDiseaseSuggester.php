@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Http;
 
 class DogDiseaseSuggester
 {
-    public function suggest(string $input, array $petContext = []): string
+    public function suggest(string $input, array $petContext = []): array
     {
         $prompt = $this->buildPrompt($input, $petContext);
 
@@ -20,9 +20,9 @@ class DogDiseaseSuggester
         foreach ($models as $model) {
             try {
                 $raw = $this->callGemini($prompt, $model);
-                $name = $this->extractDiseaseName($raw);
-                if ($name !== '') {
-                    return $name;
+                $result = $this->extractResult($raw);
+                if ($result !== null) {
+                    return $result;
                 }
             } catch (\Throwable $e) {
                 $lastError = $e;
@@ -31,7 +31,10 @@ class DogDiseaseSuggester
         }
 
         // If all models fail, degrade gracefully
-        return 'Unknown dog disease';
+        return [
+            'disease_name' => 'Unknown dog disease',
+            'category' => 'normal',
+        ];
     }
 
     private function buildPrompt(string $symptom, array $pet): string
@@ -55,9 +58,10 @@ class DogDiseaseSuggester
 You are a veterinary assistant and only answer about dog diseases. The user will share either symptoms or a possibly misspelled disease name.
 Tasks:
 - Return the single best-matching dog disease/condition with corrected spelling.
-- If the text is unrelated to dogs or you are unsure, answer "Unknown dog disease".
+- Classify the case as either "normal" (acute/minor or not clearly chronic) or "chronic" (long-term/degenerative/relapsing).
+- If the text is unrelated to dogs or you are unsure, set disease_name to "Unknown dog disease" and category to "normal".
 - Stick to concise clinical disease names and avoid explanations (examples: Canine parvovirus, Kennel cough (infectious tracheobronchitis), Canine distemper, Heartworm disease, Tick fever (canine ehrlichiosis/babesiosis), Lyme disease, Gastroenteritis, Pancreatitis, Otitis externa, Mange, Hip dysplasia).
-- Output strictly one line of JSON: {"disease_name": "<corrected dog disease name or Unknown dog disease>"}.
+- Output strictly one line of JSON: {"disease_name": "<corrected dog disease name or Unknown dog disease>", "category": "<normal|chronic>"}.
 
 Patient context: {$patientContext}
 User text: "{$symptom}"
@@ -104,11 +108,11 @@ PROMPT;
         return trim($text);
     }
 
-    private function extractDiseaseName(string $raw): string
+    private function extractResult(string $raw): ?array
     {
         $raw = trim($raw);
         if ($raw === '') {
-            return '';
+            return null;
         }
 
         $jsonStart = strpos($raw, '{');
@@ -116,18 +120,27 @@ PROMPT;
             $json = substr($raw, $jsonStart);
             $decoded = json_decode($json, true);
             if (is_array($decoded) && !empty($decoded['disease_name'])) {
-                return trim((string) $decoded['disease_name']);
+                return [
+                    'disease_name' => trim((string) $decoded['disease_name']),
+                    'category' => isset($decoded['category']) ? trim((string) $decoded['category']) : 'normal',
+                ];
             }
         }
 
         if (preg_match('/disease[_ ]name[^:]*[:=]\\s*\"?([^\\n\"\\}]+)\"?/i', $raw, $m)) {
-            return trim($m[1]);
+            return [
+                'disease_name' => trim($m[1]),
+                'category' => 'normal',
+            ];
         }
 
         if (stripos($raw, 'unknown dog disease') !== false) {
-            return 'Unknown dog disease';
+            return [
+                'disease_name' => 'Unknown dog disease',
+                'category' => 'normal',
+            ];
         }
 
-        return trim(trim($raw), "\"'");
+        return null;
     }
 }

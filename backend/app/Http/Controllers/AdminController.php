@@ -333,12 +333,14 @@ class AdminController extends Controller
 
         try {
             $suggester = new DogDiseaseSuggester();
-            $diseaseName = $suggester->suggest($symptom, [
+            $result = $suggester->suggest($symptom, [
                 'name'       => $pet->name ?? null,
                 'breed'      => $pet->breed ?? null,
                 'pet_age'    => $pet->pet_age ?? null,
                 'pet_gender' => $pet->pet_gender ?? null,
             ]);
+            $diseaseName = $result['disease_name'] ?? 'Unknown dog disease';
+            $category = strtolower($result['category'] ?? 'normal');
         } catch (\Throwable $e) {
             return response()->json([
                 'status' => 'error',
@@ -357,6 +359,7 @@ class AdminController extends Controller
                 'pet_id' => $petId,
                 'symptom_saved' => $symptom,
                 'suggested_disease' => $diseaseName,
+                'category' => in_array($category, ['normal','chronic'], true) ? $category : 'normal',
             ],
         ]);
     }

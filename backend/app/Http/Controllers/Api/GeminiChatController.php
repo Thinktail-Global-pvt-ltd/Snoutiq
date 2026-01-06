@@ -52,7 +52,9 @@ class GeminiChatController extends Controller
 
         try {
             $suggester = new DogDiseaseSuggester();
-            $diseaseName = $suggester->suggest($symptom, $context);
+            $result = $suggester->suggest($symptom, $context);
+            $diseaseName = $result['disease_name'] ?? 'Unknown dog disease';
+            $category = strtolower($result['category'] ?? 'normal');
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -72,6 +74,7 @@ class GeminiChatController extends Controller
                 'user_id' => $data['user_id'],
                 'symptom_saved' => $symptom,
                 'suggested_disease' => $diseaseName,
+                'category' => in_array($category, ['normal','chronic'], true) ? $category : 'normal',
                 'pet_profile' => $context,
             ],
         ]);
