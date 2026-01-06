@@ -7,6 +7,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use App\Support\GeminiConfig;
 
 class AdminController extends Controller
 {
@@ -311,6 +313,51 @@ class AdminController extends Controller
         if (!$deleted) return response()->json(['status'=>'error','message'=>'Pet not found'], 404);
         return response()->json(['status'=>'success','message'=>'Pet deleted']);
     }
+
+    /**
+     * AI-assisted disease spell correction/suggestion for dogs.
+     * Stores the reported symptom and returns a corrected dog disease name.
+     */
+    public function suggestDogDisease(Request $request, $petId)
+    {
+        $payload = $request->validate([
+            'symptom' => 'required|string|max:500',
+        ]);
+
+        $petRows = DB::select('SELECT id, name, breed, pet_age, pet_gender FROM pets WHERE id = ? LIMIT 1', [$petId]);
+        if (!$petRows) {
+            return response()->json(['status' => 'error', 'message' => 'Pet not found'], 404);
+        }
+
+        $pet = $petRows[0];
+        $symptom = trim($payload['symptom']);
+
+        try {
+            $prompt = $this->buildDogDiseasePrompt($symptom, $pet);
+            $rawResponse = $this->callGeminiDogDisease($prompt);
+            $diseaseName = $this->extractDogDiseaseName($rawResponse) ?: 'Unknown dog disease';
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Could not generate disease suggestion: '.$e->getMessage(),
+            ], 500);
+        }
+
+        DB::update(
+            'UPDATE pets SET reported_symptom = ?, updated_at = NOW() WHERE id = ?',
+            [$symptom, $petId]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'pet_id' => $petId,
+                'symptom_saved' => $symptom,
+                'suggested_disease' => $diseaseName,
+                'model' => GeminiConfig::chatModel(),
+            ],
+        ]);
+    }
     // Fetch all users
     public function getUsers_old(Request $request)
     {
@@ -353,6 +400,103 @@ class AdminController extends Controller
 
         $vets = DB::table('vet_registerations_temp')->get();
         return response()->json(['status' => 'success', 'data' => $vets]);
+    }
+
+    private function buildDogDiseasePrompt(string $symptom, object $pet): string
+    {
+        $context = [];
+        if (!empty($pet->name)) {
+            $context[] = 'Pet name: '.$pet->name;
+        }
+        if (!empty($pet->breed)) {
+            $context[] = 'Breed: '.$pet->breed;
+        }
+        if (!empty($pet->pet_age)) {
+            $context[] = 'Age: '.$pet->pet_age;
+        }
+        if (!empty($pet->pet_gender)) {
+            $context[] = 'Gender: '.$pet->pet_gender;
+        }
+        $patientContext = $context ? implode(', ', $context) : 'Dog patient';
+
+        return <<<PROMPT
+You are a veterinary assistant and only answer about dog diseases. The user will share either symptoms or a possibly misspelled disease name.
+Tasks:
+- Return the single best-matching dog disease/condition with corrected spelling.
+- If the text is unrelated to dogs or you are unsure, answer "Unknown dog disease".
+- Stick to concise clinical disease names and avoid explanations (examples: Canine parvovirus, Kennel cough (infectious tracheobronchitis), Canine distemper, Heartworm disease, Tick fever (canine ehrlichiosis/babesiosis), Lyme disease, Gastroenteritis, Pancreatitis, Otitis externa, Mange, Hip dysplasia).
+- Output strictly one line of JSON: {"disease_name": "<corrected dog disease name or Unknown dog disease>"}.
+
+Patient context: {$patientContext}
+User text: "{$symptom}"
+PROMPT;
+    }
+
+    private function callGeminiDogDisease(string $prompt): string
+    {
+        $apiKey = trim(GeminiConfig::apiKey());
+        if ($apiKey === '') {
+            throw new \RuntimeException('Gemini API key is not configured.');
+        }
+
+        $model = GeminiConfig::chatModel() ?: GeminiConfig::defaultModel();
+        $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent', $model);
+
+        $payload = [
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [['text' => $prompt]],
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.25,
+                'topP' => 0.9,
+                'topK' => 32,
+            ],
+        ];
+
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'X-goog-api-key' => $apiKey,
+        ])->post($endpoint, $payload);
+
+        if (!$response->successful()) {
+            $message = data_get($response->json(), 'error.message') ?: 'Gemini API error';
+            throw new \RuntimeException($message);
+        }
+
+        $text = $response->json('candidates.0.content.parts.0.text');
+        if (!$text) {
+            throw new \RuntimeException('Gemini returned an empty response.');
+        }
+
+        return trim($text);
+    }
+
+    private function extractDogDiseaseName(string $raw): string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return '';
+        }
+
+        $jsonStart = strpos($raw, '{');
+        if ($jsonStart !== false) {
+            $json = substr($raw, $jsonStart);
+            $decoded = json_decode($json, true);
+            if (is_array($decoded) && !empty($decoded['disease_name'])) {
+                return trim((string) $decoded['disease_name']);
+            }
+        }
+
+        if (preg_match('/disease[_ ]name[^:]*[:=]\\s*\"?([^\\n\"\\}]+)\"?/i', $raw, $m)) {
+            return trim($m[1]);
+        }
+
+        if (stripos($raw, 'unknown dog disease') !== false) {
+            return 'Unknown dog disease';
+        }
+
+        return trim(trim($raw), "\"'");
     }
 
     private function storePetDocument(Request $request, string $field): ?string
