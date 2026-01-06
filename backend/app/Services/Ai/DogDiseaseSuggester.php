@@ -66,7 +66,7 @@ PROMPT;
 
     private function callGemini(string $prompt, ?string $modelOverride = null): string
     {
-        $apiKey = trim(GeminiConfig::apiKey());
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? GeminiConfig::apiKey()));
         if ($apiKey === '') {
             throw new \RuntimeException('Gemini API key is not configured.');
         }
