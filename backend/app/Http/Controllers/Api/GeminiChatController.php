@@ -5,15 +5,77 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Chat;
 use App\Models\ChatRoom;
 use Illuminate\Support\Str;
 use App\Support\GeminiConfig;
+use App\Services\Ai\DogDiseaseSuggester;
 
 class GeminiChatController extends Controller
 {
     private const UNIFIED_SESSION_TTL_MIN = 1440; // 24h
+
+    /**
+     * Dog disease spell-correct/suggestion with similar shape to /chat/send.
+     */
+    public function dogDisease(Request $request)
+    {
+        $data = $request->validate([
+            'user_id'  => 'required|integer',
+            'pet_id'   => 'required|integer',
+            'question' => 'required|string|max:500',
+            'pet_name'   => 'nullable|string',
+            'pet_breed'  => 'nullable|string',
+            'pet_age'    => 'nullable|string',
+            'pet_gender' => 'nullable|string',
+        ]);
+
+        $petRows = DB::select('SELECT id, user_id, name, breed, pet_age, pet_gender FROM pets WHERE id = ? LIMIT 1', [$data['pet_id']]);
+        if (!$petRows) {
+            return response()->json(['success' => false, 'message' => 'Pet not found'], 404);
+        }
+        $pet = $petRows[0];
+        if (!empty($pet->user_id) && (int) $pet->user_id !== (int) $data['user_id']) {
+            return response()->json(['success' => false, 'message' => 'Pet does not belong to user'], 403);
+        }
+
+        $symptom = trim($data['question']);
+
+        $context = [
+            'name'       => $data['pet_name']   ?? ($pet->name ?? null),
+            'breed'      => $data['pet_breed']  ?? ($pet->breed ?? null),
+            'pet_age'    => $data['pet_age']    ?? ($pet->pet_age ?? null),
+            'pet_gender' => $data['pet_gender'] ?? ($pet->pet_gender ?? null),
+        ];
+
+        try {
+            $suggester = new DogDiseaseSuggester();
+            $diseaseName = $suggester->suggest($symptom, $context);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not generate disease suggestion: '.$e->getMessage(),
+            ], 500);
+        }
+
+        DB::update(
+            'UPDATE pets SET reported_symptom = ?, updated_at = NOW() WHERE id = ?',
+            [$symptom, $data['pet_id']]
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'pet_id' => $data['pet_id'],
+                'user_id' => $data['user_id'],
+                'symptom_saved' => $symptom,
+                'suggested_disease' => $diseaseName,
+                'pet_profile' => $context,
+            ],
+        ]);
+    }
 
     public function sendMessage(Request $request)
     {
