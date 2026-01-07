@@ -8,6 +8,7 @@ use App\Models\UserObservation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class UserObservationController extends Controller
 {
@@ -122,9 +123,24 @@ class UserObservationController extends Controller
         }
 
         if ($petId && $fetchPet) {
-            $petRow = DB::table('pets')->select('id', 'user_id', 'owner_id')->where('id', $petId)->first();
+            $ownerColumn = 'user_id';
+            if (Schema::hasTable('pets') && Schema::hasColumn('pets', 'owner_id')) {
+                $ownerColumn = 'owner_id';
+            }
+
+            $selectCols = ['id'];
+            if (Schema::hasTable('pets')) {
+                if (Schema::hasColumn('pets', 'user_id')) {
+                    $selectCols[] = 'user_id';
+                }
+                if ($ownerColumn === 'owner_id') {
+                    $selectCols[] = 'owner_id';
+                }
+            }
+
+            $petRow = DB::table('pets')->select($selectCols)->where('id', $petId)->first();
             if ($petRow) {
-                $petOwnerId = $petRow->user_id ?? $petRow->owner_id;
+                $petOwnerId = $petRow->user_id ?? ($petRow->owner_id ?? null);
             }
         }
 
