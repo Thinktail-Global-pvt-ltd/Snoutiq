@@ -17,6 +17,11 @@
   .timeline-dot.engagement { background: #14b8a6; box-shadow: 0 0 0 4px rgba(20,184,166,0.12); }
   .metric-pill { border-radius: 999px; padding: .4rem .75rem; font-weight: 700; background: #f1f5f9; color: #0f172a; }
   .metric-pill span { display: block; font-size: .75rem; text-transform: uppercase; letter-spacing: .03em; color: #64748b; }
+  .pet-card { transition: all .15s ease; border: 1px solid #e2e8f0; background: #fff; height: 100%; }
+  .pet-card:hover { box-shadow: 0 10px 24px rgba(15,23,42,0.08); border-color: #d0d7e2; }
+  .pet-summary { background: #f8fafc; border-radius: 10px; padding: .6rem .75rem; font-size: .85rem; color: #0f172a; }
+  .pagination { gap: .25rem; flex-wrap: wrap; }
+  .pagination .page-link { border-radius: 10px; padding: .35rem .6rem; }
 </style>
 @endpush
 
@@ -193,7 +198,7 @@
                     <div class="row g-3">
                         @forelse($selected['userPets'] as $pet)
                             <div class="col-md-6">
-                                <div class="p-3 border rounded">
+                                <div class="p-3 pet-card rounded">
                                     <div class="d-flex justify-content-between">
                                         <strong>{{ $pet->name }}</strong>
                                         <span class="badge text-bg-light">Legacy</span>
@@ -201,6 +206,12 @@
                                     <div class="text-muted small">{{ $pet->type ?? 'Pet' }} · {{ $pet->breed ?? 'Breed n/a' }}</div>
                                     <div class="small mt-1">Gender: {{ $pet->gender ?? 'n/a' }}</div>
                                     <div class="small text-muted">State: {{ $pet->health_state ?? '—' }}</div>
+                                    @if(!empty($pet->ai_summary))
+                                        <div class="pet-summary mt-2">
+                                            <div class="text-uppercase text-muted" style="font-size: .7rem;">AI Summary</div>
+                                            <div>{{ Str::limit($pet->ai_summary, 160) }}</div>
+                                        </div>
+                                    @endif
                                     <div class="small text-muted">Added {{ optional($pet->created_at)->format('d M Y') ?? '—' }}</div>
                                 </div>
                             </div>
@@ -209,7 +220,7 @@
 
                         @forelse($selected['pets'] as $pet)
                             <div class="col-md-6">
-                                <div class="p-3 border rounded">
+                                <div class="p-3 pet-card rounded">
                                     <div class="d-flex justify-content-between">
                                         <strong>{{ $pet->name ?? 'Pet' }}</strong>
                                         <span class="badge text-bg-primary-subtle text-primary-emphasis">Current</span>
@@ -217,6 +228,12 @@
                                     <div class="text-muted small">{{ $pet->breed ?? 'Breed n/a' }} · {{ $pet->pet_age ? $pet->pet_age.'y' : 'Age n/a' }}</div>
                                     <div class="small">Gender: {{ $pet->pet_gender ?? 'n/a' }}</div>
                                     <div class="small text-muted">State: {{ $pet->health_state ?? '—' }}</div>
+                                    @if(!empty($pet->ai_summary))
+                                        <div class="pet-summary mt-2">
+                                            <div class="text-uppercase text-muted" style="font-size: .7rem;">AI Summary</div>
+                                            <div>{{ Str::limit($pet->ai_summary, 160) }}</div>
+                                        </div>
+                                    @endif
                                     <div class="small text-muted">Added {{ optional($pet->created_at)->format('d M Y') ?? '—' }}</div>
                                 </div>
                             </div>

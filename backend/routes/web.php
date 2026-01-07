@@ -41,9 +41,11 @@ use App\Http\Controllers\PushSchedulerController;
 use App\Http\Controllers\S3RecordingController;
 use App\Http\Controllers\MarketingNotificationController;
 use App\Http\Controllers\Dev\NotificationPlaygroundController;
+use App\Http\Controllers\VetcompassDiseaseSearchController;
 use App\Models\LegacyQrRedirect;
 use App\Services\OnboardingProgressService;
 use App\Http\Controllers\Api\CsvUploadController;
+use App\Http\Controllers\Admin\VetUserConnectionReportPageController;
 
 
 // Public routes
@@ -97,6 +99,9 @@ Route::post('/sales/logout', function (Request $request) {
 // Public view for vet registration report (no admin auth)
 Route::get('/vet-registration-report', VetRegistrationReportPageController::class)
     ->name('vet-registration-report.public');
+// Public view for user/vet connections report (no admin auth)
+Route::get('/vet-user-connections', VetUserConnectionReportPageController::class)
+    ->name('vet-user-connections.public');
 
 Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
     Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
@@ -280,6 +285,9 @@ Route::get('/payment/{callId}', function (string $callId) {
     return view('payment', compact('callId','socketUrl'));
 })->name('video.payment');
 
+Route::match(['get', 'post'], '/vetcompass/diseases', VetcompassDiseaseSearchController::class)
+    ->name('vetcompass.disease-search');
+
 Route::match(['get', 'post'], '/rag-snoutic-symptom-checker', function (Request $request) {
     $apiUrl = 'http://82.25.104.75:5050/query';
     $defaultPayload = [
@@ -360,6 +368,8 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         return view('receptionist.front-desk');
     })->name('receptionist.front-desk');
     Route::view('/receptionist/patients', 'doctor.patients')->name('receptionist.patients');
+    Route::view('/receptionist/vaccinations', 'receptionist.vaccinations')->name('receptionist.vaccinations');
+    Route::view('/receptionist/vaccination-records', 'receptionist.vaccination-records')->name('receptionist.vaccination-records');
     Route::get('/receptionist/bookings', function(){
         return view('receptionist.bookings', ['viewMode' => 'create']);
     })->name('receptionist.bookings.create');
