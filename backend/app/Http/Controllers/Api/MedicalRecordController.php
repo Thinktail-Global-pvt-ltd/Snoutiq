@@ -414,9 +414,11 @@ class MedicalRecordController extends Controller
             return null;
         }
 
+        $fallback = $this->fallbackMedParse($raw);
+
         $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? \App\Support\GeminiConfig::apiKey()));
         if ($apiKey === '') {
-            return null;
+            return $fallback;
         }
 
         $model = \App\Support\GeminiConfig::chatModel() ?: \App\Support\GeminiConfig::defaultModel();
@@ -452,24 +454,22 @@ PROMPT;
                 ],
             ]);
 
-            if (!$response->successful()) {
-                return null;
-            }
-
             $text = $response->json('candidates.0.content.parts.0.text');
-            if (!$text) {
-                return null;
+            if (!$response->successful() || !$text) {
+                return $fallback;
             }
 
-        $jsonStart = strpos($text, '[');
-        $json = $jsonStart !== false ? substr($text, $jsonStart) : $text;
-        $decoded = json_decode($json, true);
-        return is_array($decoded) ? $decoded : null;
-    } catch (\Throwable $e) {
-            // Continue to fallback parse
+            $jsonStart = strpos($text, '[');
+            $json = $jsonStart !== false ? substr($text, $jsonStart) : $text;
+            $decoded = json_decode($json, true);
+            return is_array($decoded) ? $decoded : $fallback;
+        } catch (\Throwable $e) {
+            return $fallback;
         }
+    }
 
-        // Fallback: naive semicolon / newline split
+    private function fallbackMedParse(string $raw): ?array
+    {
         $parts = preg_split('/[;\n]+/', $raw);
         $items = [];
         foreach ($parts as $part) {
