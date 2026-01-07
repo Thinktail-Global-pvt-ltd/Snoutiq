@@ -375,6 +375,8 @@ Route::post('/appointments/submit', [AppointmentSubmissionController::class, 'st
     ->name('api.appointments.submit');
 Route::get('/appointments/by-doctor/{doctor}', [AppointmentSubmissionController::class, 'listByDoctor'])
     ->name('api.appointments.by-doctor');
+Route::get('/appointments/by-doctor/{doctor}/queue', [AppointmentSubmissionController::class, 'listByDoctorQueue'])
+    ->name('api.appointments.by-doctor-queue');
 Route::get('/appointments/by-user/{user}', [AppointmentSubmissionController::class, 'listByUser'])
     ->name('api.appointments.by-user');
 Route::get('/appointments/{appointment}', [AppointmentSubmissionController::class, 'show'])

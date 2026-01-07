@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -260,6 +261,52 @@ class AppointmentSubmissionController extends Controller
         ]);
     }
 
+    public function listByDoctorQueue(Doctor $doctor): JsonResponse
+    {
+        $appointments = Appointment::query()
+            ->with(['clinic', 'doctor'])
+            ->where('doctor_id', $doctor->id)
+            ->orderBy('appointment_date')
+            ->orderBy('appointment_time')
+            ->get();
+
+        $timezone = config('app.timezone', 'UTC');
+        $now = Carbon::now($timezone);
+        $waitingRoomUntil = $now->copy()->addMinutes(30);
+
+        $waitingRoom = collect();
+        $upcoming = collect();
+
+        foreach ($appointments as $appointment) {
+            $slot = $this->appointmentDateTime($appointment, $timezone);
+            if (!$slot || $slot->lt($now)) {
+                continue;
+            }
+
+            if ($slot->lte($waitingRoomUntil)) {
+                $waitingRoom->push($appointment);
+            } else {
+                $upcoming->push($appointment);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'doctor' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->doctor_name ?? $doctor->name ?? null,
+                ],
+                'current_time' => $now->toDateTimeString(),
+                'waiting_room_until' => $waitingRoomUntil->toDateTimeString(),
+                'waiting_room_count' => $waitingRoom->count(),
+                'upcoming_count' => $upcoming->count(),
+                'waiting_room' => $this->formatAppointments($waitingRoom),
+                'upcoming' => $this->formatAppointments($upcoming),
+            ],
+        ]);
+    }
+
     public function listByUser(User $user): JsonResponse
     {
         $appointments = Appointment::query()
@@ -461,6 +508,41 @@ class AppointmentSubmissionController extends Controller
         $email = strtolower(trim($value));
 
         return $email !== '' ? $email : null;
+    }
+
+    private function appointmentDateTime(Appointment $appointment, string $timezone): ?Carbon
+    {
+        $date = trim((string) $appointment->appointment_date);
+        if ($date === '') {
+            return null;
+        }
+
+        $time = trim((string) $appointment->appointment_time);
+        if ($time === '') {
+            $time = '00:00:00';
+        }
+
+        $dateTime = $date . ' ' . $time;
+        $formats = [
+            'Y-m-d H:i:s',
+            'Y-m-d H:i',
+            'Y-m-d h:i A',
+            'Y-m-d h:i:s A',
+        ];
+
+        foreach ($formats as $format) {
+            try {
+                return Carbon::createFromFormat($format, $dateTime, $timezone);
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        try {
+            return Carbon::parse($dateTime, $timezone);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
