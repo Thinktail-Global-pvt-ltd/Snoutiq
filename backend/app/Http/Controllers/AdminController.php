@@ -349,8 +349,8 @@ class AdminController extends Controller
         }
 
         DB::update(
-            'UPDATE pets SET reported_symptom = ?, updated_at = NOW() WHERE id = ?',
-            [$symptom, $petId]
+            'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, updated_at = NOW() WHERE id = ?',
+            [$symptom, $diseaseName, $petId]
         );
 
         return response()->json([
