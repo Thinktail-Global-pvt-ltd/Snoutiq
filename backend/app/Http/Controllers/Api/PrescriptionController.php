@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use App\Models\User;
+use App\Models\Pet;
 
 class PrescriptionController extends Controller
 {
@@ -74,12 +75,20 @@ class PrescriptionController extends Controller
                 'id',
                 'doctor_id',
                 'user_id',
+                'pet_id',
                 'content_html',
                 'image_path',
                 'next_medicine_day',
                 'next_visit_day',
                 'created_at',
             ]);
+
+        $pets = Pet::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->get();
+
+        $primaryPet = $pets->first();
 
         return response()->json([
             'success' => true,
@@ -88,14 +97,19 @@ class PrescriptionController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'summary' => $user->summary,
-                    'pet_doc' => $user->pet_doc ?? $user->pet_doc1 ?? $user->pet_doc2 ?? null,
-                    'pet_doc1' => $user->pet_doc1,
-                    'pet_doc2' => $user->pet_doc2,
-                    'pet_name' => $user->pet_name,
-                    'pet_gender' => $user->pet_gender,
-                    'pet_age' => $user->pet_age,
-                    'breed' => $user->breed,
+                    'pet_doc' => $user->pet_doc
+                        ?? $user->pet_doc1
+                        ?? $user->pet_doc2
+                        ?? data_get($primaryPet, 'pet_doc1')
+                        ?? data_get($primaryPet, 'pet_doc2'),
+                    'pet_doc1' => $user->pet_doc1 ?? data_get($primaryPet, 'pet_doc1'),
+                    'pet_doc2' => $user->pet_doc2 ?? data_get($primaryPet, 'pet_doc2'),
+                    'pet_name' => $user->pet_name ?? data_get($primaryPet, 'name'),
+                    'pet_gender' => $user->pet_gender ?? data_get($primaryPet, 'pet_gender'),
+                    'pet_age' => $user->pet_age ?? data_get($primaryPet, 'pet_age'),
+                    'breed' => $user->breed ?? data_get($primaryPet, 'breed'),
                 ],
+                'pets' => $pets,
                 'prescriptions' => $prescriptions,
             ],
         ]);

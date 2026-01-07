@@ -147,6 +147,21 @@ class ClinicsController extends Controller
         return $this->services($request, (string) $clinicId);
     }
 
+    // GET /api/clinics/patients?clinic_id=123
+    public function patientsByClinicId(Request $request)
+    {
+        $clinicId = (int) $request->query('clinic_id', 0);
+
+        if ($clinicId <= 0) {
+            return response()->json([
+                'success' => false,
+                'error' => 'clinic_id is required',
+            ], 422);
+        }
+
+        return $this->patients((string) $clinicId);
+    }
+
     // GET /api/clinics/{id}/patients
     public function patients(string $id)
     {
