@@ -12,35 +12,27 @@ class UserObservationController extends Controller
 {
     public function index(Request $request)
     {
-        $userId = $this->resolveUserId($request);
-
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'user_id is required',
-            ], 422);
+        [$userId, $petId] = $this->resolveUserAndPet($request);
+        if (!$petId && !$userId) {
+            return response()->json(['success' => false, 'message' => 'pet_id or user_id is required'], 422);
         }
 
-        if ($request->user() && (int) $request->user()->id !== $userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You cannot view observations for another user.',
-            ], 403);
-        }
-
-        $user = User::find($userId);
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found.',
-            ], 404);
+        // Authorization: if auth user present, enforce ownership when possible
+        if ($request->user() && $userId && (int) $request->user()->id !== $userId) {
+            return response()->json(['success' => false, 'message' => 'You cannot view observations for another user.'], 403);
         }
 
         $limit = (int) $request->query('limit', 50);
         $limit = $limit > 0 ? min($limit, 200) : 50;
 
-        $observations = UserObservation::query()
-            ->where('user_id', $userId)
+        $query = UserObservation::query();
+        if ($petId) {
+            $query->where('pet_id', $petId);
+        } elseif ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        $observations = $query
             ->orderByDesc('observed_at')
             ->orderByDesc('id')
             ->limit($limit)
@@ -51,6 +43,7 @@ class UserObservationController extends Controller
             'success' => true,
             'data' => [
                 'user_id' => $userId,
+                'pet_id' => $petId,
                 'observations' => $observations,
             ],
         ]);
@@ -58,23 +51,16 @@ class UserObservationController extends Controller
 
     public function store(Request $request)
     {
-        $userId = $this->resolveUserId($request);
-
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'user_id is required',
-            ], 422);
+        [$userId, $petId, $petOwnerId] = $this->resolveUserAndPet($request, true);
+        if (!$petId) {
+            return response()->json(['success' => false, 'message' => 'pet_id is required'], 422);
         }
-
-        if ($request->user() && (int) $request->user()->id !== $userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You cannot save observations for another user.',
-            ], 403);
+        if ($request->user() && $petOwnerId && (int) $request->user()->id !== $petOwnerId) {
+            return response()->json(['success' => false, 'message' => 'You cannot save observations for another user\'s pet.'], 403);
         }
 
         $validated = $request->validate([
+            'pet_id' => ['required', 'integer'],
             'user_id' => ['sometimes', 'integer', 'exists:users,id'],
             'eating' => ['nullable', 'integer', 'between:1,5'],
             'appetite' => ['nullable', 'string', 'max:50'],
@@ -86,18 +72,11 @@ class UserObservationController extends Controller
             'timestamp' => ['nullable', 'date'],
         ]);
 
-        $user = User::find($userId);
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found.',
-            ], 404);
-        }
-
         $observedAt = $validated['timestamp'] ?? null;
 
         $observation = UserObservation::create([
-            'user_id' => $userId,
+            'user_id' => $petOwnerId ?: $userId,
+            'pet_id' => $petId,
             'eating' => $validated['eating'] ?? null,
             'appetite' => $validated['appetite'] ?? null,
             'energy' => $validated['energy'] ?? null,
@@ -129,8 +108,25 @@ class UserObservationController extends Controller
         ];
     }
 
-    protected function resolveUserId(Request $request): ?int
+    protected function resolveUserAndPet(Request $request, bool $fetchPet = false): array
     {
+        $petId = null;
+        $userId = null;
+        $petOwnerId = null;
+
+        if ($request->filled('pet_id')) {
+            $petId = (int) $request->input('pet_id');
+        } elseif ($request->query('pet_id')) {
+            $petId = (int) $request->query('pet_id');
+        }
+
+        if ($petId && $fetchPet) {
+            $petRow = DB::table('pets')->select('id', 'user_id', 'owner_id')->where('id', $petId)->first();
+            if ($petRow) {
+                $petOwnerId = $petRow->user_id ?? $petRow->owner_id;
+            }
+        }
+
         $sessionUserId = null;
         if (method_exists($request, 'hasSession') && $request->hasSession()) {
             try {
@@ -150,10 +146,11 @@ class UserObservationController extends Controller
 
         foreach ($candidates as $candidate) {
             if (is_numeric($candidate) && (int) $candidate > 0) {
-                return (int) $candidate;
+                $userId = (int) $candidate;
+                break;
             }
         }
 
-        return null;
+        return [$userId, $petId, $petOwnerId];
     }
 }

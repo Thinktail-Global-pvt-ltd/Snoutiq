@@ -12,6 +12,7 @@ class UserObservation extends Model
 
     protected $fillable = [
         'user_id',
+        'pet_id',
         'eating',
         'appetite',
         'energy',
