@@ -208,58 +208,38 @@ class ClinicsController extends Controller
 
         $petMap = collect();
 
-        if ($patients->isNotEmpty()) {
+        if ($patients->isNotEmpty() && Schema::hasTable('pets')) {
             $userIds = $patients->pluck('id');
-            $petRows = collect();
 
-            if (Schema::hasTable('user_pets')) {
-                $petColumns = ['id', 'user_id', 'name', 'type', 'breed'];
-                if (Schema::hasColumn('user_pets', 'gender')) {
+            $userColumn = Schema::hasColumn('pets', 'user_id')
+                ? 'user_id'
+                : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+
+            if ($userColumn) {
+                $petColumns = ['id', DB::raw("{$userColumn} as user_id"), 'name', 'breed'];
+                if (Schema::hasColumn('pets', 'type')) {
+                    $petColumns[] = 'type';
+                }
+                if (Schema::hasColumn('pets', 'pet_age')) {
+                    $petColumns[] = 'pet_age';
+                }
+                if (Schema::hasColumn('pets', 'pet_gender')) {
+                    $petColumns[] = DB::raw('pet_gender as gender');
+                } elseif (Schema::hasColumn('pets', 'gender')) {
                     $petColumns[] = 'gender';
                 }
-                if (Schema::hasColumn('user_pets', 'dob')) {
-                    $petColumns[] = 'dob';
+                if (Schema::hasColumn('pets', 'weight')) {
+                    $petColumns[] = 'weight';
                 }
 
-                $petRows = $petRows->merge(
-                    DB::table('user_pets')
-                        ->select($petColumns)
-                        ->whereIn('user_id', $userIds)
-                        ->orderBy('name')
-                        ->get()
-                );
+                $petRows = DB::table('pets')
+                    ->select($petColumns)
+                    ->whereIn($userColumn, $userIds)
+                    ->orderBy('name')
+                    ->get();
+
+                $petMap = $petRows->groupBy('user_id');
             }
-
-            if (Schema::hasTable('pets')) {
-                $userColumn = Schema::hasColumn('pets', 'user_id')
-                    ? 'user_id'
-                    : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
-
-                if ($userColumn) {
-                    $petColumns = ['id', DB::raw("{$userColumn} as user_id"), 'name', 'breed'];
-                    if (Schema::hasColumn('pets', 'type')) {
-                        $petColumns[] = 'type';
-                    }
-                    if (Schema::hasColumn('pets', 'pet_age')) {
-                        $petColumns[] = 'pet_age';
-                    }
-                    if (Schema::hasColumn('pets', 'pet_gender')) {
-                        $petColumns[] = DB::raw('pet_gender as gender');
-                    } elseif (Schema::hasColumn('pets', 'gender')) {
-                        $petColumns[] = 'gender';
-                    }
-
-                    $petRows = $petRows->merge(
-                        DB::table('pets')
-                            ->select($petColumns)
-                            ->whereIn($userColumn, $userIds)
-                            ->orderBy('name')
-                            ->get()
-                    );
-                }
-            }
-
-            $petMap = $petRows->groupBy('user_id');
         }
 
         $patients = $patients->map(function ($patient) use ($petMap) {
