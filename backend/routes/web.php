@@ -285,7 +285,7 @@ Route::get('/payment/{callId}', function (string $callId) {
     return view('payment', compact('callId','socketUrl'));
 })->name('video.payment');
 
-Route::match(['get', 'post'], '/vetcompass/diseases', VetcompassDiseaseSearchController::class)
+Route::match(['get', 'post'], '/vetcompass/diseases', [VetcompassDiseaseSearchController::class, '__invoke'])
     ->name('vetcompass.disease-search');
 
 Route::match(['get', 'post'], '/rag-snoutic-symptom-checker', function (Request $request) {
