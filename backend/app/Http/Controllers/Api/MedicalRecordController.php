@@ -461,13 +461,33 @@ PROMPT;
                 return null;
             }
 
-            $jsonStart = strpos($text, '[');
-            $json = $jsonStart !== false ? substr($text, $jsonStart) : $text;
-            $decoded = json_decode($json, true);
-            return is_array($decoded) ? $decoded : null;
-        } catch (\Throwable $e) {
-            return null;
+        $jsonStart = strpos($text, '[');
+        $json = $jsonStart !== false ? substr($text, $jsonStart) : $text;
+        $decoded = json_decode($json, true);
+        return is_array($decoded) ? $decoded : null;
+    } catch (\Throwable $e) {
+            // Continue to fallback parse
         }
+
+        // Fallback: naive semicolon / newline split
+        $parts = preg_split('/[;\n]+/', $raw);
+        $items = [];
+        foreach ($parts as $part) {
+            $text = trim($part);
+            if ($text === '') {
+                continue;
+            }
+            $items[] = [
+                'name' => $text,
+                'dose' => '',
+                'frequency' => '',
+                'duration' => '',
+                'route' => '',
+                'notes' => '',
+            ];
+        }
+
+        return $items ?: null;
     }
 
     protected function resolveUser(string $identifier): ?User
