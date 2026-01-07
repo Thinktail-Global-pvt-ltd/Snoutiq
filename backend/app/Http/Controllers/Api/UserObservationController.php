@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserObservation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class UserObservationController extends Controller
 {
