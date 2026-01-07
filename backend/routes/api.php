@@ -831,6 +831,7 @@ Route::get('/users/{userId}/pets',  [AdminController::class, 'listPets']);
 Route::post('/users/{userId}/pets', [AdminController::class, 'addPet']);
 Route::get('/pets/{petId}',         [AdminController::class, 'getPet']);
 Route::post('/pets/{petId}/dog-disease', [AdminController::class, 'suggestDogDisease']);
+Route::post('/pets/{petId}/summary', [AdminController::class, 'summarizePet']);
 Route::put('/pets/{petId}',         [AdminController::class, 'updatePet']);
 Route::delete('/pets/{petId}',      [AdminController::class, 'deletePet']);
 

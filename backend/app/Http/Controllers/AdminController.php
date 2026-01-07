@@ -363,6 +363,50 @@ class AdminController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Build AI summary of a pet using pet fields, uploaded docs, and prescriptions.
+     */
+    public function summarizePet(Request $request, $petId)
+    {
+        $petRows = DB::select('SELECT * FROM pets WHERE id = ? LIMIT 1', [$petId]);
+        if (!$petRows) {
+            return response()->json(['status' => 'error', 'message' => 'Pet not found'], 404);
+        }
+        $pet = $petRows[0];
+
+        $prescriptions = DB::select(
+            'SELECT id, doctor_id, content_html, image_path, visit_notes, exam_notes, diagnosis, treatment_plan, home_care, follow_up_notes, created_at
+             FROM prescriptions
+             WHERE pet_id = ?
+             ORDER BY id DESC
+             LIMIT 20',
+            [$petId]
+        );
+
+        $prompt = $this->buildPetSummaryPrompt($pet, $prescriptions);
+        try {
+            $summary = $this->callGeminiForSummary($prompt);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Could not generate summary: '.$e->getMessage(),
+            ], 500);
+        }
+
+        DB::update(
+            'UPDATE pets SET ai_summary = ?, updated_at = NOW() WHERE id = ?',
+            [$summary, $petId]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'pet_id' => $petId,
+                'ai_summary' => $summary,
+            ],
+        ]);
+    }
     // Fetch all users
     public function getUsers_old(Request $request)
     {
@@ -427,5 +471,97 @@ class AdminController extends Controller
         $file->move($uploadPath, $docName);
 
         return 'backend/uploads/pet_docs/'.$docName;
+    }
+
+    private function buildPetSummaryPrompt(object $pet, array $prescriptions): string
+    {
+        $petDetails = [
+            'Name' => $pet->name ?? null,
+            'Breed' => $pet->breed ?? null,
+            'Age' => $pet->pet_age ?? null,
+            'Age (months)' => $pet->pet_age_months ?? null,
+            'Gender' => $pet->pet_gender ?? null,
+            'Weight' => $pet->weight ?? null,
+            'Temperature' => $pet->temprature ?? null,
+            'Vaccinated' => $pet->vaccenated_yes_no ?? null,
+            'Reported symptom' => $pet->reported_symptom ?? null,
+            'Suggested disease' => $pet->suggested_disease ?? null,
+            'Docs' => implode(', ', array_filter([$pet->pet_doc1 ?? null, $pet->pet_doc2 ?? null, $pet->pet_doc ?? null])),
+        ];
+
+        $prescSummaries = [];
+        foreach ($prescriptions as $p) {
+            $prescSummaries[] = [
+                'id' => $p->id,
+                'doctor_id' => $p->doctor_id,
+                'created_at' => $p->created_at,
+                'diagnosis' => $p->diagnosis,
+                'visit_notes' => $p->visit_notes,
+                'exam_notes' => $p->exam_notes,
+                'treatment_plan' => $p->treatment_plan,
+                'home_care' => $p->home_care,
+                'follow_up_notes' => $p->follow_up_notes,
+                'image_path' => $p->image_path,
+                'content_html' => $p->content_html,
+            ];
+        }
+
+        $petBlock = json_encode($petDetails, JSON_PRETTY_PRINT);
+        $prescBlock = json_encode($prescSummaries, JSON_PRETTY_PRINT);
+
+        return <<<PROMPT
+You are a veterinary medical summarizer. Using the patient details and related prescriptions, write a concise paragraph (3-6 sentences) for clinicians.
+- Capture species/breed, age, sex, key symptoms, notable history, working/suggested diagnoses, and recent care plans.
+- If images are referenced (image_path), mention that imagery is available but do not fabricate interpretations.
+- Avoid hallucinations; only use provided data. If something is missing, omit it.
+Return only the paragraph text (no bullets, no JSON).
+
+Pet details:
+{$petBlock}
+
+Prescriptions (most recent first):
+{$prescBlock}
+PROMPT;
+    }
+
+    private function callGeminiForSummary(string $prompt): string
+    {
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? \App\Support\GeminiConfig::apiKey()));
+        if ($apiKey === '') {
+            throw new \RuntimeException('Gemini API key is not configured.');
+        }
+
+        $model = \App\Support\GeminiConfig::chatModel() ?: \App\Support\GeminiConfig::defaultModel();
+        $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent', $model);
+
+        $payload = [
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [['text' => $prompt]],
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.35,
+                'topP' => 0.9,
+                'topK' => 32,
+                'maxOutputTokens' => 300,
+            ],
+        ];
+
+        $response = \Illuminate\Support\Facades\Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'X-goog-api-key' => $apiKey,
+        ])->post($endpoint, $payload);
+
+        if (!$response->successful()) {
+            $message = data_get($response->json(), 'error.message') ?: 'Gemini API error';
+            throw new \RuntimeException($message);
+        }
+
+        $text = $response->json('candidates.0.content.parts.0.text');
+        if (!$text) {
+            throw new \RuntimeException('Gemini returned an empty response.');
+        }
+
+        return trim($text);
     }
 }
