@@ -570,6 +570,12 @@
               <option value="chronic">Chronic</option>
             </select>
           </div>
+          <div class="record-field">
+            <label class="record-label" for="is-chronic">
+              <input type="checkbox" id="is-chronic" name="is_chronic" value="1">
+              <span class="ms-1">Mark as chronic case</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -582,6 +588,11 @@
         <div class="record-field">
           <label class="record-label" for="home-care">Home care / precautions</label>
           <textarea id="home-care" name="home_care" class="record-input record-textarea" placeholder="Home care / precautions"></textarea>
+        </div>
+        <div class="record-field">
+          <label class="record-label" for="medicines">Medicines (AI will structure and save)</label>
+          <textarea id="medicines" name="medicines" class="record-input record-textarea" placeholder="Amoxicillin 500mg twice daily for 5 days; Probiotic sachet once daily for 7 days"></textarea>
+          <div class="record-note">Provide plain text; Gemini will extract and save dosage, frequency, and duration.</div>
         </div>
       </div>
 
@@ -1410,6 +1421,15 @@
       }
       if (!formData.get('pet_id')) {
         formData.delete('pet_id');
+      }
+      if (formData.get('is_chronic') !== '1') {
+        formData.delete('is_chronic');
+      }
+      const meds = (formData.get('medicines') || '').toString().trim();
+      if (!meds) {
+        formData.delete('medicines');
+      } else {
+        formData.set('medicines', meds);
       }
       let url = `${API_BASE}/medical-records`;
       if (state.editingRecordId || formData.get('record_id')) {

@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 
 class MedicalRecordController extends Controller
 {
@@ -43,8 +44,10 @@ class MedicalRecordController extends Controller
             'exam_notes' => ['nullable', 'string'],
             'diagnosis' => ['nullable', 'string', 'max:255'],
             'diagnosis_status' => ['nullable', 'string', 'max:255'],
+            'is_chronic' => ['nullable', 'boolean'],
             'treatment_plan' => ['nullable', 'string'],
             'home_care' => ['nullable', 'string'],
+            'medicines' => ['nullable', 'string', 'max:2000'],
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
@@ -101,6 +104,8 @@ class MedicalRecordController extends Controller
         $record->save();
 
         $prescription = Prescription::firstOrNew(['medical_record_id' => $record->id]);
+        $medsJson = $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null);
+
         $prescription->fill([
             'medical_record_id' => $record->id,
             'user_id' => $record->user_id,
@@ -115,12 +120,14 @@ class MedicalRecordController extends Controller
             'exam_notes' => $validated['exam_notes'] ?? $prescription->exam_notes,
             'diagnosis' => $validated['diagnosis'] ?? $prescription->diagnosis,
             'diagnosis_status' => $validated['diagnosis_status'] ?? $prescription->diagnosis_status,
+            'is_chronic' => array_key_exists('is_chronic', $validated) ? (bool) $validated['is_chronic'] : $prescription->is_chronic,
             'treatment_plan' => $validated['treatment_plan'] ?? $prescription->treatment_plan,
             'home_care' => $validated['home_care'] ?? $prescription->home_care,
             'follow_up_date' => $validated['follow_up_date'] ?? $prescription->follow_up_date,
             'follow_up_type' => $validated['follow_up_type'] ?? $prescription->follow_up_type,
             'follow_up_notes' => $validated['follow_up_notes'] ?? $prescription->follow_up_notes,
             'pet_id' => $petId ?? $prescription->pet_id,
+            'medications_json' => $medsJson ?? $prescription->medications_json,
         ]);
         $prescription->save();
 
@@ -156,8 +163,10 @@ class MedicalRecordController extends Controller
             'exam_notes' => ['nullable', 'string'],
             'diagnosis' => ['nullable', 'string', 'max:255'],
             'diagnosis_status' => ['nullable', 'string', 'max:255'],
+            'is_chronic' => ['nullable', 'boolean'],
             'treatment_plan' => ['nullable', 'string'],
             'home_care' => ['nullable', 'string'],
+            'medicines' => ['nullable', 'string', 'max:2000'],
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
@@ -238,12 +247,14 @@ class MedicalRecordController extends Controller
             'exam_notes' => $validated['exam_notes'] ?? null,
             'diagnosis' => $validated['diagnosis'] ?? null,
             'diagnosis_status' => $validated['diagnosis_status'] ?? null,
+            'is_chronic' => array_key_exists('is_chronic', $validated) ? (bool) $validated['is_chronic'] : null,
             'treatment_plan' => $validated['treatment_plan'] ?? null,
             'home_care' => $validated['home_care'] ?? null,
             'follow_up_date' => $validated['follow_up_date'] ?? null,
             'follow_up_type' => $validated['follow_up_type'] ?? null,
             'follow_up_notes' => $validated['follow_up_notes'] ?? null,
             'pet_id' => $petId,
+            'medications_json' => $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
         $prescription = Prescription::create($prescriptionPayload);
 
@@ -349,6 +360,69 @@ class MedicalRecordController extends Controller
         }
 
         return null;
+    }
+
+    private function maybeStructureMedicines(?string $raw, ?string $diagnosis, ?string $notes): ?array
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? \App\Support\GeminiConfig::apiKey()));
+        if ($apiKey === '') {
+            return null;
+        }
+
+        $model = \App\Support\GeminiConfig::chatModel() ?: \App\Support\GeminiConfig::defaultModel();
+        $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent', $model);
+
+        $prompt = <<<PROMPT
+You are a veterinary prescription parser. Convert the free-text medications into a JSON array.
+Input fields:
+- diagnosis: {$diagnosis}
+- notes: {$notes}
+- medications text: "{$raw}"
+
+Rules:
+- Output ONLY JSON array. No prose. Each item: {"name": "...", "dose": "...", "frequency": "...", "duration": "...", "route": "...", "notes": "..."}.
+- Keep unknown fields as empty strings.
+- Do not invent extra meds beyond the input.
+PROMPT;
+
+        try {
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'X-goog-api-key' => $apiKey,
+            ])->post($endpoint, [
+                'contents' => [[
+                    'role' => 'user',
+                    'parts' => [['text' => $prompt]],
+                ]],
+                'generationConfig' => [
+                    'temperature' => 0.2,
+                    'topP' => 0.8,
+                    'topK' => 32,
+                    'maxOutputTokens' => 256,
+                ],
+            ]);
+
+            if (!$response->successful()) {
+                return null;
+            }
+
+            $text = $response->json('candidates.0.content.parts.0.text');
+            if (!$text) {
+                return null;
+            }
+
+            $jsonStart = strpos($text, '[');
+            $json = $jsonStart !== false ? substr($text, $jsonStart) : $text;
+            $decoded = json_decode($json, true);
+            return is_array($decoded) ? $decoded : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     protected function resolveUser(string $identifier): ?User
