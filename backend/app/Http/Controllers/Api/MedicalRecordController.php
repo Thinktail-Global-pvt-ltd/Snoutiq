@@ -44,7 +44,7 @@ class MedicalRecordController extends Controller
             'exam_notes' => ['nullable', 'string'],
             'diagnosis' => ['nullable', 'string', 'max:255'],
             'diagnosis_status' => ['nullable', 'string', 'max:255'],
-            'is_chronic' => ['nullable', 'boolean'],
+            'disease_name' => ['nullable', 'string', 'max:255'],
             'treatment_plan' => ['nullable', 'string'],
             'home_care' => ['nullable', 'string'],
             'medicines' => ['nullable', 'string', 'max:2000'],
@@ -105,6 +105,8 @@ class MedicalRecordController extends Controller
 
         $prescription = Prescription::firstOrNew(['medical_record_id' => $record->id]);
         $medsJson = $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null);
+        $diseaseName = $validated['disease_name'] ?? $validated['diagnosis'] ?? null;
+        $isChronic = ($validated['diagnosis_status'] ?? '') === 'chronic';
 
         $prescription->fill([
             'medical_record_id' => $record->id,
@@ -120,7 +122,8 @@ class MedicalRecordController extends Controller
             'exam_notes' => $validated['exam_notes'] ?? $prescription->exam_notes,
             'diagnosis' => $validated['diagnosis'] ?? $prescription->diagnosis,
             'diagnosis_status' => $validated['diagnosis_status'] ?? $prescription->diagnosis_status,
-            'is_chronic' => array_key_exists('is_chronic', $validated) ? (bool) $validated['is_chronic'] : $prescription->is_chronic,
+            'is_chronic' => $isChronic,
+            'disease_name' => $diseaseName ?? $prescription->disease_name,
             'treatment_plan' => $validated['treatment_plan'] ?? $prescription->treatment_plan,
             'home_care' => $validated['home_care'] ?? $prescription->home_care,
             'follow_up_date' => $validated['follow_up_date'] ?? $prescription->follow_up_date,
@@ -130,6 +133,10 @@ class MedicalRecordController extends Controller
             'medications_json' => $medsJson ?? $prescription->medications_json,
         ]);
         $prescription->save();
+
+        if ($petId) {
+            $this->updatePetHealthState($record->user_id, $petId, $isChronic, $diseaseName);
+        }
 
         return response()->json([
             'success' => true,
@@ -163,7 +170,7 @@ class MedicalRecordController extends Controller
             'exam_notes' => ['nullable', 'string'],
             'diagnosis' => ['nullable', 'string', 'max:255'],
             'diagnosis_status' => ['nullable', 'string', 'max:255'],
-            'is_chronic' => ['nullable', 'boolean'],
+            'disease_name' => ['nullable', 'string', 'max:255'],
             'treatment_plan' => ['nullable', 'string'],
             'home_care' => ['nullable', 'string'],
             'medicines' => ['nullable', 'string', 'max:2000'],
@@ -247,7 +254,8 @@ class MedicalRecordController extends Controller
             'exam_notes' => $validated['exam_notes'] ?? null,
             'diagnosis' => $validated['diagnosis'] ?? null,
             'diagnosis_status' => $validated['diagnosis_status'] ?? null,
-            'is_chronic' => array_key_exists('is_chronic', $validated) ? (bool) $validated['is_chronic'] : null,
+            'is_chronic' => ($validated['diagnosis_status'] ?? '') === 'chronic',
+            'disease_name' => $validated['disease_name'] ?? $validated['diagnosis'] ?? null,
             'treatment_plan' => $validated['treatment_plan'] ?? null,
             'home_care' => $validated['home_care'] ?? null,
             'follow_up_date' => $validated['follow_up_date'] ?? null,
@@ -257,6 +265,10 @@ class MedicalRecordController extends Controller
             'medications_json' => $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
         $prescription = Prescription::create($prescriptionPayload);
+
+        if ($petId) {
+            $this->updatePetHealthState($user->id, $petId, ($validated['diagnosis_status'] ?? '') === 'chronic', $validated['disease_name'] ?? $validated['diagnosis'] ?? null);
+        }
 
         return response()->json([
             'success' => true,
@@ -360,6 +372,39 @@ class MedicalRecordController extends Controller
         }
 
         return null;
+    }
+
+    private function updatePetHealthState(int $userId, int $petId, bool $isChronic, ?string $diseaseName): void
+    {
+        if (!Schema::hasTable('pets')) {
+            return;
+        }
+
+        $pet = DB::table('pets')
+            ->where('id', $petId)
+            ->where(function ($q) use ($userId) {
+                if (Schema::hasColumn('pets', 'user_id')) {
+                    $q->where('user_id', $userId);
+                }
+            })
+            ->first();
+
+        if (!$pet) {
+            return;
+        }
+
+        $updates = [];
+        if ($isChronic) {
+            $updates['health_state'] = 'chronic';
+        }
+        if ($diseaseName) {
+            $updates['suggested_disease'] = $diseaseName;
+        }
+
+        if ($updates) {
+            $updates['updated_at'] = now();
+            DB::table('pets')->where('id', $petId)->update($updates);
+        }
     }
 
     private function maybeStructureMedicines(?string $raw, ?string $diagnosis, ?string $notes): ?array

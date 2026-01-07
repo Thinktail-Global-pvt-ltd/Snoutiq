@@ -563,18 +563,16 @@
             <input id="diagnosis" name="diagnosis" type="text" class="record-input" placeholder="Diagnosis (e.g. UTI)">
           </div>
           <div class="record-field">
+            <label class="record-label" for="disease-name">Disease name (for pet record)</label>
+            <input id="disease-name" name="disease_name" type="text" class="record-input" placeholder="e.g. Canine distemper">
+          </div>
+          <div class="record-field">
             <label class="record-label" for="diagnosis-status">Status</label>
             <select id="diagnosis-status" name="diagnosis_status" class="record-input">
               <option value="new">New</option>
               <option value="ongoing">Ongoing</option>
               <option value="chronic">Chronic</option>
             </select>
-          </div>
-          <div class="record-field">
-            <label class="record-label" for="is-chronic">
-              <input type="checkbox" id="is-chronic" name="is_chronic" value="1">
-              <span class="ms-1">Mark as chronic case</span>
-            </label>
           </div>
         </div>
       </div>
@@ -1422,14 +1420,17 @@
       if (!formData.get('pet_id')) {
         formData.delete('pet_id');
       }
-      if (formData.get('is_chronic') !== '1') {
-        formData.delete('is_chronic');
-      }
       const meds = (formData.get('medicines') || '').toString().trim();
       if (!meds) {
         formData.delete('medicines');
       } else {
         formData.set('medicines', meds);
+      }
+      const diseaseName = (formData.get('disease_name') || '').toString().trim();
+      if (!diseaseName) {
+        formData.delete('disease_name');
+      } else {
+        formData.set('disease_name', diseaseName);
       }
       let url = `${API_BASE}/medical-records`;
       if (state.editingRecordId || formData.get('record_id')) {
