@@ -105,13 +105,21 @@ class PetParentController extends Controller
                 ->get()
             : collect();
 
-        $transactions = Schema::hasTable('transactions')
-            ? Transaction::with(['doctor', 'clinic'])
+        $transactions = collect();
+        if (Schema::hasTable('transactions')) {
+            $txQuery = Transaction::query()
+                ->with(['doctor'])
                 ->where('user_id', $user->id)
                 ->orderByDesc('created_at')
-                ->limit(50)
-                ->get()
-            : collect();
+                ->limit(50);
+
+            // Only eager-load clinic if the table exists to avoid missing-table errors.
+            if (Schema::hasTable('clinics')) {
+                $txQuery->with('clinic');
+            }
+
+            $transactions = $txQuery->get();
+        }
 
         $bookings = Schema::hasTable('bookings')
             ? DB::table('bookings')
