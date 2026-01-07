@@ -55,6 +55,51 @@
             </div>
         </section>
 
+        <section class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+                    <div>
+                        <h3 class="h6 mb-1">Clinic-wise patient counts</h3>
+                        <p class="text-muted mb-0">Distinct users linked to each clinic (via <code>last_vet_id</code>).</p>
+                    </div>
+                    <span class="badge text-bg-light">Clinics: {{ number_format($clinicCounts->count()) }}</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Clinic</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th class="text-end">Patients</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($clinicCounts as $clinic)
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">{{ $clinic->name ?: 'Unnamed clinic' }}</div>
+                                        <div class="small text-muted">ID: {{ $clinic->id }}</div>
+                                    </td>
+                                    <td class="small">
+                                        {{ trim(($clinic->city ?? '').($clinic->city && $clinic->pincode ? ', ' : '').($clinic->pincode ?? '')) ?: '—' }}
+                                    </td>
+                                    <td>
+                                        <span class="badge text-bg-light text-uppercase">{{ $clinic->status ?: '—' }}</span>
+                                    </td>
+                                    <td class="text-end fw-semibold">{{ number_format($clinic->user_count) }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4">No clinic/user links found.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <section class="card border-0 shadow-sm">
             <div class="card-body">
                 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">

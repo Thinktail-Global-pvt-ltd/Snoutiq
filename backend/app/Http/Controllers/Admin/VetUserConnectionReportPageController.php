@@ -22,6 +22,7 @@ class VetUserConnectionReportPageController extends Controller
         ];
 
         $connections = collect();
+        $clinicCounts = collect();
 
         if ($hasUsersLastVet && $hasVetTable) {
             $baseQuery = DB::table('users as u')
@@ -30,6 +31,19 @@ class VetUserConnectionReportPageController extends Controller
             $metrics['total_connections'] = (clone $baseQuery)->count();
             $metrics['unique_users'] = (clone $baseQuery)->distinct('u.id')->count('u.id');
             $metrics['unique_vets'] = (clone $baseQuery)->distinct('v.id')->count('v.id');
+
+            $clinicCounts = (clone $baseQuery)
+                ->select([
+                    'v.id',
+                    'v.name',
+                    'v.city',
+                    'v.pincode',
+                    'v.status',
+                    DB::raw('COUNT(DISTINCT u.id) as user_count'),
+                ])
+                ->groupBy('v.id', 'v.name', 'v.city', 'v.pincode', 'v.status')
+                ->orderByDesc('user_count')
+                ->get();
 
             $connections = (clone $baseQuery)
                 ->select([
@@ -52,6 +66,7 @@ class VetUserConnectionReportPageController extends Controller
         return view('admin.vet-user-connections', [
             'metrics' => $metrics,
             'connections' => $connections,
+            'clinicCounts' => $clinicCounts,
             'hasUsersLastVet' => $hasUsersLastVet,
             'hasVetTable' => $hasVetTable,
             'isPublic' => (bool) $request->query('public', true),

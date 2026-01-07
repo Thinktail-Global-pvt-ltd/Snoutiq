@@ -42,6 +42,7 @@ use App\Http\Controllers\S3RecordingController;
 use App\Http\Controllers\MarketingNotificationController;
 use App\Http\Controllers\Dev\NotificationPlaygroundController;
 use App\Http\Controllers\VetcompassDiseaseSearchController;
+use App\Http\Controllers\Admin\VetPetConnectionsPageController;
 use App\Models\LegacyQrRedirect;
 use App\Services\OnboardingProgressService;
 use App\Http\Controllers\Api\CsvUploadController;
@@ -102,6 +103,12 @@ Route::get('/vet-registration-report', VetRegistrationReportPageController::clas
 // Public view for user/vet connections report (no admin auth)
 Route::get('/vet-user-connections', VetUserConnectionReportPageController::class)
     ->name('vet-user-connections.public');
+// Public view for pets grouped by clinic
+Route::get('/vet-pet-connections', [VetPetConnectionsPageController::class, 'index'])
+    ->name('vet-pet-connections.public');
+Route::get('/vet-pet-connections/{vet}', [VetPetConnectionsPageController::class, 'details'])
+    ->whereNumber('vet')
+    ->name('vet-pet-connections.details');
 
 Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
     Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
