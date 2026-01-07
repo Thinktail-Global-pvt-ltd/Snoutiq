@@ -79,7 +79,7 @@
                     @endforelse
                 </div>
                 <div class="mt-3">
-                    {{ $petParents->links() }}
+                    {{ $petParents->onEachSide(1)->links('pagination::bootstrap-5') }}
                 </div>
             </div>
         </div>
