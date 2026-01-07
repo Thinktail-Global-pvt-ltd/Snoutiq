@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class PetOverviewController extends Controller
 {
@@ -34,9 +35,11 @@ class PetOverviewController extends Controller
             'state'        => $pet->health_state ?? null,
             'next_consult' => $prescriptions['next_follow_up'] ?? null,
             'protocol'     => $prescriptions['protocol'] ?? null,
+            'diagnosis'    => $prescriptions['latest_diagnosis'] ?? null,
         ];
 
         $careRoadmap = $vaccinations['care_roadmap'] ?? [];
+        $medications = $this->buildMedications($prescriptions);
 
         return response()->json([
             'success' => true,
@@ -52,6 +55,7 @@ class PetOverviewController extends Controller
                     'ai_summary' => $pet->ai_summary,
                     'reported_symptom' => $pet->reported_symptom,
                     'suggested_disease' => $pet->suggested_disease,
+                    'image' => $pet->pet_doc1 ?? $pet->pet_doc2 ?? null,
                 ],
                 'owner' => $owner ? [
                     'id' => $owner->id,
@@ -61,10 +65,17 @@ class PetOverviewController extends Controller
                 ] : null,
                 'clinical_roadmap' => $clinicalRoadmap,
                 'health_signals' => $healthSignals,
+                'health_signals_icons' => [
+                    'eating' => $healthSignals['appetite'],
+                    'activity' => null,
+                    'digestion' => null,
+                    'behavior' => $healthSignals['mood'],
+                ],
                 'latest_observation' => $observation,
                 'prescriptions' => $prescriptions['items'],
-                'medications' => $prescriptions['medications'],
+                'medications' => $medications,
                 'care_roadmap' => $careRoadmap,
+                'observation_note' => $observation['notes'] ?? null,
                 'knowledge_hub' => $this->knowledgeHubSuggestions($pet),
             ],
         ]);
@@ -83,6 +94,8 @@ class PetOverviewController extends Controller
                 'user_id',
                 'pet_id',
                 'diagnosis',
+                'disease_name',
+                'medications_json',
                 'diagnosis_status',
                 'treatment_plan',
                 'home_care',
@@ -108,9 +121,23 @@ class PetOverviewController extends Controller
 
         $nextFollowUp = $items->first()?->follow_up_date;
         $protocol     = $items->first()?->treatment_plan;
+        $latestDiagnosis = $items->first()?->diagnosis ?? $items->first()?->disease_name;
 
         $medications = [];
         foreach ($items as $p) {
+            $medJson = $p->medications_json ? json_decode($p->medications_json, true) : null;
+            if (is_array($medJson) && $medJson) {
+                foreach ($medJson as $med) {
+                    $medications[] = [
+                        'title' => $med['name'] ?? 'Medication',
+                        'details' => Str::of(($med['dose'] ?? ''))->append(' ', ($med['frequency'] ?? ''), ' ', ($med['duration'] ?? ''))->trim()->value(),
+                        'route' => $med['route'] ?? '',
+                        'notes' => $med['notes'] ?? '',
+                        'prescription_id' => $p->id,
+                    ];
+                }
+            }
+
             if (!empty($p->treatment_plan)) {
                 $medications[] = [
                     'title' => 'Treatment plan',
@@ -132,6 +159,7 @@ class PetOverviewController extends Controller
             'medications' => $medications,
             'next_follow_up' => $nextFollowUp,
             'protocol' => $protocol,
+            'latest_diagnosis' => $latestDiagnosis,
         ];
     }
 
@@ -232,5 +260,24 @@ class PetOverviewController extends Controller
                 'duration' => '6 min read',
             ],
         ];
+    }
+
+    private function buildMedications(array $prescriptions): array
+    {
+        if (!empty($prescriptions['medications'])) {
+            return $prescriptions['medications'];
+        }
+        $items = $prescriptions['items'] ?? [];
+        $meds = [];
+        foreach ($items as $p) {
+            if (!empty($p->treatment_plan)) {
+                $meds[] = [
+                    'title' => 'Treatment plan',
+                    'details' => $p->treatment_plan,
+                    'prescription_id' => $p->id,
+                ];
+            }
+        }
+        return $meds;
     }
 }
