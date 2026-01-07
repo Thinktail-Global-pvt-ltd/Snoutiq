@@ -28,7 +28,10 @@ class Prescription extends Model
         'exam_notes',
         'diagnosis',
         'diagnosis_status',
+        'disease_name',
+        'is_chronic',
         'treatment_plan',
+        'medications_json',
         'home_care',
         'follow_up_date',
         'follow_up_type',
@@ -43,6 +46,8 @@ class Prescription extends Model
         'weight' => 'float',
         'heart_rate' => 'float',
         'follow_up_date' => 'date',
+        'is_chronic' => 'boolean',
+        'medications_json' => 'array',
     ];
 
     public function doctor(): BelongsTo
