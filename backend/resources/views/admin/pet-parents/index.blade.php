@@ -200,6 +200,7 @@
                                     </div>
                                     <div class="text-muted small">{{ $pet->type ?? 'Pet' }} · {{ $pet->breed ?? 'Breed n/a' }}</div>
                                     <div class="small mt-1">Gender: {{ $pet->gender ?? 'n/a' }}</div>
+                                    <div class="small text-muted">State: {{ $pet->health_state ?? '—' }}</div>
                                     <div class="small text-muted">Added {{ optional($pet->created_at)->format('d M Y') ?? '—' }}</div>
                                 </div>
                             </div>
@@ -215,6 +216,7 @@
                                     </div>
                                     <div class="text-muted small">{{ $pet->breed ?? 'Breed n/a' }} · {{ $pet->pet_age ? $pet->pet_age.'y' : 'Age n/a' }}</div>
                                     <div class="small">Gender: {{ $pet->pet_gender ?? 'n/a' }}</div>
+                                    <div class="small text-muted">State: {{ $pet->health_state ?? '—' }}</div>
                                     <div class="small text-muted">Added {{ optional($pet->created_at)->format('d M Y') ?? '—' }}</div>
                                 </div>
                             </div>
