@@ -227,6 +227,10 @@ class AdminController extends Controller
                 'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, microchip_number, mcd_registration_number, weight, is_neutered, pet_doc1, pet_doc2, created_at, updated_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                  ON DUPLICATE KEY UPDATE
+                  name = VALUES(name),
+                  breed = VALUES(breed),
+                  pet_age = VALUES(pet_age),
+                  pet_gender = VALUES(pet_gender),
                   microchip_number = COALESCE(VALUES(microchip_number), microchip_number),
                   mcd_registration_number = COALESCE(VALUES(mcd_registration_number), mcd_registration_number),
                   weight = COALESCE(VALUES(weight), weight),
@@ -262,7 +266,7 @@ class AdminController extends Controller
     // update pet
     public function updatePet(Request $request, $petId)
     {
-        $scalarCols = ['name','breed','pet_age','pet_gender','microchip_number','mcd_registration_number'];
+        $scalarCols = ['name','breed','pet_age','pet_gender','microchip_number','mcd_registration_number','weight'];
         $sets = [];
         $params = [];
         foreach ($scalarCols as $c) {
