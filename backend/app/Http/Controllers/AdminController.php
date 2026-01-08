@@ -166,7 +166,7 @@ class AdminController extends Controller
      * ADD PET:
      * 1) migrate legacy pet fields from users → pets ONCE (idempotent via UNIQUE key)
      * 2) insert requested pet with ON DUPLICATE KEY UPDATE (no duplicates)
-     * Body: { name, breed, pet_age, pet_gender, pet_doc1?, pet_doc2? }
+     * Body: { name, breed, pet_age, pet_gender, weight?, pet_doc1?, pet_doc2? }
      */
     public function addPet(Request $request, $userId)
     {
@@ -182,6 +182,7 @@ class AdminController extends Controller
         $pet_gender = $request->input('pet_gender');
         $microchipNumber = $request->input('microchip_number');
         $mcdRegistration = $request->input('mcd_registration_number');
+        $weight = $request->filled('weight') ? (float)$request->input('weight') : null;
 
         try {
             $isNeutered = $this->normalizeNeuteredFlag($request->input('is_neutered'));
@@ -203,6 +204,7 @@ class AdminController extends Controller
             $pet_gender,
             $microchipNumber,
             $mcdRegistration,
+            $weight,
             $isNeutered,
             $pet_doc1,
             $pet_doc2
@@ -222,11 +224,12 @@ class AdminController extends Controller
 
             // (2) insert the new pet (idempotent)
             DB::statement(
-                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, microchip_number, mcd_registration_number, is_neutered, pet_doc1, pet_doc2, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, microchip_number, mcd_registration_number, weight, is_neutered, pet_doc1, pet_doc2, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                  ON DUPLICATE KEY UPDATE
                   microchip_number = COALESCE(VALUES(microchip_number), microchip_number),
                   mcd_registration_number = COALESCE(VALUES(mcd_registration_number), mcd_registration_number),
+                  weight = COALESCE(VALUES(weight), weight),
                   is_neutered = COALESCE(VALUES(is_neutered), is_neutered),
                    pet_doc1 = COALESCE(VALUES(pet_doc1), pet_doc1),
                    pet_doc2 = COALESCE(VALUES(pet_doc2), pet_doc2),
@@ -239,6 +242,7 @@ class AdminController extends Controller
                     $pet_gender,
                     $microchipNumber,
                     $mcdRegistration,
+                    $weight,
                     $isNeutered,
                     $pet_doc1,
                     $pet_doc2,
