@@ -313,9 +313,16 @@ class ReceptionistBookingController extends Controller
                 'a.appointment_time',
                 'a.status',
                 'a.doctor_id',
+                'a.notes',
                 DB::raw('COALESCE(d.doctor_name, "") as doctor_name')
             )
             ->get();
+
+        $rows = $rows->map(function ($row) {
+            $row->patient_id = $this->extractPatientId($row->notes ?? null);
+            unset($row->notes);
+            return $row;
+        });
 
         return response()->json([
             'success' => true,
@@ -323,6 +330,30 @@ class ReceptionistBookingController extends Controller
             'count' => $rows->count(),
             'appointments' => $rows,
         ]);
+    }
+
+    private function extractPatientId(?string $notes): ?int
+    {
+        if (!$notes) {
+            return null;
+        }
+
+        $decoded = json_decode($notes, true);
+        if (is_array($decoded)) {
+            foreach (['patient_user_id', 'patient_id', 'user_id'] as $key) {
+                if (isset($decoded[$key]) && is_numeric($decoded[$key])) {
+                    $value = (int) $decoded[$key];
+                    return $value > 0 ? $value : null;
+                }
+            }
+        }
+
+        if (preg_match('/patient[_-]?id\\s*[:=]\\s*(\\d+)/i', $notes, $m)) {
+            $value = (int) $m[1];
+            return $value > 0 ? $value : null;
+        }
+
+        return null;
     }
 
     public function storePatient(Request $request)
