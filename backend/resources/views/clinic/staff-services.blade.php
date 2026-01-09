@@ -99,6 +99,80 @@
     color: #334155;
   }
 
+  .preset-grid {
+    display: grid;
+    gap: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  .preset-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--ops-line);
+    background: #f8fafc;
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .preset-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .preset-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .preset-after {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #4b5563;
+    white-space: nowrap;
+  }
+
+  .preset-after input {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--ops-blue);
+  }
+
+  .preset-name input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--ops-blue);
+  }
+
+  .preset-price {
+    width: 120px;
+    min-width: 110px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .preset-price:disabled {
+    background: #f3f4f6;
+    color: #9ca3af;
+  }
+
   .ops-hero-meta {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -713,20 +787,22 @@
 
     <form id="create-form" class="space-y-4">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-semibold mb-1">Service Name</label>
-          <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-semibold mb-1">Services Offered</label>
+          <div id="service-presets" class="preset-grid bg-gray-50 rounded-lg p-2"></div>
+          <div id="service-presets-empty" class="text-xs text-gray-500 mt-2">Loading services...</div>
+          <p class="text-xs text-gray-500 mt-2">Select services and add price for each. Use the base price to auto-fill.</p>
         </div>
-        <div data-price-wrapper>
-          <label class="block text-sm font-semibold mb-1">Price (₹)</label>
-          <input name="price" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" required>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-semibold mb-1">Other Service (optional)</label>
+          <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Physiotherapy">
+          <p class="text-xs text-gray-500 mt-1">Separate multiple custom services with commas. Prices show below.</p>
+          <div id="custom-service-list" class="preset-grid mt-3 hidden"></div>
         </div>
-        <div class="flex items-start gap-2 pt-1">
-          <input id="create-price-after" name="price_after_service" type="checkbox" class="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded">
-          <label for="create-price-after" class="text-sm font-semibold text-gray-700">
-            Price after service
-            <span class="block text-xs font-normal text-gray-500">Hide price field and collect payment after service.</span>
-          </label>
+        <div data-price-wrapper class="md:col-span-2">
+          <label class="block text-sm font-semibold mb-1">Base Price (₹)</label>
+          <input name="price_all" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="Apply to empty prices">
+          <p class="text-xs text-gray-500 mt-1">Auto-fills empty price fields so you can adjust only differences.</p>
         </div>
         @unless($isOnboarding)
           <div>
@@ -1005,6 +1081,8 @@
     show:   (id) => `${CONFIG.API_BASE}/groomer/service/${id}${targetQuery()}`,
     update: (id) => `${CONFIG.API_BASE}/groomer/service/${id}/update${targetQuery()}`,
     delete: (id) => `${CONFIG.API_BASE}/groomer/service/${id}${targetQuery()}`,
+    presetsList: () => `${CONFIG.API_BASE}/clinic-service-presets${targetQuery()}`,
+    presetsCreate: `${CONFIG.API_BASE}/clinic-service-presets`,
   };
 
   function hasTarget(){
@@ -1138,6 +1216,23 @@
   const createForm  = document.getElementById('create-form');
   const editModal   = $('#edit-modal');
   const editForm    = document.getElementById('edit-form');
+  const presetGrid = document.getElementById('service-presets');
+  const presetEmpty = document.getElementById('service-presets-empty');
+  const customServiceList = document.getElementById('custom-service-list');
+  const presetOtherInput = createForm?.elements['serviceName'] ?? null;
+  const priceAllInput = createForm?.elements['price_all'] ?? null;
+  const GENERIC_SERVICE_PRESETS = [
+    'Preventive Care',
+    'Dental Care',
+    'Surgery',
+    'Emergency Care',
+    'Diagnostics',
+    'Boarding & Grooming',
+  ];
+  let customServicePresets = [];
+  let presetOptions = [];
+  const customPriceMap = new Map();
+  const customAfterMap = new Map();
   let applyCreatePriceState = () => {};
   let applyEditPriceState = () => {};
   const open = el => el.classList.remove('hidden');
@@ -1145,6 +1240,7 @@
   const resetCreateForm = () => {
     if (!createForm) return;
     createForm.reset();
+    resetPresetSelection();
     // Force selects to blank/default so data doesn't stick between opens
     ['petType','main_service','status'].forEach(name=>{
       const field = createForm.elements[name];
@@ -1156,17 +1252,416 @@
   const closeCreate = () => { resetCreateForm(); close(createModal); };
   function esc(s){ return (''+(s??'')).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 
+  const normalizePresetName = (name) => (name || '').trim().toLowerCase();
+
+  const parseCustomNames = () => {
+    const raw = (presetOtherInput?.value || '').trim();
+    if (!raw) return [];
+    const parts = raw.split(',');
+    const names = [];
+    const seen = new Set();
+    for (const part of parts) {
+      const name = part.trim();
+      if (!name) continue;
+      const key = normalizePresetName(name);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      names.push(name);
+    }
+    return names;
+  };
+
+  const normalizePrice = (value) => {
+    if (value === null || value === undefined) return null;
+    const raw = String(value).trim();
+    if (raw === '') return null;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  function applyPriceAllToEmpty() {
+    if (!priceAllInput) return;
+    const val = normalizePrice(priceAllInput.value);
+    if (val === null || val < 0) return;
+    const inputs = [];
+    if (presetGrid) {
+      inputs.push(...presetGrid.querySelectorAll('.preset-price'));
+    }
+    if (customServiceList) {
+      inputs.push(...customServiceList.querySelectorAll('.custom-price'));
+    }
+    inputs.forEach((input) => {
+      if (input.disabled) return;
+      if (String(input.value || '').trim() !== '') return;
+      input.value = String(val);
+      if (input.classList.contains('custom-price')) {
+        const key = normalizePresetName(input.dataset.serviceName);
+        if (key) {
+          customPriceMap.set(key, input.value);
+        }
+      }
+    });
+  }
+
+  function syncPriceInputs() {
+    if (presetGrid) {
+      presetGrid.querySelectorAll('.preset-item').forEach((row) => {
+        const checkbox = row.querySelector('input[name="service_presets"]');
+        const priceInput = row.querySelector('.preset-price');
+        const afterInput = row.querySelector('.preset-after-input');
+        const selected = !!checkbox?.checked;
+        if (afterInput) {
+          if (!selected && afterInput.checked) {
+            afterInput.checked = false;
+          }
+          afterInput.disabled = !selected;
+        }
+        const afterChecked = !!afterInput?.checked;
+        if (!priceInput) return;
+        priceInput.disabled = !selected || afterChecked;
+        priceInput.classList.toggle('hidden', afterChecked);
+      });
+    }
+    if (customServiceList) {
+      customServiceList.querySelectorAll('.preset-item').forEach((row) => {
+        const priceInput = row.querySelector('.custom-price');
+        const afterInput = row.querySelector('.preset-after-input');
+        const afterChecked = !!afterInput?.checked;
+        if (!priceInput) return;
+        priceInput.disabled = afterChecked;
+        priceInput.classList.toggle('hidden', afterChecked);
+      });
+    }
+  }
+
+  function buildPresetOptions() {
+    const seen = new Set();
+    const options = [];
+    const add = (value) => {
+      const trimmed = (value || '').trim();
+      if (!trimmed) return;
+      const key = normalizePresetName(trimmed);
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push(trimmed);
+    };
+    GENERIC_SERVICE_PRESETS.forEach(add);
+    const customNames = customServicePresets
+      .map((item) => (typeof item === 'string' ? item : item?.name))
+      .filter(Boolean)
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+    customNames.forEach(add);
+    return options;
+  }
+
+  function renderServicePresets() {
+    if (!presetGrid) return;
+    presetOptions = buildPresetOptions();
+    presetGrid.innerHTML = '';
+
+    if (!presetOptions.length) {
+      if (presetEmpty) {
+        presetEmpty.textContent = 'No services available yet.';
+        presetEmpty.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (presetEmpty) presetEmpty.classList.add('hidden');
+    for (const name of presetOptions) {
+      const row = document.createElement('div');
+      row.className = 'preset-item';
+
+      const nameLabel = document.createElement('label');
+      nameLabel.className = 'preset-name';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.name = 'service_presets';
+      checkbox.value = name;
+      const text = document.createElement('span');
+      text.textContent = name;
+      nameLabel.appendChild(checkbox);
+      nameLabel.appendChild(text);
+
+      const actions = document.createElement('span');
+      actions.className = 'preset-actions';
+      const priceInput = document.createElement('input');
+      priceInput.type = 'number';
+      priceInput.min = '0';
+      priceInput.step = '0.01';
+      priceInput.placeholder = 'Price (₹)';
+      priceInput.className = 'preset-price';
+      priceInput.disabled = true;
+      priceInput.dataset.serviceName = name;
+
+      const afterLabel = document.createElement('label');
+      afterLabel.className = 'preset-after';
+      const afterInput = document.createElement('input');
+      afterInput.type = 'checkbox';
+      afterInput.className = 'preset-after-input';
+      afterInput.disabled = true;
+      const afterText = document.createElement('span');
+      afterText.textContent = 'Price after service';
+      afterLabel.appendChild(afterInput);
+      afterLabel.appendChild(afterText);
+
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          applyPriceAllToEmpty();
+        }
+        syncPriceInputs();
+      });
+
+      afterInput.addEventListener('change', () => {
+        syncPriceInputs();
+        if (!afterInput.checked) {
+          applyPriceAllToEmpty();
+        }
+      });
+
+      actions.appendChild(priceInput);
+      actions.appendChild(afterLabel);
+      row.appendChild(nameLabel);
+      row.appendChild(actions);
+      presetGrid.appendChild(row);
+    }
+    syncPriceInputs();
+  }
+
+  function renderCustomServiceRows() {
+    if (!customServiceList) return;
+    const names = parseCustomNames();
+    const keys = new Set(names.map(normalizePresetName));
+    for (const key of Array.from(customPriceMap.keys())) {
+      if (!keys.has(key)) {
+        customPriceMap.delete(key);
+      }
+    }
+    for (const key of Array.from(customAfterMap.keys())) {
+      if (!keys.has(key)) {
+        customAfterMap.delete(key);
+      }
+    }
+
+    customServiceList.innerHTML = '';
+    if (!names.length) {
+      customServiceList.classList.add('hidden');
+      return;
+    }
+
+    customServiceList.classList.remove('hidden');
+    for (const name of names) {
+      if (isKnownPreset(name)) {
+        if (presetGrid) {
+          const match = Array.from(presetGrid.querySelectorAll('input[name="service_presets"]'))
+            .find((node) => normalizePresetName(node.value) === normalizePresetName(name));
+          if (match && !match.checked) {
+            match.checked = true;
+            syncPriceInputs();
+            applyPriceAllToEmpty();
+          }
+        }
+        continue;
+      }
+
+      const key = normalizePresetName(name);
+      const row = document.createElement('div');
+      row.className = 'preset-item';
+      row.dataset.serviceName = name;
+
+      const label = document.createElement('span');
+      label.className = 'preset-name';
+      label.textContent = name;
+
+      const actions = document.createElement('span');
+      actions.className = 'preset-actions';
+      const priceInput = document.createElement('input');
+      priceInput.type = 'number';
+      priceInput.min = '0';
+      priceInput.step = '0.01';
+      priceInput.placeholder = 'Price (₹)';
+      priceInput.className = 'preset-price custom-price';
+      priceInput.dataset.serviceName = name;
+      priceInput.value = customPriceMap.get(key) ?? '';
+      priceInput.addEventListener('input', () => {
+        customPriceMap.set(key, priceInput.value);
+      });
+
+      const afterLabel = document.createElement('label');
+      afterLabel.className = 'preset-after';
+      const afterInput = document.createElement('input');
+      afterInput.type = 'checkbox';
+      afterInput.className = 'preset-after-input';
+      afterInput.checked = customAfterMap.get(key) === true;
+      const afterText = document.createElement('span');
+      afterText.textContent = 'Price after service';
+      afterLabel.appendChild(afterInput);
+      afterLabel.appendChild(afterText);
+
+      afterInput.addEventListener('change', () => {
+        customAfterMap.set(key, afterInput.checked);
+        syncPriceInputs();
+        if (!afterInput.checked) {
+          applyPriceAllToEmpty();
+        }
+      });
+
+      actions.appendChild(priceInput);
+      actions.appendChild(afterLabel);
+      row.appendChild(label);
+      row.appendChild(actions);
+      customServiceList.appendChild(row);
+    }
+    syncPriceInputs();
+    applyPriceAllToEmpty();
+  }
+
+  if (presetOtherInput) {
+    presetOtherInput.addEventListener('input', renderCustomServiceRows);
+  }
+
+  if (priceAllInput) {
+    priceAllInput.addEventListener('change', applyPriceAllToEmpty);
+    priceAllInput.addEventListener('blur', applyPriceAllToEmpty);
+  }
+
+  function getSelectedPresetEntries() {
+    if (!presetGrid) return [];
+    const checked = presetGrid.querySelectorAll('input[name="service_presets"]:checked');
+    return Array.from(checked)
+      .map((node) => {
+        const row = node.closest('.preset-item');
+        const priceInput = row?.querySelector('.preset-price');
+        const afterInput = row?.querySelector('.preset-after-input');
+        return {
+          name: (node.value || '').trim(),
+          priceRaw: priceInput?.value ?? '',
+          afterService: !!afterInput?.checked,
+        };
+      })
+      .filter((entry) => entry.name);
+  }
+
+  function getCustomServiceEntries() {
+    if (!customServiceList) return [];
+    return Array.from(customServiceList.querySelectorAll('[data-service-name]'))
+      .map((row) => {
+        const name = (row.dataset.serviceName || '').trim();
+        const priceInput = row.querySelector('.custom-price');
+        const afterInput = row.querySelector('.preset-after-input');
+        return {
+          name,
+          priceRaw: priceInput?.value ?? '',
+          afterService: !!afterInput?.checked,
+        };
+      })
+      .filter((entry) => entry.name);
+  }
+
+  function isKnownPreset(name) {
+    const key = normalizePresetName(name);
+    return presetOptions.some((option) => normalizePresetName(option) === key);
+  }
+
+  async function fetchServicePresets() {
+    if (!presetGrid) return;
+    if (presetEmpty) {
+      presetEmpty.textContent = 'Loading services...';
+      presetEmpty.classList.remove('hidden');
+    }
+
+    if (!hasTarget()) {
+      customServicePresets = [];
+      renderServicePresets();
+      renderCustomServiceRows();
+      return;
+    }
+
+    try {
+      await Auth.bootstrap();
+      const res = await apiFetch(API.presetsList(), {
+        headers: Auth.headers(),
+      });
+      const items = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      customServicePresets = items;
+    } catch (err) {
+      customServicePresets = [];
+      ClientLog?.error('services.presets.load.failed', err.message || String(err));
+    }
+
+    renderServicePresets();
+    renderCustomServiceRows();
+  }
+
+  function resetPresetSelection() {
+    if (presetGrid) {
+      presetGrid.querySelectorAll('input[name="service_presets"]').forEach((input) => {
+        input.checked = false;
+      });
+      presetGrid.querySelectorAll('.preset-price').forEach((input) => {
+        input.value = '';
+        input.disabled = true;
+        input.classList.remove('hidden');
+      });
+      presetGrid.querySelectorAll('.preset-after-input').forEach((input) => {
+        input.checked = false;
+        input.disabled = true;
+      });
+    }
+    if (priceAllInput) priceAllInput.value = '';
+    if (presetOtherInput) presetOtherInput.value = '';
+    customPriceMap.clear();
+    customAfterMap.clear();
+    if (customServiceList) {
+      customServiceList.innerHTML = '';
+      customServiceList.classList.add('hidden');
+    }
+  }
+
+  async function saveCustomPresets(names, headers, opts = {}) {
+    if (!names.length) return [];
+    const saved = [];
+    for (const name of names) {
+      const payload = new FormData();
+      payload.append('name', name);
+      appendTarget(payload);
+      try {
+        const res = await apiFetch(API.presetsCreate, {
+          method: 'POST',
+          headers,
+          body: payload,
+        });
+        const created = res?.data?.name || name;
+        saved.push(created);
+      } catch (err) {
+        ClientLog?.error('services.presets.create.failed', err.message || String(err));
+      }
+    }
+    if (saved.length && !opts.silent) {
+      customServicePresets = customServicePresets.concat(saved.map((name) => ({ name })));
+      renderServicePresets();
+      renderCustomServiceRows();
+    }
+    return saved;
+  }
+
   function initPriceToggle(form){
     if (!form) return () => {};
     const checkbox = form.elements['price_after_service'];
     const priceWrapper = form.querySelector('[data-price-wrapper]');
     const priceInput = form.elements['price'];
+    const helperInput = form.elements['price_all'];
     const update = () => {
       const after = !!checkbox?.checked;
       priceWrapper?.classList.toggle('hidden', after);
       if (priceInput) {
         priceInput.required = !after;
         if (after) priceInput.value = '';
+      }
+      if (helperInput && after) {
+        helperInput.value = '';
       }
     };
     checkbox?.addEventListener('change', update);
@@ -1337,56 +1832,160 @@
     const fd = new FormData(e.target);
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalBtnText = submitBtn?.textContent;
+    const restoreSubmit = () => {
+      if (submitBtn){
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText || 'Create';
+      }
+    };
     if (submitBtn){
       submitBtn.disabled = true;
       submitBtn.textContent = 'Creating...';
     }
 
-    const priceAfter = !!e.target.elements['price_after_service']?.checked;
-    const rawPrice = fd.get('price');
-    const priceVal = rawPrice === null || rawPrice === '' ? null : Number(rawPrice);
-    if (!priceAfter){
-      if (!Number.isFinite(priceVal)){
-        Swal.fire({icon:'warning', title:'Enter a valid price or choose “price after service”.', timer:1800, showConfirmButton:false});
-        return;
-      }
-      if (priceVal < 0){
-        Swal.fire({icon:'warning', title:'Price must be zero or more', timer:1500, showConfirmButton:false});
-        return;
-      }
+    const selectedEntries = getSelectedPresetEntries();
+    const customEntries = getCustomServiceEntries();
+    const combinedEntries = selectedEntries.concat(customEntries);
+
+    if (!combinedEntries.length){
+      Swal.fire({icon:'warning', title:'Select at least one service or add a custom one.', timer:1800, showConfirmButton:false});
+      restoreSubmit();
+      return;
     }
 
-    const payload = new FormData();
-    payload.append('serviceName',  fd.get('serviceName'));
-    payload.append('description',  fd.get('description') || '');
-    payload.append('petType',      fd.get('petType'));
-    payload.append('price_after_service', priceAfter ? '1' : '0');
-    if (priceAfter){
-      payload.append('price',     '');
-      payload.append('price_min', '');
-      payload.append('price_max', '');
-    } else {
-      payload.append('price',     priceVal);
-      payload.append('price_min', priceVal);
-      payload.append('price_max', priceVal);
+    const entryMap = new Map();
+    for (const entry of combinedEntries) {
+      const key = normalizePresetName(entry.name);
+      if (!key || entryMap.has(key)) continue;
+      entryMap.set(key, entry);
     }
-    payload.append('duration',     fd.get('duration'));
-    payload.append('main_service', fd.get('main_service'));
-    payload.append('status',       fd.get('status'));
-    // ✅ send user_id from frontend (or vet_slug when available)
-    appendTarget(payload);
+    const uniqueEntries = Array.from(entryMap.values());
+
+    const missing = [];
+    const invalid = [];
+    uniqueEntries.forEach((entry) => {
+      if (entry.afterService) {
+        entry.price = null;
+        return;
+      }
+      const parsed = normalizePrice(entry.priceRaw);
+      if (parsed === null) {
+        missing.push(entry.name);
+        return;
+      }
+      if (parsed < 0 || !Number.isFinite(parsed)) {
+        invalid.push(entry.name);
+        return;
+      }
+      entry.price = parsed;
+    });
+    if (missing.length || invalid.length) {
+      const parts = [];
+      if (missing.length) parts.push(`Missing price: ${missing.join(', ')}`);
+      if (invalid.length) parts.push(`Invalid price: ${invalid.join(', ')}`);
+      Swal.fire({icon:'warning', title:'Add prices for selected services', text: parts.join('. ')});
+      restoreSubmit();
+      return;
+    }
+
+    const existingNames = new Set(ALL.map((item) => normalizePresetName(item?.name)));
+    const entriesToCreate = uniqueEntries.filter((entry) => !existingNames.has(normalizePresetName(entry.name)));
+    if (!entriesToCreate.length){
+      Swal.fire({icon:'info', title:'All selected services already exist.', timer:1800, showConfirmButton:false});
+      restoreSubmit();
+      return;
+    }
+
+    const buildPayload = (entry) => {
+      const payload = new FormData();
+      payload.append('serviceName', entry.name);
+      payload.append('description', fd.get('description') || '');
+      payload.append('petType', fd.get('petType'));
+      payload.append('price_after_service', entry.afterService ? '1' : '0');
+      if (entry.afterService){
+        payload.append('price', '');
+        payload.append('price_min', '');
+        payload.append('price_max', '');
+      } else {
+        payload.append('price', entry.price);
+        payload.append('price_min', entry.price);
+        payload.append('price_max', entry.price);
+      }
+      payload.append('duration', fd.get('duration'));
+      payload.append('main_service', fd.get('main_service'));
+      payload.append('status', fd.get('status'));
+      appendTarget(payload);
+      return payload;
+    };
 
     try{
       await Auth.bootstrap();
-      const res = await apiFetch(API.create, {
-        method:'POST',
-        headers: Auth.headers(),
-        body: payload
-      });
-      Swal.fire({icon:'success', title:'Service Created', text:'Service was created successfully', timer:1500, showConfirmButton:false});
+      const headers = Auth.headers();
+      const presetNameSet = new Set();
+      const newPresetNames = customEntries
+        .map((entry) => entry.name)
+        .filter((name) => {
+          const key = normalizePresetName(name);
+          if (!key || presetNameSet.has(key) || isKnownPreset(name)) return false;
+          presetNameSet.add(key);
+          return true;
+        });
+      if (newPresetNames.length) {
+        await saveCustomPresets(newPresetNames, headers, { silent: true });
+      }
+
+      const results = [];
+      for (const entry of entriesToCreate) {
+        try {
+          const res = await apiFetch(API.create, {
+            method:'POST',
+            headers,
+            body: buildPayload(entry)
+          });
+          results.push({ name: entry.name, ok: true, res });
+        } catch (err) {
+          results.push({ name: entry.name, ok: false, err });
+        }
+      }
+
+      const successCount = results.filter((r) => r.ok).length;
+      const failed = results.filter((r) => !r.ok);
+      const total = results.length;
+
+      if (successCount === 0) {
+        const err = failed[0]?.err || new Error('Create failed');
+        throw err;
+      }
+
+      if (failed.length === 0) {
+        Swal.fire({
+          icon:'success',
+          title: total > 1 ? 'Services Created' : 'Service Created',
+          text: total > 1 ? `${successCount} services were created successfully.` : 'Service was created successfully',
+          timer:1500,
+          showConfirmButton:false
+        });
+      } else {
+        const failedNames = failed.map((item) => item.name).join(', ');
+        Swal.fire({
+          icon:'warning',
+          title:'Some services failed',
+          text:`Created ${successCount} of ${total}. Failed: ${failedNames}`,
+        });
+        ClientLog?.error('service.create.partial_fail', JSON.stringify({
+          failed: failedNames,
+          total,
+          successCount,
+        }).slice(0, 800));
+      }
+
       closeCreate();
       await fetchServices();
-      ClientLog?.info('service.create.success', JSON.stringify(res).slice(0,800));
+      await fetchServicePresets();
+      ClientLog?.info('service.create.success', JSON.stringify({
+        total,
+        successCount,
+      }).slice(0,800));
       // If onboarding is active, move to Step 2 (Video Calling Schedule)
       try{
         const url = new URL(location.href);
@@ -1582,6 +2181,7 @@
 
   // ===== Init =====
   document.addEventListener('DOMContentLoaded', async ()=>{
+    await fetchServicePresets();
     await fetchServices();
     attachActionListeners();
   });

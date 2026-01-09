@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\SalesDashboardController;
 use App\Http\Controllers\Api\AppointmentSubmissionController;
 use App\Http\Controllers\Api\DashboardProfileController;
 use App\Http\Controllers\Api\MedicalRecordController;
+use App\Http\Controllers\Api\ClinicServicePresetController;
 use App\Http\Controllers\Api\VetRegistrationReportController;
 use App\Models\User;
 use App\Models\DeviceToken;
@@ -776,6 +777,9 @@ Route::prefix('groomer')->group(function () {
  Route::get('groomer/services', [GroomerServiceController::class, 'get']); 
 Route::post('groomer/service', [GroomerServiceController::class, 'store']);
     Route::delete('groomer/service/{id}', [GroomerServiceController::class, 'destroy']);
+
+Route::get('/clinic-service-presets', [ClinicServicePresetController::class, 'index']);
+Route::post('/clinic-service-presets', [ClinicServicePresetController::class, 'store']);
 
 Route::prefix('staff')->group(function () {
     Route::get('/', [StaffController::class, 'index']);

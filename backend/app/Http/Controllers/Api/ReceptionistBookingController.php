@@ -406,17 +406,57 @@ class ReceptionistBookingController extends Controller
 
         $pet = null;
         if (!empty($data['pet_name'])) {
-            $pet = UserPet::create([
-                'user_id' => $user->id,
+            if (!Schema::hasTable('pets')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pets table is not available.',
+                ], 500);
+            }
+
+            $userColumn = Schema::hasColumn('pets', 'user_id')
+                ? 'user_id'
+                : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+
+            if (!$userColumn) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pets table is missing user reference column.',
+                ], 500);
+            }
+
+            $petPayload = [
+                $userColumn => $user->id,
+                'name' => $data['pet_name'],
+                'breed' => $data['pet_breed'] ?? 'Unknown',
+            ];
+
+            if (Schema::hasColumn('pets', 'type')) {
+                $petPayload['type'] = $data['pet_type'] ?? 'dog';
+            } elseif (Schema::hasColumn('pets', 'pet_type')) {
+                $petPayload['pet_type'] = $data['pet_type'] ?? 'dog';
+            }
+
+            if (Schema::hasColumn('pets', 'pet_gender')) {
+                $petPayload['pet_gender'] = $data['pet_gender'] ?? 'unknown';
+            } elseif (Schema::hasColumn('pets', 'gender')) {
+                $petPayload['gender'] = $data['pet_gender'] ?? 'unknown';
+            }
+
+            $now = now();
+            if (Schema::hasColumn('pets', 'created_at')) {
+                $petPayload['created_at'] = $now;
+            }
+            if (Schema::hasColumn('pets', 'updated_at')) {
+                $petPayload['updated_at'] = $now;
+            }
+
+            $petId = DB::table('pets')->insertGetId($petPayload);
+            $pet = (object) [
+                'id' => $petId,
                 'name' => $data['pet_name'],
                 'type' => $data['pet_type'] ?? 'dog',
                 'breed' => $data['pet_breed'] ?? 'Unknown',
-                'dob' => now()->format('Y-m-d'),
-                'gender' => $data['pet_gender'] ?? 'unknown',
-                'pic_link' => null,
-                'medical_history' => '[]',
-                'vaccination_log' => '[]',
-            ]);
+            ];
         }
 
         return response()->json([
