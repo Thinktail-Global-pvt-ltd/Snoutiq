@@ -19,7 +19,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{{ $clinicName }} | SnoutIQ</title>
   <meta name="description" content="Book appointments at {{ $clinicName }}. Video consults, clinic visits, vaccinations and more."/>
-  <link rel="icon" href="{{ $snoutiqLogo }}" sizes="32x32" type="image/png"/>
+  <link rel="icon" href="{{ asset('favicon.png') }}" sizes="32x32" type="image/png"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
