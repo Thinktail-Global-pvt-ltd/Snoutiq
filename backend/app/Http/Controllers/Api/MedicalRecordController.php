@@ -55,6 +55,9 @@ class MedicalRecordController extends Controller
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
 
+        $recordFilePath = null;
+        $recordFileMime = null;
+
         $clinicId = (int) $validated['clinic_id'];
         if ((int) $record->vet_registeration_id !== $clinicId) {
             return response()->json([
@@ -97,6 +100,8 @@ class MedicalRecordController extends Controller
             $record->file_path = $storedPath;
             $record->file_name = $file->getClientOriginalName();
             $record->mime_type = $file->getClientMimeType();
+            $recordFilePath = $storedPath;
+            $recordFileMime = $record->mime_type;
         }
 
         $record->notes = $validated['notes'] ?? $record->notes;
@@ -132,6 +137,9 @@ class MedicalRecordController extends Controller
             'pet_id' => $petId ?? $prescription->pet_id,
             'medications_json' => $medsJson ?? $prescription->medications_json,
         ]);
+        if ($recordFilePath && str_starts_with((string) $recordFileMime, 'image/')) {
+            $prescription->image_path = $recordFilePath;
+        }
         $prescription->save();
 
         if ($petId) {
@@ -228,6 +236,7 @@ class MedicalRecordController extends Controller
 
         $file = $request->file('record_file');
         $storedPath = $file->store('medical-records', 'public');
+        $fileMimeType = $file->getClientMimeType();
 
         $record = MedicalRecord::create([
             'user_id' => $user->id,
@@ -264,7 +273,16 @@ class MedicalRecordController extends Controller
             'pet_id' => $petId,
             'medications_json' => $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
+        if (str_starts_with((string) $fileMimeType, 'image/')) {
+            $prescriptionPayload['image_path'] = $storedPath;
+        }
         $prescription = Prescription::create($prescriptionPayload);
+        if (!$prescription || !$prescription->exists) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Prescription could not be created',
+            ], 500);
+        }
 
         if ($petId) {
             $this->updatePetHealthState($user->id, $petId, ($validated['diagnosis_status'] ?? '') === 'chronic', $validated['disease_name'] ?? $validated['diagnosis'] ?? null);
