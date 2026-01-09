@@ -322,157 +322,6 @@
         </div>
       </section>
 
-      <!-- Services Section -->
-      <section id="services" class="section-padding bg-white">
-        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="text-center max-w-3xl mx-auto mb-16">
-            <h2 class="font-heading text-3xl md:text-4xl font-bold text-secondary-900 mb-4">Comprehensive Veterinary Services</h2>
-            <p class="text-lg text-secondary-600">From routine checkups to advanced surgical care, we provide everything your pet needs for a healthy, happy life.</p>
-          </div>
-
-          <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
-              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
-                <i class="fas fa-stethoscope text-primary-600 text-2xl"></i>
-              </div>
-              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Preventive Care</h3>
-              <p class="text-secondary-600 mb-5">Regular checkups, vaccinations, and wellness plans to keep your pet healthy and prevent diseases.</p>
-              <ul class="space-y-2 text-secondary-700">
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Annual Exams</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Vaccinations</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Parasite Prevention</span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
-              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
-                <i class="fas fa-syringe text-primary-600 text-2xl"></i>
-              </div>
-              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Dental Care</h3>
-              <p class="text-secondary-600 mb-5">Professional dental cleanings, extractions, and oral health assessments to maintain your pet&apos;s dental hygiene.</p>
-              <ul class="space-y-2 text-secondary-700">
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Teeth Cleaning</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Oral Surgery</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Preventive Education</span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
-              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
-                <i class="fas fa-clinic-medical text-primary-600 text-2xl"></i>
-              </div>
-              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Surgery</h3>
-              <p class="text-secondary-600 mb-5">State-of-the-art surgical suite for spays, neuters, soft tissue, and orthopedic procedures.</p>
-              <ul class="space-y-2 text-secondary-700">
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Spay/Neuter</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Orthopedic Surgery</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Advanced Anesthesia</span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
-              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
-                <i class="fas fa-heartbeat text-primary-600 text-2xl"></i>
-              </div>
-              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Emergency Care</h3>
-              <p class="text-secondary-600 mb-5">24/7 emergency services for urgent medical situations requiring immediate attention.</p>
-              <ul class="space-y-2 text-secondary-700">
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Critical Care</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Trauma Treatment</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Toxicology</span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
-              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
-                <i class="fas fa-microscope text-primary-600 text-2xl"></i>
-              </div>
-              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Diagnostics</h3>
-              <p class="text-secondary-600 mb-5">In-house laboratory, digital X-ray, and ultrasound for accurate and timely diagnoses.</p>
-              <ul class="space-y-2 text-secondary-700">
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Digital X-ray</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Ultrasound</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Bloodwork</span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="bg-white rounded-xl border border-secondary-100 p-6 card-hover">
-              <div class="w-14 h-14 rounded-lg bg-primary-50 flex items-center justify-center mb-6">
-                <i class="fas fa-home text-primary-600 text-2xl"></i>
-              </div>
-              <h3 class="font-heading text-xl font-bold text-secondary-900 mb-3">Boarding & Grooming</h3>
-              <p class="text-secondary-600 mb-5">Safe, comfortable boarding and professional grooming services while you&apos;re away.</p>
-              <ul class="space-y-2 text-secondary-700">
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Medical Boarding</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Professional Grooming</span>
-                </li>
-                <li class="flex items-center">
-                  <i class="fas fa-check text-primary-500 mr-3 text-sm"></i>
-                  <span>Daycare Services</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="text-center mt-12">
-            <a href="#app-download" class="inline-flex items-center text-primary-600 font-semibold hover:text-primary-700">
-              <span>Book any service through SnoutIQ App</span>
-              <i class="fas fa-arrow-right ml-2"></i>
-            </a>
-          </div>
-        </div>
-      </section>
-
       <!-- Doctor Showcase -->
       <section id="doctors" class="section-padding bg-secondary-50">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -486,8 +335,17 @@
               @foreach($doctors as $doc)
                 <div class="bg-white rounded-xl overflow-hidden card-hover">
                   <div class="h-64 bg-gradient-to-r from-primary-100 to-primary-200 flex items-center justify-center">
-                    @if(!empty($doc->doctor_image))
-                      <img src="{{ $doc->doctor_image }}" alt="{{ $doc->doctor_name ?: 'Doctor' }}" class="w-40 h-40 rounded-full object-cover border-4 border-white shadow-md">
+                    @php
+                      $doctorImageSrc = null;
+                      if (!empty($doc->doctor_image)) {
+                          $doctorImageSrc = $doc->doctor_image;
+                          if (!\Illuminate\Support\Str::startsWith($doctorImageSrc, ['http://', 'https://', 'data:image', '/'])) {
+                              $doctorImageSrc = asset($doctorImageSrc);
+                          }
+                      }
+                    @endphp
+                    @if(!empty($doctorImageSrc))
+                      <img src="{{ $doctorImageSrc }}" alt="{{ $doc->doctor_name ?: 'Doctor' }}" class="w-40 h-40 rounded-full object-cover border-4 border-white shadow-md">
                     @else
                       <div class="text-center">
                         <div class="w-40 h-40 rounded-full bg-white mx-auto mb-4 flex items-center justify-center">
