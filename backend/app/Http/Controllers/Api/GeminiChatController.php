@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use App\Models\Chat;
 use App\Models\ChatRoom;
@@ -32,6 +33,12 @@ class GeminiChatController extends Controller
             'pet_gender' => 'nullable|string',
             'vaccination' => 'nullable|array',
         ]);
+
+        $petCardPath = $this->storePetCardForAi($request);
+        if (!$petCardPath && $request->filled('pet_card_for_ai')) {
+            $petCardPath = $request->input('pet_card_for_ai');
+        }
+        $petCardUrl = $this->buildPetCardUrl($petCardPath);
 
         $petRows = DB::select('SELECT id, user_id, name, breed, pet_age, pet_gender FROM pets WHERE id = ? LIMIT 1', [$data['pet_id']]);
         if (!$petRows) {
@@ -64,7 +71,7 @@ class GeminiChatController extends Controller
         }
 
         DB::update(
-            'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, health_state = ?, dog_disease_payload = ?, updated_at = NOW() WHERE id = ?',
+            'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, health_state = ?, dog_disease_payload = ?, pet_card_for_ai = ?, updated_at = NOW() WHERE id = ?',
             [
                 $symptom,
                 $diseaseName,
@@ -78,7 +85,9 @@ class GeminiChatController extends Controller
                     'pet_age' => $data['pet_age'] ?? null,
                     'pet_gender' => $data['pet_gender'] ?? null,
                     'vaccination' => $data['vaccination'] ?? null,
+                    'pet_card_for_ai' => $petCardPath,
                 ]),
+                $petCardPath,
                 $data['pet_id'],
             ]
         );
@@ -92,6 +101,7 @@ class GeminiChatController extends Controller
                 'suggested_disease' => $diseaseName,
                 'category' => in_array($category, ['normal','chronic'], true) ? $category : 'normal',
                 'pet_profile' => $context,
+                'pet_card_for_ai' => $petCardUrl,
             ],
         ]);
     }
@@ -1338,5 +1348,40 @@ PROMPT;
             'summary'       => $summary,
             'saved'         => true,
         ]);
+    }
+
+    private function storePetCardForAi(Request $request, string $field = 'pet_card_for_ai'): ?string
+    {
+        if (!$request->hasFile($field)) {
+            return null;
+        }
+
+        $file = $request->file($field);
+        if (!$file || !$file->isValid()) {
+            return null;
+        }
+
+        $uploadPath = public_path('uploads/pet_cards');
+        if (!File::exists($uploadPath)) {
+            File::makeDirectory($uploadPath, 0777, true, true);
+        }
+
+        $fileName = time().'_'.uniqid().'_'.$file->getClientOriginalName();
+        $file->move($uploadPath, $fileName);
+
+        return 'backend/uploads/pet_cards/'.$fileName;
+    }
+
+    private function buildPetCardUrl(?string $value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        if (preg_match('/^https?:\\/\\//i', $value)) {
+            return $value;
+        }
+
+        return url($value);
     }
 }

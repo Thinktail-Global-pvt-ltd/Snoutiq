@@ -21,6 +21,7 @@ class Pet extends Model
         'is_neutered',
         'pet_doc1',
         'pet_doc2',
+        'pet_card_for_ai',
         'weight',
         'temprature',
         'vaccenated_yes_no',
