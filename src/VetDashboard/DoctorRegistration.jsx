@@ -844,19 +844,8 @@ const DoctorRegistration = () => {
       );
 
       if (res.status === 200 || res.status === 201) {
-
-        // Extract slug from backend response
-        const slug = res?.data?.data?.slug;
-
-        if (slug) {
-          // Show success message
-          toast.success(res.data.message || "Profile saved successfully!");
-
-          // Redirect to the vet profile page
-          window.location.href = `https://snoutiq.com/backend/vets/${slug}`;
-        } else {
-          toast.error("Something went wrong: slug not found");
-        }
+        toast.success(res.data.message || "Profile saved successfully!");
+        window.location.href = "https://snoutiq.com/backend/custom-doctor-login";
       }
     } catch (error) {
       const errorMessage =

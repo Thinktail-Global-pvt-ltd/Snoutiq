@@ -281,6 +281,12 @@
         </svg>
         <span class="truncate">Patient Managements</span>
       </a>
+      <a href="{{ route('receptionist.clinic-walkins') }}" class="{{ $baseItem }} {{ $active('receptionist.clinic-walkins') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"/>
+        </svg>
+        <span class="truncate">Clinic Walkins</span>
+      </a>
       <a href="{{ route('receptionist.bookings.schedule') }}" class="{{ $baseItem }} {{ $active('receptionist.bookings.schedule') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 19h14"/>
@@ -292,6 +298,19 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
         <span class="truncate">Patient History</span>
+      </a>
+      <a href="{{ route('receptionist.vaccinations') }}" class="{{ $baseItem }} {{ $active('receptionist.vaccinations') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11a5 5 0 1010 0 5 5 0 00-10 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v3m0-14v3"/>
+        </svg>
+        <span class="truncate">Vaccination Guide</span>
+      </a>
+      <a href="{{ route('receptionist.vaccination-records') }}" class="{{ $baseItem }} {{ $active('receptionist.vaccination-records') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h10"/>
+        </svg>
+        <span class="truncate">Vaccination Records</span>
       </a>
     @else
       @if($showPetMenu)
@@ -439,6 +458,13 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5V3m0 18v-2m7-7h2M3 12h2"/>
           </svg>
           <span class="truncate">Patient Managements</span>
+        </a>
+        
+        <a href="{{ route('doctor.clinic-walkins') }}" class="{{ $baseItem }} {{ $active('doctor.clinic-walkins') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"/>
+          </svg>
+          <span class="truncate">Clinic Walkins</span>
         </a>
         
         <a href="{{ route('doctor.schedule') }}" class="{{ $baseItem }} {{ $active('doctor.schedule') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">

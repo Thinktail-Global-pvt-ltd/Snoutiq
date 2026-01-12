@@ -375,6 +375,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         return view('receptionist.front-desk');
     })->name('receptionist.front-desk');
     Route::view('/receptionist/patients', 'doctor.patients')->name('receptionist.patients');
+    Route::view('/receptionist/clinic-walkins', 'doctor.clinic-walkins')->name('receptionist.clinic-walkins');
     Route::view('/receptionist/vaccinations', 'receptionist.vaccinations')->name('receptionist.vaccinations');
     Route::view('/receptionist/vaccination-records', 'receptionist.vaccination-records')->name('receptionist.vaccination-records');
     Route::get('/receptionist/bookings', function(){
@@ -410,6 +411,7 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
         return view('doctor.booking-detail', ['bookingId' => $id]);
     })->name('doctor.booking.detail');
     Route::view('/doctor/patients', 'doctor.patients')->name('doctor.patients');
+    Route::view('/doctor/clinic-walkins', 'doctor.clinic-walkins')->name('doctor.clinic-walkins');
 
     // Weekly schedule (existing, secure)
     Route::get('/doctor/schedule', function (Request $request, OnboardingProgressService $progressService) {
