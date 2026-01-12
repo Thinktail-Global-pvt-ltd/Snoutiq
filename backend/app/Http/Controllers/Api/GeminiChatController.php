@@ -30,6 +30,7 @@ class GeminiChatController extends Controller
             'pet_breed'  => 'nullable|string',
             'pet_age'    => 'nullable|string',
             'pet_gender' => 'nullable|string',
+            'vaccination' => 'nullable|array',
         ]);
 
         $petRows = DB::select('SELECT id, user_id, name, breed, pet_age, pet_gender FROM pets WHERE id = ? LIMIT 1', [$data['pet_id']]);
@@ -63,8 +64,23 @@ class GeminiChatController extends Controller
         }
 
         DB::update(
-            'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, health_state = ?, updated_at = NOW() WHERE id = ?',
-            [$symptom, $diseaseName, in_array($category, ['normal','chronic'], true) ? $category : null, $data['pet_id']]
+            'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, health_state = ?, dog_disease_payload = ?, updated_at = NOW() WHERE id = ?',
+            [
+                $symptom,
+                $diseaseName,
+                in_array($category, ['normal','chronic'], true) ? $category : null,
+                json_encode([
+                    'user_id' => $data['user_id'],
+                    'pet_id' => $data['pet_id'],
+                    'question' => $data['question'],
+                    'pet_name' => $data['pet_name'] ?? null,
+                    'pet_breed' => $data['pet_breed'] ?? null,
+                    'pet_age' => $data['pet_age'] ?? null,
+                    'pet_gender' => $data['pet_gender'] ?? null,
+                    'vaccination' => $data['vaccination'] ?? null,
+                ]),
+                $data['pet_id'],
+            ]
         );
 
         return response()->json([
