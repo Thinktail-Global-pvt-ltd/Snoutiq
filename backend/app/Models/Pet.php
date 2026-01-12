@@ -14,6 +14,8 @@ class Pet extends Model
         'pet_age',
         'pet_age_months',
         'pet_gender',
+        'pet_type',
+        'pet_dob',
         'microchip_number',
         'mcd_registration_number',
         'is_neutered',
@@ -30,6 +32,7 @@ class Pet extends Model
     protected $casts = [
         'pet_age' => 'integer',
         'pet_age_months' => 'integer',
+        'pet_dob' => 'date',
         'vaccenated_yes_no' => 'boolean',
         'last_vaccenated_date' => 'date',
         'vaccination_date' => 'date',

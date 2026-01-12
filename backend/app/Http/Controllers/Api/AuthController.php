@@ -671,9 +671,16 @@ public function register(Request $request)
     $tokenHash  = hash('sha256', $plainToken);
     $tokenExpiresAt = now()->addDays(30);
     [$latitude, $longitude] = $this->extractGeo($request);
+    $petType = $request->filled('pet_type') ? $request->input('pet_type') : null;
+    $petDob = $request->filled('pet_dob') ? $request->input('pet_dob') : null;
+    $weightRaw = $request->filled('pet_weight') ? $request->input('pet_weight') : $request->input('weight');
+    $petWeight = null;
+    if ($weightRaw !== null && $weightRaw !== '' && is_numeric($weightRaw)) {
+        $petWeight = (float) $weightRaw;
+    }
 
     try {
-        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude) {
+        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petWeight) {
             // ✅ Update user with final details
             $user->fill([
                 'pet_name'    => $request->pet_name,
@@ -700,6 +707,15 @@ public function register(Request $request)
                 'pet_doc1'   => $doc1Path,
                 'pet_doc2'   => $doc2Path,
             ];
+            if ($petType !== null) {
+                $petAttributes['pet_type'] = $petType;
+            }
+            if ($petDob !== null) {
+                $petAttributes['pet_dob'] = $petDob;
+            }
+            if ($petWeight !== null) {
+                $petAttributes['weight'] = $petWeight;
+            }
 
             $existingPet = Pet::where('user_id', $user->id)->first();
 
