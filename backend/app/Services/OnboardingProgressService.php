@@ -70,6 +70,10 @@ class OnboardingProgressService
             ->whereNotNull('doctor_document')
             ->where('doctor_document', '<>', '')
             ->exists();
+        $hasReceptionists = DB::table('receptionists')
+            ->where('vet_registeration_id', $clinicId)
+            ->exists();
+        $hasStaff = !empty($doctorIds) || $hasReceptionists;
 
         return [
             'services' => $hasServices,
@@ -77,6 +81,7 @@ class OnboardingProgressService
             'clinic_hours' => $hasClinicHours,
             'emergency' => $hasEmergency,
             'documents' => ($hasClinicDocs && $hasDoctorDocs),
+            'staff' => $hasStaff,
         ];
     }
 

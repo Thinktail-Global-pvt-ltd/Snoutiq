@@ -6,6 +6,7 @@
   $doctors = $doctors ?? collect();
   $highlightDoctor = session('highlight_doctor');
   $defaultErrors = $errors->getBag('default');
+  $nextStepLabel = 'Continue to Staff Management';
 @endphp
 
 @section('title', $page_title)
@@ -30,7 +31,7 @@
         <button type="button"
                 data-complete-onboarding
                 class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow">
-          Complete onboarding
+          {{ $nextStepLabel }}
         </button>
       @endif
     </div>
@@ -39,7 +40,7 @@
       <button type="button"
               data-complete-onboarding
               class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow">
-        Complete onboarding
+        {{ $nextStepLabel }}
       </button>
     </div>
   @endif
@@ -259,7 +260,7 @@
   })();
 
   document.addEventListener('DOMContentLoaded', () => {
-    const FINISH_URL = @json(route('dashboard.vet-home'));
+    const NEXT_URL = @json(route('clinic.staff', ['onboarding' => 1, 'step' => 6]) . '#staff-section');
     const HAS_LICENSE_NO = @json(trim((string) ($clinic->license_no ?? '')) !== '');
     const HAS_LICENSE_DOC = @json(!empty($clinic?->license_document));
     const setFileName = (input, display) => {
@@ -287,18 +288,18 @@
       const isOnboarding = (url.searchParams.get('onboarding')||'') === '1';
       const statusEl = document.querySelector('[data-onboarding-status]');
       const finishButton = document.querySelector('[data-complete-onboarding]');
-      const finishUrl = FINISH_URL || `${window.location.origin}/profile`;
+      const nextUrl = NEXT_URL || `${window.location.origin}/profile`;
       const licenseInput = document.querySelector('#license_no');
       const licenseDocInput = document.querySelector('#license_document');
 
       if (isOnboarding && finishButton){
-        const goToFinish = () => { window.location.href = finishUrl; };
+        const goToNext = () => { window.location.href = nextUrl; };
         finishButton.addEventListener('click', (e) => {
           e.preventDefault();
           const hasLicense = (licenseInput && licenseInput.value.trim() !== '') || HAS_LICENSE_NO;
           const hasDoc = (licenseDocInput && licenseDocInput.files && licenseDocInput.files.length > 0) || HAS_LICENSE_DOC;
           if (!hasLicense || !hasDoc) {
-            const msg = 'Business registration number and proof are required to complete onboarding.';
+            const msg = 'Business registration number and proof are required to continue onboarding.';
             if (window.Swal) {
               Swal.fire({ icon:'error', title:'Add clinic license details', text: msg });
             } else {
@@ -309,12 +310,12 @@
           if (window.Swal) {
             Swal.fire({
               icon:'success',
-              title:'Onboarding complete',
-              text:'You are all set! Head to your dashboard.',
-              confirmButtonText:'Go to dashboard'
-            }).then(goToFinish);
+              title:'Documents ready',
+              text:'Continue to staff management to finish onboarding.',
+              confirmButtonText:'Continue'
+            }).then(goToNext);
           } else {
-            goToFinish();
+            goToNext();
           }
         });
       }
@@ -326,7 +327,7 @@
           Swal.fire({
             icon:'success',
             title:'Documents saved',
-            text: message || 'All onboarding steps are done.',
+            text: message || 'Documents saved. Continue to staff management.',
             timer:1700,
             showConfirmButton:false,
           });

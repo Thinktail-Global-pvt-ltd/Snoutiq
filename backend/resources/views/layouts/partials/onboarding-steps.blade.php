@@ -5,6 +5,7 @@
     3 => ['title'=>'Clinic Schedule','desc'=>'Configure in-clinic hours for walk-ins/visits'],
     4 => ['title'=>'Emergency Hours Collection','desc'=>'Share night coverage team & pricing'],
     5 => ['title'=>'Documents & Compliance','desc'=>'Upload clinic & doctor credentials'],
+    6 => ['title'=>'Staff Management','desc'=>'Add doctors and receptionists to your clinic'],
   ];
   $steps = array_keys($labels);
   $totalSteps = count($steps);
@@ -15,12 +16,14 @@
   $s3 = route('doctor.schedule') . '?onboarding=1&step=3';
   $s4 = route('doctor.emergency-hours') . '?onboarding=1&step=4';
   $s5 = route('doctor.documents') . '?onboarding=1&step=5';
+  $s6 = route('clinic.staff') . '?onboarding=1&step=6#staff-section';
   $routes = [
     1 => $s1,
     2 => $s2,
     3 => $s3,
     4 => $s4,
     5 => $s5,
+    6 => $s6,
   ];
   $nextUrl = $active < $totalSteps ? $routes[$active + 1] : route('dashboard.vet-home');
   $backUrl = $active > 1 ? $routes[$active - 1] : null;
@@ -32,6 +35,7 @@
     3 => 'clinic_hours',
     4 => 'emergency',
     5 => 'documents',
+    6 => 'staff',
   ];
   $hasExplicitStatus = count($stepStatus) > 0;
 @endphp
@@ -43,7 +47,7 @@
       <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">Step {{ $active }} of {{ $totalSteps }}</span>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
       @foreach($steps as $i)
         @php
           $statusKey = $statusKeys[$i] ?? null;

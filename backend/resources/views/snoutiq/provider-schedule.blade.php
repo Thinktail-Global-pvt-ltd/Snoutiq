@@ -383,7 +383,7 @@
           Swal.fire({
             icon:'info',
             title:'Step 3: Clinic schedule',
-            html:'Set your weekly in-clinic hours. Saving these details will complete your onboarding.',
+            html:'Set your weekly in-clinic hours. Saving these details will take you to emergency hours.',
             confirmButtonText:'Got it',
           });
         };

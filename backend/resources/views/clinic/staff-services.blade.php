@@ -578,6 +578,9 @@
   }
 
   $stepStatus = $stepStatus ?? [];
+  $onboardingStep = (int) (request()->get('step', 1));
+  $isStaffStep = $isOnboarding && $onboardingStep === 6;
+  $staffStepReady = !empty($stepStatus['staff']);
 @endphp
 
 @section('content')
@@ -588,6 +591,20 @@
         'active' => (int) (request()->get('step', 1)),
         'stepStatus' => $stepStatus,
       ])
+    </div>
+  @endif
+
+  @if($isStaffStep)
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <div class="text-sm font-semibold text-gray-900">Step 6: Staff management</div>
+        <div class="text-xs text-gray-500">Add at least one doctor or receptionist to finish onboarding.</div>
+      </div>
+      <button type="button"
+              data-complete-onboarding
+              class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow">
+        Complete onboarding
+      </button>
     </div>
   @endif
 
@@ -607,80 +624,84 @@
   @endif
 
   <div class="flex flex-wrap items-center justify-end gap-2">
-    <a href="#services-section" class="ops-btn-secondary text-sm font-semibold">Jump to Services</a>
+    @if(!$isStaffStep)
+      <a href="#services-section" class="ops-btn-secondary text-sm font-semibold">Jump to Services</a>
+    @endif
     <a href="#staff-section" class="ops-btn-primary text-sm font-semibold">Jump to Staff</a>
   </div>
 
-  <div class="ops-hero" id="services-section">
-    <div class="ops-hero-body">
-      <div>
-        <div class="ops-eyebrow">Clinic Operations</div>
-        <div class="ops-hero-title">Services</div>
-        <p class="ops-hero-sub">Manage services, pricing, durations and visibility for your clinic.</p>
-        <div class="ops-chip-row">
-          <span class="pill pill-success">Visible</span>
-          <span class="pill pill-soft">Sync healthy</span>
+  <div id="services-block" class="{{ $isStaffStep ? 'hidden' : '' }}">
+    <div class="ops-hero" id="services-section">
+      <div class="ops-hero-body">
+        <div>
+          <div class="ops-eyebrow">Clinic Operations</div>
+          <div class="ops-hero-title">Services</div>
+          <p class="ops-hero-sub">Manage services, pricing, durations and visibility for your clinic.</p>
+          <div class="ops-chip-row">
+            <span class="pill pill-success">Visible</span>
+            <span class="pill pill-soft">Sync healthy</span>
+          </div>
         </div>
-      </div>
-      <div class="ops-hero-meta">
-        <div class="ops-meta-card">
-          <div class="meta-label">Role</div>
-          <div class="meta-value">{{ ucfirst($sessionRole ?? 'Clinic admin') }}</div>
-        </div>
-        <div class="ops-meta-card">
-          <div class="meta-label">Clinic ID</div>
-          <div class="meta-value">{{ $sessionClinicId ?? '—' }}</div>
+        <div class="ops-hero-meta">
+          <div class="ops-meta-card">
+            <div class="meta-label">Role</div>
+            <div class="meta-value">{{ ucfirst($sessionRole ?? 'Clinic admin') }}</div>
+          </div>
+          <div class="ops-meta-card">
+            <div class="meta-label">Clinic ID</div>
+            <div class="meta-value">{{ $sessionClinicId ?? '—' }}</div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="ops-panel">
-    <div class="ops-panel-head">
-      <div>
-        <p class="ops-eyebrow text-slate-500">Service Library</p>
-        <div class="ops-panel-title">Services Management</div>
-        <p class="ops-panel-sub">Organize services into categories. Edit price, duration and status.</p>
-      </div>
-      <div class="ops-head-actions">
-        <span class="pill pill-soft">Prices in ₹</span>
-      </div>
-    </div>
-
-    <div class="ops-filters">
-      <div class="search-wrap">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-        </svg>
-        <input id="search" type="text" placeholder="Search service or code..." class="search-input">
-      </div>
-      <div class="ops-filters-right">
-        <button id="btn-open-create" class="ops-btn-primary">
-          + Add Service
-        </button>
-      </div>
-    </div>
-
-    <div class="table-card">
-      <div class="table-container hidden md:block">
-        <table class="min-w-full text-sm services-table">
-          <thead>
-            <tr>
-              <th class="text-left">Name</th>
-              <th class="text-left">Pet</th>
-              <th class="text-left">Price (₹)</th>
-              <th class="text-left">Duration (m)</th>
-              <th class="text-left">Category</th>
-              <th class="text-left">Status</th>
-              <th class="text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="rows"></tbody>
-        </table>
+    <div class="ops-panel">
+      <div class="ops-panel-head">
+        <div>
+          <p class="ops-eyebrow text-slate-500">Service Library</p>
+          <div class="ops-panel-title">Services Management</div>
+          <p class="ops-panel-sub">Organize services into categories. Edit price, duration and status.</p>
+        </div>
+        <div class="ops-head-actions">
+          <span class="pill pill-soft">Prices in ₹</span>
+        </div>
       </div>
 
-      <div id="mobile-rows" class="md:hidden p-4 space-y-4"></div>
-      <div id="empty" class="hidden empty-state">No services found. Add a service to get started.</div>
+      <div class="ops-filters">
+        <div class="search-wrap">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input id="search" type="text" placeholder="Search service or code..." class="search-input">
+        </div>
+        <div class="ops-filters-right">
+          <button id="btn-open-create" class="ops-btn-primary">
+            + Add Service
+          </button>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-container hidden md:block">
+          <table class="min-w-full text-sm services-table">
+            <thead>
+              <tr>
+                <th class="text-left">Name</th>
+                <th class="text-left">Pet</th>
+                <th class="text-left">Price (₹)</th>
+                <th class="text-left">Duration (m)</th>
+                <th class="text-left">Category</th>
+                <th class="text-left">Status</th>
+                <th class="text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+
+        <div id="mobile-rows" class="md:hidden p-4 space-y-4"></div>
+        <div id="empty" class="hidden empty-state">No services found. Add a service to get started.</div>
+      </div>
     </div>
   </div>
 
@@ -791,18 +812,13 @@
           <label class="block text-sm font-semibold mb-1">Services Offered</label>
           <div id="service-presets" class="preset-grid bg-gray-50 rounded-lg p-2"></div>
           <div id="service-presets-empty" class="text-xs text-gray-500 mt-2">Loading services...</div>
-          <p class="text-xs text-gray-500 mt-2">Select services and add price for each. Use the base price to auto-fill.</p>
+          <p class="text-xs text-gray-500 mt-2">Select services and add price for each.</p>
         </div>
         <div class="md:col-span-2">
           <label class="block text-sm font-semibold mb-1">Other Service (optional)</label>
-          <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Physiotherapy">
-          <p class="text-xs text-gray-500 mt-1">Separate multiple custom services with commas. Prices show below.</p>
+          <input name="serviceName" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Physiotherapy, Rehabilitation">
+          <p class="text-xs text-gray-500 mt-1">Separate multiple custom services with commas to create them together.</p>
           <div id="custom-service-list" class="preset-grid mt-3 hidden"></div>
-        </div>
-        <div data-price-wrapper class="md:col-span-2">
-          <label class="block text-sm font-semibold mb-1">Base Price (₹)</label>
-          <input name="price_all" type="number" min="0" step="0.01" class="w-full bg-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="Apply to empty prices">
-          <p class="text-xs text-gray-500 mt-1">Auto-fills empty price fields so you can adjust only differences.</p>
         </div>
         @unless($isOnboarding)
           <div>
@@ -1220,7 +1236,6 @@
   const presetEmpty = document.getElementById('service-presets-empty');
   const customServiceList = document.getElementById('custom-service-list');
   const presetOtherInput = createForm?.elements['serviceName'] ?? null;
-  const priceAllInput = createForm?.elements['price_all'] ?? null;
   const GENERIC_SERVICE_PRESETS = [
     'Preventive Care',
     'Dental Care',
@@ -1278,30 +1293,6 @@
     const num = Number(raw);
     return Number.isFinite(num) ? num : null;
   };
-
-  function applyPriceAllToEmpty() {
-    if (!priceAllInput) return;
-    const val = normalizePrice(priceAllInput.value);
-    if (val === null || val < 0) return;
-    const inputs = [];
-    if (presetGrid) {
-      inputs.push(...presetGrid.querySelectorAll('.preset-price'));
-    }
-    if (customServiceList) {
-      inputs.push(...customServiceList.querySelectorAll('.custom-price'));
-    }
-    inputs.forEach((input) => {
-      if (input.disabled) return;
-      if (String(input.value || '').trim() !== '') return;
-      input.value = String(val);
-      if (input.classList.contains('custom-price')) {
-        const key = normalizePresetName(input.dataset.serviceName);
-        if (key) {
-          customPriceMap.set(key, input.value);
-        }
-      }
-    });
-  }
 
   function syncPriceInputs() {
     if (presetGrid) {
@@ -1408,17 +1399,11 @@
       afterLabel.appendChild(afterText);
 
       checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
-          applyPriceAllToEmpty();
-        }
         syncPriceInputs();
       });
 
       afterInput.addEventListener('change', () => {
         syncPriceInputs();
-        if (!afterInput.checked) {
-          applyPriceAllToEmpty();
-        }
       });
 
       actions.appendChild(priceInput);
@@ -1460,7 +1445,6 @@
           if (match && !match.checked) {
             match.checked = true;
             syncPriceInputs();
-            applyPriceAllToEmpty();
           }
         }
         continue;
@@ -1503,9 +1487,6 @@
       afterInput.addEventListener('change', () => {
         customAfterMap.set(key, afterInput.checked);
         syncPriceInputs();
-        if (!afterInput.checked) {
-          applyPriceAllToEmpty();
-        }
       });
 
       actions.appendChild(priceInput);
@@ -1515,16 +1496,10 @@
       customServiceList.appendChild(row);
     }
     syncPriceInputs();
-    applyPriceAllToEmpty();
   }
 
   if (presetOtherInput) {
     presetOtherInput.addEventListener('input', renderCustomServiceRows);
-  }
-
-  if (priceAllInput) {
-    priceAllInput.addEventListener('change', applyPriceAllToEmpty);
-    priceAllInput.addEventListener('blur', applyPriceAllToEmpty);
   }
 
   function getSelectedPresetEntries() {
@@ -1610,7 +1585,6 @@
         input.disabled = true;
       });
     }
-    if (priceAllInput) priceAllInput.value = '';
     if (presetOtherInput) presetOtherInput.value = '';
     customPriceMap.clear();
     customAfterMap.clear();
@@ -1652,16 +1626,12 @@
     const checkbox = form.elements['price_after_service'];
     const priceWrapper = form.querySelector('[data-price-wrapper]');
     const priceInput = form.elements['price'];
-    const helperInput = form.elements['price_all'];
     const update = () => {
       const after = !!checkbox?.checked;
       priceWrapper?.classList.toggle('hidden', after);
       if (priceInput) {
         priceInput.required = !after;
         if (after) priceInput.value = '';
-      }
-      if (helperInput && after) {
-        helperInput.value = '';
       }
     };
     checkbox?.addEventListener('change', update);
@@ -2407,8 +2377,19 @@
   const staffEmailInput = addForm.querySelector('input[name=\"email\"]');
   const staffPhoneInput = addForm.querySelector('input[name=\"phone\"]');
   const staffRoleInput = addForm.querySelector('select[name=\"role\"]');
+  const shouldAutoScroll = (() => {
+    try {
+      const url = new URL(location.href);
+      const isOnboarding = (url.searchParams.get('onboarding') || '') === '1';
+      const step = Number(url.searchParams.get('step') || 0);
+      return isOnboarding && step === 6;
+    } catch (_) {
+      return false;
+    }
+  })();
   let ALL_STAFF = [];
   let editContext = null;
+  let hasStaffEntries = @json($staffStepReady);
 
   function formatRole(role) {
     if (role === 'doctor') return 'Doctor';
@@ -2466,6 +2447,10 @@
     });
   }
 
+  function updateStaffCompletion(list) {
+    hasStaffEntries = list.some((item) => item.type === 'doctor' || item.type === 'receptionist');
+  }
+
   function normalizeStaff(data) {
     const rows = [];
     if (data?.clinic_admin) {
@@ -2502,6 +2487,7 @@
       const res = await apiFetch(API.list(), { headers: Auth.headers() });
       const payload = res?.data ?? res;
       ALL_STAFF = normalizeStaff(payload);
+      updateStaffCompletion(ALL_STAFF);
       renderStaff(ALL_STAFF);
     } catch (err) {
       console.error(err);
@@ -2702,7 +2688,33 @@
     renderStaff(filtered);
   });
 
-  document.addEventListener('DOMContentLoaded', fetchStaff);
+  const finishUrl = @json(route('dashboard.vet-home'));
+  const completeOnboardingBtn = document.querySelector('[data-complete-onboarding]');
+  if (completeOnboardingBtn) {
+    completeOnboardingBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (!hasStaffEntries) {
+        const msg = 'Add at least one doctor or receptionist before completing onboarding.';
+        if (window.Swal) {
+          Swal.fire({ icon: 'error', title: 'Add staff members', text: msg });
+        } else {
+          alert(msg);
+        }
+        return;
+      }
+      window.location.href = finishUrl || `${window.location.origin}/dashboard/clinic-home`;
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchStaff();
+    if (shouldAutoScroll) {
+      const section = document.getElementById('staff-section');
+      if (section) {
+        setTimeout(() => section.scrollIntoView({ block: 'start' }), 100);
+      }
+    }
+  });
 })();
 </script>
 @endsection
