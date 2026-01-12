@@ -166,7 +166,7 @@ class AdminController extends Controller
      * ADD PET:
      * 1) migrate legacy pet fields from users → pets ONCE (idempotent via UNIQUE key)
      * 2) insert requested pet with ON DUPLICATE KEY UPDATE (no duplicates)
-     * Body: { name, breed, pet_age, pet_gender, weight?, pet_doc1?, pet_doc2? }
+     * Body: { name, breed, pet_age, pet_gender, pet_type?, pet_dob?, microchip_number?, mcd_registration_number?, weight?, is_neutered?, pet_doc1?, pet_doc2? }
      */
     public function addPet(Request $request, $userId)
     {
@@ -180,6 +180,8 @@ class AdminController extends Controller
         $breed      = $request->input('breed');
         $pet_age    = (int)$request->input('pet_age');
         $pet_gender = $request->input('pet_gender');
+        $petType = $request->filled('pet_type') ? $request->input('pet_type') : null;
+        $petDob = $request->filled('pet_dob') ? $request->input('pet_dob') : null;
         $microchipNumber = $request->input('microchip_number');
         $mcdRegistration = $request->input('mcd_registration_number');
         $weight = $request->filled('weight') ? (float)$request->input('weight') : null;
@@ -202,6 +204,8 @@ class AdminController extends Controller
             $breed,
             $pet_age,
             $pet_gender,
+            $petType,
+            $petDob,
             $microchipNumber,
             $mcdRegistration,
             $weight,
@@ -224,13 +228,15 @@ class AdminController extends Controller
 
             // (2) insert the new pet (idempotent)
             DB::statement(
-                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, microchip_number, mcd_registration_number, weight, is_neutered, pet_doc1, pet_doc2, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, pet_type, pet_dob, microchip_number, mcd_registration_number, weight, is_neutered, pet_doc1, pet_doc2, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                  ON DUPLICATE KEY UPDATE
                   name = VALUES(name),
                   breed = VALUES(breed),
                   pet_age = VALUES(pet_age),
                   pet_gender = VALUES(pet_gender),
+                  pet_type = COALESCE(VALUES(pet_type), pet_type),
+                  pet_dob = COALESCE(VALUES(pet_dob), pet_dob),
                   microchip_number = COALESCE(VALUES(microchip_number), microchip_number),
                   mcd_registration_number = COALESCE(VALUES(mcd_registration_number), mcd_registration_number),
                   weight = COALESCE(VALUES(weight), weight),
@@ -244,6 +250,8 @@ class AdminController extends Controller
                     $breed,
                     $pet_age,
                     $pet_gender,
+                    $petType,
+                    $petDob,
                     $microchipNumber,
                     $mcdRegistration,
                     $weight,
@@ -266,7 +274,7 @@ class AdminController extends Controller
     // update pet
     public function updatePet(Request $request, $petId)
     {
-        $scalarCols = ['name','breed','pet_age','pet_gender','microchip_number','mcd_registration_number','weight'];
+        $scalarCols = ['name','breed','pet_age','pet_gender','pet_type','pet_dob','microchip_number','mcd_registration_number','weight'];
         $sets = [];
         $params = [];
         foreach ($scalarCols as $c) {
