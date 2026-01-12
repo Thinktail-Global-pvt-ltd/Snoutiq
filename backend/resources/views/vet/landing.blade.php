@@ -14,6 +14,17 @@
     $phoneHref      = $clinicPhone ? 'tel:' . preg_replace('/[^0-9+]/', '', $clinicPhone) : 'tel:#';
     $clinicEmail    = $vet->email ?? 'care@snoutiq.com';
     $services       = $services ?? collect();
+    $websiteTitle = trim((string) ($vet->website_title ?? ''));
+    $websiteSubtitle = trim((string) ($vet->website_subtitle ?? ''));
+    $websiteAbout = trim((string) ($vet->website_about ?? ''));
+    $websiteGallery = $vet->website_gallery ?? [];
+    if (!is_array($websiteGallery)) {
+        $decodedGallery = json_decode((string) $websiteGallery, true);
+        $websiteGallery = is_array($decodedGallery) ? $decodedGallery : [];
+    }
+    $websiteGallery = array_values(array_filter($websiteGallery, function ($path) {
+        return is_string($path) && trim($path) !== '';
+    }));
   @endphp
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -242,11 +253,19 @@
                 <i class="fas fa-star mr-2"></i> Partnered with SnoutIQ
               </div>
               <h1 class="font-heading text-4xl md:text-5xl font-bold text-secondary-900 mb-6 leading-tight">
-                Premium Care for Your <span class="text-primary-600">Furry Family</span>
+                @if(!empty($websiteTitle))
+                  {{ $websiteTitle }}
+                @else
+                  Premium Care for Your <span class="text-primary-600">Furry Family</span>
+                @endif
               </h1>
               <p class="text-lg text-secondary-600 mb-8">
-                At {{ $clinicName }}, we combine expert veterinary medicine with compassionate care.
-                Download the SnoutIQ app for seamless appointment booking, health tracking, and 24/7 pet support.
+                @if(!empty($websiteSubtitle))
+                  {{ $websiteSubtitle }}
+                @else
+                  At {{ $clinicName }}, we combine expert veterinary medicine with compassionate care.
+                  Download the SnoutIQ app for seamless appointment booking, health tracking, and 24/7 pet support.
+                @endif
               </p>
 
               <div class="mb-10">
@@ -321,6 +340,50 @@
           </div>
         </div>
       </section>
+
+      @if(!empty($websiteAbout) || !empty($websiteGallery))
+        @php
+          $showAbout = !empty($websiteAbout);
+          $showGallery = !empty($websiteGallery);
+          $gridCols = ($showAbout && $showGallery) ? 'lg:grid-cols-2' : 'lg:grid-cols-1';
+        @endphp
+        <section id="clinic-story" class="section-padding bg-white">
+          <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid {{ $gridCols }} gap-10 items-start">
+              @if($showAbout)
+                <div>
+                  <div class="inline-flex items-center px-3 py-1 rounded-full bg-secondary-100 text-secondary-700 text-sm font-medium mb-4">
+                    <i class="fas fa-heart mr-2"></i> Our Story
+                  </div>
+                  <h2 class="font-heading text-3xl md:text-4xl font-bold text-secondary-900 mb-4">About {{ $clinicName }}</h2>
+                  <p class="text-secondary-600 text-lg leading-relaxed">{{ $websiteAbout }}</p>
+                </div>
+              @endif
+
+              @if($showGallery)
+                <div>
+                  <div class="inline-flex items-center px-3 py-1 rounded-full bg-primary-100 text-primary-700 text-sm font-medium mb-4">
+                    <i class="fas fa-camera mr-2"></i> Clinic Gallery
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    @foreach($websiteGallery as $photo)
+                      @php
+                        $photoSrc = $photo;
+                        if (!\Illuminate\Support\Str::startsWith($photoSrc, ['http://', 'https://', 'data:image', '/'])) {
+                            $photoSrc = asset($photoSrc);
+                        }
+                      @endphp
+                      <div class="overflow-hidden rounded-2xl bg-secondary-50 shadow-md">
+                        <img src="{{ $photoSrc }}" alt="Clinic photo" class="h-48 w-full object-cover">
+                      </div>
+                    @endforeach
+                  </div>
+                </div>
+              @endif
+            </div>
+          </div>
+        </section>
+      @endif
 
       <!-- Doctor Showcase -->
       <section id="doctors" class="section-padding bg-secondary-50">

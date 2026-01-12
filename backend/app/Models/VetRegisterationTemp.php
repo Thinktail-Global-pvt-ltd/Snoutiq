@@ -82,6 +82,10 @@ class VetRegisterationTemp extends Model
         'address',
         'chat_price',
         'bio',
+        'website_title',
+        'website_subtitle',
+        'website_about',
+        'website_gallery',
         'password',
         'hospital_profile',
         'clinic_profile',
@@ -119,6 +123,7 @@ class VetRegisterationTemp extends Model
     protected $casts = [
         'draft_expires_at' => 'datetime',
         'claimed_at' => 'datetime',
+        'website_gallery' => 'array',
     ];
 
     public function doctors()

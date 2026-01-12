@@ -47,6 +47,7 @@ use App\Models\LegacyQrRedirect;
 use App\Services\OnboardingProgressService;
 use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\Admin\VetUserConnectionReportPageController;
+use App\Http\Controllers\ClinicWebsiteContentController;
 
 
 // Public routes
@@ -371,6 +372,8 @@ Route::middleware([EnsureSessionUser::class])->group(function(){
     };
     Route::get('/dashboard/services', $staffServicesPage)->name('groomer.services.index');
     Route::get('/dashboard/staff', $staffServicesPage)->name('clinic.staff');
+    Route::get('/dashboard/website', [ClinicWebsiteContentController::class, 'edit'])->name('clinic.website.edit');
+    Route::put('/dashboard/website', [ClinicWebsiteContentController::class, 'update'])->name('clinic.website.update');
     Route::get('/receptionist/front-desk', function () {
         return view('receptionist.front-desk');
     })->name('receptionist.front-desk');

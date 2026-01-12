@@ -396,6 +396,13 @@
           <span class="truncate">Clinic Operations</span>
         </a>
 
+        <a href="{{ route('clinic.website.edit') }}" class="{{ $baseItem }} {{ $active('clinic.website.edit') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
+          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8h18M3 16h18M8 8v8m8-8v8"/>
+          </svg>
+          <span class="truncate">Website Content</span>
+        </a>
+
         <!-- <a href="{{ route('clinic.staff') }}#staff-section" class="{{ $baseItem }} {{ $active('clinic.staff') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
           <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-4a4 4 0 11-8 0 4 4 0 018 0z"/>
