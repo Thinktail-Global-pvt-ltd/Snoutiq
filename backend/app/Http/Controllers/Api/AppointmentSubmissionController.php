@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -128,6 +129,70 @@ class AppointmentSubmissionController extends Controller
     public function show(Appointment $appointment): JsonResponse
     {
         return $this->respondWithAppointment($appointment);
+    }
+
+    public function patientDetails(Appointment $appointment): JsonResponse
+    {
+        $notes = $this->decodeNotes($appointment->notes);
+        $patientUserId = $notes['patient_user_id'] ?? null;
+        if (!is_numeric($patientUserId)) {
+            $patientUserId = $this->resolvePatientUserId($appointment, $notes);
+        }
+
+        if (!$patientUserId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'patient_user_id not found in appointment notes',
+            ], 422);
+        }
+
+        $user = User::find((int) $patientUserId);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Patient not found',
+            ], 404);
+        }
+
+        $petsPayload = $this->fetchPetsForUser($user->id);
+
+        $prescriptions = [];
+        if (Schema::hasTable('prescriptions')) {
+            $prescriptions = DB::table('prescriptions')
+                ->where('user_id', $user->id)
+                ->orderByDesc('id')
+                ->get()
+                ->all();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'appointment' => [
+                    'id' => $appointment->id,
+                    'date' => $appointment->appointment_date,
+                    'time_slot' => $appointment->appointment_time,
+                    'status' => $appointment->status,
+                ],
+                'patient_user_id' => (int) $user->id,
+                'patient' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'role' => $user->role ?? null,
+                    'pet_name' => $user->pet_name ?? null,
+                    'pet_gender' => $user->pet_gender ?? null,
+                    'pet_age' => $user->pet_age ?? null,
+                    'breed' => $user->breed ?? null,
+                    'latitude' => $user->latitude ?? null,
+                    'longitude' => $user->longitude ?? null,
+                ],
+                'pets_source' => $petsPayload['source'],
+                'pets' => $petsPayload['pets'],
+                'prescriptions' => $prescriptions,
+            ],
+        ]);
     }
 
     public function update(Request $request, Appointment $appointment): JsonResponse
@@ -508,6 +573,58 @@ class AppointmentSubmissionController extends Controller
         $email = strtolower(trim($value));
 
         return $email !== '' ? $email : null;
+    }
+
+    private function fetchPetsForUser(int $userId): array
+    {
+        if (Schema::hasTable('pets')) {
+            $userColumn = Schema::hasColumn('pets', 'user_id')
+                ? 'user_id'
+                : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
+
+            if ($userColumn) {
+                $pets = DB::table('pets')
+                    ->where($userColumn, $userId)
+                    ->orderByDesc('id')
+                    ->get()
+                    ->all();
+
+                if (!empty($pets)) {
+                    return ['source' => 'pets', 'pets' => $pets];
+                }
+            }
+        }
+
+        if (Schema::hasTable('user_pets')) {
+            $pets = DB::table('user_pets')
+                ->where('user_id', $userId)
+                ->orderByDesc('id')
+                ->get()
+                ->map(function ($pet) {
+                    if (property_exists($pet, 'medical_history')) {
+                        $pet->medical_history = $this->decodeJsonField($pet->medical_history);
+                    }
+                    if (property_exists($pet, 'vaccination_log')) {
+                        $pet->vaccination_log = $this->decodeJsonField($pet->vaccination_log);
+                    }
+                    return $pet;
+                })
+                ->all();
+
+            return ['source' => 'user_pets', 'pets' => $pets];
+        }
+
+        return ['source' => null, 'pets' => []];
+    }
+
+    private function decodeJsonField($value)
+    {
+        if (!is_string($value) || $value === '') {
+            return $value;
+        }
+
+        $decoded = json_decode($value, true);
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
     }
 
     private function appointmentDateTime(Appointment $appointment, string $timezone): ?Carbon
