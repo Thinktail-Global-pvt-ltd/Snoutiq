@@ -581,6 +581,11 @@
   $onboardingStep = (int) (request()->get('step', 1));
   $isStaffStep = $isOnboarding && $onboardingStep === 6;
   $staffStepReady = !empty($stepStatus['staff']);
+  $clinicLookupId = $sessionClinicId ?: ($doctorRecord?->vet_registeration_id ?? null);
+  $clinicSlug = $clinicLookupId
+      ? \App\Models\VetRegisterationTemp::where('id', $clinicLookupId)->value('slug')
+      : null;
+  $finishUrl = $clinicSlug ? url('/vets/'.$clinicSlug) : route('dashboard.vet-home');
 @endphp
 
 @section('content')
@@ -2688,20 +2693,11 @@
     renderStaff(filtered);
   });
 
-  const finishUrl = @json(route('dashboard.vet-home'));
+  const finishUrl = @json($finishUrl);
   const completeOnboardingBtn = document.querySelector('[data-complete-onboarding]');
   if (completeOnboardingBtn) {
     completeOnboardingBtn.addEventListener('click', (event) => {
       event.preventDefault();
-      if (!hasStaffEntries) {
-        const msg = 'Add at least one doctor or receptionist before completing onboarding.';
-        if (window.Swal) {
-          Swal.fire({ icon: 'error', title: 'Add staff members', text: msg });
-        } else {
-          alert(msg);
-        }
-        return;
-      }
       window.location.href = finishUrl || `${window.location.origin}/dashboard/clinic-home`;
     });
   }

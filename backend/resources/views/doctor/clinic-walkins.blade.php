@@ -1730,9 +1730,10 @@
 (() => {
   const CLINIC_ID = Number(@json($resolvedClinicId ?? null)) || null;
   const CURRENT_USER_ID = Number(@json(auth()->id() ?? session('user_id') ?? data_get(session('user'),'id') ?? null)) || null;
+  const PATH_PREFIX = window.location.pathname.startsWith('/backend') ? '/backend' : '';
   const CONFIG = {
-    API_BASE: @json(url('/api')),
-    CSRF_URL: @json(url('/sanctum/csrf-cookie')),
+    API_BASE: `${window.location.origin}${PATH_PREFIX}/api`,
+    CSRF_URL: `${window.location.origin}${PATH_PREFIX}/sanctum/csrf-cookie`,
   };
 
   const STORED_AUTH_FULL = (() => {
@@ -1833,6 +1834,12 @@
   };
   const BREEDS_API_URL_PRIMARY = `${CONFIG.API_BASE}/dog-breeds/all`;
   const BREEDS_API_URL_FALLBACK = 'https://snoutiq.com/backend/api/dog-breeds/all';
+  const SELECT2_ASSETS = {
+    jquery: @json(url('vertical/assets/js/jquery.min.js')),
+    jqueryCdn: 'https://code.jquery.com/jquery-3.7.1.min.js',
+    select2: @json(url('vertical/assets/plugins/select2/js/select2.min.js')),
+    select2Cdn: 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js',
+  };
 
   const bookingModal = document.getElementById('booking-modal');
   const bookingForm = document.getElementById('booking-form');
@@ -1862,6 +1869,7 @@
   let PATIENT_MODE = 'new';
   let PREFERRED_PATIENT_ID = null;
   let BREED_LIST = [];
+  let select2Loader = null;
 
   const closeButtons = bookingModal ? Array.from(bookingModal.querySelectorAll('[data-close]')) : [];
 
@@ -1878,6 +1886,7 @@
     if (dateField && !dateField.value) {
       dateField.value = new Date().toISOString().split('T')[0];
     }
+    initBreedSelect2();
     if (!PATIENTS.length) fetchPatients();
     if (!doctorSelect?.value) fetchDoctors();
   }
@@ -2101,25 +2110,75 @@
     }
   }
 
+  function loadScriptOnce(src, id) {
+    return new Promise((resolve, reject) => {
+      if (id && document.getElementById(id)) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      if (id) script.id = id;
+      script.src = src;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(script);
+    });
+  }
+
+  function ensureSelect2Ready() {
+    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+      return Promise.resolve(true);
+    }
+    if (select2Loader) return select2Loader;
+    select2Loader = (async () => {
+      try {
+        if (!window.jQuery || !window.jQuery.fn) {
+          try {
+            await loadScriptOnce(SELECT2_ASSETS.jquery, 'snoutiq-jquery');
+          } catch (_) {
+            await loadScriptOnce(SELECT2_ASSETS.jqueryCdn, 'snoutiq-jquery-cdn');
+          }
+        }
+        if (!window.jQuery || !window.jQuery.fn) return false;
+        if (!window.jQuery.fn.select2) {
+          try {
+            await loadScriptOnce(SELECT2_ASSETS.select2, 'snoutiq-select2');
+          } catch (_) {
+            await loadScriptOnce(SELECT2_ASSETS.select2Cdn, 'snoutiq-select2-cdn');
+          }
+        }
+        return Boolean(window.jQuery && window.jQuery.fn && window.jQuery.fn.select2);
+      } catch (error) {
+        console.error('Select2 load failed', error);
+        return false;
+      }
+    })();
+    return select2Loader;
+  }
+
   function initBreedSelect2() {
-    if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
-    breedSelects.forEach((select) => {
-      if (!select) return;
-      const $select = window.jQuery(select);
-      const currentValue = select.value;
-      if ($select.hasClass('select2-hidden-accessible')) {
-        $select.select2('destroy');
-      }
-      $select.select2({
-        width: '100%',
-        placeholder: 'Select breed',
-        allowClear: true,
-        minimumResultsForSearch: 0,
-        dropdownParent: bookingModal || document.body,
+    ensureSelect2Ready().then((ready) => {
+      if (!ready || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+      const dropdownParent = bookingModal ? window.jQuery(bookingModal) : window.jQuery(document.body);
+      breedSelects.forEach((select) => {
+        if (!select) return;
+        const $select = window.jQuery(select);
+        const currentValue = select.value;
+        if ($select.hasClass('select2-hidden-accessible')) {
+          $select.select2('destroy');
+        }
+        $select.select2({
+          width: '100%',
+          placeholder: 'Select breed',
+          allowClear: true,
+          minimumResultsForSearch: 0,
+          dropdownParent,
+        });
+        if (currentValue) {
+          $select.val(currentValue).trigger('change.select2');
+        }
       });
-      if (currentValue) {
-        $select.val(currentValue).trigger('change.select2');
-      }
     });
   }
 
