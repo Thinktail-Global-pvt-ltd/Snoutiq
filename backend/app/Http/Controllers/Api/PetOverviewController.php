@@ -18,6 +18,17 @@ class PetOverviewController extends Controller
             return response()->json(['success' => false, 'message' => 'Pet not found'], 404);
         }
 
+        $dogDiseasePayload = $pet->dog_disease_payload ?? null;
+        if (is_string($dogDiseasePayload)) {
+            $dogDiseasePayload = json_decode($dogDiseasePayload, true);
+        } elseif (is_object($dogDiseasePayload)) {
+            $dogDiseasePayload = json_decode(json_encode($dogDiseasePayload), true);
+        }
+        if (!is_array($dogDiseasePayload)) {
+            $dogDiseasePayload = null;
+        }
+        $dogDiseaseVaccination = $dogDiseasePayload['vaccination'] ?? null;
+
         $owner = DB::table('users')->where('id', $pet->user_id)->first();
 
         $prescriptions = $this->fetchPrescriptions($petId);
@@ -75,6 +86,7 @@ class PetOverviewController extends Controller
                 'prescriptions' => $prescriptions['items'],
                 'medications' => $medications,
                 'care_roadmap' => $careRoadmap,
+                'vaccination' => $dogDiseaseVaccination,
                 'observation_note' => $observation['notes'] ?? null,
                 'knowledge_hub' => $this->knowledgeHubSuggestions($pet),
             ],
