@@ -92,6 +92,7 @@ class DoctorScheduleController extends Controller
     public function getAvailability(Request $request, string $id)
     {
         $serviceType = $request->query('service_type'); // optional filter
+        $doctor = Doctor::select('id', 'doctors_price')->find((int) $id);
 
         $q = DB::table('doctor_availability')
             ->where('doctor_id', (int) $id)
@@ -110,6 +111,9 @@ class DoctorScheduleController extends Controller
             'doctor_id' => (int) $id,
             'service_type' => $serviceType,
             'availability' => $rows,
+            'doctor_price' => ($doctor && $doctor->doctors_price !== null)
+                ? (float) $doctor->doctors_price
+                : null,
         ]);
     }
 
