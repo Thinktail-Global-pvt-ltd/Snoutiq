@@ -1933,8 +1933,17 @@
   function normalizePhone(...candidates) {
     for (const value of candidates) {
       if (typeof value !== 'string') continue;
-      const cleaned = value.replace(/\s+/g, '').trim();
-      if (cleaned) return cleaned.slice(0, 20);
+      const trimmed = value.trim();
+      if (!trimmed || trimmed.includes('@')) continue;
+      const digits = trimmed.replace(/\D+/g, '');
+      if (!digits) continue;
+      if (digits.startsWith('91') && digits.length >= 12) {
+        return digits.slice(0, 12);
+      }
+      if (digits.length === 10) {
+        return `91${digits}`;
+      }
+      return digits;
     }
     return null;
   }
@@ -2331,7 +2340,7 @@
       }
       if (PATIENT_MODE === 'new') {
         const name = bookingForm.elements['new_patient_name'].value.trim();
-        const phone = bookingForm.elements['new_patient_phone'].value.trim();
+        const phone = normalizePhone(bookingForm.elements['new_patient_phone'].value);
         const email = bookingForm.elements['new_patient_email'].value.trim();
         const newPetName = bookingForm.elements['new_pet_name'].value.trim();
         if (!name || (!phone && !email)) {

@@ -282,15 +282,17 @@ class StaffController extends Controller
                 ]);
             }
 
-            $doctor->staff_role = $role;
-            $doctor->save();
+            if (Schema::hasColumn('doctors', 'staff_role')) {
+                $doctor->staff_role = $role;
+                $doctor->save();
+            }
 
             return response()->json([
                 'status' => true,
                 'message' => 'Doctor role updated',
                 'data' => [
                     'id' => $doctor->id,
-                    'role' => $doctor->staff_role,
+                    'role' => $doctor->staff_role ?? 'doctor',
                     'type' => 'doctor',
                 ],
             ]);
@@ -433,7 +435,7 @@ class StaffController extends Controller
             if ($phone !== null) {
                 $doctor->doctor_mobile = $phone;
             }
-            if (array_key_exists('role', $validated)) {
+            if (array_key_exists('role', $validated) && Schema::hasColumn('doctors', 'staff_role')) {
                 $doctor->staff_role = $validated['role'];
             }
 

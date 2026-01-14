@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Doctor;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class DashboardProfileController extends Controller
 {
@@ -125,6 +126,19 @@ class DashboardProfileController extends Controller
         return $trimmed === '' ? null : $trimmed;
     }
 
+    protected function referralCodeForClinic(VetRegisterationTemp $clinic): string
+    {
+        $idSeed = max(1, (int) $clinic->id);
+        $base36 = strtoupper(str_pad(base_convert((string) $idSeed, 10, 36), 5, '0', STR_PAD_LEFT));
+        $slugFragment = strtoupper(Str::substr(Str::slug($clinic->slug ?: $clinic->name), 0, 2));
+
+        if ($slugFragment === '') {
+            $slugFragment = 'CL';
+        }
+
+        return 'SN-'.$slugFragment.$base36;
+    }
+
     /**
      * GET /api/dashboard/profile
      */
@@ -144,6 +158,9 @@ class DashboardProfileController extends Controller
             $clinic = VetRegisterationTemp::query()
                 ->select($this->clinicSelect())
                 ->find($ctx['clinic_id']);
+        }
+        if ($clinic) {
+            $clinic->referral_code = $this->referralCodeForClinic($clinic);
         }
 
         $doctorsQuery = Doctor::query()->select($this->doctorSelect());

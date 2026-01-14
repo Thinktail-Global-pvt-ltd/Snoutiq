@@ -119,6 +119,10 @@
             class="h-32 w-32 rounded-xl bg-white/20 object-cover transition-opacity duration-200 opacity-40"
           />
         </div>
+        <div class="text-center">
+          <p class="text-xs uppercase tracking-wide text-white/70">Referral code</p>
+          <p id="clinic-referral-code" class="text-sm font-semibold text-white">—</p>
+        </div>
         <div class="space-y-3 text-center">
           <p class="text-xs text-white/70">Download a ready-to-print SnoutIQ card that highlights your clinic name.</p>
           <div class="flex flex-col items-center gap-2">
@@ -276,6 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clinicQrLink: document.getElementById('clinic-qr-link'),
     clinicQrStatus: document.getElementById('clinic-qr-status'),
     clinicQrDownload: document.getElementById('clinic-qr-download'),
+    clinicReferralCode: document.getElementById('clinic-referral-code'),
     doctorGrid: document.getElementById('doctor-grid'),
     doctorEmpty: document.getElementById('doctor-empty'),
     doctorCount: document.getElementById('doctor-count'),
@@ -589,6 +594,9 @@ document.addEventListener('DOMContentLoaded', () => {
       fillClinicSummary(data.clinic || null);
       const clinicNameForTemplate = data.clinic?.clinic_profile || data.clinic?.name;
       updateClinicQr(data.clinic?.slug, clinicNameForTemplate);
+      if (els.clinicReferralCode) {
+        els.clinicReferralCode.textContent = formatValue(data.clinic?.referral_code);
+      }
       fillClinicForm(data.clinic || null);
       if (els.clinicId && data.clinic_id) {
         els.clinicId.textContent = data.clinic_id;
