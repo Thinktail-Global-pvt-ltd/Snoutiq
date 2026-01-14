@@ -34,6 +34,7 @@ use App\Models\Transaction;
 use Illuminate\Support\Facades\Http;
 use App\Support\GeminiConfig;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Collection;
 
 class AuthController extends Controller
 {
@@ -207,6 +208,40 @@ class AuthController extends Controller
             : collect();
 
         return [$pets, $userPets];
+    }
+
+    private function resolvePetIdForOverview(Request $request, Collection $pets): ?int
+    {
+        $requested = $request->input('pet_id') ?? $request->input('petId');
+        if (is_numeric($requested)) {
+            $requestedId = (int) $requested;
+            if ($pets->contains('id', $requestedId)) {
+                return $requestedId;
+            }
+        }
+
+        $firstPet = $pets->first();
+        return $firstPet?->id;
+    }
+
+    private function fetchPetOverview(Request $request, ?int $petId): ?array
+    {
+        if (! $petId) {
+            return null;
+        }
+
+        try {
+            $controller = app(PetOverviewController::class);
+            $response = $controller->show($request, $petId);
+        } catch (\Throwable $e) {
+            Log::warning('Pet overview lookup failed', [
+                'pet_id' => $petId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+
+        return $response->getData(true);
     }
 
     private function snapshotPhoneOtp(?User $user, string $otp, Carbon $expiresAt): void
@@ -451,6 +486,8 @@ class AuthController extends Controller
             'token' => 'required|string',
             'otp'   => 'required|string',
             'phone' => 'required|string',
+            'pet_id' => 'nullable|integer',
+            'petId' => 'nullable|integer',
             'lat'   => 'nullable|numeric',
             'lang'  => 'nullable|numeric',
         ]);
@@ -494,6 +531,8 @@ class AuthController extends Controller
 
             [$pets, $userPets] = $this->loadRelatedPets($existingUser);
             $latestChat = $existingUser ? Chat::where('user_id', $existingUser->id)->latest()->first() : null;
+            $overviewPetId = $this->resolvePetIdForOverview($request, $pets);
+            $petOverview = $this->fetchPetOverview($request, $overviewPetId);
 
             return response()->json([
                 'message' => 'OTP already verified',
@@ -502,6 +541,7 @@ class AuthController extends Controller
                 'pets'    => $pets,
                 'user_pets' => $userPets,
                 'latest_chat' => $latestChat,
+                'pet_overview' => $petOverview,
             ], 200);
         }
 
@@ -544,6 +584,8 @@ class AuthController extends Controller
         $this->markPhoneVerified($user, $normalizedPhone, $otpEntry);
         [$pets, $userPets] = $this->loadRelatedPets($user);
         $latestChat = Chat::where('user_id', $user->id)->latest()->first();
+        $overviewPetId = $this->resolvePetIdForOverview($request, $pets);
+        $petOverview = $this->fetchPetOverview($request, $overviewPetId);
 
         return response()->json([
             'message' => 'OTP verified successfully',
@@ -552,6 +594,7 @@ class AuthController extends Controller
             'pets'    => $pets,
             'user_pets' => $userPets,
             'latest_chat' => $latestChat,
+            'pet_overview' => $petOverview,
         ]);
     }
 
