@@ -268,19 +268,6 @@
         </svg>
         <span class="truncate">Add New Booking</span>
       </a> -->
-      <a href="{{ route('receptionist.front-desk') }}" class="{{ $baseItem }} {{ $active('receptionist.front-desk') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
-        </svg>
-        <span class="truncate">Front Desk Search</span>
-      </a>
-      <a href="{{ route('receptionist.patients') }}" class="{{ $baseItem }} {{ $active('receptionist.patients') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-3 8c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7 3.582 7 8 7z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5V3m0 18v-2m7-7h2M3 12h2"/>
-        </svg>
-        <span class="truncate">Patient Managements</span>
-      </a>
       <a href="{{ route('receptionist.clinic-walkins') }}" class="{{ $baseItem }} {{ $active('receptionist.clinic-walkins') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
         <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"/>
@@ -298,19 +285,6 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
         <span class="truncate">Patient History</span>
-      </a>
-      <a href="{{ route('receptionist.vaccinations') }}" class="{{ $baseItem }} {{ $active('receptionist.vaccinations') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11a5 5 0 1010 0 5 5 0 00-10 0z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v3m0-14v3"/>
-        </svg>
-        <span class="truncate">Vaccination Guide</span>
-      </a>
-      <a href="{{ route('receptionist.vaccination-records') }}" class="{{ $baseItem }} {{ $active('receptionist.vaccination-records') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-        <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h10"/>
-        </svg>
-        <span class="truncate">Vaccination Records</span>
       </a>
     @else
       @if($showPetMenu)
@@ -459,13 +433,6 @@
           <span class="truncate">Clinic Doctors</span>
         </a> -->
 
-        <a href="{{ route('doctor.patients') }}" class="{{ $baseItem }} {{ $active('doctor.patients') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
-          <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-3 8c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7 3.582 7 8 7z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5V3m0 18v-2m7-7h2M3 12h2"/>
-          </svg>
-          <span class="truncate">Patient Managements</span>
-        </a>
         
         <a href="{{ route('doctor.clinic-walkins') }}" class="{{ $baseItem }} {{ $active('doctor.clinic-walkins') ? 'bg-white/20 ring-1 ring-white/20 text-white' : '' }}">
           <svg class="w-5 h-5 opacity-90 group-hover:opacity-100 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
