@@ -1357,6 +1357,16 @@ PROMPT;
         }
 
         $file = $request->file($field);
+        if (is_array($file)) {
+            $firstValid = null;
+            foreach ($file as $item) {
+                if ($item && method_exists($item, 'isValid') && $item->isValid()) {
+                    $firstValid = $item;
+                    break;
+                }
+            }
+            $file = $firstValid;
+        }
         if (!$file || !$file->isValid()) {
             return null;
         }
@@ -1366,10 +1376,12 @@ PROMPT;
             File::makeDirectory($uploadPath, 0777, true, true);
         }
 
-        $fileName = time().'_'.uniqid().'_'.$file->getClientOriginalName();
+        $originalName = $file->getClientOriginalName();
+        $safeName = preg_replace('/[^A-Za-z0-9._-]/', '_', $originalName);
+        $fileName = time().'_'.uniqid().'_'.$safeName;
         $file->move($uploadPath, $fileName);
 
-        return 'backend/uploads/pet_cards/'.$fileName;
+        return 'uploads/pet_cards/'.$fileName;
     }
 
     private function buildPetCardUrl(?string $value): ?string
@@ -1382,6 +1394,13 @@ PROMPT;
             return $value;
         }
 
-        return url($value);
+        $value = ltrim($value, '/');
+        $base = url('/');
+        if (preg_match('#/backend/?$#', $base) && str_starts_with($value, 'backend/')) {
+            $value = substr($value, strlen('backend/'));
+        }
+
+        $fullUrl = url($value);
+        return str_replace(' ', '%20', $fullUrl);
     }
 }
