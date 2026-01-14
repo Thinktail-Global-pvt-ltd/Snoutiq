@@ -893,6 +893,7 @@ Route::get('/doctors/{id}/slots', [\App\Http\Controllers\Api\DoctorScheduleContr
 Route::get('/doctors/{id}/slots/summary', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slotsSummary']);
 Route::post('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slots']);
 Route::post('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updatePrice']);
+Route::put('/doctors/{id}/price', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'updatePrice']);
 Route::get('/doctors/{id}/schedules/combined', [\App\Http\Controllers\Api\DoctorScheduleSummaryController::class, 'show']);
 
 // Clinics

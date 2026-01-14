@@ -230,10 +230,13 @@ class DoctorScheduleController extends Controller
         }
 
         $payload = $request->validate([
-            'price' => 'required|numeric|min:0',
+            'price' => 'nullable|numeric|min:0|required_without:doctor_price',
+            'doctor_price' => 'nullable|numeric|min:0|required_without:price',
         ]);
 
-        $doctor->doctors_price = $payload['price'];
+        $doctor->doctors_price = array_key_exists('price', $payload)
+            ? $payload['price']
+            : $payload['doctor_price'];
         $doctor->save();
 
         return response()->json([
