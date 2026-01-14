@@ -26,7 +26,7 @@ class GeminiChatController extends Controller
         $data = $request->validate([
             'user_id'  => 'required|integer',
             'pet_id'   => 'required|integer',
-            'question' => 'required|string|max:500',
+            'question' => 'nullable|string|max:500',
             'pet_name'   => 'nullable|string',
             'pet_breed'  => 'nullable|string',
             'pet_age'    => 'nullable|string',
@@ -49,7 +49,8 @@ class GeminiChatController extends Controller
             return response()->json(['success' => false, 'message' => 'Pet does not belong to user'], 403);
         }
 
-        $symptom = trim($data['question']);
+        $question = $data['question'] ?? null;
+        $symptomText = trim((string) $question);
 
         $context = [
             'name'       => $data['pet_name']   ?? ($pet->name ?? null),
@@ -58,28 +59,35 @@ class GeminiChatController extends Controller
             'pet_gender' => $data['pet_gender'] ?? ($pet->pet_gender ?? null),
         ];
 
-        try {
-            $suggester = new DogDiseaseSuggester();
-            $result = $suggester->suggest($symptom, $context);
-            $diseaseName = $result['disease_name'] ?? 'Unknown dog disease';
-            $category = strtolower($result['category'] ?? 'normal');
-        } catch (\Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Could not generate disease suggestion: '.$e->getMessage(),
-            ], 500);
+        if ($symptomText === '') {
+            $diseaseName = 'Unknown dog disease';
+            $category = 'normal';
+        } else {
+            try {
+                $suggester = new DogDiseaseSuggester();
+                $result = $suggester->suggest($symptomText, $context);
+                $diseaseName = $result['disease_name'] ?? 'Unknown dog disease';
+                $category = strtolower($result['category'] ?? 'normal');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Could not generate disease suggestion: '.$e->getMessage(),
+                ], 500);
+            }
         }
+
+        $reportedSymptom = $symptomText !== '' ? $symptomText : null;
 
         DB::update(
             'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, health_state = ?, dog_disease_payload = ?, pet_card_for_ai = ?, updated_at = NOW() WHERE id = ?',
             [
-                $symptom,
+                $reportedSymptom,
                 $diseaseName,
                 in_array($category, ['normal','chronic'], true) ? $category : null,
                 json_encode([
                     'user_id' => $data['user_id'],
                     'pet_id' => $data['pet_id'],
-                    'question' => $data['question'],
+                    'question' => $question !== null ? trim((string) $question) : null,
                     'pet_name' => $data['pet_name'] ?? null,
                     'pet_breed' => $data['pet_breed'] ?? null,
                     'pet_age' => $data['pet_age'] ?? null,
@@ -97,7 +105,7 @@ class GeminiChatController extends Controller
             'data' => [
                 'pet_id' => $data['pet_id'],
                 'user_id' => $data['user_id'],
-                'symptom_saved' => $symptom,
+                'symptom_saved' => $reportedSymptom,
                 'suggested_disease' => $diseaseName,
                 'category' => in_array($category, ['normal','chronic'], true) ? $category : 'normal',
                 'pet_profile' => $context,
