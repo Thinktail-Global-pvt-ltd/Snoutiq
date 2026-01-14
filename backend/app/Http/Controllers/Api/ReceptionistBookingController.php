@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class ReceptionistBookingController extends Controller
@@ -358,20 +359,41 @@ class ReceptionistBookingController extends Controller
 
     public function storePatient(Request $request)
     {
+        if ($request->filled('lastVetId') && !$request->filled('last_vet_id')) {
+            $request->merge(['last_vet_id' => $request->input('lastVetId')]);
+        }
+
+        if ($request->has('phone')) {
+            $phone = trim((string) $request->input('phone'));
+            $request->merge(['phone' => $phone !== '' ? $phone : null]);
+        }
+
+        $hasRoleColumn = Schema::hasColumn('users', 'role');
+        $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
+
+        $phoneRules = ['nullable', 'string', 'max:25'];
+        if ($hasRoleColumn) {
+            $phoneRules[] = Rule::unique('users', 'phone')->where(function ($query) {
+                $query->whereIn('role', self::PATIENT_ROLES);
+            });
+        } else {
+            $phoneRules[] = 'unique:users,phone';
+        }
+
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|unique:users,email',
-            'phone' => 'nullable|string|max:25|unique:users,phone',
+            'phone' => $phoneRules,
             'pet_name' => 'nullable|string|max:120',
             'pet_type' => 'nullable|string|max:120',
             'pet_breed' => 'nullable|string|max:120',
             'pet_gender' => 'nullable|string|max:50',
             'last_vet_id' => 'nullable|integer|exists:vet_registerations_temp,id',
+        ], [
+            'phone.unique' => 'A patient with this phone number already exists.',
         ]);
 
         $clinicId = $this->resolveClinicId($request);
-        $hasRoleColumn = Schema::hasColumn('users', 'role');
-        $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
 
         if (empty($data['email']) && empty($data['phone'])) {
             return response()->json([
@@ -392,9 +414,13 @@ class ReceptionistBookingController extends Controller
         if ($hasLastVetIdColumn) {
             $lastVetId = $data['last_vet_id'] ?? null;
 
-            if (!$lastVetId && $clinicId && Schema::hasTable('vet_registerations_temp')) {
-                $clinicExists = DB::table('vet_registerations_temp')->where('id', $clinicId)->exists();
-                if ($clinicExists) {
+            if (!$lastVetId && $clinicId) {
+                if (Schema::hasTable('vet_registerations_temp')) {
+                    $clinicExists = DB::table('vet_registerations_temp')->where('id', $clinicId)->exists();
+                    if ($clinicExists) {
+                        $lastVetId = $clinicId;
+                    }
+                } else {
                     $lastVetId = $clinicId;
                 }
             }

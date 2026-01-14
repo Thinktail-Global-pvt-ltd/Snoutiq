@@ -2010,14 +2010,23 @@
     const {act, id} = btn.dataset;
 
     if(act==='edit'){
+      const localService = ALL.find((item) => String(item.id) === String(id));
+      if (localService) {
+        fillEdit(localService);
+        open(editModal);
+      }
       try{
         await Auth.bootstrap();
         const data = await apiFetch(API.show(id), { headers: Auth.headers() });
         const s = data?.data || data;
-        fillEdit(s);
-        open(editModal);
+        if (s && typeof s === 'object') {
+          fillEdit(s);
+          open(editModal);
+        }
       }catch(err){
-        Swal.fire({icon:'error', title:'Failed to load service', text: err.message||'Error'});
+        if (!localService) {
+          Swal.fire({icon:'error', title:'Failed to load service', text: err.message||'Error'});
+        }
         ClientLog?.error('service.show.failed', err.message||String(err));
       }
     }
