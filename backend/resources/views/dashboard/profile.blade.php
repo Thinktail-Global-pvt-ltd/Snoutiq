@@ -21,7 +21,7 @@
         data_get(session('auth_full'), 'user.vet_registeration_id'),
     ];
 
-    if ($sessionRole !== 'doctor') {
+    if (!in_array($sessionRole, ['doctor', 'receptionist'], true)) {
         array_unshift(
             $candidates,
             session('user_id'),
@@ -38,6 +38,18 @@
         if ($num > 0) {
             $resolvedClinicId = $num;
             break;
+        }
+    }
+    if (!$resolvedClinicId && $sessionRole === 'receptionist') {
+        $receptionistId = session('receptionist_id')
+            ?? data_get(session('auth_full'), 'receptionist_id')
+            ?? data_get(session('auth_full'), 'user_id')
+            ?? session('user_id');
+        if ($receptionistId) {
+            $rec = \App\Models\Receptionist::find((int) $receptionistId);
+            if ($rec && (int) $rec->vet_registeration_id > 0) {
+                $resolvedClinicId = (int) $rec->vet_registeration_id;
+            }
         }
     }
 

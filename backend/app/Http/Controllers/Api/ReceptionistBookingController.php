@@ -414,7 +414,7 @@ class ReceptionistBookingController extends Controller
         if ($hasLastVetIdColumn) {
             $lastVetId = $data['last_vet_id'] ?? null;
 
-            if (!$lastVetId && $clinicId) {
+            if ($clinicId) {
                 if (Schema::hasTable('vet_registerations_temp')) {
                     $clinicExists = DB::table('vet_registerations_temp')->where('id', $clinicId)->exists();
                     if ($clinicExists) {

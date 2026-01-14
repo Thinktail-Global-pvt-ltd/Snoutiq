@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Doctor;
+use App\Models\Receptionist;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -43,7 +44,7 @@ class DashboardProfileController extends Controller
             data_get($sessionAuth, 'user.vet_registeration_id'),
         ];
 
-        if ($role !== 'doctor') {
+        if (!in_array($role, ['doctor', 'receptionist'], true)) {
             array_unshift(
                 $clinicCandidates,
                 $session->get('user_id'),
@@ -60,6 +61,19 @@ class DashboardProfileController extends Controller
             if ($num > 0) {
                 $clinicId = $num;
                 break;
+            }
+        }
+        if (!$clinicId && $role === 'receptionist') {
+            $receptionistId = $session->get('receptionist_id')
+                ?? data_get($sessionAuth, 'receptionist_id')
+                ?? data_get($sessionAuth, 'user_id')
+                ?? $session->get('user_id')
+                ?? data_get($sessionUser, 'id');
+            if ($receptionistId) {
+                $rec = Receptionist::find((int) $receptionistId);
+                if ($rec?->vet_registeration_id) {
+                    $clinicId = (int) $rec->vet_registeration_id;
+                }
             }
         }
 
@@ -146,10 +160,10 @@ class DashboardProfileController extends Controller
     {
         $ctx = $this->resolveContext($request);
 
-        if (! in_array($ctx['role'], ['clinic_admin', 'doctor'], true)) {
+        if (! in_array($ctx['role'], ['clinic_admin', 'doctor', 'receptionist'], true)) {
             return response()->json([
                 'success' => false,
-                'error' => 'Profile is available for clinic and doctor accounts only.',
+                'error' => 'Profile is available for clinic, doctor, and receptionist accounts only.',
             ], 403);
         }
 
