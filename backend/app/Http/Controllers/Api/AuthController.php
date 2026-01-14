@@ -25,6 +25,7 @@ use App\Services\WhatsAppService;
 use App\Models\ChatRoom;
 use App\Models\Chat;
 use App\Models\Pet;
+use App\Models\UserPet;
 use App\Models\Doctor;
 use App\Models\Receptionist;
 use App\Models\Transaction;
@@ -169,7 +170,7 @@ class AuthController extends Controller
     private function extractGeo(Request $request): array
     {
         $latKeys = ['latitude', 'lat', 'lattitude', 'laititude'];
-        $lngKeys = ['longitude', 'lng', 'lon', 'long', 'longtitude'];
+        $lngKeys = ['longitude', 'lng', 'lang', 'lon', 'long', 'longtitude'];
 
         $fetch = static function (array $keys) use ($request) {
             foreach ($keys as $key) {
@@ -189,6 +190,23 @@ class AuthController extends Controller
         };
 
         return [$fetch($latKeys), $fetch($lngKeys)];
+    }
+
+    private function loadRelatedPets(?User $user): array
+    {
+        if (! $user) {
+            return [collect(), collect()];
+        }
+
+        $pets = Schema::hasTable('pets')
+            ? Pet::where('user_id', $user->id)->orderByDesc('id')->get()
+            : collect();
+
+        $userPets = Schema::hasTable('user_pets')
+            ? UserPet::where('user_id', $user->id)->orderByDesc('id')->get()
+            : collect();
+
+        return [$pets, $userPets];
     }
 
     private function snapshotPhoneOtp(?User $user, string $otp, Carbon $expiresAt): void
@@ -433,6 +451,8 @@ class AuthController extends Controller
             'token' => 'required|string',
             'otp'   => 'required|string',
             'phone' => 'required|string',
+            'lat'   => 'nullable|numeric',
+            'lang'  => 'nullable|numeric',
         ]);
 
         $normalizedPhone = $this->normalizePhone($request->phone);
@@ -452,11 +472,27 @@ class AuthController extends Controller
             return response()->json(['error' => 'Invalid or expired OTP'], 401);
         }
 
+        [$latitude, $longitude] = $this->extractGeo($request);
+
         if ($otpEntry->is_verified) {
             $existingUser = User::where('phone', $normalizedPhone)
                 ->orWhere('email', $normalizedPhone)
                 ->first();
-            $pets = $existingUser ? Pet::where('user_id', $existingUser->id)->get() : collect();
+
+            if ($existingUser && ($latitude !== null || $longitude !== null)) {
+                $geoUpdates = [];
+                if ($latitude !== null) {
+                    $geoUpdates['latitude'] = $latitude;
+                }
+                if ($longitude !== null) {
+                    $geoUpdates['longitude'] = $longitude;
+                }
+                if ($geoUpdates) {
+                    $existingUser->forceFill($geoUpdates)->save();
+                }
+            }
+
+            [$pets, $userPets] = $this->loadRelatedPets($existingUser);
             $latestChat = $existingUser ? Chat::where('user_id', $existingUser->id)->latest()->first() : null;
 
             return response()->json([
@@ -464,6 +500,7 @@ class AuthController extends Controller
                 'user_id' => $existingUser?->id,
                 'user'    => $existingUser,
                 'pets'    => $pets,
+                'user_pets' => $userPets,
                 'latest_chat' => $latestChat,
             ], 200);
         }
@@ -476,7 +513,6 @@ class AuthController extends Controller
         $otpEntry->update(['is_verified' => 1]);
 
         $user = $otpUser;
-        [$latitude, $longitude] = $this->extractGeo($request);
 
         if (! $user) {
             $user = User::create([
@@ -490,15 +526,23 @@ class AuthController extends Controller
                 'phone_verified_at' => now(),
             ]);
         } else {
-            $user->forceFill([
+            $geoUpdates = [];
+            if ($latitude !== null) {
+                $geoUpdates['latitude'] = $latitude;
+            }
+            if ($longitude !== null) {
+                $geoUpdates['longitude'] = $longitude;
+            }
+
+            $user->forceFill(array_merge([
                 'phone_verified_at' => $user->phone_verified_at ?? now(),
                 'phone'             => $user->phone ?: $normalizedPhone,
                 'email'             => $user->email ?: $normalizedPhone,
-            ])->save();
+            ], $geoUpdates))->save();
         }
 
         $this->markPhoneVerified($user, $normalizedPhone, $otpEntry);
-        $pets = Pet::where('user_id', $user->id)->get();
+        [$pets, $userPets] = $this->loadRelatedPets($user);
         $latestChat = Chat::where('user_id', $user->id)->latest()->first();
 
         return response()->json([
@@ -506,6 +550,7 @@ class AuthController extends Controller
             'user_id' => $user->id,
             'user'    => $user,
             'pets'    => $pets,
+            'user_pets' => $userPets,
             'latest_chat' => $latestChat,
         ]);
     }
