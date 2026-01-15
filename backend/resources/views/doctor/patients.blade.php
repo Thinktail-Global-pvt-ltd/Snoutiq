@@ -129,6 +129,13 @@
     .pm-record-label{font-size:12px;font-weight:800;color:#111827;margin-bottom:6px;letter-spacing:.01em;text-transform:uppercase}
     .pm-record-value{font-size:13px;color:#0b1220;line-height:1.45}
     .pm-record-actions{display:flex;justify-content:flex-end;margin-top:10px;gap:8px;flex-wrap:wrap}
+    .pm-record-media{margin-top:10px;border:1px solid #dbeafe;background:#f8fafc;border-radius:12px;padding:10px}
+    .pm-record-media img{max-width:100%;height:auto;border-radius:10px;display:block}
+    .pm-record-media iframe{width:100%;height:360px;border:0;border-radius:10px;background:#fff}
+    .pm-record-link{color:#1d4ed8;font-weight:700;text-decoration:none}
+    .pm-record-file{font-size:12px;color:var(--pm-muted);word-break:break-word;margin-top:6px}
+    .pm-record-list{margin:0;padding-left:18px}
+    .pm-record-list li{margin:0 0 4px 0}
     .pm-empty{color:var(--pm-muted);font-size:13px;padding:8px 0}
     .pm-alert{background:#fff1f2;border:1px solid #fecdd3;color:#b91c1c;padding:12px;border-radius:12px;margin:10px 0;font-size:14px}
     .pm-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.45);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:12px;overflow-y:auto}
@@ -723,6 +730,58 @@
     return new Intl.DateTimeFormat(undefined, opts).format(date);
   }
 
+  function normalizeMedications(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  function formatMedicationList(raw) {
+    const meds = normalizeMedications(raw);
+    if (!meds.length) return '';
+    const items = meds.map((med) => {
+      if (!med) return '';
+      if (typeof med === 'string') {
+        const line = escapeHtml(med);
+        return line ? `<li>${line}</li>` : '';
+      }
+      const parts = [];
+      const name = med.name || med.medicine || med.title;
+      if (name) parts.push(escapeHtml(name));
+      if (med.dose) parts.push(`Dose: ${escapeHtml(med.dose)}`);
+      if (med.frequency) parts.push(`Frequency: ${escapeHtml(med.frequency)}`);
+      if (med.duration) parts.push(`Duration: ${escapeHtml(med.duration)}`);
+      if (med.route) parts.push(`Route: ${escapeHtml(med.route)}`);
+      if (med.notes) parts.push(`Notes: ${escapeHtml(med.notes)}`);
+      const line = parts.filter(Boolean).join(' • ');
+      return line ? `<li>${line}</li>` : '';
+    }).filter(Boolean);
+    if (!items.length) return '';
+    return `<ul class="pm-record-list">${items.join('')}</ul>`;
+  }
+
+  function buildRecordPreview(rec) {
+    if (!rec?.url) return '';
+    const url = escapeHtml(rec.url);
+    const fileName = escapeHtml(rec.file_name || 'Document');
+    const mime = String(rec.mime_type || '').toLowerCase();
+    if (mime.startsWith('image/')) {
+      return `<div class="pm-record-media"><img src="${url}" alt="${fileName}" loading="lazy"></div>`;
+    }
+    if (mime === 'application/pdf') {
+      return `<div class="pm-record-media"><iframe src="${url}" title="${fileName}"></iframe></div>`;
+    }
+    return `<div class="pm-record-media"><a class="pm-record-link" href="${url}" target="_blank" rel="noopener">View document</a><div class="pm-record-file">${fileName}</div></div>`;
+  }
+
   async function request(url, options = {}) {
     const headers = Object.assign({ 'Accept': 'application/json' }, options.headers || {});
     const res = await fetch(url, { ...options, headers });
@@ -1074,11 +1133,18 @@
       if (prescription.diagnosis || prescription.diagnosis_status) {
         detailPairs.push({ label: 'Diagnosis', value: `${escapeHtml(prescription.diagnosis || '—')} (${escapeHtml(prescription.diagnosis_status || '—')})` });
       }
+      if (prescription.disease_name) {
+        detailPairs.push({ label: 'Disease', value: escapeHtml(prescription.disease_name) });
+      }
       if (prescription.treatment_plan) {
         detailPairs.push({ label: 'Treatment', value: escapeHtml(prescription.treatment_plan) });
       }
       if (prescription.home_care) {
         detailPairs.push({ label: 'Home care', value: escapeHtml(prescription.home_care) });
+      }
+      const medsHtml = formatMedicationList(prescription.medications_json);
+      if (medsHtml) {
+        detailPairs.push({ label: 'Medicines', value: medsHtml });
       }
       if (prescription.follow_up_date || prescription.follow_up_type || prescription.follow_up_notes) {
         const fuParts = [];
@@ -1093,6 +1159,7 @@
       const detailHtml = detailPairs.length
         ? `<div class="pm-record-details">${detailPairs.map(pair => `<div class="pm-record-row"><div class="pm-record-label">${pair.label}</div><div class="pm-record-value">${pair.value}</div></div>`).join('')}</div>`
         : '';
+      const previewHtml = buildRecordPreview(rec);
       const tags = [];
       if (prescription.case_severity) tags.push(`<span class="pm-tag-soft">${escapeHtml(prescription.case_severity)}</span>`);
       if (prescription.visit_category) tags.push(`<span class="pm-tag-soft">${escapeHtml(prescription.visit_category)}</span>`);
@@ -1107,6 +1174,7 @@
         </div>
         <div class="pm-record-notes">${escapeHtml(rec.notes || 'No notes')}</div>
         ${detailHtml}
+        ${previewHtml}
         <div class="pm-record-actions">
           <button type="button" class="pm-btn pm-primary" data-role="edit-record" data-id="${rec.id}" style="padding:6px 12px">Edit</button>
           <a href="${rec.url}" target="_blank" rel="noopener" class="pm-btn pm-ghost" style="padding:6px 10px">Download</a>
