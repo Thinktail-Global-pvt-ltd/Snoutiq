@@ -175,6 +175,10 @@
     .pm-petBody{flex:1}
     .pm-petName{font-weight:800}
     .pm-petMeta{font-size:12px;color:var(--pm-muted);margin-top:2px}
+    .pm-petActions{display:flex;align-items:center;gap:8px;margin-left:auto}
+    .pm-petDelete{border:1px solid #fecaca;background:#fff1f2;color:#b91c1c;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer}
+    .pm-petDelete:hover{background:#fee2e2}
+    .pm-petDelete:disabled{opacity:.5;cursor:not-allowed}
     .pm-pill{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700;background:#eef2ff;color:#4338ca;border:1px solid #e0e7ff;margin-right:6px}
     /* Make long filenames/notes wrap so content fits without horizontal scroll */
     .pm-records,
@@ -1228,10 +1232,51 @@
       body.appendChild(meta);
       wrap.appendChild(avatar);
       wrap.appendChild(body);
+      const petId = Number(pet.id ?? pet.pet_id);
+      if (Number.isFinite(petId)) {
+        const actions = document.createElement('div');
+        actions.className = 'pm-petActions';
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'pm-petDelete';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.setAttribute('aria-label', `Delete ${pet.name || pet.pet_name || 'pet'}`);
+        deleteBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          handlePetDelete({ ...pet, id: petId }, patient);
+        });
+        actions.appendChild(deleteBtn);
+        wrap.appendChild(actions);
+      }
       els.petList.appendChild(wrap);
     });
     if (els.petCount) {
       els.petCount.textContent = `${combinedPets.length} pet${combinedPets.length === 1 ? '' : 's'}`;
+    }
+  }
+
+  async function handlePetDelete(pet, patient) {
+    if (!pet?.id) return;
+    const petName = pet.name || pet.pet_name || `Pet #${pet.id}`;
+    const patientName = patient?.name || 'this patient';
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: `Delete ${petName}?`,
+      text: `This will remove ${petName} from ${patientName}.`,
+      showCancelButton: true,
+      confirmButtonText: 'Delete',
+      confirmButtonColor: '#ef4444',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await request(`${API_BASE}/pets/${pet.id}`, { method: 'DELETE' });
+      Swal.fire({ icon: 'success', title: 'Pet deleted', timer: 1500, showConfirmButton: false });
+      if (patient?.id || state.selectedId) {
+        state.selectedId = Number(patient?.id ?? state.selectedId);
+      }
+      await loadPatients();
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Delete failed', text: error.message || 'Request failed' });
     }
   }
 
