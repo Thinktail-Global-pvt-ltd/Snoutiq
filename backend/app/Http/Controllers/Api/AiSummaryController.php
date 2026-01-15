@@ -9,72 +9,46 @@ use App\Models\ChatRoom;
 
 class AiSummaryController extends Controller
 {
-    // GET /api/ai/summary?user_id= (optional)
-    // Builds a plain text Q/A summary from chats for the user
+    // GET /api/ai/summary?pet_id= (preferred) or ?user_id= (fallback)
+    // Builds a plain text summary from the pet row
     public function summary(Request $request)
     {
-        // Prefer user-based scope; optionally narrow to a specific chat_room_token if explicitly provided
-        $uid = (int) ($request->query('user_id') ?? 0);
-        if ($uid <= 0 && method_exists($request, 'hasSession') && $request->hasSession()) {
-            $uid = (int) ($request->session()->get('user_id') ?? 0);
+        $petId = (int) ($request->query('pet_id') ?? 0);
+        $userId = (int) ($request->query('user_id') ?? 0);
+        if ($petId <= 0 && $userId <= 0 && method_exists($request, 'hasSession') && $request->hasSession()) {
+            $userId = (int) ($request->session()->get('user_id') ?? 0);
         }
-        $chatRoomToken = (string) $request->query('chat_room_token', '');
 
-        if ($uid <= 0 && !$chatRoomToken) {
+        if ($petId <= 0 && $userId <= 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Provide user_id (or set in session) or chat_room_token'
+                'message' => 'Provide pet_id (preferred) or user_id to locate a pet',
             ], 422);
         }
 
-        $limit = (int) $request->query('limit', 5);
-        $q = DB::table('chats')->orderBy('id', 'desc')->limit($limit);
-
-        // Always constrain by user when available to avoid cross-user leakage
-        if ($uid > 0) {
-            $q->where('user_id', $uid);
-        }
-        // Only filter by room if caller explicitly asked for it
-        if ($chatRoomToken !== '') {
-            $q->where('chat_room_token', $chatRoomToken);
-        }
-        $chats = $q->get(['question','answer','created_at']);
-
-        if ($chats->isEmpty()) {
-            return response()->json([
-                'success' => true,
-                'user_id' => $uid,
-                'summary' => ''
-            ]);
-        }
-
-        $lines = [];
-        foreach ($chats->reverse() as $row) { // chronological
-            if (!empty($row->question)) {
-                $lines[] = 'Q: ' . trim($row->question);
-            }
-            if (!empty($row->answer)) {
-                $lines[] = 'A: ' . trim($row->answer);
-            }
-        }
-        $transcript = trim(implode("\n", $lines));
-
-        // If format=paragraph (or summarize=1), use Gemini to turn Q/A into a paragraph summary
-        $format = (string) $request->query('format', 'qa');
-        $summarize = (string) $request->query('summarize', '0');
-        if ($format === 'paragraph' || $summarize === '1') {
-            $client = new \App\Services\Ai\GeminiClient();
-            $summary = $client->summarizeTranscript($transcript) ?? $transcript;
+        if ($petId > 0) {
+            $pet = DB::table('pets')->where('id', $petId)->first();
         } else {
-            $summary = $transcript;
+            $pet = DB::table('pets')
+                ->where('user_id', $userId)
+                ->orderByDesc('id')
+                ->first();
         }
+
+        if (!$pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found',
+            ], 404);
+        }
+
+        $summary = $this->buildPetRowSummary($pet);
 
         return response()->json([
             'success' => true,
-            'user_id' => $uid,
-            'chat_room_token' => $chatRoomToken,
+            'pet_id' => $pet->id ?? $petId,
+            'user_id' => $pet->user_id ?? ($userId ?: null),
             'summary' => $summary,
-            'count'   => $chats->count(),
         ]);
     }
 
@@ -130,5 +104,31 @@ class AiSummaryController extends Controller
             'assigned_doctor_id' => $doctorId,
             'ai_summary' => $summary,
         ]);
+    }
+
+    private function buildPetRowSummary(object $pet): string
+    {
+        $lines = [];
+        foreach (get_object_vars($pet) as $key => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            if (is_bool($value)) {
+                $value = $value ? 'true' : 'false';
+            } elseif (is_array($value) || is_object($value)) {
+                $value = json_encode($value, JSON_UNESCAPED_SLASHES);
+            }
+
+            $value = is_string($value) ? trim($value) : $value;
+            if ($value === '' || $value === null) {
+                continue;
+            }
+
+            $label = ucwords(str_replace('_', ' ', (string) $key));
+            $lines[] = $label . ': ' . $value;
+        }
+
+        return trim(implode("\n", $lines));
     }
 }

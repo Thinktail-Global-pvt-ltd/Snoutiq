@@ -918,7 +918,7 @@ Route::post('/medical-records', [MedicalRecordController::class, 'store']);
 Route::match(['put','patch'], '/medical-records/{record}', [MedicalRecordController::class, 'update']);
 Route::get('/medical-records/slug/{slug}', [MedicalRecordController::class, 'indexBySlug']);
 
-  // AI Summary from chats
+  // AI Summary from pets
   // Apply 'web' middleware to enable session access from browser-based calls
   Route::middleware('web')->get('/ai/summary', [\App\Http\Controllers\Api\AiSummaryController::class, 'summary']);
   // POST keeps session (web) but skips CSRF so it can be called via fetch()
