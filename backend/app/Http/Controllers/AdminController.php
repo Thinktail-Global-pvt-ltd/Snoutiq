@@ -164,8 +164,7 @@ class AdminController extends Controller
 
     /**
      * ADD PET:
-     * 1) migrate legacy pet fields from users → pets ONCE (idempotent via UNIQUE key)
-     * 2) insert requested pet with ON DUPLICATE KEY UPDATE (no duplicates)
+     * Insert requested pet with ON DUPLICATE KEY UPDATE (no duplicates)
      * Body: { name, breed, pet_age, pet_gender, pet_type?, pet_dob?, microchip_number?, mcd_registration_number?, weight?, is_neutered?, pet_doc1?, pet_doc2? }
      */
     public function addPet(Request $request, $userId)
@@ -213,20 +212,7 @@ class AdminController extends Controller
             $pet_doc1,
             $pet_doc2
         ) {
-
-            // (1) migrate legacy user->pets once
-            DB::statement(
-                'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, pet_doc1, pet_doc2, created_at, updated_at)
-                 SELECT u.id, u.pet_name, u.breed, u.pet_age, u.pet_gender, u.pet_doc1, u.pet_doc2, NOW(), NOW()
-                 FROM users u
-                 WHERE u.id = ?
-                   AND (u.pet_name IS NOT NULL OR u.breed IS NOT NULL OR u.pet_age IS NOT NULL
-                        OR u.pet_gender IS NOT NULL OR u.pet_doc1 IS NOT NULL OR u.pet_doc2 IS NOT NULL)
-                 ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP',
-                [$userId]
-            );
-
-            // (2) insert the new pet (idempotent)
+            // Insert the new pet (idempotent)
             DB::statement(
                 'INSERT INTO pets (user_id, name, breed, pet_age, pet_gender, pet_type, pet_dob, microchip_number, mcd_registration_number, weight, is_neutered, pet_doc1, pet_doc2, created_at, updated_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
