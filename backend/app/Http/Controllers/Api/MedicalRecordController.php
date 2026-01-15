@@ -57,6 +57,7 @@ class MedicalRecordController extends Controller
 
         $recordFilePath = null;
         $recordFileMime = null;
+        $recordFileExt = null;
 
         $clinicId = (int) $validated['clinic_id'];
         if ((int) $record->vet_registeration_id !== $clinicId) {
@@ -102,6 +103,7 @@ class MedicalRecordController extends Controller
             $record->mime_type = $file->getClientMimeType();
             $recordFilePath = $storedPath;
             $recordFileMime = $record->mime_type;
+            $recordFileExt = strtolower($file->getClientOriginalExtension() ?: pathinfo($storedPath, PATHINFO_EXTENSION));
         }
 
         $record->notes = $validated['notes'] ?? $record->notes;
@@ -137,8 +139,11 @@ class MedicalRecordController extends Controller
             'pet_id' => $petId ?? $prescription->pet_id,
             'medications_json' => $medsJson ?? $prescription->medications_json,
         ]);
-        if ($recordFilePath && str_starts_with((string) $recordFileMime, 'image/')) {
-            $prescription->image_path = $recordFilePath;
+        if ($recordFilePath) {
+            $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'svg'];
+            $isImageUpload = str_starts_with((string) $recordFileMime, 'image/')
+                || ($recordFileExt && in_array($recordFileExt, $imageExtensions, true));
+            $prescription->image_path = $isImageUpload ? $recordFilePath : null;
         }
         $prescription->save();
 
@@ -237,6 +242,7 @@ class MedicalRecordController extends Controller
         $file = $request->file('record_file');
         $storedPath = $file->store('medical-records', 'public');
         $fileMimeType = $file->getClientMimeType();
+        $fileExtension = strtolower($file->getClientOriginalExtension() ?: pathinfo($storedPath, PATHINFO_EXTENSION));
 
         $record = MedicalRecord::create([
             'user_id' => $user->id,
@@ -273,9 +279,10 @@ class MedicalRecordController extends Controller
             'pet_id' => $petId,
             'medications_json' => $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
-        if (str_starts_with((string) $fileMimeType, 'image/')) {
-            $prescriptionPayload['image_path'] = $storedPath;
-        }
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'svg'];
+        $isImageUpload = str_starts_with((string) $fileMimeType, 'image/')
+            || ($fileExtension && in_array($fileExtension, $imageExtensions, true));
+        $prescriptionPayload['image_path'] = $isImageUpload ? $storedPath : null;
         $prescription = Prescription::create($prescriptionPayload);
         if (!$prescription || !$prescription->exists) {
             return response()->json([
