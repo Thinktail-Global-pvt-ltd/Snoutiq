@@ -8,13 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Pet;
 
 class PrescriptionController extends Controller
 {
-    // GET /api/prescriptions?user_id=&doctor_id=
+    // GET /api/prescriptions?user_id=&doctor_id=&pet_id=
     public function index(Request $request)
     {
         $query = Prescription::query()->orderByDesc('id');
@@ -24,6 +25,9 @@ class PrescriptionController extends Controller
         }
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', (int) $request->query('doctor_id'));
+        }
+        if ($request->filled('pet_id') && Schema::hasColumn('prescriptions', 'pet_id')) {
+            $query->where('pet_id', (int) $request->query('pet_id'));
         }
 
         $prescriptions = $query->paginate(20);
