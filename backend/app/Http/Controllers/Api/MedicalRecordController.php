@@ -56,9 +56,6 @@ class MedicalRecordController extends Controller
         ]);
 
         $recordFilePath = null;
-        $recordFileMime = null;
-        $recordFileExt = null;
-        $recordFileTempPath = null;
 
         $clinicId = (int) $validated['clinic_id'];
         if ((int) $record->vet_registeration_id !== $clinicId) {
@@ -98,14 +95,17 @@ class MedicalRecordController extends Controller
 
         if ($request->hasFile('record_file')) {
             $file = $request->file('record_file');
-            $recordFileTempPath = $file->getPathname();
             $storedPath = $file->store('medical-records', 'public');
+            if (!$storedPath || !is_string($storedPath)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'File upload failed',
+                ], 500);
+            }
             $record->file_path = $storedPath;
             $record->file_name = $file->getClientOriginalName();
             $record->mime_type = $file->getClientMimeType();
             $recordFilePath = $storedPath;
-            $recordFileMime = $record->mime_type;
-            $recordFileExt = strtolower($file->getClientOriginalExtension() ?: pathinfo($storedPath, PATHINFO_EXTENSION));
         }
 
         $record->notes = $validated['notes'] ?? $record->notes;
@@ -142,8 +142,7 @@ class MedicalRecordController extends Controller
             'medications_json' => $medsJson ?? $prescription->medications_json,
         ]);
         if ($recordFilePath) {
-            $isImageUpload = $this->isImageUpload($recordFileMime, $recordFileExt, $recordFilePath, $recordFileTempPath);
-            $prescription->image_path = $isImageUpload ? $recordFilePath : null;
+            $prescription->image_path = $recordFilePath;
         }
         $prescription->save();
 
@@ -241,9 +240,12 @@ class MedicalRecordController extends Controller
 
         $file = $request->file('record_file');
         $storedPath = $file->store('medical-records', 'public');
-        $fileMimeType = $file->getClientMimeType();
-        $fileExtension = strtolower($file->getClientOriginalExtension() ?: pathinfo($storedPath, PATHINFO_EXTENSION));
-
+        if (!$storedPath || !is_string($storedPath)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'File upload failed',
+            ], 500);
+        }
         $record = MedicalRecord::create([
             'user_id' => $user->id,
             'doctor_id' => $doctorId,
@@ -279,8 +281,7 @@ class MedicalRecordController extends Controller
             'pet_id' => $petId,
             'medications_json' => $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
-        $isImageUpload = $this->isImageUpload($fileMimeType, $fileExtension, $storedPath, $file->getPathname());
-        $prescriptionPayload['image_path'] = $isImageUpload ? $storedPath : null;
+        $prescriptionPayload['image_path'] = $storedPath;
         $prescription = Prescription::create($prescriptionPayload);
         if (!$prescription || !$prescription->exists) {
             return response()->json([
