@@ -58,6 +58,7 @@ class MedicalRecordController extends Controller
         $recordFilePath = null;
         $recordFileMime = null;
         $recordFileExt = null;
+        $recordFileTempPath = null;
 
         $clinicId = (int) $validated['clinic_id'];
         if ((int) $record->vet_registeration_id !== $clinicId) {
@@ -97,6 +98,7 @@ class MedicalRecordController extends Controller
 
         if ($request->hasFile('record_file')) {
             $file = $request->file('record_file');
+            $recordFileTempPath = $file->getPathname();
             $storedPath = $file->store('medical-records', 'public');
             $record->file_path = $storedPath;
             $record->file_name = $file->getClientOriginalName();
@@ -140,7 +142,7 @@ class MedicalRecordController extends Controller
             'medications_json' => $medsJson ?? $prescription->medications_json,
         ]);
         if ($recordFilePath) {
-            $isImageUpload = $this->isImageUpload($recordFileMime, $recordFileExt, $recordFilePath);
+            $isImageUpload = $this->isImageUpload($recordFileMime, $recordFileExt, $recordFilePath, $recordFileTempPath);
             $prescription->image_path = $isImageUpload ? $recordFilePath : null;
         }
         $prescription->save();
@@ -277,7 +279,7 @@ class MedicalRecordController extends Controller
             'pet_id' => $petId,
             'medications_json' => $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
-        $isImageUpload = $this->isImageUpload($fileMimeType, $fileExtension, $storedPath);
+        $isImageUpload = $this->isImageUpload($fileMimeType, $fileExtension, $storedPath, $file->getPathname());
         $prescriptionPayload['image_path'] = $isImageUpload ? $storedPath : null;
         $prescription = Prescription::create($prescriptionPayload);
         if (!$prescription || !$prescription->exists) {
@@ -434,7 +436,7 @@ class MedicalRecordController extends Controller
         }
     }
 
-    private function isImageUpload(?string $mimeType, ?string $extension, ?string $storedPath): bool
+    private function isImageUpload(?string $mimeType, ?string $extension, ?string $storedPath, ?string $tempPath = null): bool
     {
         $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'svg', 'jfif', 'heic', 'heif', 'avif'];
         $normalizedExt = strtolower((string) $extension);
@@ -447,11 +449,34 @@ class MedicalRecordController extends Controller
             return true;
         }
 
+        if ($tempPath && is_file($tempPath)) {
+            try {
+                $info = @getimagesize($tempPath);
+                if ($info !== false) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // Ignore detection failures and fall back to other checks.
+            }
+        }
+
         if ($storedPath) {
             try {
                 $detectedMime = Storage::disk('public')->mimeType($storedPath);
                 if ($detectedMime && str_starts_with(strtolower($detectedMime), 'image/')) {
                     return true;
+                }
+            } catch (\Throwable $e) {
+                // Ignore detection failures and fall back to other checks.
+            }
+
+            try {
+                $fullPath = Storage::disk('public')->path($storedPath);
+                if ($fullPath && is_file($fullPath)) {
+                    $info = @getimagesize($fullPath);
+                    if ($info !== false) {
+                        return true;
+                    }
                 }
             } catch (\Throwable $e) {
                 // Ignore detection failures and fall back to other checks.
