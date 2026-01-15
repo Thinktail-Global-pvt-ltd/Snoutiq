@@ -761,6 +761,13 @@ public function register(Request $request)
     [$latitude, $longitude] = $this->extractGeo($request);
     $petType = $request->filled('pet_type') ? $request->input('pet_type') : null;
     $petDob = $request->filled('pet_dob') ? $request->input('pet_dob') : null;
+    $petAgeMonths = null;
+    if ($request->filled('pet_age_months')) {
+        $ageMonthsRaw = $request->input('pet_age_months');
+        if (is_numeric($ageMonthsRaw)) {
+            $petAgeMonths = (int) $ageMonthsRaw;
+        }
+    }
     $weightRaw = $request->filled('pet_weight') ? $request->input('pet_weight') : $request->input('weight');
     $petWeight = null;
     if ($weightRaw !== null && $weightRaw !== '' && is_numeric($weightRaw)) {
@@ -768,7 +775,7 @@ public function register(Request $request)
     }
 
     try {
-        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petWeight) {
+        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petAgeMonths, $petWeight) {
             // ✅ Update user with final details
             $user->fill([
                 'pet_name'    => $request->pet_name,
@@ -800,6 +807,9 @@ public function register(Request $request)
             }
             if ($petDob !== null) {
                 $petAttributes['pet_dob'] = $petDob;
+            }
+            if ($petAgeMonths !== null) {
+                $petAttributes['pet_age_months'] = $petAgeMonths;
             }
             if ($petWeight !== null) {
                 $petAttributes['weight'] = $petWeight;
@@ -866,6 +876,15 @@ public function register(Request $request)
         $summaryText = $this->describePetImageDynamic($imagePath);
     }
 
+    $petDob = $request->filled('pet_dob') ? $request->input('pet_dob') : null;
+    $petAgeMonths = null;
+    if ($request->filled('pet_age_months')) {
+        $ageMonthsRaw = $request->input('pet_age_months');
+        if (is_numeric($ageMonthsRaw)) {
+            $petAgeMonths = (int) $ageMonthsRaw;
+        }
+    }
+
     // ✅ user create (password bina hash)
     $user = User::create([
         'name'        => $request->fullName,
@@ -889,6 +908,26 @@ public function register(Request $request)
     $plainToken = bin2hex(random_bytes(32));
     $tokenExpiresAt = now()->addDays(30);
     $this->assignTokenToModel($user, hash('sha256', $plainToken), $tokenExpiresAt);
+
+    $petAttributes = [
+        'name'       => $request->pet_name,
+        'breed'      => $request->breed,
+        'pet_age'    => $request->pet_age,
+        'pet_gender' => $request->pet_gender,
+        'pet_doc1'   => $doc1Path,
+        'pet_doc2'   => $doc2Path,
+    ];
+    if ($petDob !== null) {
+        $petAttributes['pet_dob'] = $petDob;
+    }
+    if ($petAgeMonths !== null) {
+        $petAttributes['pet_age_months'] = $petAgeMonths;
+    }
+    if ($request->filled('pet_type')) {
+        $petAttributes['pet_type'] = $request->input('pet_type');
+    }
+
+    Pet::updateOrCreate(['user_id' => $user->id], $petAttributes);
 
     return response()->json([
         'message'    => 'User registered successfully',
@@ -954,6 +993,15 @@ public function register(Request $request)
             $summaryText = $this->describePetImageDynamic($imagePath);
         }
 
+        $petDob = $request->filled('pet_dob') ? $request->input('pet_dob') : null;
+        $petAgeMonths = null;
+        if ($request->filled('pet_age_months')) {
+            $ageMonthsRaw = $request->input('pet_age_months');
+            if (is_numeric($ageMonthsRaw)) {
+                $petAgeMonths = (int) $ageMonthsRaw;
+            }
+        }
+
         $user = User::create([
             'name'        => $request->fullName,
             'email'       => $mobileNumber,
@@ -974,6 +1022,26 @@ public function register(Request $request)
 
         $plainToken = bin2hex(random_bytes(32));
         $this->assignTokenToModel($user, hash('sha256', $plainToken), now()->addDays(30));
+
+        $petAttributes = [
+            'name'       => $request->pet_name,
+            'breed'      => $request->breed,
+            'pet_age'    => $request->pet_age,
+            'pet_gender' => $request->pet_gender,
+            'pet_doc1'   => $doc1Path,
+            'pet_doc2'   => $doc2Path,
+        ];
+        if ($petDob !== null) {
+            $petAttributes['pet_dob'] = $petDob;
+        }
+        if ($petAgeMonths !== null) {
+            $petAttributes['pet_age_months'] = $petAgeMonths;
+        }
+        if ($request->filled('pet_type')) {
+            $petAttributes['pet_type'] = $request->input('pet_type');
+        }
+
+        Pet::updateOrCreate(['user_id' => $user->id], $petAttributes);
 
         return response()->json([
             'message'    => 'User registered successfully (mobile)',
