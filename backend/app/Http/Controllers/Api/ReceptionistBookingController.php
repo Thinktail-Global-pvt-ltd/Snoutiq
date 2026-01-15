@@ -388,6 +388,9 @@ class ReceptionistBookingController extends Controller
             'pet_type' => 'nullable|string|max:120',
             'pet_breed' => 'nullable|string|max:120',
             'pet_gender' => 'nullable|string|max:50',
+            'pet_age' => 'nullable|integer|min:0|max:255',
+            'pet_age_months' => 'nullable|integer|min:0|max:255',
+            'pet_dob' => 'nullable|date',
             'last_vet_id' => 'nullable|integer|exists:vet_registerations_temp,id',
         ], [
             'phone.unique' => 'A patient with this phone number already exists.',
@@ -455,6 +458,20 @@ class ReceptionistBookingController extends Controller
                 'name' => $data['pet_name'],
                 'breed' => $data['pet_breed'] ?? 'Unknown',
             ];
+
+            if (Schema::hasColumn('pets', 'pet_age') && array_key_exists('pet_age', $data) && $data['pet_age'] !== null) {
+                $petPayload['pet_age'] = (int) $data['pet_age'];
+            }
+            if (Schema::hasColumn('pets', 'pet_age_months') && array_key_exists('pet_age_months', $data) && $data['pet_age_months'] !== null) {
+                $petPayload['pet_age_months'] = (int) $data['pet_age_months'];
+            }
+            if (array_key_exists('pet_dob', $data) && $data['pet_dob']) {
+                if (Schema::hasColumn('pets', 'pet_dob')) {
+                    $petPayload['pet_dob'] = $data['pet_dob'];
+                } elseif (Schema::hasColumn('pets', 'dob')) {
+                    $petPayload['dob'] = $data['pet_dob'];
+                }
+            }
 
             if (Schema::hasColumn('pets', 'type')) {
                 $petPayload['type'] = $data['pet_type'] ?? 'dog';
