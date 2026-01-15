@@ -9,6 +9,7 @@ use App\Models\Prescription;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
@@ -95,17 +96,23 @@ class MedicalRecordController extends Controller
 
         if ($request->hasFile('record_file')) {
             $file = $request->file('record_file');
-            $storedPath = $file->store('medical-records', 'public');
-            if (!$storedPath || !is_string($storedPath)) {
+            if (!$file->isValid()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $file->getErrorMessage(),
+                ], 422);
+            }
+            $filePayload = $this->storeRecordFile($file);
+            if (!$filePayload) {
                 return response()->json([
                     'success' => false,
                     'error' => 'File upload failed',
                 ], 500);
             }
-            $record->file_path = $storedPath;
-            $record->file_name = $file->getClientOriginalName();
-            $record->mime_type = $file->getClientMimeType();
-            $recordFilePath = $storedPath;
+            $record->file_path = $filePayload['path'];
+            $record->file_name = $filePayload['name'];
+            $record->mime_type = $filePayload['mime'];
+            $recordFilePath = $filePayload['path'];
         }
 
         $record->notes = $validated['notes'] ?? $record->notes;
@@ -239,8 +246,14 @@ class MedicalRecordController extends Controller
         }
 
         $file = $request->file('record_file');
-        $storedPath = $file->store('medical-records', 'public');
-        if (!$storedPath || !is_string($storedPath)) {
+        if (!$file || !$file->isValid()) {
+            return response()->json([
+                'success' => false,
+                'error' => $file ? $file->getErrorMessage() : 'File upload failed',
+            ], 422);
+        }
+        $filePayload = $this->storeRecordFile($file);
+        if (!$filePayload) {
             return response()->json([
                 'success' => false,
                 'error' => 'File upload failed',
@@ -250,9 +263,9 @@ class MedicalRecordController extends Controller
             'user_id' => $user->id,
             'doctor_id' => $doctorId,
             'vet_registeration_id' => $clinicId,
-            'file_path' => $storedPath,
-            'file_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType(),
+            'file_path' => $filePayload['path'],
+            'file_name' => $filePayload['name'],
+            'mime_type' => $filePayload['mime'],
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -281,7 +294,7 @@ class MedicalRecordController extends Controller
             'pet_id' => $petId,
             'medications_json' => $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
-        $prescriptionPayload['image_path'] = $storedPath;
+        $prescriptionPayload['image_path'] = $filePayload['path'];
         $prescription = Prescription::create($prescriptionPayload);
         if (!$prescription || !$prescription->exists) {
             return response()->json([
@@ -398,6 +411,87 @@ class MedicalRecordController extends Controller
         return null;
     }
 
+    private function storeRecordFile($file): ?array
+    {
+        if (!$file || !$file->isValid()) {
+            return null;
+        }
+
+        $directory = 'medical-records';
+        $filename = $file->hashName();
+        $storedPath = null;
+
+        try {
+            $disk = Storage::disk('public');
+            $disk->makeDirectory($directory);
+            $path = $disk->putFileAs($directory, $file, $filename);
+            if (is_string($path)) {
+                $storedPath = $path;
+            }
+        } catch (\Throwable $e) {
+            $storedPath = null;
+        }
+
+        if (!$storedPath) {
+            foreach ($this->recordFileTargets() as $target) {
+                $dest = rtrim($target['root'], DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $directory;
+                try {
+                    File::ensureDirectoryExists($dest);
+                    $file->move($dest, $filename);
+                    $prefix = $target['prefix'] !== '' ? trim($target['prefix'], '/\\') . '/' : '';
+                    $storedPath = $prefix . $directory . '/' . $filename;
+                    break;
+                } catch (\Throwable $e) {
+                    $storedPath = null;
+                }
+            }
+        }
+
+        if (!$storedPath || !is_string($storedPath)) {
+            return null;
+        }
+
+        return [
+            'path' => $storedPath,
+            'name' => $file->getClientOriginalName(),
+            'mime' => $file->getClientMimeType(),
+        ];
+    }
+
+    private function recordFileTargets(): array
+    {
+        $targets = [];
+        $publicRoot = rtrim(public_path(), DIRECTORY_SEPARATOR);
+        $storageRoot = rtrim(storage_path('app/public'), DIRECTORY_SEPARATOR);
+        $diskRoot = rtrim((string) config('filesystems.disks.public.root', ''), DIRECTORY_SEPARATOR);
+
+        if ($diskRoot !== '') {
+            $prefix = '';
+            if ($publicRoot !== '' && str_starts_with($diskRoot, $publicRoot)) {
+                $suffix = trim(substr($diskRoot, strlen($publicRoot)), DIRECTORY_SEPARATOR);
+                $prefix = $suffix;
+            } elseif ($diskRoot === $storageRoot) {
+                $prefix = 'storage';
+            }
+            $targets[] = ['root' => $diskRoot, 'prefix' => $prefix];
+        }
+
+        $targets[] = ['root' => $publicRoot, 'prefix' => ''];
+        $targets[] = ['root' => $storageRoot, 'prefix' => 'storage'];
+
+        $seen = [];
+        $unique = [];
+        foreach ($targets as $target) {
+            if ($target['root'] === '' || isset($seen[$target['root']])) {
+                continue;
+            }
+            $seen[$target['root']] = true;
+            $unique[] = $target;
+        }
+
+        return $unique;
+    }
+
     private function updatePetHealthState(int $userId, int $petId, bool $isChronic, ?string $diseaseName): void
     {
         if (!Schema::hasTable('pets')) {
@@ -435,56 +529,6 @@ class MedicalRecordController extends Controller
             $updates['updated_at'] = now();
             DB::table('pets')->where('id', $petId)->update($updates);
         }
-    }
-
-    private function isImageUpload(?string $mimeType, ?string $extension, ?string $storedPath, ?string $tempPath = null): bool
-    {
-        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'svg', 'jfif', 'heic', 'heif', 'avif'];
-        $normalizedExt = strtolower((string) $extension);
-        if ($normalizedExt && in_array($normalizedExt, $imageExtensions, true)) {
-            return true;
-        }
-
-        $normalizedMime = strtolower((string) $mimeType);
-        if ($normalizedMime && str_starts_with($normalizedMime, 'image/')) {
-            return true;
-        }
-
-        if ($tempPath && is_file($tempPath)) {
-            try {
-                $info = @getimagesize($tempPath);
-                if ($info !== false) {
-                    return true;
-                }
-            } catch (\Throwable $e) {
-                // Ignore detection failures and fall back to other checks.
-            }
-        }
-
-        if ($storedPath) {
-            try {
-                $detectedMime = Storage::disk('public')->mimeType($storedPath);
-                if ($detectedMime && str_starts_with(strtolower($detectedMime), 'image/')) {
-                    return true;
-                }
-            } catch (\Throwable $e) {
-                // Ignore detection failures and fall back to other checks.
-            }
-
-            try {
-                $fullPath = Storage::disk('public')->path($storedPath);
-                if ($fullPath && is_file($fullPath)) {
-                    $info = @getimagesize($fullPath);
-                    if ($info !== false) {
-                        return true;
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Ignore detection failures and fall back to other checks.
-            }
-        }
-
-        return false;
     }
 
     private function maybeStructureMedicines(?string $raw, ?string $diagnosis, ?string $notes): ?array
