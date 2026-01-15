@@ -31,6 +31,10 @@ class PrescriptionController extends Controller
         }
 
         $prescriptions = $query->paginate(20);
+        $prescriptions->getCollection()->transform(function ($prescription) {
+            $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+            return $prescription;
+        });
         return response()->json($prescriptions);
     }
 
@@ -41,7 +45,9 @@ class PrescriptionController extends Controller
         if (!$prescription) {
             return response()->json(['message' => 'Prescription not found'], 404);
         }
-        return response()->json($prescription);
+        return response()->json(array_merge($prescription->toArray(), [
+            'image_url' => $this->buildPrescriptionUrl($prescription->image_path),
+        ]));
     }
 
     // GET /api/doctors/{doctorId}/prescriptions?user_id=
@@ -55,7 +61,13 @@ class PrescriptionController extends Controller
             $query->where('user_id', (int) $request->query('user_id'));
         }
 
-        return response()->json($query->paginate(20));
+        $prescriptions = $query->paginate(20);
+        $prescriptions->getCollection()->transform(function ($prescription) {
+            $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+            return $prescription;
+        });
+
+        return response()->json($prescriptions);
     }
 
     // GET /api/users/medical-summary?user_id=
@@ -93,6 +105,11 @@ class PrescriptionController extends Controller
             ->get();
 
         $primaryPet = $pets->first();
+
+        $prescriptions = $prescriptions->map(function ($prescription) {
+            $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+            return $prescription;
+        });
 
         return response()->json([
             'success' => true,
@@ -205,5 +222,28 @@ class PrescriptionController extends Controller
                 'image_url' => $imageUrl,
             ]),
         ], 201);
+    }
+
+    private function buildPrescriptionUrl(?string $imagePath): ?string
+    {
+        $imagePath = trim((string) $imagePath);
+        if ($imagePath === '' || $imagePath === '0') {
+            return null;
+        }
+
+        if (str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')) {
+            return $imagePath;
+        }
+
+        $imagePath = ltrim($imagePath, '/');
+        $diskUrl = Storage::disk('public')->url($imagePath);
+        $path = parse_url($diskUrl, PHP_URL_PATH) ?? $diskUrl;
+        $path = '/' . ltrim($path, '/');
+        $prefix = trim(config('app.path_prefix') ?? env('APP_PATH_PREFIX', ''), '/');
+        if ($prefix && $prefix !== '') {
+            $path = '/' . trim($prefix, '/') . $path;
+        }
+
+        return url($path);
     }
 }
