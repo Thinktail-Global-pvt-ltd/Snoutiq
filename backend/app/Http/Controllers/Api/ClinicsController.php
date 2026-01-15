@@ -196,10 +196,6 @@ class ClinicsController extends Controller
                 'u.name',
                 'u.email',
                 'u.phone',
-                'u.pet_name',
-                'u.pet_gender',
-                'u.pet_age',
-                'u.breed',
                 'u.updated_at',
                 DB::raw('COALESCE(mr.total_records, 0) as records_count'),
                 'mr.last_record_at'

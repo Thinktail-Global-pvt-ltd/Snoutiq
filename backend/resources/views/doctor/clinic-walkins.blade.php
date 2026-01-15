@@ -960,14 +960,6 @@
     if (Array.isArray(patient.pets) && patient.pets.length) {
       return patient.pets[0];
     }
-    if (patient.pet_name || patient.breed || patient.pet_gender || patient.pet_age) {
-      return {
-        name: patient.pet_name,
-        breed: patient.breed,
-        gender: patient.pet_gender,
-        pet_age: patient.pet_age,
-      };
-    }
     return null;
   }
 
@@ -975,15 +967,6 @@
     if (!patient) return [];
     if (Array.isArray(patient.pets) && patient.pets.length) {
       return patient.pets;
-    }
-    if (patient.pet_name || patient.breed || patient.pet_gender || patient.pet_age) {
-      return [{
-        id: 'legacy',
-        name: patient.pet_name,
-        breed: patient.breed,
-        gender: patient.pet_gender,
-        pet_age: patient.pet_age,
-      }];
     }
     return [];
   }
@@ -1022,8 +1005,6 @@
         return (p.name || '').toLowerCase().includes(q)
           || (p.email || '').toLowerCase().includes(q)
           || (p.phone || '').toLowerCase().includes(q)
-          || (p.pet_name || '').toLowerCase().includes(q)
-          || (p.breed || '').toLowerCase().includes(q)
           || (Array.isArray(p.pets) && p.pets.some((pet) => {
             const petName = (pet.name || pet.pet_name || '').toLowerCase();
             const petBreed = (pet.breed || '').toLowerCase();
@@ -1090,11 +1071,11 @@
       row.className = 'pm-row' + (Number(patient.id) === Number(state.selectedId) ? ' is-active' : '');
       row.onclick = () => selectPatient(patient.id);
 
-      const primaryPet = getPrimaryPet(patient) || {};
+      const primaryPet = getPrimaryPet(patient);
 
       const avatar = document.createElement('div');
       avatar.className = 'pm-avatar';
-      avatar.textContent = String(primaryPet.name || patient.pet_name || patient.name || '?').charAt(0).toUpperCase();
+      avatar.textContent = String(primaryPet?.name || patient.name || '?').charAt(0).toUpperCase();
 
       const info = document.createElement('div');
       info.className = 'pm-info';
@@ -1103,9 +1084,10 @@
       name.textContent = `${patient.name || 'Patient'}  #${patient.id}`;
       const meta = document.createElement('div');
       meta.className = 'pm-meta';
-      const petName = primaryPet.name || patient.pet_name || 'Pet -';
-      const petBreed = primaryPet.breed || patient.breed || 'Breed -';
-      meta.innerHTML = `${escapeHtml(petName)} | ${escapeHtml(petBreed)}<br>${escapeHtml(patient.phone || 'Phone -')} | ${escapeHtml(patient.email || 'Email -')}`;
+      const petMeta = primaryPet
+        ? `${escapeHtml(primaryPet.name || 'Pet')} | ${escapeHtml(primaryPet.breed || 'Breed -')}`
+        : 'No pets on file';
+      meta.innerHTML = `${petMeta}<br>${escapeHtml(patient.phone || 'Phone -')} | ${escapeHtml(patient.email || 'Email -')}`;
       const badges = document.createElement('div');
       badges.className = 'pm-badges';
       const recBadge = document.createElement('span');
@@ -1155,16 +1137,20 @@
       return;
     }
 
-    const primaryPet = getPrimaryPet(patient) || {};
+    const primaryPet = getPrimaryPet(patient);
 
-    els.profileAvatar.textContent = String(primaryPet.name || patient.pet_name || patient.name || '?').charAt(0).toUpperCase();
+    els.profileAvatar.textContent = String(primaryPet?.name || patient.name || '?').charAt(0).toUpperCase();
     els.profileName.textContent = patient.name || 'Patient';
-    const petName = primaryPet.name || patient.pet_name || 'Pet -';
-    const petBreed = primaryPet.breed || patient.breed || 'Breed -';
-    const petGender = primaryPet.gender || patient.pet_gender || 'Gender -';
-    const petAge = primaryPet.pet_age ?? primaryPet.age ?? patient.pet_age;
-    const petAgeLabel = (petAge || petAge === 0) ? petAge : '-';
-    els.profileSub.textContent = `${petName} | ${petBreed} | ${petGender} | Age: ${petAgeLabel}`;
+    if (primaryPet) {
+      const petName = primaryPet.name || 'Pet';
+      const petBreed = primaryPet.breed || 'Breed -';
+      const petGender = primaryPet.gender || primaryPet.pet_gender || 'Gender -';
+      const petAge = primaryPet.pet_age ?? primaryPet.age;
+      const petAgeLabel = (petAge || petAge === 0) ? petAge : '-';
+      els.profileSub.textContent = `${petName} | ${petBreed} | ${petGender} | Age: ${petAgeLabel}`;
+    } else {
+      els.profileSub.textContent = 'No pets on file.';
+    }
     els.profileMeta.textContent = `Phone: ${patient.phone || '-'} | Email: ${patient.email || '-'}`;
     const cachedRecords = state.records.get(Number(patient.id));
     const recordTotal = Array.isArray(cachedRecords) ? cachedRecords.length : (patient.records_count || 0);
@@ -1190,16 +1176,8 @@
     }
 
     const pets = Array.isArray(patient.pets) ? patient.pets : [];
-    const hasLegacyPet = patient.pet_name || patient.breed || patient.pet_gender || patient.pet_age;
-    const combinedPets = pets.length ? pets : (hasLegacyPet ? [{
-      id: 'legacy',
-      name: patient.pet_name,
-      breed: patient.breed,
-      gender: patient.pet_gender,
-      pet_age: patient.pet_age,
-    }] : []);
 
-    if (!combinedPets.length) {
+    if (!pets.length) {
       els.petEmpty.textContent = 'No pets yet for this patient.';
       els.petEmpty.style.display = 'block';
       if (els.petCount) els.petCount.textContent = '0 pets';
@@ -1207,7 +1185,7 @@
     }
 
     els.petEmpty.style.display = 'none';
-    combinedPets.forEach((pet) => {
+    pets.forEach((pet) => {
       const wrap = document.createElement('div');
       wrap.className = 'pm-petRow';
       const avatar = document.createElement('div');
@@ -1251,7 +1229,7 @@
       els.petList.appendChild(wrap);
     });
     if (els.petCount) {
-      els.petCount.textContent = `${combinedPets.length} pet${combinedPets.length === 1 ? '' : 's'}`;
+      els.petCount.textContent = `${pets.length} pet${pets.length === 1 ? '' : 's'}`;
     }
   }
 
@@ -1586,9 +1564,13 @@
     const patient = state.patients.find((p) => Number(p.id) === Number(state.selectedId));
     if (patient) {
       els.modalPatient.textContent = `${patient.name || 'Patient'} | #${patient.id}`;
-      const petLine = [patient.pet_name, patient.breed, patient.pet_age ? `Age: ${patient.pet_age}` : null]
-        .filter(Boolean)
-        .join(' | ');
+      const primaryPet = getPrimaryPet(patient);
+      const petAge = primaryPet?.pet_age ?? primaryPet?.age;
+      const petLine = primaryPet
+        ? [primaryPet.name || 'Pet', primaryPet.breed, (petAge || petAge === 0) ? `Age: ${petAge}` : null]
+          .filter(Boolean)
+          .join(' | ')
+        : '';
       if (els.modalPet) {
         els.modalPet.textContent = petLine || '';
       }
@@ -2066,11 +2048,6 @@
           tag.textContent = `${pet.name || pet.pet_name || 'Pet'} (${pet.species || pet.pet_type || pet.type || 'Pet'})`;
           tags.appendChild(tag);
         });
-      } else if (patient.pet_name) {
-        const tag = document.createElement('span');
-        tag.className = 'patient-result-tag';
-        tag.textContent = `${patient.pet_name} (${patient.breed || patient.pet_type || 'Pet'})`;
-        tags.appendChild(tag);
       }
 
       info.appendChild(name);

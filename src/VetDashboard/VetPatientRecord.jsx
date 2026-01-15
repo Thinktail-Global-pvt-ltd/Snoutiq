@@ -17,6 +17,11 @@ const formatDate = (value) => {
   return isNaN(date.getTime()) ? value : date.toLocaleDateString();
 };
 
+const getPrimaryPet = (patient) => {
+  const pets = Array.isArray(patient?.pets) ? patient.pets : [];
+  return pets.length ? pets[0] : null;
+};
+
 const VetPatientRecord = () => {
   const { user } = useAuth();
   const [patients, setPatients] = useState([]);
@@ -32,6 +37,12 @@ const VetPatientRecord = () => {
     notes: "",
     file: null,
   });
+  const selectedPet = getPrimaryPet(selectedPatient);
+  const selectedPetName = selectedPet?.name || selectedPet?.pet_name || null;
+  const selectedPetBreed = selectedPet?.breed || null;
+  const selectedPetAge = selectedPet?.pet_age ?? selectedPet?.age;
+  const selectedPetGender =
+    selectedPet?.gender || selectedPet?.pet_gender || null;
 
   // Modal states
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
@@ -409,8 +420,29 @@ const VetPatientRecord = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {patients.map((patient) => (
-                    <tr key={patient.id} className="hover:bg-gray-50">
+                  {patients.map((patient) => {
+                    const primaryPet = getPrimaryPet(patient);
+                    const hasPet = Boolean(primaryPet);
+                    const petName =
+                      primaryPet?.name ||
+                      primaryPet?.pet_name ||
+                      "No pets on file";
+                    const petBreed = hasPet
+                      ? primaryPet?.breed || "Unknown breed"
+                      : "-";
+                    const petAge = primaryPet?.pet_age ?? primaryPet?.age;
+                    const petAgeLabel = hasPet
+                      ? petAge || petAge === 0
+                        ? `${petAge} years`
+                        : "Age unknown"
+                      : "-";
+                    const petGender = hasPet
+                      ? primaryPet?.gender ||
+                        primaryPet?.pet_gender ||
+                        "Unknown gender"
+                      : "-";
+                    return (
+                      <tr key={patient.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -435,16 +467,13 @@ const VetPatientRecord = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {patient.pet_name || "No pet"}
+                          {petName}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {patient.breed || "Unknown breed"}
+                          {petBreed}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {patient.pet_age
-                            ? `${patient.pet_age} years`
-                            : "Age unknown"}{" "}
-                          • {patient.pet_gender || "Unknown gender"}
+                          {petAgeLabel} • {petGender}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -488,7 +517,8 @@ const VetPatientRecord = () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -576,21 +606,21 @@ const VetPatientRecord = () => {
                         <div className="space-y-1">
                           <p className="text-sm">
                             <span className="font-medium">Pet Name:</span>{" "}
-                            {selectedPatient.pet_name || "Not provided"}
+                            {selectedPetName || "Not provided"}
                           </p>
                           <p className="text-sm">
                             <span className="font-medium">Breed:</span>{" "}
-                            {selectedPatient.breed || "Not provided"}
+                            {selectedPetBreed || "Not provided"}
                           </p>
                           <p className="text-sm">
                             <span className="font-medium">Age:</span>{" "}
-                            {selectedPatient.pet_age
-                              ? `${selectedPatient.pet_age} years`
+                            {selectedPetAge || selectedPetAge === 0
+                              ? `${selectedPetAge} years`
                               : "Not provided"}
                           </p>
                           <p className="text-sm">
                             <span className="font-medium">Gender:</span>{" "}
-                            {selectedPatient.pet_gender || "Not provided"}
+                            {selectedPetGender || "Not provided"}
                           </p>
                         </div>
                       </div>
