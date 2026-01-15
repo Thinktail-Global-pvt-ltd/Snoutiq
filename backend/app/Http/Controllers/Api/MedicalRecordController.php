@@ -140,9 +140,7 @@ class MedicalRecordController extends Controller
             'medications_json' => $medsJson ?? $prescription->medications_json,
         ]);
         if ($recordFilePath) {
-            $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'svg'];
-            $isImageUpload = str_starts_with((string) $recordFileMime, 'image/')
-                || ($recordFileExt && in_array($recordFileExt, $imageExtensions, true));
+            $isImageUpload = $this->isImageUpload($recordFileMime, $recordFileExt, $recordFilePath);
             $prescription->image_path = $isImageUpload ? $recordFilePath : null;
         }
         $prescription->save();
@@ -279,9 +277,7 @@ class MedicalRecordController extends Controller
             'pet_id' => $petId,
             'medications_json' => $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
-        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'svg'];
-        $isImageUpload = str_starts_with((string) $fileMimeType, 'image/')
-            || ($fileExtension && in_array($fileExtension, $imageExtensions, true));
+        $isImageUpload = $this->isImageUpload($fileMimeType, $fileExtension, $storedPath);
         $prescriptionPayload['image_path'] = $isImageUpload ? $storedPath : null;
         $prescription = Prescription::create($prescriptionPayload);
         if (!$prescription || !$prescription->exists) {
@@ -405,6 +401,12 @@ class MedicalRecordController extends Controller
             return;
         }
 
+        $hasHealthState = Schema::hasColumn('pets', 'health_state');
+        $hasSuggestedDisease = Schema::hasColumn('pets', 'suggested_disease');
+        if (!$hasHealthState && !$hasSuggestedDisease) {
+            return;
+        }
+
         $pet = DB::table('pets')
             ->where('id', $petId)
             ->where(function ($q) use ($userId) {
@@ -419,10 +421,10 @@ class MedicalRecordController extends Controller
         }
 
         $updates = [];
-        if ($isChronic) {
+        if ($isChronic && $hasHealthState) {
             $updates['health_state'] = 'chronic';
         }
-        if ($diseaseName) {
+        if ($diseaseName && $hasSuggestedDisease) {
             $updates['suggested_disease'] = $diseaseName;
         }
 
@@ -430,6 +432,33 @@ class MedicalRecordController extends Controller
             $updates['updated_at'] = now();
             DB::table('pets')->where('id', $petId)->update($updates);
         }
+    }
+
+    private function isImageUpload(?string $mimeType, ?string $extension, ?string $storedPath): bool
+    {
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'svg', 'jfif', 'heic', 'heif', 'avif'];
+        $normalizedExt = strtolower((string) $extension);
+        if ($normalizedExt && in_array($normalizedExt, $imageExtensions, true)) {
+            return true;
+        }
+
+        $normalizedMime = strtolower((string) $mimeType);
+        if ($normalizedMime && str_starts_with($normalizedMime, 'image/')) {
+            return true;
+        }
+
+        if ($storedPath) {
+            try {
+                $detectedMime = Storage::disk('public')->mimeType($storedPath);
+                if ($detectedMime && str_starts_with(strtolower($detectedMime), 'image/')) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // Ignore detection failures and fall back to other checks.
+            }
+        }
+
+        return false;
     }
 
     private function maybeStructureMedicines(?string $raw, ?string $diagnosis, ?string $notes): ?array
