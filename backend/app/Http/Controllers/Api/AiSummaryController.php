@@ -3,14 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\GeminiConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use App\Models\ChatRoom;
 
 class AiSummaryController extends Controller
 {
     // GET /api/ai/summary?pet_id= (preferred) or ?user_id= (fallback)
-    // Builds a plain text summary from the pet row
+    // Builds a 2-line Gemini summary from the pet row
     public function summary(Request $request)
     {
         $petId = (int) ($request->query('pet_id') ?? 0);
@@ -42,7 +44,16 @@ class AiSummaryController extends Controller
             ], 404);
         }
 
-        $summary = $this->buildPetRowSummary($pet);
+        $rawContext = $this->buildPetRowSummary($pet);
+        $format = strtolower((string) $request->query('format', ''));
+        $summarize = (string) $request->query('summarize', '');
+        $forceRaw = $format === 'raw' || $summarize === '0';
+
+        if ($forceRaw) {
+            $summary = $rawContext;
+        } else {
+            $summary = $this->summarizePetWithGemini($rawContext) ?? $rawContext;
+        }
 
         return response()->json([
             'success' => true,
@@ -130,5 +141,96 @@ class AiSummaryController extends Controller
         }
 
         return trim(implode("\n", $lines));
+    }
+
+    private function summarizePetWithGemini(string $petContext): ?string
+    {
+        $context = trim($petContext);
+        if ($context === '') {
+            return null;
+        }
+
+        $apiKey = trim((string) (config('services.gemini.api_key') ?? env('GEMINI_API_KEY') ?? GeminiConfig::apiKey()));
+        if ($apiKey === '') {
+            return null;
+        }
+
+        if (strlen($context) > 8000) {
+            $context = substr($context, 0, 8000);
+        }
+
+        $prompt = "You are a veterinary assistant. Based ONLY on the pet record and document references below, write a concise 2-line summary for a doctor.\n" .
+                  "Rules:\n" .
+                  "- Return exactly two lines, each line one short sentence.\n" .
+                  "- Use only provided facts; do not guess or add new details.\n" .
+                  "- Mention if documents/images are available when present.\n" .
+                  "Pet record:\n" . $context;
+
+        $models = array_values(array_unique(array_filter(array_merge(
+            [GeminiConfig::chatModel()],
+            GeminiConfig::summaryModels(),
+            [GeminiConfig::defaultModel()]
+        ))));
+
+        foreach ($models as $model) {
+            $endpoint = sprintf('https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent', $model);
+            $payload = [
+                'contents' => [[
+                    'role' => 'user',
+                    'parts' => [['text' => $prompt]],
+                ]],
+                'generationConfig' => [
+                    'temperature' => 0.3,
+                    'topP' => 0.9,
+                    'topK' => 24,
+                    'maxOutputTokens' => 160,
+                ],
+            ];
+
+            try {
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                    'X-goog-api-key' => $apiKey,
+                ])->post($endpoint, $payload);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            if (!$response->successful()) {
+                if ($response->status() === 404) {
+                    continue;
+                }
+                return null;
+            }
+
+            $text = $response->json('candidates.0.content.parts.0.text');
+            $normalized = $this->normalizeTwoLineSummary((string) $text);
+            if ($normalized !== '') {
+                return $normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeTwoLineSummary(string $text): string
+    {
+        $clean = trim(str_replace("\r\n", "\n", $text));
+        if ($clean === '') {
+            return '';
+        }
+
+        $lines = array_values(array_filter(array_map('trim', preg_split("/\n+/", $clean))));
+        if (count($lines) >= 2) {
+            return $lines[0] . "\n" . $lines[1];
+        }
+
+        $sentenceParts = preg_split('/(?<=[.!?])\s+/', $clean);
+        $sentenceParts = array_values(array_filter(array_map('trim', $sentenceParts)));
+        if (count($sentenceParts) >= 2) {
+            return $sentenceParts[0] . "\n" . $sentenceParts[1];
+        }
+
+        return $clean;
     }
 }
