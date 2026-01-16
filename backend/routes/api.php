@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\DashboardProfileController;
 use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\ClinicServicePresetController;
 use App\Http\Controllers\Api\VetRegistrationReportController;
+use App\Http\Controllers\Api\VaccinationBookingController;
 use App\Models\User;
 use App\Models\DeviceToken;
 use App\Models\Doctor;
@@ -158,6 +159,26 @@ Route::get('/doctor/profile', function (Request $request) {
         return response()->json(['message' => 'Doctor not found'], 404);
     }
 
+    $clinic = null;
+    if (!empty($doctor->vet_registeration_id)) {
+        $clinicRow = VetRegisterationTemp::find($doctor->vet_registeration_id);
+        if ($clinicRow) {
+            $clinic = [
+                'id' => $clinicRow->id,
+                'name' => $clinicRow->name ?? null,
+                'slug' => $clinicRow->slug ?? null,
+                'email' => $clinicRow->email ?? null,
+                'mobile' => $clinicRow->mobile ?? null,
+                'address' => $clinicRow->address ?? null,
+                'city' => $clinicRow->city ?? null,
+                'pincode' => $clinicRow->pincode ?? null,
+                'image' => $clinicRow->image ?? null,
+                'clinic_profile' => $clinicRow->clinic_profile ?? null,
+                'hospital_profile' => $clinicRow->hospital_profile ?? null,
+            ];
+        }
+    }
+
     return response()->json([
         'data' => [
             'id' => $doctor->id,
@@ -171,6 +192,7 @@ Route::get('/doctor/profile', function (Request $request) {
             'doctors_price' => $doctor->doctors_price,
             'vet_registeration_id' => $doctor->vet_registeration_id,
             'staff_role' => $doctor->staff_role,
+            'clinic' => $clinic,
         ],
     ]);
 });
@@ -869,6 +891,15 @@ Route::get('/doctors/{id}', [DoctorController::class, 'show']);
 Route::put('/doctors/{id}', [DoctorController::class, 'update']);
 Route::get('/doctors/{id}/bookings', [\App\Http\Controllers\Api\BookingsController::class, 'doctorBookings']);
 Route::get('/socket/doctors/{doctor}', [\App\Http\Controllers\Api\SocketDoctorController::class, 'show']);
+
+Route::prefix('vaccination')->group(function () {
+    Route::get('/clinics', [VaccinationBookingController::class, 'clinics']);
+    Route::get('/clinics/{clinicId}/slots', [VaccinationBookingController::class, 'slots']);
+    Route::post('/bookings', [VaccinationBookingController::class, 'store']);
+    Route::patch('/bookings/{id}', [VaccinationBookingController::class, 'update']);
+    Route::post('/bookings/{id}/pay', [VaccinationBookingController::class, 'pay']);
+    Route::get('/bookings/{id}', [VaccinationBookingController::class, 'show']);
+});
 
 // Coverage endpoints
 Route::get('/coverage/dashboard', [\App\Http\Controllers\Api\CoverageController::class, 'dashboard']);
