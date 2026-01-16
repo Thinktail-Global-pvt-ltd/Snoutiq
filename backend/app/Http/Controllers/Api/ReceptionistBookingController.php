@@ -10,6 +10,7 @@ use App\Models\Receptionist;
 use App\Models\Appointment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -368,6 +369,10 @@ class ReceptionistBookingController extends Controller
             $request->merge(['phone' => $phone !== '' ? $phone : null]);
         }
 
+        if ($request->filled('pet_weight') && !$request->filled('weight')) {
+            $request->merge(['weight' => $request->input('pet_weight')]);
+        }
+
         $hasRoleColumn = Schema::hasColumn('users', 'role');
         $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
 
@@ -391,6 +396,10 @@ class ReceptionistBookingController extends Controller
             'pet_age' => 'nullable|integer|min:0|max:255',
             'pet_age_months' => 'nullable|integer|min:0|max:255',
             'pet_dob' => 'nullable|date',
+            'weight' => 'nullable|numeric|min:0',
+            'pet_doc1' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
+            'pet_image' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
+            'pet_pic' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
             'last_vet_id' => 'nullable|integer|exists:vet_registerations_temp,id',
         ], [
             'phone.unique' => 'A patient with this phone number already exists.',
@@ -472,6 +481,9 @@ class ReceptionistBookingController extends Controller
                     $petPayload['dob'] = $data['pet_dob'];
                 }
             }
+            if (Schema::hasColumn('pets', 'weight') && array_key_exists('weight', $data) && $data['weight'] !== null) {
+                $petPayload['weight'] = (float) $data['weight'];
+            }
 
             if (Schema::hasColumn('pets', 'type')) {
                 $petPayload['type'] = $data['pet_type'] ?? 'dog';
@@ -483,6 +495,15 @@ class ReceptionistBookingController extends Controller
                 $petPayload['pet_gender'] = $data['pet_gender'] ?? 'unknown';
             } elseif (Schema::hasColumn('pets', 'gender')) {
                 $petPayload['gender'] = $data['pet_gender'] ?? 'unknown';
+            }
+
+            $petDocPath = $this->storePetDocument($request);
+            if ($petDocPath) {
+                if (Schema::hasColumn('pets', 'pet_doc1')) {
+                    $petPayload['pet_doc1'] = $petDocPath;
+                } elseif (Schema::hasColumn('pets', 'pic_link')) {
+                    $petPayload['pic_link'] = $petDocPath;
+                }
             }
 
             $now = now();
@@ -500,6 +521,15 @@ class ReceptionistBookingController extends Controller
                 'type' => $data['pet_type'] ?? 'dog',
                 'breed' => $data['pet_breed'] ?? 'Unknown',
             ];
+            if (isset($petPayload['weight'])) {
+                $pet->weight = $petPayload['weight'];
+            }
+            if (isset($petPayload['pet_doc1'])) {
+                $pet->pet_doc1 = $petPayload['pet_doc1'];
+            }
+            if (isset($petPayload['pic_link'])) {
+                $pet->pic_link = $petPayload['pic_link'];
+            }
         }
 
         return response()->json([
@@ -521,6 +551,36 @@ class ReceptionistBookingController extends Controller
                 ] : null,
             ],
         ], 201);
+    }
+
+    private function storePetDocument(Request $request): ?string
+    {
+        $field = null;
+        foreach (['pet_doc1', 'pet_image', 'pet_pic'] as $candidate) {
+            if ($request->hasFile($candidate)) {
+                $field = $candidate;
+                break;
+            }
+        }
+
+        if (!$field) {
+            return null;
+        }
+
+        $file = $request->file($field);
+        if (!$file || !$file->isValid()) {
+            return null;
+        }
+
+        $uploadPath = public_path('uploads/pet_docs');
+        if (!File::exists($uploadPath)) {
+            File::makeDirectory($uploadPath, 0777, true, true);
+        }
+
+        $docName = time().'_'.uniqid().'_'.$file->getClientOriginalName();
+        $file->move($uploadPath, $docName);
+
+        return 'backend/uploads/pet_docs/'.$docName;
     }
 
     public function storeBooking(Request $request)
