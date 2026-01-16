@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 // use App
 use App\Http\Controllers\Api\UnifiedIntelligenceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\RoleLoginController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\Groomer\ProfileController as GroomerProfileController;
 use App\Http\Controllers\Api\Groomer\ServiceCategoryController as GroomerServiceCategoryController;
@@ -579,6 +580,7 @@ Route::post('/auth/register-via-mobile', [AuthController::class, 'registerViaMob
 Route::post('/auth/initial-register', [AuthController::class, 'createInitialRegistration']);
 Route::post('/auth/initial-register-mobile', [AuthController::class, 'createInitialRegistrationMobile']);
 Route::post('/auth/login',      [AuthController::class, 'login']);
+Route::post('/auth/role-login', [RoleLoginController::class, 'login']);
 Route::post('/auth/pet-summary', [AuthController::class, 'generatePetSummary']);
 Route::get('/clinics/{clinic}/payments', [AuthController::class, 'clinicPayments']);
 Route::get('/clinics/payments', [AuthController::class, 'clinicPayments']);
