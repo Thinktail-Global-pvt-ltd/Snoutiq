@@ -525,10 +525,10 @@ class ReceptionistBookingController extends Controller
                 $pet->weight = $petPayload['weight'];
             }
             if (isset($petPayload['pet_doc1'])) {
-                $pet->pet_doc1 = $petPayload['pet_doc1'];
+                $pet->pet_doc1 = url($petPayload['pet_doc1']);
             }
             if (isset($petPayload['pic_link'])) {
-                $pet->pic_link = $petPayload['pic_link'];
+                $pet->pic_link = url($petPayload['pic_link']);
             }
         }
 
