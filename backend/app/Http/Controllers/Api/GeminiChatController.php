@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use App\Models\Chat;
 use App\Models\ChatRoom;
+use App\Models\Pet;
 use Illuminate\Support\Str;
 use App\Support\GeminiConfig;
 use App\Services\Ai\DogDiseaseSuggester;
@@ -1315,33 +1316,43 @@ PROMPT;
         ]);
     }
 
-    // Simple wrapper to support POST /api/summary with { user_id }
+    // Simple wrapper to support POST /api/summary with { pet_id }
     public function summary(Request $request)
     {
         $data = $request->validate([
-            'user_id'         => 'required|integer',
-            // chat_room_token no longer required; optional for backward compatibility
-            //'chat_room_token' => 'sometimes|string',
+            'pet_id'  => 'required|integer',
+            'user_id' => 'nullable|integer',
         ]);
 
-        $token = $data['chat_room_token'] ?? null;
-        if (!$token) {
-            // Resolve user's latest room; fail if none
-            $room = ChatRoom::where('user_id', $data['user_id'])
-                ->orderBy('updated_at', 'desc')
-                ->first();
-
-            if (!$room) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No chat room found for this user',
-                ], 404);
-            }
-            $token = $room->chat_room_token;
+        $pet = Pet::find($data['pet_id']);
+        if (!$pet) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Pet not found',
+            ], 404);
         }
 
-        // Delegate to summarizeRoom which also validates room ownership
-        return $this->summarizeRoom($request, $token);
+        if (!empty($data['user_id']) && $pet->user_id && (int) $pet->user_id !== (int) $data['user_id']) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Pet does not belong to the provided user',
+            ], 403);
+        }
+
+        $payload = null;
+        if (!empty($pet->dog_disease_payload)) {
+            $decoded = json_decode($pet->dog_disease_payload, true);
+            if (is_array($decoded)) {
+                $payload = $decoded;
+            }
+        }
+
+        return response()->json([
+            'status'           => 'success',
+            'pet_id'           => $pet->id,
+            'reported_symptom' => $pet->reported_symptom,
+            'dog_disease_payload' => $payload,
+        ]);
     }
 
     /**
