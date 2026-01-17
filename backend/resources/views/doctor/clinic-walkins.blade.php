@@ -787,10 +787,6 @@
             <input id="diagnosis" name="diagnosis" type="text" class="record-input" placeholder="Diagnosis (e.g. UTI)">
           </div>
           <div class="record-field">
-            <label class="record-label" for="disease-name">Disease name (for pet record)</label>
-            <input id="disease-name" name="disease_name" type="text" class="record-input" placeholder="e.g. Canine distemper">
-          </div>
-          <div class="record-field">
             <label class="record-label" for="diagnosis-status">Status</label>
             <select id="diagnosis-status" name="diagnosis_status" class="record-input">
               <option value="new">New</option>
@@ -810,11 +806,6 @@
         <div class="record-field">
           <label class="record-label" for="home-care">Home care / precautions</label>
           <textarea id="home-care" name="home_care" class="record-input record-textarea" placeholder="Home care / precautions"></textarea>
-        </div>
-        <div class="record-field">
-          <label class="record-label" for="medicines">Medicines (AI will structure and save)</label>
-          <textarea id="medicines" name="medicines" class="record-input record-textarea" placeholder="Amoxicillin 500mg twice daily for 5 days; Probiotic sachet once daily for 7 days"></textarea>
-          <div class="record-note">Provide plain text; Gemini will extract and save dosage, frequency, and duration.</div>
         </div>
       </div>
 
@@ -839,10 +830,6 @@
               <option value="video">Video Consultation</option>
             </select>
           </div>
-        </div>
-        <div class="record-field" style="margin-top:8px">
-          <label class="record-label" for="follow-up-notes">Follow-up notes</label>
-          <textarea id="follow-up-notes" name="follow_up_notes" class="record-input record-textarea" placeholder="Follow-up notes"></textarea>
         </div>
       </div>
 
@@ -1393,9 +1380,6 @@
       if (prescription.diagnosis || prescription.diagnosis_status) {
         detailPairs.push({ label: 'Diagnosis', value: `${escapeHtml(prescription.diagnosis || '-')} (${escapeHtml(prescription.diagnosis_status || '-')})` });
       }
-      if (prescription.disease_name) {
-        detailPairs.push({ label: 'Disease', value: escapeHtml(prescription.disease_name) });
-      }
       if (prescription.treatment_plan) {
         detailPairs.push({ label: 'Treatment', value: escapeHtml(prescription.treatment_plan) });
       }
@@ -1406,11 +1390,10 @@
       if (medsHtml) {
         detailPairs.push({ label: 'Medicines', value: medsHtml });
       }
-      if (prescription.follow_up_date || prescription.follow_up_type || prescription.follow_up_notes) {
+      if (prescription.follow_up_date || prescription.follow_up_type) {
         const fuParts = [];
         if (prescription.follow_up_date) fuParts.push(`Date: ${escapeHtml(prescription.follow_up_date)}`);
         if (prescription.follow_up_type) fuParts.push(`Type: ${escapeHtml(prescription.follow_up_type)}`);
-        if (prescription.follow_up_notes) fuParts.push(`Notes: ${escapeHtml(prescription.follow_up_notes)}`);
         detailPairs.push({ label: 'Follow-up', value: fuParts.join(' | ') });
       }
       if (petLabel) {
@@ -1619,7 +1602,6 @@
     mapValue('home-care', prescription.home_care ?? '');
     mapValue('follow-up-date', prescription.follow_up_date ?? '');
     mapValue('follow-up-type', prescription.follow_up_type ?? '');
-    mapValue('follow-up-notes', prescription.follow_up_notes ?? '');
     mapValue('record-pet', prescription.pet_id ?? rec.pet_id ?? '');
     toggleCriticalSections(els.caseSeverity?.value || 'general');
   }
@@ -1729,18 +1711,6 @@
       }
       if (!formData.get('pet_id')) {
         formData.delete('pet_id');
-      }
-      const meds = (formData.get('medicines') || '').toString().trim();
-      if (!meds) {
-        formData.delete('medicines');
-      } else {
-        formData.set('medicines', meds);
-      }
-      const diseaseName = (formData.get('disease_name') || '').toString().trim();
-      if (!diseaseName) {
-        formData.delete('disease_name');
-      } else {
-        formData.set('disease_name', diseaseName);
       }
       let url = `${API_BASE}/medical-records`;
       if (state.editingRecordId || formData.get('record_id')) {
