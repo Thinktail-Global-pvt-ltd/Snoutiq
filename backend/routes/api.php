@@ -58,6 +58,12 @@ use App\Http\Controllers\Api\PetVaccinationRecordController;
 use App\Http\Controllers\Api\ErrorLogController;
 use App\Http\Controllers\Api\WhatsAppMessageController;
 use App\Http\Controllers\Api\CallSessionCrudController;
+use App\Http\Controllers\Api\V1\OtpController as V1OtpController;
+use App\Http\Controllers\Api\V1\VaccinationController as V1VaccinationController;
+use App\Http\Controllers\Api\V1\VaccinationDoctorController as V1VaccinationDoctorController;
+use App\Http\Controllers\Api\V1\VaccinationSlotController as V1VaccinationSlotController;
+use App\Http\Controllers\Api\V1\VaccinationBookingController as V1VaccinationBookingController;
+use App\Http\Controllers\Api\V1\VaccinationPaymentController as V1VaccinationPaymentController;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
@@ -71,6 +77,24 @@ Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
 Route::post('/whatsapp/broadcast/users', [WhatsAppMessageController::class, 'broadcastToUsers']);
 Route::post('/whatsapp/send/new-year', [WhatsAppMessageController::class, 'sendNewYearTemplate']);
 Route::post('/whatsapp/broadcast/new-year', [WhatsAppMessageController::class, 'broadcastNewYearTemplate']);
+
+Route::prefix('v1')->group(function () {
+    Route::post('/auth/otp/request', [V1OtpController::class, 'request']);
+    Route::post('/auth/otp/verify', [V1OtpController::class, 'verify']);
+
+    Route::middleware('auth.api_token')->group(function () {
+        Route::get('/vaccinations', [V1VaccinationController::class, 'index']);
+        Route::get('/doctors', [V1VaccinationDoctorController::class, 'index']);
+        Route::get('/cities', [V1VaccinationDoctorController::class, 'cities']);
+        Route::get('/slots', [V1VaccinationSlotController::class, 'index']);
+        Route::post('/bookings', [V1VaccinationBookingController::class, 'store']);
+        Route::get('/bookings/{bookingId}', [V1VaccinationBookingController::class, 'show']);
+        Route::post('/bookings/{bookingId}/cancel', [V1VaccinationBookingController::class, 'cancel']);
+        Route::post('/payments/init', [V1VaccinationPaymentController::class, 'init']);
+    });
+
+    Route::post('/payments/webhook', [V1VaccinationPaymentController::class, 'webhook']);
+});
 
 use App\Http\Controllers\Api\VetController;
 use App\Http\Controllers\Api\AdminOnboardingStatusController;
@@ -1007,6 +1031,9 @@ Route::middleware('web')->prefix('dashboard/profile')->group(function () {
         ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
     Route::put('/doctor/{doctor}', [DashboardProfileController::class, 'updateDoctor'])
         ->name('api.dashboard.profile.doctor')
+        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::put('/password', [DashboardProfileController::class, 'updatePassword'])
+        ->name('api.dashboard.profile.password')
         ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 });
 

@@ -21,6 +21,11 @@ class AppointmentSubmissionController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
+        $petValidation = ['nullable', 'integer'];
+        if (Schema::hasTable('pets')) {
+            $petValidation[] = 'exists:pets,id';
+        }
+
         $validated = $request->validate([
             'user_id' => ['nullable', 'integer'],
             'patient_id' => ['nullable', 'integer'],
@@ -30,6 +35,7 @@ class AppointmentSubmissionController extends Controller
             'patient_phone' => ['nullable', 'string', 'max:20'],
             'patient_email' => ['nullable', 'email', 'max:191'],
             'pet_name' => ['nullable', 'string', 'max:255'],
+            'pet_id' => $petValidation,
             'date' => ['required', 'date'],
             'time_slot' => ['required', 'string', 'max:50'],
             'amount' => ['nullable', 'integer'],
@@ -109,6 +115,7 @@ class AppointmentSubmissionController extends Controller
         $appointment = Appointment::create([
             'vet_registeration_id' => $clinic->id,
             'doctor_id' => $doctor->id,
+            'pet_id' => $validated['pet_id'] ?? null,
             'name' => $validated['patient_name'],
             'mobile' => $validated['patient_phone'] ?? ($user->phone ?? null),
             'pet_name' => $validated['pet_name'] ?? null,
@@ -197,6 +204,11 @@ class AppointmentSubmissionController extends Controller
 
     public function update(Request $request, Appointment $appointment): JsonResponse
     {
+        $petValidation = ['sometimes', 'nullable', 'integer'];
+        if (Schema::hasTable('pets')) {
+            $petValidation[] = 'exists:pets,id';
+        }
+
         $validated = $request->validate([
             'user_id' => ['sometimes', 'required', 'integer', 'exists:users,id'],
             'clinic_id' => ['sometimes', 'required', 'integer', 'exists:vet_registerations_temp,id'],
@@ -204,6 +216,7 @@ class AppointmentSubmissionController extends Controller
             'patient_name' => ['sometimes', 'required', 'string', 'max:255'],
             'patient_phone' => ['sometimes', 'nullable', 'string', 'max:20'],
             'pet_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'pet_id' => $petValidation,
             'date' => ['sometimes', 'required', 'date'],
             'time_slot' => ['sometimes', 'required', 'string', 'max:50'],
             'status' => ['sometimes', 'required', 'string', 'max:24'],
@@ -248,6 +261,10 @@ class AppointmentSubmissionController extends Controller
 
         if (array_key_exists('pet_name', $validated)) {
             $appointment->pet_name = $validated['pet_name'];
+        }
+
+        if (array_key_exists('pet_id', $validated)) {
+            $appointment->pet_id = $validated['pet_id'];
         }
 
         if (array_key_exists('date', $validated)) {
@@ -430,6 +447,7 @@ class AppointmentSubmissionController extends Controller
                 'phone' => $appointment->mobile,
                 'email' => $notes['patient_email'] ?? null,
             ],
+            'pet_id' => $appointment->pet_id,
             'date' => $appointment->appointment_date,
             'time_slot' => $appointment->appointment_time,
             'status' => $appointment->status,

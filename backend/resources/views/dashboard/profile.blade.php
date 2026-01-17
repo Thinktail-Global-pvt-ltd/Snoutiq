@@ -213,6 +213,38 @@
     </form>
   </div>
 
+  @if(in_array($sessionRole, ['clinic_admin', 'doctor', 'receptionist'], true))
+    <div id="password-section" class="bg-white rounded-2xl shadow border border-gray-100">
+      <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between px-6 py-4 border-b border-gray-100">
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900">Password & Security</h3>
+          <p class="text-sm text-gray-500">Update the password used to sign in to this account.</p>
+        </div>
+      </div>
+      <form id="password-form" class="p-6 grid gap-4 md:grid-cols-2">
+        <div class="md:col-span-2">
+          <p class="text-xs text-gray-500">Use at least 6 characters. If you never set a password, leave current blank.</p>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Current Password</label>
+          <input name="current_password" type="password" autocomplete="current-password" class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">New Password</label>
+          <input name="new_password" type="password" minlength="6" autocomplete="new-password" class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" required>
+        </div>
+        <div class="md:col-span-2">
+          <label class="text-sm font-medium text-gray-700">Confirm New Password</label>
+          <input name="new_password_confirmation" type="password" minlength="6" autocomplete="new-password" class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" required>
+        </div>
+        <div class="md:col-span-2 flex justify-end gap-3">
+          <button type="reset" class="px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">Reset</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Update password</button>
+        </div>
+      </form>
+    </div>
+  @endif
+
   <div class="bg-white rounded-2xl shadow border border-gray-100">
     <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between px-6 py-4 border-b border-gray-100">
       <div>
@@ -286,6 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
     summaryAddress: document.getElementById('summary-address'),
     doctorContext: document.getElementById('doctor-context'),
     clinicForm: document.getElementById('clinic-form'),
+    passwordForm: document.getElementById('password-form'),
     clinicEditPill: document.getElementById('clinic-edit-pill'),
     refreshBtn: document.getElementById('refresh-profile'),
     clinicQrImage: document.getElementById('clinic-qr-image'),
@@ -670,6 +703,35 @@ document.addEventListener('DOMContentLoaded', () => {
     els.clinicForm.addEventListener('reset', (event) => {
       event.preventDefault();
       fillClinicForm(profilePayload?.clinic || null);
+    });
+  }
+
+  if (els.passwordForm) {
+    els.passwordForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(els.passwordForm);
+      const payload = Object.fromEntries(formData.entries());
+      try {
+        const res = await fetch(`${API_BASE}/dashboard/profile/password`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': CSRF_TOKEN,
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.error || data?.message || 'Unable to update password');
+        }
+        Swal.fire({ icon: 'success', title: 'Password updated', timer: 1400, showConfirmButton: false });
+        els.passwordForm.reset();
+      } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Update failed', text: error.message || 'Unable to update password.' });
+      }
     });
   }
 

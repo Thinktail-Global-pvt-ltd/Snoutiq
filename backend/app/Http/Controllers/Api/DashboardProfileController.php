@@ -7,6 +7,8 @@ use App\Models\Doctor;
 use App\Models\Receptionist;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class DashboardProfileController extends Controller
@@ -63,17 +65,20 @@ class DashboardProfileController extends Controller
                 break;
             }
         }
-        if (!$clinicId && $role === 'receptionist') {
+        $receptionistId = null;
+        if ($role === 'receptionist') {
             $receptionistId = $session->get('receptionist_id')
                 ?? data_get($sessionAuth, 'receptionist_id')
                 ?? data_get($sessionAuth, 'user_id')
                 ?? $session->get('user_id')
                 ?? data_get($sessionUser, 'id');
-            if ($receptionistId) {
-                $rec = Receptionist::find((int) $receptionistId);
-                if ($rec?->vet_registeration_id) {
-                    $clinicId = (int) $rec->vet_registeration_id;
-                }
+            $receptionistId = $receptionistId ? (int) $receptionistId : null;
+        }
+
+        if (!$clinicId && $role === 'receptionist' && $receptionistId) {
+            $rec = Receptionist::find($receptionistId);
+            if ($rec?->vet_registeration_id) {
+                $clinicId = (int) $rec->vet_registeration_id;
             }
         }
 
@@ -89,6 +94,7 @@ class DashboardProfileController extends Controller
             'role' => $role,
             'clinic_id' => $clinicId,
             'doctor_id' => $doctorId && $doctorId > 0 ? $doctorId : null,
+            'receptionist_id' => $receptionistId,
             'can_edit_clinic' => $role === 'clinic_admin',
             'can_edit_doctor' => in_array($role, ['clinic_admin', 'doctor'], true),
         ];
@@ -138,6 +144,19 @@ class DashboardProfileController extends Controller
 
         $trimmed = trim($value);
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    protected function passwordMatches(?string $storedPassword, string $providedPassword): bool
+    {
+        if ($storedPassword === null || $storedPassword === '') {
+            return false;
+        }
+
+        if (Str::startsWith($storedPassword, '$2y$') || Str::startsWith($storedPassword, '$argon2')) {
+            return Hash::check($providedPassword, $storedPassword);
+        }
+
+        return hash_equals((string) $storedPassword, $providedPassword);
     }
 
     protected function referralCodeForClinic(VetRegisterationTemp $clinic): string
@@ -355,6 +374,164 @@ class DashboardProfileController extends Controller
             'success' => true,
             'message' => 'Doctor profile updated successfully.',
             'doctor' => $fresh,
+        ]);
+    }
+
+    /**
+     * PUT /api/dashboard/profile/password
+     */
+    public function updatePassword(Request $request)
+    {
+        $ctx = $this->resolveContext($request);
+        if (! in_array($ctx['role'], ['clinic_admin', 'doctor', 'receptionist'], true)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Password updates are available for clinic, doctor, and receptionist accounts only.',
+            ], 403);
+        }
+
+        $payload = $request->validate([
+            'current_password' => 'nullable|string',
+            'new_password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $currentPassword = (string) ($payload['current_password'] ?? '');
+        $newPassword = (string) ($payload['new_password'] ?? '');
+        $hashedPassword = Hash::make($newPassword);
+
+        if ($ctx['role'] === 'clinic_admin') {
+            if (! $ctx['clinic_id']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Clinic profile not found.',
+                ], 404);
+            }
+            if (! Schema::hasColumn('vet_registerations_temp', 'password')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Password updates are not enabled for this clinic.',
+                ], 400);
+            }
+            $clinic = VetRegisterationTemp::query()->find($ctx['clinic_id']);
+            if (! $clinic) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Clinic profile not found.',
+                ], 404);
+            }
+            $storedPassword = (string) ($clinic->password ?? '');
+            if ($storedPassword !== '') {
+                if ($currentPassword === '') {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Current password is required.',
+                    ], 422);
+                }
+                if (! $this->passwordMatches($storedPassword, $currentPassword)) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Current password is incorrect.',
+                    ], 422);
+                }
+            }
+            $clinic->password = $hashedPassword;
+            $clinic->save();
+        } elseif ($ctx['role'] === 'doctor') {
+            if (! $ctx['doctor_id']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Doctor profile not found.',
+                ], 404);
+            }
+            $doctor = Doctor::query()->find($ctx['doctor_id']);
+            if (! $doctor) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Doctor profile not found.',
+                ], 404);
+            }
+            $columns = [];
+            if (Schema::hasColumn('doctors', 'password')) {
+                $columns[] = 'password';
+            }
+            if (Schema::hasColumn('doctors', 'doctor_password')) {
+                $columns[] = 'doctor_password';
+            }
+            if (! $columns) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Password updates are not enabled for doctors.',
+                ], 400);
+            }
+            $storedPassword = (string) ($doctor->password ?? $doctor->doctor_password ?? '');
+            if ($storedPassword !== '') {
+                if ($currentPassword === '') {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Current password is required.',
+                    ], 422);
+                }
+                if (! $this->passwordMatches($storedPassword, $currentPassword)) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Current password is incorrect.',
+                    ], 422);
+                }
+            }
+            $updates = array_fill_keys($columns, $hashedPassword);
+            $doctor->forceFill($updates);
+            $doctor->save();
+        } else {
+            $receptionistId = $ctx['receptionist_id'];
+            if (! $receptionistId) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Receptionist profile not found.',
+                ], 404);
+            }
+            $receptionist = Receptionist::query()->find($receptionistId);
+            if (! $receptionist) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Receptionist profile not found.',
+                ], 404);
+            }
+            $columns = [];
+            if (Schema::hasColumn('receptionists', 'password')) {
+                $columns[] = 'password';
+            }
+            if (Schema::hasColumn('receptionists', 'receptionist_password')) {
+                $columns[] = 'receptionist_password';
+            }
+            if (! $columns) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Password updates are not enabled for receptionists.',
+                ], 400);
+            }
+            $storedPassword = (string) ($receptionist->password ?? $receptionist->receptionist_password ?? '');
+            if ($storedPassword !== '') {
+                if ($currentPassword === '') {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Current password is required.',
+                    ], 422);
+                }
+                if (! $this->passwordMatches($storedPassword, $currentPassword)) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Current password is incorrect.',
+                    ], 422);
+                }
+            }
+            $updates = array_fill_keys($columns, $hashedPassword);
+            $receptionist->forceFill($updates);
+            $receptionist->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password updated successfully.',
         ]);
     }
 }

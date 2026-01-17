@@ -180,6 +180,10 @@
          class="mt-4 inline-flex items-center gap-2 w-full justify-center px-3 py-2 text-xs font-semibold rounded-xl bg-white/15 hover:bg-white/25 transition">
         Manage Profile
       </a>
+      <a href="{{ route('dashboard.profile') }}#password-section"
+         class="mt-2 inline-flex items-center gap-2 w-full justify-center px-3 py-2 text-xs font-semibold rounded-xl bg-white/10 hover:bg-white/20 transition">
+        Change Password
+      </a>
     @endif
   </div>
 
