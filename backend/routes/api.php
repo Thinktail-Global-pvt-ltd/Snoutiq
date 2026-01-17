@@ -532,6 +532,7 @@ Route::post('/downloads/track', [ReferralController::class, 'trackDownload'])->n
 Route::get('/chat-rooms/new', [GeminiChatController::class, 'newRoom']); 
 Route::post('/chat/send', [GeminiChatController::class, 'sendMessage']);
 Route::post('/chat/dog-disease', [GeminiChatController::class, 'dogDisease']);
+Route::put('/chat/dog-disease/question', [GeminiChatController::class, 'updateDogDiseaseQuestion']);
 Route::get('/chat/listRooms', [GeminiChatController::class, 'listRooms']);
 // routes/api.php
 Route::get('/chat-rooms/{chat_room_token}/chats', [\App\Http\Controllers\Api\GeminiChatController::class, 'history']);

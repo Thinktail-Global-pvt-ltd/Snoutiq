@@ -114,6 +114,58 @@ class GeminiChatController extends Controller
         ]);
     }
 
+    public function updateDogDiseaseQuestion(Request $request)
+    {
+        $data = $request->validate([
+            'user_id'  => 'nullable|integer',
+            'pet_id'   => 'required|integer',
+            'question' => 'nullable|string|max:500',
+        ]);
+
+        $petRow = DB::table('pets')
+            ->select('id', 'user_id', 'dog_disease_payload')
+            ->where('id', $data['pet_id'])
+            ->first();
+
+        if (!$petRow) {
+            return response()->json(['success' => false, 'message' => 'Pet not found'], 404);
+        }
+
+        if (!empty($petRow->user_id)
+            && !empty($data['user_id'])
+            && (int) $petRow->user_id !== (int) $data['user_id']) {
+            return response()->json(['success' => false, 'message' => 'Pet does not belong to the provided user'], 403);
+        }
+
+        $question = $data['question'] ?? null;
+        $reportedSymptom = $question !== null ? trim((string) $question) : null;
+        if ($reportedSymptom === '') {
+            $reportedSymptom = null;
+        }
+
+        $payload = [];
+        if (!empty($petRow->dog_disease_payload)) {
+            $decoded = json_decode($petRow->dog_disease_payload, true);
+            if (is_array($decoded)) {
+                $payload = $decoded;
+            }
+        }
+        $payload['question'] = $question;
+
+        DB::table('pets')->where('id', $petRow->id)->update([
+            'dog_disease_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'reported_symptom' => $reportedSymptom,
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'question' => $question,
+            'reported_symptom' => $reportedSymptom,
+            'dog_disease_payload' => $payload,
+        ]);
+    }
+
     public function sendMessage(Request $request)
     {
         $data = $request->validate([
