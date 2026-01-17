@@ -434,7 +434,7 @@ class DashboardProfileController extends Controller
                     ], 422);
                 }
             }
-            $clinic->password = $hashedPassword;
+            $clinic->password = $newPassword;
             $clinic->save();
         } elseif ($ctx['role'] === 'doctor') {
             if (! $ctx['doctor_id']) {
