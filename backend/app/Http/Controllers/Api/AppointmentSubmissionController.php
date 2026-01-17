@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\CallSession;
 use App\Models\Doctor;
+use App\Models\Pet;
 use App\Models\User;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Http\JsonResponse;
@@ -389,26 +390,29 @@ class AppointmentSubmissionController extends Controller
         ]);
     }
 
-    public function listByUser(User $user): JsonResponse
+    public function listByPet(Pet $pet): JsonResponse
     {
         $appointments = Appointment::query()
             ->with(['clinic', 'doctor'])
-            ->where(function ($query) use ($user) {
-                $jsonPath = 'notes->patient_user_id';
-                $query->whereJsonContains($jsonPath, $user->id)
-                    ->orWhere('notes', 'like', '%"patient_user_id":'.$user->id.'%');
-            })
+            ->where('pet_id', $pet->id)
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time')
             ->get();
 
+        $owner = $pet->owner;
+
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
+                'pet' => [
+                    'id' => $pet->id,
+                    'name' => $pet->name,
+                    'breed' => $pet->breed ?? null,
                 ],
+                'owner' => $owner ? [
+                    'id' => $owner->id,
+                    'name' => $owner->name,
+                ] : null,
                 'count' => $appointments->count(),
                 'appointments' => $this->formatAppointments($appointments),
             ],
