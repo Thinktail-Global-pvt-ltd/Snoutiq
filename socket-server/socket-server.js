@@ -3598,6 +3598,106 @@ io.on("connection", (socket) => {
     console.log(`🗑️ Cleaned up rejected call ${normalizedCallId}`);
   });
 
+  // ========== PATIENT CANCELS CALL ==========
+  const handlePatientCancelledCall = async (data = {}) => {
+    const {
+      callId: rawCallId,
+      reason = "patient_cancelled",
+      doctorId,
+      doctor_id: doctorIdLegacy,
+      doctorID: doctorIdUpper,
+      patientId,
+      patient_id: patientIdLegacy,
+      userId,
+      user_id: userIdLegacy,
+      channel,
+    } = data;
+    const normalizedCallId = normalizeCallId(rawCallId);
+    const resolvedDoctorIdRaw = doctorId ?? doctorIdLegacy ?? doctorIdUpper;
+    const resolvedDoctorId = Number(resolvedDoctorIdRaw);
+    const resolvedPatientIdRaw =
+      patientId ?? patientIdLegacy ?? userId ?? userIdLegacy;
+
+    console.log(
+      `dY"z Patient cancel: call ${normalizedCallId} doctor=${resolvedDoctorIdRaw} patient=${resolvedPatientIdRaw} reason=${reason}`,
+    );
+
+    if (!normalizedCallId) return;
+
+    const callSession = activeCalls.get(normalizedCallId);
+    const callDoctorId = callSession?.doctorId ?? resolvedDoctorIdRaw;
+    const callPatientId = callSession?.patientId ?? resolvedPatientIdRaw;
+
+    if (callDoctorId != null) {
+      removePendingCallEntry(Number(callDoctorId), normalizedCallId);
+    }
+
+    if (!callSession) {
+      if (Number.isFinite(resolvedDoctorId)) {
+        deliverNextPendingCall(resolvedDoctorId);
+        emitAvailableDoctors();
+      }
+      return;
+    }
+
+    const previousStatus = callSession.status || "UNKNOWN";
+
+    // PHASE 3: Use finalizeCall for guaranteed cleanup
+    await finalizeCall(normalizedCallId, Number(callDoctorId), "cancelled");
+
+    callSession.status = "CANCELLED";
+    callSession.cancelledAt = new Date();
+    callSession.cancelReason = reason;
+
+    const payload = {
+      callId: normalizedCallId,
+      doctorId: callDoctorId ?? null,
+      patientId: callPatientId ?? null,
+      status: "CANCELLED",
+      reason,
+      message: "Patient cancelled the call",
+      timestamp: new Date().toISOString(),
+      channel: channel ?? callSession.channel,
+    };
+
+    const emitCancel = (target) => {
+      io.to(target).emit("call-cancelled", payload);
+      io.to(target).emit("call_cancelled", payload);
+    };
+
+    if (callSession.doctorSocketId) {
+      emitCancel(callSession.doctorSocketId);
+    }
+    if (callSession.doctorId) {
+      emitCancel(`doctor-${callSession.doctorId}`);
+    }
+    if (callSession.patientSocketId) {
+      emitCancel(callSession.patientSocketId);
+    }
+    if (callSession.patientId) {
+      emitCancel(`patient-${callSession.patientId}`);
+    }
+
+    io.emit("call-status-update", {
+      callId: normalizedCallId,
+      status: "CANCELLED",
+      previousStatus,
+      cancelledBy: "patient",
+      reason,
+      doctorId: callDoctorId ?? null,
+      patientId: callPatientId ?? null,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (Number.isFinite(resolvedDoctorId)) {
+      deliverNextPendingCall(resolvedDoctorId);
+    }
+  };
+
+  socket.on("call-cancelled", handlePatientCancelledCall);
+  socket.on("call-canceled", handlePatientCancelledCall);
+  socket.on("call_cancelled", handlePatientCancelledCall);
+
   // ========== PATIENT PAYMENT COMPLETED ==========
   socket.on("payment-completed", async (data, ack) => {
     const { callId: rawCallId, patientId, doctorId, channel, paymentId } = data;
@@ -4580,6 +4680,5 @@ httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`📲 WhatsApp alerts: ENABLED (${WHATSAPP_ALERT_MODE} mode)`);
   }
 });
-
 
 
