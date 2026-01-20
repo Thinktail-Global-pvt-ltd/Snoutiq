@@ -29,6 +29,7 @@ use App\Models\UserPet;
 use App\Models\Doctor;
 use App\Models\Receptionist;
 use App\Models\Transaction;
+use App\Models\VetRegisterationTemp;
 
 
 use Illuminate\Support\Facades\Http;
@@ -283,6 +284,28 @@ class AuthController extends Controller
         $user->forceFill($updates)->save();
     }
 
+    private function ensureLastVetSlug(?User $user): ?string
+    {
+        if (! $user || ! $user->last_vet_id) {
+            return $user?->last_vet_slug;
+        }
+
+        if (! Schema::hasTable('vet_registerations_temp')) {
+            return $user->last_vet_slug;
+        }
+
+        $slug = VetRegisterationTemp::query()
+            ->where('id', $user->last_vet_id)
+            ->value('slug');
+
+        if ($slug && $slug !== $user->last_vet_slug) {
+            $user->last_vet_slug = $slug;
+            $user->save();
+        }
+
+        return $slug ?? $user->last_vet_slug;
+    }
+
     // -------------------------- OTP SEND -----------------------------------
     // public function send_otp(Request $request){
     //     $request->validate([
@@ -529,6 +552,7 @@ class AuthController extends Controller
                 }
             }
 
+            $lastVetSlug = $this->ensureLastVetSlug($existingUser);
             [$pets, $userPets] = $this->loadRelatedPets($existingUser);
             $latestChat = $existingUser ? Chat::where('user_id', $existingUser->id)->latest()->first() : null;
             $overviewPetId = $this->resolvePetIdForOverview($request, $pets);
@@ -538,6 +562,7 @@ class AuthController extends Controller
                 'message' => 'OTP already verified',
                 'user_id' => $existingUser?->id,
                 'user'    => $existingUser,
+                'last_vet_slug' => $lastVetSlug,
                 'pets'    => $pets,
                 'user_pets' => $userPets,
                 'latest_chat' => $latestChat,
@@ -582,6 +607,7 @@ class AuthController extends Controller
         }
 
         $this->markPhoneVerified($user, $normalizedPhone, $otpEntry);
+        $lastVetSlug = $this->ensureLastVetSlug($user);
         [$pets, $userPets] = $this->loadRelatedPets($user);
         $latestChat = Chat::where('user_id', $user->id)->latest()->first();
         $overviewPetId = $this->resolvePetIdForOverview($request, $pets);
@@ -591,6 +617,7 @@ class AuthController extends Controller
             'message' => 'OTP verified successfully',
             'user_id' => $user->id,
             'user'    => $user,
+            'last_vet_slug' => $lastVetSlug,
             'pets'    => $pets,
             'user_pets' => $userPets,
             'latest_chat' => $latestChat,
