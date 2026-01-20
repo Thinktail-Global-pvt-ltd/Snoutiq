@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="app-base" content="/backend">
     <title>{{ ucfirst($role) }} Socket</title>
     <style>
         body {
@@ -115,6 +116,7 @@
     @vite('resources/js/echo.js')
     <script>
         const role = document.body.dataset.role;
+        const API_BASE = document.querySelector('meta[name="app-base"]')?.content || '';
         const selfIdInput = document.getElementById('selfId');
         const peerIdInput = document.getElementById('peerId');
         const callSessionInput = document.getElementById('callSession');
@@ -191,7 +193,7 @@
             };
 
             try {
-                const res = await fetch('/api/socket/call-sessions', {
+                const res = await fetch(`${API_BASE}/api/socket/call-sessions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify(payload),
@@ -246,7 +248,7 @@
             const callId = callSessionInput.value.trim();
             if (!callId || isWsConnected()) return;
             try {
-                const res = await fetch(`/api/socket/call-sessions?call_id=${encodeURIComponent(callId)}`, {
+                const res = await fetch(`${API_BASE}/api/socket/call-sessions?call_id=${encodeURIComponent(callId)}`, {
                     headers: { 'Accept': 'application/json' },
                 });
                 if (!res.ok) return;

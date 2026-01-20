@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="app-base" content="/backend">
     <title>Socket Listener</title>
     <style>
         body {
@@ -139,6 +140,7 @@
 
     @vite('resources/js/echo.js')
     <script>
+        const API_BASE = document.querySelector('meta[name="app-base"]')?.content || '';
         const logEl = document.getElementById('eventLog');
         const currentChannelEl = document.getElementById('currentChannel');
         const subscribeBtn = document.getElementById('subscribe');
@@ -197,7 +199,7 @@
             };
 
             try {
-                const response = await fetch('/api/socket/call-sessions', {
+                const response = await fetch(`${API_BASE}/api/socket/call-sessions`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

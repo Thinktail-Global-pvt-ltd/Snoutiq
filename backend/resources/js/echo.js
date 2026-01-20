@@ -1,10 +1,10 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
-const scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'http';
-const forceTLS = scheme === 'https';
-const host = import.meta.env.VITE_REVERB_HOST;
-const port = Number(import.meta.env.VITE_REVERB_PORT ?? (forceTLS ? 443 : 80));
+// Force Reverb to connect on the current host (production VPS) over TLS
+const host = window.location.hostname;
+const port = 443;
+const forceTLS = true;
 
 window.Pusher = Pusher;
 
@@ -16,6 +16,6 @@ window.Echo = new Echo({
     wssPort: port,
     forceTLS,
     encrypted: forceTLS,
-    enabledTransports: forceTLS ? ['ws', 'wss'] : ['ws'],
+    enabledTransports: ['ws', 'wss'],
     disableStats: true,
 });
