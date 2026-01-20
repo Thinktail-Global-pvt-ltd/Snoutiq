@@ -25,6 +25,7 @@ import {
 
 
 
+
 // -------------------- PATH + CONSTANTS --------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -4380,6 +4381,81 @@ io.on("connection", (socket) => {
         const wasCallActive =
           callSession.status === "active" ||
           (callSession.doctorJoinedAt && callSession.patientJoinedAt);
+        const previousStatus = callSession.status || "UNKNOWN";
+
+        if (!wasCallActive) {
+          const cancelReason = isDoctor
+            ? "doctor_disconnected"
+            : "patient_disconnected";
+          const resolvedDoctorId = Number(callSession.doctorId);
+
+          if (Number.isFinite(resolvedDoctorId)) {
+            removePendingCallEntry(resolvedDoctorId, callId);
+          }
+
+          callSession.status = "CANCELLED";
+          callSession.cancelledAt = new Date();
+          callSession.cancelReason = cancelReason;
+
+          logFlow("call-cancelled", {
+            callId,
+            doctorId: callSession.doctorId,
+            patientId: callSession.patientId,
+            channel: callSession.channel,
+            reason: cancelReason,
+            doctorSocketId: callSession.doctorSocketId,
+            patientSocketId: callSession.patientSocketId,
+          });
+
+          setActiveCallSession(callId, callSession);
+
+          const payload = {
+            callId,
+            doctorId: callSession.doctorId,
+            patientId: callSession.patientId,
+            status: "CANCELLED",
+            reason: cancelReason,
+            message: isDoctor
+              ? "Doctor disconnected before the call started"
+              : "Patient disconnected before the call started",
+            timestamp: new Date().toISOString(),
+            channel: callSession.channel,
+          };
+
+          const emitCancel = (target) => {
+            io.to(target).emit("call-cancelled", payload);
+            io.to(target).emit("call_cancelled", payload);
+          };
+
+          if (callSession.doctorSocketId) {
+            emitCancel(callSession.doctorSocketId);
+          }
+          if (callSession.doctorId) {
+            emitCancel(`doctor-${callSession.doctorId}`);
+          }
+          if (callSession.patientSocketId) {
+            emitCancel(callSession.patientSocketId);
+          }
+          if (callSession.patientId) {
+            emitCancel(`patient-${callSession.patientId}`);
+          }
+
+          io.emit("call-status-update", {
+            callId,
+            status: "CANCELLED",
+            previousStatus,
+            cancelledBy: isDoctor ? "doctor" : "patient",
+            reason: cancelReason,
+            doctorId: callSession.doctorId,
+            patientId: callSession.patientId,
+            timestamp: new Date().toISOString(),
+          });
+
+          finalizeCall(callId, callSession.doctorId, "disconnect").catch(
+            () => {},
+          );
+          continue;
+        }
 
         callSession.status = "disconnected";
         callSession.disconnectedAt = new Date();
@@ -4409,6 +4485,9 @@ io.on("connection", (socket) => {
           if (otherSocketId) {
             io.to(otherSocketId).emit("other-party-disconnected", {
               callId,
+              channel: callSession.channel,
+              doctorId: callSession.doctorId,
+              patientId: callSession.patientId,
               disconnectedBy: isDoctor ? "doctor" : "patient",
               message: `The ${
                 isDoctor ? "doctor" : "patient"
@@ -4424,23 +4503,13 @@ io.on("connection", (socket) => {
 
             io.to(otherSocketId).emit("force-disconnect", {
               callId,
+              channel: callSession.channel,
+              doctorId: callSession.doctorId,
+              patientId: callSession.patientId,
               reason: "peer_disconnected",
               disconnectedBy: isDoctor ? "doctor" : "patient",
               timestamp: new Date().toISOString(),
             });
-
-            const otherSocket = io.sockets.sockets.get(otherSocketId);
-            if (otherSocket) {
-              otherSocket.disconnect(true);
-              logFlow("force-disconnect-counterpart", {
-                callId,
-                doctorId: callSession.doctorId,
-                patientId: callSession.patientId,
-                channel: callSession.channel,
-                socketId: otherSocketId,
-                reason: "peer_disconnected",
-              });
-            }
           }
 
           if (callSession.doctorId) {
@@ -4448,6 +4517,9 @@ io.on("connection", (socket) => {
               .to(`doctor-${callSession.doctorId}`)
               .emit("call-ended-by-other", {
                 callId,
+                channel: callSession.channel,
+                doctorId: callSession.doctorId,
+                patientId: callSession.patientId,
                 endedBy: isDoctor ? "doctor" : "patient",
                 reason: "disconnect",
                 message: "Call ended due to connection loss",
@@ -4460,6 +4532,9 @@ io.on("connection", (socket) => {
               .to(`patient-${callSession.patientId}`)
               .emit("call-ended-by-other", {
                 callId,
+                channel: callSession.channel,
+                doctorId: callSession.doctorId,
+                patientId: callSession.patientId,
                 endedBy: isDoctor ? "doctor" : "patient",
                 reason: "disconnect",
                 message: "Call ended due to connection loss",
@@ -4680,5 +4755,7 @@ httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`📲 WhatsApp alerts: ENABLED (${WHATSAPP_ALERT_MODE} mode)`);
   }
 });
+
+
 
 
