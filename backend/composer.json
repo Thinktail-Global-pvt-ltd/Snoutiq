@@ -6,15 +6,18 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "aws/aws-sdk-php": "^3.363",
         "php": "^8.2",
+        "aws/aws-sdk-php": "^3.363",
         "chillerlan/php-qrcode": "^5.0",
         "khanamiryan/qrcode-detector-decoder": "^2.0",
         "kreait/laravel-firebase": "^6.0",
         "laravel/framework": "^12.0",
+        "laravel/reverb": "^1.7",
         "laravel/sanctum": "^4.1",
         "laravel/tinker": "^2.10.1",
         "laravel/ui": "^4.6",
+        "predis/predis": "^3.3",
+        "pusher/pusher-php-server": "^7.2",
         "razorpay/razorpay": "^2.9"
     },
     "require-dev": {
