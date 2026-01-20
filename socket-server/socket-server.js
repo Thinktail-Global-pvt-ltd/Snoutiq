@@ -1699,6 +1699,17 @@ const notifyDoctorPendingCall = async (callSession) => {
       callId,
       doctorId,
       patientId,
+      patient_id: patientId,
+      userId: patientId,
+      user_id: patientId,
+      petId: callSession.petId || callSession.pet_id || null,
+      pet_id: callSession.petId || callSession.pet_id || null,
+      petName: callSession.petName || callSession.pet_name || null,
+      patientName:
+        callSession.patientName ||
+        callSession.patient_name ||
+        callSession.patientFullName ||
+        null,
       channel,
       timestamp: new Date().toISOString(),
       type: "pending_call",
@@ -1986,11 +1997,15 @@ const deliverNextPendingCall = async (doctorId) => {
     callId: session.callId,
     doctorId: session.doctorId,
     patientId: session.patientId,
+    patient_id: session.patientId,
+    userId: session.patientId,
+    user_id: session.patientId,
     channel: session.channel,
     status: "RINGING",
     queued: true,
     timestamp: new Date().toISOString(),
     petId: session.petId || session.pet_id || null,
+    pet_id: session.petId || session.pet_id || null,
     petName: session.petName || session.pet_name || null,
     patientName:
       session.patientName || session.patient_name || session.patientFullName || null,
@@ -2167,11 +2182,15 @@ const deliverPendingSessionsToDoctor = (doctorId, socket) => {
         callId,
         doctorId: callSession.doctorId,
         patientId: callSession.patientId,
+        patient_id: callSession.patientId,
+        userId: callSession.patientId,
+        user_id: callSession.patientId,
         channel: callSession.channel,
         status: "RINGING",
         timestamp: new Date().toISOString(),
         queued: true, // was waiting while you were away
         petId: callSession.petId || callSession.pet_id || null,
+        pet_id: callSession.petId || callSession.pet_id || null,
         petName: callSession.petName || callSession.pet_name || null,
         patientName:
           callSession.patientName ||
@@ -3403,11 +3422,15 @@ io.on("connection", (socket) => {
         callId,
         doctorId,
         patientId,
+        patient_id: patientId,
+        userId: patientId,
+        user_id: patientId,
         channel,
         status: "RINGING",
         timestamp: new Date().toISOString(),
         queued: false,
         petId: callSession.petId || callSession.pet_id || null,
+        pet_id: callSession.petId || callSession.pet_id || null,
         petName: callSession.petName || callSession.pet_name || null,
         patientName:
           callSession.patientName ||
