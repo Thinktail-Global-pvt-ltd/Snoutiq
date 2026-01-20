@@ -20,6 +20,8 @@ use App\Http\Controllers\EmergencyHoursPageController;
 use App\Http\Controllers\Api\ClinicEmergencyHoursController;
 use App\Http\Controllers\VetDocumentsPageController;
 use App\Http\Controllers\Dev\FcmMonitorController;
+use App\Http\Controllers\Dev\SchedulerTestController;
+use App\Http\Controllers\Dev\SocketTesterController;
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Controllers\Admin\ClinicDataReportController;
@@ -156,6 +158,11 @@ Route::post('/dev/push-scheduler', [PushSchedulerController::class, 'store'])->n
 Route::post('/dev/push-scheduler/run-now', [PushSchedulerController::class, 'runNow'])->name('dev.push-scheduler.run-now');
 Route::get('/dev/push-scheduler/logs/{run}', [PushSchedulerController::class, 'showLog'])->name('dev.push-scheduler.log');
 Route::post('/dev/push-scheduler/{notification}', [PushSchedulerController::class, 'update'])->name('dev.push-scheduler.update');
+Route::get('/dev/consult-reminders', [SchedulerTestController::class, 'index'])->name('dev.reminders');
+Route::post('/dev/consult-reminders', [SchedulerTestController::class, 'dispatch'])->name('dev.reminders.dispatch');
+Route::get('/dev/socket-tester', [SocketTesterController::class, 'index'])->name('dev.socket-tester');
+Route::get('/dev/socket-doctor', [SocketTesterController::class, 'doctor'])->name('dev.socket-doctor');
+Route::get('/dev/socket-patient', [SocketTesterController::class, 'patient'])->name('dev.socket-patient');
 
 // Marketing notifications
 Route::get('/marketing/notifications', [MarketingNotificationController::class, 'index'])->name('marketing.notifications');
