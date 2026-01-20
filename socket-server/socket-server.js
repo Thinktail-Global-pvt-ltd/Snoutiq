@@ -24,7 +24,8 @@ import {
 
 
 
-// ----------------------- PATH + CONSTANTS --------------------
+
+// -------------------- PATH + CONSTANTS --------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -1764,6 +1765,10 @@ const persistCallRequested = async (callSession) => {
       .hset(`call:${callSession.callId}`, {
         doctorId: String(callSession.doctorId ?? ""),
         patientId: String(callSession.patientId ?? ""),
+        petId:
+          callSession.petId != null ? String(callSession.petId) : "",
+        petName: callSession.petName || "",
+        patientName: callSession.patientName || "",
         channel: callSession.channel || "",
         status: callSession.status || "",
         createdAt: createdAt.toISOString(),
@@ -3125,7 +3130,30 @@ io.on("connection", (socket) => {
   // IMPORTANT: We DO NOT block if doctor is offline/busy – we queue + notify.
   socket.on(
     "call-requested",
-    async ({ doctorId, patientId, channel, callId: incomingCallId, timestamp }) => {
+    async (payload = {}) => {
+      let {
+        doctorId,
+        patientId,
+        channel,
+        callId: incomingCallId,
+        timestamp,
+        petId,
+        pet_id: petIdLegacy,
+        petName,
+        pet_name: petNameLegacy,
+        patientName,
+        patient_name: patientNameLegacy,
+        userId,
+        user_id: userIdLegacy,
+        patient_id: patientIdLegacy,
+      } = payload;
+      if (patientId == null) {
+        patientId = userId ?? userIdLegacy ?? patientIdLegacy ?? null;
+      }
+      const resolvedPetId = petId ?? petIdLegacy ?? null;
+      const resolvedPetName = petName ?? petNameLegacy ?? null;
+      const resolvedPatientName =
+        patientName ?? patientNameLegacy ?? null;
       console.log(`📞 Call request: Patient ${patientId} → Doctor ${doctorId}`);
 
       // ✅ FIX: Validate timestamp
@@ -3208,6 +3236,9 @@ io.on("connection", (socket) => {
         doctorId,
         patientId,
         channel,
+        petId: resolvedPetId,
+        petName: resolvedPetName,
+        patientName: resolvedPatientName,
         status: shouldQueue ? "queued" : "INITIATED",
         createdAt: new Date(),
         queuedAt: shouldQueue ? new Date() : null,
@@ -3222,6 +3253,9 @@ io.on("connection", (socket) => {
         doctorId,
         patientId,
         channel,
+        petId: resolvedPetId,
+        petName: resolvedPetName,
+        patientName: resolvedPatientName,
         socketId: socket.id,
         extra: `doctorConnected=${doctorConnected}, doctorBusy=${doctorBusy}`,
       });
@@ -4523,4 +4557,6 @@ httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`📲 WhatsApp alerts: ENABLED (${WHATSAPP_ALERT_MODE} mode)`);
   }
 });
+
+
 
