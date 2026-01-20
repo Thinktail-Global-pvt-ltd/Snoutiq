@@ -914,22 +914,26 @@
   </script>
   @endif
 
+  @php
+    $clinicSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'MedicalClinic',
+        'name' => $clinicName,
+        'image' => $vet->image ?? $snoutiqLogo,
+        'address' => [
+            '@type' => 'PostalAddress',
+            'streetAddress' => $vet->formatted_address ?? $vet->address ?? '',
+            'addressLocality' => $vet->city ?? '',
+            'postalCode' => $vet->pincode ?? '',
+            'addressCountry' => 'IN',
+        ],
+        'telephone' => $clinicPhone ?? '',
+        'url' => url('/backend/vet/'.$vet->slug),
+    ];
+  @endphp
+
   <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "MedicalClinic",
-    "name": "{{ $clinicName }}",
-    "image": "{{ $vet->image ?? $snoutiqLogo }}",
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "{{ $vet->formatted_address ?? $vet->address ?? '' }}",
-      "addressLocality": "{{ $vet->city ?? '' }}",
-      "postalCode": "{{ $vet->pincode ?? '' }}",
-      "addressCountry": "IN"
-    },
-    "telephone": "{{ $clinicPhone ?? '' }}",
-    "url": "{{ url('/backend/vet/'.$vet->slug) }}"
-  }
+  @json($clinicSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
   </script>
 </body>
 </html>
