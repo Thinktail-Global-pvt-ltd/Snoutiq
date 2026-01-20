@@ -56,6 +56,7 @@ use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\ReceptionistBookingController;
 use App\Http\Controllers\Api\PetVaccinationRecordController;
 use App\Http\Controllers\Api\ErrorLogController;
+use App\Http\Controllers\Api\SocketServerController;
 use App\Http\Controllers\Api\WhatsAppMessageController;
 use App\Http\Controllers\Api\CallSessionCrudController;
 use App\Http\Controllers\Api\V1\OtpController as V1OtpController;
@@ -77,6 +78,13 @@ Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
 Route::post('/whatsapp/broadcast/users', [WhatsAppMessageController::class, 'broadcastToUsers']);
 Route::post('/whatsapp/send/new-year', [WhatsAppMessageController::class, 'sendNewYearTemplate']);
 Route::post('/whatsapp/broadcast/new-year', [WhatsAppMessageController::class, 'broadcastNewYearTemplate']);
+
+Route::prefix('socket')->group(function () {
+    Route::get('/health', [SocketServerController::class, 'health']);
+    Route::get('/active-doctors', [SocketServerController::class, 'activeDoctors']);
+    Route::post('/call-sessions', [SocketServerController::class, 'storeCallSession']);
+    Route::get('/call-sessions', [SocketServerController::class, 'getCallSession']);
+});
 
 Route::prefix('v1')->group(function () {
     Route::post('/auth/otp/request', [V1OtpController::class, 'request']);
