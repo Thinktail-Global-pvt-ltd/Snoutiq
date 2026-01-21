@@ -3,34 +3,40 @@ import Pusher from 'pusher-js';
 
 window.Pusher = Pusher;
 
-// Static Reverb settings (hardcoded for production WS)
 const REVERB_CONFIG = {
-  key: 'base64:yT9RzP3vXl9lJ2pB2g==',
-  host: 'snoutiq.com',
-  port: 443,
-  scheme: 'https',
-  path: '/app', // default Reverb path
+  key: 'base64:yT9RzP3vXl9lJ2pB2g==', // replace with your plain key if different
+  host: typeof window !== 'undefined' ? window.location.hostname : 'localhost',
+  port: typeof window !== 'undefined' && window.location.protocol === 'https:' ? 443 : 80,
+  scheme: typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http',
+  // Backend dev pages run under /backend, so keep wsPath aligned with Blade: meta base + /app
+  path: '/backend',
+  authEndpoint: '/backend/broadcasting/auth',
 };
 
 export function createEcho() {
-  const forceTLS = true;
-
-  // Log the exact target URL for debugging
-  const debugUrl = `wss://${REVERB_CONFIG.host}${REVERB_CONFIG.path}/${REVERB_CONFIG.key}?protocol=7&client=js`;
-  console.log('[echo] connecting to', debugUrl);
+  const forceTLS = REVERB_CONFIG.scheme === 'https';
+  const proto = forceTLS ? 'wss' : 'ws';
+  const debugUrl = `${proto}://${REVERB_CONFIG.host}${REVERB_CONFIG.port ? ':' + REVERB_CONFIG.port : ''}${REVERB_CONFIG.path}/${REVERB_CONFIG.key}?protocol=7&client=js`;
+  console.log('[echo] connecting to', debugUrl, {
+    host: REVERB_CONFIG.host,
+    port: REVERB_CONFIG.port,
+    path: REVERB_CONFIG.path,
+    key: REVERB_CONFIG.key,
+    authEndpoint: REVERB_CONFIG.authEndpoint,
+    transports: forceTLS ? ['wss'] : ['ws', 'wss'],
+  });
 
   const echo = new Echo({
-    broadcaster: 'pusher',
+    broadcaster: 'reverb',
     key: REVERB_CONFIG.key,
-    cluster: 'mt1', // required by pusher-js to avoid cluster error
     wsHost: REVERB_CONFIG.host,
     wsPort: REVERB_CONFIG.port,
     wssPort: REVERB_CONFIG.port,
-    wsPath: '', // let pusher-js build /app/{key}; do NOT prefix another /app
+    wsPath: REVERB_CONFIG.path, // already includes /backend/app
     forceTLS,
-    encrypted: forceTLS,
+    enabledTransports: forceTLS ? ['wss'] : ['ws', 'wss'],
     disableStats: true,
-    enabledTransports: ['wss'],
+    authEndpoint: REVERB_CONFIG.authEndpoint,
   });
 
   const conn = echo.connector?.pusher?.connection;
@@ -42,6 +48,9 @@ export function createEcho() {
         key: REVERB_CONFIG.key,
         err,
       });
+    });
+    conn.bind('state_change', (states) => {
+      console.log('[echo] state', states);
     });
   }
 
