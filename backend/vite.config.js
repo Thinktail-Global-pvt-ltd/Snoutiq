@@ -8,6 +8,7 @@ export default defineConfig({
                 'resources/sass/app.scss',
                 'resources/js/app.js',
                 'resources/js/echo.js',
+                'resources/js/dev/doctor-receiver.js',
             ],
             refresh: true,
         }),
