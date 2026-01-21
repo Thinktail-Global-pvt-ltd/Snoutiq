@@ -1012,3 +1012,7 @@ Route::get('/backend/video/night/edit', function (\Illuminate\Http\Request $req)
         // 'doctors' => \App\Models\Doctor::select('id','name')->get(), // optional
     ]);
 })->name('video.night.edit');
+
+// Dev helper page to exercise the Reverb call flow
+Route::view('/dev/call-lab', 'dev.call-lab')->name('dev.call-lab');
+Route::view('/dev/doctor-receiver', 'dev.doctor-receiver')->name('dev.doctor-receiver');

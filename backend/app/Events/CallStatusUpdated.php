@@ -8,7 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class CallRequested implements ShouldBroadcastNow
+class CallStatusUpdated implements ShouldBroadcastNow
 {
     use Dispatchable;
     use SerializesModels;
@@ -21,12 +21,13 @@ class CallRequested implements ShouldBroadcastNow
     {
         return [
             new Channel('doctor.'.$this->call->doctor_id),
+            new Channel('patient.'.$this->call->patient_id),
         ];
     }
 
     public function broadcastAs(): string
     {
-        return 'CallRequested';
+        return 'CallStatusUpdated';
     }
 
     public function broadcastWith(): array
@@ -38,7 +39,12 @@ class CallRequested implements ShouldBroadcastNow
             'status' => $this->call->status,
             'channel' => $this->call->channel,
             'rtc' => $this->call->rtc,
-            'requested_at' => $this->call->created_at?->toIso8601String(),
+            'accepted_at' => $this->call->accepted_at?->toIso8601String(),
+            'rejected_at' => $this->call->rejected_at?->toIso8601String(),
+            'ended_at' => $this->call->ended_at?->toIso8601String(),
+            'cancelled_at' => $this->call->cancelled_at?->toIso8601String(),
+            'missed_at' => $this->call->missed_at?->toIso8601String(),
+            'updated_at' => $this->call->updated_at?->toIso8601String(),
         ];
     }
 }

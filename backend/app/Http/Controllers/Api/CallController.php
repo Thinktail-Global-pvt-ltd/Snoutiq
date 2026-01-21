@@ -1,112 +1,85 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;   // 👈 ye add karo
+use App\Events\CallStatusUpdated;
+use App\Http\Controllers\Controller;
+use App\Models\Call;
+use App\Services\CallRoutingService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Events\CallRequested;
-use App\Models\CallSession;
-use App\Support\CallSessionUrlBuilder;
 
 class CallController extends Controller
 {
-    public function requestCall(Request $request)
+    public function request(Request $request, CallRoutingService $service): JsonResponse
     {
         $data = $request->validate([
-            'doctor_id'    => 'required|integer',
-            'patient_id'   => 'required|integer',
-            'channel_name' => 'nullable|string|max:64',
-            'call_id'      => 'nullable|string|max:64',
+            'patient_id' => 'required|integer',
+            'channel' => 'nullable|string',
+            'rtc' => 'nullable|array',
         ]);
 
-        $callIdentifier = CallSessionUrlBuilder::ensureIdentifier($data['call_id'] ?? null);
-        $channelName = CallSessionUrlBuilder::ensureChannel($data['channel_name'] ?? null, $callIdentifier);
+        $patientId = $data['patient_id'];
+        $doctorId = $service->assignDoctor();
 
-        $sessionQuery = CallSession::query()
-            ->where('channel_name', $channelName);
-
-        if (CallSession::supportsColumn('call_identifier')) {
-            $sessionQuery->orWhere('call_identifier', $callIdentifier);
+        if (! $doctorId) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'No doctors online',
+            ], 409);
         }
 
-        $session = $sessionQuery->first();
-
-        if (!$session) {
-            $session = new CallSession();
-            $session->status = 'pending';
-            $session->payment_status = 'unpaid';
-            $session->currency = 'INR';
-        }
-
-        $session->patient_id = $data['patient_id'];
-        $session->doctor_id = $data['doctor_id'];
-        $session->channel_name = $channelName;
-        $session->useCallIdentifier($callIdentifier);
-        $session->currency = $session->currency ?? 'INR';
-        $session->status = $session->status ?? 'pending';
-        $session->payment_status = $session->payment_status ?? 'unpaid';
-
-        $session->refreshComputedLinks();
-        $session->save();
-
-        // Event fire
-        event(new CallRequested($session->doctor_id, $session->patient_id, $session->channel_name, $session->id));
+        $call = $service->createCall($doctorId, $patientId, $data['channel'] ?? null, $data['rtc'] ?? null);
 
         return response()->json([
-            'success' => true,
-            'message' => 'Call requested',
-            'data' => [
-                'doctor_id'   => $session->doctor_id,
-                'patient_id'  => $session->patient_id,
-                'channel'     => $session->channel_name,
-                'call_id'     => $session->resolveIdentifier(),
-                'doctor_join_url' => $session->resolvedDoctorJoinUrl(),
-                'patient_payment_url' => $session->resolvedPatientPaymentUrl(),
-                'session_id'  => $session->id,
-            ]
+            'ok' => true,
+            'call_id' => $call->id,
+            'doctor_id' => $doctorId,
+            'status' => $call->status,
         ]);
     }
 
-    public function requestTestCall(Request $request)
+    public function accept(Call $call, CallRoutingService $service): JsonResponse
     {
-        $validated = $request->validate([
-            'doctor_id'  => 'required|integer',
-            'patient_id' => 'nullable|integer',
-        ]);
+        if ($call->status !== Call::STATUS_RINGING) {
+            return response()->json(['ok' => false, 'message' => 'Call not ringing'], 409);
+        }
 
-        $doctorId = $validated['doctor_id'];
-        $patientId = $validated['patient_id'] ?? 99999;
+        $service->markAccepted($call);
 
-        $callIdentifier = CallSessionUrlBuilder::generateIdentifier();
-        $channelName = CallSessionUrlBuilder::defaultChannel($callIdentifier);
+        return response()->json(['ok' => true, 'status' => $call->status]);
+    }
 
-        $session = new CallSession([
-            'doctor_id'     => $doctorId,
-            'patient_id'    => $patientId,
-            'channel_name'  => $channelName,
-            'currency'      => 'INR',
-            'status'        => 'pending',
-            'payment_status'=> 'unpaid',
-        ]);
+    public function reject(Call $call, CallRoutingService $service): JsonResponse
+    {
+        if ($call->status !== Call::STATUS_RINGING) {
+            return response()->json(['ok' => false, 'message' => 'Call not ringing'], 409);
+        }
 
-        $session->useCallIdentifier($callIdentifier);
+        $service->markRejected($call);
 
-        $session->refreshComputedLinks();
-        $session->save();
+        return response()->json(['ok' => true, 'status' => $call->status]);
+    }
 
-        event(new CallRequested($session->doctor_id, $session->patient_id, $session->channel_name, $session->id));
+    public function end(Call $call, CallRoutingService $service): JsonResponse
+    {
+        if (! in_array($call->status, [Call::STATUS_ACCEPTED, Call::STATUS_RINGING, Call::STATUS_PENDING])) {
+            return response()->json(['ok' => false, 'message' => 'Call not active'], 409);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Test call requested',
-            'data' => [
-                'doctor_id'  => $session->doctor_id,
-                'patient_id' => $session->patient_id,
-                'channel'    => $session->channel_name,
-                'call_id'    => $session->resolveIdentifier(),
-                'doctor_join_url' => $session->resolvedDoctorJoinUrl(),
-                'patient_payment_url' => $session->resolvedPatientPaymentUrl(),
-                'session_id' => $session->id,
-            ],
-        ]);
+        $service->markEnded($call);
+
+        return response()->json(['ok' => true, 'status' => $call->status]);
+    }
+
+    public function cancel(Call $call, CallRoutingService $service): JsonResponse
+    {
+        if (! in_array($call->status, [Call::STATUS_RINGING, Call::STATUS_PENDING])) {
+            return response()->json(['ok' => false, 'message' => 'Call not cancelable'], 409);
+        }
+
+        $service->markCancelled($call);
+
+        return response()->json(['ok' => true, 'status' => $call->status]);
     }
 }

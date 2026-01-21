@@ -51,6 +51,8 @@ use App\Http\Controllers\Api\CallController as ApiCallController; // handles lig
 use App\Http\Controllers\CallController as CoreCallController;    // handles sessions + token
 use App\Http\Controllers\Api\CallRecordingController;
 use App\Http\Controllers\Api\RecordingUploadController;
+use App\Http\Controllers\Api\RealtimeController;
+use App\Http\Controllers\Api\CallController as NewCallController;
 use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\ReceptionistBookingController;
@@ -84,6 +86,16 @@ Route::prefix('socket')->group(function () {
     Route::get('/active-doctors', [SocketServerController::class, 'activeDoctors']);
     Route::post('/call-sessions', [SocketServerController::class, 'storeCallSession']);
     Route::get('/call-sessions', [SocketServerController::class, 'getCallSession']);
+});
+
+Route::post('/realtime/heartbeat', [RealtimeController::class, 'heartbeat']);
+
+Route::prefix('calls')->group(function () {
+    Route::post('/request', [NewCallController::class, 'request']);
+    Route::post('/{call}/accept', [NewCallController::class, 'accept']);
+    Route::post('/{call}/reject', [NewCallController::class, 'reject']);
+    Route::post('/{call}/end', [NewCallController::class, 'end']);
+    Route::post('/{call}/cancel', [NewCallController::class, 'cancel']);
 });
 
 Route::prefix('v1')->group(function () {
@@ -575,7 +587,7 @@ Route::get('/ai-stats', function (Request $Request) {
       'totalQuery'=>App\Models\UserAiChat::count()
     ]);
 });
-Route::middleware('auth:sanctum')->get('/user/data', function (Request $Request) {
+Route::get('/user/data', function (Request $Request) {
             $onboarding = false;
                if($Request->user()->role=="pet_owner"){
         // 
@@ -654,7 +666,7 @@ Route::get('/users', function () {
           Route::get('/bookings', [GroomerCalenderController::class, 'bookings']);
           Route::get('/bookings-v2', [GroomerCalenderController::class, 'bookingsV2']);
           Route::get('/bookings/{id}', [GroomerCalenderController::class, 'booking_single']);
-Route::prefix('groomer')->middleware('auth:sanctum')->group(function () {
+Route::prefix('groomer')->group(function () {
 Route::post('/profile', [GroomerProfileController::class, 'store']);
 Route::get('/ratings', [GroomerProfileController::class, 'ratings']);
 
@@ -713,7 +725,7 @@ NAVEEN MARKETING MODULE
 });
 
 
-Route::prefix('user')->middleware('auth:sanctum')->group(function () {
+Route::prefix('user')->group(function () {
 
 
 
@@ -760,15 +772,15 @@ Route::prefix('public')->group(function(){
     Route::get('/groomers', [PublicController::class, 'groomers']);
     Route::get('/single_groomer/{id}', [PublicController::class, 'single_groomer']);
 
-      Route::middleware('auth:sanctum')->post('/chats/startChat', [ChatController::class, 'startChat']);
-      Route::middleware('auth:sanctum')->post('/chats/myMessages', [ChatController::class, 'myMessages']);
-      Route::middleware('auth:sanctum')->post('/chats/chatHistory', [ChatController::class, 'chatHistory']);
-      Route::middleware('auth:sanctum')->post('/chats/sendMessage', [ChatController::class, 'sendMessage']);
+      Route::post('/chats/startChat', [ChatController::class, 'startChat']);
+      Route::post('/chats/myMessages', [ChatController::class, 'myMessages']);
+      Route::post('/chats/chatHistory', [ChatController::class, 'chatHistory']);
+      Route::post('/chats/sendMessage', [ChatController::class, 'sendMessage']);
 
 
 
-    Route::middleware('auth:sanctum')->post('/support/sendMessage', [SupportController::class, 'store']);
-    Route::middleware('auth:sanctum')->post('/support/mydata', [SupportController::class, 'mydata']);
+    Route::post('/support/sendMessage', [SupportController::class, 'store']);
+    Route::post('/support/mydata', [SupportController::class, 'mydata']);
 
 });
 

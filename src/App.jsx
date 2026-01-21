@@ -411,6 +411,8 @@ const DoctorDashboard = lazy(() => import("./pages/DoctorDashboard"));
 const CallTestPage = lazy(() => import("./pages/CallTestPage"));
 const CallRecordingDemo = lazy(() => import("./pages/CallRecordingDemo"));
 const RegisterPassword = lazy(() => import("./pages/RegisterPetPassword"));
+const PatientCallTest = lazy(() => import("./pages/PatientCallTest"));
+const DoctorReceiverTest = lazy(() => import("./pages/DoctorReceiverTest"));
 
 // Core app pages
 // const Home = lazy(() => import("./pages/Home"));
@@ -607,6 +609,8 @@ function App() {
               element={<DoctorDashboard doctorId={501} />}
             /> */}
             <Route path="/call-page/:channelName" element={<CallPage />} />
+            <Route path="/patient-call-test" element={<PatientCallTest />} />
+            <Route path="/doctor-receiver-test" element={<DoctorReceiverTest />} />
             {/* Multiple doctor routes if needed */}
             <Route
               path="/doctor-dashboard/:doctorId"
