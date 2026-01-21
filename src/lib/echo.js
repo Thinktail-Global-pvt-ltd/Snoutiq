@@ -4,7 +4,7 @@ import Pusher from 'pusher-js';
 window.Pusher = Pusher;
 
 const REVERB_CONFIG = {
-  key: 'yT9RzP3vXl9lJ2pB2g==', // plain key
+  key: 'base64:yT9RzP3vXl9lJ2pB2g==', // plain key
   host: 'snoutiq.com',
   scheme: 'https',
   path: '/app',
