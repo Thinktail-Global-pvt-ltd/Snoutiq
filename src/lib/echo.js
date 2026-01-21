@@ -5,7 +5,7 @@ window.Pusher = Pusher;
 
 // Static Reverb settings (hardcoded for production WS)
 const REVERB_CONFIG = {
-  key: '<PUT_YOUR_REVERB_KEY_HERE>',
+  key: 'base64:yT9RzP3vXl9lJ2pB2g==',
   host: 'snoutiq.com',
   port: 443,
   scheme: 'https',
