@@ -22,7 +22,7 @@ export function createEcho() {
   const echo = new Echo({
     broadcaster: 'pusher',
     key: REVERB_CONFIG.key,
-    // cluster intentionally omitted (not needed when host provided)
+    cluster: 'mt1', // required by pusher-js to avoid cluster error
     wsHost: REVERB_CONFIG.host,
     wsPort: REVERB_CONFIG.port,
     wssPort: REVERB_CONFIG.port,
