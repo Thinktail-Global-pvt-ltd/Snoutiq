@@ -3,52 +3,59 @@ import Pusher from 'pusher-js';
 
 window.Pusher = Pusher;
 
-const isBrowser = typeof window !== 'undefined';
-const isHttps = isBrowser ? window.location.protocol === 'https:' : false;
-
 const REVERB_CONFIG = {
-  // IMPORTANT: remove "base64:"
-  key: 'yT9RzP3vXl9lJ2pB2g==',
-
-  host: isBrowser ? window.location.hostname : 'localhost',
-  scheme: isHttps ? 'https' : 'http',
-
-  // IMPORTANT: keep wsPath aligned with backend prefix
+  key: 'yT9RzP3vXl9lJ2pB2g==', // replace with your plain key if different
+  host: typeof window !== 'undefined' ? window.location.hostname : 'localhost',
+  port: typeof window !== 'undefined' && window.location.protocol === 'https:' ? 443 : 80,
+  scheme: typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http',
+  // Backend dev pages run under /backend, so keep wsPath aligned with Blade: meta base + /app
   path: '/backend/app',
-
-  // if you’re not using auth yet, remove authEndpoint entirely
   authEndpoint: '/backend/broadcasting/auth',
 };
 
 export function createEcho() {
-  const forceTLS = isHttps;
+  const forceTLS = REVERB_CONFIG.scheme === 'https';
+  const proto = forceTLS ? 'wss' : 'ws';
+  const debugUrl = `${proto}://${REVERB_CONFIG.host}${REVERB_CONFIG.port ? ':' + REVERB_CONFIG.port : ''}${REVERB_CONFIG.path}/${REVERB_CONFIG.key}?protocol=7&client=js`;
+  console.log('[echo] connecting to', debugUrl, {
+    host: REVERB_CONFIG.host,
+    port: REVERB_CONFIG.port,
+    path: REVERB_CONFIG.path,
+    key: REVERB_CONFIG.key,
+    authEndpoint: REVERB_CONFIG.authEndpoint,
+    transports: forceTLS ? ['wss'] : ['ws', 'wss'],
+  });
 
   const echo = new Echo({
     broadcaster: 'reverb',
     key: REVERB_CONFIG.key,
-
     wsHost: REVERB_CONFIG.host,
-
-    // IMPORTANT: on HTTPS, let it use default wss (443) without forcing port
-    wsPort: forceTLS ? undefined : 80,
-    wssPort: forceTLS ? undefined : undefined,
-
-    wsPath: REVERB_CONFIG.path,
+    wsPort: REVERB_CONFIG.port,
+    wssPort: REVERB_CONFIG.port,
+    wsPath: REVERB_CONFIG.path, // already includes /backend/app
     forceTLS,
-    enabledTransports: forceTLS ? ['wss'] : ['ws'],
+    enabledTransports: forceTLS ? ['wss'] : ['ws', 'wss'],
     disableStats: true,
-
-    // keep only if using private channels
     authEndpoint: REVERB_CONFIG.authEndpoint,
   });
 
   const conn = echo.connector?.pusher?.connection;
   if (conn?.bind) {
-    conn.bind('error', (err) => console.error('[echo] error', err));
-    conn.bind('state_change', (states) => console.log('[echo] state', states));
+    conn.bind('error', (err) => {
+      console.error('[echo] websocket error', {
+        host: REVERB_CONFIG.host,
+        port: REVERB_CONFIG.port,
+        key: REVERB_CONFIG.key,
+        err,
+      });
+    });
+    conn.bind('state_change', (states) => {
+      console.log('[echo] state', states);
+    });
   }
 
   return echo;
 }
 
+export { REVERB_CONFIG };
 export default createEcho;
