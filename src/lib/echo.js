@@ -9,7 +9,7 @@ const REVERB_CONFIG = {
   port: typeof window !== 'undefined' && window.location.protocol === 'https:' ? 443 : 80,
   scheme: typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http',
   // Backend dev pages run under /backend, so keep wsPath aligned with Blade: meta base + /app
-  path: '/backend',
+  path: '/backend/app',
   authEndpoint: '/backend/broadcasting/auth',
 };
 
