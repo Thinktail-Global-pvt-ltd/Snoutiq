@@ -6,15 +6,13 @@ window.Pusher = Pusher;
 const REVERB_CONFIG = {
   key: 'base64:yT9RzP3vXl9lJ2pB2g==', // plain key
   host: 'snoutiq.com',
-  scheme: 'https',
   path: '/app',
   authEndpoint: '/backend/broadcasting/auth',
 };
 
 export function createEcho() {
   const forceTLS = true;
-  const proto = 'wss';
-  const debugUrl = `${proto}://${REVERB_CONFIG.host}${REVERB_CONFIG.path}/${REVERB_CONFIG.key}?protocol=7&client=js`;
+  const debugUrl = 'wss://snoutiq.com/app/base64:yT9RzP3vXl9lJ2pB2g==?protocol=7&client=js&version=8.4.0&flash=false';
   console.log('[echo] connecting to', debugUrl, {
     host: REVERB_CONFIG.host,
     path: REVERB_CONFIG.path,
@@ -22,12 +20,23 @@ export function createEcho() {
     authEndpoint: REVERB_CONFIG.authEndpoint,
     transports: ['wss'],
   });
+  try {
+    const socket = new WebSocket(debugUrl);
+    socket.onopen = () => {
+      console.log('[echo] raw websocket opened', debugUrl);
+    };
+    socket.onerror = (event) => {
+      console.error('[echo] raw websocket error', { event, debugUrl });
+    };
+  } catch (error) {
+    console.error('[echo] failed to open raw websocket', { error, debugUrl });
+  }
 
   const echo = new Echo({
     broadcaster: 'reverb',
     key: REVERB_CONFIG.key,
-    wsHost: REVERB_CONFIG.host,
-    wsPath: REVERB_CONFIG.path, // /app
+    wsHost: 'snoutiq.com',
+    wsPath: REVERB_CONFIG.path,
     forceTLS,
     enabledTransports: ['wss'],
     disableStats: true,
@@ -39,7 +48,6 @@ export function createEcho() {
     conn.bind('error', (err) => {
       console.error('[echo] websocket error', {
         host: REVERB_CONFIG.host,
-        port: REVERB_CONFIG.port,
         key: REVERB_CONFIG.key,
         err,
       });
