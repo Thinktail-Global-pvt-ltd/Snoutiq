@@ -6,8 +6,10 @@ window.Pusher = Pusher;
 const REVERB_CONFIG = {
   key: 'base64:yT9RzP3vXl9lJ2pB2g==', // plain key
   host: 'snoutiq.com',
+  scheme: 'https',
+  port: 443,
   path: '/app',
-  authEndpoint: '/backend/broadcasting/auth',
+  authEndpoint: 'https://snoutiq.com/backend/broadcasting/auth',
 };
 
 export function createEcho() {
@@ -18,12 +20,18 @@ export function createEcho() {
     path: REVERB_CONFIG.path,
     key: REVERB_CONFIG.key,
     authEndpoint: REVERB_CONFIG.authEndpoint,
-    transports: ['wss'],
+    transports: ['ws', 'wss'],
   });
   try {
     const socket = new WebSocket(debugUrl);
     socket.onopen = () => {
       console.log('[echo] raw websocket opened', debugUrl);
+    };
+    socket.onmessage = (event) => {
+      console.log('[echo] raw websocket message', event.data);
+    };
+    socket.onclose = (event) => {
+      console.warn('[echo] raw websocket closed', { code: event.code, reason: event.reason, wasClean: event.wasClean });
     };
     socket.onerror = (event) => {
       console.error('[echo] raw websocket error', { event, debugUrl });
@@ -35,10 +43,13 @@ export function createEcho() {
   const echo = new Echo({
     broadcaster: 'reverb',
     key: REVERB_CONFIG.key,
-    wsHost: 'snoutiq.com',
-    wsPath: REVERB_CONFIG.path,
+    wsHost: REVERB_CONFIG.host,
+    wsPort: REVERB_CONFIG.port,
+    wssPort: REVERB_CONFIG.port,
+    // omit wsPath to let Echo/Pusher default to /app
     forceTLS,
-    enabledTransports: ['wss'],
+    encrypted: forceTLS,
+    enabledTransports: ['ws', 'wss'],
     disableStats: true,
     authEndpoint: REVERB_CONFIG.authEndpoint,
   });
@@ -55,6 +66,10 @@ export function createEcho() {
     conn.bind('state_change', (states) => {
       console.log('[echo] state', states);
     });
+    conn.bind('connected', () => console.log('[echo] connected'));
+    conn.bind('disconnected', () => console.warn('[echo] disconnected'));
+    conn.bind('connecting_in', (delay) => console.log('[echo] reconnecting in', delay));
+    conn.bind('unavailable', () => console.error('[echo] unavailable'));
   }
 
   return echo;

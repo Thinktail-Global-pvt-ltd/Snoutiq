@@ -395,6 +395,9 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import { FaPaw } from "react-icons/fa";
 import { RegistrationProvider } from "./auth/RegistrationContext";
 
+import CallLab from "./pages/CallLab";
+import DoctorReceiver from "./pages/DoctorReceiver";
+
 // Public pages
 const Login = lazy(() => import("./pages/Login"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -611,6 +614,8 @@ function App() {
             <Route path="/call-page/:channelName" element={<CallPage />} />
             <Route path="/patient-call-test" element={<PatientCallTest />} />
             <Route path="/doctor-receiver-test" element={<DoctorReceiverTest />} />
+            <Route path="/call-lab" element={<CallLab />} />
+            <Route path="/doctor-receiver" element={<DoctorReceiver />} />
             {/* Multiple doctor routes if needed */}
             <Route
               path="/doctor-dashboard/:doctorId"
