@@ -136,6 +136,63 @@ class PrescriptionController extends Controller
         ]);
     }
 
+    // GET /api/users/pets-prescriptions?user_id=
+    public function userPetsAndPrescriptions(Request $request)
+    {
+        $payload = $request->validate([
+            'user_id' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $user = User::find($payload['user_id']);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        $pets = Pet::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->get(['id', 'user_id', 'name', 'pet_gender', 'breed', 'pet_age', 'pet_age_months', 'pet_type']);
+
+        $prescriptions = Prescription::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->get([
+                'id',
+                'doctor_id',
+                'user_id',
+                'pet_id',
+                'visit_category',
+                'case_severity',
+                'visit_notes',
+                'content_html',
+                'image_path',
+                'next_medicine_day',
+                'next_visit_day',
+                'created_at',
+            ])
+            ->map(function ($prescription) {
+                $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+                return $prescription;
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                ],
+                'pets' => $pets,
+                'prescriptions' => $prescriptions,
+            ],
+        ]);
+    }
+
     // POST /api/prescriptions
     public function store(Request $request)
     {
