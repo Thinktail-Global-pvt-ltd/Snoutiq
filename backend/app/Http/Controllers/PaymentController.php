@@ -10,6 +10,7 @@ use App\Models\Transaction;
 use App\Models\Clinic;
 use App\Models\Doctor;
 use App\Models\CallSession;
+use Illuminate\Support\Str;
 
 class PaymentController extends Controller
 {
@@ -48,6 +49,16 @@ class PaymentController extends Controller
             'via' => 'snoutiq',
         ]);
         $context = $this->resolveTransactionContext($request, $notes);
+        $callSession = null;
+
+        if (($notes['order_type'] ?? null) === 'video_consult') {
+            $callSession = $this->createCallSessionIfMissing($context);
+            if ($callSession) {
+                $notes['call_session_id'] = $callSession->resolveIdentifier();
+                $notes['channel_name'] = $callSession->channel_name;
+                $context['call_identifier'] = $callSession->resolveIdentifier();
+            }
+        }
 
         try {
             $api = new Api($this->key, $this->secret);
@@ -72,6 +83,14 @@ class PaymentController extends Controller
                 'key'      => $this->key,
                 'order'    => $orderArr,
                 'order_id' => $orderArr['id'],
+                'call_session' => $callSession ? [
+                    'id' => $callSession->id,
+                    'call_identifier' => $callSession->resolveIdentifier(),
+                    'channel_name' => $callSession->channel_name,
+                    'doctor_id' => $callSession->doctor_id,
+                    'patient_id' => $callSession->patient_id,
+                    'status' => $callSession->status,
+                ] : null,
             ]);
         } catch (RazorpayError $e) {
             return response()->json([
@@ -514,5 +533,42 @@ class PaymentController extends Controller
         }
 
         return null;
+    }
+
+    protected function createCallSessionIfMissing(array $context): ?CallSession
+    {
+        $patientId = $context['user_id'] ?? null;
+        $doctorId = $context['doctor_id'] ?? null;
+
+        if (!$patientId || !$doctorId) {
+            return null;
+        }
+
+        // Reuse latest matching pending session if present
+        $existing = CallSession::query()
+            ->where('patient_id', $patientId)
+            ->where('doctor_id', $doctorId)
+            ->whereIn('status', ['pending', 'scheduled'])
+            ->latest('id')
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $channel = 'channel_' . Str::random(12);
+        $session = new CallSession([
+            'patient_id' => $patientId,
+            'doctor_id' => $doctorId,
+            'channel_name' => $channel,
+            'status' => 'pending',
+            'payment_status' => 'pending',
+        ]);
+
+        $session->useCallIdentifier(Str::random(16));
+        $session->refreshComputedLinks();
+        $session->save();
+
+        return $session;
     }
 }
