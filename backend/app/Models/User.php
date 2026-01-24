@@ -38,6 +38,11 @@ class User extends Authenticatable
         return $this->hasMany(CallSession::class, 'patient_id');
     }
 
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
     public function pets(): HasMany
     {
         return $this->hasMany(Pet::class);
