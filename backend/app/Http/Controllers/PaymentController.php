@@ -548,7 +548,7 @@ class PaymentController extends Controller
         $existing = CallSession::query()
             ->where('patient_id', $patientId)
             ->where('doctor_id', $doctorId)
-            ->whereIn('status', ['pending', 'scheduled'])
+            ->whereIn('status', ['pending'])
             ->latest('id')
             ->first();
 
@@ -562,7 +562,7 @@ class PaymentController extends Controller
             'doctor_id' => $doctorId,
             'channel_name' => $channel,
             'status' => 'pending',
-            'payment_status' => 'pending',
+            'payment_status' => 'unpaid',
         ]);
 
         $session->useCallIdentifier(Str::random(16));
