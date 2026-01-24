@@ -10,10 +10,16 @@ class TransactionController extends Controller
 {
     public function index(Request $request)
     {
-        $limit = (int) $request->query('limit', 50);
-        $limit = max(1, min($limit, 200));
+        $data = $request->validate([
+            'doctor_id' => 'required|integer',
+            'limit' => 'nullable|integer|min:1|max:200',
+        ]);
+
+        $limit = (int) ($data['limit'] ?? 50);
 
         $transactions = Transaction::query()
+            ->where('type', 'video_consult')
+            ->where('doctor_id', $data['doctor_id'])
             ->with([
                 'user' => fn ($q) => $q->select('id', 'name'),
                 'user.deviceTokens:id,user_id,token',
