@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CallSession;
+use App\Models\DeviceToken;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 
@@ -35,15 +36,23 @@ class TransactionController extends Controller
             userIds: $transactions->pluck('user_id')->filter()->unique()
         );
 
-        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions) {
+        $deviceTokensByUser = $this->deviceTokensForUsers($transactions, $latestSessions);
+
+        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $deviceTokensByUser) {
             $user = $tx->user;
-            $deviceTokens = $user
-                ? $user->deviceTokens->pluck('token')->filter()->unique()->values()->all()
-                : [];
             $petNames = $user
                 ? $user->pets->pluck('name')->filter()->unique()->values()->all()
                 : [];
             $callSession = $latestSessions->get($tx->user_id);
+            $deviceTokens = $deviceTokensByUser->get((int) $tx->user_id)
+                ?: ($callSession ? $deviceTokensByUser->get((int) $callSession->patient_id, []) : []);
+
+            // Fallback to eager-loaded relationship if the direct lookup missed
+            if (empty($deviceTokens) && $user) {
+                $deviceTokens = $user->deviceTokens
+                    ? $user->deviceTokens->pluck('token')->filter()->unique()->values()->all()
+                    : [];
+            }
 
             return [
                 'id' => $tx->id,
@@ -87,6 +96,31 @@ class TransactionController extends Controller
         return $sessions
             ->groupBy('patient_id')
             ->map(fn ($group) => $group->first());
+    }
+
+    protected function deviceTokensForUsers($transactions, $latestSessions)
+    {
+        $userIds = collect()
+            ->merge($transactions->pluck('user_id'))
+            ->merge($latestSessions->pluck('patient_id'))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($userIds->isEmpty()) {
+            return collect();
+        }
+
+        $tokens = DeviceToken::query()
+            ->select(['user_id', 'token'])
+            ->whereIn('user_id', $userIds)
+            ->whereNotNull('token')
+            ->get()
+            ->groupBy(fn (DeviceToken $token) => (int) $token->user_id)
+            ->map(fn ($group) => $group->pluck('token')->filter()->unique()->values()->all());
+
+        return $tokens;
     }
 
     protected function formatCallSession(CallSession $session): array
