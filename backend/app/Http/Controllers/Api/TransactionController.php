@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CallSession;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 
@@ -29,7 +30,12 @@ class TransactionController extends Controller
             ->limit($limit)
             ->get();
 
-        $payload = $transactions->map(function (Transaction $tx) {
+        $latestSessions = $this->latestCallSessionsForUsers(
+            doctorId: (int) $data['doctor_id'],
+            userIds: $transactions->pluck('user_id')->filter()->unique()
+        );
+
+        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions) {
             $user = $tx->user;
             $deviceTokens = $user
                 ? $user->deviceTokens->pluck('token')->filter()->unique()->values()->all()
@@ -37,6 +43,7 @@ class TransactionController extends Controller
             $petNames = $user
                 ? $user->pets->pluck('name')->filter()->unique()->values()->all()
                 : [];
+            $callSession = $latestSessions->get($tx->user_id);
 
             return [
                 'id' => $tx->id,
@@ -51,6 +58,7 @@ class TransactionController extends Controller
                 'user_name' => $user->name ?? null,
                 'device_tokens' => $deviceTokens,
                 'pet_names' => $petNames,
+                'call_session' => $callSession ? $this->formatCallSession($callSession) : null,
             ];
         });
 
@@ -59,5 +67,41 @@ class TransactionController extends Controller
             'count' => $payload->count(),
             'data' => $payload,
         ]);
+    }
+
+    /**
+     * Fetch the latest call session for each user for a given doctor.
+     */
+    protected function latestCallSessionsForUsers(int $doctorId, $userIds)
+    {
+        if ($userIds->isEmpty()) {
+            return collect();
+        }
+
+        $sessions = CallSession::query()
+            ->where('doctor_id', $doctorId)
+            ->whereIn('patient_id', $userIds)
+            ->orderByDesc('id')
+            ->get();
+
+        return $sessions
+            ->groupBy('patient_id')
+            ->map(fn ($group) => $group->first());
+    }
+
+    protected function formatCallSession(CallSession $session): array
+    {
+        return [
+            'id' => $session->id,
+            'doctor_id' => $session->doctor_id,
+            'patient_id' => $session->patient_id,
+            'call_session' => $session->resolveIdentifier(),
+            'channel_name' => $session->channel_name,
+            'status' => $session->status,
+            'payment_status' => $session->payment_status,
+            'currency' => $session->currency,
+            'created_at' => optional($session->created_at)->toIso8601String(),
+            'updated_at' => optional($session->updated_at)->toIso8601String(),
+        ];
     }
 }
