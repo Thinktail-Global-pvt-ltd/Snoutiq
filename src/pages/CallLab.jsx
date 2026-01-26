@@ -195,7 +195,6 @@ export default function CallLab() {
   const appendLog = (line) => setLogs((p) => `${p}\n${line}`);
 
   // ring loop refs
-  const ringIntervalRef = useRef(null);
   const ringStopTimeoutRef = useRef(null);
 
   const authHeaders = () => {
@@ -222,10 +221,6 @@ export default function CallLab() {
   }
 
   function stopRingingPush() {
-    if (ringIntervalRef.current) {
-      clearInterval(ringIntervalRef.current);
-      ringIntervalRef.current = null;
-    }
     if (ringStopTimeoutRef.current) {
       clearTimeout(ringStopTimeoutRef.current);
       ringStopTimeoutRef.current = null;
@@ -249,7 +244,7 @@ export default function CallLab() {
   }
 
   function startRingingPush({ token, call_id, doctor_id, mode }) {
-    stopRingingPush(); // kill old loops
+    stopRingingPush(); // kill old loop
 
     if (!token?.trim()) {
       appendLog("⚠️ Doctor FCM token missing, skipping push ringing");
@@ -257,21 +252,13 @@ export default function CallLab() {
     }
 
     const RING_FOR_MS = 30_000;   // match backend ring timeout default (30s)
-    const EVERY_MS = 5_000;       // push every 5s (6 pushes total)
-
-    appendLog(`🔔 Starting ringing push: ${RING_FOR_MS / 1000}s, every ${EVERY_MS / 1000}s`);
+    appendLog(`🔔 Starting ringing push: ${RING_FOR_MS / 1000}s (single-shot)`);
 
     // fire immediately
     (async () => {
       const r = await sendIncomingCallPushOnce({ token, call_id, doctor_id, mode });
       appendLog(`push/test → ${r.status} ${JSON.stringify(r.json)}`);
     })();
-
-    // then repeat
-    ringIntervalRef.current = setInterval(async () => {
-      const r = await sendIncomingCallPushOnce({ token, call_id, doctor_id, mode });
-      appendLog(`push/test → ${r.status} ${JSON.stringify(r.json)}`);
-    }, EVERY_MS);
 
     // hard stop after timeout
     ringStopTimeoutRef.current = setTimeout(() => {
