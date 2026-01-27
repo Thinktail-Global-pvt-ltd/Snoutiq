@@ -131,6 +131,7 @@ class GeminiChatController extends Controller
             'user_id'  => 'nullable|integer',
             'pet_id'   => 'required|integer',
             'question' => 'nullable|string|max:500',
+            'video_calling_upload_file' => 'nullable|file',
         ]);
 
         $petRow = DB::table('pets')
@@ -154,6 +155,7 @@ class GeminiChatController extends Controller
             $reportedSymptom = null;
         }
 
+        // Persist payload + optional video upload
         $payload = [];
         if (!empty($petRow->dog_disease_payload)) {
             $decoded = json_decode($petRow->dog_disease_payload, true);
@@ -163,9 +165,19 @@ class GeminiChatController extends Controller
         }
         $payload['question'] = $question;
 
+        // Save uploaded file (or accept existing string path)
+        $videoUploadPath = $this->storePetCardForAi($request, 'video_calling_upload_file');
+        if (!$videoUploadPath && $request->filled('video_calling_upload_file')) {
+            $videoUploadPath = $request->input('video_calling_upload_file');
+        }
+        if ($videoUploadPath) {
+            $payload['video_calling_upload_file'] = $videoUploadPath;
+        }
+
         DB::table('pets')->where('id', $petRow->id)->update([
             'dog_disease_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
             'reported_symptom' => $reportedSymptom,
+            'video_calling_upload_file' => $videoUploadPath,
             'updated_at' => now(),
         ]);
 
@@ -174,6 +186,7 @@ class GeminiChatController extends Controller
             'question' => $question,
             'reported_symptom' => $reportedSymptom,
             'dog_disease_payload' => $payload,
+            'video_calling_upload_file' => $videoUploadPath ? $this->buildPetCardUrl($videoUploadPath) : null,
         ]);
     }
 
