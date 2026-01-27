@@ -22,6 +22,7 @@ class Pet extends Model
         'pet_doc1',
         'pet_doc2',
         'pet_card_for_ai',
+        'video_calling_upload_file',
         'weight',
         'temprature',
         'vaccenated_yes_no',

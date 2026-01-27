@@ -33,6 +33,7 @@ class GeminiChatController extends Controller
             'pet_age'    => 'nullable|string',
             'pet_gender' => 'nullable|string',
             'vaccination' => 'nullable|array',
+            'video_calling_upload_file' => 'nullable|file',
         ]);
 
         $petCardPath = $this->storePetCardForAi($request);
@@ -79,8 +80,14 @@ class GeminiChatController extends Controller
 
         $reportedSymptom = $symptomText !== '' ? $symptomText : null;
 
+        // Handle optional video calling upload file
+        $videoUploadPath = $this->storePetCardForAi($request, 'video_calling_upload_file');
+        if (!$videoUploadPath && $request->filled('video_calling_upload_file')) {
+            $videoUploadPath = $request->input('video_calling_upload_file');
+        }
+
         DB::update(
-            'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, health_state = ?, dog_disease_payload = ?, pet_card_for_ai = ?, updated_at = NOW() WHERE id = ?',
+            'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, health_state = ?, dog_disease_payload = ?, pet_card_for_ai = ?, video_calling_upload_file = ?, updated_at = NOW() WHERE id = ?',
             [
                 $reportedSymptom,
                 $diseaseName,
@@ -95,8 +102,10 @@ class GeminiChatController extends Controller
                     'pet_gender' => $data['pet_gender'] ?? null,
                     'vaccination' => $data['vaccination'] ?? null,
                     'pet_card_for_ai' => $petCardPath,
+                    'video_calling_upload_file' => $videoUploadPath,
                 ]),
                 $petCardPath,
+                $videoUploadPath,
                 $data['pet_id'],
             ]
         );
@@ -111,6 +120,7 @@ class GeminiChatController extends Controller
                 'category' => in_array($category, ['normal','chronic'], true) ? $category : 'normal',
                 'pet_profile' => $context,
                 'pet_card_for_ai' => $petCardUrl,
+                'video_calling_upload_file' => $videoUploadPath ? $this->buildPetCardUrl($videoUploadPath) : null,
             ],
         ]);
     }
