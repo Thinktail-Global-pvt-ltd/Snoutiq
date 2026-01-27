@@ -79,6 +79,49 @@ class TransactionController extends Controller
     }
 
     /**
+     * GET /api/transactions/by-user?user_id=123[&limit=50][&type=video_consult]
+     * Returns raw transaction rows for a given user, filtered by type (defaults to video_consult).
+     */
+    public function byUser(Request $request)
+    {
+        $data = $request->validate([
+            'user_id' => 'required|integer',
+            'type' => 'nullable|string',
+            'limit' => 'nullable|integer|min:1|max:200',
+        ]);
+
+        $limit = (int) ($data['limit'] ?? 50);
+        $type = $data['type'] ?? 'video_consult';
+
+        $tx = Transaction::query()
+            ->where('user_id', $data['user_id'])
+            ->when($type, fn ($q) => $q->where('type', $type))
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get([
+                'id',
+                'user_id',
+                'pet_id',
+                'doctor_id',
+                'clinic_id',
+                'amount_paise',
+                'status',
+                'type',
+                'payment_method',
+                'reference',
+                'metadata',
+                'created_at',
+                'updated_at',
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'count' => $tx->count(),
+            'data' => $tx,
+        ]);
+    }
+
+    /**
      * Fetch the latest call session for each user for a given doctor.
      */
     protected function latestCallSessionsForUsers(int $doctorId, $userIds)

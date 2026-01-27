@@ -1159,6 +1159,7 @@ Route::get('/video/slots/doctor-test', function (\Illuminate\Http\Request $reque
 
 // Transactions with user/device/pet info
 Route::get('/transactions/with-user-data', [\App\Http\Controllers\Api\TransactionController::class, 'index']);
+Route::get('/transactions/by-user', [\App\Http\Controllers\Api\TransactionController::class, 'byUser']);
 
 Route::middleware([\App\Http\Middleware\FounderRequestLogger::class])->prefix('founder')->group(function () {
     Route::get('dashboard', [FounderDashboardController::class, 'index']);
