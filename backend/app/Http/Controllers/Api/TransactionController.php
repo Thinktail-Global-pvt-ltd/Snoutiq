@@ -25,7 +25,7 @@ class TransactionController extends Controller
             ->with([
                 'user' => fn ($q) => $q->select('id', 'name'),
                 'user.deviceTokens:id,user_id,token',
-                'user.pets:id,user_id,name',
+                'pet:id,name',
             ])
             ->orderByDesc('id')
             ->limit($limit)
@@ -40,9 +40,7 @@ class TransactionController extends Controller
 
         $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $deviceTokensByUser) {
             $user = $tx->user;
-            $petNames = $user
-                ? $user->pets->pluck('name')->filter()->unique()->values()->all()
-                : [];
+            $pet = $tx->pet;
             $callSession = $latestSessions->get($tx->user_id);
             $deviceTokens = $deviceTokensByUser->get((int) $tx->user_id)
                 ?: ($callSession ? $deviceTokensByUser->get((int) $callSession->patient_id, []) : []);
@@ -66,7 +64,10 @@ class TransactionController extends Controller
                 'updated_at' => optional($tx->updated_at)->toIso8601String(),
                 'user_name' => $user->name ?? null,
                 'device_tokens' => $deviceTokens,
-                'pet_names' => $petNames,
+                'pet' => $pet ? [
+                    'id' => $pet->id,
+                    'name' => $pet->name,
+                ] : null,
                 'call_session' => $callSession ? $this->formatCallSession($callSession) : null,
             ];
         });
