@@ -14,6 +14,7 @@ class Transaction extends Model
         'clinic_id',
         'doctor_id',
         'user_id',
+        'pet_id',
         'amount_paise',
         'status',
         'type',

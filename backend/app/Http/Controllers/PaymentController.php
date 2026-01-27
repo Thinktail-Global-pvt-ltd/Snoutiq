@@ -42,6 +42,7 @@ class PaymentController extends Controller
             'order_type' => 'nullable|string',
             'vet_slug' => 'nullable|string',
             'call_session_id' => 'nullable|string',
+            'pet_id' => 'nullable|integer',
         ]);
 
         $amountInInr = (int) ($request->input('amount', 500));
@@ -239,6 +240,7 @@ class PaymentController extends Controller
                     'clinic_id' => $clinicId,
                     'doctor_id' => $doctorId,
                     'user_id' => $userId,
+                    'pet_id' => $context['pet_id'] ?? null,
                     'amount_paise' => (int) ($order['amount'] ?? 0),
                     'status' => 'pending',
                     'type' => $transactionType,
@@ -254,6 +256,7 @@ class PaymentController extends Controller
                         'doctor_id' => $doctorId,
                         'clinic_id' => $clinicId,
                         'user_id' => $userId,
+                        'pet_id' => $context['pet_id'] ?? null,
                     ],
                 ]
             );
@@ -275,6 +278,7 @@ class PaymentController extends Controller
         $context['clinic_id'] = $clinicId;
         $doctorId = $context['doctor_id'] ?? null;
         $userId = $context['user_id'] ?? null;
+        $petId = $context['pet_id'] ?? null;
         $callId = $context['call_identifier'] ?? null;
         $transactionType = $this->resolveTransactionType($notes);
 
@@ -288,6 +292,7 @@ class PaymentController extends Controller
                 'clinic_id' => $clinicId,
                 'doctor_id' => $doctorId,
                 'user_id' => $userId,
+                'pet_id' => $petId,
                 'amount_paise' => (int) ($amount ?? 0),
                 'status' => $status ?? 'pending',
                 'type' => $transactionType,
@@ -305,6 +310,7 @@ class PaymentController extends Controller
                     'doctor_id' => $doctorId,
                     'clinic_id' => $clinicId,
                     'user_id' => $userId,
+                    'pet_id' => $petId,
                 ],
             ];
 
@@ -388,6 +394,7 @@ class PaymentController extends Controller
             'clinic_id' => ['clinic_id', 'clinicId'],
             'doctor_id' => ['doctor_id', 'doctorId'],
             'user_id' => ['user_id', 'userId', 'patient_id', 'patientId'],
+            'pet_id' => ['pet_id', 'petId'],
         ];
 
         foreach ($mapping as $noteKey => $keys) {
@@ -409,6 +416,7 @@ class PaymentController extends Controller
             'clinic_id' => $this->toNullableInt($this->firstFilled($request, ['clinic_id', 'clinicId'], $notes)),
             'doctor_id' => $this->toNullableInt($this->firstFilled($request, ['doctor_id', 'doctorId'], $notes)),
             'user_id' => $this->toNullableInt($this->firstFilled($request, ['user_id', 'userId', 'patient_id', 'patientId'], $notes)),
+            'pet_id' => $this->toNullableInt($this->firstFilled($request, ['pet_id', 'petId'], $notes)),
         ];
 
         if (! $context['user_id'] && $request->user()) {
