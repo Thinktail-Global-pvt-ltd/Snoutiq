@@ -5,6 +5,7 @@ namespace App\Services\Push;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
+use Kreait\Firebase\Messaging\AndroidConfig;
 use App\Models\DeviceToken;
 use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Firebase\Exception\MessagingException;
@@ -35,6 +36,47 @@ class FcmService
         }
 
         return true;
+    }
+
+    /**
+     * @param array<string,mixed> $data
+     * @return array<string,string>
+     */
+    private function normalizeDataPayload(array $data): array
+    {
+        $normalized = [];
+        foreach ($data as $key => $value) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            if (is_array($value) || is_object($value)) {
+                $normalized[$key] = json_encode($value);
+                continue;
+            }
+
+            if ($value === null) {
+                continue;
+            }
+
+            $normalized[$key] = (string) $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string,string> $data
+     */
+    private function shouldSendDataOnly(array $data): bool
+    {
+        $type = $data['type'] ?? null;
+        if ($type === 'incoming_call') {
+            return true;
+        }
+
+        $dataOnly = strtolower($data['data_only'] ?? '');
+        return in_array($dataOnly, ['1', 'true', 'yes'], true);
     }
 
     /**
@@ -72,15 +114,25 @@ class FcmService
             return;
         }
 
+        $normalizedData = $this->normalizeDataPayload($data);
+        $dataOnly = $this->shouldSendDataOnly($normalizedData);
+
         \Log::info('FCM send to token attempt', [
             'token' => $this->maskToken($normalizedToken),
             'title' => $title,
-            'data_keys' => array_keys($data),
+            'data_keys' => array_keys($normalizedData),
+            'data_only' => $dataOnly,
         ]);
 
         $message = CloudMessage::withTarget('token', $normalizedToken)
-            ->withNotification(Notification::create($title, $body))
-            ->withData($data);
+            ->withData($normalizedData)
+            ->withAndroidConfig(AndroidConfig::fromArray([
+                'priority' => 'high',
+            ]));
+
+        if (!$dataOnly) {
+            $message = $message->withNotification(Notification::create($title, $body));
+        }
 
         $this->sendMessage($message, $normalizedToken);
 
@@ -107,9 +159,18 @@ class FcmService
             ];
         }
 
+        $normalizedData = $this->normalizeDataPayload($data);
+        $dataOnly = $this->shouldSendDataOnly($normalizedData);
+
         $message = CloudMessage::new()
-            ->withNotification(Notification::create($title, $body))
-            ->withData($data);
+            ->withData($normalizedData)
+            ->withAndroidConfig(AndroidConfig::fromArray([
+                'priority' => 'high',
+            ]));
+
+        if (!$dataOnly) {
+            $message = $message->withNotification(Notification::create($title, $body));
+        }
 
         return $this->sendMulticastMessage($message, $validTokens);
     }
@@ -140,9 +201,18 @@ class FcmService
             $this->messaging->subscribeToTopic($topic, $tokensToEnsure);
         }
 
+        $normalizedData = $this->normalizeDataPayload($data);
+        $dataOnly = $this->shouldSendDataOnly($normalizedData);
+
         $message = CloudMessage::withTarget('topic', $topic)
-            ->withNotification(Notification::create($title, $body))
-            ->withData($data);
+            ->withData($normalizedData)
+            ->withAndroidConfig(AndroidConfig::fromArray([
+                'priority' => 'high',
+            ]));
+
+        if (!$dataOnly) {
+            $message = $message->withNotification(Notification::create($title, $body));
+        }
 
         $this->sendMessage($message, $topic);
     }
