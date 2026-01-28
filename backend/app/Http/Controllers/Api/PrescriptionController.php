@@ -140,19 +140,39 @@ class PrescriptionController extends Controller
     public function userPetsAndPrescriptions(Request $request)
     {
         $payload = $request->validate([
-            'user_id' => ['required', 'integer', 'min:1'],
+            'user_id' => ['nullable', 'integer', 'min:1'],
             'pet_id'  => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $user = User::find($payload['user_id']);
+        if (!$payload['user_id'] && !$payload['pet_id']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Provide either user_id or pet_id',
+            ], 422);
+        }
+
+        $petId = $payload['pet_id'] ?? null;
+        $userId = $payload['user_id'] ?? null;
+
+        // Resolve user via pet when only pet_id is provided.
+        if (!$userId && $petId) {
+            $petForUserLookup = Pet::find($petId);
+            if (!$petForUserLookup) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pet not found',
+                ], 404);
+            }
+            $userId = $petForUserLookup->user_id;
+        }
+
+        $user = User::find($userId);
         if (!$user) {
             return response()->json([
                 'success' => false,
                 'message' => 'User not found',
             ], 404);
         }
-
-        $petId = $payload['pet_id'] ?? null;
 
         $petColumns = [
             'id',
@@ -189,6 +209,17 @@ class PrescriptionController extends Controller
                 'success' => false,
                 'message' => 'Pet not found for this user',
             ], 404);
+        }
+
+        // If both user_id and pet_id were provided, ensure ownership match.
+        if ($petId && $payload['user_id']) {
+            $petOwnerMismatch = $pets->first()?->user_id !== $user->id;
+            if ($petOwnerMismatch) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pet does not belong to this user',
+                ], 404);
+            }
         }
 
         $prescriptions = Prescription::query()
