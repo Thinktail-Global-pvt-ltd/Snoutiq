@@ -158,6 +158,7 @@ class MedicalRecordController extends Controller
             $prescription->image_path = $recordFilePath;
         }
         $prescription->save();
+        $this->markCallSessionCompleted($validated['call_session'] ?? null);
 
         if ($petId) {
             $this->updatePetHealthState($record->user_id, $petId, $isChronic, $diseaseName);
@@ -318,6 +319,7 @@ class MedicalRecordController extends Controller
         if ($petId) {
             $this->updatePetHealthState($user->id, $petId, ($validated['diagnosis_status'] ?? '') === 'chronic', $validated['disease_name'] ?? $validated['diagnosis'] ?? null);
         }
+        $this->markCallSessionCompleted($validated['call_session'] ?? null);
 
         return response()->json([
             'success' => true,
@@ -598,6 +600,20 @@ class MedicalRecordController extends Controller
         }
 
         return $normalized ?: null;
+    }
+
+    private function markCallSessionCompleted(?string $channelName): void
+    {
+        $channelName = trim((string) $channelName);
+        if ($channelName === '') {
+            return;
+        }
+        if (!Schema::hasTable('call_sessions') || !Schema::hasColumn('call_sessions', 'channel_name') || !Schema::hasColumn('call_sessions', 'is_completed')) {
+            return;
+        }
+        DB::table('call_sessions')
+            ->where('channel_name', $channelName)
+            ->update(['is_completed' => 1, 'updated_at' => now()]);
     }
 
     private function maybeStructureMedicines(?string $raw, ?string $diagnosis, ?string $notes): ?array
