@@ -151,10 +151,29 @@ class PrescriptionController extends Controller
             ], 404);
         }
 
+        $petColumns = [
+            'id',
+            'user_id',
+            'name',
+            'pet_gender',
+            'breed',
+            'pet_age',
+            'pet_age_months',
+            'pet_type',
+        ];
+
+        // Include optional columns only if they exist to avoid runtime errors on older schemas.
+        if (Schema::hasColumn('pets', 'suggested_disease')) {
+            $petColumns[] = 'suggested_disease';
+        }
+        if (Schema::hasColumn('pets', 'video_calling_upload_file')) {
+            $petColumns[] = 'video_calling_upload_file';
+        }
+
         $pets = Pet::query()
             ->where('user_id', $user->id)
             ->orderByDesc('id')
-            ->get(['id', 'user_id', 'name', 'pet_gender', 'breed', 'pet_age', 'pet_age_months', 'pet_type']);
+            ->get($petColumns);
 
         $prescriptions = Prescription::query()
             ->where('user_id', $user->id)
