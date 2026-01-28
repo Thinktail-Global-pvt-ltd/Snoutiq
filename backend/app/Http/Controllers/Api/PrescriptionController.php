@@ -216,9 +216,6 @@ class PrescriptionController extends Controller
             'name',
             'pet_gender',
             'breed',
-            'pet_age',
-            'pet_age_months',
-            'pet_type',
         ];
 
         // Include optional columns only if they exist to avoid runtime errors on older schemas.
@@ -227,6 +224,9 @@ class PrescriptionController extends Controller
         }
         if (Schema::hasColumn('pets', 'reported_symptom')) {
             $petColumns[] = 'reported_symptom';
+        }
+        if (Schema::hasColumn('pets', 'pet_dob')) {
+            $petColumns[] = 'pet_dob';
         }
 
         $petsQuery = Pet::query()
