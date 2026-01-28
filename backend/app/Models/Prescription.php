@@ -33,6 +33,7 @@ class Prescription extends Model
         'treatment_plan',
         'medications_json',
         'home_care',
+        'video_inclinic',
         'follow_up_date',
         'follow_up_type',
         'follow_up_notes',
