@@ -141,6 +141,7 @@ class PrescriptionController extends Controller
     {
         $payload = $request->validate([
             'user_id' => ['required', 'integer', 'min:1'],
+            'pet_id'  => ['nullable', 'integer', 'min:1'],
         ]);
 
         $user = User::find($payload['user_id']);
@@ -150,6 +151,8 @@ class PrescriptionController extends Controller
                 'message' => 'User not found',
             ], 404);
         }
+
+        $petId = $payload['pet_id'] ?? null;
 
         $petColumns = [
             'id',
@@ -170,14 +173,31 @@ class PrescriptionController extends Controller
             $petColumns[] = 'video_calling_upload_file';
         }
 
-        $pets = Pet::query()
-            ->where('user_id', $user->id)
+        $petsQuery = Pet::query()
+            ->where('user_id', $user->id);
+
+        if ($petId) {
+            $petsQuery->where('id', $petId);
+        }
+
+        $pets = $petsQuery
             ->orderByDesc('id')
             ->get($petColumns);
+
+        if ($petId && $pets->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found for this user',
+            ], 404);
+        }
 
         $prescriptions = Prescription::query()
             ->where('user_id', $user->id)
             ->orderByDesc('id')
+            ->when(
+                $petId && Schema::hasColumn('prescriptions', 'pet_id'),
+                fn ($query) => $query->where('pet_id', $petId)
+            )
             ->get([
                 'id',
                 'doctor_id',
