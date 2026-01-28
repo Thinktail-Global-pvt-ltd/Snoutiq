@@ -70,9 +70,10 @@ class FcmService
      */
     private function shouldSendDataOnly(array $data): bool
     {
-        $type = $data['type'] ?? null;
+        $type = strtolower($data['type'] ?? '');
         if ($type === 'incoming_call') {
-            return true;
+            // Incoming calls must include notification payload for OS-level display.
+            return false;
         }
 
         $dataOnly = strtolower($data['data_only'] ?? '');

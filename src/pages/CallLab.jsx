@@ -241,7 +241,6 @@ export default function CallLab() {
         channel: String(mode || "video"),
         patient_id: String(patient_id),
         expires_at: String(Date.now() + 30000),
-        data_only: "1",
       },
     });
   }
