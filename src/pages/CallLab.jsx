@@ -228,7 +228,7 @@ export default function CallLab() {
     appendLog("🔇 Ringing push stopped");
   }
 
-  async function sendIncomingCallPushOnce({ token, call_id, doctor_id, mode }) {
+  async function sendIncomingCallPushOnce({ token, call_id, doctor_id, patient_id, mode }) {
     // Uses your existing backend logic: /api/push/test
     return postJSON("/api/push/test", {
       token,
@@ -239,11 +239,14 @@ export default function CallLab() {
         call_id: String(call_id),
         doctor_id: String(doctor_id),
         channel: String(mode || "video"),
+        patient_id: String(patient_id),
+        expires_at: String(Date.now() + 30000),
+        data_only: "1",
       },
     });
   }
 
-  function startRingingPush({ token, call_id, doctor_id, mode }) {
+  function startRingingPush({ token, call_id, doctor_id, patient_id, mode }) {
     stopRingingPush(); // kill old loop
 
     if (!token?.trim()) {
@@ -256,7 +259,7 @@ export default function CallLab() {
 
     // fire immediately
     (async () => {
-      const r = await sendIncomingCallPushOnce({ token, call_id, doctor_id, mode });
+      const r = await sendIncomingCallPushOnce({ token, call_id, doctor_id, patient_id, mode });
       appendLog(`push/test → ${r.status} ${JSON.stringify(r.json)}`);
     })();
 
@@ -290,6 +293,7 @@ export default function CallLab() {
         token: doctorFcmToken.trim(),
         call_id: newCallId,
         doctor_id: r.json.doctor_id ?? doctorId,
+        patient_id: patientId,
         mode: channel || "video",
       });
     }
