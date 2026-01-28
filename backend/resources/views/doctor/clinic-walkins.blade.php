@@ -162,6 +162,23 @@
     .record-textarea{min-height:70px;resize:vertical}
     .record-upload{border:2px dashed #c7d2fe;border-radius:12px;padding:12px;text-align:center;font-weight:700;color:#4338ca;cursor:pointer;background:#f8f9ff;display:inline-block}
     .record-note{font-size:12px;color:var(--pm-muted);margin-top:4px}
+    .meds-shell{border:1px dashed #d7dde6;border-radius:12px;padding:12px;margin-top:8px;background:#f8fafc}
+    .meds-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .meds-hint{font-size:12px;color:#64748b;max-width:520px}
+    .meds-add{padding:8px 12px;font-weight:700;font-size:13px}
+    .meds-list{display:flex;flex-direction:column;gap:12px}
+    .meds-card{border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fff;box-shadow:0 6px 16px rgba(15,23,42,0.06)}
+    .meds-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:10px}
+    .meds-field label{font-size:12px;font-weight:700;color:#111827;display:block;margin-bottom:4px}
+    .meds-chipRow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+    .meds-chipLabel{font-size:12px;font-weight:700;color:#111827;min-width:120px}
+    .meds-chipGroup{display:flex;flex-wrap:wrap;gap:8px}
+    .meds-chip{padding:7px 10px;border-radius:999px;border:1px solid #d7dde6;background:#f8fafc;font-weight:700;font-size:12px;color:#475569;cursor:pointer}
+    .meds-chip.is-active{background:#0f766e;color:#fff;border-color:#0f766e;box-shadow:0 6px 14px rgba(15,118,110,0.18)}
+    .meds-preview{background:#f1f5f9;border-radius:10px;padding:8px 10px;font-size:12px;color:#0f172a;margin-top:6px}
+    .meds-remove{color:#b91c1c;border:1px solid #fecdd3;background:#fff1f2;padding:6px 10px;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;margin-top:8px}
+    .meds-empty{font-size:12px;color:#94a3b8;margin-bottom:6px}
+    .meds-hidden-text{display:none}
     .record-critical{display:block}
     .record-critical.is-visible{display:block}
     .record-actions{
@@ -803,6 +820,19 @@
           <label class="record-label" for="treatment-plan">Medication / treatment plan</label>
           <textarea id="treatment-plan" name="treatment_plan" class="record-input record-textarea" placeholder="Medication / treatment plan"></textarea>
         </div>
+        <div class="record-field meds-shell">
+          <div class="meds-head">
+            <div>
+              <div class="record-label" style="margin-bottom:2px">Medicines (structured)</div>
+              <div class="meds-hint">Type medicine name → choose frequency & timing → set dosage and duration. Data is saved for each medicine.</div>
+            </div>
+            <button class="meds-add pm-btn pm-primary" type="button" data-role="add-medicine">+ Add medicine</button>
+          </div>
+          <input type="hidden" id="medications-json" name="medications_json">
+          <textarea id="medicines-text" name="medicines" class="record-input record-textarea meds-hidden-text" style="display:none"></textarea>
+          <div id="medications-empty" class="meds-empty">No medicines added yet. Click “Add medicine”.</div>
+          <div id="medications-list" class="meds-list"></div>
+        </div>
         <div class="record-field">
           <label class="record-label" for="home-care">Home care / precautions</label>
           <textarea id="home-care" name="home_care" class="record-input record-textarea" placeholder="Home care / precautions"></textarea>
@@ -901,6 +931,11 @@
     recordForm: document.getElementById('record-form'),
     doctorSelect: document.getElementById('doctor-select'),
     recordPet: document.getElementById('record-pet'),
+    medicationsList: document.getElementById('medications-list'),
+    medicationsEmpty: document.getElementById('medications-empty'),
+    medicationsJson: document.getElementById('medications-json'),
+    medicinesText: document.getElementById('medicines-text'),
+    addMedicineBtn: document.querySelector('[data-role="add-medicine"]'),
     caseSeverity: document.getElementById('case-severity'),
     criticalSections: Array.from(document.querySelectorAll('[data-critical]')),
     petModal: document.getElementById('pet-modal'),
@@ -910,6 +945,246 @@
   };
 
   let lastRecordError = null;
+
+  const MED_FREQUENCIES = [
+    { value: 'OD (Once daily)', label: 'OD (Once daily)' },
+    { value: 'BD (Twice daily)', label: 'BD (Twice daily)' },
+    { value: 'TDS (3 times)', label: 'TDS (3 times)' },
+    { value: 'QID (4 times)', label: 'QID (4 times)' },
+  ];
+  const MED_TIMINGS = [
+    { value: 'Morning', label: 'Morning' },
+    { value: 'Afternoon', label: 'Afternoon' },
+    { value: 'Evening', label: 'Evening' },
+    { value: 'Night', label: 'Night' },
+  ];
+  const MED_FOOD = [
+    { value: 'Before food (AC)', label: 'Before food (AC)' },
+    { value: 'After food (PC)', label: 'After food (PC)' },
+    { value: 'With food', label: 'With food' },
+    { value: 'Empty stomach', label: 'Empty stomach' },
+  ];
+  let medications = [];
+
+  const cleanTimings = (value) => Array.isArray(value)
+    ? Array.from(new Set(value.map((t) => t && t.toString().trim()).filter(Boolean)))
+    : [];
+
+  function newMedication(initial = {}) {
+    return {
+      name: '',
+      dose: '',
+      frequency: '',
+      duration: '',
+      route: '',
+      notes: '',
+      timings: [],
+      food_relation: '',
+      ...initial,
+    };
+  }
+
+  function medPreviewLine(med) {
+    const parts = [];
+    if (med.name) parts.push(med.name);
+    if (med.dose) parts.push(med.dose);
+    if (med.frequency) parts.push(med.frequency);
+    const timings = cleanTimings(med.timings);
+    if (timings.length) parts.push(`Timing: ${timings.join(', ')}`);
+    if (med.food_relation) parts.push(med.food_relation);
+    if (med.duration) parts.push(`Duration: ${med.duration}`);
+    if (med.notes) parts.push(`Notes: ${med.notes}`);
+    return parts.filter(Boolean).join(' • ') || 'Fill in details to see prescription';
+  }
+
+  function normalizeMedicationState(raw) {
+    const meds = normalizeMedications(raw);
+    if (!meds.length) return [];
+    return meds.map((med) => newMedication({
+      name: med.name || med.medicine || med.title || '',
+      dose: med.dose || '',
+      frequency: med.frequency || '',
+      duration: med.duration || '',
+      route: med.route || '',
+      notes: med.notes || '',
+      timings: cleanTimings(med.timings || med.timing || []),
+      food_relation: med.food_relation || med.food || '',
+    })).filter((m) => medPreviewLine(m).trim() !== 'Fill in details to see prescription');
+  }
+
+  function syncMedicationPayload() {
+    const payload = medications
+      .map((med) => ({
+        ...med,
+        timings: cleanTimings(med.timings),
+        food_relation: (med.food_relation || '').trim(),
+      }))
+      .filter((med) => {
+        return Boolean(
+          (med.name || '').trim()
+          || (med.dose || '').trim()
+          || (med.frequency || '').trim()
+          || (med.duration || '').trim()
+          || cleanTimings(med.timings).length
+          || (med.food_relation || '').trim()
+          || (med.notes || '').trim()
+        );
+      });
+
+    if (els.medicationsJson) {
+      els.medicationsJson.value = payload.length ? JSON.stringify(payload) : '';
+    }
+
+    if (els.medicinesText) {
+      const fallbackLines = payload.map((med) => medPreviewLine(med));
+      els.medicinesText.value = fallbackLines.join(';\n');
+    }
+
+    if (els.medicationsEmpty) {
+      els.medicationsEmpty.style.display = payload.length ? 'none' : 'block';
+    }
+  }
+
+  function buildChipRow(label, options, { multi = false, med, field, onChange }) {
+    const row = document.createElement('div');
+    row.className = 'meds-chipRow';
+    const lab = document.createElement('div');
+    lab.className = 'meds-chipLabel';
+    lab.textContent = label;
+    const group = document.createElement('div');
+    group.className = 'meds-chipGroup';
+    options.forEach((opt) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const isActive = multi
+        ? cleanTimings(med[field]).includes(opt.value)
+        : (med[field] || '') === opt.value;
+      btn.className = 'meds-chip' + (isActive ? ' is-active' : '');
+      btn.textContent = opt.label;
+      btn.addEventListener('click', () => {
+        if (multi) {
+          const next = new Set(cleanTimings(med[field]));
+          if (next.has(opt.value)) {
+            next.delete(opt.value);
+          } else {
+            next.add(opt.value);
+          }
+          const arr = Array.from(next);
+          med[field] = arr;
+          btn.classList.toggle('is-active');
+          onChange(arr);
+        } else {
+          med[field] = opt.value;
+          group.querySelectorAll('.meds-chip').forEach((chip) => chip.classList.remove('is-active'));
+          btn.classList.add('is-active');
+          onChange(opt.value);
+        }
+      });
+      group.appendChild(btn);
+    });
+    row.appendChild(lab);
+    row.appendChild(group);
+    return row;
+  }
+
+  function buildMedicationCard(med, index) {
+    const card = document.createElement('div');
+    card.className = 'meds-card';
+    let preview = null;
+
+    const row = document.createElement('div');
+    row.className = 'meds-row';
+
+    const fields = [
+      { label: 'Medicine Name', field: 'name', placeholder: 'Start typing medicine name...' },
+      { label: 'Dosage', field: 'dose', placeholder: 'e.g., 1 tab' },
+      { label: 'Duration', field: 'duration', placeholder: 'e.g., 5 days' },
+    ];
+
+    fields.forEach((cfg) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'meds-field';
+      const lab = document.createElement('label');
+      lab.textContent = cfg.label;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = med[cfg.field] || '';
+      input.placeholder = cfg.placeholder;
+      input.className = 'record-input';
+      input.addEventListener('input', (event) => {
+        med[cfg.field] = event.target.value;
+        if (preview) preview.textContent = medPreviewLine(med);
+        syncMedicationPayload();
+      });
+      wrap.appendChild(lab);
+      wrap.appendChild(input);
+      row.appendChild(wrap);
+    });
+
+    card.appendChild(row);
+
+    const freqRow = buildChipRow('Frequency', MED_FREQUENCIES, {
+      med,
+      field: 'frequency',
+      onChange: () => { preview.textContent = medPreviewLine(med); syncMedicationPayload(); },
+    });
+    const timeRow = buildChipRow('Timing', MED_TIMINGS, {
+      med,
+      field: 'timings',
+      multi: true,
+      onChange: () => { preview.textContent = medPreviewLine(med); syncMedicationPayload(); },
+    });
+    const foodRow = buildChipRow('Food Relation', MED_FOOD, {
+      med,
+      field: 'food_relation',
+      onChange: () => { preview.textContent = medPreviewLine(med); syncMedicationPayload(); },
+    });
+
+    card.appendChild(freqRow);
+    card.appendChild(timeRow);
+    card.appendChild(foodRow);
+
+    preview = document.createElement('div');
+    preview.className = 'meds-preview';
+    preview.textContent = medPreviewLine(med);
+    card.appendChild(preview);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'meds-remove';
+    removeBtn.textContent = 'Remove';
+    removeBtn.addEventListener('click', () => {
+      medications.splice(index, 1);
+      renderMedicationCards();
+      syncMedicationPayload();
+    });
+    card.appendChild(removeBtn);
+
+    return card;
+  }
+
+  function renderMedicationCards() {
+    if (!els.medicationsList) return;
+    els.medicationsList.innerHTML = '';
+    medications.forEach((med, idx) => {
+      els.medicationsList.appendChild(buildMedicationCard(med, idx));
+    });
+    if (els.medicationsEmpty) {
+      els.medicationsEmpty.style.display = medications.length ? 'none' : 'block';
+    }
+  }
+
+  function addMedication(prefill = {}) {
+    medications.push(newMedication(prefill));
+    renderMedicationCards();
+    syncMedicationPayload();
+  }
+
+  function resetMedications() {
+    medications = [];
+    renderMedicationCards();
+    syncMedicationPayload();
+  }
 
   function toggleCriticalSections(value) {
     (els.criticalSections || []).forEach((section) => {
@@ -964,6 +1239,9 @@
       if (name) parts.push(escapeHtml(name));
       if (med.dose) parts.push(`Dose: ${escapeHtml(med.dose)}`);
       if (med.frequency) parts.push(`Frequency: ${escapeHtml(med.frequency)}`);
+      const timings = Array.isArray(med.timings) ? med.timings : (med.timing ? [med.timing] : []);
+      if (timings.length) parts.push(`Timing: ${escapeHtml(timings.join(', '))}`);
+      if (med.food_relation || med.food) parts.push(`Food: ${escapeHtml(med.food_relation || med.food)}`);
       if (med.duration) parts.push(`Duration: ${escapeHtml(med.duration)}`);
       if (med.route) parts.push(`Route: ${escapeHtml(med.route)}`);
       if (med.notes) parts.push(`Notes: ${escapeHtml(med.notes)}`);
@@ -1558,6 +1836,7 @@
     if (els.caseSeverity) {
       els.caseSeverity.value = 'general';
     }
+    resetMedications();
     toggleCriticalSections(els.caseSeverity?.value || 'general');
     const recordIdInput = document.getElementById('record-id');
     if (recordIdInput) recordIdInput.value = '';
@@ -1603,6 +1882,12 @@
     mapValue('follow-up-date', prescription.follow_up_date ?? '');
     mapValue('follow-up-type', prescription.follow_up_type ?? '');
     mapValue('record-pet', prescription.pet_id ?? rec.pet_id ?? '');
+    medications = normalizeMedicationState(prescription.medications_json || []);
+    renderMedicationCards();
+    syncMedicationPayload();
+    if (!medications.length) {
+      addMedication();
+    }
     toggleCriticalSections(els.caseSeverity?.value || 'general');
   }
 
@@ -1627,6 +1912,9 @@
       els.modalUserInput.value = patient.id;
     }
     resetRecordForm();
+    if (!medications.length) {
+      addMedication();
+    }
     renderPetSelect(patient);
     if (els.doctorSelect && DEFAULT_DOCTOR_ID) {
       els.doctorSelect.value = DEFAULT_DOCTOR_ID;
@@ -1692,6 +1980,7 @@
     els.caseSeverity?.addEventListener('change', (event) => {
       toggleCriticalSections(event.target.value || 'general');
     });
+    els.addMedicineBtn?.addEventListener('click', () => addMedication());
 
     els.recordForm?.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -1704,6 +1993,7 @@
         Swal.fire({ icon: 'error', title: 'Patient missing', text: 'Select a patient before uploading.' });
         return;
       }
+      syncMedicationPayload();
       const formData = new FormData(els.recordForm);
       formData.append('clinic_id', CLINIC_ID);
       if (!formData.get('doctor_id')) {
@@ -1784,6 +2074,8 @@
   renderTagFilters();
   renderPatientList();
   renderProfile();
+  renderMedicationCards();
+  syncMedicationPayload();
   wireEvents();
   toggleCriticalSections(els.caseSeverity?.value || 'general');
   loadPatients();

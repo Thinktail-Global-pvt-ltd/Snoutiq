@@ -49,6 +49,7 @@ class MedicalRecordController extends Controller
             'treatment_plan' => ['nullable', 'string'],
             'home_care' => ['nullable', 'string'],
             'medicines' => ['nullable', 'string', 'max:2000'],
+            'medications_json' => ['nullable'],
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
@@ -120,7 +121,8 @@ class MedicalRecordController extends Controller
         $record->save();
 
         $prescription = Prescription::firstOrNew(['medical_record_id' => $record->id]);
-        $medsJson = $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null);
+        $structuredMedications = $this->decodeMedicationsInput($request->input('medications_json'));
+        $medsJson = $structuredMedications ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null);
         $diseaseName = $validated['disease_name'] ?? $validated['diagnosis'] ?? null;
         $isChronic = ($validated['diagnosis_status'] ?? '') === 'chronic';
 
@@ -193,6 +195,7 @@ class MedicalRecordController extends Controller
             'treatment_plan' => ['nullable', 'string'],
             'home_care' => ['nullable', 'string'],
             'medicines' => ['nullable', 'string', 'max:2000'],
+            'medications_json' => ['nullable'],
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
@@ -292,7 +295,8 @@ class MedicalRecordController extends Controller
             'follow_up_type' => $validated['follow_up_type'] ?? null,
             'follow_up_notes' => $validated['follow_up_notes'] ?? null,
             'pet_id' => $petId,
-            'medications_json' => $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
+            'medications_json' => $this->decodeMedicationsInput($request->input('medications_json'))
+                ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
         $prescriptionPayload['image_path'] = $filePayload['path'];
         $prescription = Prescription::create($prescriptionPayload);
@@ -529,6 +533,63 @@ class MedicalRecordController extends Controller
             $updates['updated_at'] = now();
             DB::table('pets')->where('id', $petId)->update($updates);
         }
+    }
+
+    private function decodeMedicationsInput($input): ?array
+    {
+        if ($input === null || $input === '') {
+            return null;
+        }
+
+        if (is_string($input)) {
+            $decoded = json_decode($input, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $input = $decoded;
+            }
+        }
+
+        if (!is_array($input)) {
+            return null;
+        }
+
+        $normalized = [];
+        foreach ($input as $item) {
+            if (is_object($item)) {
+                $item = json_decode(json_encode($item), true);
+            }
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $med = [
+                'name' => trim((string) ($item['name'] ?? $item['medicine'] ?? '')),
+                'dose' => trim((string) ($item['dose'] ?? '')),
+                'frequency' => trim((string) ($item['frequency'] ?? '')),
+                'duration' => trim((string) ($item['duration'] ?? '')),
+                'route' => trim((string) ($item['route'] ?? '')),
+                'notes' => trim((string) ($item['notes'] ?? '')),
+            ];
+
+            $timings = $item['timings'] ?? $item['timing'] ?? [];
+            if (is_string($timings)) {
+                $timings = array_filter(array_map('trim', explode(',', $timings)));
+            }
+            if (is_array($timings)) {
+                $med['timings'] = array_values(array_unique(array_filter(array_map('trim', $timings))));
+            }
+
+            $food = trim((string) ($item['food_relation'] ?? $item['food'] ?? ''));
+            if ($food !== '') {
+                $med['food_relation'] = $food;
+            }
+
+            $hasContent = array_filter($med, static fn ($value) => $value !== '' && $value !== []);
+            if ($hasContent) {
+                $normalized[] = $med;
+            }
+        }
+
+        return $normalized ?: null;
     }
 
     private function maybeStructureMedicines(?string $raw, ?string $diagnosis, ?string $notes): ?array
