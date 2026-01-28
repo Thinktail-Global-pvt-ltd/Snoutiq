@@ -69,6 +69,7 @@ class TransactionController extends Controller
                     'name' => $pet->name,
                 ] : null,
                 'call_session' => $callSession ? $this->formatCallSession($callSession) : null,
+                'call_session_is_completed' => $callSession ? (bool) ($callSession->is_completed ?? false) : null,
             ];
         });
 
@@ -178,6 +179,7 @@ class TransactionController extends Controller
             'status' => $session->status,
             'payment_status' => $session->payment_status,
             'currency' => $session->currency,
+            'is_completed' => $session->is_completed ?? null,
             'created_at' => optional($session->created_at)->toIso8601String(),
             'updated_at' => optional($session->updated_at)->toIso8601String(),
         ];
