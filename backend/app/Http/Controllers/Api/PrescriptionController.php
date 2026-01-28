@@ -222,11 +222,11 @@ class PrescriptionController extends Controller
         ];
 
         // Include optional columns only if they exist to avoid runtime errors on older schemas.
-        if (Schema::hasColumn('pets', 'suggested_disease')) {
-            $petColumns[] = 'suggested_disease';
-        }
         if (Schema::hasColumn('pets', 'video_calling_upload_file')) {
             $petColumns[] = 'video_calling_upload_file';
+        }
+        if (Schema::hasColumn('pets', 'reported_symptom')) {
+            $petColumns[] = 'reported_symptom';
         }
 
         $petsQuery = Pet::query()
