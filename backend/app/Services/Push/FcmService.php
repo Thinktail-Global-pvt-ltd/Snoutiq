@@ -70,6 +70,11 @@ class FcmService
      */
     private function shouldSendDataOnly(array $data): bool
     {
+        $type = $data['type'] ?? null;
+        if ($type === 'incoming_call') {
+            return true;
+        }
+
         $dataOnly = strtolower($data['data_only'] ?? '');
         return in_array($dataOnly, ['1', 'true', 'yes'], true);
     }
