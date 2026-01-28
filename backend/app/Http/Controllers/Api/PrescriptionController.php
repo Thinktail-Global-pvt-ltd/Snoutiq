@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Pet;
+use Carbon\Carbon;
 
 class PrescriptionController extends Controller
 {
@@ -33,6 +34,41 @@ class PrescriptionController extends Controller
         $prescriptions = $query->paginate(20);
         $prescriptions->getCollection()->transform(function ($prescription) {
             $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+
+            // Enrich medications_json with days_remaining based on created_at + duration
+            $createdAt = $prescription->created_at ? Carbon::parse($prescription->created_at) : null;
+            $meds = $prescription->medications_json ?? [];
+            if (is_string($meds)) {
+                $decoded = json_decode($meds, true);
+                $meds = json_last_error() === JSON_ERROR_NONE ? $decoded : [];
+            }
+            if (is_array($meds) && $createdAt) {
+                $meds = array_map(function ($med) use ($createdAt) {
+                    if (!is_array($med)) {
+                        return $med;
+                    }
+                    $durationRaw = $med['duration'] ?? '';
+                    // extract leading number for duration (e.g., "7 days" => 7)
+                    preg_match('/(\\d+(?:\\.\\d+)?)/', (string) $durationRaw, $m);
+                    $durationDays = isset($m[1]) ? (float) $m[1] : null;
+                    if ($durationDays !== null) {
+                        $elapsed = $createdAt->diffInDays(Carbon::now());
+                        $remaining = max((int) ceil($durationDays - $elapsed), 0);
+                        $med['days_remaining'] = $remaining;
+                    }
+                    return $med;
+                }, $meds);
+                $prescription->medications_json = $meds;
+            }
+
+            // Normalize treatment_plan phrasing
+            if (!empty($prescription->treatment_plan)) {
+                $tp = $prescription->treatment_plan;
+                $tp = preg_replace('/(Dosage:\\s*\\d+(?:\\.\\d+)?)(?!\\s*times)/i', '$1 times', $tp);
+                $tp = preg_replace('/(Duration:\\s*\\d+(?:\\.\\d+)?)(?!\\s*days)/i', '$1 days', $tp);
+                $prescription->treatment_plan = $tp;
+            }
+
             return $prescription;
         });
         return response()->json($prescriptions);
