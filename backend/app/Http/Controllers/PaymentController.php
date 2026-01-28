@@ -552,18 +552,7 @@ class PaymentController extends Controller
             return null;
         }
 
-        // Reuse latest matching pending session if present
-        $existing = CallSession::query()
-            ->where('patient_id', $patientId)
-            ->where('doctor_id', $doctorId)
-            ->whereIn('status', ['pending'])
-            ->latest('id')
-            ->first();
-
-        if ($existing) {
-            return $existing;
-        }
-
+        // Always create a fresh session for each order to avoid reusing prior pending sessions
         $channel = 'channel_' . Str::random(12);
         $session = new CallSession([
             'patient_id' => $patientId,
