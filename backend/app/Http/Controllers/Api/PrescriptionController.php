@@ -144,15 +144,15 @@ class PrescriptionController extends Controller
             'pet_id'  => ['nullable', 'integer', 'min:1'],
         ]);
 
-        if (!$payload['user_id'] && !$payload['pet_id']) {
+        $userId = $payload['user_id'] ?? null;
+        $petId = $payload['pet_id'] ?? null;
+
+        if (!$userId && !$petId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Provide either user_id or pet_id',
             ], 422);
         }
-
-        $petId = $payload['pet_id'] ?? null;
-        $userId = $payload['user_id'] ?? null;
 
         // Resolve user via pet when only pet_id is provided.
         if (!$userId && $petId) {
@@ -212,7 +212,7 @@ class PrescriptionController extends Controller
         }
 
         // If both user_id and pet_id were provided, ensure ownership match.
-        if ($petId && $payload['user_id']) {
+        if ($petId && $userId) {
             $petOwnerMismatch = $pets->first()?->user_id !== $user->id;
             if ($petOwnerMismatch) {
                 return response()->json([
