@@ -9,6 +9,7 @@ use App\Services\Push\FcmService;
 use App\Support\DeviceTokenOwnerResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Kreait\Firebase\Exception\MessagingException;
 use Throwable;
@@ -293,6 +294,64 @@ class PushController extends Controller
                 'details' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function ring(Request $request, FcmService $push)
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string'],
+            'call_id' => ['required'],
+            'doctor_id' => ['nullable'],
+            'channel' => ['nullable', 'string'],
+            'title' => ['nullable', 'string'],
+            'body' => ['nullable', 'string'],
+            'duration_ms' => ['nullable', 'integer', 'min:1000', 'max:120000'],
+            'interval_ms' => ['nullable', 'integer', 'min:500', 'max:10000'],
+        ]);
+
+        $token = $this->normalizeToken($validated['token']);
+        if (!$this->isLikelyFcmToken($token)) {
+            return response()->json([
+                'error' => 'The provided token does not look like a valid FCM registration token.',
+            ], 422);
+        }
+
+        $title = $validated['title'] ?? 'Snoutiq Incoming Call';
+        $body = $validated['body'] ?? 'Incoming call alert';
+        $durationMs = $validated['duration_ms'] ?? 30_000;
+        $intervalMs = $validated['interval_ms'] ?? 4_000;
+
+        $data = [
+            'type' => 'incoming_call',
+            'call_id' => (string) $validated['call_id'],
+        ];
+
+        if (isset($validated['doctor_id'])) {
+            $data['doctor_id'] = (string) $validated['doctor_id'];
+        }
+
+        if (isset($validated['channel'])) {
+            $data['channel'] = (string) $validated['channel'];
+        }
+
+        // Fire the first push immediately
+        $push->sendToToken($token, $title, $body, $data);
+
+        $remainingSends = max(0, (int) floor(($durationMs - 1) / $intervalMs));
+        for ($i = 1; $i <= $remainingSends; $i++) {
+            $delayMs = $i * $intervalMs;
+            $delayedData = array_merge($data, ['ring_sequence' => (string) $i]);
+
+            SendFcmMessage::dispatch($token, $title, $body, $delayedData)
+                ->delay(Carbon::now()->addMilliseconds($delayMs));
+        }
+
+        return response()->json([
+            'ok' => true,
+            'scheduled' => 1 + $remainingSends,
+            'duration_ms' => $durationMs,
+            'interval_ms' => $intervalMs,
+        ]);
     }
 
     private function normalizeToken(string $token): string
