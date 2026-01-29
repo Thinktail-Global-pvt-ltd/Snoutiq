@@ -6,6 +6,7 @@ use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 use Kreait\Firebase\Messaging\AndroidConfig;
+use Kreait\Firebase\Messaging\ApnsConfig;
 use App\Models\DeviceToken;
 use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Firebase\Exception\MessagingException;
@@ -68,16 +69,68 @@ class FcmService
     /**
      * @param array<string,string> $data
      */
+    private function isIncomingCall(array $data): bool
+    {
+        return strtolower($data['type'] ?? '') === 'incoming_call';
+    }
+
+    /**
+     * @param array<string,string> $data
+     */
     private function shouldSendDataOnly(array $data): bool
     {
-        $type = strtolower($data['type'] ?? '');
-        if ($type === 'incoming_call') {
-            // Incoming calls must include notification payload for OS-level display.
-            return false;
+        if ($this->isIncomingCall($data)) {
+            // Incoming calls must be data-only so the background handler can persist state.
+            return true;
         }
 
         $dataOnly = strtolower($data['data_only'] ?? '');
         return in_array($dataOnly, ['1', 'true', 'yes'], true);
+    }
+
+    /**
+     * @param array<string,string> $data
+     * @return array<string,string>
+     */
+    private function ensureIncomingCallDataOnlyFlag(array $data): array
+    {
+        if ($this->isIncomingCall($data) && !array_key_exists('data_only', $data)) {
+            $data['data_only'] = '1';
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param array<string,string> $data
+     */
+    private function buildAndroidConfig(array $data): AndroidConfig
+    {
+        $config = [
+            'priority' => 'high',
+        ];
+
+        if ($this->isIncomingCall($data)) {
+            $config['ttl'] = '30s';
+        }
+
+        return AndroidConfig::fromArray($config);
+    }
+
+    /**
+     * @param array<string,string> $data
+     */
+    private function buildApnsConfig(array $data): ?ApnsConfig
+    {
+        if (!$this->isIncomingCall($data)) {
+            return null;
+        }
+
+        return ApnsConfig::fromArray([
+            'headers' => [
+                'apns-priority' => '10',
+            ],
+        ]);
     }
 
     /**
@@ -116,7 +169,9 @@ class FcmService
         }
 
         $normalizedData = $this->normalizeDataPayload($data);
+        $normalizedData = $this->ensureIncomingCallDataOnlyFlag($normalizedData);
         $dataOnly = $this->shouldSendDataOnly($normalizedData);
+        $apnsConfig = $this->buildApnsConfig($normalizedData);
 
         \Log::info('FCM send to token attempt', [
             'token' => $this->maskToken($normalizedToken),
@@ -127,9 +182,11 @@ class FcmService
 
         $message = CloudMessage::withTarget('token', $normalizedToken)
             ->withData($normalizedData)
-            ->withAndroidConfig(AndroidConfig::fromArray([
-                'priority' => 'high',
-            ]));
+            ->withAndroidConfig($this->buildAndroidConfig($normalizedData));
+
+        if ($apnsConfig !== null) {
+            $message = $message->withApnsConfig($apnsConfig);
+        }
 
         if (!$dataOnly) {
             $message = $message->withNotification(Notification::create($title, $body));
@@ -161,13 +218,17 @@ class FcmService
         }
 
         $normalizedData = $this->normalizeDataPayload($data);
+        $normalizedData = $this->ensureIncomingCallDataOnlyFlag($normalizedData);
         $dataOnly = $this->shouldSendDataOnly($normalizedData);
+        $apnsConfig = $this->buildApnsConfig($normalizedData);
 
         $message = CloudMessage::new()
             ->withData($normalizedData)
-            ->withAndroidConfig(AndroidConfig::fromArray([
-                'priority' => 'high',
-            ]));
+            ->withAndroidConfig($this->buildAndroidConfig($normalizedData));
+
+        if ($apnsConfig !== null) {
+            $message = $message->withApnsConfig($apnsConfig);
+        }
 
         if (!$dataOnly) {
             $message = $message->withNotification(Notification::create($title, $body));
@@ -203,13 +264,17 @@ class FcmService
         }
 
         $normalizedData = $this->normalizeDataPayload($data);
+        $normalizedData = $this->ensureIncomingCallDataOnlyFlag($normalizedData);
         $dataOnly = $this->shouldSendDataOnly($normalizedData);
+        $apnsConfig = $this->buildApnsConfig($normalizedData);
 
         $message = CloudMessage::withTarget('topic', $topic)
             ->withData($normalizedData)
-            ->withAndroidConfig(AndroidConfig::fromArray([
-                'priority' => 'high',
-            ]));
+            ->withAndroidConfig($this->buildAndroidConfig($normalizedData));
+
+        if ($apnsConfig !== null) {
+            $message = $message->withApnsConfig($apnsConfig);
+        }
 
         if (!$dataOnly) {
             $message = $message->withNotification(Notification::create($title, $body));
