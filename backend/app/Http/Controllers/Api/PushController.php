@@ -245,6 +245,9 @@ class PushController extends Controller
         ]);
 
         try {
+            $report = null;
+            $tokenSource = null;
+
             if (!empty($validated['token'])) {
                 $normalizedToken = $this->normalizeToken($validated['token']);
                 if (!$this->isLikelyFcmToken($normalizedToken)) {
@@ -253,23 +256,50 @@ class PushController extends Controller
                     ], 422);
                 }
                 // Send immediately for testing
-                $push->sendToToken($normalizedToken, $title, $body, $data);
+                $report = $push->sendToTokenWithReport($normalizedToken, $title, $body, $data);
+                $tokenSource = 'request_token';
             } else {
-                // If token not provided, try sending to the current user's registered devices
+                // If token not provided, use the latest registered device for the current user
                 $userId = Auth::id();
                 if (!$userId) {
                     return response()->json(['error' => 'Login or pass token'], 422);
                 }
-                $tokens = DeviceToken::where('user_id', $userId)->pluck('token')->all();
-                foreach ($tokens as $t) {
-                    $push->sendToToken($t, $title, $body, $data);
+
+                $latestToken = DeviceToken::where('user_id', $userId)
+                    ->orderByDesc('last_seen_at')
+                    ->orderByDesc('id')
+                    ->first();
+
+                if (!$latestToken) {
+                    return response()->json(['error' => 'No device tokens found for user'], 404);
                 }
+
+                $report = $push->sendToTokenWithReport($latestToken->token, $title, $body, $data);
+                $tokenSource = 'latest_by_last_seen_at';
+                $report['token_id'] = $latestToken->id;
             }
+
+            $hasNotification = !($report['data_only'] ?? false);
 
             return response()->json([
                 'sent' => true,
                 'success' => true,
+                'token_source' => $tokenSource,
+                'data_only' => $report['data_only'] ?? null,
+                'has_notification' => $hasNotification,
+                'payload' => $report['payload'] ?? null,
+                'message_id' => $report['message_id'] ?? null,
             ]);
+        } catch (\InvalidArgumentException $e) {
+            \Log::warning('FCM test push rejected', [
+                'token' => $validated['token'] ?? null,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 422);
         } catch (MessagingException $e) {
             \Log::error('FCM test push failed', [
                 'token' => $validated['token'] ?? null,

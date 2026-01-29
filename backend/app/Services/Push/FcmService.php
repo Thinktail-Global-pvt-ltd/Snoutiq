@@ -134,6 +134,57 @@ class FcmService
     }
 
     /**
+     * @param array<string,string> $data
+     * @return array<string,mixed>
+     */
+    private function buildPayloadArray(
+        string $token,
+        string $title,
+        string $body,
+        array $data,
+        bool $dataOnly
+    ): array {
+        $payload = [
+            'token' => $token,
+            'data' => $data,
+            'android' => [
+                'priority' => 'high',
+            ],
+        ];
+
+        if ($this->isIncomingCall($data)) {
+            $payload['android']['ttl'] = '30s';
+            $payload['apns'] = [
+                'headers' => [
+                    'apns-priority' => '10',
+                ],
+            ];
+        }
+
+        if (!$dataOnly) {
+            $payload['notification'] = [
+                'title' => $title,
+                'body' => $body,
+            ];
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array<string,mixed>
+     */
+    private function maskPayloadToken(array $payload): array
+    {
+        if (isset($payload['token']) && is_string($payload['token'])) {
+            $payload['token'] = $this->maskToken($payload['token']);
+        }
+
+        return $payload;
+    }
+
+    /**
      * @param array<int,string> $tokens
      * @return array<int,string>
      */
@@ -172,6 +223,7 @@ class FcmService
         $normalizedData = $this->ensureIncomingCallDataOnlyFlag($normalizedData);
         $dataOnly = $this->shouldSendDataOnly($normalizedData);
         $apnsConfig = $this->buildApnsConfig($normalizedData);
+        $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData, $dataOnly);
 
         \Log::info('FCM send to token attempt', [
             'token' => $this->maskToken($normalizedToken),
@@ -179,6 +231,16 @@ class FcmService
             'data_keys' => array_keys($normalizedData),
             'data_only' => $dataOnly,
         ]);
+
+        if ($this->isIncomingCall($normalizedData)) {
+            $payloadForLog = config('app.debug')
+                ? $payload
+                : $this->maskPayloadToken($payload);
+
+            \Log::info('FCM payload (incoming_call)', [
+                'payload' => $payloadForLog,
+            ]);
+        }
 
         $message = CloudMessage::withTarget('token', $normalizedToken)
             ->withData($normalizedData)
@@ -192,11 +254,62 @@ class FcmService
             $message = $message->withNotification(Notification::create($title, $body));
         }
 
-        $this->sendMessage($message, $normalizedToken);
+        $messageId = $this->sendMessage($message, $normalizedToken);
 
         \Log::info('FCM send to token success', [
             'token' => $this->maskToken($normalizedToken),
+            'message_id' => $messageId,
         ]);
+    }
+
+    /**
+     * Send a notification to a single token and return a payload report.
+     *
+     * @param array<string,string> $data
+     * @return array<string,mixed>
+     */
+    public function sendToTokenWithReport(string $token, string $title, string $body, array $data = []): array
+    {
+        $normalizedToken = $this->normalizeToken($token);
+        if (!$this->isLikelyFcmToken($normalizedToken)) {
+            throw new \InvalidArgumentException('Token rejected as invalid format.');
+        }
+
+        $normalizedData = $this->normalizeDataPayload($data);
+        $normalizedData = $this->ensureIncomingCallDataOnlyFlag($normalizedData);
+        $dataOnly = $this->shouldSendDataOnly($normalizedData);
+        $apnsConfig = $this->buildApnsConfig($normalizedData);
+        $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData, $dataOnly);
+
+        if ($this->isIncomingCall($normalizedData)) {
+            $payloadForLog = config('app.debug')
+                ? $payload
+                : $this->maskPayloadToken($payload);
+
+            \Log::info('FCM payload (incoming_call)', [
+                'payload' => $payloadForLog,
+            ]);
+        }
+
+        $message = CloudMessage::withTarget('token', $normalizedToken)
+            ->withData($normalizedData)
+            ->withAndroidConfig($this->buildAndroidConfig($normalizedData));
+
+        if ($apnsConfig !== null) {
+            $message = $message->withApnsConfig($apnsConfig);
+        }
+
+        if (!$dataOnly) {
+            $message = $message->withNotification(Notification::create($title, $body));
+        }
+
+        $messageId = $this->sendMessage($message, $normalizedToken);
+
+        return [
+            'payload' => $payload,
+            'data_only' => $dataOnly,
+            'message_id' => $messageId,
+        ];
     }
 
     /**
@@ -283,10 +396,10 @@ class FcmService
         $this->sendMessage($message, $topic);
     }
 
-    private function sendMessage(CloudMessage $message, string $target): void
+    private function sendMessage(CloudMessage $message, string $target): mixed
     {
         try {
-            $this->messaging->send($message);
+            return $this->messaging->send($message);
         } catch (MessagingException | FirebaseException | Throwable $e) {
             \Log::error('FCM send failed', [
                 'target' => $target,
