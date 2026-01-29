@@ -256,7 +256,10 @@ $response['rating']=UserRating::where('servicer_id', $booking->user_id)->avg('ra
     }
 public function add_pet(Request $request)
 {
-    $request->validate([
+    $user = $request->user();
+
+    // Make it callable from public routes: if no auth user, require user_id in body.
+    $rules = [
         'name'        => 'required|string|max:255',
         'type'        => 'required|string|max:100',
         'breed'       => 'nullable|string|max:100',
@@ -265,12 +268,18 @@ public function add_pet(Request $request)
         'pet_pic'     => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         'medical_history' => 'required|string',
 'vaccination_log'=>'required|string'
-    ]);
+    ];
 
-    $user = $request->user();
+    if (!$user) {
+        $rules['user_id'] = 'required|integer|exists:users,id';
+    }
+
+    $validated = $request->validate($rules);
+
+    $userId = $user?->id ?? $validated['user_id'];
 
     $petData = [
-        'user_id' => $user->id,
+        'user_id' => $userId,
         'name'    => $request->name,
         'type'    => $request->type,
         'breed'   => $request->breed,
