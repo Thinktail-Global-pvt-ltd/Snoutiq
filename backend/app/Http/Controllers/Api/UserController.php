@@ -291,7 +291,7 @@ public function add_pet(Request $request)
 
     if ($request->hasFile('pet_pic')) {
         $image     = $request->file('pet_pic');
-        $imageName = 'pet_' . $user->id . '_' . time() . '.' . $image->getClientOriginalExtension();
+        $imageName = 'pet_' . $userId . '_' . time() . '.' . $image->getClientOriginalExtension();
         $path      = public_path('pet_pics');
 
         if (!file_exists($path)) {
