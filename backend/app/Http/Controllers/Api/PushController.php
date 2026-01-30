@@ -296,80 +296,117 @@ class PushController extends Controller
 
     public function ring(Request $request, FcmService $push)
     {
-        // Promote nested data.call_id to top-level to satisfy legacy validation rules.
-        if (!$request->filled('call_id') && $request->filled('data.call_id')) {
-            $request->merge(['call_id' => $request->input('data.call_id')]);
-        }
-
         $validated = $request->validate([
             'token' => ['required', 'string'],
             'title' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
             'data' => ['nullable', 'array'],
             'data.call_id' => ['nullable', 'string'],
-            'android' => ['nullable', 'array'], // accepted but not yet used
-            'apns' => ['nullable', 'array'],    // accepted but not yet used
-            // Legacy fields (kept for backward compatibility)
-            'call_id' => ['required', 'string'],
+            'data.doctor_id' => ['nullable'],
+            'data.patient_id' => ['nullable'],
+            'data.channel' => ['nullable', 'string'],
+            'data.channel_name' => ['nullable', 'string'],
+            'data.expires_at' => ['nullable'],
+            // Legacy fields (backward compatibility)
+            'call_id' => ['nullable', 'string'],
             'doctor_id' => ['nullable'],
             'patient_id' => ['nullable'],
             'channel' => ['nullable', 'string'],
             'channel_name' => ['nullable', 'string'],
             'expires_at' => ['nullable'],
-            'data_only' => ['nullable'],
-        ], [
-            'call_id.required' => 'Provide call_id either at top-level or inside data.call_id',
         ]);
 
         $token = $this->normalizeToken($validated['token']);
         if (!$this->isLikelyFcmToken($token)) {
             return response()->json([
-                'error' => 'The provided token does not look like a valid FCM registration token.',
+                'success' => false,
+                'message' => 'The provided token does not look like a valid FCM registration token.',
             ], 422);
         }
 
+        $dataBlock = $validated['data'] ?? [];
+        $callId = $dataBlock['call_id'] ?? $validated['call_id'] ?? null;
+        $doctorId = $dataBlock['doctor_id'] ?? $validated['doctor_id'] ?? null;
+        $patientId = $dataBlock['patient_id'] ?? $validated['patient_id'] ?? null;
+        $channel = $dataBlock['channel'] ?? $validated['channel'] ?? null;
+        $channelName = $dataBlock['channel_name'] ?? $validated['channel_name'] ?? null;
+        $expiresAt = $dataBlock['expires_at'] ?? $validated['expires_at'] ?? null;
+
+        $validator = validator([
+            'call_id' => $callId,
+            'doctor_id' => $doctorId,
+            'patient_id' => $patientId,
+            'channel' => $channel,
+        ], [
+            'call_id' => ['required', 'string'],
+            'doctor_id' => ['required'],
+            'patient_id' => ['required'],
+            'channel' => ['required', 'string'],
+        ], [
+            'call_id.required' => 'Provide call_id either at top-level or inside data.call_id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($expiresAt !== null && !ctype_digit((string) $expiresAt)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'expires_at must be a millisecond epoch string',
+            ], 422);
+        }
+
+        $nowMs = now()->valueOf();
+        $expiresAtMs = $expiresAt !== null ? (int) $expiresAt : now()->addSeconds(90)->valueOf();
+        if ($expiresAtMs < $nowMs) {
+            \Log::warning('FCM ring push expires_at was in the past, overriding', [
+                'call_id' => $callId,
+                'doctor_id' => $doctorId,
+                'expires_at' => $expiresAtMs,
+                'now_ms' => $nowMs,
+            ]);
+            $expiresAtMs = now()->addSeconds(90)->valueOf();
+        }
+
+        $channelName = $channelName ?: "agora_channel_{$callId}";
         $title = $validated['title'] ?? 'Snoutiq Incoming Call';
         $body = $validated['body'] ?? 'Incoming call alert';
 
-        // Merge new structured "data" block with legacy top-level params.
-        $data = $validated['data'] ?? [];
-
-        $legacyKeys = [
-            'type'         => 'incoming_call',
-            'call_id'      => null,
-            'doctor_id'    => null,
-            'patient_id'   => null,
-            'channel'      => null,
-            'channel_name' => null,
-            'expires_at'   => null,
-            'data_only'    => null,
+        $data = [
+            'type' => 'incoming_call',
+            'call_id' => (string) $callId,
+            'doctor_id' => (string) $doctorId,
+            'patient_id' => (string) $patientId,
+            'channel' => (string) $channel,
+            'channel_name' => (string) $channelName,
+            'expires_at' => (string) $expiresAtMs,
+            'data_only' => '1',
         ];
 
-        foreach ($legacyKeys as $key => $default) {
-            if (array_key_exists($key, $data)) {
-                continue;
-            }
-            if (array_key_exists($key, $validated) && $validated[$key] !== null) {
-                $data[$key] = (string) $validated[$key];
-            } elseif ($default !== null && !isset($data[$key])) {
-                $data[$key] = $default;
-            }
-        }
+        $tokenLast8 = strlen($token) >= 8 ? substr($token, -8) : $token;
 
-        // Ensure call_id present for tracking (belt and suspenders)
-        if (empty($data['call_id'])) {
-            return response()->json([
-                'error' => 'call_id is required (provide in data.call_id or top-level call_id)',
-            ], 422);
-        }
+        \Log::info('FCM ring push attempt', [
+            'call_id' => $callId,
+            'doctor_id' => $doctorId,
+            'token_last8' => $tokenLast8,
+            'payload' => [
+                'token_last8' => $tokenLast8,
+                'data' => $data,
+                'android' => ['priority' => 'high', 'ttl' => '90s'],
+                'apns' => ['headers' => ['apns-priority' => '10']],
+            ],
+        ]);
 
-        // Send a single push (no repeated ring spam)
         $push->sendToToken($token, $title, $body, $data);
 
         return response()->json([
-            'ok' => true,
-            'scheduled' => 1,
-            'data_keys' => array_keys($data),
+            'success' => true,
+            'data' => $data,
         ]);
     }
 
