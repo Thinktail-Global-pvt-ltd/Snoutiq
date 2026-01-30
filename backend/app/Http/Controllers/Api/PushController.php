@@ -296,21 +296,29 @@ class PushController extends Controller
 
     public function ring(Request $request, FcmService $push)
     {
+        // Promote nested data.call_id to top-level to satisfy legacy validation rules.
+        if (!$request->filled('call_id') && $request->filled('data.call_id')) {
+            $request->merge(['call_id' => $request->input('data.call_id')]);
+        }
+
         $validated = $request->validate([
             'token' => ['required', 'string'],
             'title' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
             'data' => ['nullable', 'array'],
+            'data.call_id' => ['nullable', 'string'],
             'android' => ['nullable', 'array'], // accepted but not yet used
             'apns' => ['nullable', 'array'],    // accepted but not yet used
             // Legacy fields (kept for backward compatibility)
-            'call_id' => ['nullable'],
+            'call_id' => ['required', 'string'],
             'doctor_id' => ['nullable'],
             'patient_id' => ['nullable'],
             'channel' => ['nullable', 'string'],
             'channel_name' => ['nullable', 'string'],
             'expires_at' => ['nullable'],
             'data_only' => ['nullable'],
+        ], [
+            'call_id.required' => 'Provide call_id either at top-level or inside data.call_id',
         ]);
 
         $token = $this->normalizeToken($validated['token']);
@@ -348,7 +356,7 @@ class PushController extends Controller
             }
         }
 
-        // Ensure call_id present for tracking
+        // Ensure call_id present for tracking (belt and suspenders)
         if (empty($data['call_id'])) {
             return response()->json([
                 'error' => 'call_id is required (provide in data.call_id or top-level call_id)',
