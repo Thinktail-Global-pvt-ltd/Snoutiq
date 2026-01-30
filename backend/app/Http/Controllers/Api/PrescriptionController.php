@@ -228,6 +228,9 @@ class PrescriptionController extends Controller
         if (Schema::hasColumn('pets', 'pet_dob')) {
             $petColumns[] = 'pet_dob';
         }
+        if (Schema::hasColumn('pets', 'dog_disease_payload')) {
+            $petColumns[] = 'dog_disease_payload';
+        }
 
         $petsQuery = Pet::query()
             ->where('user_id', $user->id);
@@ -238,7 +241,19 @@ class PrescriptionController extends Controller
 
         $pets = $petsQuery
             ->orderByDesc('id')
-            ->get($petColumns);
+            ->get($petColumns)
+            ->map(function ($pet) {
+                // Surface vaccination info from dog_disease_payload if present.
+                $payload = $pet->dog_disease_payload ?? null;
+                if (is_string($payload)) {
+                    $decoded = json_decode($payload, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $payload = $decoded;
+                    }
+                }
+                $pet->vaccination = data_get($payload, 'vaccination');
+                return $pet;
+            });
 
         if ($petId && $pets->isEmpty()) {
             return response()->json([

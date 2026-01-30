@@ -29,6 +29,7 @@ class Pet extends Model
         'last_vaccenated_date',
         'vaccination_date',
         'vaccine_reminder_status',
+        'dog_disease_payload',
     ];
 
     protected $casts = [
@@ -39,6 +40,7 @@ class Pet extends Model
         'last_vaccenated_date' => 'date',
         'vaccination_date' => 'date',
         'vaccine_reminder_status' => 'array',
+        'dog_disease_payload' => 'array',
     ];
 
     public function owner(): BelongsTo
