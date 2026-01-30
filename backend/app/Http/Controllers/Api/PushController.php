@@ -298,13 +298,19 @@ class PushController extends Controller
     {
         $validated = $request->validate([
             'token' => ['required', 'string'],
-            'call_id' => ['required'],
-            'doctor_id' => ['nullable'],
-            'channel' => ['nullable', 'string'],
             'title' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
-            'duration_ms' => ['nullable', 'integer', 'min:1000', 'max:120000'],
-            'interval_ms' => ['nullable', 'integer', 'min:500', 'max:10000'],
+            'data' => ['nullable', 'array'],
+            'android' => ['nullable', 'array'], // accepted but not yet used
+            'apns' => ['nullable', 'array'],    // accepted but not yet used
+            // Legacy fields (kept for backward compatibility)
+            'call_id' => ['nullable'],
+            'doctor_id' => ['nullable'],
+            'patient_id' => ['nullable'],
+            'channel' => ['nullable', 'string'],
+            'channel_name' => ['nullable', 'string'],
+            'expires_at' => ['nullable'],
+            'data_only' => ['nullable'],
         ]);
 
         $token = $this->normalizeToken($validated['token']);
@@ -317,17 +323,36 @@ class PushController extends Controller
         $title = $validated['title'] ?? 'Snoutiq Incoming Call';
         $body = $validated['body'] ?? 'Incoming call alert';
 
-        $data = [
-            'type' => 'incoming_call',
-            'call_id' => (string) $validated['call_id'],
+        // Merge new structured "data" block with legacy top-level params.
+        $data = $validated['data'] ?? [];
+
+        $legacyKeys = [
+            'type'         => 'incoming_call',
+            'call_id'      => null,
+            'doctor_id'    => null,
+            'patient_id'   => null,
+            'channel'      => null,
+            'channel_name' => null,
+            'expires_at'   => null,
+            'data_only'    => null,
         ];
 
-        if (isset($validated['doctor_id'])) {
-            $data['doctor_id'] = (string) $validated['doctor_id'];
+        foreach ($legacyKeys as $key => $default) {
+            if (array_key_exists($key, $data)) {
+                continue;
+            }
+            if (array_key_exists($key, $validated) && $validated[$key] !== null) {
+                $data[$key] = (string) $validated[$key];
+            } elseif ($default !== null && !isset($data[$key])) {
+                $data[$key] = $default;
+            }
         }
 
-        if (isset($validated['channel'])) {
-            $data['channel'] = (string) $validated['channel'];
+        // Ensure call_id present for tracking
+        if (empty($data['call_id'])) {
+            return response()->json([
+                'error' => 'call_id is required (provide in data.call_id or top-level call_id)',
+            ], 422);
         }
 
         // Send a single push (no repeated ring spam)
@@ -336,6 +361,7 @@ class PushController extends Controller
         return response()->json([
             'ok' => true,
             'scheduled' => 1,
+            'data_keys' => array_keys($data),
         ]);
     }
 
