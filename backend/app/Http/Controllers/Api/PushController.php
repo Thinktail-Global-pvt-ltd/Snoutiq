@@ -3,13 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\SendFcmMessage;
 use App\Models\DeviceToken;
 use App\Services\Push\FcmService;
 use App\Support\DeviceTokenOwnerResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Kreait\Firebase\Exception\MessagingException;
 use Throwable;
@@ -318,8 +316,6 @@ class PushController extends Controller
 
         $title = $validated['title'] ?? 'Snoutiq Incoming Call';
         $body = $validated['body'] ?? 'Incoming call alert';
-        $durationMs = $validated['duration_ms'] ?? 30_000;
-        $intervalMs = $validated['interval_ms'] ?? 4_000;
 
         $data = [
             'type' => 'incoming_call',
@@ -334,23 +330,12 @@ class PushController extends Controller
             $data['channel'] = (string) $validated['channel'];
         }
 
-        // Fire the first push immediately
+        // Send a single push (no repeated ring spam)
         $push->sendToToken($token, $title, $body, $data);
-
-        $remainingSends = max(0, (int) floor(($durationMs - 1) / $intervalMs));
-        for ($i = 1; $i <= $remainingSends; $i++) {
-            $delayMs = $i * $intervalMs;
-            $delayedData = array_merge($data, ['ring_sequence' => (string) $i]);
-
-            SendFcmMessage::dispatch($token, $title, $body, $delayedData)
-                ->delay(Carbon::now()->addMilliseconds($delayMs));
-        }
 
         return response()->json([
             'ok' => true,
-            'scheduled' => 1 + $remainingSends,
-            'duration_ms' => $durationMs,
-            'interval_ms' => $intervalMs,
+            'scheduled' => 1,
         ]);
     }
 
