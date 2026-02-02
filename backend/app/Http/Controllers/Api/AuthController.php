@@ -30,6 +30,7 @@ use App\Models\Doctor;
 use App\Models\Receptionist;
 use App\Models\Transaction;
 use App\Models\VetRegisterationTemp;
+use App\Models\CallSession;
 
 
 use Illuminate\Support\Facades\Http;
@@ -209,6 +210,54 @@ class AuthController extends Controller
             : collect();
 
         return [$pets, $userPets];
+    }
+
+    private function latestCallSessionForUser(?User $user): ?CallSession
+    {
+        if (!$user || !Schema::hasTable('call_sessions')) {
+            return null;
+        }
+
+        $query = CallSession::where('patient_id', $user->id);
+
+        $orderColumns = [];
+        foreach (['ended_at', 'started_at', 'created_at'] as $column) {
+            if (Schema::hasColumn('call_sessions', $column)) {
+                $orderColumns[] = "call_sessions.{$column}";
+            }
+        }
+
+        if ($orderColumns) {
+            $query->orderByDesc(DB::raw('COALESCE(' . implode(', ', $orderColumns) . ')'));
+        }
+
+        $query->orderByDesc('id');
+
+        return $query->first();
+    }
+
+    private function formatCallSessionForResponse(?CallSession $session): ?array
+    {
+        if (!$session) {
+            return null;
+        }
+
+        return [
+            'id' => $session->id,
+            'call_identifier' => $session->resolveIdentifier(),
+            'channel_name' => $session->channel_name,
+            'doctor_id' => $session->doctor_id,
+            'patient_id' => $session->patient_id,
+            'status' => $session->status,
+            'payment_status' => $session->payment_status,
+            'doctor_join_url' => $session->resolvedDoctorJoinUrl(),
+            'patient_payment_url' => $session->resolvedPatientPaymentUrl(),
+            'accepted_at' => optional($session->accepted_at)->toIso8601String(),
+            'started_at' => optional($session->started_at)->toIso8601String(),
+            'ended_at' => optional($session->ended_at)->toIso8601String(),
+            'created_at' => optional($session->created_at)->toIso8601String(),
+            'updated_at' => optional($session->updated_at)->toIso8601String(),
+        ];
     }
 
     private function resolvePetIdForOverview(Request $request, Collection $pets): ?int
@@ -555,6 +604,7 @@ class AuthController extends Controller
             $lastVetSlug = $this->ensureLastVetSlug($existingUser);
             [$pets, $userPets] = $this->loadRelatedPets($existingUser);
             $latestChat = $existingUser ? Chat::where('user_id', $existingUser->id)->latest()->first() : null;
+            $latestCallSession = $this->latestCallSessionForUser($existingUser);
             $overviewPetId = $this->resolvePetIdForOverview($request, $pets);
             $petOverview = $this->fetchPetOverview($request, $overviewPetId);
 
@@ -567,6 +617,7 @@ class AuthController extends Controller
                 'pets'    => $pets,
                 'user_pets' => $userPets,
                 'latest_chat' => $latestChat,
+                'latest_call_session' => $this->formatCallSessionForResponse($latestCallSession),
                 'pet_overview' => $petOverview,
             ], 200);
         }
@@ -611,6 +662,7 @@ class AuthController extends Controller
         $lastVetSlug = $this->ensureLastVetSlug($user);
         [$pets, $userPets] = $this->loadRelatedPets($user);
         $latestChat = Chat::where('user_id', $user->id)->latest()->first();
+        $latestCallSession = $this->latestCallSessionForUser($user);
         $overviewPetId = $this->resolvePetIdForOverview($request, $pets);
         $petOverview = $this->fetchPetOverview($request, $overviewPetId);
 
@@ -623,6 +675,7 @@ class AuthController extends Controller
             'pets'    => $pets,
             'user_pets' => $userPets,
             'latest_chat' => $latestChat,
+            'latest_call_session' => $this->formatCallSessionForResponse($latestCallSession),
             'pet_overview' => $petOverview,
         ]);
     }
