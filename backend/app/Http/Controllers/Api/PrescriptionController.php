@@ -21,6 +21,11 @@ class PrescriptionController extends Controller
     {
         $query = Prescription::query()->orderByDesc('id');
 
+        // Cache schema checks so we don't hit information_schema repeatedly per row
+        $hasFollowUpDate  = Schema::hasColumn('prescriptions', 'follow_up_date');
+        $hasFollowUpType  = Schema::hasColumn('prescriptions', 'follow_up_type');
+        $hasFollowUpNotes = Schema::hasColumn('prescriptions', 'follow_up_notes');
+
         if ($request->filled('user_id')) {
             $query->where('user_id', (int) $request->query('user_id'));
         }
@@ -32,7 +37,7 @@ class PrescriptionController extends Controller
         }
 
         $prescriptions = $query->paginate(20);
-        $prescriptions->getCollection()->transform(function ($prescription) {
+        $prescriptions->getCollection()->transform(function ($prescription) use ($hasFollowUpDate, $hasFollowUpType, $hasFollowUpNotes) {
             $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
 
             // Enrich medications_json with days_remaining based on created_at + duration
@@ -67,6 +72,25 @@ class PrescriptionController extends Controller
                 $tp = preg_replace('/(Dosage:\\s*\\d+(?:\\.\\d+)?)(?!\\s*times)/i', '$1 times', $tp);
                 $tp = preg_replace('/(Duration:\\s*\\d+(?:\\.\\d+)?)(?!\\s*days)/i', '$1 days', $tp);
                 $prescription->treatment_plan = $tp;
+            }
+
+            // Surface follow-up details even on older schemas; always include consistent keys
+            if (isset($hasFollowUpDate) && $hasFollowUpDate) {
+                $prescription->follow_up_date = $prescription->follow_up_date
+                    ? Carbon::parse($prescription->follow_up_date)->toDateString()
+                    : null;
+            } else {
+                $prescription->follow_up_date = null;
+            }
+            if (isset($hasFollowUpType) && $hasFollowUpType) {
+                $prescription->follow_up_type = $prescription->follow_up_type ?? null;
+            } else {
+                $prescription->follow_up_type = null;
+            }
+            if (isset($hasFollowUpNotes) && $hasFollowUpNotes) {
+                $prescription->follow_up_notes = $prescription->follow_up_notes ?? null;
+            } else {
+                $prescription->follow_up_notes = null;
             }
 
             return $prescription;
@@ -123,7 +147,7 @@ class PrescriptionController extends Controller
         $prescriptions = Prescription::query()
             ->where('user_id', $user->id)
             ->orderByDesc('id')
-            ->get([
+            ->get(array_values(array_filter([
                 'id',
                 'doctor_id',
                 'user_id',
@@ -132,8 +156,11 @@ class PrescriptionController extends Controller
                 'image_path',
                 'next_medicine_day',
                 'next_visit_day',
+                Schema::hasColumn('prescriptions', 'follow_up_date')  ? 'follow_up_date'  : null,
+                Schema::hasColumn('prescriptions', 'follow_up_type')  ? 'follow_up_type'  : null,
+                Schema::hasColumn('prescriptions', 'follow_up_notes') ? 'follow_up_notes' : null,
                 'created_at',
-            ]);
+            ])));
 
         $pets = Pet::query()
             ->where('user_id', $user->id)
@@ -273,6 +300,30 @@ class PrescriptionController extends Controller
             }
         }
 
+        $prescriptionColumns = [
+            'id',
+            'doctor_id',
+            'user_id',
+            'pet_id',
+            'visit_category',
+            'case_severity',
+            'visit_notes',
+            'content_html',
+            'image_path',
+            'next_medicine_day',
+            'next_visit_day',
+            'created_at',
+        ];
+        if (Schema::hasColumn('prescriptions', 'follow_up_date')) {
+            $prescriptionColumns[] = 'follow_up_date';
+        }
+        if (Schema::hasColumn('prescriptions', 'follow_up_type')) {
+            $prescriptionColumns[] = 'follow_up_type';
+        }
+        if (Schema::hasColumn('prescriptions', 'follow_up_notes')) {
+            $prescriptionColumns[] = 'follow_up_notes';
+        }
+
         $prescriptions = Prescription::query()
             ->where('user_id', $user->id)
             ->orderByDesc('id')
@@ -280,20 +331,7 @@ class PrescriptionController extends Controller
                 $petId && Schema::hasColumn('prescriptions', 'pet_id'),
                 fn ($query) => $query->where('pet_id', $petId)
             )
-            ->get([
-                'id',
-                'doctor_id',
-                'user_id',
-                'pet_id',
-                'visit_category',
-                'case_severity',
-                'visit_notes',
-                'content_html',
-                'image_path',
-                'next_medicine_day',
-                'next_visit_day',
-                'created_at',
-            ])
+            ->get($prescriptionColumns)
             ->map(function ($prescription) {
                 $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
                 return $prescription;
