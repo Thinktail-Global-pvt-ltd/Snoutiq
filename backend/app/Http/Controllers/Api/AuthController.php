@@ -851,7 +851,7 @@ public function register(Request $request)
     }
 
     try {
-        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petWeight) {
+        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petWeight, $ownerName) {
             // ✅ Update user with final details
             $user->fill([
                 'name'        => $ownerName,
@@ -870,6 +870,11 @@ public function register(Request $request)
             $user->save();
 
             $this->assignTokenToModel($user, $tokenHash, $tokenExpiresAt);
+
+            // If pets table is absent, skip pet upsert gracefully
+            if (!Schema::hasTable('pets')) {
+                return null;
+            }
 
             $petAttributes = [
                 'name'       => $request->pet_name,
@@ -902,6 +907,11 @@ public function register(Request $request)
             return $pet;
         });
     } catch (\Throwable $e) {
+        Log::error('register.failed', [
+            'user_id' => $request->user_id,
+            'error' => $e->getMessage(),
+            'trace' => app()->environment('production') ? null : $e->getTraceAsString(),
+        ]);
         return response()->json([
             'status'  => 'error',
             'message' => 'Unable to complete registration at this time',
