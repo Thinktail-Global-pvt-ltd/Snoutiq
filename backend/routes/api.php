@@ -68,6 +68,7 @@ use App\Http\Controllers\Api\V1\VaccinationDoctorController as V1VaccinationDoct
 use App\Http\Controllers\Api\V1\VaccinationSlotController as V1VaccinationSlotController;
 use App\Http\Controllers\Api\V1\VaccinationBookingController as V1VaccinationBookingController;
 use App\Http\Controllers\Api\V1\VaccinationPaymentController as V1VaccinationPaymentController;
+use App\Http\Controllers\Api\ClinicFinancialsController;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
@@ -141,6 +142,9 @@ Route::get('/admin/vet-registrations/report', [VetRegistrationReportController::
 // Public alias for the same report (no admin guard)
 Route::get('/vet-registrations/report', [VetRegistrationReportController::class, 'summary'])
     ->name('api.vet-registrations.report.public');
+
+// Financials (clinic dashboard KPIs + charts + transactions)
+Route::get('/financials', [ClinicFinancialsController::class, 'show'])->name('api.clinic.financials');
 
 
 Route::get('/agora/appid', function () {
