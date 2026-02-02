@@ -528,6 +528,7 @@ Route::get('/weather/hourly-schedule', [WeatherController::class, 'hourlySchedul
 // routes/api.php
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/nearby-doctors', [VideoCallingController::class, 'nearbyDoctors']);
+Route::get('/nearby-plus-featured', [VideoCallingController::class, 'nearbyPlusFeatured']);
 // Route::get('/active-doctors', ActiveDoctorController::class);
 
 // ---- Prescriptions ----

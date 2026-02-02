@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Models\User;
+use App\Models\Doctor;
+use App\Models\VetRegisterationTemp;
 
 class VideoCallingController extends Controller
 {
@@ -19,6 +22,42 @@ class VideoCallingController extends Controller
     public function nearbyDoctors(Request $request)
     {
         return $this->buildNearbyResponse($request, 'doctor');
+    }
+
+    public function nearbyPlusFeatured(Request $request)
+    {
+        $userId = $request->query('user_id');
+
+        if (!$userId) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'user_id is required',
+            ], 422);
+        }
+
+        $user = User::query()->select('id', 'last_vet_id')->find($userId);
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        $nearbyResponse = $this->buildNearbyResponse($request, 'vet');
+        if ($nearbyResponse->getStatusCode() !== 200) {
+            return $nearbyResponse;
+        }
+
+        $nearby = $nearbyResponse->getData(true);
+        $featured = $this->buildFeaturedData($user);
+
+        return response()->json([
+            'status' => 'success',
+            'date' => $nearby['date'] ?? null,
+            'day' => $nearby['day'] ?? null,
+            'nearby' => $nearby,
+            'featured' => $featured,
+        ]);
     }
 
     private function buildNearbyResponse(Request $request, string $mode)
@@ -304,5 +343,66 @@ class VideoCallingController extends Controller
         }
 
         return 'SN-'.$slugFragment.$base36;
+    }
+
+    private function buildFeaturedData(User $user): array
+    {
+        if (empty($user->last_vet_id)) {
+            return [
+                'success' => true,
+                'data' => [
+                    'user_id' => $user->id,
+                    'last_vet_id' => null,
+                    'clinic' => null,
+                    'doctors' => [],
+                ],
+            ];
+        }
+
+        $clinic = VetRegisterationTemp::with('doctors')->find($user->last_vet_id);
+
+        if (!$clinic) {
+            return [
+                'success' => true,
+                'data' => [
+                    'user_id' => $user->id,
+                    'last_vet_id' => $user->last_vet_id,
+                    'clinic' => null,
+                    'doctors' => [],
+                ],
+            ];
+        }
+
+        $clinicData = [
+            'id' => $clinic->id,
+            'name' => $clinic->name,
+            'slug' => $clinic->slug,
+            'city' => $clinic->city,
+            'address' => $clinic->formatted_address ?? $clinic->address,
+            'phone' => $clinic->mobile,
+            'image' => $clinic->image,
+        ];
+
+        $doctorsData = $clinic->doctors->map(function (Doctor $doc) {
+            return [
+                'id' => $doc->id,
+                'name' => $doc->doctor_name,
+                'email' => $doc->doctor_email,
+                'phone' => $doc->doctor_mobile,
+                'license' => $doc->doctor_license,
+                'image' => $doc->doctor_image,
+                'price' => $doc->doctors_price,
+            ];
+        })->values();
+
+        return [
+            'success' => true,
+            'data' => [
+                'user_id' => $user->id,
+                'last_vet_id' => $user->last_vet_id,
+                'clinic' => $clinicData,
+                'doctors' => $doctorsData,
+            ],
+        ];
     }
 }
