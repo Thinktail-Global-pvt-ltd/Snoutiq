@@ -1148,11 +1148,8 @@ private function storePetDocument(Request $request, string $field): array
  */
 private function describePetImageDynamic($imagePath)
 {
-    if (empty($imagePath)) {
-        return null;
-    }
-
-    return $this->summarizeImageFile($imagePath);
+    // Gemini integration disabled (API key suspended); skip summary generation
+    return null;
 }
 
 private function summarizeImageFile(string $imagePath): ?string
