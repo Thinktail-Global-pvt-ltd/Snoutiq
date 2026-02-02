@@ -65,10 +65,14 @@ class DocumentUploadController extends Controller
                 ], 500);
             }
 
+            $publicBase = rtrim((string) config('app.url'), '/');
+            $relativePath = ltrim($path, '/');
+
             $storedFiles[] = [
                 'original_name' => $file->getClientOriginalName(),
                 'stored_path' => $path,
                 'url' => Storage::disk('public')->url($path),
+                'public_url' => $publicBase !== '' ? $publicBase . '/' . $relativePath : Storage::disk('public')->url($path),
                 'mime_type' => $file->getClientMimeType(),
                 'size' => $file->getSize(),
             ];
