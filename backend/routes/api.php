@@ -123,12 +123,20 @@ Route::prefix('v1')->group(function () {
 use App\Http\Controllers\Api\VetController;
 use App\Http\Controllers\Api\AdminOnboardingStatusController;
 use App\Http\Controllers\Api\VetLeadController;
+use App\Http\Controllers\Api\ClinicDetailsController;
 
 Route::get('/vets', [VetController::class, 'index']);        // All vets
 Route::get('/vets/by-referral/{code}', [VetController::class, 'showByReferral'])->name('api.vets.by-referral');
 Route::get('/vets/{id}', [VetController::class, 'show']);    // Single vet
 Route::delete('/vets/{id}', [VetController::class, 'destroy']); // Delete vet
 Route::post('/vet-leads', [VetLeadController::class, 'store']);
+
+// Clinic profile + doctors
+Route::get('/clinics/{clinic}/details', [ClinicDetailsController::class, 'show'])
+    ->whereNumber('clinic')
+    ->name('api.clinics.details');
+Route::get('/clinics/details', [ClinicDetailsController::class, 'show'])
+    ->name('api.clinics.details.query');
 
 Route::prefix('admin/onboarding')->group(function () {
     Route::get('/services', [AdminOnboardingStatusController::class, 'services']);
