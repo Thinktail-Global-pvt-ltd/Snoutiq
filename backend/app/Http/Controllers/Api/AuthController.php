@@ -1279,13 +1279,19 @@ private function sendImageToGemini(string $imageData, string $mimeType): ?string
                 'body'   => $response->json(),
             ]);
 
+            // Hard-stop on auth/rate/permission errors; skip further models and return null
+            if (in_array($response->status(), [401, 403, 429], true)) {
+                return null;
+            }
+
+            // For other errors (5xx etc), don't keep cycling through models
             if ($response->status() !== 404) {
-                break;
+                return null;
             }
         }
     }
 
-    Log::error('Gemini summary exhausted models', ['models' => $models]);
+    // If we reach here, all attempts were skipped or failed softly; avoid creating a summary
     return null;
 }
 
