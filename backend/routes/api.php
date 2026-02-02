@@ -78,6 +78,7 @@ Route::post('/call-recordings/upload', [RecordingUploadController::class, 'store
 Route::post('/csv/upload', [CsvUploadController::class, 'store']);
 Route::post('/error-logs', [ErrorLogController::class, 'store'])->name('api.error-logs.store');
 Route::post('/documents/upload', [DocumentUploadController::class, 'store'])->name('api.documents.upload');
+Route::get('/users/{userId}/document-uploads', [DocumentUploadController::class, 'index'])->name('api.documents.index');
 Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
 Route::post('/whatsapp/broadcast/users', [WhatsAppMessageController::class, 'broadcastToUsers']);
 Route::post('/whatsapp/send/new-year', [WhatsAppMessageController::class, 'sendNewYearTemplate']);

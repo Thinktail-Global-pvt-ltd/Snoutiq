@@ -13,6 +13,54 @@ use Illuminate\Validation\ValidationException;
 class DocumentUploadController extends Controller
 {
     /**
+     * List document uploads for a given user (optionally filtered by pet/record_type).
+     */
+    public function index(Request $request, int $userId)
+    {
+        $filters = $request->validate([
+            'pet_id' => ['nullable', 'integer'],
+            'record_type' => ['nullable', 'string', 'max:100'],
+            'source' => ['nullable', 'string', 'max:60'],
+        ]);
+
+        $query = DocumentUpload::query()
+            ->where('user_id', $userId)
+            ->orderByDesc('uploaded_at')
+            ->orderByDesc('id');
+
+        if (! empty($filters['pet_id'])) {
+            $query->where('pet_id', $filters['pet_id']);
+        }
+
+        if (! empty($filters['record_type'])) {
+            $query->where('record_type', $filters['record_type']);
+        }
+
+        if (! empty($filters['source'])) {
+            $query->where('source', $filters['source']);
+        }
+
+        $uploads = $query->get()->map(function (DocumentUpload $upload) {
+            return [
+                'id' => $upload->id,
+                'user_id' => $upload->user_id,
+                'pet_id' => $upload->pet_id,
+                'record_type' => $upload->record_type,
+                'record_label' => $upload->record_label,
+                'source' => $upload->source,
+                'file_count' => $upload->file_count,
+                'uploaded_at' => optional($upload->uploaded_at)->toIso8601String(),
+                'files' => $upload->files_json ?? [],
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $uploads,
+        ]);
+    }
+
+    /**
      * Persist uploaded document metadata and store files.
      */
     public function store(Request $request)
