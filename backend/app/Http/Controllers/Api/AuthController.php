@@ -815,6 +815,7 @@ public function register(Request $request)
     $existingDoc1 = $user->pet_doc1;
     $existingDoc2 = $user->pet_doc2;
     $existingSummary = $user->summary;
+    $ownerName = $request->input('pet_owner_name') ?? $request->input('fullName') ?? $user->name;
 
     $doc1Path = null;
     $doc2Path = null;
@@ -853,6 +854,7 @@ public function register(Request $request)
         $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petWeight) {
             // ✅ Update user with final details
             $user->fill([
+                'name'        => $ownerName,
                 'pet_name'    => $request->pet_name,
                 'pet_gender'  => $request->pet_gender,
                 'pet_age'     => $request->pet_age,
