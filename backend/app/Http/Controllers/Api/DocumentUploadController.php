@@ -66,6 +66,9 @@ class DocumentUploadController extends Controller
             }
 
             $publicBase = rtrim((string) config('app.url'), '/');
+            if (! str_ends_with($publicBase, '/backend')) {
+                $publicBase .= '/backend';
+            }
             $relativePath = ltrim($path, '/');
 
             $storedFiles[] = [
