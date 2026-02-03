@@ -45,11 +45,33 @@
         </div>
       </div>
 
-      <!-- <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
-        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="max_bph">Max bookings / hour</label>
-        <input type="number" id="max_bph" value="3" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200">
-        <p class="mt-2 text-xs text-slate-500">Keep this aligned with table capacity or staff strength.</p>
-      </div> -->
+      <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="doctor_price">Doctor price</label>
+            <p class="text-xs text-slate-500">Applies to the doctor selected on the left.</p>
+          </div>
+          <button
+            type="button"
+            id="btnSavePrice"
+            class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1"
+          >
+            Update price
+          </button>
+        </div>
+        <div class="relative mt-3">
+          <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-sm font-semibold text-slate-500">₹</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            id="doctor_price"
+            class="mt-0 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pl-9 text-sm font-medium text-slate-800 shadow-inner shadow-white/40 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            placeholder="e.g. 500"
+          >
+        </div>
+        <div class="mt-2 text-xs text-slate-500" id="priceStatus">No price saved yet.</div>
+      </div>
     </div>
   </section>
 
@@ -192,6 +214,37 @@
     breakStart: el('#default_break_start'),
     breakEnd:   el('#default_break_end'),
     weekends:   el('#allow_weekends')
+  };
+  const priceField   = el('#doctor_price');
+  const priceStatus  = el('#priceStatus');
+  const priceButton  = el('#btnSavePrice');
+  let priceDirty     = false;
+  const setPriceStatus = (msg, ok = true) => {
+    if (!priceStatus) return;
+    priceStatus.textContent = msg || '';
+    priceStatus.className = ok
+      ? 'mt-2 text-xs text-emerald-600'
+      : 'mt-2 text-xs text-red-600';
+  };
+  const setSelectedOptionPrice = (price) => {
+    const opt = el('#doctor_id')?.selectedOptions?.[0];
+    if (opt) opt.dataset.price = price ?? '';
+  };
+  const hydratePriceFromOption = () => {
+    const opt = el('#doctor_id')?.selectedOptions?.[0];
+    const raw = opt ? (opt.dataset.price ?? '') : '';
+    const val = raw === '' || raw === undefined ? '' : raw;
+    return val;
+  };
+  const primePriceField = (val) => {
+    if (!priceField) return;
+    priceField.value = (val ?? '') === null ? '' : val;
+    priceDirty = false;
+  };
+  const togglePriceButton = (state) => {
+    if (!priceButton) return;
+    priceButton.disabled = !!state;
+    priceButton.textContent = state ? 'Saving…' : 'Update price';
   };
   let avgConsultationMins = DEFAULT_AVG_CONSULTATION_MINS;
   const weeklyContainer = el('#weeklyCards');
@@ -410,6 +463,19 @@
       let json   = null; try { json = JSON.parse(text.replace(/^\uFEFF/, '')); } catch {}
       if (!res.ok) { out('#saveOut', text || 'Failed to load availability', false); return; }
 
+      const doctorPrice = (json && typeof json === 'object') ? json.doctor_price : null;
+      if (priceField) {
+        const fallbackPrice = hydratePriceFromOption();
+        const priceToUse = doctorPrice ?? (fallbackPrice === '' ? '' : fallbackPrice);
+        primePriceField(priceToUse);
+        setPriceStatus(
+          priceToUse !== '' && priceToUse !== null
+            ? `Current price: ₹${priceToUse}`
+            : 'No price saved yet.'
+        );
+        setSelectedOptionPrice(priceToUse);
+      }
+
       const list  = Array.isArray(json?.availability) ? json.availability : [];
       const byDow = new Map(list.map(r => [Number(r.day_of_week), r]));
       const hasWeekend = list.some(r => [0,6].includes(Number(r.day_of_week)));
@@ -548,6 +614,53 @@
     return { availability, validationError };
   }
 
+  async function saveDoctorPrice(autoTriggered = false) {
+    const doctorId = getSelectedDoctorId();
+    if (!doctorId) {
+      setPriceStatus('Select a doctor first.', false);
+      return;
+    }
+    if (!priceField) return;
+
+    const raw = String(priceField.value ?? '').trim();
+    const price = raw === '' ? null : Number(raw);
+    if (raw !== '' && (!Number.isFinite(price) || price < 0)) {
+      setPriceStatus('Enter a valid non-negative amount.', false);
+      priceField.focus();
+      return;
+    }
+
+    togglePriceButton(true);
+    setPriceStatus('Saving price…', true);
+
+    try {
+      const res = await fetch(`${apiBase}/doctors/${doctorId}/price`, {
+        method: 'PUT',
+        headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+        body: JSON.stringify({ doctor_price: price }),
+      });
+      const text = await res.text();
+      let json = null; try { json = JSON.parse(text); } catch {}
+      if (!res.ok) {
+        const msg = json?.message || json?.error || text || 'Failed to save price';
+        throw new Error(msg);
+      }
+
+      const savedPrice = json?.doctor_price ?? price ?? '';
+      primePriceField(savedPrice === null ? '' : savedPrice);
+      setSelectedOptionPrice(savedPrice);
+      priceDirty = false;
+      setPriceStatus('Price saved for this doctor.', true);
+      if (!autoTriggered && typeof toast === 'function') toast('Doctor price updated');
+    } catch (err) {
+      const msg = err?.message || 'Could not save price';
+      setPriceStatus(msg, false);
+      if (typeof toast === 'function') toast(msg, false);
+    } finally {
+      togglePriceButton(false);
+    }
+  }
+
   async function saveAvailability(autoTriggered = false) {
     const doctorId = getSelectedDoctorId();
     if (!doctorId) {
@@ -631,10 +744,20 @@
   document.addEventListener('DOMContentLoaded', () => {
     const dd = el('#doctor_id');
     if (dd && dd.options.length && dd.value) {
+      const initialPrice = hydratePriceFromOption();
+      primePriceField(initialPrice);
+      setPriceStatus(
+        initialPrice !== '' && initialPrice !== null
+          ? `Current price: ₹${initialPrice}`
+          : 'No price saved yet.'
+      );
       loadExistingAvailability();
     }
 
     dd?.addEventListener('change', () => {
+      const optPrice = hydratePriceFromOption();
+      primePriceField(optPrice);
+      setPriceStatus('Loading doctor schedule…', true);
       loadExistingAvailability();
     });
 
@@ -657,11 +780,20 @@
     applyDefaultHours(true);
     isBootstrapping = false;
 
+    priceField?.addEventListener('input', () => {
+      priceDirty = true;
+      setPriceStatus('Not saved yet.', false);
+    });
+    priceButton?.addEventListener('click', () => saveDoctorPrice(false));
+
     const manualSave = el('#btnManualSave');
     manualSave?.addEventListener('click', async ()=>{
       toggleManualSaveButton(true);
       try{
         await saveAvailability(false);
+        if (priceDirty) {
+          await saveDoctorPrice(true);
+        }
       }finally{
         toggleManualSaveButton(false);
       }
