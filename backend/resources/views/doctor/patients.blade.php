@@ -507,10 +507,8 @@
             <label class="record-label" for="visit-category">Visit Category</label>
             <select id="visit-category" name="visit_category" class="record-input">
               <option value="vaccination">Vaccination</option>
-              <option value="routine">Routine Checkup</option>
-              <option value="minor">Minor Issue</option>
-              <option value="follow_up">Follow-up</option>
-              <option value="illness">Illness / Treatment</option>
+              <option value="consultation">Consultation</option>
+              <option value="followup">Follow-up</option>
             </select>
           </div>
           <div class="record-field">
@@ -1341,12 +1339,16 @@
     if (recordUserInput) recordUserInput.value = rec.user_id;
     const recordFile = document.getElementById('record-file');
     if (recordFile) recordFile.required = false;
+    const normalizeVisitCategory = (val) => {
+      if (val === 'follow_up') return 'followup';
+      return val ?? '';
+    };
     const mapValue = (id, value) => {
       const el = document.getElementById(id);
       if (el) el.value = value ?? '';
     };
     mapValue('record-notes', rec.notes ?? prescription.visit_notes ?? '');
-    mapValue('visit-category', prescription.visit_category ?? '');
+    mapValue('visit-category', normalizeVisitCategory(prescription.visit_category));
     mapValue('case-severity', prescription.case_severity ?? '');
     mapValue('doctor-select', rec.doctor_id ?? prescription.doctor_id ?? DEFAULT_DOCTOR_ID ?? '');
     mapValue('temperature', prescription.temperature ?? '');

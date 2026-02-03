@@ -67,6 +67,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url('vertical/assets/plugins/select2/css/select2.min.css') }}">
   <style>
     .pm-shell { --pm-bg:#f5f7fb; --pm-panel:#ffffff; --pm-muted:#6b7280; --pm-blue:#5b5be5; --pm-purple:#9f7aea; --pm-green:#10b981; --pm-orange:#f97316; --pm-radius:12px; --pm-shadow:0 8px 28px rgba(10,20,40,0.06); background:var(--pm-bg); border-radius:16px; padding:18px; font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; color:#0b1220; }
@@ -137,6 +138,15 @@
     .pm-record-file{font-size:12px;color:var(--pm-muted);word-break:break-word;margin-top:6px}
     .pm-record-list{margin:0;padding-left:18px}
     .pm-record-list li{margin:0 0 4px 0}
+    .pv-context{border:1px dashed #dbeafe;background:linear-gradient(180deg,#f8fbff,#ffffff);padding:14px;border-radius:16px;box-shadow:0 10px 24px rgba(91,91,229,0.08);margin-bottom:12px}
+    .pv-context-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+    .pv-context-title{font-size:14px;font-weight:800;color:#0f172a;display:flex;gap:8px;align-items:center}
+    .pv-context-meta{font-size:12px;color:#6b7280}
+    .pv-context-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:10px}
+    .pv-context-row{padding:10px 12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff}
+    .pv-context-label{font-size:11px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.02em}
+    .pv-context-value{display:block;margin-top:4px;font-size:13px;color:#0b1220;line-height:1.45}
+    .pv-context-empty{font-size:13px;color:#6b7280;margin-top:6px}
     .pm-empty{color:var(--pm-muted);font-size:13px;padding:8px 0}
     .pm-alert{background:#fff1f2;border:1px solid #fecdd3;color:#b91c1c;padding:12px;border-radius:12px;margin:10px 0;font-size:14px}
     .pm-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.45);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:12px;overflow-y:auto}
@@ -178,6 +188,42 @@
     .meds-preview{background:#f1f5f9;border-radius:10px;padding:8px 10px;font-size:12px;color:#0f172a;margin-top:6px}
     .meds-remove{color:#b91c1c;border:1px solid #fecdd3;background:#fff1f2;padding:6px 10px;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;margin-top:8px}
     .meds-empty{font-size:12px;color:#94a3b8;margin-bottom:6px}
+    /* Post-visit UI refresh */
+    .pv-shell{--pv-primary:#2563eb;--pv-primary-dark:#1e40af;--pv-bg:#f8fafc;--pv-card:#ffffff;--pv-text:#0f172a;--pv-muted:#64748b;--pv-border:#e2e8f0;--pv-radius:12px;--pv-shadow:0 10px 18px rgba(15,23,42,0.06);background:var(--pv-bg);color:var(--pv-text);font-family:'DM Sans','Inter',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
+    .pv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+    .pv-overline{font-size:13px;font-weight:700;color:var(--pv-primary);letter-spacing:.01em}
+    .pv-patientRow{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700}
+    .pv-patient{color:var(--pv-text)}
+    .pv-pet{color:var(--pv-muted)}
+    .pv-sep{color:var(--pv-muted)}
+    .pv-meta{margin-top:6px}
+    .pv-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px}
+    .pv-badge-primary{background:#dbeafe;color:var(--pv-primary)}
+    .pv-dot{width:8px;height:8px;border-radius:50%;background:var(--pv-primary);display:inline-block}
+    .pv-form{display:flex;flex-direction:column;gap:14px}
+    .pv-card{background:var(--pv-card);border:1px solid var(--pv-border);border-radius:var(--pv-radius);padding:16px;box-shadow:var(--pv-shadow)}
+    .pv-cardTitle{font-size:16px;font-weight:700;margin-bottom:12px;color:var(--pv-text);display:flex;align-items:center;gap:6px}
+    .pv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+    .pv-grid-vitals{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+    .pv-field{display:flex;flex-direction:column;gap:6px}
+    .pv-label{font-size:13px;font-weight:700;color:var(--pv-text);display:flex;align-items:center;gap:6px}
+    .pv-required{color:#ef4444}
+    .pv-optional{font-size:11px;font-weight:600;color:var(--pv-muted);background:#f1f5f9;padding:2px 6px;border-radius:6px}
+    .pv-input{width:100%;padding:10px 12px;border:1.5px solid var(--pv-border);border-radius:10px;font-size:14px;background:var(--pv-card);transition:border-color .15s,box-shadow .15s}
+    .pv-input:focus{outline:none;border-color:var(--pv-primary);box-shadow:0 0 0 3px rgba(37,99,235,0.12)}
+    .pv-textarea{min-height:90px;resize:vertical}
+    .pv-inputWrap{position:relative}
+    .pv-unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--pv-muted)}
+    .pv-upload{border:1.5px dashed var(--pv-primary);border-radius:10px;padding:12px;display:inline-flex;align-items:center;gap:8px;font-weight:700;color:var(--pv-primary);cursor:pointer;background:#eff6ff}
+    .pv-helper{font-size:12px;color:var(--pv-muted);margin-top:4px}
+    .pv-actions{display:flex;gap:10px;justify-content:flex-end}
+    .pv-btn{padding:12px 18px;border-radius:10px;font-weight:700;font-size:14px;border:1.5px solid transparent;cursor:pointer;transition:transform .12s,box-shadow .12s}
+    .pv-btn-primary{background:var(--pv-primary);color:#fff}
+    .pv-btn-primary:hover{background:var(--pv-primary-dark);box-shadow:0 10px 18px rgba(37,99,235,0.25);transform:translateY(-1px)}
+    .pv-btn-ghost{background:#fff;border-color:var(--pv-border);color:var(--pv-muted)}
+    .pv-btn-ghost:hover{background:#f8fafc}
+    .pv-critical{background:linear-gradient(180deg,#f8fafc,#ffffff);border:1px solid #e0e7ff}
+    .pv-hidden{display:none!important}
     .meds-hidden-text{display:none}
     .record-critical{display:block}
     .record-critical.is-visible{display:block}
@@ -507,7 +553,7 @@
           <div class="pm-actions">
             <div class="pm-small" id="pm-pet-count">-</div>
             <button class="pm-btn pm-primary" data-role="open-pet">+ Add Pet</button>
-            <button class="pm-btn pm-primary" data-role="open-upload">Post Op Form</button>
+            <button class="pm-btn pm-primary" data-role="open-upload" data-followup="1">Post Op Form</button>
           </div>
         </div>
         <div class="pm-card">
@@ -720,92 +766,115 @@
 </div>
 
 <div class="pm-overlay" id="record-modal">
-  <div class="pm-modal record-modal" role="dialog" aria-modal="true">
-    <div class="record-header">
+  <div class="pm-modal record-modal pv-shell" role="dialog" aria-modal="true">
+    <div class="pv-header">
       <div>
-        <div class="record-title">Close Consultation</div>
-        <div id="record-modal-patient" class="record-patient">Patient | -</div>
-        <div id="record-modal-pet" class="record-patientSub"></div>
-        <div class="record-status">Active Case</div>
+        <div class="pv-overline">Close Consultation</div>
+        <div class="pv-patientRow">
+          <span id="record-modal-patient" class="pv-patient">Patient | -</span>
+          <span class="pv-sep">•</span>
+          <span id="record-modal-pet" class="pv-pet"></span>
+        </div>
+        <div class="pv-meta">
+          <span class="pv-badge pv-badge-primary"><span class="pv-dot"></span> Active Case</span>
+        </div>
       </div>
-      <button type="button" class="pm-btn pm-ghost" data-role="close-record-modal">Close</button>
+      <button type="button" class="pv-btn pv-btn-ghost" data-role="close-record-modal">Close</button>
     </div>
-    <form id="record-form" class="space-y-2" enctype="multipart/form-data">
+
+    <form id="record-form" class="pv-form" enctype="multipart/form-data">
       <input type="hidden" name="user_id" id="record-user-id">
       <input type="hidden" name="record_id" id="record-id">
 
-      <div class="record-section">
-        <div class="record-sectionTitle">Visit Overview</div>
-        <div class="record-grid">
-          <div class="record-field">
-            <label class="record-label" for="visit-category">Visit Category</label>
-            <select id="visit-category" name="visit_category" class="record-input">
+      <div class="pv-card pv-context" id="pv-followup-context" style="display:none">
+        <div class="pv-context-head">
+          <div class="pv-context-title">
+            <span>Previous consultation snapshot</span>
+          </div>
+          <div class="pv-context-meta" id="pv-followup-context-meta"></div>
+        </div>
+        <div class="pv-context-grid" id="pv-followup-context-body"></div>
+      </div>
+
+      <div class="pv-card" id="pv-overview-card">
+        <div class="pv-cardTitle">Visit Overview</div>
+        <div class="pv-grid">
+          <div class="pv-field">
+            <label class="pv-label" for="visit-category"><span class="pv-required">*</span> Visit Category</label>
+            <select id="visit-category" name="visit_category" class="pv-input">
               <option value="vaccination">Vaccination</option>
-              <option value="routine">Routine Checkup</option>
-              <option value="minor">Minor Issue</option>
-              <option value="follow_up">Follow-up</option>
-              <option value="illness">Illness / Treatment</option>
+              <option value="consultation">Consultation</option>
+              <option value="followup">Follow-up</option>
             </select>
           </div>
-          <div class="record-field">
-            <label class="record-label" for="case-severity">Case Severity</label>
-            <select id="case-severity" name="case_severity" class="record-input" data-role="case-severity">
+          <div class="pv-field">
+            <label class="pv-label" for="case-severity"><span class="pv-required">*</span> Case Severity</label>
+            <select id="case-severity" name="case_severity" class="pv-input" data-role="case-severity">
               <option value="general">General</option>
               <option value="critical">Critical / Treatment</option>
             </select>
           </div>
-          <div class="record-field">
-            <label class="record-label" for="doctor-select">Doctor</label>
-            <select name="doctor_id" id="doctor-select" class="record-input">
+          <div class="pv-field">
+            <label class="pv-label" for="doctor-select"><span class="pv-required">*</span> Doctor</label>
+            <select name="doctor_id" id="doctor-select" class="pv-input">
               <option value="">Select doctor</option>
             </select>
           </div>
-          <div class="record-field">
-            <label class="record-label" for="record-pet">Pet</label>
-            <select name="pet_id" id="record-pet" class="record-input">
+          <div class="pv-field">
+            <label class="pv-label" for="record-pet"><span class="pv-required">*</span> Pet</label>
+            <select name="pet_id" id="record-pet" class="pv-input">
               <option value="">Select pet</option>
             </select>
           </div>
         </div>
       </div>
 
-      <div class="record-section">
-        <div class="record-sectionTitle">Visit Notes</div>
-        <textarea id="record-notes" name="notes" class="record-input record-textarea" placeholder="Reason for visit / brief notes"></textarea>
+      <div class="pv-card" id="pv-notes-card">
+        <div class="pv-cardTitle">Visit Notes</div>
+        <textarea id="record-notes" name="notes" class="pv-input pv-textarea" placeholder="Reason for visit / brief notes"></textarea>
       </div>
 
-      <div class="record-section record-critical" data-critical>
-        <div class="record-sectionTitle">Clinical Observations</div>
-        <div class="record-grid narrow">
-          <div class="record-field">
-            <label class="record-label" for="temperature">Temperature (C)</label>
-            <input id="temperature" name="temperature" type="text" class="record-input" placeholder="Temperature (C)">
+      <div class="pv-card pv-critical" data-critical id="pv-clinical-card">
+        <div class="pv-cardTitle">Clinical Observations</div>
+        <div class="pv-grid pv-grid-vitals">
+          <div class="pv-field pv-vital">
+            <label class="pv-label" for="temperature">Temperature</label>
+            <div class="pv-inputWrap">
+              <input id="temperature" name="temperature" type="number" step="0.1" class="pv-input" placeholder="38.5">
+              <span class="pv-unit">°C</span>
+            </div>
           </div>
-          <div class="record-field">
-            <label class="record-label" for="weight">Weight (kg)</label>
-            <input id="weight" name="weight" type="text" class="record-input" placeholder="Weight (kg)">
+          <div class="pv-field pv-vital">
+            <label class="pv-label" for="weight">Weight</label>
+            <div class="pv-inputWrap">
+              <input id="weight" name="weight" type="number" step="0.1" class="pv-input" placeholder="4.5">
+              <span class="pv-unit">kg</span>
+            </div>
           </div>
-          <div class="record-field">
-            <label class="record-label" for="heart-rate">Heart Rate (optional)</label>
-            <input id="heart-rate" name="heart_rate" type="text" class="record-input" placeholder="Heart Rate (optional)">
+          <div class="pv-field pv-vital">
+            <label class="pv-label" for="heart-rate">Heart Rate <span class="pv-optional">optional</span></label>
+            <div class="pv-inputWrap">
+              <input id="heart-rate" name="heart_rate" type="number" class="pv-input" placeholder="120">
+              <span class="pv-unit">bpm</span>
+            </div>
           </div>
         </div>
-        <div class="record-field" style="margin-top:8px">
-          <label class="record-label" for="exam-notes">Physical examination notes</label>
-          <textarea id="exam-notes" name="exam_notes" class="record-input record-textarea" placeholder="Physical examination notes"></textarea>
+        <div class="pv-field">
+          <label class="pv-label" for="exam-notes">Physical examination notes <span class="pv-optional">optional</span></label>
+          <textarea id="exam-notes" name="exam_notes" class="pv-input pv-textarea" placeholder="Physical examination findings..."></textarea>
         </div>
       </div>
 
-      <div class="record-section record-critical" data-critical>
-        <div class="record-sectionTitle">Diagnosis</div>
-        <div class="record-grid">
-          <div class="record-field">
-            <label class="record-label" for="diagnosis">Diagnosis</label>
-            <input id="diagnosis" name="diagnosis" type="text" class="record-input" placeholder="Diagnosis (e.g. UTI)">
+      <div class="pv-card pv-critical" data-critical id="pv-diagnosis-card">
+        <div class="pv-cardTitle"><span class="pv-required">*</span> Diagnosis &amp; Assessment</div>
+        <div class="pv-grid">
+          <div class="pv-field">
+            <label class="pv-label" for="diagnosis">Diagnosis</label>
+            <input id="diagnosis" name="diagnosis" type="text" class="pv-input" placeholder="Diagnosis (e.g. UTI)">
           </div>
-          <div class="record-field">
-            <label class="record-label" for="diagnosis-status">Status</label>
-            <select id="diagnosis-status" name="diagnosis_status" class="record-input">
+          <div class="pv-field">
+            <label class="pv-label" for="diagnosis-status">Status</label>
+            <select id="diagnosis-status" name="diagnosis_status" class="pv-input">
               <option value="new">New</option>
               <option value="ongoing">Ongoing</option>
               <option value="chronic">Chronic</option>
@@ -814,48 +883,49 @@
         </div>
       </div>
 
-      <div class="record-section record-critical" data-critical>
-        <div class="record-sectionTitle">Treatment &amp; Precautions</div>
-        <div class="record-field">
-          <label class="record-label" for="treatment-plan">Medication / treatment plan</label>
-          <textarea id="treatment-plan" name="treatment_plan" class="record-input record-textarea" placeholder="Medication / treatment plan"></textarea>
+      <div class="pv-card pv-critical" data-critical id="pv-treatment-card">
+        <div class="pv-cardTitle">Treatment &amp; Medications</div>
+        <div class="pv-field">
+          <label class="pv-label" for="treatment-plan">Medication / treatment plan</label>
+          <textarea id="treatment-plan" name="treatment_plan" class="pv-input pv-textarea" placeholder="Medication / treatment plan"></textarea>
         </div>
-        <div class="record-field meds-shell">
+        <div class="pv-field meds-shell">
           <div class="meds-head">
             <div>
-              <div class="record-label" style="margin-bottom:2px">Medicines (structured)</div>
+              <div class="pv-label" style="margin-bottom:2px">Medicines (structured)</div>
               <div class="meds-hint">Type medicine name → choose frequency & timing → set dosage and duration. Data is saved for each medicine.</div>
             </div>
             <button class="meds-add pm-btn pm-primary" type="button" data-role="add-medicine">+ Add medicine</button>
           </div>
           <input type="hidden" id="medications-json" name="medications_json">
-          <textarea id="medicines-text" name="medicines" class="record-input record-textarea meds-hidden-text" style="display:none"></textarea>
+          <textarea id="medicines-text" name="medicines" class="pv-input pv-textarea meds-hidden-text" style="display:none"></textarea>
           <div id="medications-empty" class="meds-empty">No medicines added yet. Click “Add medicine”.</div>
           <div id="medications-list" class="meds-list"></div>
         </div>
-        <div class="record-field">
-          <label class="record-label" for="home-care">Home care / precautions</label>
-          <textarea id="home-care" name="home_care" class="record-input record-textarea" placeholder="Home care / precautions"></textarea>
+        <div class="pv-field">
+          <label class="pv-label" for="home-care"><span class="pv-required">*</span> Home care / precautions</label>
+          <textarea id="home-care" name="home_care" class="pv-input pv-textarea" placeholder="Care instructions shown to pet parent"></textarea>
+          <div class="pv-helper">Be clear and specific — this text is shared with the pet parent.</div>
         </div>
       </div>
 
-      <div class="record-section">
-        <div class="record-sectionTitle">Upload Documents</div>
-        <label class="record-upload" for="record-file">+ Upload prescription / lab report</label>
-        <input id="record-file" name="record_file" type="file" class="record-input" required>
-        <div class="record-note">PDF, JPG, PNG, DOC up to 10 MB.</div>
+      <div class="pv-card" id="pv-documents-card">
+        <div class="pv-cardTitle">Documents <span class="pv-optional">optional</span></div>
+        <label class="pv-upload" for="record-file"><span>📎</span> Upload prescription / lab report</label>
+        <input id="record-file" name="record_file" type="file" class="pv-input" required>
+        <div class="pv-helper">PDF, JPG, PNG, DOC up to 10 MB.</div>
       </div>
 
-      <div class="record-section record-critical" data-critical>
-        <div class="record-sectionTitle">Follow-up</div>
-        <div class="record-grid">
-          <div class="record-field">
-            <label class="record-label" for="follow-up-date">Date</label>
-            <input id="follow-up-date" name="follow_up_date" type="date" class="record-input">
+      <div class="pv-card pv-critical" data-critical id="pv-followup-card">
+        <div class="pv-cardTitle">Follow-up</div>
+        <div class="pv-grid">
+          <div class="pv-field">
+            <label class="pv-label" for="follow-up-date">Date</label>
+            <input id="follow-up-date" name="follow_up_date" type="date" class="pv-input">
           </div>
-          <div class="record-field">
-            <label class="record-label" for="follow-up-type">Visit Type</label>
-            <select id="follow-up-type" name="follow_up_type" class="record-input">
+          <div class="pv-field">
+            <label class="pv-label" for="follow-up-type">Visit Type</label>
+            <select id="follow-up-type" name="follow_up_type" class="pv-input">
               <option value="clinic">Clinic Visit</option>
               <option value="video">Video Consultation</option>
             </select>
@@ -863,9 +933,9 @@
         </div>
       </div>
 
-      <div class="record-actions">
-        <button type="button" class="pm-btn pm-ghost" data-role="close-record-modal">Cancel</button>
-        <button type="submit" class="pm-btn pm-primary">Close &amp; Share</button>
+      <div class="pv-actions">
+        <button type="button" class="pv-btn pv-btn-ghost" data-role="close-record-modal">Cancel</button>
+        <button type="submit" class="pv-btn pv-btn-primary">Close &amp; Share</button>
       </div>
     </form>
   </div>
@@ -888,6 +958,7 @@
     tagFilters: [],
     selectedId: null,
     records: new Map(),
+    lastPostOp: null,
     loadingPatients: false,
     loadingRecords: false,
     editingRecordId: null,
@@ -920,6 +991,9 @@
     petCount: document.getElementById('pm-pet-count'),
     petEmpty: document.getElementById('pm-pets-empty'),
     petList: document.getElementById('pm-pets-list'),
+    followupContextCard: document.getElementById('pv-followup-context'),
+    followupContextBody: document.getElementById('pv-followup-context-body'),
+    followupContextMeta: document.getElementById('pv-followup-context-meta'),
     refreshBtn: document.getElementById('pm-refresh'),
     refreshProfile: document.getElementById('pm-refresh-profile'),
     openUploadBtns: Array.from(document.querySelectorAll('[data-role="open-upload"]')),
@@ -936,6 +1010,12 @@
     medicationsJson: document.getElementById('medications-json'),
     medicinesText: document.getElementById('medicines-text'),
     addMedicineBtn: document.querySelector('[data-role="add-medicine"]'),
+    visitCategory: document.getElementById('visit-category'),
+    clinicalCard: document.getElementById('pv-clinical-card'),
+    diagnosisCard: document.getElementById('pv-diagnosis-card'),
+    treatmentCard: document.getElementById('pv-treatment-card'),
+    followupCard: document.getElementById('pv-followup-card'),
+    notesCard: document.getElementById('pv-notes-card'),
     caseSeverity: document.getElementById('case-severity'),
     criticalSections: Array.from(document.querySelectorAll('[data-critical]')),
     petModal: document.getElementById('pet-modal'),
@@ -1193,6 +1273,34 @@
     });
   }
 
+  function setCardVisible(card, visible) {
+    if (!card) return;
+    card.classList.toggle('pv-hidden', !visible);
+  }
+
+  function updateVisitCategoryUI(category) {
+    const cat = category || els.visitCategory?.value || '';
+    if (!cat) {
+      setCardVisible(els.clinicalCard, true);
+      setCardVisible(els.diagnosisCard, true);
+      setCardVisible(els.treatmentCard, true);
+      setCardVisible(els.followupCard, true);
+      return;
+    }
+    const isVaccination = cat === 'vaccination';
+    const isFollowUp = cat === 'followup' || cat === 'follow_up';
+
+    setCardVisible(els.clinicalCard, !isVaccination);
+    setCardVisible(els.diagnosisCard, !isVaccination);
+    setCardVisible(els.treatmentCard, !isVaccination);
+    setCardVisible(els.followupCard, true); // always shown but contextual
+
+    if (isFollowUp && els['diagnosis-status']) {
+      els['diagnosis-status'].value = els['diagnosis-status'].value || 'ongoing';
+    }
+    renderFollowupContext();
+  }
+
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, (char) => ({
       '&': '&amp;',
@@ -1250,6 +1358,78 @@
     }).filter(Boolean);
     if (!items.length) return '';
     return `<ul class="pm-record-list">${items.join('')}</ul>`;
+  }
+
+  function extractLastPostOp(records = []) {
+    if (!Array.isArray(records) || !records.length) return null;
+    const recent = records.find((r) => r && r.prescription) || null;
+    if (!recent || !recent.prescription) return null;
+    const rx = recent.prescription;
+    return {
+      raw: recent,
+      visit_category: rx.visit_category || '',
+      case_severity: rx.case_severity || '',
+      visit_notes: rx.visit_notes || '',
+      diagnosis: rx.diagnosis || '',
+      diagnosis_status: rx.diagnosis_status || '',
+      treatment_plan: rx.treatment_plan || '',
+      home_care: rx.home_care || '',
+      medications_html: formatMedicationList(rx.medications_json),
+      follow_up_date: rx.follow_up_date || '',
+      follow_up_type: rx.follow_up_type || '',
+      date: recent.uploaded_at || rx.created_at || null,
+    };
+  }
+
+  function renderFollowupContext() {
+    const card = els.followupContextCard;
+    const body = els.followupContextBody;
+    const meta = els.followupContextMeta;
+    if (!card || !body || !meta) return;
+    const cat = els.visitCategory?.value || '';
+    const isFollowUp = cat === 'followup' || cat === 'follow_up';
+    if (!isFollowUp || !state.selectedId) {
+      card.style.display = 'none';
+      return;
+    }
+    const ctx = state.lastPostOp;
+    body.innerHTML = '';
+    meta.textContent = '';
+    if (!ctx) {
+      body.innerHTML = '<div class=\"pv-context-empty\">No previous consultation found for this patient.</div>';
+      card.style.display = 'block';
+      return;
+    }
+    meta.textContent = ctx.date ? `Last record: ${formatDate(ctx.date, true)}` : 'Last record';
+    const rows = [];
+    if (ctx.visit_category || ctx.case_severity) {
+      rows.push({ label: 'Visit', value: `${escapeHtml(ctx.visit_category || '-')}${ctx.case_severity ? ' • ' + escapeHtml(ctx.case_severity) : ''}` });
+    }
+    if (ctx.visit_notes) rows.push({ label: 'Visit notes', value: escapeHtml(ctx.visit_notes) });
+    if (ctx.diagnosis || ctx.diagnosis_status) {
+      rows.push({ label: 'Diagnosis', value: `${escapeHtml(ctx.diagnosis || '-')}${ctx.diagnosis_status ? ' (' + escapeHtml(ctx.diagnosis_status) + ')' : ''}` });
+    }
+    if (ctx.treatment_plan) rows.push({ label: 'Treatment', value: escapeHtml(ctx.treatment_plan) });
+    if (ctx.home_care) rows.push({ label: 'Home care', value: escapeHtml(ctx.home_care) });
+    if (ctx.follow_up_date || ctx.follow_up_type) {
+      const bits = [];
+      if (ctx.follow_up_date) bits.push(`Date: ${escapeHtml(ctx.follow_up_date)}`);
+      if (ctx.follow_up_type) bits.push(`Type: ${escapeHtml(ctx.follow_up_type)}`);
+      rows.push({ label: 'Follow-up', value: bits.join(' | ') });
+    }
+    if (ctx.medications_html) {
+      rows.push({ label: 'Medicines', value: ctx.medications_html });
+    }
+    if (!rows.length) {
+      body.innerHTML = '<div class=\"pv-context-empty\">Latest record has no clinical details.</div>';
+      card.style.display = 'block';
+      return;
+    }
+    const html = rows.map((row) => {
+      return `<div class=\"pv-context-row\"><div class=\"pv-context-label\">${row.label}</div><div class=\"pv-context-value\">${row.value}</div></div>`;
+    }).join('');
+    body.innerHTML = html;
+    card.style.display = 'block';
   }
 
   function buildRecordPreview(rec) {
@@ -1812,21 +1992,26 @@
       const data = await request(`${API_BASE}/users/${patientId}/medical-records?clinic_id=${CLINIC_ID}`);
       const records = Array.isArray(data?.data?.records) ? data.data.records : [];
       state.records.set(Number(patientId), records);
+      state.lastPostOp = extractLastPostOp(records);
     } catch (error) {
       lastRecordError = escapeHtml(error.message);
       state.records.set(Number(patientId), []);
+      state.lastPostOp = null;
     } finally {
       state.loadingRecords = false;
       renderRecords();
+      renderFollowupContext();
     }
   }
 
   function selectPatient(patientId) {
     state.selectedId = Number(patientId);
+    state.lastPostOp = null;
     state.loadingRecords = true;
     lastRecordError = null;
     renderPatientList();
     renderProfile();
+    renderFollowupContext();
     loadRecords(patientId);
   }
 
@@ -1836,8 +2021,12 @@
     if (els.caseSeverity) {
       els.caseSeverity.value = 'general';
     }
+    if (els.visitCategory) {
+      els.visitCategory.value = '';
+    }
     resetMedications();
     toggleCriticalSections(els.caseSeverity?.value || 'general');
+    updateVisitCategoryUI(els.visitCategory?.value || '');
     const recordIdInput = document.getElementById('record-id');
     if (recordIdInput) recordIdInput.value = '';
     const recordFile = document.getElementById('record-file');
@@ -1863,12 +2052,16 @@
     if (recordUserInput) recordUserInput.value = rec.user_id;
     const recordFile = document.getElementById('record-file');
     if (recordFile) recordFile.required = false;
+    const normalizeVisitCategory = (val) => {
+      if (val === 'follow_up') return 'followup';
+      return val ?? '';
+    };
     const mapValue = (id, value) => {
       const el = document.getElementById(id);
       if (el) el.value = value ?? '';
     };
     mapValue('record-notes', rec.notes ?? prescription.visit_notes ?? '');
-    mapValue('visit-category', prescription.visit_category ?? '');
+    mapValue('visit-category', normalizeVisitCategory(prescription.visit_category));
     mapValue('case-severity', prescription.case_severity ?? '');
     mapValue('doctor-select', rec.doctor_id ?? prescription.doctor_id ?? DEFAULT_DOCTOR_ID ?? '');
     mapValue('temperature', prescription.temperature ?? '');
@@ -1882,6 +2075,7 @@
     mapValue('follow-up-date', prescription.follow_up_date ?? '');
     mapValue('follow-up-type', prescription.follow_up_type ?? '');
     mapValue('record-pet', prescription.pet_id ?? rec.pet_id ?? '');
+    updateVisitCategoryUI(els.visitCategory?.value || '');
     medications = normalizeMedicationState(prescription.medications_json || []);
     renderMedicationCards();
     syncMedicationPayload();
@@ -1889,9 +2083,10 @@
       addMedication();
     }
     toggleCriticalSections(els.caseSeverity?.value || 'general');
+    updateVisitCategoryUI(els.visitCategory?.value || '');
   }
 
-  function openUploadModal() {
+  function openUploadModal(forceFollowup = false) {
     if (!state.selectedId) {
       Swal.fire({ icon: 'info', title: 'Select a patient', text: 'Pick a patient from the list before uploading.' });
       return;
@@ -1912,6 +2107,10 @@
       els.modalUserInput.value = patient.id;
     }
     resetRecordForm();
+    if (forceFollowup && els.visitCategory) {
+      els.visitCategory.value = 'followup';
+      updateVisitCategoryUI('followup');
+    }
     if (!medications.length) {
       addMedication();
     }
@@ -1973,7 +2172,10 @@
       }
       loadPatients();
     });
-    els.openUploadBtns.forEach((btn) => btn.addEventListener('click', openUploadModal));
+    els.openUploadBtns.forEach((btn) => btn.addEventListener('click', (ev) => {
+      const forceFollowup = ev.currentTarget?.dataset?.followup === '1';
+      openUploadModal(forceFollowup);
+    }));
     els.openPetBtns.forEach((btn) => btn.addEventListener('click', openPetModal));
     document.querySelectorAll('[data-role="close-record-modal"]').forEach((btn) => btn.addEventListener('click', closeModal));
     document.querySelectorAll('[data-role="close-pet-modal"]').forEach((btn) => btn.addEventListener('click', closePetModal));
@@ -1981,6 +2183,10 @@
       toggleCriticalSections(event.target.value || 'general');
     });
     els.addMedicineBtn?.addEventListener('click', () => addMedication());
+    els.visitCategory?.addEventListener('change', (event) => {
+      updateVisitCategoryUI(event.target.value);
+    });
+    renderFollowupContext();
 
     els.recordForm?.addEventListener('submit', async (event) => {
       event.preventDefault();
