@@ -162,7 +162,11 @@ class AppointmentSubmissionController extends Controller
             ], 404);
         }
 
-        $petsPayload = $this->fetchPetsForUser($user->id);
+        // Prefer the pet attached to the appointment; fall back to legacy user-pet lookup.
+        $appointmentPet = $this->fetchAppointmentPet($appointment);
+        $petsPayload = $appointmentPet
+            ? ['source' => 'appointment_pet', 'pets' => [$appointmentPet]]
+            : $this->fetchPetsForUser($user->id);
 
         $prescriptions = [];
         if (Schema::hasTable('prescriptions')) {
@@ -183,6 +187,8 @@ class AppointmentSubmissionController extends Controller
                     'status' => $appointment->status,
                 ],
                 'patient_user_id' => (int) $user->id,
+                'user' => $user->toArray(),
+                'pet' => $appointmentPet,
                 'patient' => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -637,6 +643,33 @@ class AppointmentSubmissionController extends Controller
         }
 
         return ['source' => null, 'pets' => []];
+    }
+
+    /**
+     * Fetch the pet linked directly to the appointment (appointments.pet_id) from the pets table.
+     */
+    private function fetchAppointmentPet(Appointment $appointment): ?array
+    {
+        if (!$appointment->pet_id || !Schema::hasTable('pets')) {
+            return null;
+        }
+
+        $pet = DB::table('pets')
+            ->where('id', $appointment->pet_id)
+            ->first();
+
+        if (!$pet) {
+            return null;
+        }
+
+        // Normalize known JSON columns so consumers get structured data.
+        foreach (['vaccine_reminder_status', 'dog_disease_payload'] as $jsonField) {
+            if (property_exists($pet, $jsonField)) {
+                $pet->{$jsonField} = $this->decodeJsonField($pet->{$jsonField});
+            }
+        }
+
+        return (array) $pet;
     }
 
     private function decodeJsonField($value)
