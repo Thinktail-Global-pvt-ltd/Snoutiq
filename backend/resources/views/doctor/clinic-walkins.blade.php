@@ -1360,9 +1360,14 @@
     return `<ul class="pm-record-list">${items.join('')}</ul>`;
   }
 
-  function extractLastPostOp(records = []) {
+  function extractLastPostOp(records = [], petId = null) {
     if (!Array.isArray(records) || !records.length) return null;
-    const recent = records.find((r) => r && r.prescription) || null;
+    const recent = records.find((r) => {
+      if (!r || !r.prescription) return false;
+      if (petId === null) return true;
+      const recPet = r.prescription.pet_id ?? r.pet_id ?? null;
+      return Number(recPet) === Number(petId);
+    }) || null;
     if (!recent || !recent.prescription) return null;
     const rx = recent.prescription;
     return {
@@ -1379,6 +1384,18 @@
       follow_up_type: rx.follow_up_type || '',
       date: recent.uploaded_at || rx.created_at || null,
     };
+  }
+
+  function recomputeLastPostOp() {
+    if (!state.selectedId) {
+      state.lastPostOp = null;
+      renderFollowupContext();
+      return;
+    }
+    const records = state.records.get(Number(state.selectedId)) || [];
+    const petId = getSelectedPetId();
+    state.lastPostOp = extractLastPostOp(records, petId);
+    renderFollowupContext();
   }
 
   function renderFollowupContext() {
@@ -1483,6 +1500,13 @@
       return match.name || match.pet_name || `Pet #${petId}`;
     }
     return `Pet #${petId}`;
+  }
+
+  function getSelectedPetId() {
+    const raw = els.recordPet?.value || '';
+    if (!raw) return null;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : null;
   }
 
   function renderTagFilters() {
@@ -1992,7 +2016,7 @@
       const data = await request(`${API_BASE}/users/${patientId}/medical-records?clinic_id=${CLINIC_ID}`);
       const records = Array.isArray(data?.data?.records) ? data.data.records : [];
       state.records.set(Number(patientId), records);
-      state.lastPostOp = extractLastPostOp(records);
+      recomputeLastPostOp();
     } catch (error) {
       lastRecordError = escapeHtml(error.message);
       state.records.set(Number(patientId), []);
@@ -2076,6 +2100,7 @@
     mapValue('follow-up-type', prescription.follow_up_type ?? '');
     mapValue('record-pet', prescription.pet_id ?? rec.pet_id ?? '');
     updateVisitCategoryUI(els.visitCategory?.value || '');
+    recomputeLastPostOp();
     medications = normalizeMedicationState(prescription.medications_json || []);
     renderMedicationCards();
     syncMedicationPayload();
@@ -2115,6 +2140,7 @@
       addMedication();
     }
     renderPetSelect(patient);
+    recomputeLastPostOp();
     if (els.doctorSelect && DEFAULT_DOCTOR_ID) {
       els.doctorSelect.value = DEFAULT_DOCTOR_ID;
     }
@@ -2185,6 +2211,9 @@
     els.addMedicineBtn?.addEventListener('click', () => addMedication());
     els.visitCategory?.addEventListener('change', (event) => {
       updateVisitCategoryUI(event.target.value);
+    });
+    els.recordPet?.addEventListener('change', () => {
+      recomputeLastPostOp();
     });
     renderFollowupContext();
 
