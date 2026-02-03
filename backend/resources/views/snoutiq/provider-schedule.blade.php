@@ -38,11 +38,11 @@
             <option value="">No doctors found for your account</option>
           @endif
         </select>
-        <div class="mt-2 text-xs text-slate-500" id="docIdNote">
+        {{-- <div class="mt-2 text-xs text-slate-500" id="docIdNote">
           @if(!empty($vetId))
             Vet session ID: {{ $vetId }}
           @endif
-        </div>
+        </div> --}}
       </div>
 
       <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm">
