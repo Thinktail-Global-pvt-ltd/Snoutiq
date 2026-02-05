@@ -7,13 +7,14 @@ use Razorpay\Api\Api;
 use Razorpay\Api\Errors\Error as RazorpayError;
 use App\Models\Payment;
 use App\Models\Transaction;
-use App\Models\Clinic;
 use App\Models\Doctor;
 use App\Models\CallSession;
 use App\Models\User;
 use App\Models\Pet;
 use Illuminate\Support\Str;
 use App\Services\WhatsAppService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PaymentController extends Controller
 {
@@ -378,23 +379,16 @@ class PaymentController extends Controller
             }
         }
 
-        try {
-            $clinic = Clinic::query()->first();
-            if ($clinic) {
-                return $clinic->id;
+        // Fallbacks only if clinics table exists
+        if (Schema::hasTable('clinics')) {
+            try {
+                $clinic = DB::table('clinics')->select('id')->first();
+                if ($clinic) {
+                    return (int) $clinic->id;
+                }
+            } catch (\Throwable $e) {
+                report($e);
             }
-
-            $clinic = Clinic::create([
-                'name' => 'General Clinic',
-                'status' => 'active',
-                'city' => 'Unknown',
-                'state' => 'Unknown',
-                'country' => 'India',
-            ]);
-
-            return $clinic->id;
-        } catch (\Throwable $e) {
-            report($e);
         }
 
         return null;
@@ -452,7 +446,11 @@ class PaymentController extends Controller
                 $clinicId = $this->resolveClinicId(request(), $notes, $context);
             }
             if ($clinicId) {
-                $clinicName = Clinic::where('id', $clinicId)->value('name');
+                $clinicName = DB::table('vet_registerations_temp')->where('id', $clinicId)->value('name');
+                // fallback to clinics table only if present
+                if (!$clinicName && Schema::hasTable('clinics')) {
+                    $clinicName = DB::table('clinics')->where('id', $clinicId)->value('name');
+                }
             }
 
             $petName = null;
