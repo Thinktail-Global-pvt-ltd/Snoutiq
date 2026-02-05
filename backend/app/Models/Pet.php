@@ -16,6 +16,9 @@ class Pet extends Model
         'pet_gender',
         'pet_type',
         'pet_dob',
+        'gender',
+        'type',
+        'dob',
         'microchip_number',
         'mcd_registration_number',
         'is_neutered',
@@ -30,6 +33,9 @@ class Pet extends Model
         'vaccination_date',
         'vaccine_reminder_status',
         'dog_disease_payload',
+        'medical_history',
+        'vaccination_log',
+        'pic_link',
     ];
 
     protected $casts = [

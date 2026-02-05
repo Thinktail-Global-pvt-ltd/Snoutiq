@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\UserProfile;
 use App\Models\UserPet;
+use App\Models\Pet;
 use App\Models\GroomerClientPet;
 use App\Models\GroomerClient;
 use App\Models\GroomerService;
@@ -303,12 +304,20 @@ public function add_pet(Request $request)
         $petData['pic_link'] = 'pet_pics/' . $imageName;
     }
 
-    // Assuming you have a Pet model
-    $pet = UserPet::create($petData);
+    // Create in pets table (canonical)
+    $pet = Pet::create(array_merge($petData, [
+        'pet_type'   => $request->type,
+        'type'       => $request->type,
+        'pet_gender' => $request->gender,
+        'gender'     => $request->gender,
+        'pet_dob'    => $request->dob,
+        'dob'        => $request->dob,
+        'pet_doc1'   => $petData['pic_link'] ?? null,
+    ]));
 
     $petData = $pet->toArray();
-    if (isset($pet->pet_pic_link)) {
-        $petData['pic_link'] = url($pet->pet_pic_link);
+    if (isset($pet->pic_link) && $pet->pic_link) {
+        $petData['pic_link'] = url($pet->pic_link);
     }
 
     return response()->json([
