@@ -43,7 +43,8 @@ class VideoCallingController extends Controller
             ], 404);
         }
 
-        $nearbyResponse = $this->buildNearbyResponse($request, 'vet');
+        // Return nearby results as individual doctors (not just clinics)
+        $nearbyResponse = $this->buildNearbyResponse($request, 'doctor');
         if ($nearbyResponse->getStatusCode() !== 200) {
             return $nearbyResponse;
         }
@@ -141,17 +142,7 @@ class VideoCallingController extends Controller
         $vetIds = $vets->pluck('id')->all();
 
         $doctors = DB::table('doctors')
-            ->select(
-                'id',
-                'vet_registeration_id',
-                'doctor_name',
-                'doctor_email',
-                'doctor_mobile',
-                'doctor_license',
-                'doctor_document',
-                'doctor_image',
-                'toggle_availability'
-            )
+            ->select('doctors.*')
             ->whereIn('vet_registeration_id', $vetIds)
             ->get();
 
@@ -298,17 +289,7 @@ class VideoCallingController extends Controller
                 $entry['clinic_id'] = $clinicId;
                 $entry['id'] = $doctor->id;
                 $entry['referral_code'] = $referralByVet[$clinicId] ?? null;
-                $entry['doctor'] = [
-                    'id' => $doctor->id,
-                    'name' => $doctor->doctor_name,
-                    'email' => $doctor->doctor_email,
-                    'mobile' => $doctor->doctor_mobile,
-                    'license' => $doctor->doctor_license,
-                    'document' => $doctor->doctor_document,
-                    'image' => $doctor->doctor_image,
-                    'toggle_availability' => $doctor->toggle_availability,
-                    'clinic_id' => $doctor->vet_registeration_id,
-                ];
+                $entry['doctor'] = (array) $doctor;
 
                 $payload->push($entry);
             }
@@ -384,15 +365,7 @@ class VideoCallingController extends Controller
         ];
 
         $doctorsData = $clinic->doctors->map(function (Doctor $doc) {
-            return [
-                'id' => $doc->id,
-                'name' => $doc->doctor_name,
-                'email' => $doc->doctor_email,
-                'phone' => $doc->doctor_mobile,
-                'license' => $doc->doctor_license,
-                'image' => $doc->doctor_image,
-                'price' => $doc->doctors_price,
-            ];
+            return $doc->toArray();
         })->values();
 
         return [
