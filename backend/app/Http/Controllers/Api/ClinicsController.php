@@ -224,6 +224,11 @@ class ClinicsController extends Controller
                 } elseif (Schema::hasColumn('pets', 'gender')) {
                     $petColumns[] = 'gender';
                 }
+                if (Schema::hasColumn('pets', 'pet_dob')) {
+                    $petColumns[] = 'pet_dob';
+                } elseif (Schema::hasColumn('pets', 'dob')) {
+                    $petColumns[] = DB::raw('dob as pet_dob');
+                }
                 if (Schema::hasColumn('pets', 'weight')) {
                     $petColumns[] = 'weight';
                 }
