@@ -517,7 +517,6 @@ public function pet_update(Request $request, $id)
             ['group' => 'user', 'column' => 'name',      'label' => 'Owner name'],
             ['group' => 'user', 'column' => 'email',     'label' => 'Email'],
             ['group' => 'user', 'column' => 'phone',     'label' => 'Phone'],
-            ['group' => 'user', 'column' => 'summary',   'label' => 'About owner'],
             ['group' => 'user', 'column' => 'latitude',  'label' => 'Latitude'],
             ['group' => 'user', 'column' => 'longitude', 'label' => 'Longitude'],
 
@@ -529,9 +528,8 @@ public function pet_update(Request $request, $id)
             ['group' => 'pet', 'column' => 'pet_age',   'label' => 'Age (years)',       'alternates' => ['pet_age_months'], 'legacy' => 'pet_age'],
             ['group' => 'pet', 'column' => 'pet_dob',   'label' => 'Date of birth',     'alternates' => ['dob']],
             ['group' => 'pet', 'column' => 'weight',    'label' => 'Weight (kg)'],
-            ['group' => 'pet', 'column' => 'vaccination_date', 'label' => 'Vaccination date', 'alternates' => ['last_vaccenated_date']],
             ['group' => 'pet', 'column' => 'pet_doc1',  'label' => 'Medical document #1', 'legacy' => 'pet_doc1'],
-            ['group' => 'pet', 'column' => 'pet_doc2',  'label' => 'Medical document #2', 'legacy' => 'pet_doc2'],
+            ['group' => 'pet', 'column' => 'dog_disease_payload', 'label' => 'Vaccination payload', 'meta' => 'vaccination'],
         ];
 
         $results = [];
@@ -582,6 +580,15 @@ public function pet_update(Request $request, $id)
                     if ($this->profileValueFilled($legacyValue)) {
                         $value = $legacyValue;
                         $usedColumn = $field['legacy'];
+                    }
+                }
+
+                // Nested meta (e.g., dog_disease_payload.vaccination)
+                if (!$this->profileValueFilled($value) && isset($field['meta'])) {
+                    $nested = data_get($petSource, "{$field['column']}.{$field['meta']}");
+                    if ($this->profileValueFilled($nested)) {
+                        $value = $nested;
+                        $usedColumn = "{$field['column']}.{$field['meta']}";
                     }
                 }
             }
