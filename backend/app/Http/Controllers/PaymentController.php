@@ -10,7 +10,10 @@ use App\Models\Transaction;
 use App\Models\Clinic;
 use App\Models\Doctor;
 use App\Models\CallSession;
+use App\Models\User;
+use App\Models\Pet;
 use Illuminate\Support\Str;
+use App\Services\WhatsAppService;
 
 class PaymentController extends Controller
 {
@@ -18,11 +21,13 @@ class PaymentController extends Controller
     private string $key;
     private string $secret;
     private array $doctorClinicCache = [];
+    private ?WhatsAppService $whatsApp = null;
 
-    public function __construct()
+    public function __construct(WhatsAppService $whatsApp)
     {
         $this->key    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_test_1nhE9190sR3rkP';
         $this->secret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'L6CPZlUwrKQpdC9N3TRX8gIh';
+        $this->whatsApp = $whatsApp;
 
 
     }
@@ -78,6 +83,15 @@ class PaymentController extends Controller
                 notes: $notes,
                 context: $context
             );
+
+            // Fire WhatsApp notification only for video consult orders (best-effort)
+            if (($notes['order_type'] ?? null) === 'video_consult') {
+                $this->notifyVideoConsultBooked(
+                    context: $context,
+                    notes: $notes,
+                    amountInInr: $amountInInr
+                );
+            }
 
             return response()->json([
                 'success'  => true,
@@ -407,6 +421,65 @@ class PaymentController extends Controller
         }
 
         return $notes;
+    }
+
+    /**
+     * Send WhatsApp notification to pet parent when a video consultation is booked.
+     * Best-effort: silently ignores failures.
+     */
+    protected function notifyVideoConsultBooked(array $context, array $notes, int $amountInInr): void
+    {
+        if (! $this->whatsApp?->isConfigured()) {
+            return;
+        }
+
+        try {
+            $user = $context['user_id'] ? User::find($context['user_id']) : null;
+            if (! $user || empty($user->phone)) {
+                return;
+            }
+
+            $doctorName = null;
+            if ($context['doctor_id']) {
+                $doctorName = Doctor::where('id', $context['doctor_id'])->value('doctor_name');
+            }
+
+            $clinicName = null;
+            $clinicId = $context['clinic_id'] ?? null;
+            if (! $clinicId) {
+                $clinicId = $this->resolveClinicId(request(), $notes, $context);
+            }
+            if ($clinicId) {
+                $clinicName = Clinic::where('id', $clinicId)->value('name');
+            }
+
+            $petName = null;
+            if ($context['pet_id']) {
+                $petName = Pet::where('id', $context['pet_id'])->value('name');
+            }
+
+            $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
+
+            $body = <<<MSG
+🐾
+Video Consultation Confirmed
+Hi {$user->name},
+Your video consultation has been successfully booked.
+󰞯
+Vet: Dr. {$doctorName}
+🏥
+Clinic: {$clinicName}
+💰
+Fee Paid: ₹{$amountInInr}
+⏱
+Expected Response Time: within {$responseMinutes} minutes
+Please keep {$petName} nearby and ensure good internet connectivity. The vet will connect with you here shortly.
+MSG;
+
+            $this->whatsApp->sendText($user->phone, $body);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     protected function resolveTransactionContext(Request $request, array $notes = []): array
