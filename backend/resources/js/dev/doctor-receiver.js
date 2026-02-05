@@ -118,19 +118,26 @@ const subscribeDoctorChannel = () => {
         channel.stopListening('.CallStatusUpdated');
     }
 
-    channel = echo.channel(`doctor.${doctorId}`)
-        .listen('.CallRequested', (e) => {
-            log('CallRequested', JSON.stringify(e));
-            updateCallUi({ ...e, status: e.status || 'ringing' });
-        })
-        .listen('.CallStatusUpdated', (e) => {
-            log('CallStatusUpdated', JSON.stringify(e));
-            updateCallUi(e);
-        })
-        .error((err) => {
-            setChannelStatus('error', false);
-            log('Channel error', JSON.stringify(err));
-        });
+channel = echo.channel(`doctor.${doctorId}`)
+    .listen('.CallRequested', (e) => {
+        log('CallRequested', JSON.stringify(e));
+        updateCallUi({ ...e, status: e.status || 'ringing' });
+    })
+    .listen('.CallStatusUpdated', (e) => {
+        log('CallStatusUpdated', JSON.stringify(e));
+        updateCallUi(e);
+
+        // Auto-disconnect on terminal states to mirror React page behavior
+        const terminalStatuses = ['ended', 'cancelled', 'missed', 'rejected'];
+        if (terminalStatuses.includes((e.status || '').toLowerCase())) {
+            log(`Call status ${e.status}; disconnecting listener`);
+            cleanupEcho();
+        }
+    })
+    .error((err) => {
+        setChannelStatus('error', false);
+        log('Channel error', JSON.stringify(err));
+    });
 
     setChannelStatus(`doctor.${doctorId}`, true);
     log('Subscribed', `doctor.${doctorId}`);

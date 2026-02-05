@@ -99,7 +99,20 @@ export default function DoctorReceiver() {
 
     ch.listen(".CallStatusUpdated", (e) => {
       push("CallStatusUpdated: " + JSON.stringify(e));
-      setIncoming((prev) => ({ ...(prev || {}), ...(e || {}) }));
+
+      setIncoming((prev) => {
+        const merged = { ...(prev || {}), ...(e || {}) };
+
+        // Auto cleanup if the call has ended/cancelled/missed/rejected
+        const terminalStatuses = ["ended", "cancelled", "missed", "rejected"];
+        if (terminalStatuses.includes((e.status || "").toLowerCase())) {
+          push(`Call status is ${e.status}; disconnecting listener`);
+          cleanup();
+        }
+
+        return merged;
+      });
+
       if (e.call_id || e.id) setCallId(String(e.call_id || e.id));
     });
 
