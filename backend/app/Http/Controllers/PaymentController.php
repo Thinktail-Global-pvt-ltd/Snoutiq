@@ -85,8 +85,9 @@ class PaymentController extends Controller
             );
 
             // Fire WhatsApp notification only for video consult orders (best-effort)
+            $whatsAppMeta = null;
             if (($notes['order_type'] ?? null) === 'video_consult') {
-                $this->notifyVideoConsultBooked(
+                $whatsAppMeta = $this->notifyVideoConsultBooked(
                     context: $context,
                     notes: $notes,
                     amountInInr: $amountInInr
@@ -98,6 +99,7 @@ class PaymentController extends Controller
                 'key'      => $this->key,
                 'order'    => $orderArr,
                 'order_id' => $orderArr['id'],
+                'whatsapp' => $whatsAppMeta,
                 'call_session' => $callSession ? [
                     'id' => $callSession->id,
                     'call_identifier' => $callSession->resolveIdentifier(),
@@ -427,16 +429,16 @@ class PaymentController extends Controller
      * Send WhatsApp notification to pet parent when a video consultation is booked.
      * Best-effort: silently ignores failures.
      */
-    protected function notifyVideoConsultBooked(array $context, array $notes, int $amountInInr): void
+    protected function notifyVideoConsultBooked(array $context, array $notes, int $amountInInr): array
     {
         if (! $this->whatsApp?->isConfigured()) {
-            return;
+            return ['sent' => false, 'reason' => 'whatsapp_not_configured'];
         }
 
         try {
             $user = $context['user_id'] ? User::find($context['user_id']) : null;
             if (! $user || empty($user->phone)) {
-                return;
+                return ['sent' => false, 'reason' => 'user_or_phone_missing'];
             }
 
             $doctorName = null;
@@ -481,8 +483,15 @@ class PaymentController extends Controller
                 $components,
                 'en'
             );
+            return [
+                'sent' => true,
+                'to' => $user->phone,
+                'template' => 'pp_video_consult_booked',
+                'language' => 'en',
+            ];
         } catch (\Throwable $e) {
             report($e);
+            return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
         }
     }
 
