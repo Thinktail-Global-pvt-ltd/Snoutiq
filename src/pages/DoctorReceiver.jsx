@@ -1,20 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import Echo from "laravel-echo";
 import Pusher from "pusher-js";
+import { apiBaseUrl } from "../lib/api";
 
 window.Pusher = Pusher;
 
 export default function DoctorReceiver() {
-  // ===== PROD/LOCAL SWITCH (NO .env) =====
-  const isProd = window.location.hostname === "snoutiq.com";
-
-  // If Laravel is at https://snoutiq.com (root), set this to "".
-  // If it's at https://snoutiq.com/backend, keep "/backend".
-  const BACKEND_PREFIX = "/backend";
-
-  const API_BASE = isProd
-    ? `${window.location.origin}${BACKEND_PREFIX}`
-    : "http://127.0.0.1:8000";
+  // ===== Single source of truth for backend base =====
+  // Uses hardcoded "/backend" helper so prod + local behave consistently.
+  const API_BASE = apiBaseUrl();
 
   // Reverb config
   const REVERB_APP_KEY = "base64:yT9RzP3vXl9lJ2pB2g==";

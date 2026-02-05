@@ -168,19 +168,12 @@
 // };
 
 import React, { useMemo, useRef, useState } from "react";
+import { apiBaseUrl } from "../lib/api";
 
 export default function CallLab() {
   // ✅ Local + Prod compatible (no .env)
-  const API_BASE = useMemo(() => {
-    const host = window.location.hostname;
-    const origin = window.location.origin;
-
-    // prod: snoutiq.com backend is mounted at /backend
-    if (host.includes("snoutiq.com")) return `${origin}/backend`;
-
-    // local backend runs at 127.0.0.1:8000
-    return "http://127.0.0.1:8000";
-  }, []);
+  // Single source of truth so prod/local stay in sync
+  const API_BASE = useMemo(() => apiBaseUrl(), []);
 
   const [patientId, setPatientId] = useState("2");
   const [doctorId, setDoctorId] = useState("1");
@@ -429,4 +422,3 @@ const logStyle = {
   minHeight: 220,
   whiteSpace: "pre-wrap",
 };
-
