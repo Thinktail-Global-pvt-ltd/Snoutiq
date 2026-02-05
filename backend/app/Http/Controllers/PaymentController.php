@@ -460,23 +460,27 @@ class PaymentController extends Controller
 
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
 
-            $body = <<<MSG
-🐾
-Video Consultation Confirmed
-Hi {$user->name},
-Your video consultation has been successfully booked.
-󰞯
-Vet: Dr. {$doctorName}
-🏥
-Clinic: {$clinicName}
-💰
-Fee Paid: ₹{$amountInInr}
-⏱
-Expected Response Time: within {$responseMinutes} minutes
-Please keep {$petName} nearby and ensure good internet connectivity. The vet will connect with you here shortly.
-MSG;
+            // Use approved template: pp_video_consult_booked (language: en)
+            $components = [
+                [
+                    'type' => 'body',
+                    'parameters' => [
+                        ['type' => 'text', 'text' => $user->name ?: 'Pet Parent'],                  // {{1}} PetParentName
+                        ['type' => 'text', 'text' => $doctorName ?: 'Doctor'],                       // {{2}} VetName
+                        ['type' => 'text', 'text' => $clinicName ?: 'Clinic'],                       // {{3}} ClinicName
+                        ['type' => 'text', 'text' => (string) $amountInInr],                         // {{4}} Amount (numbers only)
+                        ['type' => 'text', 'text' => (string) $responseMinutes],                     // {{5}} ResponseTime minutes
+                        ['type' => 'text', 'text' => $petName ?: 'your pet'],                        // {{6}} PetName
+                    ],
+                ],
+            ];
 
-            $this->whatsApp->sendText($user->phone, $body);
+            $this->whatsApp->sendTemplate(
+                $user->phone,
+                'pp_video_consult_booked',
+                $components,
+                'en'
+            );
         } catch (\Throwable $e) {
             report($e);
         }
