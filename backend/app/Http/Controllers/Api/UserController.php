@@ -20,6 +20,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 class UserController extends Controller
 {
     //
@@ -304,20 +305,12 @@ public function add_pet(Request $request)
         $petData['pic_link'] = 'pet_pics/' . $imageName;
     }
 
-    // Create in pets table (canonical)
-    $pet = Pet::create(array_merge($petData, [
-        'pet_type'   => $request->type,
-        'type'       => $request->type,
-        'pet_gender' => $request->gender,
-        'gender'     => $request->gender,
-        'pet_dob'    => $request->dob,
-        'dob'        => $request->dob,
-        'pet_doc1'   => $petData['pic_link'] ?? null,
-    ]));
+    // Assuming you have a Pet model
+    $pet = UserPet::create($petData);
 
     $petData = $pet->toArray();
-    if (isset($pet->pic_link) && $pet->pic_link) {
-        $petData['pic_link'] = url($pet->pic_link);
+    if (isset($pet->pet_pic_link)) {
+        $petData['pic_link'] = url($pet->pet_pic_link);
     }
 
     return response()->json([
@@ -462,5 +455,183 @@ public function pet_update(Request $request, $id)
                 'last_vaccenated_date' => $pet->last_vaccenated_date,
             ],
         ]);
+    }
+
+    /**
+     * GET /api/user/profile/completion
+     * Returns completion percent + missing fields using users + pets tables.
+     */
+    public function profileCompletion(Request $request)
+    {
+        $payload = $request->validate([
+            'user_id' => 'sometimes|integer|exists:users,id',
+            'pet_id'  => 'sometimes|integer',
+        ]);
+
+        // Resolve user from auth → explicit param → header/query (matches other endpoints)
+        $user = $request->user();
+        if (!$user && isset($payload['user_id'])) {
+            $user = User::find($payload['user_id']);
+        }
+        if (!$user) {
+            $fallbackId = (int) ($request->header('X-Session-User') ?? $request->query('user_id', 0));
+            $user = $fallbackId ? User::find($fallbackId) : null;
+        }
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Not authenticated. Provide user_id or login first.',
+            ], 401);
+        }
+
+        $userColumns = Schema::hasTable('users') ? Schema::getColumnListing('users') : [];
+        $hasPetsTable = Schema::hasTable('pets');
+        $petColumns = $hasPetsTable ? Schema::getColumnListing('pets') : [];
+
+        $pet = null;
+        if ($hasPetsTable) {
+            $petQuery = Pet::query()->where('user_id', $user->id);
+            if (!empty($payload['pet_id'])) {
+                $petQuery->where('id', (int) $payload['pet_id']);
+            }
+            $pet = $petQuery->orderByDesc('id')->first();
+        }
+
+        // Legacy inline pet data on users table
+        $legacyPet = (object) [
+            'name'        => $user->pet_name ?? null,
+            'pet_gender'  => $user->pet_gender ?? null,
+            'pet_age'     => $user->pet_age ?? null,
+            'breed'       => $user->breed ?? null,
+            'pet_doc1'    => $user->pet_doc1 ?? null,
+            'pet_doc2'    => $user->pet_doc2 ?? null,
+        ];
+        $legacyPetHasData = collect((array) $legacyPet)
+            ->filter(fn($v) => $this->profileValueFilled($v))
+            ->isNotEmpty();
+
+        $petSource = $pet ?: ($legacyPetHasData ? $legacyPet : null);
+
+        $fields = [
+            // User table fields
+            ['group' => 'user', 'column' => 'name',      'label' => 'Owner name'],
+            ['group' => 'user', 'column' => 'email',     'label' => 'Email'],
+            ['group' => 'user', 'column' => 'phone',     'label' => 'Phone'],
+            ['group' => 'user', 'column' => 'summary',   'label' => 'About owner'],
+            ['group' => 'user', 'column' => 'latitude',  'label' => 'Latitude'],
+            ['group' => 'user', 'column' => 'longitude', 'label' => 'Longitude'],
+
+            // Pet table fields (with fallbacks to legacy user columns)
+            ['group' => 'pet', 'column' => 'name',      'label' => 'Pet name',          'legacy' => 'pet_name'],
+            ['group' => 'pet', 'column' => 'pet_type',  'label' => 'Pet type',          'alternates' => ['type']],
+            ['group' => 'pet', 'column' => 'breed',     'label' => 'Breed',             'legacy' => 'breed'],
+            ['group' => 'pet', 'column' => 'pet_gender','label' => 'Gender',            'alternates' => ['gender'], 'legacy' => 'pet_gender'],
+            ['group' => 'pet', 'column' => 'pet_age',   'label' => 'Age (years)',       'alternates' => ['pet_age_months'], 'legacy' => 'pet_age'],
+            ['group' => 'pet', 'column' => 'pet_dob',   'label' => 'Date of birth',     'alternates' => ['dob']],
+            ['group' => 'pet', 'column' => 'weight',    'label' => 'Weight (kg)'],
+            ['group' => 'pet', 'column' => 'vaccination_date', 'label' => 'Vaccination date', 'alternates' => ['last_vaccenated_date']],
+            ['group' => 'pet', 'column' => 'pet_doc1',  'label' => 'Medical document #1', 'legacy' => 'pet_doc1'],
+            ['group' => 'pet', 'column' => 'pet_doc2',  'label' => 'Medical document #2', 'legacy' => 'pet_doc2'],
+        ];
+
+        $results = [];
+        $total = 0;
+        $filled = 0;
+
+        foreach ($fields as $field) {
+            // Skip if the base column is missing from the relevant table
+            if ($field['group'] === 'user' && !in_array($field['column'], $userColumns, true)) {
+                continue;
+            }
+            if ($field['group'] === 'pet' && !$hasPetsTable && !$legacyPetHasData) {
+                // No pets table and no legacy fallback data; nothing to evaluate
+                continue;
+            }
+
+            $value = null;
+            $usedColumn = $field['column'];
+
+            if ($field['group'] === 'user') {
+                $value = $user->{$field['column']} ?? null;
+            } else {
+                // Prefer pets table
+                if ($petSource) {
+                    // Ensure the column exists on pets table or we're using legacy object
+                    if ($pet || in_array($field['column'], $petColumns, true)) {
+                        $value = data_get($petSource, $field['column']);
+                    }
+                }
+
+                // Alternates on pets table (e.g., type/gender/dob variants)
+                if (!$this->profileValueFilled($value) && !empty($field['alternates'])) {
+                    foreach ($field['alternates'] as $alt) {
+                        if ($petSource && ($pet || in_array($alt, $petColumns, true))) {
+                            $altValue = data_get($petSource, $alt);
+                            if ($this->profileValueFilled($altValue)) {
+                                $value = $altValue;
+                                $usedColumn = $alt;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Legacy user table fallbacks
+                if (!$this->profileValueFilled($value) && isset($field['legacy'])) {
+                    $legacyValue = data_get($user, $field['legacy']);
+                    if ($this->profileValueFilled($legacyValue)) {
+                        $value = $legacyValue;
+                        $usedColumn = $field['legacy'];
+                    }
+                }
+            }
+
+            $isFilled = $this->profileValueFilled($value);
+            $results[] = [
+                'group' => $field['group'],
+                'label' => $field['label'],
+                'column' => $usedColumn,
+                'filled' => $isFilled,
+                'value' => $value,
+            ];
+
+            $total++;
+            if ($isFilled) {
+                $filled++;
+            }
+        }
+
+        $missingFields = array_values(array_filter($results, fn ($r) => !$r['filled']));
+        $filledFields  = array_values(array_filter($results, fn ($r) => $r['filled']));
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user_id' => $user->id,
+                'pet_id' => $pet?->id,
+                'fields_total' => $total,
+                'fields_filled' => $filled,
+                'fields_missing' => max(0, $total - $filled),
+                'completion_percent' => $total ? round(($filled / $total) * 100) : 0,
+                'missing_labels' => array_map(fn ($row) => $row['label'], $missingFields),
+                'missing_fields' => $missingFields,
+                'filled_fields' => $filledFields,
+            ],
+        ]);
+    }
+
+    private function profileValueFilled($value): bool
+    {
+        if ($value === null) {
+            return false;
+        }
+        if (is_string($value)) {
+            return trim($value) !== '';
+        }
+        if (is_array($value)) {
+            return count($value) > 0;
+        }
+
+        return true; // numbers, booleans, objects
     }
 }

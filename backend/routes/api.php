@@ -749,6 +749,7 @@ Route::prefix('user')->group(function () {
 
 
     
+    Route::get('/profile/completion', [UserController::class, 'profileCompletion']);
     Route::get('/profile', [UserController::class, 'profile']);
   Route::get('/my_bookings', [UserController::class, 'my_bookings']);
     Route::get('/my_booking/{id}', [UserController::class, 'my_booking']);
