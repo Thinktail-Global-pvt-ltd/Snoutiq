@@ -39,8 +39,8 @@ class SendVetResponseReminders extends Command
                 ->where('type', 'video_consult')
                 ->whereIn('status', ['pending', 'initiated', 'created', 'authorized', 'captured', 'paid', 'success', 'successful'])
                 ->whereRaw("COALESCE(JSON_EXTRACT(metadata, '$.vet_response_reminder_sent_at'), '') = ''")
-                // No time window filter: allow manual txn_id targeting or full scan
-                ;
+                ->where('created_at', '<=', $now->copy()->subMinutes(15))
+                ->where('created_at', '>=', $now->copy()->subMinutes(20));
 
             $rows = $query->limit(200)->get();
         }
