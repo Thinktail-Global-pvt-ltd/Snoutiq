@@ -84,6 +84,7 @@ Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
 Route::post('/whatsapp/broadcast/users', [WhatsAppMessageController::class, 'broadcastToUsers']);
 Route::post('/whatsapp/send/new-year', [WhatsAppMessageController::class, 'sendNewYearTemplate']);
 Route::post('/whatsapp/broadcast/new-year', [WhatsAppMessageController::class, 'broadcastNewYearTemplate']);
+Route::post('/whatsapp/vet-opened-case', [WhatsAppMessageController::class, 'vetOpenedCase']);
 
 Route::prefix('socket')->group(function () {
     Route::get('/health', [SocketServerController::class, 'health']);

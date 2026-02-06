@@ -18,6 +18,82 @@ class WhatsAppMessageController extends Controller
     {
     }
 
+    /**
+     * POST /api/whatsapp/vet-opened-case
+     * Params: user_id (required), pet_id (nullable), clinic_id (nullable), vet_name (optional override), language (optional)
+     * Sends PP_VET_OPENED_CASE template to pet parent.
+     */
+    public function vetOpenedCase(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'pet_id' => ['nullable', 'integer'],
+            'clinic_id' => ['nullable', 'integer'],
+            'vet_name' => ['nullable', 'string', 'max:255'],
+            'language' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        if (!$this->whatsApp->isConfigured()) {
+            return response()->json(['message' => 'WhatsApp credentials are not configured.'], 503);
+        }
+
+        $user = User::find($data['user_id']);
+        if (!$user || empty($user->phone)) {
+            return response()->json(['message' => 'User not found or missing phone'], 422);
+        }
+
+        // Resolve pet name
+        $petName = null;
+        if (!empty($data['pet_id'])) {
+            $petName = Pet::where('id', $data['pet_id'])->value('name');
+        }
+        if (!$petName) {
+            $petName = Pet::where('user_id', $user->id)->orderByDesc('id')->value('name');
+        }
+
+        // Resolve vet/clinic name
+        $vetName = $data['vet_name'] ?? null;
+        if (!$vetName && !empty($data['clinic_id'])) {
+            $vetName = \DB::table('vet_registerations_temp')->where('id', $data['clinic_id'])->value('name');
+        }
+        if (!$vetName) {
+            $vetName = 'Vet';
+        }
+
+        $components = [
+            [
+                'type' => 'body',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $vetName],          // {{1}} VetName
+                    ['type' => 'text', 'text' => $petName ?: 'pet'], // {{2}} PetName
+                ],
+            ],
+        ];
+
+        try {
+            $result = $this->whatsApp->sendTemplateWithResult(
+                $user->phone,
+                'pp_vet_opened_case',
+                $components,
+                $data['language'] ?? 'en'
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 502);
+        }
+
+        return response()->json([
+            'message' => 'Message queued for delivery.',
+            'data' => [
+                'to' => $user->phone,
+                'type' => 'template',
+                'template' => 'pp_vet_opened_case',
+                'message_id' => $result['messages'][0]['id'] ?? null,
+                'vet_name' => $vetName,
+                'pet_name' => $petName,
+            ],
+        ]);
+    }
+
     public function send(Request $request): JsonResponse
     {
         $data = $request->validate([
