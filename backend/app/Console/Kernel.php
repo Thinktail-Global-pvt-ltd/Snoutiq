@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Console;
 
 use App\Console\Commands\DispatchConsultationReminders;
+use App\Console\Commands\ExpireCallSessions;
 use App\Console\Commands\SendVaccineReminders;
+use App\Console\Commands\SendVetResponseReminders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use Illuminate\Support\Facades\Log;
@@ -15,6 +17,8 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         DispatchConsultationReminders::class,
         SendVaccineReminders::class,
+        ExpireCallSessions::class,
+        SendVetResponseReminders::class,
     ];
 
     protected function schedule(Schedule $schedule): void
@@ -91,9 +95,18 @@ class Kernel extends ConsoleKernel
             ->everyMinute()
             ->withoutOverlapping();
 
+        $schedule->command('notifications:vet-response-reminders')
+            ->everyMinute()
+            ->withoutOverlapping();
+
         $schedule->command('vaccines:send-reminders')
             ->everyMinute()
             ->withoutOverlapping();
+
+        $schedule->command('socket:expire-calls')
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->onOneServer();
     }
 
     protected function commands(): void
