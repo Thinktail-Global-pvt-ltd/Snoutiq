@@ -10,7 +10,7 @@ use Illuminate\Support\Carbon;
 
 class SendVetResponseReminders extends Command
 {
-    protected $signature = 'notifications:vet-response-reminders';
+    protected $signature = 'notifications:vet-response-reminders {--txn_id=}';
     protected $description = 'Send WhatsApp reminders to pet parents when vet has not opened the video consult case in time.';
 
     public function __construct(private readonly WhatsAppService $whatsApp)
@@ -27,18 +27,28 @@ class SendVetResponseReminders extends Command
             return self::SUCCESS;
         }
 
-        $query = Transaction::query()
-            ->where('type', 'video_consult')
-            ->whereIn('status', ['pending', 'initiated', 'created', 'authorized', 'captured', 'paid', 'success', 'successful'])
-            ->whereRaw("COALESCE(JSON_EXTRACT(metadata, '$.vet_response_reminder_sent_at'), '') = ''")
-            ->where('created_at', '<=', $now->copy()->subMinutes(3))
-            ->where('created_at', '>=', $now->copy()->subMinutes(20)); // safety window
+        $forceTxnId = $this->option('txn_id');
 
-        $rows = $query->limit(200)->get();
+        if ($forceTxnId) {
+            $rows = Transaction::query()
+                ->where('id', (int) $forceTxnId)
+                ->limit(1)
+                ->get();
+        } else {
+            $query = Transaction::query()
+                ->where('type', 'video_consult')
+                ->whereIn('status', ['pending', 'initiated', 'created', 'authorized', 'captured', 'paid', 'success', 'successful'])
+                ->whereRaw("COALESCE(JSON_EXTRACT(metadata, '$.vet_response_reminder_sent_at'), '') = ''")
+                ->where('created_at', '<=', $now->copy()->subMinutes(3))
+                ->where('created_at', '>=', $now->copy()->subMinutes(20)); // safety window
+
+            $rows = $query->limit(200)->get();
+        }
 
         Log::info('vet_response.reminder.run_start', [
             'candidates' => $rows->count(),
             'at' => $now->toDateTimeString(),
+            'forced_txn_id' => $forceTxnId ?? null,
         ]);
 
         $sent = 0;
