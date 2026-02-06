@@ -4,6 +4,7 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use App\Models\VetRegisterationTemp;
 use Illuminate\Support\Str;
+use App\Console\Commands\SendVetResponseReminders;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -44,3 +45,8 @@ Artisan::command('vet:backfill-slugs {--dry}', function () {
 
     $this->info("Processed: {$total}, Updated: {$updated}, Skipped: {$skipped}");
 })->purpose('Backfill slug from email prefix for VetRegisterationTemp rows with null name');
+
+// Explicit registration to guarantee availability in all environments (scheduler + manual)
+Artisan::command('notifications:vet-response-reminders', function () {
+    return app(SendVetResponseReminders::class)->handle();
+})->describe('Send WhatsApp reminders to pet parents when vet has not opened video consult case.');
