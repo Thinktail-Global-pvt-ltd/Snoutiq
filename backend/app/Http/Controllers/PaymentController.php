@@ -560,19 +560,40 @@ class PaymentController extends Controller
                 ],
             ];
 
-            $this->whatsApp->sendTemplate(
-                $doctor->doctor_mobile,
+            // Try configured + common template name variants to avoid translation-name mismatch
+            $templateCandidates = array_values(array_filter([
+                config('services.whatsapp.templates.vet_new_video_consult') ?? null,
+                'VET_NEW_VIDEO_CONSULT',
                 'vet_new_video_consult',
-                $components,
-                'en'
-            );
+            ]));
 
-            return [
-                'sent' => true,
-                'to' => $doctor->doctor_mobile,
-                'template' => 'vet_new_video_consult',
-                'language' => 'en',
-            ];
+            $lastError = null;
+            foreach ($templateCandidates as $tpl) {
+                try {
+                    $this->whatsApp->sendTemplate(
+                        $doctor->doctor_mobile,
+                        $tpl,
+                        $components,
+                        'en'
+                    );
+
+                    return [
+                        'sent' => true,
+                        'to' => $doctor->doctor_mobile,
+                        'template' => $tpl,
+                        'language' => 'en',
+                    ];
+                } catch (\RuntimeException $ex) {
+                    $lastError = $ex->getMessage();
+                    // try next template candidate
+                }
+            }
+
+            if ($lastError) {
+                throw new \RuntimeException($lastError);
+            }
+
+            // Should not reach
         } catch (\Throwable $e) {
             report($e);
             return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
