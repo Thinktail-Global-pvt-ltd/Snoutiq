@@ -34,4 +34,9 @@ class MedicalRecord extends Model
     {
         return $this->belongsTo(VetRegisterationTemp::class, 'vet_registeration_id');
     }
+
+    public function reminderLogs()
+    {
+        return $this->hasMany(VetResponseReminderLog::class, 'meta->record_id', 'id');
+    }
 }
