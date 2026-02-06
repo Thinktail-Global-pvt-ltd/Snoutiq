@@ -94,6 +94,104 @@ class WhatsAppMessageController extends Controller
         ]);
     }
 
+    /**
+     * POST /api/whatsapp/vet-video-consult-test
+     * Send VET_NEW_VIDEO_CONSULT (or provided template) to an arbitrary number for debugging.
+     * Body:
+     *  - mobile_number (required)
+     *  - pet_name, species, age_text, parent_name, issue, amount, response_minutes (all optional; sensible defaults)
+     *  - template_name (optional, default VET_NEW_VIDEO_CONSULT then vet_new_video_consult)
+     *  - language (optional, default en)
+     */
+    public function vetVideoConsultTest(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'mobile_number' => ['required', 'string', 'max:20'],
+            'pet_name' => ['nullable', 'string', 'max:255'],
+            'species' => ['nullable', 'string', 'max:255'],
+            'age_text' => ['nullable', 'string', 'max:255'],
+            'parent_name' => ['nullable', 'string', 'max:255'],
+            'issue' => ['nullable', 'string', 'max:500'],
+            'amount' => ['nullable', 'string', 'max:50'],
+            'response_minutes' => ['nullable', 'integer', 'min:1', 'max:240'],
+            'template_name' => ['nullable', 'string', 'max:255'],
+            'language' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        if (!$this->whatsApp->isConfigured()) {
+            return response()->json(['message' => 'WhatsApp credentials are not configured.'], 503);
+        }
+
+        $petName = $data['pet_name'] ?? 'Pet';
+        $species = $data['species'] ?? 'Pet';
+        $ageText = $data['age_text'] ?? '-';
+        $parentName = $data['parent_name'] ?? 'Pet Parent';
+        $issue = $data['issue'] ?? 'Video consult';
+        $amount = $data['amount'] ?? '0';
+        $responseMinutes = (string) ($data['response_minutes'] ?? 20);
+
+        $components = [
+            [
+                'type' => 'body',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $petName],          // {{1}}
+                    ['type' => 'text', 'text' => $species],          // {{2}}
+                    ['type' => 'text', 'text' => $ageText],          // {{3}}
+                    ['type' => 'text', 'text' => $parentName],       // {{4}}
+                    ['type' => 'text', 'text' => $issue],            // {{5}}
+                    ['type' => 'text', 'text' => $amount],           // {{6}}
+                    ['type' => 'text', 'text' => $responseMinutes],  // {{7}}
+                ],
+            ],
+        ];
+
+        $templateCandidates = array_values(array_filter([
+            $data['template_name'] ?? null,
+            config('services.whatsapp.templates.vet_new_video_consult') ?? null,
+            'VET_NEW_VIDEO_CONSULT',
+            'vet_new_video_consult',
+        ]));
+
+        $languageCandidates = array_values(array_filter([
+            $data['language'] ?? null,
+            config('services.whatsapp.templates.vet_new_video_consult_language') ?? null,
+            'en_US',
+            'en_GB',
+            'en',
+        ]));
+
+        $lastError = null;
+        foreach ($templateCandidates as $tpl) {
+            foreach ($languageCandidates as $lang) {
+                try {
+                    $result = $this->whatsApp->sendTemplateWithResult(
+                        $data['mobile_number'],
+                        $tpl,
+                        $components,
+                        $lang
+                    );
+
+                    return response()->json([
+                        'message' => 'Message queued for delivery.',
+                        'data' => [
+                            'to' => $data['mobile_number'],
+                            'template' => $tpl,
+                            'language' => $lang,
+                            'message_id' => $result['messages'][0]['id'] ?? null,
+                        ],
+                    ]);
+                } catch (\RuntimeException $ex) {
+                    $lastError = $ex->getMessage();
+                }
+            }
+        }
+
+        return response()->json([
+            'message' => 'Failed to send after trying all templates/languages.',
+            'error' => $lastError,
+        ], 502);
+    }
+
     public function send(Request $request): JsonResponse
     {
         $data = $request->validate([
