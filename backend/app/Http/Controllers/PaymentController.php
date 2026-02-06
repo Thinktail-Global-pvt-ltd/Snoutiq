@@ -570,27 +570,36 @@ class PaymentController extends Controller
                 'vet_new_video_consult',
             ]));
 
-            $language = $notes['vet_template_language'] ?? 'en';
+            // language fallbacks: provided -> config -> en_US -> en_GB -> en
+            $languageCandidates = array_values(array_filter([
+                $notes['vet_template_language'] ?? null,
+                config('services.whatsapp.templates.vet_new_video_consult_language') ?? null,
+                'en_US',
+                'en_GB',
+                'en',
+            ]));
 
             $lastError = null;
             foreach ($templateCandidates as $tpl) {
-                try {
-                    $this->whatsApp->sendTemplate(
-                        $doctor->doctor_mobile,
-                        $tpl,
-                        $components,
-                        $language
-                    );
+                foreach ($languageCandidates as $lang) {
+                    try {
+                        $this->whatsApp->sendTemplate(
+                            $doctor->doctor_mobile,
+                            $tpl,
+                            $components,
+                            $lang
+                        );
 
-                    return [
-                        'sent' => true,
-                        'to' => $doctor->doctor_mobile,
-                        'template' => $tpl,
-                        'language' => $language,
-                    ];
-                } catch (\RuntimeException $ex) {
-                    $lastError = $ex->getMessage();
-                    // try next template candidate
+                        return [
+                            'sent' => true,
+                            'to' => $doctor->doctor_mobile,
+                            'template' => $tpl,
+                            'language' => $lang,
+                        ];
+                    } catch (\RuntimeException $ex) {
+                        $lastError = $ex->getMessage();
+                        // try next language/template combo
+                    }
                 }
             }
 
