@@ -7,6 +7,7 @@ use App\Services\WhatsAppService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class SendVetResponseReminders extends Command
 {
@@ -59,6 +60,7 @@ class SendVetResponseReminders extends Command
 
             if (! $phone) {
                 Log::warning('vet_response.reminder.skip_no_phone', ['txn_id' => $txn->id, 'user_id' => $txn->user_id]);
+                $this->logReminder($txn, 'skipped_no_phone', null, null, null, 'user phone missing');
                 $this->markSent($txn, $now, 'skipped_no_phone');
                 continue;
             }
@@ -88,6 +90,7 @@ class SendVetResponseReminders extends Command
                     try {
                         $this->whatsApp->sendTemplate($phone, $tpl, $components, $lang);
                         $sentThis = true;
+                        $this->logReminder($txn, 'sent', $tpl, $lang, $phone, null);
                         break 2;
                     } catch (\RuntimeException $ex) {
                         $lastError = $ex->getMessage();
@@ -109,6 +112,7 @@ class SendVetResponseReminders extends Command
                     'txn_id' => $txn->id,
                     'error' => $lastError,
                 ]);
+                $this->logReminder($txn, 'failed', $templateCandidates[0] ?? null, $languageCandidates[0] ?? null, $phone, $lastError);
                 $this->markSent($txn, $now, 'failed');
             }
         }
@@ -128,5 +132,29 @@ class SendVetResponseReminders extends Command
         $meta['vet_response_reminder_status'] = $status;
         $txn->metadata = $meta;
         $txn->save();
+    }
+
+    private function logReminder(Transaction $txn, string $status, ?string $template, ?string $language, ?string $phone, ?string $error): void
+    {
+        try {
+            DB::table('vet_response_reminder_logs')->insert([
+                'transaction_id' => $txn->id,
+                'user_id' => $txn->user_id,
+                'pet_id' => $txn->pet_id,
+                'phone' => $phone,
+                'template' => $template,
+                'language' => $language,
+                'status' => $status,
+                'error' => $error,
+                'meta' => json_encode([
+                    'amount_paise' => $txn->amount_paise,
+                    'created_at' => optional($txn->created_at)->toIso8601String(),
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('vet_response.reminder.log_failed', ['txn_id' => $txn->id, 'error' => $e->getMessage()]);
+        }
     }
 }
