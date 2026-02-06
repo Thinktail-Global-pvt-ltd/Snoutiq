@@ -36,6 +36,11 @@ class AppointmentReminderService
             '30m' => ['threshold' => 30, 'appointments' => []],
         ];
 
+        Log::info('Reminder run started', [
+            'appointments_to_check' => $appointments->count(),
+            'at' => $now->toDateTimeString(),
+        ]);
+
         foreach ($appointments as $appointment) {
             $startTime = $this->resolveStartTime($appointment);
             if (! $startTime) {
@@ -61,6 +66,17 @@ class AppointmentReminderService
             }
         }
 
+        Log::info('Reminder run finished', [
+            'dispatched' => $count,
+            'at' => now()->toDateTimeString(),
+        ]);
+
+        Log::info('Reminder buckets summary', [
+            '24h' => count($buckets['24h']['appointments']),
+            '3h' => count($buckets['3h']['appointments']),
+            '30m' => count($buckets['30m']['appointments']),
+        ]);
+
         return $count;
     }
 
@@ -80,6 +96,11 @@ class AppointmentReminderService
     {
         $field = $reminder['field'];
         if ($appointment->{$field}) {
+            Log::debug("Reminder already sent", [
+                'appointment_id' => $appointment->id,
+                'field' => $field,
+                'sent_at' => $appointment->{$field},
+            ]);
             return 0;
         }
 
@@ -98,6 +119,11 @@ class AppointmentReminderService
 
         $userId = $this->resolvePatientUserId($appointment);
         if (! $userId) {
+            Log::warning("Cannot send reminder: patient_user_id not found", [
+                'appointment_id' => $appointment->id,
+                'field' => $field,
+                'notes' => $appointment->notes,
+            ]);
             return 0;
         }
 
@@ -119,7 +145,14 @@ class AppointmentReminderService
             ->values()
             ->all();
 
-        if (empty($tokens)) return 0;
+        if (empty($tokens)) {
+            Log::warning('Reminder push skipped; no tokens', [
+                'appointment_id' => $appointment->id,
+                'field' => $field,
+                'user_id' => $userId,
+            ]);
+            return 0;
+        }
 
         $label = $reminder['label'];
 
@@ -152,6 +185,15 @@ class AppointmentReminderService
                 ];
             }
         }
+
+        Log::info('Reminder push results', [
+            'appointment_id' => $appointment->id,
+            'field' => $field,
+            'user_id' => $userId,
+            'token_count' => count($tokens),
+            'success' => $success,
+            'errors' => $errors,
+        ]);
 
         if ($success <= 0) {
             return 0;
