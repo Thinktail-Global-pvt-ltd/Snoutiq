@@ -5,10 +5,12 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Support\Facades\Log;
 use App\Console\Commands\SendVaccineReminders;
+use App\Console\Commands\SendVetResponseReminders;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         SendVaccineReminders::class,
+        SendVetResponseReminders::class,
     ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
@@ -45,6 +47,10 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         $schedule->command('notifications:consult-reminders')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command('notifications:vet-response-reminders')
             ->everyMinute()
             ->withoutOverlapping();
 
