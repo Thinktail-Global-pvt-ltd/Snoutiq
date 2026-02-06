@@ -412,6 +412,8 @@ class PaymentController extends Controller
             'doctor_id' => ['doctor_id', 'doctorId'],
             'user_id' => ['user_id', 'userId', 'patient_id', 'patientId'],
             'pet_id' => ['pet_id', 'petId'],
+            'vet_template' => ['vet_template', 'vetTemplate', 'vet_template_name'],
+            'vet_template_language' => ['vet_template_language', 'vetTemplateLanguage'],
         ];
 
         foreach ($mapping as $noteKey => $keys) {
@@ -560,12 +562,15 @@ class PaymentController extends Controller
                 ],
             ];
 
-            // Try configured + common template name variants to avoid translation-name mismatch
+            // Try provided + configured + common template name variants to avoid translation-name mismatch
             $templateCandidates = array_values(array_filter([
+                $notes['vet_template'] ?? null,
                 config('services.whatsapp.templates.vet_new_video_consult') ?? null,
                 'VET_NEW_VIDEO_CONSULT',
                 'vet_new_video_consult',
             ]));
+
+            $language = $notes['vet_template_language'] ?? 'en';
 
             $lastError = null;
             foreach ($templateCandidates as $tpl) {
@@ -574,14 +579,14 @@ class PaymentController extends Controller
                         $doctor->doctor_mobile,
                         $tpl,
                         $components,
-                        'en'
+                        $language
                     );
 
                     return [
                         'sent' => true,
                         'to' => $doctor->doctor_mobile,
                         'template' => $tpl,
-                        'language' => 'en',
+                        'language' => $language,
                     ];
                 } catch (\RuntimeException $ex) {
                     $lastError = $ex->getMessage();
