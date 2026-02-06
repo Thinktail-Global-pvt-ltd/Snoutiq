@@ -87,8 +87,14 @@ class PaymentController extends Controller
 
             // Fire WhatsApp notification only for video consult orders (best-effort)
             $whatsAppMeta = null;
+            $vetWhatsAppMeta = null;
             if (($notes['order_type'] ?? null) === 'video_consult') {
                 $whatsAppMeta = $this->notifyVideoConsultBooked(
+                    context: $context,
+                    notes: $notes,
+                    amountInInr: $amountInInr
+                );
+                $vetWhatsAppMeta = $this->notifyVetVideoConsultBooked(
                     context: $context,
                     notes: $notes,
                     amountInInr: $amountInInr
@@ -101,6 +107,7 @@ class PaymentController extends Controller
                 'order'    => $orderArr,
                 'order_id' => $orderArr['id'],
                 'whatsapp' => $whatsAppMeta,
+                'vet_whatsapp' => $vetWhatsAppMeta,
                 'call_session' => $callSession ? [
                     'id' => $callSession->id,
                     'call_identifier' => $callSession->resolveIdentifier(),
@@ -485,6 +492,85 @@ class PaymentController extends Controller
                 'sent' => true,
                 'to' => $user->phone,
                 'template' => 'pp_video_consult_booked',
+                'language' => 'en',
+            ];
+        } catch (\Throwable $e) {
+            report($e);
+            return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Send WhatsApp to the vet for video consult bookings.
+     */
+    protected function notifyVetVideoConsultBooked(array $context, array $notes, int $amountInInr): array
+    {
+        if (! $this->whatsApp?->isConfigured()) {
+            return ['sent' => false, 'reason' => 'whatsapp_not_configured'];
+        }
+
+        try {
+            $doctorId = $context['doctor_id'] ?? null;
+            if (! $doctorId) {
+                return ['sent' => false, 'reason' => 'doctor_missing'];
+            }
+
+            $doctor = Doctor::find($doctorId);
+            if (! $doctor || empty($doctor->doctor_mobile)) {
+                return ['sent' => false, 'reason' => 'doctor_phone_missing'];
+            }
+
+            $user = $context['user_id'] ? User::find($context['user_id']) : null;
+            $pet = $context['pet_id'] ? Pet::find($context['pet_id']) : null;
+
+            $petName = $pet?->name ?? 'Pet';
+            $species = $pet?->pet_type ?? $pet?->type ?? 'Pet';
+
+            $ageText = null;
+            if ($pet?->pet_age !== null) {
+                $ageText = $pet->pet_age . ' yrs';
+            } elseif ($pet?->pet_age_months !== null) {
+                $ageText = $pet->pet_age_months . ' months';
+            } elseif ($pet?->pet_dob) {
+                try {
+                    $months = \Carbon\Carbon::parse($pet->pet_dob)->diffInMonths(now());
+                    $ageText = $months >= 12 ? floor($months/12).' yrs' : $months.' months';
+                } catch (\Throwable $e) {
+                    $ageText = null;
+                }
+            }
+            $ageText = $ageText ?: '-';
+
+            $parentName = $user?->name ?? 'Pet Parent';
+            $issue = $notes['summary'] ?? $notes['reason'] ?? $notes['concern'] ?? 'Video consult';
+            $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 20));
+
+            $components = [
+                [
+                    'type' => 'body',
+                    'parameters' => [
+                        ['type' => 'text', 'text' => $petName],                 // {{1}} PetName
+                        ['type' => 'text', 'text' => $species],                 // {{2}} Species
+                        ['type' => 'text', 'text' => $ageText],                 // {{3}} Age
+                        ['type' => 'text', 'text' => $parentName],              // {{4}} PetParentName
+                        ['type' => 'text', 'text' => $issue],                   // {{5}} ShortIssueSummary
+                        ['type' => 'text', 'text' => (string) $amountInInr],    // {{6}} Amount
+                        ['type' => 'text', 'text' => (string) $responseMinutes] // {{7}} ResponseTime minutes
+                    ],
+                ],
+            ];
+
+            $this->whatsApp->sendTemplate(
+                $doctor->doctor_mobile,
+                'vet_new_video_consult',
+                $components,
+                'en'
+            );
+
+            return [
+                'sent' => true,
+                'to' => $doctor->doctor_mobile,
+                'template' => 'vet_new_video_consult',
                 'language' => 'en',
             ];
         } catch (\Throwable $e) {
