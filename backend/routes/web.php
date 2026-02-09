@@ -3,6 +3,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -163,6 +164,25 @@ Route::post('/dev/consult-reminders', [SchedulerTestController::class, 'dispatch
 Route::get('/dev/socket-tester', [SocketTesterController::class, 'index'])->name('dev.socket-tester');
 Route::get('/dev/socket-doctor', [SocketTesterController::class, 'doctor'])->name('dev.socket-doctor');
 Route::get('/dev/socket-patient', [SocketTesterController::class, 'patient'])->name('dev.socket-patient');
+
+// Quick trigger for dummy vet form migration (dev only)
+Route::match(['get', 'post'], '/dev/migrate-dummy-vets', function (Request $request) {
+    $options = [
+        '--chunk' => $request->input('chunk', 200),
+        '--limit' => $request->input('limit'),
+    ];
+    if ($request->boolean('dry_run')) {
+        $options['--dry-run'] = true;
+    }
+
+    $exitCode = Artisan::call('data:migrate-dummy-vets', array_filter($options, fn ($v) => $v !== null));
+
+    return response()->json([
+        'status' => 'ok',
+        'exit_code' => $exitCode,
+        'output' => Artisan::output(),
+    ]);
+})->name('dev.migrate-dummy-vets');
 
 // Marketing notifications
 Route::get('/marketing/notifications', [MarketingNotificationController::class, 'index'])->name('marketing.notifications');

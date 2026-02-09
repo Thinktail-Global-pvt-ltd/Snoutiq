@@ -6,6 +6,7 @@ namespace App\Console;
 
 use App\Console\Commands\DispatchConsultationReminders;
 use App\Console\Commands\ExpireCallSessions;
+use App\Console\Commands\MigrateDummyVetFormResponses;
 use App\Console\Commands\SendVaccineReminders;
 use App\Console\Commands\SendVetResponseReminders;
 use App\Console\Commands\SendMedicalRecordCreatedReminders;
@@ -21,6 +22,7 @@ class Kernel extends ConsoleKernel
         DispatchConsultationReminders::class,
         SendVaccineReminders::class,
         ExpireCallSessions::class,
+        MigrateDummyVetFormResponses::class,
         SendVetResponseReminders::class,
         SendMedicalRecordCreatedReminders::class,
         SendUserCreatedReminders::class,
