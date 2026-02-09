@@ -50,6 +50,7 @@ use App\Models\LegacyQrRedirect;
 use App\Services\OnboardingProgressService;
 use App\Http\Controllers\Api\CsvUploadController;
 use App\Http\Controllers\Admin\VetUserConnectionReportPageController;
+use App\Http\Controllers\Admin\VetClinicConnectionsExportController;
 use App\Http\Controllers\ClinicWebsiteContentController;
 
 
@@ -113,6 +114,8 @@ Route::get('/vet-pet-connections', [VetPetConnectionsPageController::class, 'ind
 Route::get('/vet-pet-connections/{vet}', [VetPetConnectionsPageController::class, 'details'])
     ->whereNumber('vet')
     ->name('vet-pet-connections.details');
+Route::get('/vet-clinic-connections/export', [VetClinicConnectionsExportController::class, 'export'])
+    ->name('vet-clinic-connections.export');
 
 Route::middleware([EnsureSalesAuthenticated::class])->group(function () {
     Route::get('/sales', [SalesCrmController::class, 'index'])->name('sales.crm');
