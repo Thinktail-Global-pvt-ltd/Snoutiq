@@ -18,7 +18,6 @@ import {
   ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import logo from "../assets/images/logo.webp";
-import { AuthContext } from "../auth/AuthContext";
 
 const navItems = [
   // {
@@ -113,7 +112,6 @@ const Header = React.memo(function Header() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useContext(AuthContext);
   const userDropdownRef = useRef(null);
 
   useEffect(() => {
@@ -286,7 +284,7 @@ const Header = React.memo(function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <Link
-              to={user ? "/dashboard" : "/"}
+              to={"/"}
               className="flex items-center space-x-3 group"
             >
               <img
@@ -358,8 +356,6 @@ const Header = React.memo(function Header() {
             </div>
 
             <div className="hidden lg:flex items-center space-x-4">
-              {!user ? (
-                <>
                   <button
                     onClick={handleLogin}
                     className="px-6 py-2.5 text-sm font-semibold text-gray-700 hover:text-blue-600 transition-all duration-200 rounded-lg hover:bg-gray-50"
@@ -372,69 +368,6 @@ const Header = React.memo(function Header() {
                   >
                     Get Started
                   </button>
-                </>
-              ) : (
-                <div className="flex items-center space-x-4">
-                  <div className="relative" ref={userDropdownRef}>
-                    <button
-                      onClick={() => setIsUserDropdownOpen((prev) => !prev)}
-                      className="flex items-center space-x-3 bg-white rounded-xl px-4 py-2.5 shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200"
-                      aria-haspopup="true"
-                      aria-expanded={isUserDropdownOpen}
-                    >
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center shadow-md">
-                        <UserIcon className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="flex flex-col items-start">
-                        <span className="text-sm font-semibold text-gray-800">
-                          {user?.name || "User"}
-                        </span>
-                        <span className="text-xs text-gray-500">Pet Owner</span>
-                      </div>
-                      <ChevronDownIcon
-                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
-                          isUserDropdownOpen ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
-
-                    <AnimatePresence>
-                      {isUserDropdownOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                          className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50"
-                          role="menu"
-                        >
-                          <button
-                            onClick={handleDashboard}
-                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200"
-                          >
-                            <HomeIcon className="w-4 h-4 mr-3" />
-                            Dashboard
-                          </button>
-                          <button
-                            onClick={handlePetInfo}
-                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200"
-                          >
-                            <HeartIcon className="w-4 h-4 mr-3" />
-                            My Pets
-                          </button>
-                          <div className="border-t border-gray-100 my-1" />
-                          <button
-                            onClick={handleLogout}
-                            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-all duration-200"
-                          >
-                            <ArrowRightOnRectangleIcon className="w-4 h-4 mr-3" />
-                            Logout
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              )}
             </div>
 
             <button
@@ -517,8 +450,6 @@ const Header = React.memo(function Header() {
                 ))}
 
                 <div className="pt-4 space-y-3 border-t border-gray-200">
-                  {!user ? (
-                    <>
                       <button
                         onClick={() => {
                           handleLogin();
@@ -537,41 +468,6 @@ const Header = React.memo(function Header() {
                       >
                         Get Started
                       </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          handleDashboard();
-                          setIsOpen(false);
-                        }}
-                        className="flex items-center w-full py-3 px-4 text-gray-700 font-medium border border-gray-300 rounded-xl hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
-                      >
-                        <HomeIcon className="w-5 h-5 mr-3" />
-                        Dashboard
-                      </button>
-                      <button
-                        onClick={() => {
-                          handlePetInfo();
-                          setIsOpen(false);
-                        }}
-                        className="flex items-center w-full py-3 px-4 text-gray-700 font-medium border border-gray-300 rounded-xl hover:border-blue-500 hover:text-blue-600 transition-all duration-200"
-                      >
-                        <HeartIcon className="w-5 h-5 mr-3" />
-                        My Pets
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleLogout();
-                          setIsOpen(false);
-                        }}
-                        className="flex items-center w-full py-3 px-4 text-red-600 font-medium border border-red-200 rounded-xl hover:border-red-500 hover:bg-red-50 transition-all duration-200"
-                      >
-                        <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" />
-                        Logout
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
             </motion.div>
