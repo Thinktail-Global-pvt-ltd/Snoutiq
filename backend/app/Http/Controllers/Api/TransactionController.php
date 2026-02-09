@@ -26,6 +26,7 @@ class TransactionController extends Controller
                 'user' => fn ($q) => $q->select('id', 'name'),
                 'user.deviceTokens:id,user_id,token',
                 'pet:id,name',
+                'doctor:id,doctor_name',
             ])
             ->orderByDesc('id')
             ->limit($limit)
@@ -55,6 +56,7 @@ class TransactionController extends Controller
             return [
                 'id' => $tx->id,
                 'user_id' => $tx->user_id,
+                'doctor_id' => $tx->doctor_id,
                 'amount_paise' => $tx->amount_paise,
                 'status' => $tx->status,
                 'type' => $tx->type,
@@ -63,6 +65,7 @@ class TransactionController extends Controller
                 'created_at' => optional($tx->created_at)->toIso8601String(),
                 'updated_at' => optional($tx->updated_at)->toIso8601String(),
                 'user_name' => $user->name ?? null,
+                'doctor_name' => $tx->doctor->doctor_name ?? null,
                 'device_tokens' => $deviceTokens,
                 'pet' => $pet ? [
                     'id' => $pet->id,
