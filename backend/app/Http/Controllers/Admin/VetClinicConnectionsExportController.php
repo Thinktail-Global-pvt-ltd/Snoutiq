@@ -29,7 +29,6 @@ class VetClinicConnectionsExportController extends Controller
                 'u.name as user_name',
                 'u.email as user_email',
                 'u.phone as user_phone',
-                'u.role as user_role',
                 'u.updated_at as user_updated_at',
             ])
             ->orderBy('v.id')
@@ -57,7 +56,6 @@ class VetClinicConnectionsExportController extends Controller
                 'User Name',
                 'User Email',
                 'User Phone',
-                'User Role',
                 'User Updated At',
                 'Pet Count',
                 'Pet Details',
@@ -84,7 +82,6 @@ class VetClinicConnectionsExportController extends Controller
                     $row->user_name,
                     $row->user_email,
                     $row->user_phone,
-                    $row->user_role,
                     $formatDate($row->user_updated_at),
                     $petMeta['count'],
                     $petMeta['summary'],
@@ -188,4 +185,3 @@ class VetClinicConnectionsExportController extends Controller
         return null;
     }
 }
-
