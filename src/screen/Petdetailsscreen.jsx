@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { SYMPTOMS, SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
-import { Header, ProgressBar } from "../components/SharedComponents";
+import { Header, ProgressBar } from "../components/Sharedcomponents";
 import { CheckCircle2, Upload, Star } from "lucide-react";
 
 const PetDetailsScreen = ({ onSubmit, onBack }) => {
