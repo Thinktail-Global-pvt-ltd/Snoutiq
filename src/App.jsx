@@ -99,7 +99,7 @@ import BestDogFoodForGoldenRetrievers from "./blog/BestDogFoodForGoldenRetriever
 import GoldenRetrieverVaccinationScheduleIndia from "./blog/GoldenRetrieverVaccinationScheduleIndia";
 import WhyWinterGroomingIsImportantForCats from "./blog/WhyWinterGroomingIsImportantForCats";
 import HomePage from "./components/Home";
-import DoctorRegister from "./pages/DoctorRegister";
+import DoctorRegistration from "./components/DoctorRegistration";
 
 function App() {
   return (
@@ -141,7 +141,7 @@ function App() {
             <Route path="/terms-of-service" element={<TearmsCondition />} />
             <Route path="/cancellation-policy" element={<Cancelation />} />
             <Route path="/cookie-policy" element={<CookiePolicy />} />
-            <Route path="/vet-register" element={<DoctorRegister />} />
+            <Route path="/vet-register" element={<DoctorRegistration />} />
             <Route
               path="/medical-data-consent"
               element={<MedicalDataConsent />}
