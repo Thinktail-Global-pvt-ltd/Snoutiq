@@ -39,15 +39,15 @@ export const Header = ({ onBack, title }) => (
   </div>
 );
 
-export const ProgressBar = ({ current, total }) => (
+export const ProgressBar = ({ current = 1, total = 3 }) => (
   <div className="flex gap-2 mb-6 px-1 md:px-0 md:mb-10 md:gap-3">
     {Array.from({ length: total }).map((_, i) => (
       <div
         key={i}
         className={`
           h-1.5 rounded-full flex-1 transition-all duration-500
-          md:h-2 "
-          ${i < current ? "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600" : "bg-stone-200"}
+          md:h-2
+          ${i < current ? "bg-gradient-to-r from-blue-600 to-blue-500" : "bg-stone-200"}
         `}
       />
     ))}
