@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\MedicalRecord;
 use App\Models\User;
+use App\Models\Pet;
 use App\Models\VetRegisterationTemp;
 use App\Services\WhatsAppService;
 use Illuminate\Console\Command;
@@ -37,7 +38,6 @@ class SendMedicalRecordCreatedReminders extends Command
             ->when(! $forcedId, fn($q) => $q->whereBetween('created_at', [$windowStart, $windowEnd]))
             ->whereNotNull('doctor_id')
             ->whereNotNull('vet_registeration_id')
-            ->whereNotNull('pet_id')
             ->whereNotNull('user_id')
             ->whereDoesntHave('reminderLogs')
             ->limit(200)
@@ -53,7 +53,9 @@ class SendMedicalRecordCreatedReminders extends Command
         foreach ($records as $record) {
             $user = User::find($record->user_id);
             $phone = $user?->phone;
-            $petName = $record->pet?->name ?? 'your pet';
+            $petName = $record->pet?->name
+                ?? Pet::where('user_id', $record->user_id)->orderByDesc('id')->value('name')
+                ?? 'your pet';
             $doctorName = $record->doctor?->doctor_name ?? null;
             $clinicName = VetRegisterationTemp::where('id', $record->vet_registeration_id)->value('name');
 
