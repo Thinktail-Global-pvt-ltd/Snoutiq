@@ -19,6 +19,38 @@ class WhatsAppMessageController extends Controller
     }
 
     /**
+     * POST /api/whatsapp/temp-send
+     * Body: { "mobile_number": "...", "message": "..." }
+     * Sends a plain text WhatsApp to the given number (temporary/debug).
+     */
+    public function tempSend(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'mobile_number' => ['required', 'string', 'max:20'],
+            'message' => ['required', 'string', 'max:1000'],
+        ]);
+
+        if (! $this->whatsApp->isConfigured()) {
+            return response()->json(['message' => 'WhatsApp credentials are not configured.'], 503);
+        }
+
+        try {
+            $result = $this->whatsApp->sendTextWithResult($data['mobile_number'], $data['message']);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 502);
+        }
+
+        return response()->json([
+            'message' => 'Message queued for delivery.',
+            'data' => [
+                'to' => $data['mobile_number'],
+                'type' => 'text',
+                'message_id' => $result['messages'][0]['id'] ?? null,
+            ],
+        ]);
+    }
+
+    /**
      * POST /api/whatsapp/vet-opened-case
      * Params: user_id (required), pet_id (nullable), clinic_id (nullable), vet_name (optional override), language (optional)
      * Sends PP_VET_OPENED_CASE template to pet parent.

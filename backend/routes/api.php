@@ -81,6 +81,7 @@ Route::post('/error-logs', [ErrorLogController::class, 'store'])->name('api.erro
 Route::post('/documents/upload', [DocumentUploadController::class, 'store'])->name('api.documents.upload');
 Route::get('/users/{userId}/document-uploads', [DocumentUploadController::class, 'index'])->name('api.documents.index');
 Route::post('/whatsapp/send', [WhatsAppMessageController::class, 'send']);
+Route::post('/whatsapp/temp-send', [WhatsAppMessageController::class, 'tempSend']);
 Route::post('/whatsapp/broadcast/users', [WhatsAppMessageController::class, 'broadcastToUsers']);
 Route::post('/whatsapp/send/new-year', [WhatsAppMessageController::class, 'sendNewYearTemplate']);
 Route::post('/whatsapp/broadcast/new-year', [WhatsAppMessageController::class, 'broadcastNewYearTemplate']);
