@@ -7,6 +7,7 @@ use App\Models\VetRegisterationTemp;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Hash;
 
 class MigrateDummyVetFormResponses extends Command
 {
@@ -96,6 +97,7 @@ class MigrateDummyVetFormResponses extends Command
             $vet->name = $name;
             $vet->email = $email;
             $vet->mobile = $mobile;
+            $this->setVetPassword($vet);
             $vet->save();
             $counters['vets_created']++;
         } else {
@@ -118,10 +120,13 @@ class MigrateDummyVetFormResponses extends Command
             }
         }
 
-        if (property_exists($row, 'exported_from_excell') && $row->exported_from_excell) {
-            $vet->exported_from_excell = $this->clean($row->exported_from_excell);
-            $vet->save();
+        // Always mark imported rows as coming from excel dump
+        if (Schema::hasColumn('vet_registerations_temp', 'exported_from_excell')) {
+            $vet->exported_from_excell = 1;
         }
+
+        $this->setVetPassword($vet, false);
+        $vet->save();
 
         return $vet;
     }
@@ -151,6 +156,7 @@ class MigrateDummyVetFormResponses extends Command
             $doctor->doctor_name = $name;
             $doctor->doctor_email = $email;
             $doctor->doctor_mobile = $mobile;
+            $this->setDoctorPassword($doctor);
             $counters['doctors_created']++;
         } else {
             $counters['doctors_updated']++;
@@ -174,7 +180,7 @@ class MigrateDummyVetFormResponses extends Command
             'break_do_not_disturb_time_example_2_4_pm' => $row->break_do_not_disturb_time_example_2_4_pm ?? null,
             'do_you_offer_a_free_follow_up_within_3_days_after_a_consulta' => $row->do_you_offer_a_free_follow_up_within_3_days_after_a_consulta ?? null,
             'commission_and_agreement' => $row->commission_and_agreement ?? null,
-            'exported_from_excell' => $row->exported_from_excell ?? null,
+            'exported_from_excell' => 1,
         ];
 
         foreach ($map as $field => $value) {
@@ -192,6 +198,8 @@ class MigrateDummyVetFormResponses extends Command
         if ($videoNight !== null) {
             $doctor->video_night_rate = $videoNight;
         }
+
+        $this->setDoctorPassword($doctor, false);
     }
 
     private function clean($value): ?string
@@ -209,6 +217,37 @@ class MigrateDummyVetFormResponses extends Command
         }
         $clean = preg_replace('/[^\d.]/', '', (string) $value);
         return $clean === '' ? null : round((float) $clean, 2);
+    }
+
+    private function setVetPassword(VetRegisterationTemp $vet, bool $onlyWhenMissing = true): void
+    {
+        if (! Schema::hasColumn('vet_registerations_temp', 'password')) {
+            return;
+        }
+        if ($onlyWhenMissing && $vet->password) {
+            return;
+        }
+        $vet->password = '123456';
+    }
+
+    private function setDoctorPassword(Doctor $doctor, bool $onlyWhenMissing = true): void
+    {
+        $hasPassword = Schema::hasColumn('doctors', 'password');
+        $hasDoctorPassword = Schema::hasColumn('doctors', 'doctor_password');
+
+        if (! $hasPassword && ! $hasDoctorPassword) {
+            return;
+        }
+
+        $targetPassword = '123456';
+
+        if ($hasPassword && (! $onlyWhenMissing || empty($doctor->password))) {
+            $doctor->password = $targetPassword;
+        }
+
+        if ($hasDoctorPassword && (! $onlyWhenMissing || empty($doctor->doctor_password))) {
+            $doctor->doctor_password = $targetPassword;
+        }
     }
 
     private function formatRowPreview(object $row): string
