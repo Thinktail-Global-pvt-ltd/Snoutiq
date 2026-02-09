@@ -146,6 +146,7 @@ function App() {
               path="/medical-data-consent"
               element={<MedicalDataConsent />}
             />
+            
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
             {/* <Route path="/patient-dashboard" element={<PatientDashboard />} /> */}
             {/* <Route
