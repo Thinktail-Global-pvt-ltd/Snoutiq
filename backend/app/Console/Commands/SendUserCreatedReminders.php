@@ -33,16 +33,22 @@ class SendUserCreatedReminders extends Command
         $windowStart = $now->copy()->subHours(3);
         $windowEnd   = $now->copy()->subHours(2);
 
-        $users = User::query()
-            ->when($forcedUserId, fn($q) => $q->where('id', (int) $forcedUserId))
-            ->when(! $forcedUserId, fn($q) => $q->whereBetween('created_at', [$windowStart, $windowEnd]))
-            ->whereNotNull('phone')
-            ->where('phone', '!=', '')
-            ->whereDoesntHave('reminderLogs', function ($q) {
-                $q->whereJsonContains('meta->type', 'pp_user_created');
-            })
-            ->limit(200)
-            ->get();
+        if ($forcedUserId) {
+            $users = User::query()
+                ->where('id', (int) $forcedUserId)
+                ->limit(1)
+                ->get();
+        } else {
+            $users = User::query()
+                ->whereBetween('created_at', [$windowStart, $windowEnd])
+                ->whereNotNull('phone')
+                ->where('phone', '!=', '')
+                ->whereDoesntHave('reminderLogs', function ($q) {
+                    $q->whereJsonContains('meta->type', 'pp_user_created');
+                })
+                ->limit(200)
+                ->get();
+        }
 
         Log::info('pp_user_created.run_start', [
             'candidates' => $users->count(),
