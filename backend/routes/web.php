@@ -182,7 +182,9 @@ Route::match(['get', 'post'], '/dev/migrate-dummy-vets', function (Request $requ
         'exit_code' => $exitCode,
         'output' => Artisan::output(),
     ]);
-})->name('dev.migrate-dummy-vets');
+})
+    ->name('dev.migrate-dummy-vets')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 // Marketing notifications
 Route::get('/marketing/notifications', [MarketingNotificationController::class, 'index'])->name('marketing.notifications');
