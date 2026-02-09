@@ -30,38 +30,23 @@ class SendUserContinuityReminders extends Command
         $forcedUserId = $this->option('user_id');
 
         if ($forcedUserId) {
-            // For manual testing, bypass 24h/log prerequisites
+            // For manual testing, bypass timing/log prerequisites
             $users = User::where('id', (int) $forcedUserId)->get();
         } else {
-            // Find users who received template 1 at least 24h ago and haven't received continuity
-            $eligibleUsers = DB::table('vet_response_reminder_logs')
-                ->select('user_id', DB::raw("MIN(created_at) as first_sent_at"))
-                ->where('status', 'sent')
-                ->whereRaw("JSON_EXTRACT(meta, '$.type') = 'pp_user_created'")
-                ->groupBy('user_id')
-                ->havingRaw('first_sent_at <= ?', [$now->copy()->subHours(24)])
-                ->pluck('first_sent_at', 'user_id');
+            // Auto: users whose created_at is ~24h ago and who haven't received continuity yet
+            $windowCenter = $now->copy()->subHours(24);
+            $windowStart  = $windowCenter->copy()->subMinutes(10);
+            $windowEnd    = $windowCenter->copy()->addMinutes(10);
 
-            if ($eligibleUsers->isEmpty()) {
-                Log::info('pp_user_continuity.run_start', [
-                    'candidates' => 0,
-                    'at' => $now->toDateTimeString(),
-                    'forced_user_id' => $forcedUserId,
-                ]);
-                Log::info('pp_user_continuity.run_finish', ['sent' => 0, 'at' => now()->toDateTimeString()]);
-                return self::SUCCESS;
-            }
-
-            // Exclude users who already got continuity
-            $alreadySent = DB::table('vet_response_reminder_logs')
-                ->select('user_id')
-                ->whereRaw("JSON_EXTRACT(meta, '$.type') = 'pp_user_continuity'")
-                ->where('status', 'sent')
-                ->pluck('user_id')
-                ->all();
-
-            $userIds = $eligibleUsers->keys()->diff($alreadySent)->values();
-            $users = User::whereIn('id', $userIds)->get();
+            $users = User::query()
+                ->whereBetween('created_at', [$windowStart, $windowEnd])
+                ->whereNotNull('phone')
+                ->where('phone', '!=', '')
+                ->whereDoesntHave('reminderLogs', function ($q) {
+                    $q->whereJsonContains('meta->type', 'pp_user_continuity');
+                })
+                ->limit(200)
+                ->get();
         }
 
         Log::info('pp_user_continuity.run_start', [
