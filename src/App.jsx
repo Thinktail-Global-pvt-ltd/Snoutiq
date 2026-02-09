@@ -8,34 +8,6 @@ import {
 import { Toaster } from "react-hot-toast";
 import { FaPaw } from "react-icons/fa";
 
-import CallLab from "./pages/CallLab";
-import DoctorReceiver from "./pages/DoctorReceiver";
-
-// Public pages
-const PrivacyPolicy = lazy(() => import("./policies/PrivacyPolicy"));
-const TearmsCondition = lazy(() => import("./policies/TearmsCondition"));
-const Cancelation = lazy(() => import("./policies/Cancelation"));
-const CookiePolicy = lazy(() => import("./policies/CookiePolicy"));
-const MedicalDataConsent = lazy(() => import("./policies/MedicalDataConsent"));
-const ShippingPolicy = lazy(() => import("./policies/ShippingPolicy"));
-// const RegisterPetOwner = lazy(() => import("./pages/RegisterPetOwner"));
-const DoctorDashboard = lazy(() => import("./pages/DoctorDashboard"));
-const CallTestPage = lazy(() => import("./pages/CallTestPage"));
-const CallRecordingDemo = lazy(() => import("./pages/CallRecordingDemo"));
-const PatientCallTest = lazy(() => import("./pages/PatientCallTest"));
-const DoctorReceiverTest = lazy(() => import("./pages/DoctorReceiverTest"));
-
-// Core app pages
-const Home = lazy(() => import("./pages/Home"));
-// import Home from "./pages/Home";
-
-const Support = lazy(() => import("./pages/Support"));
-
-const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
-const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
-const CsvUploadPage = lazy(() => import("./pages/CsvUploadPage"));
-// App.js mein yeh component replace karo:
-
 const ScrollToTopAndHash = () => {
   const { pathname, hash } = useLocation();
 
@@ -70,36 +42,76 @@ const ScrollToTopAndHash = () => {
   return null;
 };
 
-import Blog from "./blog/Blog";
-import DogWinterCareGuide from "./blog/DogWinterCareGuide";
-import TickFeverGuide from "./blog/TickFeverGuide";
-import PetPawProtecteGuide from "./blog/PetPawProtecteGuide";
-// import PricingPage from "./pages/PricingPage";
-import DelhiPage from "./pages/DelhiPage";
-import GurugramPage from "./pages/GurugramPage";
-import ClinicsSolutionPage from "./pages/ClinicsSolutionPage";
-// import FeaturesPage from "./pages/FeaturesPage";
-// import VideoConsultPage from "./pages/VideoConsultPage";
-import AITriagePage from "./pages/AITriagePage";
-import FirstAidEvery from "./blog/FirstAidEvery";
-import BoostYourDog from "./blog/BoostYourDog";
-import VaccinationSchedule from "./blog/VaccinationSchedule";
-import BestFoodForDog from "./blog/BestFoodForDog";
-import HowVetsGrow from "./blog/HowVetsGrow";
-import RegisterAsAnOnlineVet from "./blog/RegisterAsAnOnlineVet";
-import OnlineVetConsultation from "./blog/OnlineVetConsultation";
-import VetsIncreaseMonthlyRevenue from "./blog/VetsIncreaseMonthlyRevenue";
-import TopFriendlyDogBreeds from "./blog/TopFriendlyDogBreeds";
-import BestCatBreedsInIndia from "./blog/BestCatBreedsInIndia";
-import CatVaccinationScheduleIndia from "./blog/CatVaccinationScheduleIndia";
-import CatsDiseasesAndSymptoms from "./blog/CatsDiseasesAndSymptoms";
-import BestCatFoodInIndia from "./blog/BestCatFoodInIndia";
-import FoodsGoldenRetrieversShouldNeverEat from "./blog/FoodsGoldenRetrieversShouldNeverEat";
-import BestDogFoodForGoldenRetrievers from "./blog/BestDogFoodForGoldenRetrievers";
-import GoldenRetrieverVaccinationScheduleIndia from "./blog/GoldenRetrieverVaccinationScheduleIndia";
-import WhyWinterGroomingIsImportantForCats from "./blog/WhyWinterGroomingIsImportantForCats";
-import HomePage from "./components/Home";
-import DoctorRegistration from "./components/DoctorRegistration";
+// ✅ Core / Call pages (were direct imports)
+const CallLab = lazy(() => import("./pages/CallLab"));
+const DoctorReceiver = lazy(() => import("./pages/DoctorReceiver"));
+
+// ✅ Public pages
+const PrivacyPolicy = lazy(() => import("./policies/PrivacyPolicy"));
+const TearmsCondition = lazy(() => import("./policies/TearmsCondition"));
+const Cancelation = lazy(() => import("./policies/Cancelation"));
+const CookiePolicy = lazy(() => import("./policies/CookiePolicy"));
+const MedicalDataConsent = lazy(() => import("./policies/MedicalDataConsent"));
+const ShippingPolicy = lazy(() => import("./policies/ShippingPolicy"));
+
+// ✅ App pages
+const DoctorDashboard = lazy(() => import("./pages/DoctorDashboard"));
+const CallTestPage = lazy(() => import("./pages/CallTestPage"));
+const CallRecordingDemo = lazy(() => import("./pages/CallRecordingDemo"));
+const PatientCallTest = lazy(() => import("./pages/PatientCallTest"));
+const DoctorReceiverTest = lazy(() => import("./pages/DoctorReceiverTest"));
+const Home = lazy(() => import("./pages/Home"));
+const Support = lazy(() => import("./pages/Support"));
+const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
+const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
+const CsvUploadPage = lazy(() => import("./pages/CsvUploadPage"));
+
+// ✅ Blog (were direct imports — heavy)
+const Blog = lazy(() => import("./blog/Blog"));
+const DogWinterCareGuide = lazy(() => import("./blog/DogWinterCareGuide"));
+const TickFeverGuide = lazy(() => import("./blog/TickFeverGuide"));
+const PetPawProtecteGuide = lazy(() => import("./blog/PetPawProtecteGuide"));
+const FirstAidEvery = lazy(() => import("./blog/FirstAidEvery"));
+const BoostYourDog = lazy(() => import("./blog/BoostYourDog"));
+const VaccinationSchedule = lazy(() => import("./blog/VaccinationSchedule"));
+const BestFoodForDog = lazy(() => import("./blog/BestFoodForDog"));
+const HowVetsGrow = lazy(() => import("./blog/HowVetsGrow"));
+const RegisterAsAnOnlineVet = lazy(() => import("./blog/RegisterAsAnOnlineVet"));
+const OnlineVetConsultation = lazy(() => import("./blog/OnlineVetConsultation"));
+const VetsIncreaseMonthlyRevenue = lazy(() =>
+  import("./blog/VetsIncreaseMonthlyRevenue")
+);
+const TopFriendlyDogBreeds = lazy(() => import("./blog/TopFriendlyDogBreeds"));
+const BestCatBreedsInIndia = lazy(() => import("./blog/BestCatBreedsInIndia"));
+const CatVaccinationScheduleIndia = lazy(() =>
+  import("./blog/CatVaccinationScheduleIndia")
+);
+const CatsDiseasesAndSymptoms = lazy(() =>
+  import("./blog/CatsDiseasesAndSymptoms")
+);
+const BestCatFoodInIndia = lazy(() => import("./blog/BestCatFoodInIndia"));
+const FoodsGoldenRetrieversShouldNeverEat = lazy(() =>
+  import("./blog/FoodsGoldenRetrieversShouldNeverEat")
+);
+const BestDogFoodForGoldenRetrievers = lazy(() =>
+  import("./blog/BestDogFoodForGoldenRetrievers")
+);
+const GoldenRetrieverVaccinationScheduleIndia = lazy(() =>
+  import("./blog/GoldenRetrieverVaccinationScheduleIndia")
+);
+const WhyWinterGroomingIsImportantForCats = lazy(() =>
+  import("./blog/WhyWinterGroomingIsImportantForCats")
+);
+
+// ✅ Other pages/components that were direct imports
+const DelhiPage = lazy(() => import("./pages/DelhiPage"));
+const GurugramPage = lazy(() => import("./pages/GurugramPage"));
+const ClinicsSolutionPage = lazy(() => import("./pages/ClinicsSolutionPage"));
+const AITriagePage = lazy(() => import("./pages/AITriagePage"));
+
+const HomePage = lazy(() => import("./components/Home"));
+const DoctorRegistration = lazy(() => import("./components/DoctorRegistration"));
+
 
 function App() {
   return (
@@ -146,7 +158,7 @@ function App() {
               path="/medical-data-consent"
               element={<MedicalDataConsent />}
             />
-            
+
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
             {/* <Route path="/patient-dashboard" element={<PatientDashboard />} /> */}
             {/* <Route

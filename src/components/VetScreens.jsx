@@ -14,6 +14,7 @@ import {
   History,
   Lock,
 } from "lucide-react";
+import logo from "../assets/images/logo.png";
 
 /**
  * Mobile UI SAME.
@@ -70,8 +71,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
         <div className="flex-1 px-6 py-8 flex flex-col justify-center max-w-sm mx-auto w-full md:max-w-2xl md:px-0 md:py-16">
           <div className="text-center mb-8 md:mb-10">
             <div className="w-16 h-16 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center mx-auto mb-4 md:w-24 md:h-24">
-              <Stethoscope size={32} className="md:hidden" />
-              <Stethoscope size={42} className="hidden md:block" />
+              <img src={logo} alt="SnoutIQ Logo" className="w-8 md:w-16" />
             </div>
             <h2 className="text-2xl font-bold text-stone-800 md:text-4xl">
               Welcome, Doctor
