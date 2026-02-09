@@ -64,12 +64,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Pet parent records-created reminder (medical records)
         $schedule->command('notifications:pp-records-created')
-            ->everyFiveMinutes()
+            ->everyMinute()
             ->withoutOverlapping();
 
         // Pet parent user-created reminder (2h after user is created)
         $schedule->command('notifications:pp-user-created')
-            ->everyFiveMinutes()
+            ->everyMinute()
             ->withoutOverlapping();
 
         // Weather fetch every 4 hours
