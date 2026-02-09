@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { VETS } from "../../constants";
 import { Button } from "../components/Button";
-import { Header, ProgressBar } from "../components/SharedComponents";
+import { Header, ProgressBar } from "../components/Sharedcomponents";
 import { Clock, Award, Star, Sparkles, Zap, SlidersHorizontal } from "lucide-react";
 
 const VetsScreen = ({ petDetails, onSelect, onBack }) => {

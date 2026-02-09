@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "../components/Button";
-import { Header, ProgressBar } from "../components/SharedComponents";
+import { Header, ProgressBar } from "../components/Sharedcomponents";
 import {
   ShieldCheck,
   ArrowRight,
