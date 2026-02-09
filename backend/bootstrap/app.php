@@ -62,6 +62,16 @@ return Application::configure(basePath: dirname(__DIR__))
             ->everyMinute()
             ->withoutOverlapping();
 
+        // Pet parent records-created reminder (medical records)
+        $schedule->command('notifications:pp-records-created')
+            ->everyFiveMinutes()
+            ->withoutOverlapping();
+
+        // Pet parent user-created reminder (2h after user is created)
+        $schedule->command('notifications:pp-user-created')
+            ->everyFiveMinutes()
+            ->withoutOverlapping();
+
         // Weather fetch every 4 hours
         $schedule->command('weather:fetch 28.6139 77.2090')->everyFourHours();
     })
