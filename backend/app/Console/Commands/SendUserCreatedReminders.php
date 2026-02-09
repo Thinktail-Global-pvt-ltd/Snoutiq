@@ -82,20 +82,13 @@ class SendUserCreatedReminders extends Command
                 continue;
             }
 
+            // Body params only; template has static URL button.
             $components = [
                 [
                     'type' => 'body',
                     'parameters' => [
                         ['type' => 'text', 'text' => $doctorName], // {{1}}
                         ['type' => 'text', 'text' => $petName],    // {{2}}
-                    ],
-                ],
-                [
-                    'type' => 'button',
-                    'sub_type' => 'url',
-                    'index' => '0',
-                    'parameters' => [
-                        ['type' => 'text', 'text' => 'https://play.google.com/store/apps/details?id=com.petai.snoutiq'],
                     ],
                 ],
             ];
@@ -105,7 +98,12 @@ class SendUserCreatedReminders extends Command
                 'SNQ_PP_RECORDS_CREATED',
                 'snq_pp_records_created',
             ]));
-            $languages = ['en_US', 'en_GB', 'en'];
+            $languages = array_values(array_filter([
+                config('services.whatsapp.templates.snq_pp_records_created_language') ?? null,
+                'en_US',
+                'en_GB',
+                'en',
+            ]));
 
             $ok = false; $last = null; $tplUsed = null; $langUsed = null;
             foreach ($templates as $tpl) {
