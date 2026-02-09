@@ -9,6 +9,7 @@ use App\Console\Commands\ExpireCallSessions;
 use App\Console\Commands\SendVaccineReminders;
 use App\Console\Commands\SendVetResponseReminders;
 use App\Console\Commands\SendMedicalRecordCreatedReminders;
+use App\Console\Commands\SendUserCreatedReminders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +22,7 @@ class Kernel extends ConsoleKernel
         ExpireCallSessions::class,
         SendVetResponseReminders::class,
         SendMedicalRecordCreatedReminders::class,
+        SendUserCreatedReminders::class,
     ];
 
     protected function schedule(Schedule $schedule): void
@@ -102,6 +104,10 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping();
 
         $schedule->command('notifications:pp-records-created')
+            ->everyFiveMinutes()
+            ->withoutOverlapping();
+
+        $schedule->command('notifications:pp-user-created')
             ->everyFiveMinutes()
             ->withoutOverlapping();
 

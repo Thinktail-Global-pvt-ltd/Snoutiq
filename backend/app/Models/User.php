@@ -47,4 +47,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Pet::class);
     }
+
+    public function reminderLogs(): HasMany
+    {
+        return $this->hasMany(\App\Models\VetResponseReminderLog::class);
+    }
 }
