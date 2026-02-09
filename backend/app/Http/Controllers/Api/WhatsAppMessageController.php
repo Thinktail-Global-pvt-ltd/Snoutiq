@@ -19,6 +19,66 @@ class WhatsAppMessageController extends Controller
     }
 
     /**
+     * POST /api/whatsapp/template-test
+     * Body: {
+     *   "mobile_number": "91xxxxxxxxxx",
+     *   "template_name": "SNQ_PP_RECORDS_CREATED",
+     *   "language": "en",
+     *   "params": ["Doctor Name", "Pet Name"] // ordered body params
+     * }
+     * Sends a template with simple text body parameters (no button params).
+     */
+    public function templateTest(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'mobile_number' => ['required', 'string', 'max:20'],
+            'template_name' => ['required', 'string', 'max:255'],
+            'language' => ['nullable', 'string', 'max:10'],
+            'params' => ['nullable', 'array'],
+            'params.*' => ['nullable', 'string'],
+        ]);
+
+        if (! $this->whatsApp->isConfigured()) {
+            return response()->json(['message' => 'WhatsApp credentials are not configured.'], 503);
+        }
+
+        $components = [];
+        if (!empty($data['params'])) {
+            $components[] = [
+                'type' => 'body',
+                'parameters' => collect($data['params'])
+                    ->map(fn($p) => ['type' => 'text', 'text' => (string) $p])
+                    ->values()
+                    ->all(),
+            ];
+        }
+
+        try {
+            $result = $this->whatsApp->sendTemplateWithResult(
+                $data['mobile_number'],
+                $data['template_name'],
+                $components,
+                $data['language'] ?? 'en'
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'message' => 'Message queued for delivery.',
+            'data' => [
+                'to' => $data['mobile_number'],
+                'type' => 'template',
+                'template' => $data['template_name'],
+                'language' => $data['language'] ?? 'en',
+                'message_id' => $result['messages'][0]['id'] ?? null,
+            ],
+        ]);
+    }
+
+    /**
      * POST /api/whatsapp/temp-send
      * Body: { "mobile_number": "...", "message": "..." }
      * Sends a plain text WhatsApp to the given number (temporary/debug).
