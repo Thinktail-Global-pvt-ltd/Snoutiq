@@ -76,7 +76,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Pet parent continuity reminder (+24h after template 1)
         $schedule->command('notifications:pp-user-continuity')
-            ->everyFiveMinutes()
+            ->everyMinute()
             ->withoutOverlapping();
 
         // Weather fetch every 4 hours
