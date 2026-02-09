@@ -8,6 +8,7 @@ use App\Console\Commands\SendVaccineReminders;
 use App\Console\Commands\SendVetResponseReminders;
 use App\Console\Commands\SendMedicalRecordCreatedReminders;
 use App\Console\Commands\SendUserCreatedReminders;
+use App\Console\Commands\SendUserContinuityReminders;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SendVetResponseReminders::class,
         SendMedicalRecordCreatedReminders::class,
         SendUserCreatedReminders::class,
+        SendUserContinuityReminders::class,
     ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
@@ -70,6 +72,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Pet parent user-created reminder (2h after user is created)
         $schedule->command('notifications:pp-user-created')
             ->everyMinute()
+            ->withoutOverlapping();
+
+        // Pet parent continuity reminder (+24h after template 1)
+        $schedule->command('notifications:pp-user-continuity')
+            ->everyFiveMinutes()
             ->withoutOverlapping();
 
         // Weather fetch every 4 hours
