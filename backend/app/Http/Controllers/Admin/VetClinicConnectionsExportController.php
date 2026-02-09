@@ -31,6 +31,7 @@ class VetClinicConnectionsExportController extends Controller
                 'u.phone as user_phone',
                 'u.updated_at as user_updated_at',
             ])
+            ->whereNotIn('v.id', [123, 81])
             ->orderBy('v.id')
             ->orderBy('u.id')
             ->get();
