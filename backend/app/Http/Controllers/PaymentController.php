@@ -105,6 +105,11 @@ class PaymentController extends Controller
                     notes: $notes,
                     amountInInr: $amountInInr
                 );
+                $vetWhatsAppMeta = $this->notifyVetExcelExportCampaignAssigned(
+                    context: $context,
+                    notes: $notes,
+                    amountInInr: $amountInInr
+                );
             }
 
             return response()->json([
@@ -569,6 +574,87 @@ class PaymentController extends Controller
                 'sent' => true,
                 'to' => $user->phone,
                 'template' => 'pp_booking_confirmed',
+                'language' => 'en',
+            ];
+        } catch (\Throwable $e) {
+            report($e);
+            return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Send WhatsApp to the assigned vet for Excel export campaign orders.
+     */
+    protected function notifyVetExcelExportCampaignAssigned(array $context, array $notes, int $amountInInr): array
+    {
+        if (! $this->whatsApp?->isConfigured()) {
+            return ['sent' => false, 'reason' => 'whatsapp_not_configured'];
+        }
+
+        try {
+            $doctorId = $context['doctor_id'] ?? null;
+            if (! $doctorId) {
+                return ['sent' => false, 'reason' => 'doctor_missing'];
+            }
+
+            $doctor = Doctor::find($doctorId);
+            if (! $doctor || empty($doctor->doctor_mobile)) {
+                return ['sent' => false, 'reason' => 'doctor_phone_missing'];
+            }
+
+            $user = $context['user_id'] ? User::find($context['user_id']) : null;
+            $pet = $context['pet_id'] ? Pet::find($context['pet_id']) : null;
+
+            $petName = $pet?->name ?? 'Pet';
+            $petType = $pet?->pet_type ?? $pet?->type ?? $pet?->breed ?? 'Pet';
+            $parentName = $user?->name ?? 'Pet Parent';
+            $parentPhone = $user?->phone ?? 'N/A';
+
+            $issue = $notes['issue'] ?? $notes['concern'] ?? $pet?->reported_symptom ?? 'N/A';
+
+            $mediaString = $notes['media_attached'] ?? $notes['media'] ?? $notes['files'] ?? null;
+            if ($mediaString === null) {
+                $mediaString = 'None';
+            }
+
+            $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
+
+            // Template: vet_new_consultation_assigned (language: en)
+            // {{1}} Vet name
+            // {{2}} Pet name
+            // {{3}} Pet type/breed
+            // {{4}} Pet parent name
+            // {{5}} WhatsApp number
+            // {{6}} Issue/concern
+            // {{7}} Media attached (string)
+            // {{8}} Response time
+            $components = [
+                [
+                    'type' => 'body',
+                    'parameters' => [
+                        ['type' => 'text', 'text' => $doctor->doctor_name ?: 'Doctor'], // {{1}}
+                        ['type' => 'text', 'text' => $petName],                         // {{2}}
+                        ['type' => 'text', 'text' => $petType],                         // {{3}}
+                        ['type' => 'text', 'text' => $parentName],                      // {{4}}
+                        ['type' => 'text', 'text' => $parentPhone],                     // {{5}}
+                        ['type' => 'text', 'text' => $issue],                           // {{6}}
+                        ['type' => 'text', 'text' => $mediaString],                     // {{7}}
+                        ['type' => 'text', 'text' => (string) $responseMinutes],        // {{8}}
+                    ],
+                ],
+            ];
+
+            $this->whatsApp->sendTemplate(
+                $doctor->doctor_mobile,
+                'vet_new_consultation_assigned',
+                $components,
+                'en'
+            );
+
+            return [
+                'sent' => true,
+                'to' => $doctor->doctor_mobile,
+                'template' => 'vet_new_consultation_assigned',
                 'language' => 'en',
             ];
         } catch (\Throwable $e) {
