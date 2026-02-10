@@ -469,8 +469,18 @@ Route::get('/excell-export/transactions', function (Request $request) {
         })
         ->with([
             'user:id,name,phone,email',
-            'pet:id,user_id,name,breed,pet_type,type,pet_dob,dob,reported_symptom,pet_doc1,pet_doc2',
             'doctor:id,doctor_name,doctor_email,doctor_mobile',
+            'pet' => function ($q) {
+                $cols = ['id', 'user_id', 'name', 'breed'];
+                if (Schema::hasColumn('pets', 'pet_type')) { $cols[] = 'pet_type'; }
+                if (Schema::hasColumn('pets', 'type')) { $cols[] = 'type'; }
+                if (Schema::hasColumn('pets', 'pet_dob')) { $cols[] = 'pet_dob'; }
+                if (Schema::hasColumn('pets', 'dob')) { $cols[] = 'dob'; }
+                if (Schema::hasColumn('pets', 'reported_symptom')) { $cols[] = 'reported_symptom'; }
+                if (Schema::hasColumn('pets', 'pet_doc1')) { $cols[] = 'pet_doc1'; }
+                if (Schema::hasColumn('pets', 'pet_doc2')) { $cols[] = 'pet_doc2'; }
+                $q->select($cols);
+            },
         ])
         ->orderByDesc('id')
         ->limit(200)
