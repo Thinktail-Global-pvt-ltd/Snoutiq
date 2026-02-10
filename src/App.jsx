@@ -65,6 +65,8 @@ const Support = lazy(() => import("./pages/Support"));
 const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
 const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
 const CsvUploadPage = lazy(() => import("./pages/CsvUploadPage"));
+const Auth = lazy(() => import("./pages/Auth"));
+const VetDashboard = lazy(() => import("./pages/VetDashboard"));
 
 // ✅ Blog (were direct imports — heavy)
 const Blog = lazy(() => import("./blog/Blog"));
@@ -111,6 +113,7 @@ const AITriagePage = lazy(() => import("./pages/AITriagePage"));
 
 const HomePage = lazy(() => import("./components/Home"));
 const DoctorRegistration = lazy(() => import("./components/DoctorRegistration"));
+const ConsultationBooked = lazy(() => import("./pages/ConsultationBooked"));
 
 
 function App() {
@@ -142,6 +145,8 @@ function App() {
           <Routes>
             {/* Home page - will redirect authenticated users to dashboard */}
             <Route path="/" element={<HomePage />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/vet-dashboard" element={<VetDashboard />} />
              <Route path="/veterinary-practice-software" element={<Home />} />
             {/* <Route
               path="/register-pet-details"
@@ -160,6 +165,10 @@ function App() {
             />
 
             <Route path="/shipping-policy" element={<ShippingPolicy />} />
+            <Route
+              path="/consultation-booked"
+              element={<ConsultationBooked />}
+            />
             {/* <Route path="/patient-dashboard" element={<PatientDashboard />} /> */}
             {/* <Route
               path="/doctor-dashboard"

@@ -360,8 +360,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     if (details.ownerMobile.replace(/\D/g, "").length !== 10) return "Enter 10-digit mobile";
     if (!details.name.trim()) return "Enter pet name";
     if (!details.type) return "Select pet type";
-    if (showBreed && !details.breed) return "Select breed";
     if (isExotic && !details.exoticType.trim()) return "Tell us which exotic pet";
+    if (showBreed && !details.breed) return "Select breed";
     if (!details.petDob) return "Select pet DOB";
     if (details.problemText.trim().length <= 10) return "Describe the problem (min 10+ chars)";
     if (!details.lastDaysEnergy) return "Select energy";

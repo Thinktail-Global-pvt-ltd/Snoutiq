@@ -21,6 +21,7 @@
     "agora-rtc-sdk-ng": "^4.24.0",
     "agora-token": "^2.0.5",
     "axios": "^1.13.2",
+    "browser-image-compression": "^2.0.2",
     "chart.js": "^4.5.0",
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",

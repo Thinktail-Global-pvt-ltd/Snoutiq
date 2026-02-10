@@ -1,9 +1,10 @@
 import React from "react";
 import { VETS } from "../../constants";
 import { Button } from "../components/Button";
-import { Clock, Award, FileText, Star, Heart, Stethoscope, Shield, CheckCircle } from "lucide-react";
+import { Clock, Award, FileText, Heart, Stethoscope, Shield, CheckCircle } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import logo from "../assets/images/logo.png";
+import doctorImage from "../assets/images/doctor_1.png";
 
 const LandingScreen = ({ onStart, onVetAccess }) => {
   const trustData = [
@@ -87,7 +88,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                   {VETS.map((vet) => (
                     <div key={vet.id} className="relative">
                       <img
-                        src={vet.image}
+                        src={doctorImage}
                         alt={vet.name}
                         className="w-12 h-12 rounded-full border-3 border-white object-cover shadow-md md:w-16 md:h-16"
                       />
@@ -147,21 +148,6 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                   </div>
                 </div>
 
-                {/* Rating Display */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 mb-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="w-5 h-5 text-amber-500 fill-amber-500" />
-                      ))}
-                    </div>
-                    <span className="text-lg font-bold text-slate-900">4.9/5</span>
-                  </div>
-                  <p className="text-slate-600 text-sm">
-                    Professional consultations with verified veterinarians
-                  </p>
-                </div>
-
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl border border-slate-100 p-4">
@@ -179,7 +165,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
         </div>
 
         {/* Trust Indicators (Mobile & Desktop) */}
-        <div className="px-6 py-8 grid grid-cols-2 gap-4 md:px-10 lg:px-16 md:grid-cols-4 md:gap-6 md:py-12">
+        <div className="px-6 py-8 grid grid-cols-2 gap-4 md:px-10 lg:px-16 md:grid-cols-3 md:gap-6 md:py-12">
           {[
             {
               icon: Clock,
@@ -201,13 +187,6 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               value: "Prescription",
               bgClass: "bg-purple-50",
               textClass: "text-purple-600",
-            },
-            {
-              icon: Star,
-              label: "Rated",
-              value: "4.9/5",
-              bgClass: "bg-amber-50",
-              textClass: "text-amber-600",
             },
           ].map((item, index) => (
             <div key={index} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center text-center gap-3 md:p-6 md:rounded-3xl">

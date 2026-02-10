@@ -461,12 +461,14 @@ export const ConfirmationScreen = ({ vet }) => {
           </div>
 
           <h2 className="text-2xl font-bold text-stone-800 mb-2 md:text-4xl">
-            You&apos;re connected!
+            Thank you! Consultation booked.
           </h2>
 
           <p className="text-stone-500 mb-8 max-w-[250px] mx-auto md:max-w-2xl md:text-lg">
-            <strong className="text-stone-700">{vet?.name}</strong> has been
-            notified and will respond in about 10-15 minutes.
+            <strong className="text-stone-700">
+              {vet?.name || "Your vet"}
+            </strong>{" "}
+            has been notified and will respond in about 10-15 minutes.
           </p>
 
           <div className="bg-stone-50 rounded-2xl p-6 w-full max-w-sm border border-stone-100 mb-8 mx-auto md:max-w-4xl md:p-10 md:rounded-3xl">
@@ -511,7 +513,7 @@ export const ConfirmationScreen = ({ vet }) => {
           </div>
 
           <p className="text-sm text-stone-400 italic md:text-base">
-            "You can relax — help is on the way."
+            "You can relax - help is on the way."
           </p>
         </div>
       </div>

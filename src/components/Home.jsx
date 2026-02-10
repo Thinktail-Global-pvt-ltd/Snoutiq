@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useNavigate } from "react-router-dom";
 
-// ✅ Lazy screens (default exports)
+// Lazy screens (default exports)
 const LandingScreen = lazy(() => import("../screen/Landingscreen"));
 const PetDetailsScreen = lazy(() => import("../screen/Petdetailsscreen"));
 const VetsScreen = lazy(() => import("../screen/Vetsscreen"));
 
-// ✅ Payment has named exports
+// Payment has named exports
 const PaymentScreen = lazy(() =>
   import("../screen/Paymentscreen").then((m) => ({ default: m.PaymentScreen }))
 );
@@ -15,7 +16,7 @@ const ConfirmationScreen = lazy(() =>
   }))
 );
 
-// ✅ Vet screens are named exports from ../components/VetScreens
+// Vet screens are named exports from ../components/VetScreens
 const VetLoginScreen = lazy(() =>
   import("../components/VetScreens").then((m) => ({ default: m.VetLoginScreen }))
 );
@@ -35,7 +36,7 @@ const VetDashboardScreen = lazy(() =>
   }))
 );
 
-// ✅ Small professional loader
+// Small professional loader
 const LoadingScreen = () => (
   <div className="min-h-screen w-full flex items-center justify-center bg-white">
     <div className="flex flex-col items-center gap-3">
@@ -46,6 +47,7 @@ const LoadingScreen = () => (
 );
 
 const Home = () => {
+  const navigate = useNavigate();
   const [screen, setScreen] = useState("landing");
   const [petDetails, setPetDetails] = useState(null);
   const [selectedVet, setSelectedVet] = useState(null);
@@ -54,7 +56,7 @@ const Home = () => {
     window.scrollTo(0, 0);
   }, [screen]);
 
-  // ✅ One goBack map instead of many ifs
+  // One goBack map instead of many ifs
   const backMap = useMemo(
     () => ({
       details: "landing",
@@ -75,7 +77,7 @@ const Home = () => {
     if (prev) setScreen(prev);
   };
 
-  // ✅ (Optional) cleanup state when jumping back
+  // (Optional) cleanup state when jumping back
   useEffect(() => {
     if (screen === "landing") {
       setPetDetails(null);
@@ -86,14 +88,14 @@ const Home = () => {
     }
   }, [screen]);
 
-  // ✅ Render routes in a clean map
+  // Render routes in a clean map
   const content = useMemo(() => {
     switch (screen) {
       case "landing":
         return (
           <LandingScreen
             onStart={() => setScreen("details")}
-            onVetAccess={() => setScreen("vet-login")}
+            onVetAccess={() => navigate("/auth")}
           />
         );
 
@@ -127,7 +129,9 @@ const Home = () => {
             petDetails={petDetails}
             onBack={goBack}
             onPay={() => {
-              setTimeout(() => setScreen("confirmation"), 1500);
+              setTimeout(() => {
+                navigate("/consultation-booked", { state: { vet: selectedVet } });
+              }, 1200);
             }}
           />
         ) : (
@@ -145,7 +149,10 @@ const Home = () => {
       case "vet-login":
         return (
           <VetLoginScreen
-            onLogin={() => setScreen("vet-dashboard")}
+            onLogin={(payload) => {
+              setScreen("vet-dashboard");
+              navigate("/vet-dashboard", { state: { auth: payload } });
+            }}
             onRegisterClick={() => setScreen("vet-register")}
             onBack={goBack}
           />
@@ -163,9 +170,14 @@ const Home = () => {
         return <VetDashboardScreen onLogout={() => setScreen("landing")} />;
 
       default:
-        return <LandingScreen onStart={() => setScreen("details")} onVetAccess={() => setScreen("vet-login")} />;
+        return (
+          <LandingScreen
+            onStart={() => setScreen("details")}
+            onVetAccess={() => navigate("/auth")}
+          />
+        );
     }
-  }, [screen, petDetails, selectedVet, backMap]); // backMap safe (memo)
+  }, [screen, petDetails, selectedVet, backMap, navigate]); // backMap safe (memo)
 
   return (
     <div className="min-h-screen bg-stone-100 font-sans">
@@ -178,7 +190,7 @@ const Home = () => {
               "md:w-full md:rounded-none md:shadow-none md:border-0",
             ].join(" ")}
           >
-            {/* ✅ Lazy loading boundary */}
+            {/* Lazy loading boundary */}
             <Suspense fallback={<LoadingScreen />}>{content}</Suspense>
           </div>
         </div>
