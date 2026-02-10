@@ -455,6 +455,40 @@ Route::get('/excell-export/transactions', function (Request $request) {
     $count = (int) ($row->total ?? 0);
     $totalPaise = (int) ($row->total_paise ?? 0);
 
+    // Detailed list
+    $transactions = Transaction::query()
+        ->where('doctor_id', $data['doctor_id'])
+        ->where('clinic_id', $data['clinic_id'])
+        ->where(function ($q) {
+            $q->where('type', 'excell_export_campaign')
+              ->orWhere('metadata->order_type', 'excell_export_campaign');
+        })
+        ->with([
+            'user:id,name,phone,email',
+            'pet:id,user_id,name,breed,pet_type,type,pet_dob,dob,reported_symptom,pet_doc1,pet_doc2',
+            'doctor:id,doctor_name,doctor_email,doctor_mobile',
+        ])
+        ->orderByDesc('id')
+        ->limit(200)
+        ->get()
+        ->map(function (Transaction $t) {
+            return [
+                'id' => $t->id,
+                'reference' => $t->reference,
+                'status' => $t->status,
+                'amount_paise' => $t->amount_paise,
+                'amount_inr' => $t->amount_paise / 100,
+                'payment_method' => $t->payment_method,
+                'type' => $t->type,
+                'metadata' => $t->metadata,
+                'created_at' => optional($t->created_at)->toIso8601String(),
+                'updated_at' => optional($t->updated_at)->toIso8601String(),
+                'user' => $t->user,
+                'pet' => $t->pet,
+                'doctor' => $t->doctor,
+            ];
+        });
+
     return response()->json([
         'success' => true,
         'doctor_id' => $data['doctor_id'],
@@ -463,6 +497,7 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'total_transactions' => $count,
         'total_amount_paise' => $totalPaise,
         'total_amount_inr' => $totalPaise / 100,
+        'transactions' => $transactions,
     ]);
 })->name('excell_export.transactions');
 
