@@ -220,6 +220,38 @@ class PaymentController extends Controller
                 context: $context
             );
 
+            // Send WhatsApp after successful payment verification
+            $amountInInr = $amount !== null ? (int) round(((int) $amount) / 100) : 0;
+            $whatsAppMeta = null;
+            $vetWhatsAppMeta = null;
+            try {
+                if (($notes['order_type'] ?? null) === 'video_consult') {
+                    $whatsAppMeta = $this->notifyVideoConsultBooked(
+                        context: $context,
+                        notes: $notes,
+                        amountInInr: $amountInInr
+                    );
+                    $vetWhatsAppMeta = $this->notifyVetVideoConsultBooked(
+                        context: $context,
+                        notes: $notes,
+                        amountInInr: $amountInInr
+                    );
+                } elseif (($notes['order_type'] ?? null) === 'excell_export_campaign') {
+                    $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
+                        context: $context,
+                        notes: $notes,
+                        amountInInr: $amountInInr
+                    );
+                    $vetWhatsAppMeta = $this->notifyVetExcelExportCampaignAssigned(
+                        context: $context,
+                        notes: $notes,
+                        amountInInr: $amountInInr
+                    );
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
             return response()->json([
                 'success'  => true,
                 'verified' => true,
@@ -232,6 +264,8 @@ class PaymentController extends Controller
                     'currency' => $record->currency,
                     'db_id'    => $record->id,
                 ],
+                'whatsapp' => $whatsAppMeta,
+                'vet_whatsapp' => $vetWhatsAppMeta,
             ]);
 
         } catch (RazorpayError $e) {
