@@ -225,7 +225,7 @@ const PricingSection = ({
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-bold text-stone-400 mb-1">
-          Video Consultation Price (Day time) (Rs.)
+          Video Consultation Price (Day time) (Rs.) *
         </label>
         <input
           type="number"
@@ -252,7 +252,7 @@ const PricingSection = ({
 
       <div>
         <label className="block text-sm font-bold text-stone-400 mb-1">
-          Video Consultation Price (Night time) (Rs.)
+          Video Consultation Price (Night time) (Rs.) *
         </label>
         <input
           type="number"
@@ -280,7 +280,7 @@ const PricingSection = ({
 
     <div className="space-y-3">
       <div className="text-sm font-bold text-stone-400">
-        Do you offer a free follow-up within 3 days after a consultation?
+        Do you offer a free follow-up within 3 days after a consultation? *
       </div>
       <div className="space-y-2">
         {FOLLOW_UP_OPTIONS.map((option) => (
@@ -305,7 +305,7 @@ const PricingSection = ({
 
     <div className="space-y-3">
       <div className="text-sm font-bold text-stone-400">
-        Preferred Payout Method (UPI number to receive payment)
+        Preferred Payout Method (UPI number to receive payment) *
       </div>
       <div className="space-y-2">
         {PAYOUT_OPTIONS.map((option) => (
@@ -330,7 +330,9 @@ const PricingSection = ({
         type="text"
         value={form.payoutDetail}
         onChange={updateForm("payoutDetail")}
-        placeholder={form.payoutMethod === "upi" ? "yourname@upi" : "Describe payout method"}
+        placeholder={
+          form.payoutMethod === "upi" ? "yourname@upi *" : "Describe payout method *"
+        }
         required
         className={INPUT_BASE_CLASS}
       />
@@ -966,7 +968,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
             Join India&apos;s most trusted network of empathetic veterinarians.
           </p>
           <p className="text-xs text-stone-400 mb-6 px-2 md:px-0 md:text-sm">
-            All fields are required.
+            All fields marked * are required.
           </p>
 
           <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-12 md:gap-10 lg:gap-12">
@@ -1059,7 +1061,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                 <input
                   type="text"
-                  placeholder="Vet Full Name"
+                  placeholder="Vet Full Name *"
                   value={form.vetFullName}
                   onChange={updateForm("vetFullName")}
                   required
@@ -1067,14 +1069,14 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                 />
                 <input
                   type="text"
-                  placeholder="Clinic Name"
+                  placeholder="Clinic Name *"
                   value={form.clinicName}
                   onChange={updateForm("clinicName")}
                   required
                   className={inputBase}
                 />
                 <textarea
-                  placeholder="Short Intro"
+                  placeholder="Short Intro *"
                   value={form.shortIntro}
                   onChange={updateForm("shortIntro")}
                   rows={3}
@@ -1085,7 +1087,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     type="text"
-                    placeholder="City"
+                    placeholder="City *"
                     value={form.vetCity}
                     onChange={updateForm("vetCity")}
                     required
@@ -1095,7 +1097,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     type="tel"
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    placeholder="WhatsApp Number (Active)"
+                    placeholder="WhatsApp Number (Active) *"
                     value={form.whatsappNumber}
                     onChange={(e) =>
                       setForm((prev) => ({
@@ -1114,7 +1116,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                 <input
                   type="email"
-                  placeholder="Email Address"
+                  placeholder="Email Address *"
                   value={form.email}
                   onChange={updateForm("email")}
                   required
@@ -1133,7 +1135,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                 <input
                   type="text"
-                  placeholder="Vet Registration Number (Required)"
+                  placeholder="Vet Registration Number *"
                   value={form.doctorLicense}
                   onChange={updateForm("doctorLicense")}
                   required
@@ -1141,7 +1143,9 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                 />
 
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-stone-400 md:text-sm">Degree</label>
+                  <label className="block text-xs font-bold text-stone-400 md:text-sm">
+                    Degree *
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     {DEGREE_OPTIONS.map((degree) => (
                       <label
@@ -1165,7 +1169,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                   {form.degree === "Other" ? (
                     <input
                       type="text"
-                      placeholder="Specify degree"
+                      placeholder="Specify degree *"
                       value={form.degreeOther}
                       onChange={updateForm("degreeOther")}
                       required
@@ -1176,7 +1180,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                 <input
                   type="number"
-                  placeholder="Years of Experience"
+                  placeholder="Years of Experience *"
                   value={form.yearsOfExperience}
                   onChange={updateForm("yearsOfExperience")}
                   onKeyDown={blockNumberInput}
@@ -1188,7 +1192,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-stone-400 md:text-sm">
-                    Specialization (Select all that apply)
+                    Specialization (Select all that apply) *
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {SPECIALIZATION_OPTIONS.map((spec) => (
@@ -1210,7 +1214,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                   {specializations.includes("Other") ? (
                     <input
                       type="text"
-                      placeholder="Other specialization"
+                      placeholder="Other specialization *"
                       value={specializationOther}
                       onChange={(e) => setSpecializationOther(e.target.value)}
                       required
@@ -1231,7 +1235,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-stone-400 md:text-sm">
-                    Response Time for Online Consults (Day)
+                    Response Time for Online Consults (Day) *
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {RESPONSE_TIME_DAY_OPTIONS.map((option) => (
@@ -1256,7 +1260,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-stone-400 md:text-sm">
-                    Response Time for Online Consults (Night)
+                    Response Time for Online Consults (Night) *
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {RESPONSE_TIME_NIGHT_OPTIONS.map((option) => (
@@ -1281,7 +1285,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-stone-400 md:text-sm">
-                    Break / do-not-disturb time (example: 2-4 PM)
+                    Break / do-not-disturb time (example: 2-4 PM) *
                   </label>
                   <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
                     <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 md:px-4 md:rounded-2xl focus-within:ring-2 focus-within:ring-[#3998de]/30 focus-within:border-[#3998de]">
