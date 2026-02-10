@@ -5,6 +5,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 // use App
 use App\Http\Controllers\Api\UnifiedIntelligenceController;
 use App\Http\Controllers\Api\AuthController;
@@ -296,6 +297,7 @@ Route::post('/user-pet-observation', function (Request $request) {
         'type' => ['required', 'string', 'max:100'],
         'reported_symptom' => ['nullable', 'string'],
         'pet_doc2' => ['nullable', 'string'],
+        'file' => ['nullable', 'file', 'max:10240'], // optional upload (10 MB)
         'appetite' => ['nullable', 'string'],
         'enery' => ['nullable', 'string'], // input typo handled
         'energy' => ['nullable', 'string'],
@@ -342,6 +344,20 @@ Route::post('/user-pet-observation', function (Request $request) {
             }
         }
 
+        // Handle optional file upload and set pet_doc2
+        if (!empty($data['file'])) {
+            $file = $request->file('file');
+            if ($file && $file->isValid()) {
+                $storedPath = $file->store('pet-docs', 'public');
+                $publicBase = rtrim((string) config('app.url'), '/');
+                if (! str_ends_with($publicBase, '/backend')) {
+                    $publicBase .= '/backend';
+                }
+                $publicUrl = $publicBase.'/'.ltrim($storedPath, '/');
+                $pet->pet_doc2 = $publicUrl;
+            }
+        }
+
         $pet->save();
 
         $observation = new UserObservation();
@@ -365,6 +381,55 @@ Route::post('/user-pet-observation', function (Request $request) {
         'data' => $result,
     ], 201);
 })->name('user_pet_observation.store');
+
+// Upload a pet document and optionally attach to pet_doc2
+Route::post('/pet-doc/upload', function (Request $request) {
+    $data = $request->validate([
+        'file' => ['required', 'file', 'max:10240'], // 10 MB
+        'pet_id' => ['required', 'integer', 'exists:pets,id'],
+        'user_id' => ['nullable', 'integer', 'exists:users,id'],
+    ]);
+
+    $file = $request->file('file');
+    if (! $file->isValid()) {
+        return response()->json([
+            'success' => false,
+            'message' => $file->getErrorMessage() ?: 'Invalid upload.',
+        ], 422);
+    }
+
+    $storedPath = $file->store('pet-docs', 'public');
+    if (! $storedPath) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unable to store file.',
+        ], 500);
+    }
+
+    $publicBase = rtrim((string) config('app.url'), '/');
+    if (! str_ends_with($publicBase, '/backend')) {
+        $publicBase .= '/backend';
+    }
+    $publicUrl = $publicBase.'/'.ltrim($storedPath, '/');
+
+    // Attach to pet_doc2
+    $pet = Pet::find($data['pet_id']);
+    if ($pet) {
+        $pet->pet_doc2 = $publicUrl;
+        $pet->save();
+    }
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'pet_id' => $pet?->id,
+            'pet_doc2' => $pet?->pet_doc2,
+            'stored_path' => $storedPath,
+            'url' => Storage::disk('public')->url($storedPath),
+            'public_url' => $publicUrl,
+        ],
+    ], 201);
+})->name('pet_doc.upload');
 
 Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
     $doctorId = $request->query('doctor_id');
