@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Header, ProgressBar } from "../components/Sharedcomponents";
+import { apiPost } from "../lib/api";
 import {
   ShieldCheck,
   ArrowRight,
@@ -9,10 +10,264 @@ import {
   Video,
 } from "lucide-react";
 
-export const PaymentScreen = ({ vet, onPay, onBack }) => {
-  const fee = vet?.priceDay || 0;
+const loadRazorpayScript = () =>
+  new Promise((resolve) => {
+    if (typeof window !== "undefined" && window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
+const pickValue = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) return trimmed;
+      continue;
+    }
+    return value;
+  }
+  return undefined;
+};
+
+const toNumber = (value) => {
+  if (value === undefined || value === null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const stripEmpty = (payload) =>
+  Object.fromEntries(
+    Object.entries(payload).filter(
+      ([, value]) => value !== undefined && value !== null && value !== ""
+    )
+  );
+
+export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) => {
+  const fee = Number(vet?.priceDay) || 0;
   const service = 20;
   const total = fee + service;
+  const [isPaying, setIsPaying] = useState(false);
+  const [gatewayReady, setGatewayReady] = useState(false);
+  const [statusType, setStatusType] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    loadRazorpayScript().then((ready) => {
+      if (active) setGatewayReady(ready);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const paymentContext = useMemo(() => {
+    const orderType =
+      pickValue(
+        paymentMeta?.order_type,
+        paymentMeta?.orderType,
+        petDetails?.order_type,
+        petDetails?.orderType
+      ) || "excell_export_campaign";
+
+    const serviceId =
+      pickValue(
+        paymentMeta?.service_id,
+        paymentMeta?.serviceId,
+        vet?.service_id,
+        vet?.raw?.service_id,
+        petDetails?.service_id,
+        petDetails?.serviceId
+      ) || "consult_basic";
+
+    const vetSlug = pickValue(
+      paymentMeta?.vet_slug,
+      paymentMeta?.vetSlug,
+      vet?.slug,
+      vet?.raw?.slug,
+      vet?.raw?.vet_slug
+    );
+
+    const callSessionId = pickValue(
+      paymentMeta?.call_session_id,
+      paymentMeta?.callSessionId,
+      petDetails?.call_session_id,
+      petDetails?.callSessionId
+    );
+
+    const clinicId = toNumber(
+      pickValue(
+        paymentMeta?.clinic_id,
+        paymentMeta?.clinicId,
+        vet?.clinic_id,
+        vet?.raw?.clinic_id,
+        vet?.raw?.vet_registeration_id
+      )
+    );
+
+    const doctorId = toNumber(
+      pickValue(
+        paymentMeta?.doctor_id,
+        paymentMeta?.doctorId,
+        vet?.doctor_id,
+        vet?.id,
+        vet?.raw?.doctor_id,
+        vet?.raw?.id
+      )
+    );
+
+    const userId = toNumber(
+      pickValue(
+        paymentMeta?.user_id,
+        paymentMeta?.userId,
+        petDetails?.user_id,
+        petDetails?.userId,
+        petDetails?.data?.user_id,
+        petDetails?.data?.userId,
+        petDetails?.user?.id,
+        petDetails?.observation?.user_id,
+        petDetails?.observation?.userId,
+        petDetails?.observation?.user?.id,
+        petDetails?.observationResponse?.user_id,
+        petDetails?.observationResponse?.userId,
+        petDetails?.observationResponse?.user?.id,
+        petDetails?.observationResponse?.data?.user_id,
+        petDetails?.observationResponse?.data?.userId,
+        petDetails?.observationResponse?.data?.user?.id,
+        petDetails?.observationResponse?.data?.data?.user_id,
+        petDetails?.observationResponse?.data?.data?.userId,
+        petDetails?.observationResponse?.data?.data?.user?.id
+      )
+    );
+
+    const petId = toNumber(
+      pickValue(
+        paymentMeta?.pet_id,
+        paymentMeta?.petId,
+        petDetails?.pet_id,
+        petDetails?.petId,
+        petDetails?.data?.pet_id,
+        petDetails?.data?.petId,
+        petDetails?.pet?.id,
+        petDetails?.observation?.pet_id,
+        petDetails?.observation?.petId,
+        petDetails?.observation?.pet?.id,
+        petDetails?.observationResponse?.pet_id,
+        petDetails?.observationResponse?.petId,
+        petDetails?.observationResponse?.pet?.id,
+        petDetails?.observationResponse?.data?.pet_id,
+        petDetails?.observationResponse?.data?.petId,
+        petDetails?.observationResponse?.data?.pet?.id,
+        petDetails?.observationResponse?.data?.data?.pet_id,
+        petDetails?.observationResponse?.data?.data?.petId,
+        petDetails?.observationResponse?.data?.data?.pet?.id
+      )
+    );
+
+    return stripEmpty({
+      order_type: orderType,
+      clinic_id: clinicId,
+      service_id: serviceId,
+      vet_slug: vetSlug,
+      call_session_id: callSessionId,
+      pet_id: petId,
+      doctor_id: doctorId,
+      user_id: userId,
+    });
+  }, [paymentMeta, petDetails, vet]);
+
+  const statusClassName = useMemo(() => {
+    if (statusType === "success") return "text-emerald-600";
+    if (statusType === "error") return "text-red-600";
+    if (statusType === "info") return "text-blue-600";
+    return "text-stone-400";
+  }, [statusType]);
+
+  const updateStatus = (type, message) => {
+    setStatusType(type);
+    setStatusMessage(message);
+  };
+
+  const handlePay = async () => {
+    if (isPaying) return;
+    if (!gatewayReady || typeof window === "undefined" || !window.Razorpay) {
+      updateStatus("error", "Payment gateway failed to load. Please refresh.");
+      return;
+    }
+
+    setIsPaying(true);
+    updateStatus("info", "Creating order...");
+
+    try {
+      const order = await apiPost("/api/create-order", {
+        amount: Math.round(total),
+        ...paymentContext,
+      });
+
+      const orderId = order?.order_id || order?.order?.id;
+      const key = order?.key;
+
+      if (!orderId || !key) {
+        throw new Error("Invalid order response");
+      }
+
+      const options = {
+        key,
+        order_id: orderId,
+        name: "Snoutiq Veterinary Consultation",
+        description: vet?.name
+          ? `Video consultation with ${vet.name}`
+          : "Video consultation",
+        handler: async (response) => {
+          updateStatus("info", "Verifying payment...");
+          try {
+            const verify = await apiPost("/api/rzp/verify", {
+              ...paymentContext,
+              razorpay_order_id: response?.razorpay_order_id,
+              razorpay_payment_id: response?.razorpay_payment_id,
+              razorpay_signature: response?.razorpay_signature,
+            });
+
+            if (!verify?.success) {
+              throw new Error(verify?.error || "Verification failed");
+            }
+
+            updateStatus("success", "Payment successful.");
+            setShowSuccessModal(true);
+            onPay?.(verify);
+          } catch (error) {
+            updateStatus(
+              "error",
+              error?.message || "Payment verification failed."
+            );
+          } finally {
+            setIsPaying(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            updateStatus("error", "Payment cancelled.");
+            setIsPaying(false);
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      updateStatus("info", "Opening secure payment...");
+    } catch (error) {
+      updateStatus("error", error?.message || "Payment failed. Please try again.");
+      setIsPaying(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-calm-bg flex flex-col animate-slide-up md:bg-gradient-to-b md:from-calm-bg md:to-white">
@@ -121,14 +376,15 @@ export const PaymentScreen = ({ vet, onPay, onBack }) => {
                 {/* Desktop pay button inside card (mobile uses bottom sticky) */}
                 <div className="hidden md:block pt-2">
                   <Button
-                    onClick={onPay}
+                    onClick={handlePay}
+                    disabled={isPaying}
                     fullWidth
                     className="
                       flex justify-between items-center group
                       md:text-xl md:px-8 md:py-4 md:rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600
                     "
                   >
-                    <span>Pay ₹{total}</span>
+                    <span>{isPaying ? "Processing..." : `Pay ₹${total}`}</span>
                     <span className="flex items-center gap-2 text-brand-100 group-hover:text-white transition-colors bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600">
                       Start <ArrowRight size={20} />
                     </span>
@@ -137,6 +393,11 @@ export const PaymentScreen = ({ vet, onPay, onBack }) => {
                   <p className="text-sm text-center text-stone-400 mt-3 flex items-center justify-center gap-2">
                     <ShieldCheck size={16} /> Secure UPI / Card Payment
                   </p>
+                  {statusMessage ? (
+                    <p className={`text-sm text-center mt-2 ${statusClassName}`}>
+                      {statusMessage}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -150,11 +411,12 @@ export const PaymentScreen = ({ vet, onPay, onBack }) => {
       {/* Sticky CTA (mobile same, md+ hidden because button is in right card) */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-stone-100 safe-area-pb max-w-md mx-auto z-20 md:hidden bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600">
         <Button
-          onClick={onPay}
+          onClick={handlePay}
+          disabled={isPaying}
           fullWidth
           className="flex justify-between items-center group"
         >
-          <span>Pay ₹{total}</span>
+          <span>{isPaying ? "Processing..." : `Pay ₹${total}`}</span>
           <span className="flex items-center gap-1 text-brand-100 group-hover:text-white transition-colors">
             Start <ArrowRight size={18} />
           </span>
@@ -162,7 +424,27 @@ export const PaymentScreen = ({ vet, onPay, onBack }) => {
         <p className="text-[10px] text-center text-stone-400 mt-2 flex items-center justify-center gap-1">
           <ShieldCheck size={10} /> Secure UPI / Card Payment
         </p>
+        {statusMessage ? (
+          <p className={`text-xs text-center mt-2 ${statusClassName}`}>
+            {statusMessage}
+          </p>
+        ) : null}
       </div>
+      {showSuccessModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center shadow-xl">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <CheckCircle2 size={28} />
+            </div>
+            <div className="text-lg font-bold text-stone-800">
+              Payment confirmed
+            </div>
+            <p className="text-sm text-stone-500 mt-2">
+              Your booking is confirmed. Connecting you to the vet...
+            </p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

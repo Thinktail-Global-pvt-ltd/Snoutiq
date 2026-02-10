@@ -124,6 +124,7 @@ const Home = () => {
         return selectedVet ? (
           <PaymentScreen
             vet={selectedVet}
+            petDetails={petDetails}
             onBack={goBack}
             onPay={() => {
               setTimeout(() => setScreen("confirmation"), 1500);

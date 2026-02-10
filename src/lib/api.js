@@ -1,13 +1,10 @@
-// API base helper:
-// - prod (snoutiq.com): backend is mounted at /backend
-// - local dev: backend at http://127.0.0.1:8000
 const API_BASE = (() => {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     const origin = window.location.origin;
     if (host.includes('snoutiq.com')) return `${origin}/backend`;
   }
-  return 'http://127.0.0.1:8000';
+  return 'https://snoutiq.com/backend';
 })();
 
 const jsonHeaders = {

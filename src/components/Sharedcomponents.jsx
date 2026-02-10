@@ -47,7 +47,11 @@ export const ProgressBar = ({ current = 1, total = 3 }) => (
         className={`
           h-1.5 rounded-full flex-1 transition-all duration-500
           md:h-2
-          ${i < current ? "bg-gradient-to-r from-blue-600 to-blue-500" : "bg-stone-200"}
+          ${
+            i < current
+              ? "bg-gradient-to-r from-[#3998de] to-[#3998de]"
+              : "bg-stone-200"
+          }
         `}
       />
     ))}
