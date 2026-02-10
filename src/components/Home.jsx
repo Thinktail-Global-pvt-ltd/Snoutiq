@@ -160,7 +160,7 @@ const Home = () => {
 
       case "vet-register":
         return (
-          <VetRegisterScreen onSubmit={() => setScreen("vet-pending")} onBack={goBack} />
+          <VetRegisterScreen onSubmit={() => setScreen("vet-login")} onBack={goBack} />
         );
 
       case "vet-pending":

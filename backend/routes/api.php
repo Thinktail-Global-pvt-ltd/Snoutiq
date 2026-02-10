@@ -436,6 +436,44 @@ Route::post('/pet-doc/upload', function (Request $request) {
     ], 201);
 })->name('pet_doc.upload');
 
+// Upload vet profile photo and return public URL
+Route::post('/vet-photo/upload', function (Request $request) {
+    $data = $request->validate([
+        'file' => ['required', 'file', 'image', 'max:5120'], // 5 MB
+    ]);
+
+    $file = $request->file('file');
+    if (! $file->isValid()) {
+        return response()->json([
+            'success' => false,
+            'message' => $file->getErrorMessage() ?: 'Invalid upload.',
+        ], 422);
+    }
+
+    $storedPath = $file->store('vet-photos', 'public');
+    if (! $storedPath) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unable to store file.',
+        ], 500);
+    }
+
+    $publicBase = rtrim((string) config('app.url'), '/');
+    if (! str_ends_with($publicBase, '/backend')) {
+        $publicBase .= '/backend';
+    }
+    $publicUrl = $publicBase.'/'.ltrim($storedPath, '/');
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'stored_path' => $storedPath,
+            'url' => Storage::disk('public')->url($storedPath),
+            'public_url' => $publicUrl,
+        ],
+    ], 201);
+})->name('vet_photo.upload');
+
 // Doctor OTP: send
 Route::post('/doctor/otp/request', function (Request $request, WhatsAppService $whatsApp) {
     $payload = $request->validate([
@@ -623,6 +661,7 @@ Route::post('/excell-export/import', function (Request $request) {
         'doctor_mobile' => ['nullable', 'string', 'max:30'],
         'doctor_license' => ['nullable', 'string', 'max:255'],
         'doctor_image' => ['nullable', 'string', 'max:500'],
+        'doctor_image_file' => ['nullable', 'file', 'image', 'max:5120'],
         'degree' => ['nullable', 'string', 'max:255'],
         'years_of_experience' => ['nullable', 'string', 'max:50'],
         'specialization_select_all_that_apply' => ['nullable', 'array'],
@@ -637,7 +676,32 @@ Route::post('/excell-export/import', function (Request $request) {
         'video_night_rate' => ['nullable', 'numeric'],
     ]);
 
-    $result = DB::transaction(function () use ($data) {
+    $doctorImageUrl = $data['doctor_image'] ?? null;
+    if ($request->hasFile('doctor_image_file')) {
+        $file = $request->file('doctor_image_file');
+        if (! $file->isValid()) {
+            return response()->json([
+                'success' => false,
+                'message' => $file->getErrorMessage() ?: 'Invalid upload.',
+            ], 422);
+        }
+
+        $storedPath = $file->store('vet-photos', 'public');
+        if (! $storedPath) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to store file.',
+            ], 500);
+        }
+
+        $publicBase = rtrim((string) config('app.url'), '/');
+        if (! str_ends_with($publicBase, '/backend')) {
+            $publicBase .= '/backend';
+        }
+        $doctorImageUrl = $publicBase.'/'.ltrim($storedPath, '/');
+    }
+
+    $result = DB::transaction(function () use ($data, $doctorImageUrl) {
         $vet = new VetRegisterationTemp();
         $vet->name = $data['vet_name'];
         $vet->email = $data['vet_email'] ?? null;
@@ -660,7 +724,7 @@ Route::post('/excell-export/import', function (Request $request) {
         $doctor->doctor_email = $data['doctor_email'] ?? null;
         $doctor->doctor_mobile = $data['doctor_mobile'] ?? null;
         $doctor->doctor_license = $data['doctor_license'] ?? null;
-        $doctor->doctor_image = $data['doctor_image'] ?? null;
+        $doctor->doctor_image = $doctorImageUrl;
         $doctor->degree = $data['degree'] ?? null;
         $doctor->years_of_experience = $data['years_of_experience'] ?? null;
         $doctor->specialization_select_all_that_apply = isset($data['specialization_select_all_that_apply'])

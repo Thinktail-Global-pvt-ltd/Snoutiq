@@ -346,7 +346,7 @@ export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) =
                   <h4 className="font-bold text-stone-700 md:text-lg">
                     Payment Summary
                   </h4>
-                  <div className="text-xs font-bold text-stone-600 bg-stone-50 border border-stone-100 px-3 py-1.5 rounded-full md:text-sm">
+                  <div className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full md:text-sm">
                     Instant confirmation
                   </div>
                 </div>
@@ -362,9 +362,11 @@ export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) =
                     <span>₹{service}</span>
                   </div>
 
-                  <div className="flex justify-between text-sm text-emerald-600 font-medium md:text-base">
-                    <span>Digital Prescription</span>
-                    <span>FREE</span>
+                  <div className="flex justify-between text-sm md:text-base">
+                    <span className="text-stone-600">Digital Prescription</span>
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 text-xs font-semibold md:text-sm">
+                      FREE
+                    </span>
                   </div>
 
                   <div className="border-t border-stone-100 pt-4 flex justify-between font-bold text-lg text-stone-800 md:text-2xl">

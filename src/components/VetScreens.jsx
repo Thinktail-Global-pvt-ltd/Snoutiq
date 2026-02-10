@@ -4,7 +4,7 @@
 // - Upload image to get a URL (backend upload endpoint).
 // - Send doctor_image as a URL string.
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import imageCompression from "browser-image-compression";
 import { Button } from "./Button";
@@ -93,6 +93,46 @@ const PAYOUT_OPTIONS = [
 ];
 
 const IMAGE_URL_LIMIT = 500;
+
+const normalizeId = (value) => {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return "";
+  return String(num);
+};
+
+const fetchClinicIdForDoctor = async (doctorId, authToken = "", signal) => {
+  if (!doctorId) return "";
+  try {
+    const headers = authToken
+      ? { Authorization: `Bearer ${authToken}`, Accept: "application/json" }
+      : { Accept: "application/json" };
+    const res = await fetch(
+      `${apiBaseUrl()}/api/doctor/profile?doctor_id=${encodeURIComponent(doctorId)}`,
+      { headers, credentials: "include", signal }
+    );
+    if (!res.ok) return "";
+    const data = await res.json().catch(() => ({}));
+    return normalizeId(
+      data?.data?.vet_registeration_id || data?.data?.clinic?.id || data?.clinic?.id
+    );
+  } catch (error) {
+    if (error?.name === "AbortError") return "";
+    return "";
+  }
+};
+
+const ensureDashboardLoaded = () => {
+  if (typeof window === "undefined") return;
+  window.setTimeout(() => {
+    if (window.location.pathname !== "/vet-dashboard") return;
+    const stored = loadVetAuth();
+    if (!stored) return;
+    const dashboardRoot = document.querySelector("[data-vet-dashboard='true']");
+    if (!dashboardRoot) {
+      window.location.assign("/vet-dashboard");
+    }
+  }, 300);
+};
 
 const blockNumberInput = (e) => {
   if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
@@ -386,8 +426,11 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
         storedAuth?.token ||
         storedAuth?.phone)
     ) {
-      onLogin?.(storedAuth);
-      navigate("/vet-dashboard", { replace: true, state: { auth: storedAuth } });
+      if (onLogin) {
+        onLogin(storedAuth);
+      } else {
+        navigate("/vet-dashboard", { replace: true, state: { auth: storedAuth } });
+      }
     }
   }, [navigate, onLogin]);
 
@@ -457,23 +500,43 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
         res?.data?.vet_id ||
         "";
 
+      const normalizedDoctorId = normalizeId(doctorId);
+      let normalizedClinicId = normalizeId(clinicId);
+      if (!normalizedClinicId && normalizedDoctorId) {
+        normalizedClinicId = await fetchClinicIdForDoctor(normalizedDoctorId);
+      }
+
+      const doctorProfile =
+        doctor || {
+          doctor_name: res?.doctor_name || res?.name || res?.data?.doctor_name || "",
+          doctor_email: res?.doctor_email || res?.email || res?.data?.doctor_email || "",
+          doctor_mobile: res?.doctor_mobile || mobile,
+        };
+
       const authPayload = {
         phone: mobile,
         request_id: requestId,
-        doctor_id: doctorId,
-        clinic_id: clinicId,
+        doctor_id: normalizedDoctorId || doctorId,
+        clinic_id: normalizedClinicId || clinicId,
         token: res?.token || res?.access_token || res?.data?.token || res?.data?.access_token || "",
-        doctor:
-          doctor || {
-            doctor_name: res?.doctor_name || res?.name || res?.data?.doctor_name || "",
-            doctor_email: res?.doctor_email || res?.email || res?.data?.doctor_email || "",
-            doctor_mobile: res?.doctor_mobile || mobile,
-          },
+        doctor: {
+          ...doctorProfile,
+          ...(normalizedDoctorId
+            ? { id: Number(normalizedDoctorId), doctor_id: Number(normalizedDoctorId) }
+            : {}),
+          ...(normalizedClinicId
+            ? {
+                clinic_id: Number(normalizedClinicId),
+                vet_registeration_id: Number(normalizedClinicId),
+              }
+            : {}),
+        },
       };
 
       saveVetAuth(authPayload);
       onLogin?.(authPayload);
       navigate("/vet-dashboard", { replace: true, state: { auth: authPayload } });
+      ensureDashboardLoaded();
     } catch (error) {
       setErrorMessage(error?.message || "OTP verification failed.");
     } finally {
@@ -611,7 +674,8 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   const [specializations, setSpecializations] = useState([]);
   const [specializationOther, setSpecializationOther] = useState("");
-  const [breakInput, setBreakInput] = useState("");
+  const [breakStart, setBreakStart] = useState("");
+  const [breakEnd, setBreakEnd] = useState("");
   const [breakTimes, setBreakTimes] = useState([]);
   const [dayPrice, setDayPrice] = useState("");
   const [nightPrice, setNightPrice] = useState("");
@@ -619,18 +683,34 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const [agreement2, setAgreement2] = useState(false);
 
   const [doctorImageFile, setDoctorImageFile] = useState(null);
+  const [doctorImagePreview, setDoctorImagePreview] = useState("");
   const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [imageError, setImageError] = useState("");
   const [showImageUrl, setShowImageUrl] = useState(false); // keep if you want URL option
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successPayload, setSuccessPayload] = useState(null);
   const [showErrors, setShowErrors] = useState(false);
+  const breakStartRef = useRef(null);
+  const breakEndRef = useRef(null);
 
   const agreed = agreement1 && agreement2;
   const updateForm = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  useEffect(() => {
+    if (doctorImageFile) {
+      const previewUrl = URL.createObjectURL(doctorImageFile);
+      setDoctorImagePreview(previewUrl);
+      return () => URL.revokeObjectURL(previewUrl);
+    }
+    const trimmedUrl = form.doctorImageUrl.trim();
+    if (trimmedUrl) {
+      setDoctorImagePreview(trimmedUrl);
+      return undefined;
+    }
+    setDoctorImagePreview("");
+    return undefined;
+  }, [doctorImageFile, form.doctorImageUrl]);
 
   const calculateCommission = (priceStr) => {
     const price = parseFloat(priceStr);
@@ -651,11 +731,24 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     );
   };
 
+  const formatTimeLabel = (value) => {
+    if (!value) return "";
+    const [hours, minutes] = value.split(":").map((part) => Number(part));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value;
+    const hour12 = ((hours + 11) % 12) + 1;
+    const period = hours >= 12 ? "PM" : "AM";
+    return `${hour12}:${String(minutes).padStart(2, "0")} ${period}`;
+  };
+
   const addBreakTime = () => {
-    const trimmed = breakInput.trim();
-    if (!trimmed || breakTimes.includes(trimmed)) return;
-    setBreakTimes((prev) => [...prev, trimmed]);
-    setBreakInput("");
+    if (!breakStart || !breakEnd) return;
+    const startLabel = formatTimeLabel(breakStart);
+    const endLabel = formatTimeLabel(breakEnd);
+    const label = startLabel && endLabel ? `${startLabel} - ${endLabel}` : "";
+    if (!label || breakTimes.includes(label)) return;
+    setBreakTimes((prev) => [...prev, label]);
+    setBreakStart("");
+    setBreakEnd("");
   };
 
   const removeBreakTime = (value) => {
@@ -768,24 +861,6 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     setShowErrors(false);
 
     try {
-      let doctorImageString = "";
-
-      if (doctorImageFile) {
-        doctorImageString = await uploadDoctorImageAndGetUrl(doctorImageFile);
-      } else {
-        doctorImageString = trimmedImageUrl;
-      }
-
-      if (!doctorImageString) {
-        throw new Error("Image upload failed.");
-      }
-
-      if (doctorImageString.length > IMAGE_URL_LIMIT) {
-        throw new Error(
-          `Image URL must be ${IMAGE_URL_LIMIT} characters or less.`
-        );
-      }
-
       const payload = {
         vet_name: form.clinicName.trim(),
         vet_email: form.email.trim(),
@@ -795,7 +870,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         doctor_email: form.email.trim(),
         doctor_mobile: form.whatsappNumber.trim(),
         doctor_license: form.doctorLicense.trim(),
-        doctor_image: doctorImageString,
+        doctor_image: trimmedImageUrl || undefined,
         degree: degreeReady,
         years_of_experience: form.yearsOfExperience.trim(),
         specialization_select_all_that_apply: selectedSpecs,
@@ -812,26 +887,52 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         preferred_payout_detail: payoutReady,
       };
 
-      const data = await apiPost("/api/excell-export/import", payload);
-      setSuccessPayload(data);
-      setShowSuccessModal(true);
+      let data = null;
+      if (doctorImageFile) {
+        const fd = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+          if (Array.isArray(value)) {
+            value.forEach((item) => fd.append(`${key}[]`, item));
+            return;
+          }
+          if (value !== undefined && value !== null && value !== "") {
+            fd.append(key, String(value));
+          }
+        });
+        fd.append("doctor_image_file", doctorImageFile);
+
+        const res = await fetch(`${apiBaseUrl()}/api/excell-export/import`, {
+          method: "POST",
+          body: fd,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json?.success === false) {
+          throw new Error(json?.message || "Image upload failed.");
+        }
+        data = json;
+      } else {
+        if (trimmedImageUrl && trimmedImageUrl.length > IMAGE_URL_LIMIT) {
+          throw new Error(
+            `Image URL must be ${IMAGE_URL_LIMIT} characters or less.`
+          );
+        }
+        data = await apiPost("/api/excell-export/import", payload);
+      }
+
+      onSubmit?.(data);
     } catch (error) {
       const message = error?.message || "Failed to submit application.";
       setSubmitError(message);
-      if (message.toLowerCase().includes("image")) {
+      if (
+        message.toLowerCase().includes("image") ||
+        message.toLowerCase().includes("upload") ||
+        doctorImageFile
+      ) {
         setImageError(message);
         setShowImageUrl(true);
       }
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleSuccessClose = () => {
-    setShowSuccessModal(false);
-    if (successPayload) {
-      onSubmit?.(successPayload);
-      setSuccessPayload(null);
     }
   };
 
@@ -885,12 +986,20 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     />
                     <label htmlFor="doctorImageUpload" className="cursor-pointer">
                       <div className="h-24 w-24 md:h-32 md:w-32 rounded-full border-2 border-[#3998de]/20 bg-[#3998de]/10 flex items-center justify-center overflow-hidden shadow-sm transition-shadow hover:shadow-md">
-                        <div className="flex flex-col items-center text-[#3998de]">
-                          <Camera size={26} />
-                          <span className="text-[10px] font-semibold uppercase tracking-wide mt-1">
-                            Upload
-                          </span>
-                        </div>
+                        {doctorImagePreview ? (
+                          <img
+                            src={doctorImagePreview}
+                            alt="Doctor preview"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center text-[#3998de]">
+                            <Camera size={26} />
+                            <span className="text-[10px] font-semibold uppercase tracking-wide mt-1">
+                              Upload
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </label>
                   </div>
@@ -935,25 +1044,6 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                         JPG/PNG recommended. Square photos look best.
                       </p>
                     )}
-
-                    {showImageUrl ? (
-                      <div className="w-full space-y-2 pt-2">
-                        <label className="block text-[11px] font-bold uppercase text-stone-400">
-                          Image URL
-                        </label>
-                        <input
-                          type="url"
-                          value={form.doctorImageUrl}
-                          onChange={handleDoctorImageUrlChange}
-                          maxLength={IMAGE_URL_LIMIT}
-                          placeholder="https://example.com/photo.jpg"
-                          className={inputBase}
-                        />
-                        <p className="text-[10px] text-stone-400">
-                          Use a public image URL (max {IMAGE_URL_LIMIT} characters).
-                        </p>
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               </section>
@@ -1193,15 +1283,66 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                   <label className="block text-xs font-bold text-stone-400 md:text-sm">
                     Break / do-not-disturb time (example: 2-4 PM)
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={breakInput}
-                      onChange={(e) => setBreakInput(e.target.value)}
-                      placeholder="2-4 PM"
-                      className={inputBase}
-                    />
-                    <Button type="button" onClick={addBreakTime} className="px-4">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
+                    <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 md:px-4 md:rounded-2xl focus-within:ring-2 focus-within:ring-[#3998de]/30 focus-within:border-[#3998de]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = breakStartRef.current;
+                          if (!el) return;
+                          if (typeof el.showPicker === "function") {
+                            el.showPicker();
+                          } else {
+                            el.focus();
+                          }
+                        }}
+                        className="text-[#3998de] shrink-0 p-1"
+                        aria-label="Choose break start time"
+                      >
+                        <Clock size={16} />
+                      </button>
+                      <input
+                        ref={breakStartRef}
+                        type="time"
+                        value={breakStart}
+                        onChange={(e) => setBreakStart(e.target.value)}
+                        className={`flex-1 bg-transparent py-3 text-sm font-medium outline-none md:py-4 md:text-base ${
+                          breakStart ? "text-stone-800" : "text-transparent"
+                        }`}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 md:px-4 md:rounded-2xl focus-within:ring-2 focus-within:ring-[#3998de]/30 focus-within:border-[#3998de]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = breakEndRef.current;
+                          if (!el) return;
+                          if (typeof el.showPicker === "function") {
+                            el.showPicker();
+                          } else {
+                            el.focus();
+                          }
+                        }}
+                        className="text-[#3998de] shrink-0 p-1"
+                        aria-label="Choose break end time"
+                      >
+                        <Clock size={16} />
+                      </button>
+                      <input
+                        ref={breakEndRef}
+                        type="time"
+                        value={breakEnd}
+                        onChange={(e) => setBreakEnd(e.target.value)}
+                        className={`flex-1 bg-transparent py-3 text-sm font-medium outline-none md:py-4 md:text-base ${
+                          breakEnd ? "text-stone-800" : "text-transparent"
+                        }`}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={addBreakTime}
+                      className="w-full sm:w-auto px-4"
+                    >
                       Add
                     </Button>
                   </div>
@@ -1247,22 +1388,6 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         </Button>
       </div>
 
-      {showSuccessModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center shadow-xl">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-              <CheckCircle2 size={28} />
-            </div>
-            <div className="text-lg font-bold text-stone-800">Application submitted</div>
-            <p className="text-sm text-stone-500 mt-2">
-              We will review your application and activate your profile within 24-48 hours.
-            </p>
-            <Button onClick={handleSuccessClose} fullWidth className="mt-4">
-              Continue
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 };
@@ -1372,12 +1497,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   };
 
   const statusLabel = (status) => (status ? status.replace(/_/g, " ") : "unknown");
-
-  const normalizeId = (value) => {
-    const num = Number(value);
-    if (!Number.isFinite(num) || num <= 0) return "";
-    return String(num);
-  };
 
   const doctorId = normalizeId(
     auth?.doctor_id ||
@@ -1564,29 +1683,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     }
 
     const controller = new AbortController();
-    const resolveClinicId = async (value) => {
-      try {
-        const url = `${apiBaseUrl()}/api/doctor/profile?doctor_id=${encodeURIComponent(
-          value
-        )}`;
-        const headers = authToken
-          ? { Authorization: `Bearer ${authToken}`, Accept: "application/json" }
-          : { Accept: "application/json" };
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers,
-          credentials: "include",
-        });
-        if (!res.ok) return "";
-        const data = await res.json().catch(() => ({}));
-        return normalizeId(
-          data?.data?.vet_registeration_id || data?.data?.clinic?.id || data?.clinic?.id
-        );
-      } catch (error) {
-        if (error?.name === "AbortError") return "";
-        return "";
-      }
-    };
 
     const fetchTransactions = async () => {
       setIsLoading(true);
@@ -1594,7 +1690,11 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       try {
         let clinicId = clinicIdRaw;
         if (!clinicId) {
-          const resolvedClinicId = await resolveClinicId(doctorId);
+          const resolvedClinicId = await fetchClinicIdForDoctor(
+            doctorId,
+            authToken,
+            controller.signal
+          );
           if (resolvedClinicId && resolvedClinicId !== clinicIdRaw) {
             setAuth((prev) => ({
               ...(prev || {}),
@@ -1704,7 +1804,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold transition-colors";
 
   return (
-    <div className={`min-h-screen ${pageBg} flex flex-col animate-slide-up`}>
+    <div
+      className={`min-h-screen ${pageBg} flex flex-col animate-slide-up`}
+      data-vet-dashboard="true"
+    >
       <div
         className={`
           ${headerBg} text-white pt-8 pb-12 px-6 relative
@@ -1972,11 +2075,11 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     {activeTransaction?.user?.name || "Not available"}
                   </p>
                   {activeTransaction?.user?.phone ? (
-                    <p>Phone: {activeTransaction.user.phone}</p>
+                    <p>Whatsapp Phone: {activeTransaction.user.phone}</p>
                   ) : null}
-                  {activeTransaction?.user?.email ? (
+                  {/* {activeTransaction?.user?.email ? (
                     <p>Email: {activeTransaction.user.email}</p>
-                  ) : null}
+                  ) : null} */}
                 </div>
               </div>
 

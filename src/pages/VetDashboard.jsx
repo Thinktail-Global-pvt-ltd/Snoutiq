@@ -7,6 +7,11 @@ const VetDashboardScreen = lazy(() =>
     default: m.VetDashboardScreen,
   }))
 );
+const VetLoginScreen = lazy(() =>
+  import("../components/VetScreens").then((m) => ({
+    default: m.VetLoginScreen,
+  }))
+);
 
 const LoadingScreen = () => (
   <div className="min-h-screen w-full flex items-center justify-center bg-white">
@@ -31,21 +36,36 @@ const VetDashboard = () => {
   }, [incomingAuth]);
 
   useEffect(() => {
-    if (!auth) {
-      navigate("/auth", { replace: true });
+    if (auth) return;
+    const stored = loadVetAuth();
+    if (stored) {
+      setAuth(stored);
     }
-  }, [auth, navigate]);
+  }, [auth]);
 
-  if (!auth) {
-    return <LoadingScreen />;
-  }
+  const handleLogin = (payload) => {
+    const nextAuth = payload || loadVetAuth();
+    if (!nextAuth) return;
+    saveVetAuth(nextAuth);
+    setAuth(nextAuth);
+  };
 
   return (
     <Suspense fallback={<LoadingScreen />}>
-      <VetDashboardScreen
-        auth={auth}
-        onLogout={() => navigate("/auth", { replace: true })}
-      />
+      {auth ? (
+        <VetDashboardScreen
+          auth={auth}
+          onLogout={() => navigate("/auth", { replace: true })}
+        />
+      ) : (
+        <VetLoginScreen
+          onLogin={handleLogin}
+          onRegisterClick={() =>
+            navigate("/auth", { state: { mode: "register" } })
+          }
+          onBack={() => navigate("/")}
+        />
+      )}
     </Suspense>
   );
 };

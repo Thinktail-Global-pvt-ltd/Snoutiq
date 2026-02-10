@@ -10,6 +10,8 @@ import {
   Upload,
   Video,
   Star,
+  Clock,
+  Plus,
 } from "lucide-react";
 
 const CAT_BREEDS = [
@@ -74,6 +76,24 @@ const calcAgeFromDob = (dob) => {
   return `${years} yr${years === 1 ? "" : "s"}`;
 };
 
+const to12h = (hhmm) => {
+  if (!hhmm) return "";
+  const [hStr, mStr] = String(hhmm).split(":");
+  let h = Number(hStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return "";
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  if (m === 0) return `${h} ${ampm}`;
+  return `${h}:${String(m).padStart(2, "0")} ${ampm}`;
+};
+
+const slotLabel = (start, end) => {
+  if (!start || !end) return "";
+  return `${to12h(start)}-${to12h(end)}`; // e.g. "2 PM-4 PM"
+};
+
 const fieldBase =
   "w-full rounded-xl border border-stone-200 bg-white p-3 text-stone-900 placeholder:text-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 focus:border-[#3998de] disabled:bg-stone-100 disabled:text-stone-400 disabled:cursor-not-allowed md:rounded-2xl md:p-4 md:text-base";
 const selectBase = `${fieldBase} appearance-none pr-10`;
@@ -124,13 +144,11 @@ const compressImageFile = async (
   const isImage = file.type?.startsWith("image/");
   if (!isImage) return file;
 
-  // If browser doesn't support canvas conversion for some formats, fallback to original
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) return file;
 
   let { width, height } = bitmap;
 
-  // Keep aspect ratio
   const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
   const targetW = Math.round(width * ratio);
   const targetH = Math.round(height * ratio);
@@ -154,7 +172,6 @@ const compressImageFile = async (
 
   if (!blob) return file;
 
-  // If compression didn't reduce size, keep original
   if (blob.size >= file.size) return file;
 
   const ext = outputMime === "image/webp" ? "webp" : "jpg";
@@ -183,6 +200,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     lastDaysEnergy: "",
     lastDaysAppetite: "",
 
+    // ✅ NEW: Break/DND slots
+    breakSlots: [{ start: "", end: "" }],
+
     hasPhoto: false,
   });
 
@@ -202,9 +222,22 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
     setSubmitError("");
 
+    // ✅ cleanup old preview url immediately
+    setUploadPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return "";
+    });
+
+    // ✅ preview (objectURL) with fallback
     if (file.type?.startsWith("image/")) {
-      const url = URL.createObjectURL(file);
-      setUploadPreviewUrl(url);
+      try {
+        const url = URL.createObjectURL(file);
+        setUploadPreviewUrl(url);
+      } catch {
+        const reader = new FileReader();
+        reader.onload = () => setUploadPreviewUrl(String(reader.result || ""));
+        reader.readAsDataURL(file);
+      }
     } else {
       setUploadPreviewUrl("");
     }
@@ -253,9 +286,12 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       setLoadingBreeds(true);
 
       try {
-        const res = await fetch("https://snoutiq.com/backend/api/dog-breeds/all", {
-          method: "GET",
-        });
+        const res = await fetch(
+          "https://snoutiq.com/backend/api/dog-breeds/all",
+          {
+            method: "GET",
+          }
+        );
         const data = await res.json();
 
         if (data?.status === "success" && data?.breeds) {
@@ -276,7 +312,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
           });
 
           list.sort((a, b) => a.label.localeCompare(b.label));
-          list.push({ label: "Mixed Breed", value: "mixed_breed" }, { label: "Other", value: "other" });
+          list.push(
+            { label: "Mixed Breed", value: "mixed_breed" },
+            { label: "Other", value: "other" }
+          );
 
           setDogBreeds(list);
         } else {
@@ -320,7 +359,11 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
   const showBreed = details.type === "dog" || details.type === "cat";
   const isExotic = details.type === "exotic";
-  const approxAge = useMemo(() => calcAgeFromDob(details.petDob), [details.petDob]);
+  const approxAge = useMemo(
+    () => calcAgeFromDob(details.petDob),
+    [details.petDob]
+  );
+
   const uploadKind = useMemo(() => {
     if (!uploadFile?.type) return "file";
     if (uploadFile.type.startsWith("image/")) return "image";
@@ -328,11 +371,13 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     if (uploadFile.type === "application/pdf") return "pdf";
     return "file";
   }, [uploadFile]);
+
   const uploadIcon = useMemo(() => {
     if (uploadKind === "image") return <Image className="w-4 h-4" />;
     if (uploadKind === "video") return <Video className="w-4 h-4" />;
     return <FileText className="w-4 h-4" />;
   }, [uploadKind]);
+
   const uploadLabel = useMemo(() => {
     if (uploadKind === "image") return "Image";
     if (uploadKind === "video") return "Video";
@@ -357,13 +402,15 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
   const getSubmitTooltip = () => {
     if (!details.ownerName.trim()) return "Enter owner name";
-    if (details.ownerMobile.replace(/\D/g, "").length !== 10) return "Enter 10-digit mobile";
+    if (details.ownerMobile.replace(/\D/g, "").length !== 10)
+      return "Enter 10-digit mobile";
     if (!details.name.trim()) return "Enter pet name";
     if (!details.type) return "Select pet type";
     if (isExotic && !details.exoticType.trim()) return "Tell us which exotic pet";
     if (showBreed && !details.breed) return "Select breed";
     if (!details.petDob) return "Select pet DOB";
-    if (details.problemText.trim().length <= 10) return "Describe the problem (min 10+ chars)";
+    if (details.problemText.trim().length <= 10)
+      return "Describe the problem (min 10+ chars)";
     if (!details.lastDaysEnergy) return "Select energy";
     if (!details.lastDaysAppetite) return "Select appetite";
     if (!details.mood) return "Select mood";
@@ -376,7 +423,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     setSubmitting(true);
 
     try {
-      // ✅ Compress ONLY image before sending (doctor ko compressed image jayegi)
+      // ✅ Compress ONLY image before sending
       let fileToSend = uploadFile;
 
       if (uploadFile?.type?.startsWith("image/")) {
@@ -390,9 +437,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
         fileToSend = compressed;
 
         setUploadMeta((prev) =>
-          prev
-            ? { ...prev, compressedSize: compressed?.size ?? null }
-            : prev
+          prev ? { ...prev, compressedSize: compressed?.size ?? null } : prev
         );
       }
 
@@ -403,9 +448,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       fd.append("dob", details.petDob || "");
 
       const breedValue =
-        details.type === "exotic"
-          ? details.exoticType.trim()
-          : details.breed || "";
+        details.type === "exotic" ? details.exoticType.trim() : details.breed || "";
       fd.append("breed", breedValue);
 
       fd.append("reported_symptom", details.problemText || "");
@@ -418,16 +461,29 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
         fd.append("pet_doc2", details.petDoc2.trim());
       }
 
-      // ✅ file attach
-      if (fileToSend) {
-        fd.append("file", fileToSend);
+      // ✅ Break/DND time array (safe for multipart)
+      const breakLabels = (details.breakSlots || [])
+        .filter((s) => s.start && s.end)
+        .map((s) => slotLabel(s.start, s.end));
+      if (breakLabels.length) {
+        fd.append(
+          "break_do_not_disturb_time_example_2_4_pm",
+          JSON.stringify(breakLabels)
+        );
       }
 
-      const res = await fetch("https://snoutiq.com/backend/api/user-pet-observation", {
-        method: "POST",
-        body: fd,
-        // ❌ Content-Type header mat set karo
-      });
+      // ✅ file attach
+      if (fileToSend) {
+        fd.append("file", fileToSend, fileToSend.name || "upload.jpg");
+      }
+
+      const res = await fetch(
+        "https://snoutiq.com/backend/api/user-pet-observation",
+        {
+          method: "POST",
+          body: fd,
+        }
+      );
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -528,7 +584,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           type="text"
                           value={details.ownerName}
                           onChange={(e) =>
-                            setDetails((p) => ({ ...p, ownerName: e.target.value }))
+                            setDetails((p) => ({
+                              ...p,
+                              ownerName: e.target.value,
+                            }))
                           }
                           placeholder="e.g. Rahul Sharma"
                           className={fieldBase}
@@ -577,16 +636,16 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       <label className="block text-sm font-semibold text-stone-700 mb-2 md:text-base">
                         Pet&apos;s Name <span className="text-red-500">*</span>
                       </label>
-                        <input
-                          type="text"
-                          value={details.name}
-                          onChange={(e) =>
-                            setDetails((p) => ({ ...p, name: e.target.value }))
-                          }
-                          placeholder="e.g. Buster"
-                          className={fieldBase}
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        value={details.name}
+                        onChange={(e) =>
+                          setDetails((p) => ({ ...p, name: e.target.value }))
+                        }
+                        placeholder="e.g. Buster"
+                        className={fieldBase}
+                      />
+                    </div>
 
                     <div>
                       <label className="block text-sm font-semibold text-stone-700 mb-2 md:text-base">
@@ -616,7 +675,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           >
                             <div
                               className={
-                                details.type === type ? "text-white" : "text-stone-400"
+                                details.type === type
+                                  ? "text-white"
+                                  : "text-stone-400"
                               }
                             >
                               {SPECIALTY_ICONS[type] || <Star />}
@@ -640,7 +701,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           <select
                             value={details.breed}
                             onChange={(e) =>
-                              setDetails((p) => ({ ...p, breed: e.target.value }))
+                              setDetails((p) => ({
+                                ...p,
+                                breed: e.target.value,
+                              }))
                             }
                             disabled={
                               (details.type === "dog" && loadingBreeds) ||
@@ -659,9 +723,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                               </option>
                             ))}
                           </select>
-                          <ChevronDown
-                            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"
-                          />
+                          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
                         </div>
 
                         {breedError ? (
@@ -676,13 +738,17 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                     {isExotic && (
                       <div>
                         <label className="block text-sm font-semibold text-stone-700 mb-2 md:text-base">
-                          Which exotic pet? <span className="text-red-500">*</span>
+                          Which exotic pet?{" "}
+                          <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
                           value={details.exoticType}
                           onChange={(e) =>
-                            setDetails((p) => ({ ...p, exoticType: e.target.value }))
+                            setDetails((p) => ({
+                              ...p,
+                              exoticType: e.target.value,
+                            }))
                           }
                           placeholder="e.g. Parrot, Rabbit, Turtle, Guinea pig"
                           className={fieldBase}
@@ -739,13 +805,17 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
                     <div>
                       <label className="block text-sm font-semibold text-stone-700 mb-2 md:text-base">
-                        What&apos;s happening? <span className="text-red-500">*</span>
+                        What&apos;s happening?{" "}
+                        <span className="text-red-500">*</span>
                       </label>
 
                       <textarea
                         value={details.problemText}
                         onChange={(e) =>
-                          setDetails((p) => ({ ...p, problemText: e.target.value }))
+                          setDetails((p) => ({
+                            ...p,
+                            problemText: e.target.value,
+                          }))
                         }
                         placeholder="Example: My dog is limping since yesterday, not putting weight on front leg, and crying when touched..."
                         rows={4}
@@ -771,7 +841,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
                       <div>
                         <label className="block text-sm font-semibold text-stone-700 mb-2 md:text-base">
-                          Last few days: Energy <span className="text-red-500">*</span>
+                          Last few days: Energy{" "}
+                          <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
                           <select
@@ -847,6 +918,111 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                     </div>
                   </section>
 
+                  {/* ✅ Break / Do-not-disturb time */}
+                  <section className="bg-white p-5 rounded-2xl shadow-sm space-y-4 md:p-9 md:rounded-3xl md:border md:border-stone-100 md:shadow-[0_8px_30px_rgba(0,0,0,0.05)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-base font-bold text-stone-900 md:text-xl">
+                        Break / Do-not-disturb time
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDetails((p) => ({
+                            ...p,
+                            breakSlots: [...(p.breakSlots || []), { start: "", end: "" }],
+                          }))
+                        }
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-[#3998de] hover:underline"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add slot
+                      </button>
+                    </div>
+
+                    <p className="text-sm text-stone-500">
+                      Example: 2–4 PM (vet will not be disturbed in this window)
+                    </p>
+
+                    <div className="space-y-3">
+                      {(details.breakSlots || []).map((slot, idx) => {
+                        const label = slotLabel(slot.start, slot.end);
+
+                        return (
+                          <div
+                            key={idx}
+                            className="rounded-2xl border border-stone-200 bg-white p-4 md:p-5"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2 text-stone-700 font-semibold">
+                                <Clock className="h-4 w-4 text-stone-400" />
+                                Slot {idx + 1}
+                                {label ? (
+                                  <span className="ml-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-full">
+                                    {label}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              {(details.breakSlots || []).length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDetails((p) => ({
+                                      ...p,
+                                      breakSlots: p.breakSlots.filter((_, i) => i !== idx),
+                                    }))
+                                  }
+                                  className="text-xs font-semibold text-red-600 hover:underline"
+                                >
+                                  Remove
+                                </button>
+                              ) : null}
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                              <div>
+                                <label className="block text-sm font-semibold text-stone-700 mb-2">
+                                  Start time
+                                </label>
+                                <input
+                                  type="time"
+                                  value={slot.start}
+                                  onChange={(e) =>
+                                    setDetails((p) => {
+                                      const next = [...p.breakSlots];
+                                      next[idx] = { ...next[idx], start: e.target.value };
+                                      return { ...p, breakSlots: next };
+                                    })
+                                  }
+                                  className={fieldBase}
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-semibold text-stone-700 mb-2">
+                                  End time
+                                </label>
+                                <input
+                                  type="time"
+                                  value={slot.end}
+                                  onChange={(e) =>
+                                    setDetails((p) => {
+                                      const next = [...p.breakSlots];
+                                      next[idx] = { ...next[idx], end: e.target.value };
+                                      return { ...p, breakSlots: next };
+                                    })
+                                  }
+                                  className={fieldBase}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+
                   {/* Upload */}
                   <section className="bg-white p-5 rounded-2xl shadow-sm md:p-9 md:rounded-3xl md:border md:border-stone-100 md:shadow-[0_8px_30px_rgba(0,0,0,0.05)]">
                     <div className="text-base font-bold text-stone-900 md:text-xl mb-4">
@@ -907,7 +1083,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                               {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
                               {uploadMeta?.compressedSize ? (
                                 <>
-                                  {" "}{" "}
+                                  {" "}
                                   <span className="font-semibold text-emerald-700">
                                     {(uploadMeta.compressedSize / 1024 / 1024).toFixed(2)} MB
                                   </span>{" "}
@@ -938,10 +1114,14 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           src={uploadPreviewUrl}
                           alt="Upload preview"
                           className="w-full max-h-56 object-contain rounded-xl border border-stone-100 bg-white"
+                          onError={() => {
+                            // ✅ if preview fails, clear it (prevents broken image icon)
+                            setUploadPreviewUrl("");
+                          }}
                         />
                       </div>
                     ) : null}
-
+{/* 
                     <div className="mt-4">
                       <label className="block text-sm font-semibold text-stone-700 mb-2 md:text-base">
                         Report link (optional)
@@ -958,7 +1138,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       <p className="mt-1 text-xs text-stone-400 md:text-sm md:text-stone-500">
                         If you already have a report URL, paste it here.
                       </p>
-                    </div>
+                    </div> */}
 
                     <p className="hidden md:block mt-3 text-sm text-stone-500">
                       Tip: A short 5–10 sec video works great for movement issues.
@@ -1049,6 +1229,29 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         </span>
                       </div>
 
+                      {/* ✅ Break summary */}
+                      <div className="pt-4 border-t border-stone-100">
+                        <div className="text-stone-500 text-sm mb-2">
+                          Break/DND
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(details.breakSlots || [])
+                            .filter((s) => s.start && s.end)
+                            .map((s, i) => (
+                              <span
+                                key={`${s.start}-${s.end}-${i}`}
+                                className="text-sm bg-stone-50 border border-stone-200 px-3 py-1.5 rounded-full text-stone-700"
+                              >
+                                {slotLabel(s.start, s.end)}
+                              </span>
+                            ))}
+                          {(details.breakSlots || []).filter((s) => s.start && s.end)
+                            .length === 0 ? (
+                            <span className="text-sm text-stone-400">—</span>
+                          ) : null}
+                        </div>
+                      </div>
+
                       <div className="pt-4 border-t border-stone-100">
                         <div className="text-stone-500 text-sm mb-2">Problem</div>
                         <div className="text-sm text-stone-800 leading-relaxed">
@@ -1088,15 +1291,17 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           {details.hasPhoto && uploadFile ? "Added" : "Required"}
                         </span>
                       </div>
+
                       {details.petDoc2 ? (
                         <div className="pt-4 border-t border-stone-100">
-                          <div className="text-stone-500 text-sm mb-2">Report link</div>
+                          <div className="text-stone-500 text-sm mb-2">
+                            Report link
+                          </div>
                           <div className="text-sm text-stone-800 break-all">
                             {details.petDoc2}
                           </div>
                         </div>
                       ) : null}
-
                     </div>
                   </div>
 
@@ -1115,7 +1320,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                     </Button>
 
                     {!isValid ? (
-                      <p className="text-sm text-red-600 mt-3">{getSubmitTooltip()}</p>
+                      <p className="text-sm text-red-600 mt-3">
+                        {getSubmitTooltip()}
+                      </p>
                     ) : submitting ? (
                       <p className="text-sm text-stone-500 mt-3">
                         Compressing & uploading...
