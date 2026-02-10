@@ -99,6 +99,12 @@ class PaymentController extends Controller
                     notes: $notes,
                     amountInInr: $amountInInr
                 );
+            } elseif (($notes['order_type'] ?? null) === 'excell_export_campaign') {
+                $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
+                    context: $context,
+                    notes: $notes,
+                    amountInInr: $amountInInr
+                );
             }
 
             return response()->json([
@@ -494,6 +500,75 @@ class PaymentController extends Controller
                 'sent' => true,
                 'to' => $user->phone,
                 'template' => 'pp_video_consult_booked',
+                'language' => 'en',
+            ];
+        } catch (\Throwable $e) {
+            report($e);
+            return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Send WhatsApp when an Excel export campaign order is created.
+     */
+    protected function notifyExcelExportCampaignBooked(array $context, array $notes, int $amountInInr): array
+    {
+        if (! $this->whatsApp?->isConfigured()) {
+            return ['sent' => false, 'reason' => 'whatsapp_not_configured'];
+        }
+
+        try {
+            $user = $context['user_id'] ? User::find($context['user_id']) : null;
+            if (! $user || empty($user->phone)) {
+                return ['sent' => false, 'reason' => 'user_or_phone_missing'];
+            }
+
+            $doctorName = null;
+            if ($context['doctor_id']) {
+                $doctorName = Doctor::where('id', $context['doctor_id'])->value('doctor_name');
+            }
+            $doctorName ??= 'Doctor';
+
+            $pet = $context['pet_id'] ? Pet::find($context['pet_id']) : null;
+            $petName = $pet?->name ?: 'your pet';
+            $petType = $pet?->pet_type ?? $pet?->type ?? 'Pet';
+
+            $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
+
+            // Template: pp_booking_confirmed (language: en)
+            // {{1}} Pet parent name
+            // {{2}} Pet name
+            // {{3}} Pet type
+            // {{4}} Vet name
+            // {{5}} Response time (minutes)
+            // {{6}} Amount paid
+            // {{7}} Vet name (duplicate of {{4}})
+            $components = [
+                [
+                    'type' => 'body',
+                    'parameters' => [
+                        ['type' => 'text', 'text' => $user->name ?: 'Pet Parent'], // {{1}}
+                        ['type' => 'text', 'text' => $petName],                    // {{2}}
+                        ['type' => 'text', 'text' => $petType],                    // {{3}}
+                        ['type' => 'text', 'text' => $doctorName],                 // {{4}}
+                        ['type' => 'text', 'text' => (string) $responseMinutes],   // {{5}}
+                        ['type' => 'text', 'text' => (string) $amountInInr],       // {{6}}
+                        ['type' => 'text', 'text' => $doctorName],                 // {{7}}
+                    ],
+                ],
+            ];
+
+            $this->whatsApp->sendTemplate(
+                $user->phone,
+                'pp_booking_confirmed',
+                $components,
+                'en'
+            );
+
+            return [
+                'sent' => true,
+                'to' => $user->phone,
+                'template' => 'pp_booking_confirmed',
                 'language' => 'en',
             ];
         } catch (\Throwable $e) {
