@@ -598,7 +598,30 @@ class PaymentController extends Controller
             }
 
             $doctor = Doctor::find($doctorId);
-            if (! $doctor || empty($doctor->doctor_mobile)) {
+            if (! $doctor) {
+                return ['sent' => false, 'reason' => 'doctor_missing'];
+            }
+
+            // Prefer doctor_mobile; fall back to doctor_phone/phone if those columns exist,
+            // then clinic mobile if present.
+            $doctorPhone = $doctor->doctor_mobile ?? null;
+            if (! $doctorPhone && isset($doctor->doctor_phone)) {
+                $doctorPhone = $doctor->doctor_phone;
+            }
+            if (! $doctorPhone && isset($doctor->phone)) {
+                $doctorPhone = $doctor->phone;
+            }
+            if (! $doctorPhone && $doctor->vet_registeration_id) {
+                try {
+                    $doctorPhone = DB::table('vet_registerations_temp')
+                        ->where('id', $doctor->vet_registeration_id)
+                        ->value('mobile');
+                } catch (\Throwable $e) {
+                    $doctorPhone = null;
+                }
+            }
+
+            if (empty($doctorPhone)) {
                 return ['sent' => false, 'reason' => 'doctor_phone_missing'];
             }
 
@@ -645,7 +668,7 @@ class PaymentController extends Controller
             ];
 
             $this->whatsApp->sendTemplate(
-                $doctor->doctor_mobile,
+                $doctorPhone,
                 'vet_new_consultation_assigned',
                 $components,
                 'en'
@@ -653,7 +676,7 @@ class PaymentController extends Controller
 
             return [
                 'sent' => true,
-                'to' => $doctor->doctor_mobile,
+                'to' => $doctorPhone,
                 'template' => 'vet_new_consultation_assigned',
                 'language' => 'en',
             ];
@@ -679,7 +702,28 @@ class PaymentController extends Controller
             }
 
             $doctor = Doctor::find($doctorId);
-            if (! $doctor || empty($doctor->doctor_mobile)) {
+            if (! $doctor) {
+                return ['sent' => false, 'reason' => 'doctor_missing'];
+            }
+
+            $doctorPhone = $doctor->doctor_mobile ?? null;
+            if (! $doctorPhone && isset($doctor->doctor_phone)) {
+                $doctorPhone = $doctor->doctor_phone;
+            }
+            if (! $doctorPhone && isset($doctor->phone)) {
+                $doctorPhone = $doctor->phone;
+            }
+            if (! $doctorPhone && $doctor->vet_registeration_id) {
+                try {
+                    $doctorPhone = DB::table('vet_registerations_temp')
+                        ->where('id', $doctor->vet_registeration_id)
+                        ->value('mobile');
+                } catch (\Throwable $e) {
+                    $doctorPhone = null;
+                }
+            }
+
+            if (empty($doctorPhone)) {
                 return ['sent' => false, 'reason' => 'doctor_phone_missing'];
             }
 
@@ -745,7 +789,7 @@ class PaymentController extends Controller
                 foreach ($languageCandidates as $lang) {
                     try {
                         $this->whatsApp->sendTemplate(
-                            $doctor->doctor_mobile,
+                            $doctorPhone,
                             $tpl,
                             $components,
                             $lang
@@ -753,7 +797,7 @@ class PaymentController extends Controller
 
                         return [
                             'sent' => true,
-                            'to' => $doctor->doctor_mobile,
+                            'to' => $doctorPhone,
                             'template' => $tpl,
                             'language' => $lang,
                         ];
