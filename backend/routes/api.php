@@ -445,8 +445,10 @@ Route::get('/excell-export/transactions', function (Request $request) {
         ->where('doctor_id', $data['doctor_id'])
         ->where('clinic_id', $data['clinic_id'])
         ->where(function ($q) {
-            $q->where('type', 'excell_export_campaign')
-              ->orWhere('metadata->order_type', 'excell_export_campaign');
+            if (Schema::hasColumn('transactions', 'type')) {
+                $q->where('type', 'excell_export_campaign');
+            }
+            $q->orWhere('metadata->order_type', 'excell_export_campaign');
         })
         ->selectRaw('count(*) as total, coalesce(sum(amount_paise),0) as total_paise');
 
@@ -460,8 +462,10 @@ Route::get('/excell-export/transactions', function (Request $request) {
         ->where('doctor_id', $data['doctor_id'])
         ->where('clinic_id', $data['clinic_id'])
         ->where(function ($q) {
-            $q->where('type', 'excell_export_campaign')
-              ->orWhere('metadata->order_type', 'excell_export_campaign');
+            if (Schema::hasColumn('transactions', 'type')) {
+                $q->where('type', 'excell_export_campaign');
+            }
+            $q->orWhere('metadata->order_type', 'excell_export_campaign');
         })
         ->with([
             'user:id,name,phone,email',
