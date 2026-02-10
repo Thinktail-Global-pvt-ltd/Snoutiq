@@ -1571,8 +1571,11 @@ Route::middleware('web')->group(function () {
 Route::put('/pets/{id}/extras', [\App\Http\Controllers\Api\UserController::class, 'petExtrasUpdate']);
 
 use App\Http\Controllers\Api\UserOrdersController;
+use App\Http\Controllers\Api\FeedbackWhatsAppController;
 
 Route::get('/users/{id}/orders', [UserOrdersController::class, 'index']);
+Route::post('/consultation/feedback/send', [FeedbackWhatsAppController::class, 'send']);
+Route::post('/consultation/feedback/send-by-pet-vet', [FeedbackWhatsAppController::class, 'sendByPetVet']);
 
 // Night Video Coverage APIs
 use App\Http\Controllers\Api\Video\DoctorVideoScheduleController as VDoctorVideoScheduleController;
