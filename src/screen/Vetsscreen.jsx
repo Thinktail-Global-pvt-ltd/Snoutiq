@@ -8,10 +8,32 @@ const API_URL = "https://snoutiq.com/backend/api/exported_from_excell_doctors";
 const FALLBACK_AVATAR =
   "https://ui-avatars.com/api/?name=Vet&background=E5E7EB&color=111827&size=128";
 
+const parseListField = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item).trim()).filter(Boolean);
+        }
+      } catch {
+        // fall through to comma split
+      }
+    }
+    return trimmed.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+  return [String(value).trim()].filter(Boolean);
+};
+
 const normalizeSpecialties = (specializationText = "") => {
-  const raw = String(specializationText)
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
+  const raw = parseListField(specializationText)
+    .map((s) => s.toLowerCase())
     .filter(Boolean);
 
   const mapped = new Set();
@@ -42,6 +64,13 @@ const buildVetsFromApi = (apiData = []) => {
     const clinicName = clinic?.name || "Clinic";
 
     (clinic?.doctors || []).forEach((doc) => {
+      const specializationList = parseListField(
+        doc?.specialization_select_all_that_apply
+      );
+      const breakTimes = parseListField(
+        doc?.break_do_not_disturb_time_example_2_4_pm
+      );
+
       list.push({
         id: doc?.id,
         clinicName,
@@ -59,7 +88,14 @@ const buildVetsFromApi = (apiData = []) => {
         rating: 4.6,
         consultations: 120,
 
-        specialties: normalizeSpecialties(doc?.specialization_select_all_that_apply),
+        specialties: normalizeSpecialties(specializationList),
+        specializationList,
+        responseDay: doc?.response_time_for_online_consults_day || "",
+        responseNight: doc?.response_time_for_online_consults_night || "",
+        breakTimes,
+        followUp:
+          doc?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta ||
+          "",
 
         raw: doc,
       });
@@ -234,6 +270,47 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           </span>
                         </div>
 
+                        {vet.specializationList?.length ? (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {vet.specializationList.slice(0, 4).map((spec, idx) => (
+                              <span
+                                key={`${spec}-${idx}`}
+                                className="text-[10px] md:text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full border border-stone-200"
+                              >
+                                {spec}
+                              </span>
+                            ))}
+                            {vet.specializationList.length > 4 ? (
+                              <span className="text-[10px] md:text-xs text-stone-400">
+                                +{vet.specializationList.length - 4}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        {vet.responseDay || vet.responseNight || vet.breakTimes?.length ? (
+                          <div className="space-y-1 text-[11px] text-stone-500 md:text-xs">
+                            {vet.responseDay ? (
+                              <div className="flex items-center gap-1">
+                                <Clock size={12} />
+                                <span>Day response: {vet.responseDay}</span>
+                              </div>
+                            ) : null}
+                            {vet.responseNight ? (
+                              <div className="flex items-center gap-1">
+                                <Clock size={12} />
+                                <span>Night response: {vet.responseNight}</span>
+                              </div>
+                            ) : null}
+                            {vet.breakTimes?.length ? (
+                              <div className="flex items-center gap-1">
+                                <Clock size={12} />
+                                <span>Break: {vet.breakTimes.join(", ")}</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+
                         <p className="hidden md:block text-xs text-stone-400">
                           {vet.clinicName}
                         </p>
@@ -246,8 +323,13 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           ₹{vet.priceDay}
                         </span>
                         <span className="text-xs text-stone-400 md:text-sm">
-                          video consult
+                          day consult
                         </span>
+                        {vet.priceNight > 0 ? (
+                          <span className="text-xs text-stone-500 md:text-sm">
+                            Night: Rs. {vet.priceNight}
+                          </span>
+                        ) : null}
                       </div>
 
                       <Button

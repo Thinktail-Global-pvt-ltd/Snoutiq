@@ -44,9 +44,9 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
   return (
     <div className="min-h-screen bg-white text-slate-800">
       {/* Header */}
-      <header className="bg-white shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
         <div className="mx-auto max-w-6xl px-5">
-          <div className="flex items-center justify-between py-5">
+          <div className="flex items-center justify-between py-4 md:py-5">
             <button
               type="button"
               onClick={() => (typeof onStart === "function" ? onStart() : null)}
@@ -54,16 +54,11 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               aria-label="SnoutIQ Home"
             >
               {/* Use logo if you have it; fallback text matches the HTML */}
-             <img
-  src={logo}
-  alt="SnoutIQ"
-  className="
-    h-5 md:h-6 lg:h-6
-    w-auto
-    object-contain
-    hidden sm:block
-  "
-/>
+              <img
+                src={logo}
+                alt="SnoutIQ"
+                className="h-6 w-auto object-contain drop-shadow-sm md:h-6 lg:h-6"
+              />
 
             </button>
 
@@ -72,7 +67,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               onClick={() =>
                 typeof onVetAccess === "function" ? onVetAccess() : null
               }
-              className="font-medium text-blue-600 hover:opacity-80"
+              className="rounded-full border border-[#3998de]/30 px-4 py-1.5 text-sm font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10"
             >
               🩺 Vet Access
             </button>
@@ -81,18 +76,20 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       </header>
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-sky-50 to-sky-100 py-14">
-        <div className="mx-auto max-w-6xl px-5">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-16">
+        <div className="pointer-events-none absolute -top-24 right-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 left-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
+        <div className="relative mx-auto max-w-6xl px-5">
           <div className="grid grid-cols-1 items-center gap-12 md:grid-cols-2">
             {/* Left */}
             <div>
-              <div className="inline-block rounded-full bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-900">
+              <div className="inline-block rounded-full bg-[#EAF4FF] px-4 py-2 text-sm font-semibold text-[#1D4E89] shadow-sm">
                 ⭐ Trusted by 1000+ Pet Parents
               </div>
 
               <h1 className="mt-5 text-4xl font-extrabold leading-tight text-slate-900 md:text-5xl">
                 Connect with a{" "}
-                <span className="text-blue-600">verified veterinarian</span> in
+                <span className="text-[#3998de]">verified veterinarian</span> in
                 15 minutes
               </h1>
 
@@ -103,7 +100,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               </p>
 
               {/* Vets display */}
-              <div className="mt-6 flex items-center gap-4">
+              <div className="mt-6 flex items-center gap-4 rounded-2xl bg-white/70 px-4 py-3 shadow-sm ring-1 ring-white/60">
                 <div className="flex items-center">
                   {["Dr", "Dr", "Dr", "Dr"].map((t, i) => (
                     <div
@@ -119,7 +116,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                       {t}
                     </div>
                   ))}
-                  <div className="-ml-2 flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-white bg-blue-100 text-sm font-bold text-blue-700 shadow-sm">
+                  <div className="-ml-2 flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-white bg-[#EAF4FF] text-sm font-bold text-[#1D4E89] shadow-sm">
                     +6
                   </div>
                 </div>
@@ -136,20 +133,20 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               <button
                 type="button"
                 onClick={() => (typeof onStart === "function" ? onStart() : null)}
-                className="mt-7 inline-flex items-center justify-center rounded-lg bg-blue-600 px-10 py-4 text-lg font-semibold text-white transition hover:bg-blue-700"
+                className="mt-7 inline-flex items-center justify-center rounded-xl bg-[#3998de] px-10 py-4 text-lg font-semibold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0]"
               >
                 📹 Consult a Veterinarian
               </button>
 
               {/* Stats */}
-              <div className="mt-8 flex flex-col gap-5 sm:flex-row sm:gap-10">
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
                 {[
                   { n: "~15min", l: "Average response time" },
                   { n: "100%", l: "Licensed vets" },
                   { n: "24/7", l: "Available" },
                 ].map((s, i) => (
-                  <div key={i} className="text-center sm:text-left">
-                    <div className="text-3xl font-extrabold text-blue-600">
+                  <div key={i} className="rounded-xl border border-white/70 bg-white/80 px-4 py-3 text-center shadow-sm sm:text-left">
+                    <div className="text-3xl font-extrabold text-[#3998de]">
                       {s.n}
                     </div>
                     <div className="text-sm text-slate-500">{s.l}</div>
@@ -295,7 +292,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
             ].map((f, i) => (
               <div
                 key={i}
-                className="rounded-xl bg-slate-50 p-8 text-center"
+                className="rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
               >
                 <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200 text-4xl">
                   {f.icon}
@@ -335,8 +332,8 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 desc: "Get professional advice on next steps, home care recommendations, and when to visit a clinic.",
               },
             ].map((s, i) => (
-              <div key={i} className="p-8 text-center">
-                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-2xl font-extrabold text-white">
+              <div key={i} className="rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-sm">
+                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#3998de] text-2xl font-extrabold text-white">
                   {s.n}
                 </div>
                 <h3 className="text-xl font-semibold text-slate-900">
@@ -370,7 +367,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                     className="flex w-full items-center justify-between bg-slate-50 px-5 py-5 text-left font-semibold text-slate-900 hover:bg-slate-100"
                   >
                     <span className="pr-4">{item.q}</span>
-                    <span className="text-xl font-bold text-blue-600">
+                    <span className="text-xl font-bold text-[#3998de]">
                       {isOpen ? "−" : "+"}
                     </span>
                   </button>

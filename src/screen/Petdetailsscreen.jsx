@@ -63,15 +63,41 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const calcAgeFromDob = (dob) => {
   if (!dob) return "";
-  const d = new Date(dob);
-  if (Number.isNaN(d.getTime())) return "";
-  const now = new Date();
-  if (d > now) return "";
-  let years = now.getFullYear() - d.getFullYear();
-  const m = now.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) years -= 1;
-  if (years < 0) return "";
-  return `${years} yr${years === 1 ? "" : "s"}`;
+
+  const birth = new Date(dob);
+  if (Number.isNaN(birth.getTime())) return "";
+
+  const today = new Date();
+  if (birth > today) return "";
+
+  let years = today.getFullYear() - birth.getFullYear();
+  let months = today.getMonth() - birth.getMonth();
+  let days = today.getDate() - birth.getDate();
+
+  if (days < 0) {
+    months -= 1;
+  }
+
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  if (years <= 0 && months <= 0) {
+    return "Less than 1 month";
+  }
+
+  if (years <= 0) {
+    return `${months} mo${months === 1 ? "" : "s"}`;
+  }
+
+  if (months === 0) {
+    return `${years} yr${years === 1 ? "" : "s"}`;
+  }
+
+  return `${years} yr${years === 1 ? "" : "s"} ${months} mo${
+    months === 1 ? "" : "s"
+  }`;
 };
 
 const fieldBase =
