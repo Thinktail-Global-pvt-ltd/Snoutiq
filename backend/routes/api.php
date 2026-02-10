@@ -441,14 +441,19 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'clinic_id' => ['required', 'integer'],
     ]);
 
-    $count = Transaction::query()
+    $query = Transaction::query()
         ->where('doctor_id', $data['doctor_id'])
         ->where('clinic_id', $data['clinic_id'])
         ->where(function ($q) {
             $q->where('type', 'excell_export_campaign')
               ->orWhere('metadata->order_type', 'excell_export_campaign');
         })
-        ->count();
+        ->selectRaw('count(*) as total, coalesce(sum(amount_paise),0) as total_paise');
+
+    $row = $query->first();
+
+    $count = (int) ($row->total ?? 0);
+    $totalPaise = (int) ($row->total_paise ?? 0);
 
     return response()->json([
         'success' => true,
@@ -456,6 +461,8 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'clinic_id' => $data['clinic_id'],
         'order_type' => 'excell_export_campaign',
         'total_transactions' => $count,
+        'total_amount_paise' => $totalPaise,
+        'total_amount_inr' => $totalPaise / 100,
     ]);
 })->name('excell_export.transactions');
 
