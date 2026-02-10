@@ -3,6 +3,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 // use App
 use App\Http\Controllers\Api\UnifiedIntelligenceController;
 use App\Http\Controllers\Api\AuthController;
@@ -39,6 +41,8 @@ use App\Models\User;
 use App\Models\DeviceToken;
 use App\Models\Doctor;
 use App\Models\VetRegisterationTemp;
+use App\Models\Pet;
+use App\Models\UserObservation;
 use App\Support\DeviceTokenOwnerResolver;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
@@ -281,6 +285,86 @@ Route::get('/exported_from_excell_doctors', function () {
         'data' => $vets,
     ]);
 })->name('exported_from_excell_doctors');
+
+// Create user + pet + observation
+Route::post('/user-pet-observation', function (Request $request) {
+    $data = $request->validate([
+        'name' => ['required', 'string', 'max:255'],
+        'phone' => ['required', 'string', 'max:20', 'unique:users,phone'],
+        'breed' => ['required', 'string', 'max:255'],
+        'dob' => ['nullable', 'date'],
+        'type' => ['required', 'string', 'max:100'],
+        'reported_symptom' => ['nullable', 'string'],
+        'pet_doc2' => ['nullable', 'string'],
+        'appetite' => ['nullable', 'string'],
+        'enery' => ['nullable', 'string'], // input typo handled
+        'energy' => ['nullable', 'string'],
+        'mood' => ['nullable', 'string'],
+    ]);
+
+    $result = DB::transaction(function () use ($data) {
+        $phoneDigits = preg_replace('/\\D+/', '', $data['phone']);
+        $baseEmail = 'pp_'.$phoneDigits.'@snoutiq.local';
+        $email = $baseEmail;
+        $suffix = 1;
+        while (User::where('email', $email)->exists()) {
+            $email = 'pp_'.$phoneDigits.'_'.$suffix.'@snoutiq.local';
+            $suffix++;
+        }
+
+        $user = User::create([
+            'name' => $data['name'],
+            'phone' => $data['phone'],
+            'email' => $email,
+            'role' => 'pet_parent',
+            'password' => Hash::make('123456'),
+        ]);
+
+        $pet = new Pet();
+        $pet->user_id = $user->id;
+        $pet->name = $data['name']."'s pet";
+        $pet->breed = $data['breed'];
+        $pet->reported_symptom = $data['reported_symptom'] ?? null;
+        $pet->pet_doc2 = $data['pet_doc2'] ?? null;
+
+        if (Schema::hasColumn('pets', 'pet_type')) {
+            $pet->pet_type = $data['type'];
+        }
+        if (Schema::hasColumn('pets', 'type')) {
+            $pet->type = $data['type'];
+        }
+        if (!empty($data['dob'])) {
+            if (Schema::hasColumn('pets', 'pet_dob')) {
+                $pet->pet_dob = $data['dob'];
+            }
+            if (Schema::hasColumn('pets', 'dob')) {
+                $pet->dob = $data['dob'];
+            }
+        }
+
+        $pet->save();
+
+        $observation = new UserObservation();
+        $observation->user_id = $user->id;
+        $observation->pet_id = $pet->id;
+        $observation->appetite = $data['appetite'] ?? null;
+        $observation->energy = $data['energy'] ?? ($data['enery'] ?? null);
+        $observation->mood = $data['mood'] ?? null;
+        $observation->observed_at = now();
+        $observation->save();
+
+        return [
+            'user' => $user->only(['id', 'name', 'phone', 'email']),
+            'pet' => $pet->only(['id', 'user_id', 'name', 'breed', 'pet_type', 'type', 'pet_dob', 'dob', 'reported_symptom', 'pet_doc2']),
+            'observation' => $observation->only(['id', 'user_id', 'pet_id', 'appetite', 'energy', 'mood', 'observed_at']),
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'data' => $result,
+    ], 201);
+})->name('user_pet_observation.store');
 
 Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
     $doctorId = $request->query('doctor_id');
