@@ -304,7 +304,9 @@ Route::post('/user-pet-observation', function (Request $request) {
         'mood' => ['nullable', 'string'],
     ]);
 
-    $result = DB::transaction(function () use ($data) {
+    $uploadedFile = $request->file('file');
+
+    $result = DB::transaction(function () use ($data, $uploadedFile) {
         $phoneDigits = preg_replace('/\\D+/', '', $data['phone']);
         $baseEmail = 'pp_'.$phoneDigits.'@snoutiq.local';
         $email = $baseEmail;
@@ -345,9 +347,9 @@ Route::post('/user-pet-observation', function (Request $request) {
         }
 
         // Handle optional file upload and set pet_doc2
-        if (!empty($data['file'])) {
-            $file = $request->file('file');
-            if ($file && $file->isValid()) {
+        if ($uploadedFile) {
+            $file = $uploadedFile;
+            if ($file->isValid()) {
                 $storedPath = $file->store('pet-docs', 'public');
                 $publicBase = rtrim((string) config('app.url'), '/');
                 if (! str_ends_with($publicBase, '/backend')) {
