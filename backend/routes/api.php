@@ -45,8 +45,10 @@ use App\Models\VetRegisterationTemp;
 use App\Models\Pet;
 use App\Models\UserObservation;
 use App\Models\Transaction;
+use App\Models\Otp;
 use App\Support\DeviceTokenOwnerResolver;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
+use App\Services\WhatsAppService;
 
 use App\Http\Controllers\AdminController;
 // use App\Http\Controllers\CallController;
@@ -433,6 +435,97 @@ Route::post('/pet-doc/upload', function (Request $request) {
         ],
     ], 201);
 })->name('pet_doc.upload');
+
+// Doctor OTP: send
+Route::post('/doctor/otp/request', function (Request $request, WhatsAppService $whatsApp) {
+    $payload = $request->validate([
+        'phone' => ['required', 'string'],
+    ]);
+
+    $phone = preg_replace('/\\D+/', '', $payload['phone']);
+    if (! $phone) {
+        return response()->json(['success' => false, 'message' => 'Invalid phone'], 422);
+    }
+
+    $doctor = Doctor::whereRaw("REGEXP_REPLACE(doctor_mobile, '[^0-9]', '') = ?", [$phone])->first()
+        ?: Doctor::where('doctor_mobile', $payload['phone'])->first();
+    if (! $doctor) {
+        return response()->json(['success' => false, 'message' => 'Doctor not found'], 404);
+    }
+
+    $otp = (string) random_int(100000, 999999);
+    $token = (string) \Illuminate\Support\Str::uuid();
+    $expiresAt = now()->addMinutes(10);
+
+    if ($whatsApp->isConfigured()) {
+        try {
+            $whatsApp->sendOtpTemplate($phone, $otp);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Unable to send OTP'], 503);
+        }
+    }
+
+    Otp::create([
+        'token' => $token,
+        'type' => 'whatsapp',
+        'value' => $phone,
+        'otp' => $otp,
+        'expires_at' => $expiresAt,
+        'is_verified' => 0,
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'OTP sent',
+        'request_id' => $token,
+        'expires_in' => 600,
+        'otp' => config('app.debug') ? $otp : 'hidden',
+    ]);
+})->name('doctor.otp.request');
+
+// Doctor OTP: verify
+Route::post('/doctor/otp/verify', function (Request $request) {
+    $payload = $request->validate([
+        'phone' => ['required', 'string'],
+        'otp' => ['required', 'string'],
+        'request_id' => ['nullable', 'string'],
+    ]);
+
+    $phone = preg_replace('/\\D+/', '', $payload['phone']);
+    if (! $phone) {
+        return response()->json(['success' => false, 'message' => 'Invalid phone'], 422);
+    }
+
+    $doctor = Doctor::whereRaw("REGEXP_REPLACE(doctor_mobile, '[^0-9]', '') = ?", [$phone])->first()
+        ?: Doctor::where('doctor_mobile', $payload['phone'])->first();
+    if (! $doctor) {
+        return response()->json(['success' => false, 'message' => 'Doctor not found'], 404);
+    }
+
+    $otpQuery = Otp::query()
+        ->where('type', 'whatsapp')
+        ->where('value', $phone)
+        ->where('otp', $payload['otp'])
+        ->where('expires_at', '>', now());
+
+    if (! empty($payload['request_id'])) {
+        $otpQuery->where('token', $payload['request_id']);
+    }
+
+    $otpEntry = $otpQuery->latest()->first();
+    if (! $otpEntry) {
+        return response()->json(['success' => false, 'message' => 'Invalid or expired OTP'], 401);
+    }
+
+    $otpEntry->update(['is_verified' => 1]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'OTP verified',
+        'doctor_id' => $doctor->id,
+        'doctor' => $doctor->only(['id', 'doctor_name', 'doctor_email', 'doctor_mobile']),
+    ]);
+})->name('doctor.otp.verify');
 
 // Transactions count for excell export campaign by doctor & clinic
 Route::get('/excell-export/transactions', function (Request $request) {
