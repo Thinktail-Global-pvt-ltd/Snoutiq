@@ -261,6 +261,27 @@ Route::get('/doctor/profile', function (Request $request) {
     ]);
 });
 
+// Exported-from-excel vets with doctors
+Route::get('/exported_from_excell_doctors', function () {
+    $vets = VetRegisterationTemp::query()
+        ->where('exported_from_excell', 1)
+        ->with(['doctors' => function ($q) {
+            $q->where('exported_from_excell', 1);
+        }])
+        ->get([
+            'id',
+            'name',
+            'email',
+            'mobile',
+            'exported_from_excell',
+        ]);
+
+    return response()->json([
+        'success' => true,
+        'data' => $vets,
+    ]);
+})->name('exported_from_excell_doctors');
+
 Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
     $doctorId = $request->query('doctor_id');
     if (!$doctorId) {
