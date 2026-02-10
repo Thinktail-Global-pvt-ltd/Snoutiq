@@ -37,7 +37,7 @@ class SendVetResponseReminders extends Command
                 ->get();
         } else {
             $query = Transaction::query()
-                ->where('type', 'video_consult')
+                ->whereIn('type', ['video_consult', 'excell_export_campaign'])
                 ->whereIn('status', ['pending', 'initiated', 'created', 'authorized', 'captured', 'paid', 'success', 'successful'])
                 ->whereRaw("COALESCE(JSON_EXTRACT(metadata, '$.vet_response_reminder_sent_at'), '') = ''")
                 ->where('created_at', '<=', $now->copy()->subMinutes(15))
