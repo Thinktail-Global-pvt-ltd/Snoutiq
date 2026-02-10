@@ -483,7 +483,7 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 'amount_paise' => $t->amount_paise,
                 'amount_inr' => $t->amount_paise / 100,
                 'payment_method' => $t->payment_method,
-                'type' => $t->type,
+                'type' => $t->type ?? ($t->metadata['order_type'] ?? null),
                 'metadata' => $t->metadata,
                 'created_at' => optional($t->created_at)->toIso8601String(),
                 'updated_at' => optional($t->updated_at)->toIso8601String(),
