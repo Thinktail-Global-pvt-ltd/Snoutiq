@@ -54,6 +54,9 @@ const Auth = () => {
   const handleLogin = (payload) => {
     const nextAuth = payload || loadVetAuth();
     setAuth(nextAuth);
+    if (nextAuth) {
+      navigate("/vet-dashboard", { replace: true, state: { auth: nextAuth } });
+    }
   };
 
   return (

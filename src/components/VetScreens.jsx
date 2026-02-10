@@ -1301,8 +1301,8 @@ export const VetPendingScreen = ({ onHome }) => {
 // Keep your existing VetDashboardScreen here as-is.
 // (No image upload needed in dashboard, so no changes required)
 
-export const VetDashboardScreen = ({ onLogout }) => {
-  const [auth, setAuth] = useState(() => loadVetAuth());
+export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
+  const [auth, setAuth] = useState(() => authFromProps || loadVetAuth());
   const [dashboardData, setDashboardData] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1323,6 +1323,23 @@ export const VetDashboardScreen = ({ onLogout }) => {
     medications: [{ name: "", dosage: "", frequency: "", duration: "" }],
     recordFile: null,
   });
+
+  useEffect(() => {
+    if (authFromProps) {
+      setAuth(authFromProps);
+      return;
+    }
+    const storedAuth = loadVetAuth();
+    if (storedAuth) {
+      setAuth(storedAuth);
+    }
+  }, [authFromProps]);
+
+  useEffect(() => {
+    if (auth) {
+      saveVetAuth(auth);
+    }
+  }, [auth]);
 
   const formatAmount = (value) => {
     const num = Number(value);
@@ -1356,6 +1373,34 @@ export const VetDashboardScreen = ({ onLogout }) => {
 
   const statusLabel = (status) => (status ? status.replace(/_/g, " ") : "unknown");
 
+  const normalizeId = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) return "";
+    return String(num);
+  };
+
+  const doctorId = normalizeId(
+    auth?.doctor_id ||
+      auth?.doctor?.id ||
+      auth?.doctor?.doctor_id ||
+      auth?.doctor?.doctorId
+  );
+
+  const clinicIdRaw = normalizeId(
+    auth?.clinic_id ||
+      auth?.doctor?.clinic_id ||
+      auth?.doctor?.vet_registeration_id ||
+      auth?.doctor?.vet_registration_id ||
+      auth?.doctor?.clinicId
+  );
+
+  const authToken =
+    auth?.token ||
+    auth?.access_token ||
+    auth?.doctor?.token ||
+    auth?.doctor?.access_token ||
+    "";
+
   const resolveTransactionIds = (transaction) => {
     const metadata = transaction?.metadata || {};
     const notes = metadata?.notes || {};
@@ -1363,12 +1408,10 @@ export const VetDashboardScreen = ({ onLogout }) => {
       userId: transaction?.user?.id || metadata?.user_id || notes?.user_id || "",
       petId: transaction?.pet?.id || metadata?.pet_id || notes?.pet_id || "",
       doctorId:
-        auth?.doctor_id ||
-        transaction?.doctor?.id ||
-        metadata?.doctor_id ||
-        notes?.doctor_id ||
-        "",
-      clinicId: auth?.clinic_id || metadata?.clinic_id || notes?.clinic_id || "",
+        doctorId ||
+        normalizeId(transaction?.doctor?.id || metadata?.doctor_id || notes?.doctor_id),
+      clinicId:
+        clinicIdRaw || normalizeId(metadata?.clinic_id || notes?.clinic_id),
     };
   };
 
@@ -1513,20 +1556,31 @@ export const VetDashboardScreen = ({ onLogout }) => {
   };
 
   useEffect(() => {
+    if (!auth) return;
+    if (!doctorId) {
+      setLoadError("Missing doctor ID. Please log in again.");
+      setIsLoading(false);
+      return;
+    }
+
     const controller = new AbortController();
-    const resolveClinicId = async (doctorId) => {
+    const resolveClinicId = async (value) => {
       try {
         const url = `${apiBaseUrl()}/api/doctor/profile?doctor_id=${encodeURIComponent(
-          doctorId
+          value
         )}`;
-        const res = await fetch(url, { signal: controller.signal });
+        const headers = authToken
+          ? { Authorization: `Bearer ${authToken}`, Accept: "application/json" }
+          : { Accept: "application/json" };
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers,
+          credentials: "include",
+        });
         if (!res.ok) return "";
         const data = await res.json().catch(() => ({}));
-        return (
-          data?.data?.vet_registeration_id ||
-          data?.data?.clinic?.id ||
-          data?.clinic?.id ||
-          ""
+        return normalizeId(
+          data?.data?.vet_registeration_id || data?.data?.clinic?.id || data?.clinic?.id
         );
       } catch (error) {
         if (error?.name === "AbortError") return "";
@@ -1538,40 +1592,20 @@ export const VetDashboardScreen = ({ onLogout }) => {
       setIsLoading(true);
       setLoadError("");
       try {
-        const storedAuth = loadVetAuth();
-        setAuth(storedAuth);
-
-        const doctorId =
-          storedAuth?.doctor_id ||
-          storedAuth?.doctor?.id ||
-          storedAuth?.doctor?.doctor_id ||
-          "";
-        let clinicId =
-          storedAuth?.clinic_id ||
-          storedAuth?.doctor?.clinic_id ||
-          storedAuth?.doctor?.vet_registeration_id ||
-          storedAuth?.doctor?.vet_registration_id ||
-          "";
-
-        if (!doctorId) {
-          throw new Error("Missing doctor ID. Please log in again.");
-        }
-
+        let clinicId = clinicIdRaw;
         if (!clinicId) {
           const resolvedClinicId = await resolveClinicId(doctorId);
-          if (resolvedClinicId) {
-            clinicId = resolvedClinicId;
-            const updatedAuth = {
-              ...storedAuth,
+          if (resolvedClinicId && resolvedClinicId !== clinicIdRaw) {
+            setAuth((prev) => ({
+              ...(prev || {}),
               clinic_id: resolvedClinicId,
               doctor: {
-                ...(storedAuth?.doctor || {}),
+                ...(prev?.doctor || {}),
                 clinic_id: resolvedClinicId,
                 vet_registeration_id: resolvedClinicId,
               },
-            };
-            saveVetAuth(updatedAuth);
-            setAuth(updatedAuth);
+            }));
+            clinicId = resolvedClinicId;
           }
         }
 
@@ -1582,7 +1616,14 @@ export const VetDashboardScreen = ({ onLogout }) => {
         const url = `${apiBaseUrl()}/api/excell-export/transactions?doctor_id=${encodeURIComponent(
           doctorId
         )}&clinic_id=${encodeURIComponent(clinicId)}`;
-        const res = await fetch(url, { signal: controller.signal });
+        const headers = authToken
+          ? { Authorization: `Bearer ${authToken}`, Accept: "application/json" }
+          : { Accept: "application/json" };
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers,
+          credentials: "include",
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!data?.success) {
@@ -1605,7 +1646,7 @@ export const VetDashboardScreen = ({ onLogout }) => {
 
     fetchTransactions();
     return () => controller.abort();
-  }, []);
+  }, [auth, authToken, clinicIdRaw, doctorId]);
 
   const handleLogout = () => {
     clearVetAuth();

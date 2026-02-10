@@ -42,7 +42,10 @@ const VetDashboard = () => {
 
   return (
     <Suspense fallback={<LoadingScreen />}>
-      <VetDashboardScreen onLogout={() => navigate("/auth", { replace: true })} />
+      <VetDashboardScreen
+        auth={auth}
+        onLogout={() => navigate("/auth", { replace: true })}
+      />
     </Suspense>
   );
 };

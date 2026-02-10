@@ -402,12 +402,11 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       fd.append("type", details.type || "");
       fd.append("dob", details.petDob || "");
 
-      // breed only for dog/cat
-      if (details.type === "dog" || details.type === "cat") {
-        fd.append("breed", details.breed || "");
-      } else {
-        fd.append("breed", "");
-      }
+      const breedValue =
+        details.type === "exotic"
+          ? details.exoticType.trim()
+          : details.breed || "";
+      fd.append("breed", breedValue);
 
       fd.append("reported_symptom", details.problemText || "");
       fd.append("appetite", details.lastDaysAppetite || "");

@@ -1,0 +1,19 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Serve existing files/directories
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Root
+    RewriteRule ^$ /index.html [L]
+
+    # Known SPA routes (keep in sync with React routes)
+    RewriteRule ^(auth|vet-dashboard|veterinary-practice-software|privacy-policy|terms-of-service|cancellation-policy|cookie-policy|vet-register|medical-data-consent|shipping-policy|consultation-booked|patient-call-test|doctor-receiver-test|call-lab|doctor-receiver|call-demo|csv-upload|s3-upload-test|delhi|gurugram|clinics-solution)/?$ /index.html [L]
+    RewriteRule ^blog($|/.*) /index.html [L]
+    RewriteRule ^doctor-dashboard/[^/]+/?$ /index.html [L]
+
+    # Everything else is a real 404
+    RewriteRule ^ - [R=404,L]
+</IfModule>
