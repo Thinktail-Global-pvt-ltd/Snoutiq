@@ -2137,7 +2137,10 @@ export const VetDashboardScreen = ({ onLogout }) => {
                       </div>
                       <div className="space-y-3">
                         {prescriptionForm.medications.map((medication, index) => (
-                          <div key={`med-${index}`} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          <div
+                            key={`med-${index}`}
+                            className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.2fr_0.9fr_0.9fr_0.8fr_auto] items-center"
+                          >
                             <input
                               type="text"
                               value={medication.name}
@@ -2159,22 +2162,20 @@ export const VetDashboardScreen = ({ onLogout }) => {
                               placeholder="Frequency"
                               className={INPUT_BASE_CLASS}
                             />
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                              <input
-                                type="text"
-                                value={medication.duration}
-                                onChange={updateMedication(index, "duration")}
-                                placeholder="Duration"
-                                className={INPUT_BASE_CLASS}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeMedication(index)}
-                                className="rounded-full border border-stone-200 px-3 py-2 text-xs text-stone-500 hover:bg-stone-50 w-full sm:w-auto"
-                              >
-                                Remove
-                              </button>
-                            </div>
+                            <input
+                              type="text"
+                              value={medication.duration}
+                              onChange={updateMedication(index, "duration")}
+                              placeholder="Duration"
+                              className={INPUT_BASE_CLASS}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeMedication(index)}
+                              className="rounded-full border border-stone-200 px-3 py-2 text-xs text-stone-500 hover:bg-stone-50 sm:col-span-2 lg:col-span-1 w-full lg:w-auto lg:justify-self-end"
+                            >
+                              Remove
+                            </button>
                           </div>
                         ))}
                       </div>

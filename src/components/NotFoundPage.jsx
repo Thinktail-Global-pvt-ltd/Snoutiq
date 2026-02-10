@@ -41,26 +41,71 @@ const NotFoundPage = () => {
     document.title = 'Page Not Found | SnoutIQ';
 
     let robotsMeta = document.querySelector('meta[name="robots"]');
-    let createdMeta = false;
+    let createdRobots = false;
     const previousRobots = robotsMeta?.getAttribute('content') || null;
+    let googlebotMeta = document.querySelector('meta[name="googlebot"]');
+    let createdGooglebot = false;
+    const previousGooglebot = googlebotMeta?.getAttribute('content') || null;
+    let canonicalLink = document.querySelector('link[rel="canonical"]');
+    let createdCanonical = false;
+    const previousCanonical = canonicalLink?.getAttribute('href') || null;
+    const canonicalUrl = `${window.location.origin}/404`;
 
     if (!robotsMeta) {
       robotsMeta = document.createElement('meta');
       robotsMeta.setAttribute('name', 'robots');
       document.head.appendChild(robotsMeta);
-      createdMeta = true;
+      createdRobots = true;
     }
     robotsMeta.setAttribute('content', 'noindex, nofollow');
+
+    if (!googlebotMeta) {
+      googlebotMeta = document.createElement('meta');
+      googlebotMeta.setAttribute('name', 'googlebot');
+      document.head.appendChild(googlebotMeta);
+      createdGooglebot = true;
+    }
+    googlebotMeta.setAttribute('content', 'noindex, nofollow');
+
+    if (!canonicalLink) {
+      canonicalLink = document.createElement('link');
+      canonicalLink.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonicalLink);
+      createdCanonical = true;
+    }
+    canonicalLink.setAttribute('href', canonicalUrl);
+
+    if (window.location.pathname !== '/404') {
+      window.history.replaceState(null, '', '/404');
+    }
 
     return () => {
       document.title = previousTitle;
       if (robotsMeta) {
-        if (createdMeta && robotsMeta.parentNode) {
+        if (createdRobots && robotsMeta.parentNode) {
           robotsMeta.parentNode.removeChild(robotsMeta);
         } else if (previousRobots !== null) {
           robotsMeta.setAttribute('content', previousRobots);
         } else {
           robotsMeta.removeAttribute('content');
+        }
+      }
+      if (googlebotMeta) {
+        if (createdGooglebot && googlebotMeta.parentNode) {
+          googlebotMeta.parentNode.removeChild(googlebotMeta);
+        } else if (previousGooglebot !== null) {
+          googlebotMeta.setAttribute('content', previousGooglebot);
+        } else {
+          googlebotMeta.removeAttribute('content');
+        }
+      }
+      if (canonicalLink) {
+        if (createdCanonical && canonicalLink.parentNode) {
+          canonicalLink.parentNode.removeChild(canonicalLink);
+        } else if (previousCanonical !== null) {
+          canonicalLink.setAttribute('href', previousCanonical);
+        } else {
+          canonicalLink.removeAttribute('href');
         }
       }
     };

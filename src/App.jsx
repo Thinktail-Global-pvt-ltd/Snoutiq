@@ -169,6 +169,7 @@ function App() {
               path="/consultation-booked"
               element={<ConsultationBooked />}
             />
+            <Route path="/404" element={<NotFoundPage />} />
             {/* <Route path="/patient-dashboard" element={<PatientDashboard />} /> */}
             {/* <Route
               path="/doctor-dashboard"
