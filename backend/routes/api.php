@@ -515,6 +515,117 @@ Route::get('/excell-export/transactions', function (Request $request) {
     ]);
 })->name('excell_export.transactions');
 
+// Create vet + doctor for excel export campaign (standalone API)
+Route::post('/excell-export/import', function (Request $request) {
+    $data = $request->validate([
+        // Vet fields
+        'vet_name' => ['required', 'string', 'max:255'],
+        'vet_email' => ['nullable', 'email', 'max:255'],
+        'vet_mobile' => ['nullable', 'string', 'max:30'],
+        'vet_city' => ['nullable', 'string', 'max:150'],
+
+        // Doctor fields
+        'doctor_name' => ['required', 'string', 'max:255'],
+        'doctor_email' => ['nullable', 'email', 'max:255'],
+        'doctor_mobile' => ['nullable', 'string', 'max:30'],
+        'doctor_license' => ['nullable', 'string', 'max:255'],
+        'doctor_image' => ['nullable', 'string', 'max:500'],
+        'degree' => ['nullable', 'string', 'max:255'],
+        'years_of_experience' => ['nullable', 'string', 'max:50'],
+        'specialization_select_all_that_apply' => ['nullable', 'array'],
+        'specialization_select_all_that_apply.*' => ['nullable', 'string'],
+        'response_time_for_online_consults_day' => ['nullable', 'string', 'max:255'],
+        'response_time_for_online_consults_night' => ['nullable', 'string', 'max:255'],
+        'break_do_not_disturb_time_example_2_4_pm' => ['nullable', 'array'],
+        'break_do_not_disturb_time_example_2_4_pm.*' => ['nullable', 'string', 'max:255'],
+        'do_you_offer_a_free_follow_up_within_3_days_after_a_consulta' => ['nullable', 'string', 'max:255'],
+        'commission_and_agreement' => ['nullable', 'string', 'max:255'],
+        'video_day_rate' => ['nullable', 'numeric'],
+        'video_night_rate' => ['nullable', 'numeric'],
+    ]);
+
+    $result = DB::transaction(function () use ($data) {
+        $vet = new VetRegisterationTemp();
+        $vet->name = $data['vet_name'];
+        $vet->email = $data['vet_email'] ?? null;
+        $vet->mobile = $data['vet_mobile'] ?? null;
+        if (Schema::hasColumn('vet_registerations_temp', 'city')) {
+            $vet->city = $data['vet_city'] ?? null;
+        }
+
+        if (Schema::hasColumn('vet_registerations_temp', 'password') && empty($vet->password)) {
+            $vet->password = '123456';
+        }
+        if (Schema::hasColumn('vet_registerations_temp', 'exported_from_excell')) {
+            $vet->exported_from_excell = 1;
+        }
+        $vet->save();
+
+        $doctor = new Doctor();
+        $doctor->vet_registeration_id = $vet->id;
+        $doctor->doctor_name = $data['doctor_name'];
+        $doctor->doctor_email = $data['doctor_email'] ?? null;
+        $doctor->doctor_mobile = $data['doctor_mobile'] ?? null;
+        $doctor->doctor_license = $data['doctor_license'] ?? null;
+        $doctor->doctor_image = $data['doctor_image'] ?? null;
+        $doctor->degree = $data['degree'] ?? null;
+        $doctor->years_of_experience = $data['years_of_experience'] ?? null;
+        $doctor->specialization_select_all_that_apply = isset($data['specialization_select_all_that_apply'])
+            ? json_encode(array_values(array_filter($data['specialization_select_all_that_apply'])))
+            : null;
+        $doctor->response_time_for_online_consults_day = $data['response_time_for_online_consults_day'] ?? null;
+        $doctor->response_time_for_online_consults_night = $data['response_time_for_online_consults_night'] ?? null;
+        $doctor->break_do_not_disturb_time_example_2_4_pm = isset($data['break_do_not_disturb_time_example_2_4_pm'])
+            ? json_encode(array_values(array_filter($data['break_do_not_disturb_time_example_2_4_pm'])))
+            : null;
+        $doctor->do_you_offer_a_free_follow_up_within_3_days_after_a_consulta = $data['do_you_offer_a_free_follow_up_within_3_days_after_a_consulta'] ?? null;
+        $doctor->commission_and_agreement = $data['commission_and_agreement'] ?? null;
+        $doctor->video_day_rate = $data['video_day_rate'] ?? null;
+        $doctor->video_night_rate = $data['video_night_rate'] ?? null;
+
+        if (Schema::hasColumn('doctors', 'exported_from_excell')) {
+            $doctor->exported_from_excell = 1;
+        }
+        if (Schema::hasColumn('doctors', 'password') && empty($doctor->password)) {
+            $doctor->password = '123456';
+        }
+        if (Schema::hasColumn('doctors', 'doctor_password') && empty($doctor->doctor_password)) {
+            $doctor->doctor_password = '123456';
+        }
+
+        $doctor->save();
+
+        return [
+            'vet' => $vet->only(['id', 'name', 'email', 'mobile', 'exported_from_excell']),
+            'doctor' => $doctor->only([
+                'id',
+                'vet_registeration_id',
+                'doctor_name',
+                'doctor_email',
+                'doctor_mobile',
+                'doctor_license',
+                'doctor_image',
+                'degree',
+                'years_of_experience',
+                'specialization_select_all_that_apply',
+                'response_time_for_online_consults_day',
+                'response_time_for_online_consults_night',
+                'break_do_not_disturb_time_example_2_4_pm',
+                'do_you_offer_a_free_follow_up_within_3_days_after_a_consulta',
+                'commission_and_agreement',
+                'video_day_rate',
+                'video_night_rate',
+                'exported_from_excell',
+            ]),
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'data' => $result,
+    ], 201);
+})->name('excell_export.import');
+
 Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
     $doctorId = $request->query('doctor_id');
     if (!$doctorId) {
