@@ -44,6 +44,7 @@ use App\Models\Doctor;
 use App\Models\VetRegisterationTemp;
 use App\Models\Pet;
 use App\Models\UserObservation;
+use App\Models\Transaction;
 use App\Support\DeviceTokenOwnerResolver;
 use App\Http\Controllers\Auth\ForgotPasswordSimpleController;
 
@@ -432,6 +433,31 @@ Route::post('/pet-doc/upload', function (Request $request) {
         ],
     ], 201);
 })->name('pet_doc.upload');
+
+// Transactions count for excell export campaign by doctor & clinic
+Route::get('/excell-export/transactions', function (Request $request) {
+    $data = $request->validate([
+        'doctor_id' => ['required', 'integer'],
+        'clinic_id' => ['required', 'integer'],
+    ]);
+
+    $count = Transaction::query()
+        ->where('doctor_id', $data['doctor_id'])
+        ->where('clinic_id', $data['clinic_id'])
+        ->where(function ($q) {
+            $q->where('type', 'excell_export_campaign')
+              ->orWhere('metadata->order_type', 'excell_export_campaign');
+        })
+        ->count();
+
+    return response()->json([
+        'success' => true,
+        'doctor_id' => $data['doctor_id'],
+        'clinic_id' => $data['clinic_id'],
+        'order_type' => 'excell_export_campaign',
+        'total_transactions' => $count,
+    ]);
+})->name('excell_export.transactions');
 
 Route::match(['put', 'patch'], '/doctor/profile', function (Request $request) {
     $doctorId = $request->query('doctor_id');
