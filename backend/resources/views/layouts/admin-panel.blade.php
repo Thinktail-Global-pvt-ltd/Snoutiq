@@ -69,6 +69,7 @@
             <a href="{{ route('admin.vet-registrations') }}" class="{{ request()->routeIs('admin.vet-registrations') ? 'active' : '' }}">Vet Registrations</a>
             <a href="{{ route('admin.vet-registration-report') }}" class="{{ request()->routeIs('admin.vet-registration-report') ? 'active' : '' }}">Vet Registration Report</a>
             <a href="{{ route('admin.bookings') }}" class="{{ request()->routeIs('admin.bookings') ? 'active' : '' }}">Bookings</a>
+            <a href="{{ route('admin.transactions.excell-export') }}" class="{{ request()->routeIs('admin.transactions.excell-export') ? 'active' : '' }}">Excel Export Transactions</a>
             <a href="{{ route('admin.supports') }}" class="{{ request()->routeIs('admin.supports') ? 'active' : '' }}">Supports</a>
             <a href="{{ route('admin.video.slot-overview') }}" class="{{ request()->routeIs('admin.video.slot-overview') ? 'active' : '' }}">Video Slot Overview</a>
             <a href="{{ route('admin.analytics.pincode-heatmap') }}" class="{{ request()->routeIs('admin.analytics.pincode-heatmap') ? 'active' : '' }}">Pincode Heatmap</a>

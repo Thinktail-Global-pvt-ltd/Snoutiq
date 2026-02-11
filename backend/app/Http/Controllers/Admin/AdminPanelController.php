@@ -10,6 +10,7 @@ use App\Models\GroomerProfile;
 use App\Models\Pet;
 use App\Models\User;
 use App\Models\VetRegisterationTemp;
+use App\Models\Transaction;
 use Illuminate\Contracts\View\View;
 use App\Services\CallAnalyticsService;
 use App\Services\DoctorAvailabilityService;
@@ -120,6 +121,25 @@ class AdminPanelController extends Controller
     public function pincodeHeatmap(): View
     {
         return view('admin.pincode-heatmap');
+    }
+
+    public function excellExportTransactions(): View
+    {
+        $transactions = Transaction::query()
+            ->where(function ($query) {
+                $query->where('type', 'excell_export_campaign')
+                    ->orWhere('metadata->order_type', 'excell_export_campaign');
+            })
+            ->with([
+                'clinic:id,name',
+                'doctor:id,doctor_name,doctor_email,doctor_mobile',
+                'user:id,name,email,phone',
+                'pet',
+            ])
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('admin.transactions-excell-export', compact('transactions'));
     }
 
     private function getOnlineClinics(?Collection $activeClinicIds = null): Collection
