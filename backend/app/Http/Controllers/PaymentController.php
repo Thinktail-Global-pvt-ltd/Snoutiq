@@ -687,7 +687,14 @@ class PaymentController extends Controller
 
             $issue = $notes['issue'] ?? $notes['concern'] ?? $pet?->reported_symptom ?? 'N/A';
 
-            $mediaString = $this->inferMediaString($notes, $pet);
+            // Always set media to the prescription PDF link (latest)
+            $userId = $context['user_id'] ?? null;
+            $petId = $context['pet_id'] ?? null;
+            $base = rtrim((string) config('app.url'), '/');
+            if (! str_ends_with($base, '/backend')) {
+                $base .= '/backend';
+            }
+            $mediaString = $base . '/api/consultation/prescription/pdf?user_id=' . ($userId ?? '0') . '&pet_id=' . ($petId ?? '0');
 
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
 
