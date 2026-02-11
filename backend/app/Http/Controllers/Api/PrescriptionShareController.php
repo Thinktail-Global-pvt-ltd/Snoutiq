@@ -100,16 +100,24 @@ class PrescriptionShareController extends Controller
      */
     public function downloadLatest(Request $request)
     {
-        $data = $request->validate([
-            'user_id' => ['required', 'integer'],
-            'pet_id' => ['required', 'integer'],
-        ]);
+        try {
+            $data = $request->validate([
+                'user_id' => ['required', 'integer'],
+                'pet_id' => ['required', 'integer'],
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => 'validation_failed', 'message' => $e->getMessage()], 422);
+        }
 
-        $prescription = Prescription::query()
-            ->where('user_id', $data['user_id'])
-            ->where('pet_id', $data['pet_id'])
-            ->orderByDesc('id')
-            ->first();
+        try {
+            $prescription = Prescription::query()
+                ->where('user_id', $data['user_id'])
+                ->where('pet_id', $data['pet_id'])
+                ->orderByDesc('id')
+                ->first();
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => 'query_failed', 'message' => $e->getMessage()], 500);
+        }
 
         if (! $prescription) {
             return response()->json(['success' => false, 'error' => 'prescription_not_found'], 404);
@@ -125,10 +133,14 @@ class PrescriptionShareController extends Controller
         $docPath = null;
 
         if ($prescription->medical_record_id) {
-            $record = MedicalRecord::find($prescription->medical_record_id);
-            if ($record && $record->file_path) {
-                $docPath = $record->file_path;
-                $docName = $record->file_name ?: $docName;
+            try {
+                $record = MedicalRecord::find($prescription->medical_record_id);
+                if ($record && $record->file_path) {
+                    $docPath = $record->file_path;
+                    $docName = $record->file_name ?: $docName;
+                }
+            } catch (\Throwable $e) {
+                // continue to fallback
             }
         }
 
@@ -138,22 +150,29 @@ class PrescriptionShareController extends Controller
 
         // If no stored file, generate on the fly and stream
         if (! $docPath) {
-            $html = $this->buildHtml($prescription, $user, $pet, $doctor);
-            $options = new Options();
-            $options->set('isRemoteEnabled', true);
-            $dompdf = new Dompdf($options);
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
-            $output = $dompdf->output();
-            return response()->streamDownload(function () use ($output) {
-                echo $output;
-            }, $docName, ['Content-Type' => 'application/pdf']);
+            try {
+                $html = $this->buildHtml($prescription, $user, $pet, $doctor);
+                $options = new Options();
+                $options->set('isRemoteEnabled', true);
+                $dompdf = new Dompdf($options);
+                $dompdf->loadHtml($html);
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+                $output = $dompdf->output();
+                return response()->streamDownload(function () use ($output) {
+                    echo $output;
+                }, $docName, ['Content-Type' => 'application/pdf']);
+            } catch (\Throwable $e) {
+                return response()->json(['success' => false, 'error' => 'pdf_generation_failed', 'message' => $e->getMessage()], 500);
+            }
         }
 
-        // If stored file: stream from storage/public (or absolute)
-        $absolute = $this->publicUrl($docPath);
-        return redirect()->away($absolute);
+        try {
+            $absolute = $this->publicUrl($docPath);
+            return redirect()->away($absolute);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => 'redirect_failed', 'message' => $e->getMessage()], 500);
+        }
     }
 
     private function generatePdf($prescription, $user, $pet, $doctor): ?array
