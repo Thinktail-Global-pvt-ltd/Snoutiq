@@ -24,6 +24,25 @@ import {
   Pill,
   X,
   Upload,
+  PawPrint,
+  Stethoscope,
+  Award,
+  Calendar,
+  Phone,
+  Mail,
+  MapPin,
+  Briefcase,
+  GraduationCap,
+  Heart,
+  Users,
+  Star,
+  Shield,
+  LogOut,
+  TrendingUp,
+  Activity,
+  Video,
+  Moon,
+  Sun,
 } from "lucide-react";
 import logo from "../assets/images/logo.png";
 
@@ -35,13 +54,13 @@ import logo from "../assets/images/logo.png";
 
 // ---------------- UI Helpers ----------------
 
-const VetHeader = ({ onBack, title }) => (
-  <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-stone-100">
-    <div className="px-4 py-3 flex items-center md:px-10 lg:px-16 md:py-4">
+const VetHeader = ({ onBack, title, subtitle }) => (
+  <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg border-b border-gray-100 shadow-sm">
+    <div className="px-6 py-4 flex items-center md:px-12 lg:px-20 md:py-6">
       {onBack ? (
         <button
           onClick={onBack}
-          className="p-2 -ml-2 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#3998de]/30"
+          className="p-2 -ml-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/30"
           aria-label="Go back"
         >
           <ChevronLeft size={24} />
@@ -50,9 +69,14 @@ const VetHeader = ({ onBack, title }) => (
         <div className="w-10" />
       )}
 
-      <h1 className="flex-1 text-center font-bold text-lg text-stone-800 md:text-2xl">
-        {title}
-      </h1>
+      <div className="flex-1 text-center">
+        <h1 className="font-bold text-xl text-gray-900 md:text-2xl">
+          {title}
+        </h1>
+        {subtitle && (
+          <p className="text-xs text-gray-500 mt-1 md:text-sm">{subtitle}</p>
+        )}
+      </div>
 
       <div className="w-10" />
     </div>
@@ -60,11 +84,14 @@ const VetHeader = ({ onBack, title }) => (
 );
 
 const PageWrap = ({ children }) => (
-  <div className="w-full md:px-10 lg:px-16">{children}</div>
+  <div className="w-full md:px-12 lg:px-20">{children}</div>
 );
 
 const INPUT_BASE_CLASS =
-  "w-full p-3 rounded-xl border border-stone-200 bg-stone-50 text-sm md:text-base md:p-4 md:rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 focus:border-[#3998de] placeholder:text-stone-400";
+  "w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 md:text-base md:px-5 md:py-4 md:rounded-2xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400 hover:border-gray-300";
+
+const CARD_CLASS = 
+  "bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(11,77,103,0.08)] transition-all duration-300";
 
 const SPECIALIZATION_OPTIONS = [
   "Dogs",
@@ -142,19 +169,15 @@ const handleNumberWheel = (e) => {
   e.currentTarget.blur();
 };
 
-// -------------- Image Compression (File based) --------------
+// -------------- Image Compression --------------
 
-/**
- * Compress a selected image into a small JPEG file.
- * Adjust maxSizeMB/maxWidthOrHeight according to your needs.
- */
 const compressToFile = async (file) => {
   if (!file || !file.type?.startsWith("image/")) {
     throw new Error("Please upload a valid image file.");
   }
 
   const options = {
-    maxSizeMB: 0.2, // 200 KB target
+    maxSizeMB: 0.2,
     maxWidthOrHeight: 720,
     useWebWorker: true,
     fileType: "image/jpeg",
@@ -162,7 +185,6 @@ const compressToFile = async (file) => {
   };
 
   const compressedBlob = await imageCompression(file, options);
-
   return new File([compressedBlob], "doctor.jpg", {
     type: "image/jpeg",
     lastModified: Date.now(),
@@ -214,79 +236,84 @@ const PricingSection = ({
   submitting,
   handleSubmit,
 }) => (
-  <section className="bg-white p-6 rounded-3xl shadow-md border border-stone-100 space-y-4">
-    <h3 className="font-bold text-stone-800 flex items-center gap-2 text-lg">
-      <span className="bg-[#3998de]/10 text-[#3998de] w-7 h-7 rounded-full flex items-center justify-center text-sm">
-        4
-      </span>
-      Pricing & Commission
-    </h3>
-
-    <div className="space-y-4">
+  <section className={`${CARD_CLASS} p-6 space-y-6 md:p-8`}>
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-[#0B4D67]/10 flex items-center justify-center">
+        <DollarSign size={20} className="text-[#0B4D67]" />
+      </div>
       <div>
-        <label className="block text-sm font-bold text-stone-400 mb-1">
-          Video Consultation Price (Day time) (Rs.) *
+        <h3 className="font-semibold text-gray-900 text-lg">Pricing & Commission</h3>
+        <p className="text-xs text-gray-500">Set your consultation fees</p>
+      </div>
+    </div>
+
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Day Consultation Price (6 AM - 8 PM) *
         </label>
-        <input
-          type="number"
-          value={dayPrice}
-          onChange={(e) => setDayPrice(e.target.value)}
-          onKeyDown={blockNumberInput}
-          onWheel={handleNumberWheel}
-          min="0"
-          placeholder="399"
-          required
-          className="w-full p-4 rounded-2xl border border-stone-200 bg-stone-50 text-base font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 focus:border-[#3998de] placeholder:text-stone-400"
-        />
-        {dayMath ? (
-          <div className="mt-2 text-xs flex justify-between bg-green-50 text-green-800 px-3 py-2 rounded-xl border border-green-100">
-            <span>
-              You earn: <strong>Rs. {dayMath.earning}</strong>
-            </span>
-            <span className="text-green-600/70">
-              Snoutiq Fee: Rs. {dayMath.commission}
-            </span>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+          <input
+            type="number"
+            value={dayPrice}
+            onChange={(e) => setDayPrice(e.target.value)}
+            onKeyDown={blockNumberInput}
+            onWheel={handleNumberWheel}
+            min="0"
+            placeholder="Enter day consultation price"
+            required
+            className="w-full pl-8 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50 text-base font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400"
+          />
+        </div>
+        {dayMath && (
+          <div className="mt-2 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+            <div className="flex justify-between text-xs">
+              <span className="text-emerald-700 font-medium">Your earnings: ₹{dayMath.earning}</span>
+              <span className="text-emerald-600/70">Platform fee: ₹{dayMath.commission}</span>
+            </div>
           </div>
-        ) : null}
+        )}
       </div>
 
-      <div>
-        <label className="block text-sm font-bold text-stone-400 mb-1">
-          Video Consultation Price (Night time) (Rs.) *
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Night Consultation Price (8 PM - 6 AM) *
         </label>
-        <input
-          type="number"
-          value={nightPrice}
-          onChange={(e) => setNightPrice(e.target.value)}
-          onKeyDown={blockNumberInput}
-          onWheel={handleNumberWheel}
-          min="0"
-          placeholder="599"
-          required
-          className="w-full p-4 rounded-2xl border border-stone-200 bg-stone-50 text-base font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 focus:border-[#3998de] placeholder:text-stone-400"
-        />
-        {nightMath ? (
-          <div className="mt-2 text-xs flex justify-between bg-green-50 text-green-800 px-3 py-2 rounded-xl border border-green-100">
-            <span>
-              You earn: <strong>Rs. {nightMath.earning}</strong>
-            </span>
-            <span className="text-green-600/70">
-              Snoutiq Fee: Rs. {nightMath.commission}
-            </span>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+          <input
+            type="number"
+            value={nightPrice}
+            onChange={(e) => setNightPrice(e.target.value)}
+            onKeyDown={blockNumberInput}
+            onWheel={handleNumberWheel}
+            min="0"
+            placeholder="Enter night consultation price"
+            required
+            className="w-full pl-8 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50 text-base font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400"
+          />
+        </div>
+        {nightMath && (
+          <div className="mt-2 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+            <div className="flex justify-between text-xs">
+              <span className="text-emerald-700 font-medium">Your earnings: ₹{nightMath.earning}</span>
+              <span className="text-emerald-600/70">Platform fee: ₹{nightMath.commission}</span>
+            </div>
           </div>
-        ) : null}
+        )}
       </div>
     </div>
 
     <div className="space-y-3">
-      <div className="text-sm font-bold text-stone-400">
-        Do you offer a free follow-up within 3 days after a consultation? *
-      </div>
+      <label className="block text-sm font-medium text-gray-700">
+        Free Follow-up Consultation *
+      </label>
       <div className="space-y-2">
         {FOLLOW_UP_OPTIONS.map((option) => (
           <label
             key={option.value}
-            className="flex items-center gap-2 text-sm text-stone-700"
+            className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-[#0B4D67]/30 hover:bg-gray-50/50 transition-all cursor-pointer"
           >
             <input
               type="radio"
@@ -295,23 +322,23 @@ const PricingSection = ({
               checked={form.freeFollowUp === option.value}
               onChange={updateForm("freeFollowUp")}
               required
-              className="accent-[#3998de]"
+              className="w-4 h-4 text-[#0B4D67] border-gray-300 focus:ring-[#0B4D67]/30"
             />
-            {option.label}
+            <span className="text-sm text-gray-700">{option.label}</span>
           </label>
         ))}
       </div>
     </div>
 
     <div className="space-y-3">
-      <div className="text-sm font-bold text-stone-400">
-        Preferred Payout Method (UPI number to receive payment) *
-      </div>
+      <label className="block text-sm font-medium text-gray-700">
+        Preferred Payout Method *
+      </label>
       <div className="space-y-2">
         {PAYOUT_OPTIONS.map((option) => (
           <label
             key={option.value}
-            className="flex items-center gap-2 text-sm text-stone-700"
+            className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-[#0B4D67]/30 hover:bg-gray-50/50 transition-all cursor-pointer"
           >
             <input
               type="radio"
@@ -320,9 +347,9 @@ const PricingSection = ({
               checked={form.payoutMethod === option.value}
               onChange={updateForm("payoutMethod")}
               required
-              className="accent-[#3998de]"
+              className="w-4 h-4 text-[#0B4D67] border-gray-300 focus:ring-[#0B4D67]/30"
             />
-            {option.label}
+            <span className="text-sm text-gray-700">{option.label}</span>
           </label>
         ))}
       </div>
@@ -330,79 +357,95 @@ const PricingSection = ({
         type="text"
         value={form.payoutDetail}
         onChange={updateForm("payoutDetail")}
-        placeholder={
-          form.payoutMethod === "upi" ? "yourname@upi *" : "Describe payout method *"
-        }
+        placeholder={form.payoutMethod === "upi" ? "Enter your UPI ID (e.g., doctor@okhdfcbank)" : "Enter payout details"}
         required
         className={INPUT_BASE_CLASS}
       />
     </div>
 
-    <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-      <h4 className="text-amber-800 font-bold text-xs uppercase mb-2 flex items-center gap-1">
-        <DollarSign size={12} /> Commission Structure
-      </h4>
-      <ul className="text-sm text-amber-900/80 space-y-1 list-disc pl-4">
-        <li>We charge 25% OR Rs. 99 per consultation (whichever is higher).</li>
-        <li>The remaining amount is yours.</li>
-        <li>No monthly subscription fees.</li>
+    <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100">
+      <div className="flex items-center gap-2 mb-2">
+        <Shield size={16} className="text-amber-600" />
+        <h4 className="text-xs font-semibold uppercase text-amber-800">Commission Structure</h4>
+      </div>
+      <ul className="text-xs text-amber-800/80 space-y-1.5 pl-4">
+        <li className="flex items-start gap-2">
+          <span className="text-amber-600">•</span>
+          <span>We charge 25% OR ₹99 per consultation (whichever is higher)</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="text-amber-600">•</span>
+          <span>Remaining amount is transferred to your account</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="text-amber-600">•</span>
+          <span>No monthly subscription fees, ever</span>
+        </li>
       </ul>
     </div>
 
-    <div className="space-y-2">
-      <label className="flex gap-3 items-start p-2 cursor-pointer rounded-xl hover:bg-stone-50 transition-colors">
+    <div className="space-y-3 pt-2">
+      <label className="flex gap-3 items-start p-2 cursor-pointer rounded-xl hover:bg-gray-50 transition-colors">
         <input
           type="checkbox"
           checked={agreement1}
           onChange={(e) => setAgreement1(e.target.checked)}
-          className="mt-1 accent-[#3998de]"
+          className="mt-1 w-4 h-4 text-[#0B4D67] border-gray-300 rounded focus:ring-[#0B4D67]/30"
         />
-        <span className="text-sm text-stone-600 leading-relaxed">
-          I understand Snoutiq charges 25% or Rs. 99 per consultation (whichever is higher).
+        <span className="text-sm text-gray-600 leading-relaxed">
+          I understand Snoutiq charges 25% or ₹99 per consultation (whichever is higher)
         </span>
       </label>
-      <label className="flex gap-3 items-start p-2 cursor-pointer rounded-xl hover:bg-stone-50 transition-colors">
+      <label className="flex gap-3 items-start p-2 cursor-pointer rounded-xl hover:bg-gray-50 transition-colors">
         <input
           type="checkbox"
           checked={agreement2}
           onChange={(e) => setAgreement2(e.target.checked)}
-          className="mt-1 accent-[#3998de]"
+          className="mt-1 w-4 h-4 text-[#0B4D67] border-gray-300 rounded focus:ring-[#0B4D67]/30"
         />
-        <span className="text-sm text-stone-600 leading-relaxed">
-          I understand earnings will be settled weekly to my registered payout method.
+        <span className="text-sm text-gray-600 leading-relaxed">
+          I understand earnings will be settled weekly to my registered payout method
         </span>
       </label>
     </div>
 
-    {submitError ? (
-      <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 p-3 rounded-xl">
-        <AlertCircle size={16} />
+    {submitError && (
+      <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 p-4 rounded-xl">
+        <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
         <span>{submitError}</span>
       </div>
-    ) : null}
+    )}
 
-    {showErrors && !canSubmit ? (
-      <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 p-3 rounded-xl">
-        <AlertCircle size={16} />
-        <span>Please complete all required fields.</span>
+    {showErrors && !canSubmit && (
+      <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 p-4 rounded-xl">
+        <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+        <span>Please complete all required fields before submitting</span>
       </div>
-    ) : null}
+    )}
 
     <div className="hidden md:block">
       <Button
         onClick={handleSubmit}
         fullWidth
         disabled={!canSubmit || submitting}
-        className={`md:text-xl md:py-4 md:rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 ${
-          !canSubmit || submitting ? "opacity-50" : ""
+        className={`md:text-lg md:py-4 md:rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-300 ${
+          !canSubmit || submitting ? "opacity-50 cursor-not-allowed" : "shadow-lg shadow-blue-500/30"
         }`}
       >
-        {submitting ? "Submitting..." : "Submit Application"}
+        {submitting ? (
+          <span className="flex items-center justify-center gap-2">
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            Submitting Application...
+          </span>
+        ) : (
+          "Submit Application"
+        )}
       </Button>
     </div>
 
-    <p className="text-xs text-stone-400 flex items-center gap-1">
-      <Lock size={12} /> Patient contact details stay private.
+    <p className="text-xs text-gray-400 flex items-center gap-1.5">
+      <Lock size={12} />
+      Patient contact details remain private and secure
     </p>
   </section>
 );
@@ -456,6 +499,12 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleResendOtp = async () => {
+    if (isSending || mobile.length < 10) return;
+    setOtp("");
+    await handleSendOtp();
   };
 
   const handleVerifyOtp = async () => {
@@ -547,65 +596,74 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-calm-bg flex flex-col animate-slide-up md:bg-gradient-to-b md:from-calm-bg md:to-white">
-      <VetHeader onBack={onBack} title="Vet Partner Login" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex flex-col">
+      <VetHeader onBack={onBack} title="Vet Partner Login" subtitle="Welcome back to SnoutIQ" />
 
       <PageWrap>
-        <div className="flex-1 px-6 py-8 flex flex-col justify-center max-w-sm mx-auto w-full md:max-w-2xl md:px-0 md:py-16">
-          <div className="text-center mb-8 md:mb-10">
-            <div className="w-16 h-16 bg-[#3998de]/10 text-[#3998de] rounded-full flex items-center justify-center mx-auto mb-4 md:w-24 md:h-24 ring-1 ring-[#3998de]/20">
-              <img src={logo} alt="SnoutIQ Logo" className="w-8 md:w-16" />
+        <div className="flex-1 px-6 py-8 flex flex-col justify-center max-w-md mx-auto w-full md:max-w-2xl md:px-0 md:py-16">
+          <div className="text-center mb-8 md:mb-12">
+            <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-xl shadow-blue-500/30 transform hover:scale-105 transition-transform">
+              <img src={logo} alt="SnoutIQ" className="w-10 h-10 md:w-12 md:h-12 object-contain" />
             </div>
-            <h2 className="text-2xl font-bold text-stone-800 md:text-4xl">Welcome, Doctor</h2>
-            <p className="text-stone-500 mt-2 text-sm md:text-lg">Log in to manage your consultations.</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Welcome back, Doctor</h2>
+            <p className="text-gray-500 md:text-lg">Securely access your practice dashboard</p>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 space-y-6 md:p-10 md:rounded-3xl md:shadow-md md:shadow-stone-200/40">
+          <div className={`${CARD_CLASS} p-6 md:p-8 space-y-6`}>
             {step === "mobile" ? (
               <>
-                <div>
-                  <label className="block text-xs font-bold uppercase text-stone-400 mb-1 md:text-sm">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
                     Mobile Number
                   </label>
-
-                  <div className="flex items-center border border-stone-200 rounded-xl px-3 bg-stone-50 focus-within:ring-2 focus-within:ring-[#3998de]/30 focus-within:border-[#3998de] md:px-4 md:py-1">
-                    <span className="text-stone-500 font-medium border-r border-stone-200 pr-3 mr-3 md:text-lg">
+                  <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50 focus-within:ring-2 focus-within:ring-[#0B4D67]/20 focus-within:border-[#0B4D67] focus-within:bg-white transition-all">
+                    <span className="text-gray-500 font-medium px-4 border-r border-gray-200 py-3.5">
                       +91
                     </span>
                     <input
                       type="tel"
                       value={mobile}
                       onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                      placeholder="98765 43210"
-                      className="flex-1 py-3 bg-transparent outline-none font-medium text-stone-800 md:py-4 md:text-lg placeholder:text-stone-400"
+                      placeholder="Enter 10-digit mobile number"
+                      className="flex-1 px-4 py-3.5 bg-transparent outline-none font-medium text-gray-900 placeholder:text-gray-400"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    We'll send a 6-digit OTP for verification
+                  </p>
                 </div>
 
                 <Button
                   onClick={handleSendOtp}
                   disabled={mobile.length < 10 || isSending}
                   fullWidth
-                  className="md:text-xl md:py-4 md:rounded-2xl bg-gradient-to-r from-[#3998de] to-[#3998de] hover:from-[#3998de] hover:to-[#3998de] focus:outline-none focus:ring-2 focus:ring-[#3998de]/30"
+                  className="md:text-lg md:py-4 md:rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-300 shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSending ? "Sending..." : "Send OTP"}
+                  {isSending ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Sending OTP...
+                    </span>
+                  ) : (
+                    "Send OTP"
+                  )}
                 </Button>
               </>
             ) : (
               <>
-                <div>
-                  <label className="block text-xs font-bold uppercase text-stone-400 mb-1 md:text-sm">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
                     Enter OTP
                   </label>
                   <input
                     type="text"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="Enter 6 digits"
-                    className="w-full py-3 px-4 text-center text-2xl tracking-widest border border-stone-200 rounded-xl bg-stone-50 focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 focus:border-[#3998de] md:py-4 md:text-3xl md:rounded-2xl placeholder:text-stone-400"
+                    placeholder="Enter 6-digit OTP"
+                    className="w-full px-4 py-3.5 text-center text-2xl tracking-[0.5em] border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400 placeholder:tracking-normal"
                   />
-                  <p className="text-xs text-center text-stone-400 mt-2 md:text-sm">
-                    Sent to +91 {mobile}
+                  <p className="text-xs text-center text-gray-500 mt-2">
+                    OTP sent to +91 {mobile}
                   </p>
                 </div>
 
@@ -613,37 +671,56 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
                   onClick={handleVerifyOtp}
                   disabled={otp.length < 6 || isVerifying}
                   fullWidth
-                  className="md:text-xl md:py-4 md:rounded-2xl bg-gradient-to-r from-[#3998de] to-[#3998de] hover:from-[#3998de] hover:to-[#3998de] focus:outline-none focus:ring-2 focus:ring-[#3998de]/30"
+                  className="md:text-lg md:py-4 md:rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-300 shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isVerifying ? "Verifying..." : "Verify & Login"}
+                  {isVerifying ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Verifying...
+                    </span>
+                  ) : (
+                    "Verify & Login"
+                  )}
                 </Button>
 
-                <button
-                  onClick={() => {
-                    setStep("mobile");
-                    setOtp("");
-                    setRequestId("");
-                    setErrorMessage("");
-                  }}
-                  className="w-full text-xs text-[#3998de] font-medium py-2 md:text-sm hover:underline"
-                >
-                  Change Number
-                </button>
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    onClick={handleResendOtp}
+                    disabled={isSending || mobile.length < 10}
+                    className="text-sm text-[#0B4D67] font-medium hover:underline disabled:text-gray-400 disabled:hover:no-underline"
+                  >
+                    {isSending ? "Sending..." : "Resend OTP"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setStep("mobile");
+                      setOtp("");
+                      setRequestId("");
+                      setErrorMessage("");
+                    }}
+                    className="text-sm text-gray-500 font-medium hover:text-gray-700"
+                  >
+                    Change Number
+                  </button>
+                </div>
               </>
             )}
 
-            {errorMessage ? (
-              <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-100 p-3 rounded-xl">
-                <AlertCircle size={14} />
+            {errorMessage && (
+              <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 p-4 rounded-xl">
+                <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
                 <span>{errorMessage}</span>
               </div>
-            ) : null}
+            )}
           </div>
 
-          <div className="mt-8 text-center md:mt-10">
-            <p className="text-stone-500 text-sm md:text-base">New to Snoutiq?</p>
-            <button onClick={onRegisterClick} className="text-[#3998de] font-bold text-sm hover:underline mt-1 md:text-lg">
-              Register as a Partner
+          <div className="mt-8 text-center">
+            <p className="text-gray-500 text-sm md:text-base">New to SnoutIQ?</p>
+            <button 
+              onClick={onRegisterClick} 
+              className="text-[#0B4D67] font-semibold text-sm hover:text-[#1A6F8F] hover:underline mt-1 md:text-lg transition-colors"
+            >
+              Register as a Partner →
             </button>
           </div>
         </div>
@@ -672,7 +749,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     freeFollowUp: "",
     payoutMethod: "upi",
     payoutDetail: "",
-    doctorImageUrl: "", // optional (if you want URL mode)
+    doctorImageUrl: "",
   });
 
   const [specializations, setSpecializations] = useState([]);
@@ -680,6 +757,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const [breakStart, setBreakStart] = useState("");
   const [breakEnd, setBreakEnd] = useState("");
   const [breakTimes, setBreakTimes] = useState([]);
+  const [noBreakTime, setNoBreakTime] = useState(false);
   const [dayPrice, setDayPrice] = useState("");
   const [nightPrice, setNightPrice] = useState("");
   const [agreement1, setAgreement1] = useState(false);
@@ -689,7 +767,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const [doctorImagePreview, setDoctorImagePreview] = useState("");
   const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [imageError, setImageError] = useState("");
-  const [showImageUrl, setShowImageUrl] = useState(false); // keep if you want URL option
+  const [showImageUrl, setShowImageUrl] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -727,8 +805,6 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const dayMath = calculateCommission(dayPrice);
   const nightMath = calculateCommission(nightPrice);
 
-  const inputBase = INPUT_BASE_CLASS;
-
   const toggleSpecialization = (value) => {
     setSpecializations((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
@@ -745,6 +821,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   };
 
   const addBreakTime = () => {
+    if (noBreakTime) return;
     if (!breakStart || !breakEnd) return;
     const startLabel = formatTimeLabel(breakStart);
     const endLabel = formatTimeLabel(breakEnd);
@@ -757,6 +834,16 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   const removeBreakTime = (value) => {
     setBreakTimes((prev) => prev.filter((item) => item !== value));
+  };
+
+  const handleNoBreakToggle = (event) => {
+    const nextValue = event.target.checked;
+    setNoBreakTime(nextValue);
+    if (nextValue) {
+      setBreakTimes([]);
+      setBreakStart("");
+      setBreakEnd("");
+    }
   };
 
   const handleDoctorImageFile = async (e) => {
@@ -774,7 +861,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     } catch (err) {
       setDoctorImageFile(null);
       setImageError(
-        err?.message || "Image compress failed. Try another image or use a URL."
+        err?.message || "Image compression failed. Please try another image."
       );
       setShowImageUrl(true);
     } finally {
@@ -791,18 +878,6 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     } else {
       setImageError("");
     }
-  };
-
-  const handleUseImageUrl = () => {
-    setShowImageUrl(true);
-    setDoctorImageFile(null);
-    setImageError("");
-  };
-
-  const handleUseImageUpload = () => {
-    setShowImageUrl(false);
-    setForm((prev) => ({ ...prev, doctorImageUrl: "" }));
-    setImageError("");
   };
 
   const clearImage = () => {
@@ -827,6 +902,8 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     trimmedImageUrl.length > 0 && trimmedImageUrl.length <= IMAGE_URL_LIMIT;
   const imageReady = Boolean(doctorImageFile) || urlReady;
 
+  const breakReady = noBreakTime || breakTimes.length > 0;
+
   const canSubmit =
     agreed &&
     form.vetFullName.trim() &&
@@ -842,7 +919,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     selectedSpecs.length > 0 &&
     form.responseTimeDay &&
     form.responseTimeNight &&
-    breakTimes.length > 0 &&
+    breakReady &&
     dayPrice &&
     nightPrice &&
     form.freeFollowUp &&
@@ -873,6 +950,8 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     setShowErrors(false);
 
     try {
+      const breakPayload = noBreakTime ? ["No"] : breakTimes;
+
       const payload = {
         vet_name: form.clinicName.trim(),
         vet_email: form.email.trim(),
@@ -888,7 +967,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         specialization_select_all_that_apply: selectedSpecs,
         response_time_for_online_consults_day: form.responseTimeDay,
         response_time_for_online_consults_night: form.responseTimeNight,
-        break_do_not_disturb_time_example_2_4_pm: breakTimes,
+        break_do_not_disturb_time_example_2_4_pm: breakPayload,
         do_you_offer_a_free_follow_up_within_3_days_after_a_consulta:
           form.freeFollowUp === "yes" ? "Yes" : "No",
         commission_and_agreement: agreed ? "Agreed" : "Not agreed",
@@ -919,7 +998,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || json?.success === false) {
-          throw new Error(json?.message || "Image upload failed.");
+          throw new Error(json?.message || "Registration failed. Please try again.");
         }
         data = json;
       } else {
@@ -969,91 +1048,125 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-calm-bg flex flex-col animate-slide-up md:bg-gradient-to-b md:from-calm-bg md:to-white">
-      <VetHeader onBack={onBack} title="Partner Registration" />
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col">
+      <VetHeader 
+        onBack={onBack} 
+        title="Partner Registration" 
+        subtitle="Join India's trusted veterinary network" 
+      />
 
       <PageWrap>
-        <div className="flex-1 px-4 py-6 pb-32 overflow-y-auto no-scrollbar md:px-0 md:py-12">
-          <p className="text-sm text-stone-500 mb-6 px-2 md:px-0 md:text-lg">
-            Join India&apos;s most trusted network of empathetic veterinarians.
-          </p>
-          <p className="text-xs text-stone-400 mb-6 px-2 md:px-0 md:text-sm">
-            All fields marked * are required.
-          </p>
+        <div className="flex-1 px-4 py-8 pb-32 overflow-y-auto no-scrollbar md:px-0 md:py-12">
+          {/* Progress Steps */}
+          <div className="hidden md:flex items-center justify-center mb-12">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white flex items-center justify-center font-semibold">1</div>
+                <span className="font-medium text-gray-700">Basic Details</span>
+              </div>
+              <div className="w-16 h-0.5 bg-gray-200"></div>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-semibold">2</div>
+                <span className="font-medium text-gray-500">Professional</span>
+              </div>
+              <div className="w-16 h-0.5 bg-gray-200"></div>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-semibold">3</div>
+                <span className="font-medium text-gray-500">Availability</span>
+              </div>
+              <div className="w-16 h-0.5 bg-gray-200"></div>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-semibold">4</div>
+                <span className="font-medium text-gray-500">Pricing</span>
+              </div>
+            </div>
+          </div>
 
-          <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-12 md:gap-10 lg:gap-12">
-            {/* LEFT */}
-            <div className="md:col-span-7 lg:col-span-8 space-y-6">
-              {/* Profile Image */}
-              <section className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100 space-y-4 md:p-8 md:rounded-3xl md:shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-                <div className="flex flex-col items-center gap-5 md:flex-row md:items-center md:gap-6">
-                  <div className="relative flex flex-col items-center gap-2">
+          <div className="space-y-8 md:space-y-0 md:grid md:grid-cols-12 md:gap-8 lg:gap-12">
+            {/* LEFT COLUMN - Main Form */}
+            <div className="md:col-span-7 lg:col-span-8 space-y-8">
+              {/* Profile Image Section */}
+              <section className={`${CARD_CLASS} p-6 md:p-8`}>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-[#0B4D67]/10 flex items-center justify-center">
+                    <Camera size={20} className="text-[#0B4D67]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-lg">Profile Photo</h3>
+                    <p className="text-xs text-gray-500">Upload a professional photo for your profile</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                  <div className="relative">
+                    <div className="h-32 w-32 md:h-40 md:w-40 rounded-2xl border-3 border-[#0B4D67]/20 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden shadow-lg">
+                      {doctorImagePreview ? (
+                        <img
+                          src={doctorImagePreview}
+                          alt="Doctor preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="text-center">
+                          <User size={48} className="mx-auto text-gray-400 mb-2" />
+                          <span className="text-xs font-medium text-gray-500">No photo</span>
+                        </div>
+                      )}
+                    </div>
                     <input
                       id="doctorImageUpload"
                       type="file"
                       accept="image/*"
-                      required
                       className="hidden"
                       onChange={handleDoctorImageFile}
                     />
-                    <label htmlFor="doctorImageUpload" className="cursor-pointer">
-                      <div className="h-24 w-24 md:h-32 md:w-32 rounded-full border-2 border-[#3998de]/20 bg-[#3998de]/10 flex items-center justify-center overflow-hidden shadow-sm transition-shadow hover:shadow-md">
-                        {doctorImagePreview ? (
-                          <img
-                            src={doctorImagePreview}
-                            alt="Doctor preview"
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center text-[#3998de]">
-                            <Camera size={26} />
-                            <span className="text-[10px] font-semibold uppercase tracking-wide mt-1">
-                              Upload
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                    <label
+                      htmlFor="doctorImageUpload"
+                      className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white flex items-center justify-center cursor-pointer shadow-lg transition-colors"
+                    >
+                      <Camera size={18} />
                     </label>
                   </div>
 
-                  <div className="w-full text-center md:text-left space-y-2">
+                  <div className="flex-1 text-center md:text-left space-y-3">
                     <div>
-                      <h3 className="text-sm font-bold text-stone-800">Profile Photo *</h3>
-                      <p className="text-xs text-stone-500">
-                        We compress and upload your photo, then send the URL.
-                      </p>
+                      <p className="text-sm font-medium text-gray-700">Professional photo guidelines</p>
+                      <ul className="text-xs text-gray-500 mt-2 space-y-1">
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 size={12} className="text-green-500" />
+                          Clear, front-facing photo
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 size={12} className="text-green-500" />
+                          Professional attire recommended
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 size={12} className="text-green-500" />
+                          JPG or PNG format
+                        </li>
+                      </ul>
                     </div>
 
-                    <div className="flex items-center justify-center md:justify-start gap-2">
-                      <label
-                        htmlFor="doctorImageUpload"
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-stone-200 shadow-sm text-xs text-stone-600 cursor-pointer hover:bg-stone-50 transition-colors"
+                    {(doctorImageFile || form.doctorImageUrl.trim()) && (
+                      <button
+                        type="button"
+                        onClick={clearImage}
+                        className="text-sm text-red-600 hover:text-red-700 font-medium"
                       >
-                        Choose photo
-                      </label>
+                        Remove photo
+                      </button>
+                    )}
 
-                      {(doctorImageFile || form.doctorImageUrl.trim()) ? (
-                        <button
-                          type="button"
-                          onClick={clearImage}
-                          className="text-xs text-stone-500 hover:text-stone-700"
-                        >
-                          Remove
-                        </button>
-                      ) : null}
-                    </div>
+                    {isImageProcessing && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="w-4 h-4 border-2 border-[#0B4D67] border-t-transparent rounded-full animate-spin" />
+                        Optimizing image...
+                      </div>
+                    )}
 
-                    {isImageProcessing ? (
-                      <p className="text-xs text-stone-400">Optimizing image...</p>
-                    ) : imageError ? (
-                      <p className="text-xs text-red-600">{imageError}</p>
-                    ) : doctorImageFile ? (
-                      <p className="text-xs text-stone-400">
-                        Photo ready - it will upload on submit.
-                      </p>
-                    ) : (
-                      <p className="text-xs text-stone-400">
-                        JPG/PNG recommended. Square photos look best.
+                    {imageError && (
+                      <p className="text-sm text-red-600 bg-red-50 p-3 rounded-xl">
+                        {imageError}
                       </p>
                     )}
                   </div>
@@ -1061,106 +1174,163 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
               </section>
 
               {/* Basic Details */}
-              <section className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100 space-y-4 md:p-8 md:rounded-3xl md:shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-                <h3 className="font-bold text-stone-800 flex items-center gap-2 md:text-lg">
-                  <span className="bg-[#3998de]/10 text-[#3998de] w-6 h-6 rounded-full flex items-center justify-center text-xs md:w-7 md:h-7 md:text-sm">
-                    1
-                  </span>
-                  Basic Details
-                </h3>
-
-                <input
-                  type="text"
-                  placeholder="Vet Full Name *"
-                  value={form.vetFullName}
-                  onChange={updateForm("vetFullName")}
-                  required
-                  className={inputBase}
-                />
-                <input
-                  type="text"
-                  placeholder="Clinic Name *"
-                  value={form.clinicName}
-                  onChange={updateForm("clinicName")}
-                  required
-                  className={inputBase}
-                />
-                <textarea
-                  placeholder="Short Intro *"
-                  value={form.shortIntro}
-                  onChange={updateForm("shortIntro")}
-                  rows={3}
-                  required
-                  className={`${inputBase} resize-none`}
-                />
-
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    placeholder="City *"
-                    value={form.vetCity}
-                    onChange={updateForm("vetCity")}
-                    required
-                    className={inputBase}
-                  />
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="WhatsApp Number (Active) *"
-                    value={form.whatsappNumber}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        whatsappNumber: e.target.value.replace(/\D/g, ""),
-                      }))
-                    }
-                    required
-                    className={inputBase}
-                  />
+              <section className={`${CARD_CLASS} p-6 md:p-8 space-y-5`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#0B4D67]/10 flex items-center justify-center">
+                    <User size={20} className="text-[#0B4D67]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-lg">Basic Information</h3>
+                    <p className="text-xs text-gray-500">Your personal and clinic details</p>
+                  </div>
                 </div>
 
-                <p className="text-[10px] text-stone-400 flex items-center gap-1 md:text-xs">
-                  <Lock size={10} /> Your number is kept private and never shared directly with pet parents.
-                </p>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <User
+                      size={18}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={form.vetFullName}
+                      onChange={updateForm("vetFullName")}
+                      required
+                      className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                    />
+                  </div>
 
-                <input
-                  type="email"
-                  placeholder="Email Address *"
-                  value={form.email}
-                  onChange={updateForm("email")}
-                  required
-                  className={inputBase}
-                />
+                  <div className="relative">
+                    <Briefcase
+                      size={18}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Enter clinic/hospital name"
+                      value={form.clinicName}
+                      onChange={updateForm("clinicName")}
+                      required
+                      className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <MapPin
+                      size={18}
+                      className="absolute left-4 top-4 text-gray-400 pointer-events-none"
+                    />
+                    <textarea
+                      placeholder="Write a short introduction about yourself and your practice"
+                      value={form.shortIntro}
+                      onChange={updateForm("shortIntro")}
+                      rows={4}
+                      required
+                      className={`${INPUT_BASE_CLASS} pl-12 md:pl-12 resize-none`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="relative">
+                      <MapPin
+                        size={18}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Enter your city"
+                        value={form.vetCity}
+                        onChange={updateForm("vetCity")}
+                        required
+                        className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                      />
+                    </div>
+                    <div className="relative">
+                      <Phone
+                        size={18}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                      />
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="Enter WhatsApp number"
+                        value={form.whatsappNumber}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            whatsappNumber: e.target.value.replace(/\D/g, ""),
+                          }))
+                        }
+                        required
+                        className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <Mail
+                      size={18}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Enter your email address"
+                      value={form.email}
+                      onChange={updateForm("email")}
+                      required
+                      className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                    />
+                  </div>
+
+                  <p className="text-xs text-gray-500 flex items-center gap-1.5 bg-gray-50 p-3 rounded-xl">
+                    <Lock size={12} className="text-[#0B4D67]" />
+                    Your contact details are kept private and never shared directly
+                  </p>
+                </div>
               </section>
 
               {/* Professional Details */}
-              <section className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100 space-y-4 md:p-8 md:rounded-3xl md:shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-                <h3 className="font-bold text-stone-800 flex items-center gap-2 md:text-lg">
-                  <span className="bg-[#3998de]/10 text-[#3998de] w-6 h-6 rounded-full flex items-center justify-center text-xs md:w-7 md:h-7 md:text-sm">
-                    2
-                  </span>
-                  Professional Details
-                </h3>
+              <section className={`${CARD_CLASS} p-6 md:p-8 space-y-6`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#0B4D67]/10 flex items-center justify-center">
+                    <Stethoscope size={20} className="text-[#0B4D67]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-lg">Professional Credentials</h3>
+                    <p className="text-xs text-gray-500">Your qualifications and expertise</p>
+                  </div>
+                </div>
 
-                <input
-                  type="text"
-                  placeholder="Vet Registration Number *"
-                  value={form.doctorLicense}
-                  onChange={updateForm("doctorLicense")}
-                  required
-                  className={inputBase}
-                />
+                <div className="relative">
+                  <Award
+                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Enter veterinary registration number"
+                    value={form.doctorLicense}
+                    onChange={updateForm("doctorLicense")}
+                    required
+                    className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                  />
+                </div>
 
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-stone-400 md:text-sm">
-                    Degree *
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Degree / Qualification *
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {DEGREE_OPTIONS.map((degree) => (
                       <label
                         key={degree}
-                        className="flex items-center gap-2 px-3 py-2 border border-stone-200 rounded-lg text-sm bg-stone-50 md:text-base md:px-4 md:py-3 md:rounded-xl hover:bg-stone-100 transition-colors"
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm cursor-pointer transition-all ${
+                          form.degree === degree
+                            ? "border-[#0B4D67] bg-[#0B4D67]/5 text-[#0B4D67]"
+                            : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300"
+                        }`}
                       >
                         <input
                           type="radio"
@@ -1169,50 +1339,57 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                           checked={form.degree === degree}
                           onChange={updateForm("degree")}
                           required
-                          className="accent-[#3998de]"
+                          className="hidden"
                         />
                         {degree}
                       </label>
                     ))}
                   </div>
 
-                  {form.degree === "Other" ? (
+                  {form.degree === "Other" && (
                     <input
                       type="text"
-                      placeholder="Specify degree *"
+                      placeholder="Specify your degree"
                       value={form.degreeOther}
                       onChange={updateForm("degreeOther")}
                       required
-                      className={inputBase}
+                      className={INPUT_BASE_CLASS}
                     />
-                  ) : null}
+                  )}
                 </div>
 
-                <input
-                  type="number"
-                  placeholder="Years of Experience *"
-                  value={form.yearsOfExperience}
-                  onChange={updateForm("yearsOfExperience")}
-                  onKeyDown={blockNumberInput}
-                  onWheel={handleNumberWheel}
-                  min="0"
-                  required
-                  className={inputBase}
-                />
+                <div className="relative">
+                  <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="number"
+                    placeholder="Enter years of professional experience"
+                    value={form.yearsOfExperience}
+                    onChange={updateForm("yearsOfExperience")}
+                    onKeyDown={blockNumberInput}
+                    onWheel={handleNumberWheel}
+                    min="0"
+                    required
+                    className={`${INPUT_BASE_CLASS} pl-12`}
+                  />
+                </div>
 
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-stone-400 md:text-sm">
-                    Specialization (Select all that apply) *
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Specializations (Select all that apply) *
                   </label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {SPECIALIZATION_OPTIONS.map((spec) => (
                       <label
                         key={spec}
-                        className="flex items-center gap-2 px-3 py-2 border border-stone-200 rounded-lg text-sm bg-stone-50 md:text-base md:px-4 md:py-3 md:rounded-xl hover:bg-stone-100 transition-colors"
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm cursor-pointer transition-all ${
+                          specializations.includes(spec)
+                            ? "border-[#0B4D67] bg-[#0B4D67]/5 text-[#0B4D67]"
+                            : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300"
+                        }`}
                       >
                         <input
                           type="checkbox"
-                          className="accent-[#3998de]"
+                          className="hidden"
                           checked={specializations.includes(spec)}
                           onChange={() => toggleSpecialization(spec)}
                         />
@@ -1221,171 +1398,178 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     ))}
                   </div>
 
-                  {specializations.includes("Other") ? (
+                  {specializations.includes("Other") && (
                     <input
                       type="text"
-                      placeholder="Other specialization *"
+                      placeholder="Specify other specialization"
                       value={specializationOther}
                       onChange={(e) => setSpecializationOther(e.target.value)}
                       required
-                      className={inputBase}
+                      className={INPUT_BASE_CLASS}
                     />
-                  ) : null}
+                  )}
                 </div>
               </section>
 
               {/* Availability & Timing */}
-              <section className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100 space-y-4 md:p-8 md:rounded-3xl md:shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-                <h3 className="font-bold text-stone-800 flex items-center gap-2 md:text-lg">
-                  <span className="bg-[#3998de]/10 text-[#3998de] w-6 h-6 rounded-full flex items-center justify-center text-xs md:w-7 md:h-7 md:text-sm">
-                    3
-                  </span>
-                  Availability & Timing
-                </h3>
-
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-stone-400 md:text-sm">
-                    Response Time for Online Consults (Day) *
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {RESPONSE_TIME_DAY_OPTIONS.map((option) => (
-                      <label
-                        key={option}
-                        className="flex items-center gap-2 px-3 py-2 border border-stone-200 rounded-lg text-sm bg-stone-50 md:text-base md:px-4 md:py-3 md:rounded-xl hover:bg-stone-100 transition-colors"
-                      >
-                        <input
-                          type="radio"
-                          name="responseTimeDay"
-                          value={option}
-                          checked={form.responseTimeDay === option}
-                          onChange={updateForm("responseTimeDay")}
-                          required
-                          className="accent-[#3998de]"
-                        />
-                        {option}
-                      </label>
-                    ))}
+              <section className={`${CARD_CLASS} p-6 md:p-8 space-y-6`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#0B4D67]/10 flex items-center justify-center">
+                    <Clock size={20} className="text-[#0B4D67]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-lg">Availability & Timing</h3>
+                    <p className="text-xs text-gray-500">Set your consultation response times</p>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-stone-400 md:text-sm">
-                    Response Time for Online Consults (Night) *
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {RESPONSE_TIME_NIGHT_OPTIONS.map((option) => (
-                      <label
-                        key={option}
-                        className="flex items-center gap-2 px-3 py-2 border border-stone-200 rounded-lg text-sm bg-stone-50 md:text-base md:px-4 md:py-3 md:rounded-xl hover:bg-stone-100 transition-colors"
-                      >
-                        <input
-                          type="radio"
-                          name="responseTimeNight"
-                          value={option}
-                          checked={form.responseTimeNight === option}
-                          onChange={updateForm("responseTimeNight")}
-                          required
-                          className="accent-[#3998de]"
-                        />
-                        {option}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-stone-400 md:text-sm">
-                    Break / do-not-disturb time (example: 2-4 PM) *
-                  </label>
-                  <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
-                    <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 md:px-4 md:rounded-2xl focus-within:ring-2 focus-within:ring-[#3998de]/30 focus-within:border-[#3998de]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const el = breakStartRef.current;
-                          if (!el) return;
-                          if (typeof el.showPicker === "function") {
-                            el.showPicker();
-                          } else {
-                            el.focus();
-                          }
-                        }}
-                        className="text-[#3998de] shrink-0 p-1"
-                        aria-label="Choose break start time"
-                      >
-                        <Clock size={16} />
-                      </button>
-                      <input
-                        ref={breakStartRef}
-                        type="time"
-                        value={breakStart}
-                        onChange={(e) => setBreakStart(e.target.value)}
-                        className={`flex-1 bg-transparent py-3 text-sm font-medium outline-none md:py-4 md:text-base ${
-                          breakStart ? "text-stone-800" : "text-transparent"
-                        }`}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 md:px-4 md:rounded-2xl focus-within:ring-2 focus-within:ring-[#3998de]/30 focus-within:border-[#3998de]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const el = breakEndRef.current;
-                          if (!el) return;
-                          if (typeof el.showPicker === "function") {
-                            el.showPicker();
-                          } else {
-                            el.focus();
-                          }
-                        }}
-                        className="text-[#3998de] shrink-0 p-1"
-                        aria-label="Choose break end time"
-                      >
-                        <Clock size={16} />
-                      </button>
-                      <input
-                        ref={breakEndRef}
-                        type="time"
-                        value={breakEnd}
-                        onChange={(e) => setBreakEnd(e.target.value)}
-                        className={`flex-1 bg-transparent py-3 text-sm font-medium outline-none md:py-4 md:text-base ${
-                          breakEnd ? "text-stone-800" : "text-transparent"
-                        }`}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={addBreakTime}
-                      className="w-full sm:w-auto px-4"
-                    >
-                      Add
-                    </Button>
-                  </div>
-
-                  {breakTimes.length ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Day Response Time (6 AM - 8 PM) *
+                    </label>
                     <div className="flex flex-wrap gap-2">
-                      {breakTimes.map((time) => (
-                        <span
-                          key={time}
-                          className="inline-flex items-center gap-2 rounded-full bg-stone-100 text-stone-600 text-xs px-3 py-1"
+                      {RESPONSE_TIME_DAY_OPTIONS.map((option) => (
+                        <label
+                          key={option}
+                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm cursor-pointer transition-all ${
+                            form.responseTimeDay === option
+                              ? "border-[#0B4D67] bg-[#0B4D67]/5 text-[#0B4D67]"
+                              : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300"
+                          }`}
                         >
-                          {time}
-                          <button
-                            type="button"
-                            onClick={() => removeBreakTime(time)}
-                            className="text-stone-400 hover:text-stone-600"
-                          >
-                            x
-                          </button>
-                        </span>
+                          <input
+                            type="radio"
+                            name="responseTimeDay"
+                            value={option}
+                            checked={form.responseTimeDay === option}
+                            onChange={updateForm("responseTimeDay")}
+                            required
+                            className="hidden"
+                          />
+                          {option}
+                        </label>
                       ))}
                     </div>
-                  ) : null}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Night Response Time (8 PM - 6 AM) *
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {RESPONSE_TIME_NIGHT_OPTIONS.map((option) => (
+                        <label
+                          key={option}
+                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm cursor-pointer transition-all ${
+                            form.responseTimeNight === option
+                              ? "border-[#0B4D67] bg-[#0B4D67]/5 text-[#0B4D67]"
+                              : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="responseTimeNight"
+                            value={option}
+                            checked={form.responseTimeNight === option}
+                            onChange={updateForm("responseTimeNight")}
+                            required
+                            className="hidden"
+                          />
+                          {option}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Break / Do-Not-Disturb Time *
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={noBreakTime}
+                          onChange={handleNoBreakToggle}
+                          className="w-4 h-4 text-[#0B4D67] border-gray-300 rounded focus:ring-[#0B4D67]/30"
+                        />
+                        No break time
+                      </label>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-[1fr,1fr,auto] items-center">
+                      <div className="relative">
+                        <Clock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <div className="relative">
+                          <span className="block w-full px-4 py-3.5 pl-12 rounded-xl border border-gray-200 bg-gray-50 text-sm">
+                            {breakStart ? formatTimeLabel(breakStart) : "Select start time"}
+                          </span>
+                          <input
+                            ref={breakStartRef}
+                            type="time"
+                            value={breakStart}
+                            onChange={(e) => setBreakStart(e.target.value)}
+                            disabled={noBreakTime}
+                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="relative">
+                        <Clock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <div className="relative">
+                          <span className="block w-full px-4 py-3.5 pl-12 rounded-xl border border-gray-200 bg-gray-50 text-sm">
+                            {breakEnd ? formatTimeLabel(breakEnd) : "Select end time"}
+                          </span>
+                          <input
+                            ref={breakEndRef}
+                            type="time"
+                            value={breakEnd}
+                            onChange={(e) => setBreakEnd(e.target.value)}
+                            disabled={noBreakTime}
+                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                          />
+                        </div>
+                      </div>
+
+                      <Button
+                        type="button"
+                        onClick={addBreakTime}
+                        disabled={noBreakTime}
+                        className="w-full md:w-auto px-6 py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Add Break
+                      </Button>
+                    </div>
+
+                    {breakTimes.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {breakTimes.map((time) => (
+                          <span
+                            key={time}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0B4D67]/10 text-[#0B4D67] text-sm"
+                          >
+                            {time}
+                            <button
+                              type="button"
+                              onClick={() => removeBreakTime(time)}
+                              className="hover:text-[#0B4D67]/70"
+                            >
+                              <X size={14} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </section>
             </div>
 
+            {/* RIGHT COLUMN - Pricing & Submit */}
             <div className="md:col-span-5 lg:col-span-4 space-y-6">
-              <div className="md:sticky md:top-28 space-y-4">
+              <div className="md:sticky md:top-28 space-y-6">
                 <PricingSection {...pricingProps} />
               </div>
             </div>
@@ -1396,35 +1580,47 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
       </PageWrap>
 
       {/* Mobile bottom button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-stone-100 safe-area-pb max-w-md mx-auto z-20 md:hidden">
-        <Button onClick={handleSubmit} fullWidth disabled={!canSubmit || submitting} className={!canSubmit || submitting ? "opacity-50" : ""}>
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 safe-area-pb max-w-md mx-auto z-20 md:hidden">
+        <Button
+          onClick={handleSubmit}
+          fullWidth
+          disabled={!canSubmit || submitting}
+          className={`bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white py-4 rounded-xl font-semibold ${
+            !canSubmit || submitting ? "opacity-50" : ""
+          }`}
+        >
           {submitting ? "Submitting..." : "Submit Application"}
         </Button>
       </div>
 
-      {showRegisterSuccessModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl md:max-w-md md:p-8">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-              <CheckCircle2 size={28} />
+      {/* Success Modal */}
+      {showRegisterSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl transform animate-scale-in">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <CheckCircle2 size={32} />
             </div>
-            <div className="text-lg font-bold text-stone-800 md:text-xl">
-              Application submitted
-            </div>
-            <p className="mt-2 text-sm text-stone-500 md:text-base">
-              Our team will review your application and activate your profile within
-              24-48 hours.
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              Application Submitted!
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Thank you for joining SnoutIQ. Our team will review your application and activate your profile within 24-48 hours.
             </p>
+            <div className="bg-emerald-50 rounded-xl p-4 mb-6">
+              <p className="text-sm text-emerald-800">
+                <strong>Next steps:</strong> You'll receive an email confirmation once your profile is verified.
+              </p>
+            </div>
             <Button
               onClick={handleRegisterSuccessLogin}
               fullWidth
-              className="mt-4 md:text-lg md:py-4 md:rounded-2xl"
+              className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white py-4 rounded-xl font-semibold hover:shadow-lg transition-all"
             >
               Go to Login
             </Button>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 };
@@ -1433,35 +1629,65 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
 export const VetPendingScreen = ({ onHome }) => {
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center animate-fade-in md:bg-gradient-to-b md:from-white md:to-calm-bg md:p-16 md:py-24 md:rounded-3xl md:shadow-lg">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex flex-col items-center justify-center p-6">
       <PageWrap>
-        <div className="w-full max-w-sm mx-auto md:max-w-2xl md:py-10">
-          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mb-6 text-amber-600 mx-auto md:w-24 md:h-24 ring-1 ring-amber-200/60">
-            <Clock size={40} className="md:hidden" />
-            <Clock size={48} className="hidden md:block" />
+        <div className="w-full max-w-2xl mx-auto text-center">
+          <div className="mb-8">
+            <div className="w-24 h-24 bg-amber-100 rounded-3xl flex items-center justify-center mx-auto mb-6 transform rotate-3">
+              <Clock size={48} className="text-amber-600" />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+              Application Received
+            </h2>
+            <p className="text-lg text-gray-600 mb-2">
+              Thanks for submitting your application, Doctor!
+            </p>
+            <p className="text-gray-500">
+              We're reviewing your credentials and will activate your profile within 24-48 hours.
+            </p>
           </div>
 
-          <h2 className="text-2xl font-bold text-stone-800 mb-2 md:text-4xl">
-            Application Received
-          </h2>
-          <p className="text-stone-500 mb-8 max-w-[280px] mx-auto leading-relaxed md:max-w-2xl md:text-lg">
-            Thanks, Doctor. Our team will verify your credentials and activate your profile within 24-48 hours.
-          </p>
+          <div className={`${CARD_CLASS} p-8 mb-8`}>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-full bg-[#0B4D67]/10 flex items-center justify-center">
+                <Shield size={24} className="text-[#0B4D67]" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-gray-900">Verification in progress</h3>
+                <p className="text-sm text-gray-500">We'll notify you via SMS and email</p>
+              </div>
+            </div>
 
-          <div className="w-full max-w-xs mx-auto space-y-3 md:max-w-sm">
-            <Button onClick={onHome} variant="secondary" fullWidth className="md:text-lg md:py-4 md:rounded-2xl">
-              Back to Home
-            </Button>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-sm">
+                <CheckCircle2 size={16} className="text-emerald-500" />
+                <span className="text-gray-600">Application received</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-gray-600">Credentials verification</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-4 h-4 rounded-full border-2 border-gray-200" />
+                <span className="text-gray-400">Profile activation</span>
+              </div>
+            </div>
           </div>
+
+          <Button
+            onClick={onHome}
+            variant="secondary"
+            className="px-8 py-4 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-semibold transition-all"
+          >
+            Back to Home
+          </Button>
         </div>
       </PageWrap>
     </div>
   );
 };
 
-// ---------------- 4) Vet Dashboard Screen (unchanged from your version) ----------------
-// Keep your existing VetDashboardScreen here as-is.
-// (No image upload needed in dashboard, so no changes required)
+// ---------------- 4) Vet Dashboard Screen ----------------
 
 export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [auth, setAuth] = useState(() => authFromProps || loadVetAuth());
@@ -1478,6 +1704,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [showPrescriptionSuccessModal, setShowPrescriptionSuccessModal] = useState(false);
   const prescriptionSuccessTimer = useRef(null);
   const [docPreviewUrl, setDocPreviewUrl] = useState("");
+  const refreshTimerRef = useRef(null);
+  const isFirstLoadRef = useRef(true);
   const [prescriptionForm, setPrescriptionForm] = useState({
     visitCategory: "Follow-up",
     caseSeverity: "general",
@@ -1508,12 +1736,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
   const formatAmount = (value) => {
     const num = Number(value);
-    if (!Number.isFinite(num)) return "Rs. 0";
-    return `Rs. ${num.toLocaleString("en-IN")}`;
+    if (!Number.isFinite(num)) return "₹0";
+    return `₹${num.toLocaleString("en-IN")}`;
   };
 
   const formatDate = (value) => {
-    if (!value) return "NA";
+    if (!value) return "N/A";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleString("en-IN", {
@@ -1590,14 +1818,14 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
   const statusClass = (status) => {
     const key = (status || "").toLowerCase();
-    if (key === "pending") return "bg-amber-50 text-amber-700";
+    if (key === "pending") return "bg-amber-50 text-amber-700 border-amber-200";
     if (["paid", "success", "captured", "completed"].includes(key)) {
-      return "bg-emerald-50 text-emerald-700";
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
     }
     if (["failed", "cancelled", "canceled", "refunded"].includes(key)) {
-      return "bg-rose-50 text-rose-700";
+      return "bg-rose-50 text-rose-700 border-rose-200";
     }
-    return "bg-slate-100 text-slate-600";
+    return "bg-gray-100 text-gray-600 border-gray-200";
   };
 
   const statusLabel = (status) => {
@@ -1826,18 +2054,27 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   }, [showPrescriptionSuccessModal]);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) return undefined;
     if (!doctorId) {
       setLoadError("Missing doctor ID. Please log in again.");
       setIsLoading(false);
-      return;
+      return undefined;
     }
 
-    const controller = new AbortController();
+    let active = true;
+    let controller = null;
 
     const fetchTransactions = async () => {
-      setIsLoading(true);
+      if (!active) return;
+      if (controller) controller.abort();
+      controller = new AbortController();
+
+      const showLoading = isFirstLoadRef.current;
+      if (showLoading) {
+        setIsLoading(true);
+      }
       setLoadError("");
+
       try {
         let clinicId = clinicIdRaw;
         if (!clinicId) {
@@ -1885,21 +2122,43 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           console.log("Vet dashboard data:", data);
         }
         setDashboardData(data);
-        
         setTransactions(Array.isArray(data?.transactions) ? data.transactions : []);
       } catch (error) {
         if (error?.name !== "AbortError") {
           setLoadError(error?.message || "Failed to load transactions.");
         }
       } finally {
-        setIsLoading(false);
+        if (showLoading) {
+          setIsLoading(false);
+          isFirstLoadRef.current = false;
+        }
       }
     };
 
     fetchTransactions();
-    return () => controller.abort();
-  }, [auth, authToken, clinicIdRaw, doctorId]);
 
+    if (refreshTimerRef.current) {
+      window.clearInterval(refreshTimerRef.current);
+    }
+    refreshTimerRef.current = window.setInterval(fetchTransactions, 30000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchTransactions();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      active = false;
+      if (controller) controller.abort();
+      if (refreshTimerRef.current) {
+        window.clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [auth, authToken, clinicIdRaw, doctorId]);
 
   const handleLogout = () => {
     clearVetAuth();
@@ -1949,373 +2208,313 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       };
     }, [dashboardData, transactions]);
 
-  const headerBg = "bg-[#0B4D67]";
-  const pageBg = "bg-[#F6F7FB]";
-  const card = "bg-white border border-stone-100 shadow-[0_8px_30px_rgba(0,0,0,0.06)]";
-  const cardSoft = "bg-white border border-stone-100 shadow-sm";
-  const actionButton =
-    "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold transition-colors";
-
   return (
     <div
-      className={`min-h-screen ${pageBg} flex flex-col animate-slide-up`}
+      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col animate-fade-in"
       data-vet-dashboard="true"
     >
-      <div
-        className={`
-          ${headerBg} text-white pt-8 pb-12 px-6 relative
-          w-screen max-w-none left-1/2 right-1/2 -mx-[50vw]
-          md:px-10 md:pt-12 md:pb-16 lg:px-16
-          md:rounded-none rounded-b-[2rem]
-          shadow-[0_18px_60px_rgba(11,77,103,0.35)]
-        `}
-      >
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-6">
-          <div className="flex items-center gap-3">
-            <div
-              className={`
-                w-12 h-12 rounded-full
-                bg-white/15 border border-white/20
-                flex items-center justify-center text-xl font-bold
-                md:w-16 md:h-16 md:text-2xl
-              `}
-            >
-              {initials}
-            </div>
-
-            <div>
-              <h1 className="font-bold text-lg md:text-2xl">{doctorName}</h1>
-              <div className="mt-2 text-xs text-white/75 md:text-sm">
-                Verified veterinary partner
+      {/* Header with Gradient */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white">
+        <div className="px-6 py-6 md:px-12 lg:px-20 md:py-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-xl">
+                <span className="text-2xl md:text-3xl font-bold">{initials}</span>
+              </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold mb-1">Dr. {doctorName}</h1>
+                <div className="flex items-center gap-2 text-white/80 text-sm">
+                  <Shield size={16} />
+                  <span>Verified Veterinary Partner</span>
+                </div>
               </div>
             </div>
+            
+            <div className="flex items-center gap-3">
+              <div className="hidden md:flex items-center gap-2 text-white/70 text-sm bg-white/10 px-4 py-2 rounded-xl">
+                <Clock size={16} />
+                <span>Last updated: {isLoading ? "Loading..." : formatDate(lastUpdated)}</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-sm font-medium"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="hidden md:inline text-xs text-white/70">
-              Last updated: {isLoading ? "Loading..." : formatDate(lastUpdated)}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="text-xs text-white/80 hover:text-white font-semibold md:text-sm focus:outline-none focus:ring-2 focus:ring-white/30 rounded-lg px-3 py-2 bg-white/10 hover:bg-white/15 transition-colors"
-            >
-              Logout
-            </button>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
+              <p className="text-white/70 text-xs uppercase mb-1">Total Earnings</p>
+              <p className="text-2xl md:text-3xl font-bold">{isLoading ? "..." : formatAmount(totalAmount)}</p>
+              <p className="text-white/60 text-xs mt-1">All time</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
+              <p className="text-white/70 text-xs uppercase mb-1">Consultations</p>
+              <p className="text-2xl md:text-3xl font-bold">{isLoading ? "..." : totalTransactions}</p>
+              <p className="text-white/60 text-xs mt-1">Total transactions</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
+              <p className="text-white/70 text-xs uppercase mb-1">Pending</p>
+              <p className="text-2xl md:text-3xl font-bold">{isLoading ? "..." : pendingCount}</p>
+              <p className="text-white/60 text-xs mt-1">Awaiting action</p>
+            </div>
           </div>
-        </div>
-
-        <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/80 md:text-sm">
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1">
-            Earnings: {isLoading ? "Loading..." : formatAmount(totalAmount)}
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1">
-            Transactions: {isLoading ? "Loading..." : totalTransactions}
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1">
-            Pending: {isLoading ? "Loading..." : pendingCount}
-          </span>
         </div>
       </div>
 
       <PageWrap>
-        <div className="px-4 mt-6 mb-8 grid grid-cols-2 gap-3 md:px-0 md:grid-cols-3 md:gap-5">
-          <div className={`${card} p-4 rounded-2xl md:p-7`}>
-            <p className="text-stone-400 text-xs uppercase font-bold mb-1 md:text-sm">Total Amount</p>
-            <p className="text-2xl font-bold text-stone-900 md:text-4xl">{isLoading ? "Loading..." : formatAmount(totalAmount)}</p>
-            <p className="text-[10px] text-stone-400 mt-1 md:text-sm">All time</p>
-          </div>
-
-          <div className={`${card} p-4 rounded-2xl md:p-7`}>
-            <p className="text-stone-400 text-xs uppercase font-bold mb-1 md:text-sm">Total Transactions</p>
-            <p className="text-2xl font-bold text-stone-900 md:text-4xl">{isLoading ? "Loading..." : totalTransactions}</p>
-            <p className="text-[10px] text-stone-400 mt-1 md:text-sm">All time</p>
-          </div>
-
-          <div className={`${card} p-4 rounded-2xl md:p-7`}>
-            <p className="text-stone-400 text-xs uppercase font-bold mb-1 md:text-sm">Pending</p>
-            <p className="text-2xl font-bold text-stone-900 md:text-4xl">{isLoading ? "Loading..." : pendingCount}</p>
-            <p className="text-[10px] text-stone-400 mt-1 md:text-sm">Awaiting</p>
-          </div>
-        </div>
-
-        <div className="flex-1 px-4 pb-20 overflow-y-auto no-scrollbar space-y-6 md:px-0 md:pb-24 md:grid md:grid-cols-12 md:gap-10 md:space-y-0">
-          <div className="md:col-span-7 lg:col-span-8 space-y-6">
-            {loadError ? (
-              <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 p-3 rounded-xl">
-                <AlertCircle size={16} />
-                <span>{loadError}</span>
+        <div className="px-6 py-8 md:px-0 md:py-10">
+          {loadError ? (
+            <div className="flex items-start gap-3 text-red-600 bg-red-50 border border-red-200 p-5 rounded-2xl mb-6">
+              <AlertCircle size={20} className="flex-shrink-0" />
+              <div>
+                <p className="font-medium">Error loading dashboard</p>
+                <p className="text-sm text-red-600/80 mt-1">{loadError}</p>
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            <section>
-              <h3 className="font-bold text-stone-800 mb-3 text-sm md:text-lg">Transaction Summary</h3>
-
-              <div className={`${cardSoft} rounded-2xl p-2 md:rounded-3xl`}>
-                <div className="grid grid-cols-3 divide-x divide-stone-100">
-                  <div className="p-4 text-center md:p-7">
-                    <p className="text-stone-400 text-[10px] uppercase font-bold mb-1 md:text-xs">Completed</p>
-                    <div className="font-bold text-stone-900 md:text-xl">{isLoading ? "-" : completedCount}</div>
-                  </div>
-
-                  <div className="p-4 text-center md:p-7">
-                    <p className="text-stone-400 text-[10px] uppercase font-bold mb-1 md:text-xs">Pending</p>
-                    <div className="font-bold text-stone-900 md:text-xl">{isLoading ? "-" : pendingCount}</div>
-                  </div>
-
-                  <div className="p-4 text-center md:p-7">
-                    <p className="text-stone-400 text-[10px] uppercase font-bold mb-1 md:text-xs">Failed</p>
-                    <div className="font-bold text-stone-900 md:text-xl">{isLoading ? "-" : failedCount}</div>
-                  </div>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Main Content - Transactions */}
+            <div className="lg:col-span-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <History size={20} className="text-[#0B4D67]" />
+                  Recent Consultations
+                </h2>
+                <span className="text-xs text-gray-500 bg-white px-3 py-1.5 rounded-full border border-gray-200">
+                  Auto-refreshes every 30s
+                </span>
               </div>
-            </section>
 
-            <section>
-              <h3 className="font-bold text-stone-800 mb-3 text-sm flex items-center gap-2 md:text-lg">
-                <History size={16} />
-                Recent Transactions
-              </h3>
-
-              <div className={`${cardSoft} rounded-2xl overflow-hidden md:rounded-3xl`}>
+              <div className={`${CARD_CLASS} overflow-hidden`}>
                 {isLoading ? (
-                  <div className="px-4 py-6 text-sm text-stone-500 md:px-7">Loading transactions...</div>
-                ) : latestTransactions.length ? (
-                  latestTransactions.map((item, idx) => {
-                    const amountInr = item?.amount_inr ?? (item?.amount_paise ? item.amount_paise / 100 : 0);
-                    const petName = resolvePetName(item);
-                    const petMeta = formatPetText(
-                      item?.pet?.breed || item?.pet?.pet_type || "Details"
-                    );
-                    const reference = item?.reference || item?.metadata?.order_id || "NA";
+                  <div className="p-8 text-center">
+                    <div className="inline-block w-8 h-8 border-3 border-[#0B4D67] border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <p className="text-gray-500">Loading transactions...</p>
+                  </div>
+                ) : latestTransactions.length > 0 ? (
+                  <div className="divide-y divide-gray-100">
+                    {latestTransactions.map((item, idx) => {
+                      const amountInr = item?.amount_inr ?? (item?.amount_paise ? item.amount_paise / 100 : 0);
+                      const petName = resolvePetName(item);
+                      const { userId, clinicId } = resolveTransactionIds(item);
+                      const canOpenPrescription = Boolean(userId && clinicId);
+                      const canView = Boolean(item?.user || item?.pet);
 
-                    const { userId, petId, clinicId } = resolveTransactionIds(item);
-                    const canOpenPrescription = Boolean(userId && clinicId);
-                    const canView = Boolean(item?.user || item?.pet);
-
-                    return (
-                      <div
-                        key={item?.id || item?.reference || idx}
-                        className={`px-4 py-4 flex justify-between items-start md:px-7 md:py-6 hover:bg-stone-50/60 transition-colors ${
-                          idx !== latestTransactions.length - 1 ? "border-b border-stone-100" : ""
-                        }`}
-                      >
-                        <div>
-                          <p className="font-bold text-stone-900 text-sm md:text-lg">{item?.user?.name || "Pet Parent"}</p>
-                          <p className="text-xs text-stone-500 md:text-base">
-                            {petName} ({petMeta})
-                          </p>
-                          <p className="text-[10px] text-stone-400 md:text-sm">
-                            Ref: {reference} | {formatDate(item?.created_at)}
-                          </p>
-                        </div>
-
-                        <div className="text-right flex flex-col items-end gap-2">
-                          <p className="font-bold text-stone-900 text-sm md:text-lg">{formatAmount(amountInr)}</p>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold ${statusClass(item?.status)}`}>
-                            {statusLabel(item?.status)}
-                          </span>
-                          <div className="flex flex-wrap gap-2 justify-end">
-                            <button
-                              type="button"
-                              onClick={() => openPatientModal(item)}
-                              disabled={!canView}
-                              className={`${actionButton} border border-stone-200 text-stone-600 hover:bg-stone-50 ${
-                                !canView ? "opacity-50 cursor-not-allowed" : ""
-                              }`}
-                            >
-                              View
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openPrescriptionModal(item)}
-                              disabled={!canOpenPrescription}
-                              className={`${actionButton} bg-[#3998de] text-white hover:bg-[#2F7FC0] ${
-                                !canOpenPrescription ? "opacity-50 cursor-not-allowed" : ""
-                              }`}
-                            >
-                              Prescription
-                            </button>
+                      return (
+                        <div key={item?.id || idx} className="p-5 hover:bg-gray-50/50 transition-colors">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-gray-900">{item?.user?.name || "Pet Parent"}</span>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${statusClass(item?.status)}`}>
+                                  {statusLabel(item?.status)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                                <PawPrint size={14} />
+                                <span>{petName}</span>
+                                <span className="text-gray-400">•</span>
+                                <span>{item?.pet?.breed || "Pet"}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <span>Ref: {item?.reference || item?.metadata?.order_id || "N/A"}</span>
+                                <span>•</span>
+                                <span>{formatDate(item?.created_at)}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-gray-900">{formatAmount(amountInr)}</span>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => openPatientModal(item)}
+                                  disabled={!canView}
+                                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => openPrescriptionModal(item)}
+                                  disabled={!canOpenPrescription}
+                                  className="px-4 py-2 text-sm font-medium text-white rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Prescribe
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                  </div>
                 ) : (
-                  <div className="px-4 py-6 text-sm text-stone-500 md:px-7">No transactions yet.</div>
+                  <div className="p-12 text-center">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <History size={24} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-600 font-medium">No consultations yet</p>
+                    <p className="text-sm text-gray-400 mt-1">Your consultations will appear here</p>
+                  </div>
                 )}
               </div>
 
-              <p className="text-[10px] text-stone-400 mt-2 flex items-center gap-1 md:text-xs">
-                <Lock size={12} />
-                Patient contact details are hidden for privacy.
+              <p className="text-xs text-gray-400 flex items-center gap-1.5 bg-white p-3 rounded-xl border border-gray-100">
+                <Lock size={12} className="text-[#0B4D67]" />
+                Patient contact details are encrypted and remain private
               </p>
-            </section>
-          </div>
+            </div>
 
-          <div className="md:col-span-5 lg:col-span-4 space-y-6">
-            <section>
-              <h3 className="font-bold text-stone-800 mb-3 text-sm md:text-lg">Account Details</h3>
-
-              <div className={`${cardSoft} p-4 rounded-2xl md:p-7 md:rounded-3xl`}>
-                <div className="space-y-4 text-sm">
+            {/* Sidebar - Account Info & Tips */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className={`${CARD_CLASS} p-6`}>
+                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <User size={18} className="text-[#0B4D67]" />
+                  Account Information
+                </h3>
+                <div className="space-y-4">
                   <div>
-                    <p className="text-stone-400 text-[10px] uppercase font-bold">Doctor</p>
-                    <p className="text-stone-800 font-semibold">{doctorName}</p>
+                    <p className="text-xs text-gray-400 uppercase mb-1">Doctor Name</p>
+                    <p className="font-medium text-gray-900">Dr. {doctorName}</p>
                   </div>
-                  {doctorEmail ? (
+                  {doctorEmail && (
                     <div>
-                      <p className="text-stone-400 text-[10px] uppercase font-bold">Email</p>
-                      <p className="text-stone-700">{doctorEmail}</p>
+                      <p className="text-xs text-gray-400 uppercase mb-1">Email</p>
+                      <p className="text-sm text-gray-700">{doctorEmail}</p>
                     </div>
-                  ) : null}
-                  {doctorPhone ? (
+                  )}
+                  {doctorPhone && (
                     <div>
-                      <p className="text-stone-400 text-[10px] uppercase font-bold">Phone</p>
-                      <p className="text-stone-700">{doctorPhone}</p>
+                      <p className="text-xs text-gray-400 uppercase mb-1">Phone</p>
+                      <p className="text-sm text-gray-700">{doctorPhone}</p>
                     </div>
-                  ) : null}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-stone-400 text-[10px] uppercase font-bold">Last Updated</p>
-                      <p className="text-stone-700">
-                        {isLoading ? "Loading..." : formatDate(lastUpdated)}
-                      </p>
+                  )}
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 uppercase mb-1">Account Status</p>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                      <span className="text-sm font-medium text-emerald-700">Active</span>
                     </div>
                   </div>
-                  {/* <div>
-                    <p className="text-stone-400 text-[10px] uppercase font-bold">Last Updated</p>
-                    <p className="text-stone-700">{isLoading ? "Loading..." : formatDate(lastUpdated)}</p>
-                  </div> */}
                 </div>
               </div>
-            </section>
 
-            <div className="bg-[#EAF3FF] p-4 rounded-2xl border border-[#CFE2FF] flex gap-3 md:p-7 md:rounded-3xl">
-              <AlertCircle className="text-[#2563EB] flex-shrink-0" size={22} />
-              <div className="text-xs text-[#1E3A8A] md:text-base">
-                <strong>Pro Tip:</strong> Updating your availability accurately helps you get 3x more consultations.
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-100">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <Star size={20} className="text-amber-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-amber-800 mb-1">Pro Tip</h4>
+                    <p className="text-sm text-amber-700">
+                      Update your availability regularly to get 3x more consultation requests from pet parents.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 border border-gray-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-[#0B4D67]/10 flex items-center justify-center">
+                    <TrendingUp size={16} className="text-[#0B4D67]" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900">Quick Stats</h4>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-500">Completed</p>
+                    <p className="text-xl font-bold text-gray-900">{completedCount}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-500">Failed</p>
+                    <p className="text-xl font-bold text-gray-900">{failedCount}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </PageWrap>
 
-      {showPatientModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between bg-gradient-to-r from-[#0B4D67] to-[#0E5F7B] px-6 py-4 text-white">
+      {/* Patient Details Modal */}
+      {showPatientModal && activeTransaction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
-                  <User size={20} />
+                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                  <User size={20} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/70">Patient Details</p>
-                  <h3 className="text-lg font-semibold">Consult Overview</h3>
+                  <p className="text-white/70 text-xs">Patient Details</p>
+                  <h3 className="text-white font-semibold">Consultation Overview</h3>
                 </div>
               </div>
               <button
-                type="button"
                 onClick={closePatientModal}
-                className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
               >
-                <X size={16} />
+                <X size={16} className="text-white" />
               </button>
             </div>
 
-            <div className="space-y-4 bg-[#F8FAFC] p-6 max-h-[calc(90vh-70px)] overflow-y-auto">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-stone-100 bg-white p-4">
-                  <div className="text-xs font-semibold uppercase text-stone-400">Pet Parent</div>
-                  <div className="mt-2 space-y-1 text-sm text-stone-700">
-                    <p className="font-semibold text-stone-900">
-                      {activeTransaction?.user?.name || "Not available"}
-                    </p>
-                    {formatPhone(activeTransaction?.user?.phone) ? (
-                      <p>Whatsapp Phone: {formatPhone(activeTransaction?.user?.phone)}</p>
-                    ) : (
-                      <p>Whatsapp Phone: Not available</p>
-                    )}
-                  </div>
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-3">Pet Parent</h4>
+                  <p className="font-semibold text-gray-900">{activeTransaction?.user?.name || "Not available"}</p>
+                  {activeTransaction?.user?.phone && (
+                    <p className="text-sm text-gray-600 mt-1">📱 {formatPhone(activeTransaction.user.phone)}</p>
+                  )}
                 </div>
 
-                <div className="rounded-2xl border border-stone-100 bg-white p-4">
-                  <div className="text-xs font-semibold uppercase text-stone-400">Pet Details</div>
-                  <div className="mt-2 grid gap-3 text-sm text-stone-700 md:grid-cols-2">
-                    <div>
-                      <span className="text-stone-400">Name</span>
-                      <p className="font-semibold text-stone-900">
-                        {resolvePetName(activeTransaction)}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-stone-400">Breed</span>
-                      <p className="font-semibold text-stone-900">
-                        {formatPetText(activeTransaction?.pet?.breed) || "Not available"}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-stone-400">Type</span>
-                      <p className="font-semibold text-stone-900">
-                        {formatPetText(activeTransaction?.pet?.pet_type) || "Not available"}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-stone-400">DOB</span>
-                      <p className="font-semibold text-stone-900">
-                        {formatDob(activeTransaction?.pet?.pet_dob)}
-                      </p>
-                    </div>
-                    {activeTransaction?.pet?.reported_symptom ? (
-                      <div className="md:col-span-2">
-                        <span className="text-stone-400">Reported Symptom</span>
-                        <p className="font-semibold text-stone-900">
-                          {activeTransaction.pet.reported_symptom}
-                        </p>
-                      </div>
-                    ) : null}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-3">Pet Details</h4>
+                  <div className="space-y-2">
+                    <p className="text-sm"><span className="text-gray-500">Name:</span> <span className="font-medium">{resolvePetName(activeTransaction)}</span></p>
+                    <p className="text-sm"><span className="text-gray-500">Breed:</span> {formatPetText(activeTransaction?.pet?.breed) || "Not available"}</p>
+                    <p className="text-sm"><span className="text-gray-500">Type:</span> {formatPetText(activeTransaction?.pet?.pet_type) || "Not available"}</p>
+                    {activeTransaction?.pet?.pet_dob && (
+                      <p className="text-sm"><span className="text-gray-500">DOB:</span> {formatDob(activeTransaction.pet.pet_dob)}</p>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-stone-100 bg-white p-4">
-                <div className="text-xs font-semibold uppercase text-stone-400">Pet Document</div>
-                <div className="mt-3">
-                  {(() => {
-                    const docUrl = toDocUrl(activeTransaction?.pet?.pet_doc2);
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => handleDocPreview(docUrl)}
-                        className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-stone-200 px-4 py-4 text-xs text-stone-500 transition ${
-                          docUrl
-                            ? "bg-stone-50 hover:border-[#3998de] hover:text-[#3998de]"
-                            : "bg-stone-50/70 cursor-default"
-                        }`}
-                        disabled={!docUrl}
-                      >
-                        {docUrl && isImageUrl(docUrl) ? (
-                          <img
-                            src={docUrl}
-                            alt="Pet document"
-                            className="h-24 w-full rounded-lg object-cover"
-                          />
-                        ) : (
-                          <FileText size={20} />
-                        )}
-                        <span className="font-semibold">
-                          {docUrl ? "View Document" : "Document not uploaded"}
-                        </span>
-                      </button>
-                    );
-                  })()}
+              {activeTransaction?.pet?.reported_symptom && (
+                <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Reported Symptoms</h4>
+                  <p className="text-gray-700">{activeTransaction.pet.reported_symptom}</p>
                 </div>
+              )}
+
+              <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Pet Document</h4>
+                {(() => {
+                  const docUrl = toDocUrl(activeTransaction?.pet?.pet_doc2);
+                  return docUrl ? (
+                    <button
+                      onClick={() => handleDocPreview(docUrl)}
+                      className="flex items-center gap-2 text-[#0B4D67] hover:text-[#1A6F8F] font-medium"
+                    >
+                      <FileText size={16} />
+                      View Document
+                    </button>
+                  ) : (
+                    <p className="text-sm text-gray-500">No document uploaded</p>
+                  );
+                })()}
               </div>
 
               <div className="flex justify-end">
                 <button
-                  type="button"
                   onClick={closePatientModal}
-                  className="rounded-full bg-[#3998de] px-5 py-2 text-sm font-semibold text-white hover:bg-[#2F7FC0]"
+                  className="px-6 py-2.5 text-white rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-colors font-medium"
                 >
                   Close
                 </button>
@@ -2323,96 +2522,56 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
             </div>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {docPreviewUrl ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-              <span className="text-sm font-semibold text-stone-700">Document Preview</span>
-              <button
-                type="button"
-                onClick={() => setDocPreviewUrl("")}
-                className="rounded-full bg-stone-100 p-2 text-stone-600 hover:bg-stone-200"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="bg-black/5 p-4">
-              <img
-                src={docPreviewUrl}
-                alt="Pet document"
-                className="max-h-[70vh] w-full rounded-xl object-contain"
-              />
-              <div className="mt-3 flex justify-end">
-                <a
-                  href={docPreviewUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm font-semibold text-[#3998de] hover:underline"
-                >
-                  Open in new tab
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showPrescriptionModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between bg-gradient-to-r from-[#0B4D67] to-[#0E5F7B] px-6 py-4 text-white">
+      {/* Prescription Modal */}
+      {showPrescriptionModal && activeTransaction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
-                  <FileText size={20} />
+                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                  <FileText size={20} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/70">Prescription</p>
-                  <h3 className="text-lg font-semibold">Create Medical Record</h3>
+                  <p className="text-white/70 text-xs">Create Prescription</p>
+                  <h3 className="text-white font-semibold">Medical Record</h3>
                 </div>
               </div>
               <button
-                type="button"
                 onClick={closePrescriptionModal}
-                className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
               >
-                <X size={16} />
+                <X size={16} className="text-white" />
               </button>
             </div>
 
-            <div className="bg-[#F4F7FB] px-6 pb-6 pt-4 overflow-y-auto max-h-[calc(92vh-76px)]">
-              <form onSubmit={handlePrescriptionSubmit} className="space-y-6">
-                <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-                  <div className="space-y-6">
-                    <div className="rounded-2xl border border-stone-100 bg-white p-4 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs uppercase text-stone-400">Patient</p>
-                          <p className="text-sm font-semibold text-stone-900">
-                            {activeTransaction?.user?.name || "Pet Parent"}
-                          </p>
-                          <p className="text-xs text-stone-500">
-                            {resolvePetName(activeTransaction)} -{" "}
-                            {activeTransaction?.pet?.breed || "Breed"}
-                          </p>
-                        </div>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold ${statusClass(
-                            activeTransaction?.status
-                          )}`}
-                        >
-                          {statusLabel(activeTransaction?.status)}
-                        </span>
+            <form onSubmit={handlePrescriptionSubmit} className="p-6 max-h-[70vh] overflow-y-auto">
+              <div className="grid lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Patient Info Summary */}
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-400">Patient</p>
+                        <p className="font-semibold text-gray-900">{activeTransaction?.user?.name || "Pet Parent"}</p>
+                        <p className="text-sm text-gray-600">{resolvePetName(activeTransaction)}</p>
                       </div>
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-medium border ${statusClass(activeTransaction?.status)}`}>
+                        {statusLabel(activeTransaction?.status)}
+                      </span>
                     </div>
+                  </div>
 
-                    <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3 shadow-sm">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
-                        <FileText size={16} /> Consultation Basics
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-semibold text-stone-400">Visit Category</label>
+                  {/* Consultation Basics */}
+                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                      <FileText size={16} className="text-[#0B4D67]" />
+                      Consultation Details
+                    </h4>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Visit Category</label>
                         <select
                           value={prescriptionForm.visitCategory}
                           onChange={updatePrescriptionField("visitCategory")}
@@ -2424,8 +2583,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           <option value="Emergency">Emergency</option>
                         </select>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-semibold text-stone-400">Case Severity</label>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Case Severity</label>
                         <select
                           value={prescriptionForm.caseSeverity}
                           onChange={updatePrescriptionField("caseSeverity")}
@@ -2437,78 +2596,78 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           <option value="critical">Critical</option>
                         </select>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-semibold text-stone-400">Notes</label>
-                        <textarea
-                          value={prescriptionForm.notes}
-                          onChange={updatePrescriptionField("notes")}
-                          rows={3}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Clinical Notes</label>
+                      <textarea
+                        value={prescriptionForm.notes}
+                        onChange={updatePrescriptionField("notes")}
+                        rows={4}
+                        required
+                        placeholder="Enter diagnosis, observations, and treatment plan..."
+                        className={`${INPUT_BASE_CLASS} resize-none`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Vitals */}
+                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                      <Activity size={16} className="text-[#0B4D67]" />
+                      Vital Signs
+                    </h4>
+                    <div className="grid sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Temperature (°C)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={prescriptionForm.temperature}
+                          onChange={updatePrescriptionField("temperature")}
                           required
-                          placeholder="Add key observations, diagnosis, and advice."
-                          className={`${INPUT_BASE_CLASS} resize-none`}
+                          placeholder="38.5"
+                          className={INPUT_BASE_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Weight (kg)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={prescriptionForm.weight}
+                          onChange={updatePrescriptionField("weight")}
+                          required
+                          placeholder="5.2"
+                          className={INPUT_BASE_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Heart Rate (bpm)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={prescriptionForm.heartRate}
+                          onChange={updatePrescriptionField("heartRate")}
+                          required
+                          placeholder="120"
+                          className={INPUT_BASE_CLASS}
                         />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3 shadow-sm">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
-                        <Pill size={16} /> Vitals
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="text-xs font-semibold text-stone-400">Temperature (C)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={prescriptionForm.temperature}
-                            onChange={updatePrescriptionField("temperature")}
-                            onKeyDown={blockNumberInput}
-                            onWheel={handleNumberWheel}
-                            required
-                            className={INPUT_BASE_CLASS}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-stone-400">Weight (kg)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={prescriptionForm.weight}
-                            onChange={updatePrescriptionField("weight")}
-                            onKeyDown={blockNumberInput}
-                            onWheel={handleNumberWheel}
-                            required
-                            className={INPUT_BASE_CLASS}
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="text-xs font-semibold text-stone-400">Heart Rate (bpm)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={prescriptionForm.heartRate}
-                            onChange={updatePrescriptionField("heartRate")}
-                            onKeyDown={blockNumberInput}
-                            onWheel={handleNumberWheel}
-                            required
-                            className={INPUT_BASE_CLASS}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3 shadow-sm">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
-                        <Pill size={16} /> Medications
-                      </div>
-                      <div className="space-y-3">
-                        {prescriptionForm.medications.map((medication, index) => (
-                          <div
-                            key={`med-${index}`}
-                            className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.2fr_0.9fr_0.9fr_0.8fr_auto] items-center"
-                          >
+                  {/* Medications */}
+                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                      <Pill size={16} className="text-[#0B4D67]" />
+                      Medications
+                    </h4>
+                    <div className="space-y-3">
+                      {prescriptionForm.medications.map((medication, index) => (
+                        <div key={index} className="grid sm:grid-cols-5 gap-2 items-start">
+                         
                             <input
                               type="text"
                               value={medication.name}
@@ -2630,7 +2789,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       <button
                         type="submit"
                         disabled={prescriptionSubmitting}
-                        className={`rounded-full bg-[#3998de] px-6 py-2 text-sm font-semibold text-white hover:bg-[#2F7FC0] ${
+                        className={`rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 px-6 py-2 text-sm font-semibold text-white ${
                           prescriptionSubmitting ? "opacity-60 cursor-not-allowed" : ""
                         }`}
                       >
@@ -2642,8 +2801,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
               </form>
             </div>
           </div>
-        </div>
-      ) : null}
+        )}
 
       {showPrescriptionSuccessModal ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
@@ -2660,7 +2818,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
             <Button
               onClick={closePrescriptionSuccessModal}
               fullWidth
-              className="mt-4"
+              className="mt-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600"
             >
               Done
             </Button>

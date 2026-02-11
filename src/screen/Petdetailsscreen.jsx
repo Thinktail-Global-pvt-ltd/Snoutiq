@@ -427,6 +427,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       fd.append("phone", formatPhone(details.ownerMobile));
       fd.append("type", details.type || "");
       fd.append("dob", details.petDob || "");
+      fd.append("pet_name", details.name || "");
 
       const breedValue =
         details.type === "exotic"

@@ -31,6 +31,23 @@ const parseListField = (value) => {
   return [String(value).trim()].filter(Boolean);
 };
 
+const normalizeBreakTimes = (value) => {
+  const list = parseListField(value);
+  return list.filter((item) => {
+    const cleaned = String(item).toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!cleaned) return false;
+    if (
+      ["no", "none", "nil", "na", "na0", "n/a", "noany", "notavailable"].includes(
+        cleaned
+      )
+    ) {
+      return false;
+    }
+    if (cleaned.startsWith("no")) return false;
+    return true;
+  });
+};
+
 const normalizeSpecialties = (specializationText = "") => {
   const raw = parseListField(specializationText)
     .map((s) => s.toLowerCase())
@@ -83,7 +100,7 @@ const buildVetsFromApi = (apiData = []) => {
       const specializationList = parseListField(
         doc?.specialization_select_all_that_apply
       );
-      const breakTimes = parseListField(
+      const breakTimes = normalizeBreakTimes(
         doc?.break_do_not_disturb_time_example_2_4_pm
       );
 
@@ -401,7 +418,12 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                     <div>
                       Night response: {activeBioVet.responseNight || "Not available"}
                     </div>
-                    <div>Break: {formatList(activeBioVet.breakTimes)}</div>
+                    <div>
+                      Break:{" "}
+                      {activeBioVet.breakTimes?.length
+                        ? activeBioVet.breakTimes.join(", ")
+                        : "No break time"}
+                    </div>
                   </div>
                 </div>
                 <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">

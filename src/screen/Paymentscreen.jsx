@@ -588,6 +588,7 @@ export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) =
   const [statusType, setStatusType] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -728,6 +729,10 @@ export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) =
 
   const handlePay = async () => {
     if (isPaying) return;
+    if (!acknowledged) {
+      updateStatus("error", "Please acknowledge the consultation notice to proceed.");
+      return;
+    }
     if (!gatewayReady || typeof window === "undefined" || !window.Razorpay) {
       updateStatus("error", "Payment gateway failed to load. Please refresh.");
       return;
@@ -900,10 +905,41 @@ export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) =
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 md:text-sm">
+                  <div className="flex items-center gap-2 font-semibold text-amber-800">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-200/70 text-amber-900 text-[11px]">
+                      !
+                    </span>
+                    Important Information
+                  </div>
+                  <ul className="mt-2 space-y-1 text-amber-800/90 list-disc pl-4">
+                    <li>Not all issues can be solved via video consultation.</li>
+                    <li>Clinic visit may be required after the call.</li>
+                    <li>Information shared is for this consultation session only.</li>
+                  </ul>
+                </div>
+
+                <label className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-4 text-xs text-stone-600 md:text-sm">
+                  <input
+                    type="checkbox"
+                    checked={acknowledged}
+                    onChange={(e) => setAcknowledged(e.target.checked)}
+                    className="mt-1 h-4 w-4 accent-[#3998de]"
+                  />
+                  <div>
+                    <div className="font-semibold text-stone-700">
+                      I acknowledge and agree to proceed
+                    </div>
+                    <div className="text-stone-500">
+                      I understand the limitations and conditions of this consultation.
+                    </div>
+                  </div>
+                </label>
+
                 <div className="hidden md:block pt-2">
                   <Button
                     onClick={handlePay}
-                    disabled={isPaying}
+                    disabled={isPaying || !acknowledged}
                     fullWidth
                     className="
                       flex justify-between items-center group
@@ -936,7 +972,7 @@ export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) =
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-stone-100 safe-area-pb max-w-md mx-auto z-20 md:hidden">
         <Button
           onClick={handlePay}
-          disabled={isPaying}
+          disabled={isPaying || !acknowledged}
           fullWidth
           className="flex justify-between items-center group"
         >
