@@ -1018,16 +1018,13 @@ class PaymentController extends Controller
             $user = User::find($userId);
             $pet = Pet::find($petId);
 
-            // Always generate a fresh PDF using dompdf (ignore existing stored docs)
-            $html = $this->buildPrescriptionHtml($prescription, $user, $pet, $doctor);
-            $pdf = $this->renderPdf($html);
-
-            $dir = 'prescriptions';
-            Storage::disk('public')->makeDirectory($dir);
-            $filename = 'prescription-'.$prescription->id.'-doctor.pdf';
-            $path = $dir.'/'.$filename;
-            Storage::disk('public')->put($path, $pdf);
-            $url = Storage::disk('public')->url($path);
+            // Send document link using the PDF endpoint (always generated fresh)
+            $base = rtrim((string) config('app.url'), '/');
+            if (! str_ends_with($base, '/backend')) {
+                $base .= '/backend';
+            }
+            $url = $base . '/api/consultation/prescription/pdf?user_id=' . $userId . '&pet_id=' . $petId;
+            $filename = 'prescription-' . $prescription->id . '-doctor.pdf';
 
             $result = $this->whatsApp->sendDocument($doctorPhone, $url, $filename);
 
