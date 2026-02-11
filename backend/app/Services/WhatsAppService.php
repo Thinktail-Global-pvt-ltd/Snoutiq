@@ -75,6 +75,19 @@ class WhatsAppService
         ], true);
     }
 
+    public function sendDocument(string $to, string $link, ?string $filename = null): array
+    {
+        return $this->dispatch([
+            'messaging_product' => 'whatsapp',
+            'to' => $to,
+            'type' => 'document',
+            'document' => array_filter([
+                'link' => $link,
+                'filename' => $filename,
+            ]),
+        ], true);
+    }
+
     public function sendOtpTemplate(string $to, string $otp, string $template = 'whatsapp_authentication', string $language = 'en'): void
     {
         $components = [

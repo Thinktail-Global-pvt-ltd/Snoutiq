@@ -225,7 +225,14 @@ class PaymentController extends Controller
             $whatsAppMeta = null;
             $vetWhatsAppMeta = null;
             try {
-                if (($notes['order_type'] ?? null) === 'video_consult') {
+                // Derive order type from notes or stored payment/transaction data
+                $orderType = $notes['order_type']
+                    ?? ($record->notes['order_type'] ?? null)
+                    ?? ($record->raw_response['notes']['order_type'] ?? null)
+                    ?? ($record->raw_response['notes']['orderType'] ?? null)
+                    ?? ($record->raw_response['notes']['type'] ?? null);
+
+                if ($orderType === 'video_consult') {
                     $whatsAppMeta = $this->notifyVideoConsultBooked(
                         context: $context,
                         notes: $notes,
@@ -236,7 +243,7 @@ class PaymentController extends Controller
                         notes: $notes,
                         amountInInr: $amountInInr
                     );
-                } elseif (($notes['order_type'] ?? null) === 'excell_export_campaign') {
+                } elseif ($orderType === 'excell_export_campaign') {
                     $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
                         context: $context,
                         notes: $notes,

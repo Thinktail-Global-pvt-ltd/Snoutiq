@@ -1572,10 +1572,12 @@ Route::put('/pets/{id}/extras', [\App\Http\Controllers\Api\UserController::class
 
 use App\Http\Controllers\Api\UserOrdersController;
 use App\Http\Controllers\Api\FeedbackWhatsAppController;
+use App\Http\Controllers\Api\PrescriptionShareController;
 
 Route::get('/users/{id}/orders', [UserOrdersController::class, 'index']);
 Route::post('/consultation/feedback/send', [FeedbackWhatsAppController::class, 'send']);
 Route::post('/consultation/feedback/send-by-pet-vet', [FeedbackWhatsAppController::class, 'sendByPetVet']);
+Route::post('/consultation/prescription/send-doc', [PrescriptionShareController::class, 'sendLatest']);
 
 // Night Video Coverage APIs
 use App\Http\Controllers\Api\Video\DoctorVideoScheduleController as VDoctorVideoScheduleController;
