@@ -2,6 +2,9 @@
 import React, { useMemo, useState } from "react";
 import logo from "../assets/images/logo.png";
 import doctorHero from "../assets/images/doctor_1.png";
+import blogVaccination from "../assets/images/vaccination_schedule.jpeg";
+import blogTickFever from "../assets/images/tickfever.png";
+import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
 import { ArrowRight } from "lucide-react";
 import { Clock, ShieldCheck, Headphones } from "lucide-react";
 
@@ -37,6 +40,39 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       {
         q: "Will I receive documentation after the consultation?",
         a: "Yes. You'll receive a consultation summary with the veterinarian's assessment, recommendations, and any suggested follow-up actions. This can be shared with your regular veterinarian if needed.",
+      },
+    ],
+    [],
+  );
+
+  const blogPosts = useMemo(
+    () => [
+      {
+        title: "Vaccination Schedule for Pets in India",
+        excerpt:
+          "Complete, vet-approved vaccine timeline with essential boosters for dogs and cats.",
+        link: "/blog/vaccination-schedule-for-pets-in-india",
+        image: blogVaccination,
+        category: "Pet Health",
+        readTime: "5 min read",
+      },
+      {
+        title: "Symptoms of Tick Fever in Dogs",
+        excerpt:
+          "Learn the early warning signs, prevention tips, and when to seek care.",
+        link: "/blog/symptoms-of-tick-fever-in-dogs",
+        image: blogTickFever,
+        category: "Dog Care",
+        readTime: "7 min read",
+      },
+      {
+        title: "First Aid Tips Every Pet Parent Should Know",
+        excerpt:
+          "Practical first-aid steps for common pet emergencies before you reach a vet.",
+        link: "/blog/first-aid-tips-every-pet-parent-should-know",
+        image: blogFirstAid,
+        category: "Emergency",
+        readTime: "6 min read",
       },
     ],
     [],
@@ -313,6 +349,53 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
 
 
 
+      {/* Blog */}
+      <section className="bg-white py-20">
+        <div className="mx-auto max-w-6xl px-5">
+          <div className="text-center">
+            <h2 className="text-4xl font-bold text-slate-900">
+              Pet Care Resources
+            </h2>
+            <p className="mt-3 text-base text-slate-500">
+              Expert guidance and practical tips for pet parents.
+            </p>
+          </div>
+
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {blogPosts.map((post) => (
+              <a
+                key={post.link}
+                href={post.link}
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+              >
+                <div className="h-48 w-full overflow-hidden bg-slate-50">
+                  <img
+                    src={post.image}
+                    alt={post.title}
+                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                  />
+                </div>
+                <div className="flex flex-1 flex-col p-6">
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <span className="rounded-full bg-[#3998de]/10 px-3 py-1 text-[#3998de]">
+                      {post.category}
+                    </span>
+                    <span>{post.readTime}</span>
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-slate-900">
+                    {post.title}
+                  </h3>
+                  <p className="mt-3 text-sm text-slate-500">{post.excerpt}</p>
+                  <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#3998de]">
+                    Read Article <ArrowRight className="h-4 w-4" />
+                  </span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
       <section className="bg-white py-20">
         <div className="mx-auto max-w-6xl px-5">
@@ -389,13 +472,98 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 py-10 text-center text-white">
+      <footer className="bg-slate-900 py-12 text-white">
         <div className="mx-auto max-w-6xl px-5">
-          <p>© 2025 SnoutIQ. Professional veterinary consultation services.</p>
-          <p className="mt-2 text-sm opacity-80">
-            All veterinarians are licensed professionals registered with the
-            Veterinary Council of India
-          </p>
+          <div className="mb-10 rounded-xl bg-white/5 p-6">
+            <h4 className="text-lg font-semibold">Important Medical & Legal Disclaimer</h4>
+            <p className="mt-3 text-sm text-slate-200">
+              <strong>NO ONLINE PRESCRIPTIONS:</strong> SnoutIQ does not prescribe,
+              dispense, or sell any medications. We do not provide online
+              prescriptions under any circumstances. All medication needs must be
+              addressed through in-person veterinary clinics with proper physical
+              examination.
+            </p>
+            <p className="mt-3 text-sm text-slate-200">
+              <strong>CONSULTATION ONLY:</strong> SnoutIQ provides professional
+              veterinary teletriage and consultation services only. Our service is
+              designed to help pet parents understand their pet&apos;s condition and
+              determine appropriate next steps, including when to seek in-person
+              veterinary care.
+            </p>
+            <p className="mt-3 text-sm text-slate-200">
+              <strong>NOT FOR EMERGENCIES:</strong> This service is not suitable
+              for veterinary emergencies. For emergencies, trauma, severe symptoms,
+              or life-threatening conditions, please visit your nearest veterinary
+              emergency clinic immediately.
+            </p>
+            <p className="mt-3 text-sm text-slate-200">
+              <strong>LICENSED PROFESSIONALS:</strong> All veterinarians on SnoutIQ
+              are licensed professionals registered with the Veterinary Council of
+              India. However, video consultations cannot replace comprehensive
+              physical examinations.
+            </p>
+          </div>
+
+          <div className="grid gap-8 md:grid-cols-3">
+            <div>
+              <h4 className="text-lg font-semibold">SnoutIQ</h4>
+              <p className="mt-3 text-sm text-slate-300">
+                Professional veterinary teleconsultation and triage services across
+                India.
+              </p>
+              <p className="mt-4 text-sm text-slate-300">
+                <strong>Service Type:</strong> Consultation &amp; Triage Only
+              </p>
+              <p className="text-sm text-slate-300">
+                <strong>No Prescriptions:</strong> Not a pharmacy service
+              </p>
+            </div>
+
+            <div>
+              <h4 className="text-lg font-semibold">Contact</h4>
+              <p className="mt-3 text-sm text-slate-300">Email: hello@snoutiq.com</p>
+              <p className="text-sm text-slate-300">Service Area: India</p>
+              <p className="mt-4 text-sm font-semibold text-rose-200">
+                For emergencies, visit your nearest veterinary clinic immediately.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="text-lg font-semibold">Legal &amp; Compliance</h4>
+              <div className="mt-3 space-y-2 text-sm text-slate-300">
+                <a className="block hover:text-white" href="/terms-of-service">
+                  Terms of Service
+                </a>
+                <a className="block hover:text-white" href="/privacy-policy">
+                  Privacy Policy
+                </a>
+                <a className="block hover:text-white" href="/medical-data-consent">
+                  Medical Disclaimer
+                </a>
+                <a className="block hover:text-white" href="/cookie-policy">
+                  Cookie Policy
+                </a>
+                <a className="block hover:text-white" href="#">
+                  Veterinary Council Registration
+                </a>
+                <a className="block hover:text-white" href="#">
+                  Google Policy Compliance
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-slate-400">
+            <p>© 2025 SnoutIQ. Professional veterinary teleconsultation services.</p>
+            <p className="mt-2">
+              All veterinarians are licensed professionals registered with the
+              Veterinary Council of India.
+            </p>
+            <p className="mt-2 font-semibold">
+              We do not prescribe medications or provide online prescriptions.
+              Consultation and triage services only.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

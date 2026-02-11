@@ -525,6 +525,7 @@
 
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Header, ProgressBar } from "../components/Sharedcomponents";
 import { apiPost } from "../lib/api";
@@ -974,6 +975,8 @@ export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) =
 };
 
 export const ConfirmationScreen = ({ vet }) => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center animate-fade-in md:bg-gradient-to-b md:from-white md:to-calm-bg">
       <div className="w-full md:px-10 lg:px-16">
@@ -1033,6 +1036,16 @@ export const ConfirmationScreen = ({ vet }) => {
             </div>
           </div>
 
+          <div className="mb-6 flex justify-center">
+            <Button
+              onClick={() => navigate("/")}
+              fullWidth
+              className="max-w-xs md:max-w-sm md:text-lg md:py-4 md:rounded-2xl"
+            >
+              Go to Home
+            </Button>
+          </div>
+
           <p className="text-sm text-stone-400 italic md:text-base">
             "You can relax - help is on the way."
           </p>
@@ -1041,3 +1054,4 @@ export const ConfirmationScreen = ({ vet }) => {
     </div>
   );
 };
+

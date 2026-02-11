@@ -655,6 +655,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
 // ---------------- 2) Vet Registration Screen ----------------
 
 export const VetRegisterScreen = ({ onSubmit, onBack }) => {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     vetFullName: "",
     clinicName: "",
@@ -693,6 +694,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [showErrors, setShowErrors] = useState(false);
+  const [showRegisterSuccessModal, setShowRegisterSuccessModal] = useState(false);
   const breakStartRef = useRef(null);
   const breakEndRef = useRef(null);
 
@@ -848,6 +850,14 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     !imageError &&
     !isImageProcessing;
 
+  const handleRegisterSuccessLogin = () => {
+    setShowRegisterSuccessModal(false);
+    if (onSubmit) {
+      onSubmit();
+    }
+    navigate("/auth", { replace: true, state: { mode: "login" } });
+  };
+
   const handleSubmit = async () => {
     if (submitting) return;
     if (!canSubmit) {
@@ -921,7 +931,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         data = await apiPost("/api/excell-export/import", payload);
       }
 
-      onSubmit?.(data);
+      setShowRegisterSuccessModal(true);
     } catch (error) {
       const message = error?.message || "Failed to submit application.";
       setSubmitError(message);
@@ -1392,6 +1402,29 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         </Button>
       </div>
 
+      {showRegisterSuccessModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl md:max-w-md md:p-8">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <CheckCircle2 size={28} />
+            </div>
+            <div className="text-lg font-bold text-stone-800 md:text-xl">
+              Application submitted
+            </div>
+            <p className="mt-2 text-sm text-stone-500 md:text-base">
+              Our team will review your application and activate your profile within
+              24-48 hours.
+            </p>
+            <Button
+              onClick={handleRegisterSuccessLogin}
+              fullWidth
+              className="mt-4 md:text-lg md:py-4 md:rounded-2xl"
+            >
+              Go to Login
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -1442,6 +1475,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [prescriptionSubmitting, setPrescriptionSubmitting] = useState(false);
   const [prescriptionError, setPrescriptionError] = useState("");
   const [prescriptionSuccess, setPrescriptionSuccess] = useState(false);
+  const [showPrescriptionSuccessModal, setShowPrescriptionSuccessModal] = useState(false);
+  const prescriptionSuccessTimer = useRef(null);
+  const [docPreviewUrl, setDocPreviewUrl] = useState("");
   const [prescriptionForm, setPrescriptionForm] = useState({
     visitCategory: "Follow-up",
     caseSeverity: "general",
@@ -1488,6 +1524,70 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     });
   };
 
+  const formatDob = (value) => {
+    if (!value) return "Not available";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatPhone = (value) => {
+    if (!value) return "";
+    const digits = String(value).replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.length > 10 && digits.startsWith("91")) {
+      return digits.slice(-10);
+    }
+    return digits.length > 10 ? digits.slice(-10) : digits;
+  };
+
+  const formatPetText = (value) => {
+    if (!value) return "";
+    const cleaned = String(value)
+      .replace(/_+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) return "";
+    return cleaned.replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const resolvePetName = (transaction) => {
+    const name = transaction?.pet?.name?.trim();
+    if (name) {
+      const match = name.match(/^(.*)'s\s+pet$/i);
+      if (match && match[1]) {
+        return formatPetText(match[1].trim()) || name;
+      }
+    }
+    const fallback = formatPetText(
+      transaction?.pet?.breed || transaction?.pet?.pet_type
+    );
+    if (name) {
+      return name;
+    }
+    const metaName =
+      transaction?.metadata?.notes?.pet_name || transaction?.metadata?.pet_name || "";
+    return metaName ? String(metaName) : fallback || "Not available";
+  };
+
+  const toDocUrl = (docValue) => {
+    if (!docValue) return "";
+    const raw = String(docValue).trim();
+    if (!raw) return "";
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const base = apiBaseUrl().replace(/\/+$/, "");
+    const cleanPath = raw.replace(/^\/+/, "");
+    return `${base}/${cleanPath}`;
+  };
+
+  const isImageUrl = (url) =>
+    /^data:image\//i.test(url || "") ||
+    /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url || "");
+
   const statusClass = (status) => {
     const key = (status || "").toLowerCase();
     if (key === "pending") return "bg-amber-50 text-amber-700";
@@ -1500,7 +1600,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     return "bg-slate-100 text-slate-600";
   };
 
-  const statusLabel = (status) => (status ? status.replace(/_/g, " ") : "unknown");
+  const statusLabel = (status) => {
+    if (!status) return "unknown";
+    const key = status.toLowerCase();
+    if (key === "captured") return "paid";
+    return status.replace(/_/g, " ");
+  };
 
   const doctorId = normalizeId(
     auth?.doctor_id ||
@@ -1567,12 +1672,20 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const closePatientModal = () => {
     setShowPatientModal(false);
     setActiveTransaction(null);
+    setDocPreviewUrl("");
   };
 
   const closePrescriptionModal = () => {
     setShowPrescriptionModal(false);
     setActiveTransaction(null);
     setPrescriptionSubmitting(false);
+    setPrescriptionSuccess(false);
+    setShowPrescriptionSuccessModal(false);
+    setDocPreviewUrl("");
+    if (prescriptionSuccessTimer.current) {
+      window.clearTimeout(prescriptionSuccessTimer.current);
+      prescriptionSuccessTimer.current = null;
+    }
   };
 
   const updatePrescriptionField = (key) => (event) => {
@@ -1671,12 +1784,46 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
         throw new Error(data?.message || "Failed to save prescription.");
       }
       setPrescriptionSuccess(true);
+      setShowPrescriptionSuccessModal(true);
     } catch (error) {
       setPrescriptionError(error?.message || "Failed to save prescription.");
     } finally {
       setPrescriptionSubmitting(false);
     }
   };
+
+  const closePrescriptionSuccessModal = () => {
+    setShowPrescriptionSuccessModal(false);
+    setPrescriptionSuccess(false);
+    if (prescriptionSuccessTimer.current) {
+      window.clearTimeout(prescriptionSuccessTimer.current);
+      prescriptionSuccessTimer.current = null;
+    }
+    closePrescriptionModal();
+    resetPrescriptionForm();
+  };
+
+  const handleDocPreview = (url) => {
+    if (!url) return;
+    if (isImageUrl(url)) {
+      setDocPreviewUrl(url);
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  useEffect(() => {
+    if (!showPrescriptionSuccessModal) return undefined;
+    prescriptionSuccessTimer.current = window.setTimeout(() => {
+      closePrescriptionSuccessModal();
+    }, 2000);
+    return () => {
+      if (prescriptionSuccessTimer.current) {
+        window.clearTimeout(prescriptionSuccessTimer.current);
+        prescriptionSuccessTimer.current = null;
+      }
+    };
+  }, [showPrescriptionSuccessModal]);
 
   useEffect(() => {
     if (!auth) return;
@@ -1738,6 +1885,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           console.log("Vet dashboard data:", data);
         }
         setDashboardData(data);
+        
         setTransactions(Array.isArray(data?.transactions) ? data.transactions : []);
       } catch (error) {
         if (error?.name !== "AbortError") {
@@ -1751,6 +1899,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     fetchTransactions();
     return () => controller.abort();
   }, [auth, authToken, clinicIdRaw, doctorId]);
+
 
   const handleLogout = () => {
     clearVetAuth();
@@ -1933,8 +2082,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 ) : latestTransactions.length ? (
                   latestTransactions.map((item, idx) => {
                     const amountInr = item?.amount_inr ?? (item?.amount_paise ? item.amount_paise / 100 : 0);
-                    const petName = item?.pet?.name || "Pet";
-                    const petMeta = item?.pet?.breed || item?.pet?.pet_type || "Details";
+                    const petName = resolvePetName(item);
+                    const petMeta = formatPetText(
+                      item?.pet?.breed || item?.pet?.pet_type || "Details"
+                    );
                     const reference = item?.reference || item?.metadata?.order_id || "NA";
 
                     const { userId, petId, clinicId } = resolveTransactionIds(item);
@@ -2051,7 +2202,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
       {showPatientModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
             <div className="flex items-center justify-between bg-gradient-to-r from-[#0B4D67] to-[#0E5F7B] px-6 py-4 text-white">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
@@ -2071,57 +2222,92 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
               </button>
             </div>
 
-            <div className="space-y-4 bg-[#F8FAFC] p-6">
-              <div className="rounded-2xl border border-stone-100 bg-white p-4">
-                <div className="text-xs font-semibold uppercase text-stone-400">Pet Parent</div>
-                <div className="mt-2 space-y-1 text-sm text-stone-700">
-                  <p className="font-semibold text-stone-900">
-                    {activeTransaction?.user?.name || "Not available"}
-                  </p>
-                  {activeTransaction?.user?.phone ? (
-                    <p>Whatsapp Phone: {activeTransaction.user.phone}</p>
-                  ) : null}
-                  {/* {activeTransaction?.user?.email ? (
-                    <p>Email: {activeTransaction.user.email}</p>
-                  ) : null} */}
+            <div className="space-y-4 bg-[#F8FAFC] p-6 max-h-[calc(90vh-70px)] overflow-y-auto">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-stone-100 bg-white p-4">
+                  <div className="text-xs font-semibold uppercase text-stone-400">Pet Parent</div>
+                  <div className="mt-2 space-y-1 text-sm text-stone-700">
+                    <p className="font-semibold text-stone-900">
+                      {activeTransaction?.user?.name || "Not available"}
+                    </p>
+                    {formatPhone(activeTransaction?.user?.phone) ? (
+                      <p>Whatsapp Phone: {formatPhone(activeTransaction?.user?.phone)}</p>
+                    ) : (
+                      <p>Whatsapp Phone: Not available</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-100 bg-white p-4">
+                  <div className="text-xs font-semibold uppercase text-stone-400">Pet Details</div>
+                  <div className="mt-2 grid gap-3 text-sm text-stone-700 md:grid-cols-2">
+                    <div>
+                      <span className="text-stone-400">Name</span>
+                      <p className="font-semibold text-stone-900">
+                        {resolvePetName(activeTransaction)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-stone-400">Breed</span>
+                      <p className="font-semibold text-stone-900">
+                        {formatPetText(activeTransaction?.pet?.breed) || "Not available"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-stone-400">Type</span>
+                      <p className="font-semibold text-stone-900">
+                        {formatPetText(activeTransaction?.pet?.pet_type) || "Not available"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-stone-400">DOB</span>
+                      <p className="font-semibold text-stone-900">
+                        {formatDob(activeTransaction?.pet?.pet_dob)}
+                      </p>
+                    </div>
+                    {activeTransaction?.pet?.reported_symptom ? (
+                      <div className="md:col-span-2">
+                        <span className="text-stone-400">Reported Symptom</span>
+                        <p className="font-semibold text-stone-900">
+                          {activeTransaction.pet.reported_symptom}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-stone-100 bg-white p-4">
-                <div className="text-xs font-semibold uppercase text-stone-400">Pet Details</div>
-                <div className="mt-2 grid gap-3 text-sm text-stone-700 md:grid-cols-2">
-                  <div>
-                    <span className="text-stone-400">Name</span>
-                    <p className="font-semibold text-stone-900">
-                      {activeTransaction?.pet?.name || "Not available"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-stone-400">Breed</span>
-                    <p className="font-semibold text-stone-900">
-                      {activeTransaction?.pet?.breed || "Not available"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-stone-400">Type</span>
-                    <p className="font-semibold text-stone-900">
-                      {activeTransaction?.pet?.pet_type || "Not available"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-stone-400">DOB</span>
-                    <p className="font-semibold text-stone-900">
-                      {activeTransaction?.pet?.pet_dob || "Not available"}
-                    </p>
-                  </div>
-                  {activeTransaction?.pet?.reported_symptom ? (
-                    <div className="md:col-span-2">
-                      <span className="text-stone-400">Reported Symptom</span>
-                      <p className="font-semibold text-stone-900">
-                        {activeTransaction.pet.reported_symptom}
-                      </p>
-                    </div>
-                  ) : null}
+                <div className="text-xs font-semibold uppercase text-stone-400">Pet Document</div>
+                <div className="mt-3">
+                  {(() => {
+                    const docUrl = toDocUrl(activeTransaction?.pet?.pet_doc2);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleDocPreview(docUrl)}
+                        className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-stone-200 px-4 py-4 text-xs text-stone-500 transition ${
+                          docUrl
+                            ? "bg-stone-50 hover:border-[#3998de] hover:text-[#3998de]"
+                            : "bg-stone-50/70 cursor-default"
+                        }`}
+                        disabled={!docUrl}
+                      >
+                        {docUrl && isImageUrl(docUrl) ? (
+                          <img
+                            src={docUrl}
+                            alt="Pet document"
+                            className="h-24 w-full rounded-lg object-cover"
+                          />
+                        ) : (
+                          <FileText size={20} />
+                        )}
+                        <span className="font-semibold">
+                          {docUrl ? "View Document" : "Document not uploaded"}
+                        </span>
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -2133,6 +2319,40 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {docPreviewUrl ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+              <span className="text-sm font-semibold text-stone-700">Document Preview</span>
+              <button
+                type="button"
+                onClick={() => setDocPreviewUrl("")}
+                className="rounded-full bg-stone-100 p-2 text-stone-600 hover:bg-stone-200"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="bg-black/5 p-4">
+              <img
+                src={docPreviewUrl}
+                alt="Pet document"
+                className="max-h-[70vh] w-full rounded-xl object-contain"
+              />
+              <div className="mt-3 flex justify-end">
+                <a
+                  href={docPreviewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-semibold text-[#3998de] hover:underline"
+                >
+                  Open in new tab
+                </a>
               </div>
             </div>
           </div>
@@ -2173,7 +2393,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             {activeTransaction?.user?.name || "Pet Parent"}
                           </p>
                           <p className="text-xs text-stone-500">
-                            {activeTransaction?.pet?.name || "Pet"} -{" "}
+                            {resolvePetName(activeTransaction)} -{" "}
                             {activeTransaction?.pet?.breed || "Breed"}
                           </p>
                         </div>
@@ -2399,13 +2619,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       </div>
                     ) : null}
 
-                    {prescriptionSuccess ? (
-                      <div className="flex items-start gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-700">
-                        <CheckCircle2 size={16} />
-                        <span>Prescription saved successfully.</span>
-                      </div>
-                    ) : null}
-
                     <div className="flex flex-col gap-3">
                       <button
                         type="button"
@@ -2428,6 +2641,29 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showPrescriptionSuccessModal ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <CheckCircle2 size={28} />
+            </div>
+            <div className="text-lg font-bold text-stone-800">
+              Prescription saved
+            </div>
+            <p className="mt-2 text-sm text-stone-500">
+              Medical record has been sent successfully.
+            </p>
+            <Button
+              onClick={closePrescriptionSuccessModal}
+              fullWidth
+              className="mt-4"
+            >
+              Done
+            </Button>
           </div>
         </div>
       ) : null}

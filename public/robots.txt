@@ -1,4 +1,16 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /private/
 
-Sitemap: https://snoutiq.com/sitemap.xml
+# Important: This website provides veterinary teleconsultation services ONLY
+# We DO NOT prescribe medications online
+# We DO NOT operate as an online pharmacy
+# Consultation and triage services only
+
+Sitemap: https://www.snoutiq.com/sitemap.xml
+
+# Healthcare Compliance Notice:
+# This service complies with Google Healthcare and Medicines policies
+# Service Type: Teleconsultation and Triage Only
+# No Prescription Services Offered

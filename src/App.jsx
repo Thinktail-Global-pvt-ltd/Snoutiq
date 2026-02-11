@@ -67,6 +67,7 @@ const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
 const CsvUploadPage = lazy(() => import("./pages/CsvUploadPage"));
 const Auth = lazy(() => import("./pages/Auth"));
 const VetDashboard = lazy(() => import("./pages/VetDashboard"));
+const VetRegisterSuccess = lazy(() => import("./pages/VetRegisterSuccess"));
 
 // ✅ Blog (were direct imports — heavy)
 const Blog = lazy(() => import("./blog/Blog"));
@@ -146,6 +147,7 @@ function App() {
             {/* Home page - will redirect authenticated users to dashboard */}
             <Route path="/" element={<HomePage />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/vet-register-success" element={<VetRegisterSuccess />} />
             <Route path="/vet-dashboard" element={<VetDashboard />} />
              <Route path="/veterinary-practice-software" element={<Home />} />
             {/* <Route
