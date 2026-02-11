@@ -1018,15 +1018,15 @@ class PaymentController extends Controller
             $user = User::find($userId);
             $pet = Pet::find($petId);
 
-            // Send document link using the PDF endpoint (always generated fresh)
+            // Send link (not attachment) to PDF endpoint (always generated fresh)
             $base = rtrim((string) config('app.url'), '/');
             if (! str_ends_with($base, '/backend')) {
                 $base .= '/backend';
             }
             $url = $base . '/api/consultation/prescription/pdf?user_id=' . $userId . '&pet_id=' . $petId;
-            $filename = 'prescription-' . $prescription->id . '-doctor.pdf';
+            $text = "Prescription PDF: " . $url;
 
-            $result = $this->whatsApp->sendDocument($doctorPhone, $url, $filename);
+            $result = $this->whatsApp->sendTextWithResult($doctorPhone, $text);
 
             return ['sent' => true, 'to' => $doctorPhone, 'url' => $url, 'meta' => $result];
         } catch (\Throwable $e) {
