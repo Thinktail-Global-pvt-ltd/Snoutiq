@@ -1578,6 +1578,7 @@ Route::get('/users/{id}/orders', [UserOrdersController::class, 'index']);
 Route::post('/consultation/feedback/send', [FeedbackWhatsAppController::class, 'send']);
 Route::post('/consultation/feedback/send-by-pet-vet', [FeedbackWhatsAppController::class, 'sendByPetVet']);
 Route::post('/consultation/prescription/send-doc', [PrescriptionShareController::class, 'sendLatest']);
+Route::get('/consultation/prescription/pdf', [PrescriptionShareController::class, 'downloadLatest']);
 
 // Night Video Coverage APIs
 use App\Http\Controllers\Api\Video\DoctorVideoScheduleController as VDoctorVideoScheduleController;

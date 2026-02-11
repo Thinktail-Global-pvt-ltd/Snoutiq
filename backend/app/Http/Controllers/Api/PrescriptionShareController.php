@@ -93,6 +93,69 @@ class PrescriptionShareController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/consultation/prescription/pdf
+     * Query: user_id, pet_id
+     * Streams the latest prescription as a PDF (generates from DB if no file exists).
+     */
+    public function downloadLatest(Request $request)
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer'],
+            'pet_id' => ['required', 'integer'],
+        ]);
+
+        $prescription = Prescription::query()
+            ->where('user_id', $data['user_id'])
+            ->where('pet_id', $data['pet_id'])
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $prescription) {
+            return response()->json(['success' => false, 'error' => 'prescription_not_found'], 404);
+        }
+
+        $user = User::find($data['user_id']);
+        $pet = Pet::find($data['pet_id']);
+        $doctor = $prescription->doctor_id ? Doctor::find($prescription->doctor_id) : null;
+
+        // Prefer existing doc paths
+        $docUrl = null;
+        $docName = 'Prescription.pdf';
+        $docPath = null;
+
+        if ($prescription->medical_record_id) {
+            $record = MedicalRecord::find($prescription->medical_record_id);
+            if ($record && $record->file_path) {
+                $docPath = $record->file_path;
+                $docName = $record->file_name ?: $docName;
+            }
+        }
+
+        if (! $docPath && $prescription->image_path) {
+            $docPath = $prescription->image_path;
+        }
+
+        // If no stored file, generate on the fly and stream
+        if (! $docPath) {
+            $html = $this->buildHtml($prescription, $user, $pet, $doctor);
+            $options = new Options();
+            $options->set('isRemoteEnabled', true);
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            $output = $dompdf->output();
+            return response()->streamDownload(function () use ($output) {
+                echo $output;
+            }, $docName, ['Content-Type' => 'application/pdf']);
+        }
+
+        // If stored file: stream from storage/public (or absolute)
+        $absolute = $this->publicUrl($docPath);
+        return redirect()->away($absolute);
+    }
+
     private function generatePdf($prescription, $user, $pet, $doctor): ?array
     {
         try {
