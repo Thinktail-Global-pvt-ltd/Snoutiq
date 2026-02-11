@@ -127,51 +127,24 @@ class PrescriptionShareController extends Controller
         $pet = Pet::find($data['pet_id']);
         $doctor = $prescription->doctor_id ? Doctor::find($prescription->doctor_id) : null;
 
-        // Prefer existing doc paths
-        $docUrl = null;
-        $docName = 'Prescription.pdf';
-        $docPath = null;
-
-        if ($prescription->medical_record_id) {
-            try {
-                $record = MedicalRecord::find($prescription->medical_record_id);
-                if ($record && $record->file_path) {
-                    $docPath = $record->file_path;
-                    $docName = $record->file_name ?: $docName;
-                }
-            } catch (\Throwable $e) {
-                // continue to fallback
-            }
-        }
-
-        if (! $docPath && $prescription->image_path) {
-            $docPath = $prescription->image_path;
-        }
-
-        // If no stored file, generate on the fly and stream
-        if (! $docPath) {
-            try {
-                $html = $this->buildHtml($prescription, $user, $pet, $doctor);
-                $options = new Options();
-                $options->set('isRemoteEnabled', true);
-                $dompdf = new Dompdf($options);
-                $dompdf->loadHtml($html);
-                $dompdf->setPaper('A4', 'portrait');
-                $dompdf->render();
-                $output = $dompdf->output();
-                return response()->streamDownload(function () use ($output) {
-                    echo $output;
-                }, $docName, ['Content-Type' => 'application/pdf']);
-            } catch (\Throwable $e) {
-                return response()->json(['success' => false, 'error' => 'pdf_generation_failed', 'message' => $e->getMessage()], 500);
-            }
-        }
-
+        // Always generate a fresh PDF from prescription text (ignore stored docs)
         try {
-            $absolute = $this->publicUrl($docPath);
-            return redirect()->away($absolute);
+            $docName = 'Prescription.pdf';
+            $html = $this->buildHtml($prescription, $user, $pet, $doctor);
+            $options = new Options();
+            $options->set('isRemoteEnabled', true);
+            // use a basic sans font for consistent PDF output
+            $options->set('defaultFont', 'sans-serif');
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            $output = $dompdf->output();
+            return response()->streamDownload(function () use ($output) {
+                echo $output;
+            }, $docName, ['Content-Type' => 'application/pdf']);
         } catch (\Throwable $e) {
-            return response()->json(['success' => false, 'error' => 'redirect_failed', 'message' => $e->getMessage()], 500);
+            return response()->json(['success' => false, 'error' => 'pdf_generation_failed', 'message' => $e->getMessage()], 500);
         }
     }
 
