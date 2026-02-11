@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Header, ProgressBar } from "../components/Sharedcomponents";
-import { Clock, Star, Zap } from "lucide-react";
+import { Clock, Zap } from "lucide-react";
 
 const API_URL = "https://snoutiq.com/backend/api/exported_from_excell_doctors";
 
@@ -57,6 +57,22 @@ const toNumber = (v, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+const isDayTime = (date = new Date()) => {
+  const hour = date.getHours();
+  return hour >= 8 && hour < 20;
+};
+
+const formatPrice = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return "Price on request";
+  return `Rs. ${amount}`;
+};
+
+const formatList = (list = []) => {
+  if (!Array.isArray(list) || list.length === 0) return "Not available";
+  return list.join(", ");
+};
+
 const buildVetsFromApi = (apiData = []) => {
   const list = [];
 
@@ -109,6 +125,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
   const [vets, setVets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errMsg, setErrMsg] = useState("");
+  const [activeBioVet, setActiveBioVet] = useState(null);
 
   useEffect(() => {
     let ignore = false;
@@ -223,18 +240,17 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               {sortedVets.map((vet) => {
                 const isSpecialist =
                   petDetails?.type && vet.specialties?.includes(petDetails.type);
+                const showDayPrice = isDayTime();
+                const priceLabel = showDayPrice
+                  ? "Day consult (8 AM - 8 PM)"
+                  : "Night consult (8 PM - 8 AM)";
+                const priceValue = showDayPrice ? vet.priceDay : vet.priceNight;
 
                 return (
                   <div
                     key={vet.id}
                     className="bg-white p-4 rounded-2xl shadow-sm flex flex-col gap-4 relative overflow-hidden transition-all border border-stone-100 hover:shadow-md md:p-7 md:rounded-3xl"
                   >
-                    {/* Online Indicator (same as before) */}
-                    <div className="absolute top-4 right-4 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 md:top-6 md:right-6 md:text-xs md:px-3 md:py-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                      ~15m
-                    </div>
-
                     <div className="flex gap-4 mt-4 md:mt-10">
                       <img
                         src={vet.image}
@@ -259,77 +275,29 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           {vet.qualification} • {vet.experience} yrs exp
                         </p>
 
-                        <div className="flex gap-2 items-center mb-2">
-                          <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded text-amber-700 text-xs font-bold md:text-sm md:px-2 md:py-1 md:rounded-lg">
-                            <Star size={10} fill="currentColor" className="md:hidden" />
-                            <Star size={14} fill="currentColor" className="hidden md:block" />
-                            {vet.rating}
-                          </div>
-                          <span className="text-xs text-stone-400 md:text-sm">
-                            {vet.consultations}+ consults
-                          </span>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-stone-400 md:text-sm">
+                            {vet.clinicName}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setActiveBioVet(vet)}
+                            className="text-xs font-semibold text-[#3998de] hover:underline md:text-sm"
+                          >
+                            View bio
+                          </button>
                         </div>
-
-                        {vet.specializationList?.length ? (
-                          <div className="flex flex-wrap gap-1.5 mb-2">
-                            {vet.specializationList.slice(0, 4).map((spec, idx) => (
-                              <span
-                                key={`${spec}-${idx}`}
-                                className="text-[10px] md:text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full border border-stone-200"
-                              >
-                                {spec}
-                              </span>
-                            ))}
-                            {vet.specializationList.length > 4 ? (
-                              <span className="text-[10px] md:text-xs text-stone-400">
-                                +{vet.specializationList.length - 4}
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : null}
-
-                        {vet.responseDay || vet.responseNight || vet.breakTimes?.length ? (
-                          <div className="space-y-1 text-[11px] text-stone-500 md:text-xs">
-                            {vet.responseDay ? (
-                              <div className="flex items-center gap-1">
-                                <Clock size={12} />
-                                <span>Day response: {vet.responseDay}</span>
-                              </div>
-                            ) : null}
-                            {vet.responseNight ? (
-                              <div className="flex items-center gap-1">
-                                <Clock size={12} />
-                                <span>Night response: {vet.responseNight}</span>
-                              </div>
-                            ) : null}
-                            {vet.breakTimes?.length ? (
-                              <div className="flex items-center gap-1">
-                                <Clock size={12} />
-                                <span>Break: {vet.breakTimes.join(", ")}</span>
-                              </div>
-                            ) : null}
-                          </div>
-                        ) : null}
-
-                        <p className="hidden md:block text-xs text-stone-400">
-                          {vet.clinicName}
-                        </p>
                       </div>
                     </div>
 
                     <div className="border-t border-stone-100 pt-3 flex items-center justify-between md:pt-5">
                       <div className="flex flex-col">
                         <span className="text-lg font-bold text-stone-900 md:text-2xl">
-                          ₹{vet.priceDay}
+                          {formatPrice(priceValue)}
                         </span>
                         <span className="text-xs text-stone-400 md:text-sm">
-                          day consult
+                          {priceLabel}
                         </span>
-                        {vet.priceNight > 0 ? (
-                          <span className="text-xs text-stone-500 md:text-sm">
-                            Night: Rs. {vet.priceNight}
-                          </span>
-                        ) : null}
                       </div>
 
                       <Button
@@ -348,6 +316,121 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
           <div className="hidden md:block h-10" />
         </div>
       </div>
+
+      {activeBioVet ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+              <div>
+                <p className="text-xs uppercase text-stone-400">Doctor Bio</p>
+                <h3 className="text-lg font-bold text-stone-800 md:text-xl">
+                  {activeBioVet.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveBioVet(null)}
+                className="rounded-full bg-stone-100 px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-200 md:text-sm"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="max-h-[80vh] overflow-y-auto p-6 md:p-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-start">
+                <img
+                  src={activeBioVet.image}
+                  alt={activeBioVet.name}
+                  className="h-24 w-24 rounded-2xl object-cover border border-stone-100"
+                />
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <div className="text-xs uppercase text-stone-400">Clinic</div>
+                    <div className="text-sm font-semibold text-stone-800">
+                      {activeBioVet.clinicName || "Clinic"}
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <div className="text-xs uppercase text-stone-400">
+                        Qualification
+                      </div>
+                      <div className="text-sm text-stone-700">
+                        {activeBioVet.qualification || "Not available"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase text-stone-400">
+                        Experience
+                      </div>
+                      <div className="text-sm text-stone-700">
+                        {activeBioVet.experience || 0} years
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase text-stone-400">License</div>
+                      <div className="text-sm text-stone-700">
+                        {activeBioVet.raw?.doctor_license || "Not available"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase text-stone-400">
+                        Follow-up
+                      </div>
+                      <div className="text-sm text-stone-700">
+                        {activeBioVet.followUp || "Not available"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
+                  <div className="text-xs uppercase text-stone-400">
+                    Specializations
+                  </div>
+                  <div className="mt-2 text-sm text-stone-700">
+                    {formatList(activeBioVet.specializationList)}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
+                  <div className="text-xs uppercase text-stone-400">Availability</div>
+                  <div className="mt-2 space-y-1 text-sm text-stone-700">
+                    <div>Day response: {activeBioVet.responseDay || "Not available"}</div>
+                    <div>
+                      Night response: {activeBioVet.responseNight || "Not available"}
+                    </div>
+                    <div>Break: {formatList(activeBioVet.breakTimes)}</div>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
+                  <div className="text-xs uppercase text-stone-400">Consult Fees</div>
+                  <div className="mt-2 space-y-1 text-sm text-stone-700">
+                    <div>Day (8 AM - 8 PM): {formatPrice(activeBioVet.priceDay)}</div>
+                    <div>
+                      Night (8 PM - 8 AM): {formatPrice(activeBioVet.priceNight)}
+                    </div>
+                  </div>
+                </div>
+                {/* <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
+                  <div className="text-xs uppercase text-stone-400">Contact</div>
+                  <div className="mt-2 space-y-1 text-sm text-stone-700">
+                    <div>Email: {activeBioVet.raw?.doctor_email || "Not available"}</div>
+                    <div>Phone: {activeBioVet.raw?.doctor_mobile || "Not available"}</div>
+                  </div>
+                </div> */}
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <Button onClick={() => setActiveBioVet(null)} className="px-6">
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

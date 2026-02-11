@@ -138,7 +138,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               </p>
 
               {/* Vets display */}
-              <div className="mt-6 flex items-center gap-4 rounded-2xl bg-white/70 px-4 py-3 shadow-sm ring-1 ring-white/60">
+              {/* <div className="mt-6 flex items-center gap-4 rounded-2xl bg-white/70 px-4 py-3 shadow-sm ring-1 ring-white/60">
                 <div className="flex items-center">
                   {["Dr", "Dr", "Dr", "Dr"].map((t, i) => (
                     <div
@@ -164,7 +164,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                   </div>
                   <div className="text-slate-500">Ready to help your pet</div>
                 </div>
-              </div>
+              </div> */}
 
               {/* CTA */}
               <button
