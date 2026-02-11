@@ -31,7 +31,8 @@ class Transaction extends Model
 
     public function clinic(): BelongsTo
     {
-        return $this->belongsTo(Clinic::class);
+        // Transactions store clinic_id pointing to vet_registerations_temp
+        return $this->belongsTo(VetRegisterationTemp::class, 'clinic_id');
     }
 
     public function doctor(): BelongsTo
