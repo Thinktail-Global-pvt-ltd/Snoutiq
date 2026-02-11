@@ -123,6 +123,45 @@ class AdminPanelController extends Controller
         return view('admin.pincode-heatmap');
     }
 
+    public function whatsappTemplates(): View
+    {
+        $templates = [
+            [
+                'key' => 'pp_booking_confirmed',
+                'audience' => 'Pet parent',
+                'description' => 'Sent to pet parent after booking / Excel export campaign payment.',
+                'placeholders' => [
+                    '1' => 'Pet parent name',
+                    '2' => 'Pet name',
+                    '3' => 'Pet type',
+                    '4' => 'Vet name',
+                    '5' => 'Response time (minutes)',
+                    '6' => 'Amount paid (INR)',
+                    '7' => 'Vet name (repeat)',
+                ],
+                'body' => "Hi {{1}}, your {{3}} {{2}} is booked with {{4}}. They'll respond within {{5}} minutes. Amount paid ₹{{6}}. Vet: {{7}}. - SnoutIQ",
+            ],
+            [
+                'key' => 'vet_new_consultation_assigned',
+                'audience' => 'Vet',
+                'description' => 'Sent to assigned vet with consultation details.',
+                'placeholders' => [
+                    '1' => 'Vet name',
+                    '2' => 'Pet name',
+                    '3' => 'Pet type/breed',
+                    '4' => 'Pet parent name',
+                    '5' => 'Parent WhatsApp',
+                    '6' => 'Issue/concern',
+                    '7' => 'Prescription/PDF link',
+                    '8' => 'Response time (minutes)',
+                ],
+                'body' => "Hi Dr. {{1}}, a new consultation is assigned. Pet: {{2}} ({{3}}). Parent: {{4}} ({{5}}). Issue: {{6}}. Prescription: {{7}}. Please respond within {{8}} mins. - SnoutIQ",
+            ],
+        ];
+
+        return view('admin.whatsapp-templates', compact('templates'));
+    }
+
     public function excellExportTransactions(): View
     {
         $transactions = Transaction::query()

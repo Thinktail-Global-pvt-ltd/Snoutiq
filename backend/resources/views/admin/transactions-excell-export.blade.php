@@ -42,10 +42,23 @@
                                     <th>Pet</th>
                                     <th>Payment Method</th>
                                     <th>Reference</th>
+                                    <th class="text-nowrap">Manual WhatsApp</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($transactions as $txn)
+                                    @php
+                                        $doctorName = $txn->doctor->doctor_name ?? 'Doctor';
+                                        $parentName = $txn->user->name ?? 'Pet Parent';
+                                        $parentPhone = $txn->user->phone ?? 'N/A';
+                                        $petName = $txn->pet->name ?? 'Pet';
+                                        $petType = $txn->pet->pet_type ?? $txn->pet->type ?? $txn->pet->breed ?? 'Pet';
+                                        $issue = $txn->metadata['issue'] ?? $txn->metadata['concern'] ?? $txn->pet->reported_symptom ?? 'N/A';
+                                        $responseMinutes = (int) ($txn->metadata['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
+                                        $amountInr = $formatInr($txn->amount_paise);
+                                        $parentMsg = "Hi {$parentName}, your {$petType} {$petName} is booked with {$doctorName}. They'll respond within {$responseMinutes} minutes. Amount paid ₹{$amountInr}. Vet: {$doctorName}. - SnoutIQ";
+                                        $vetMsg = "Hi Dr. {$doctorName}, a new consultation is assigned. Pet: {$petName} ({$petType}). Parent: {$parentName} ({$parentPhone}). Issue: {$issue}. Prescription: (add link if any). Please respond within {$responseMinutes} mins. - SnoutIQ";
+                                    @endphp
                                     <tr>
                                         <td>#{{ $txn->id }}</td>
                                         <td class="text-nowrap">{{ optional($txn->created_at)->format('d M Y, H:i') ?? '—' }}</td>
@@ -79,6 +92,10 @@
                                         </td>
                                         <td>{{ $txn->payment_method ?? '—' }}</td>
                                         <td class="text-break" style="min-width: 140px;">{{ $txn->reference ?? '—' }}</td>
+                                        <td class="text-nowrap">
+                                            <button class="btn btn-sm btn-outline-primary mb-1" data-body="{{ $parentMsg }}" onclick="copyTemplate(this)">Copy parent</button>
+                                            <button class="btn btn-sm btn-outline-success" data-body="{{ $vetMsg }}" onclick="copyTemplate(this)">Copy vet</button>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -90,3 +107,22 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    function copyTemplate(btn) {
+        const text = btn.getAttribute('data-body') || '';
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.innerText;
+            btn.innerText = 'Copied!';
+            btn.classList.remove('btn-outline-primary','btn-outline-success');
+            btn.classList.add('btn-secondary','text-white');
+            setTimeout(() => {
+                btn.innerText = orig;
+                btn.classList.add(orig.includes('parent') ? 'btn-outline-primary' : 'btn-outline-success');
+                btn.classList.remove('btn-secondary','text-white');
+            }, 1200);
+        }).catch(() => alert('Copy failed, please copy manually.'));
+    }
+</script>
+@endpush
