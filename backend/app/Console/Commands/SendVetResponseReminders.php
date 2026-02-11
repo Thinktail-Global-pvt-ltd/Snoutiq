@@ -56,11 +56,19 @@ class SendVetResponseReminders extends Command
         foreach ($rows as $txn) {
             $petName = $txn->pet?->name ?? 'your pet';
             $remaining = 3; // minutes left window
-            $phone = $txn->user?->phone;
+
+            // Target doctor instead of user
+            $doctor = $txn->doctor;
+            $phone = null;
+            if ($doctor) {
+                $phone = $doctor->doctor_mobile
+                    ?? ($doctor->doctor_phone ?? null)
+                    ?? ($doctor->phone ?? null);
+            }
 
             if (! $phone) {
-                Log::warning('vet_response.reminder.skip_no_phone', ['txn_id' => $txn->id, 'user_id' => $txn->user_id]);
-                $this->logReminder($txn, 'skipped_no_phone', null, null, null, 'user phone missing');
+                Log::warning('vet_response.reminder.skip_no_doctor_phone', ['txn_id' => $txn->id, 'doctor_id' => $txn->doctor_id]);
+                $this->logReminder($txn, 'skipped_no_phone', null, null, null, 'doctor phone missing');
                 $this->markSent($txn, $now, 'skipped_no_phone');
                 continue;
             }
@@ -141,6 +149,7 @@ class SendVetResponseReminders extends Command
                 'transaction_id' => $txn->id,
                 'user_id' => $txn->user_id,
                 'pet_id' => $txn->pet_id,
+                'doctor_id' => $txn->doctor_id,
                 'phone' => $phone,
                 'template' => $template,
                 'language' => $language,
@@ -149,6 +158,7 @@ class SendVetResponseReminders extends Command
                 'meta' => json_encode([
                     'amount_paise' => $txn->amount_paise,
                     'created_at' => optional($txn->created_at)->toIso8601String(),
+                    'doctor_id' => $txn->doctor_id,
                 ]),
                 'created_at' => now(),
                 'updated_at' => now(),
