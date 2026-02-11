@@ -298,6 +298,7 @@ Route::post('/user-pet-observation', function (Request $request) {
         'breed' => ['required', 'string', 'max:255'],
         'dob' => ['nullable', 'date'],
         'type' => ['required', 'string', 'max:100'],
+        'pet_name' => ['nullable', 'string', 'max:255'],
         'reported_symptom' => ['nullable', 'string'],
         'pet_doc2' => ['nullable', 'string'],
         'file' => ['nullable', 'file', 'max:10240'], // optional upload (10 MB)
@@ -329,7 +330,7 @@ Route::post('/user-pet-observation', function (Request $request) {
 
         $pet = new Pet();
         $pet->user_id = $user->id;
-        $pet->name = $data['name']."'s pet";
+        $pet->name = $data['pet_name'] ?? ($data['name']."'s pet");
         $pet->breed = $data['breed'];
         $pet->reported_symptom = $data['reported_symptom'] ?? null;
         $pet->pet_doc2 = $data['pet_doc2'] ?? null;
