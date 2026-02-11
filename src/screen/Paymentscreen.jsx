@@ -524,7 +524,7 @@
 // };
 
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Header, ProgressBar } from "../components/Sharedcomponents";
@@ -976,6 +976,15 @@ export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) =
 
 export const ConfirmationScreen = ({ vet }) => {
   const navigate = useNavigate();
+  const conversionFiredRef = useRef(false);
+
+  useEffect(() => {
+    if (conversionFiredRef.current) return;
+    conversionFiredRef.current = true;
+    if (typeof window !== "undefined" && typeof window.gtag === "function") {
+      window.gtag("event", "ads_conversion_PURCHASE_1");
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center animate-fade-in md:bg-gradient-to-b md:from-white md:to-calm-bg">
