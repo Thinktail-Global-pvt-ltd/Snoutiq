@@ -687,10 +687,7 @@ class PaymentController extends Controller
 
             $issue = $notes['issue'] ?? $notes['concern'] ?? $pet?->reported_symptom ?? 'N/A';
 
-            $mediaString = $notes['media_attached'] ?? $notes['media'] ?? $notes['files'] ?? null;
-            if ($mediaString === null) {
-                $mediaString = 'None';
-            }
+            $mediaString = $this->inferMediaString($notes, $pet);
 
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
 
@@ -1021,6 +1018,7 @@ class PaymentController extends Controller
             $user = User::find($userId);
             $pet = Pet::find($petId);
 
+            // Always generate a fresh PDF using dompdf (ignore existing stored docs)
             $html = $this->buildPrescriptionHtml($prescription, $user, $pet, $doctor);
             $pdf = $this->renderPdf($html);
 
@@ -1166,6 +1164,38 @@ HTML;
     private function e(?string $text): string
     {
         return htmlspecialchars($text ?? '', ENT_QUOTES, 'UTF-8');
+    }
+
+    private function inferMediaString(array $notes, ?Pet $pet): string
+    {
+        // Priority: explicit notes values
+        foreach (['media_attached', 'media', 'files'] as $key) {
+            if (isset($notes[$key]) && $notes[$key] !== '') {
+                return is_array($notes[$key])
+                    ? (count($notes[$key]) ? 'Images' : 'None')
+                    : (string) $notes[$key];
+            }
+        }
+
+        $hasImages = false;
+        $hasVideo = false;
+
+        if ($pet) {
+            $hasImages = !empty($pet->pet_doc1) || !empty($pet->pet_doc2);
+            $hasVideo = !empty($pet->video_calling_upload_file);
+        }
+
+        if ($hasImages && $hasVideo) {
+            return 'Images + Video';
+        }
+        if ($hasImages) {
+            return 'Images';
+        }
+        if ($hasVideo) {
+            return 'Video';
+        }
+
+        return 'None';
     }
 
     protected function findCallSession($identifier): ?CallSession
