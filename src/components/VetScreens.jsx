@@ -734,7 +734,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
 export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    vetFullName: "",
+    vetFullName: "Dr. ",
     clinicName: "",
     shortIntro: "",
     whatsappNumber: "",
@@ -887,6 +887,14 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   };
 
   const normalizedDegree = form.degree === "Other" ? form.degreeOther.trim() : form.degree;
+  const normalizeDoctorName = (value) => {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    const withoutPrefix = trimmed.replace(/^dr\.?\s*/i, "").trim();
+    if (!withoutPrefix) return "";
+    return `Dr. ${withoutPrefix}`;
+  };
+  const doctorNameReady = normalizeDoctorName(form.vetFullName);
 
   const selectedSpecs = specializations.filter((spec) => spec !== "Other");
   if (specializations.includes("Other") && specializationOther.trim()) {
@@ -906,7 +914,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   const canSubmit =
     agreed &&
-    form.vetFullName.trim() &&
+    doctorNameReady &&
     form.clinicName.trim() &&
     whatsappReady &&
     form.email.trim() &&
@@ -957,7 +965,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         vet_email: form.email.trim(),
         vet_mobile: form.whatsappNumber.trim(),
         vet_city: form.vetCity.trim(),
-        doctor_name: form.vetFullName.trim(),
+        doctor_name: doctorNameReady,
         doctor_email: form.email.trim(),
         doctor_mobile: form.whatsappNumber.trim(),
         doctor_license: form.doctorLicense.trim(),
@@ -1217,7 +1225,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                   </div>
 
                   <div className="relative">
-                    <MapPin
+                    <FileText
                       size={18}
                       className="absolute left-4 top-4 text-gray-400 pointer-events-none"
                     />
@@ -1369,7 +1377,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     onWheel={handleNumberWheel}
                     min="0"
                     required
-                    className={`${INPUT_BASE_CLASS} pl-12`}
+                    className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
                   />
                 </div>
 
@@ -2222,7 +2230,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 <span className="text-2xl md:text-3xl font-bold">{initials}</span>
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold mb-1">Dr. {doctorName}</h1>
+                <h1 className="text-2xl md:text-3xl font-bold mb-1">{doctorName}</h1>
                 <div className="flex items-center gap-2 text-white/80 text-sm">
                   <Shield size={16} />
                   <span>Verified Veterinary Partner</span>
@@ -2380,7 +2388,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 <div className="space-y-4">
                   <div>
                     <p className="text-xs text-gray-400 uppercase mb-1">Doctor Name</p>
-                    <p className="font-medium text-gray-900">Dr. {doctorName}</p>
+                    <p className="font-medium text-gray-900">{doctorName}</p>
                   </div>
                   {doctorEmail && (
                     <div>
@@ -2411,8 +2419,21 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                   </div>
                   <div>
                     <h4 className="font-semibold text-amber-800 mb-1">Pro Tip</h4>
-                    <p className="text-sm text-amber-700">
-                      Update your availability regularly to get 3x more consultation requests from pet parents.
+                    <ul className="mt-2 space-y-2 text-xs text-amber-700">
+                      {[
+                        "Respond to consultations promptly",
+                        "Update prescriptions after every session",
+                        "Use your registered WhatsApp number for video calls",
+                        "Only the registered doctor should conduct video consultations",
+                      ].map((tip) => (
+                        <li key={tip} className="flex items-start gap-2">
+                          <CheckCircle2 size={14} className="mt-0.5 text-amber-500" />
+                          <span className="leading-relaxed">{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-3 text-xs text-amber-700 leading-relaxed">
+                      Following these steps helps avoid cancellations and ensures a smooth experience.
                     </p>
                   </div>
                 </div>
