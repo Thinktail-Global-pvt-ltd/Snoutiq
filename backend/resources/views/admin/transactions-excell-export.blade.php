@@ -93,8 +93,20 @@
                                         <td>{{ $txn->payment_method ?? '—' }}</td>
                                         <td class="text-break" style="min-width: 140px;">{{ $txn->reference ?? '—' }}</td>
                                         <td class="text-nowrap">
-                                            <button class="btn btn-sm btn-outline-primary mb-1" data-body="{{ $parentMsg }}" onclick="copyTemplate(this)">Copy parent</button>
-                                            <button class="btn btn-sm btn-outline-success" data-body="{{ $vetMsg }}" onclick="copyTemplate(this)">Copy vet</button>
+                                            <div class="mb-2">
+                                                <label class="form-label mb-1 small text-muted">Parent msg</label>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="text" class="form-control" value="{{ $parentMsg }}" readonly>
+                                                    <button class="btn btn-outline-primary" data-body="{{ $parentMsg }}" onclick="copyTemplate(this)">Copy</button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="form-label mb-1 small text-muted">Vet msg</label>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="text" class="form-control" value="{{ $vetMsg }}" readonly>
+                                                    <button class="btn btn-outline-success" data-body="{{ $vetMsg }}" onclick="copyTemplate(this)">Copy</button>
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach
