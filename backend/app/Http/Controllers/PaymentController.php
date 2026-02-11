@@ -548,7 +548,7 @@ class PaymentController extends Controller
             ];
 
             $this->whatsApp->sendTemplate(
-                $user->phone,
+                $this->normalizePhone($user->phone),
                 'pp_video_consult_booked',
                 $components,
                 'en'
@@ -616,7 +616,7 @@ class PaymentController extends Controller
             ];
 
             $this->whatsApp->sendTemplate(
-                $user->phone,
+                $this->normalizePhone($user->phone),
                 'pp_booking_confirmed',
                 $components,
                 'en'
@@ -724,7 +724,7 @@ class PaymentController extends Controller
             ];
 
             $this->whatsApp->sendTemplate(
-                $doctorPhone,
+                $this->normalizePhone($doctorPhone),
                 'vet_new_consultation_assigned',
                 $components,
                 'en'
@@ -732,7 +732,7 @@ class PaymentController extends Controller
 
             return [
                 'sent' => true,
-                'to' => $doctorPhone,
+                'to' => $this->normalizePhone($doctorPhone),
                 'template' => 'vet_new_consultation_assigned',
                 'language' => 'en',
             ];
@@ -845,7 +845,7 @@ class PaymentController extends Controller
                 foreach ($languageCandidates as $lang) {
                     try {
                         $this->whatsApp->sendTemplate(
-                            $doctorPhone,
+                            $this->normalizePhone($doctorPhone),
                             $tpl,
                             $components,
                             $lang
@@ -853,7 +853,7 @@ class PaymentController extends Controller
 
                         return [
                             'sent' => true,
-                            'to' => $doctorPhone,
+                            'to' => $this->normalizePhone($doctorPhone),
                             'template' => $tpl,
                             'language' => $lang,
                         ];
@@ -1033,9 +1033,10 @@ class PaymentController extends Controller
             $url = $base . '/api/consultation/prescription/pdf?user_id=' . $userId . '&pet_id=' . $petId;
             $text = "Prescription PDF: " . $url;
 
-            $result = $this->whatsApp->sendTextWithResult($doctorPhone, $text);
+            $to = $this->normalizePhone($doctorPhone);
+            $result = $this->whatsApp->sendTextWithResult($to, $text);
 
-            return ['sent' => true, 'to' => $doctorPhone, 'url' => $url, 'meta' => $result];
+            return ['sent' => true, 'to' => $to, 'url' => $url, 'meta' => $result];
         } catch (\Throwable $e) {
             report($e);
             return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
@@ -1168,6 +1169,17 @@ HTML;
     private function e(?string $text): string
     {
         return htmlspecialchars($text ?? '', ENT_QUOTES, 'UTF-8');
+    }
+
+    private function normalizePhone(?string $raw): ?string
+    {
+        if (!$raw) return null;
+        $digits = preg_replace('/\\D+/', '', $raw);
+        if (!$digits) return null;
+        if (strlen($digits) === 10) {
+            return '91' . $digits;
+        }
+        return $digits;
     }
 
     private function inferMediaString(array $notes, ?Pet $pet): string
