@@ -1,6 +1,9 @@
 // src/screen/Landingscreen.jsx
 import React, { useMemo, useState } from "react";
 import logo from "../assets/images/logo.png";
+import doctorHero from "../assets/images/doctor_1.png";
+import { ArrowRight } from "lucide-react";
+import { Clock, ShieldCheck, Headphones } from "lucide-react";
 
 const LandingScreen = ({ onStart, onVetAccess }) => {
   const [openFaq, setOpenFaq] = useState(null);
@@ -36,7 +39,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
         a: "Yes. You'll receive a consultation summary with the veterinarian's assessment, recommendations, and any suggested follow-up actions. This can be shared with your regular veterinarian if needed.",
       },
     ],
-    []
+    [],
   );
 
   const toggleFaq = (idx) => setOpenFaq((prev) => (prev === idx ? null : idx));
@@ -59,7 +62,6 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 alt="SnoutIQ"
                 className="h-6 w-auto object-contain drop-shadow-sm md:h-6 lg:h-6"
               />
-
             </button>
 
             <button
@@ -109,8 +111,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                         i === 0 ? "ml-0" : ""
                       }`}
                       style={{
-                        background:
-                          "linear-gradient(135deg, #2563eb, #7c3aed)",
+                        background: "linear-gradient(135deg, #2563eb, #7c3aed)",
                       }}
                     >
                       {t}
@@ -132,118 +133,74 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               {/* CTA */}
               <button
                 type="button"
-                onClick={() => (typeof onStart === "function" ? onStart() : null)}
-                className="mt-7 inline-flex items-center justify-center rounded-xl bg-[#3998de] px-10 py-4 text-lg font-semibold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0]"
+                onClick={() =>
+                  typeof onStart === "function" ? onStart() : null
+                }
+                className="
+    mt-7 
+    inline-flex items-center justify-center gap-2
+    rounded-xl 
+    bg-[#3998de] 
+    px-10 py-4 
+    text-lg font-semibold text-white 
+    shadow-lg shadow-[#3998de]/30 
+    transition 
+    hover:bg-[#2F7FC0]
+    hover:gap-3
+  "
               >
-                📹 Consult a Veterinarian
+                Consult a Veterinarian
+                <ArrowRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
               </button>
 
               {/* Stats */}
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
                 {[
-                  { n: "~15min", l: "Average response time" },
-                  { n: "100%", l: "Licensed vets" },
-                  { n: "24/7", l: "Available" },
+                  { n: "15min", l: "Average response time", icon: Clock },
+                  { n: "100%", l: "Licensed and experienced vets", icon: ShieldCheck },
+                  { n: "24/7", l: "Available", icon: Headphones },
                 ].map((s, i) => (
-                  <div key={i} className="rounded-xl border border-white/70 bg-white/80 px-4 py-3 text-center shadow-sm sm:text-left">
+                  <div
+                    key={i}
+                    className="rounded-xl border border-white/70 bg-white/90 px-5 py-5 shadow-sm hover:shadow-md transition"
+                  >
+                    {/* Icon */}
+                    <div className="mb-3">
+                      <div className="w-10 h-10 flex items-center justify-center rounded-full bg-[#3998de]/10">
+                        <s.icon className="w-5 h-5 text-[#3998de]" />
+                      </div>
+                    </div>
+
+                    {/* Number */}
                     <div className="text-3xl font-extrabold text-[#3998de]">
                       {s.n}
                     </div>
-                    <div className="text-sm text-slate-500">{s.l}</div>
+
+                    {/* Label */}
+                    <div className="text-sm text-slate-500 mt-1">{s.l}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Right (SVG Illustration) */}
+            {/* Right (Doctor Image) */}
             <div className="w-full">
-              <div className="w-full">
-                <svg
-                  width="100%"
-                  height="400"
-                  viewBox="0 0 400 400"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <rect
-                    x="50"
-                    y="50"
-                    width="300"
-                    height="300"
-                    rx="20"
-                    fill="#2563eb"
-                    opacity="0.1"
+              <div className="relative mx-auto w-full max-w-md">
+                <div className="absolute -top-6 right-10 h-20 w-20 rounded-full bg-[#3998de]/15 blur-2xl" />
+                <div className="absolute -bottom-8 left-6 h-24 w-24 rounded-full bg-[#3998de]/10 blur-2xl" />
+                <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-4 shadow-[0_25px_60px_rgba(15,118,110,0.08)] md:p-6">
+                  <div className="absolute right-4 top-4 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700">
+                    Online
+                  </div>
+                  <img
+                    src={doctorHero}
+                    alt="Veterinarian"
+                    className="h-auto w-full rounded-2xl object-cover"
                   />
-                  <circle
-                    cx="200"
-                    cy="150"
-                    r="50"
-                    fill="#2563eb"
-                    opacity="0.2"
-                  />
-                  <rect
-                    x="150"
-                    y="120"
-                    width="100"
-                    height="60"
-                    rx="30"
-                    fill="#2563eb"
-                    opacity="0.3"
-                  />
-                  <circle cx="175" cy="140" r="8" fill="#2563eb" />
-                  <circle cx="225" cy="140" r="8" fill="#2563eb" />
-                  <path
-                    d="M 180 160 Q 200 170 220 160"
-                    stroke="#2563eb"
-                    strokeWidth="3"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-
-                  <ellipse
-                    cx="200"
-                    cy="280"
-                    rx="60"
-                    ry="40"
-                    fill="#7c3aed"
-                    opacity="0.3"
-                  />
-                  <circle
-                    cx="180"
-                    cy="270"
-                    r="15"
-                    fill="#7c3aed"
-                    opacity="0.4"
-                  />
-                  <circle
-                    cx="220"
-                    cy="270"
-                    r="15"
-                    fill="#7c3aed"
-                    opacity="0.4"
-                  />
-
-                  <rect
-                    x="280"
-                    y="80"
-                    width="60"
-                    height="40"
-                    rx="5"
-                    fill="#22c55e"
-                    opacity="0.3"
-                  />
-                  <circle cx="310" cy="100" r="8" fill="#22c55e" />
-
-                  <text
-                    x="200"
-                    y="350"
-                    fontSize="16"
-                    fill="#2563eb"
-                    textAnchor="middle"
-                    fontWeight="600"
-                  >
+                  <div className="mt-4 text-center text-sm font-semibold text-[#3998de]">
                     Video Consultation
-                  </text>
-                </svg>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -267,7 +224,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               {
                 icon: "🏥",
                 title: "Expert Guidance",
-                desc: "Licensed veterinarians provide professional assessment and advice for your pet's health concerns.",
+                desc: "Licensed and experienced veterinarians provide professional assessment and advice for your pet's health concerns.",
               },
               {
                 icon: "📱",
@@ -314,37 +271,47 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
             How It Works
           </h2>
 
-          <div className="mt-12 grid grid-cols-1 gap-10 md:grid-cols-3">
-            {[
-              {
-                n: "1",
-                title: "Describe Your Concern",
-                desc: "Tell us what's happening with your pet. Include symptoms, duration, and any relevant history.",
-              },
-              {
-                n: "2",
-                title: "Connect via Video",
-                desc: "Get matched with an available veterinarian. Join a secure video consultation within minutes.",
-              },
-              {
-                n: "3",
-                title: "Receive Guidance",
-                desc: "Get professional advice on next steps, home care recommendations, and when to visit a clinic.",
-              },
-            ].map((s, i) => (
-              <div key={i} className="rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-sm">
-                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#3998de] text-2xl font-extrabold text-white">
-                  {s.n}
+          <div className="relative mt-20">
+            <div className="absolute left-1/2 top-0 bottom-0 hidden w-px -translate-x-1/2 bg-[#3998de]/20 md:hidden" />
+            <div className="absolute left-1/2 top-6 hidden h-px w-[70%] -translate-x-1/2 bg-[#3998de]/20 md:block" />
+
+            <div className="relative grid gap-12 md:grid-cols-3">
+              {[
+                {
+                  n: "1",
+                  title: "Describe Your Concern",
+                  desc: "Tell us what's happening with your pet. Include symptoms, duration, and any relevant history.",
+                },
+                {
+                  n: "2",
+                  title: "Connect via Video",
+                  desc: "Get matched with an available veterinarian. Join a secure video consultation within minutes.",
+                },
+                {
+                  n: "3",
+                  title: "Receive Guidance",
+                  desc: "Get professional advice on next steps, home care recommendations, and when to visit a clinic.",
+                },
+              ].map((s, i) => (
+                <div key={i} className="relative flex flex-col items-center">
+                  <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-[#3998de] text-lg font-bold text-white shadow-lg">
+                    {s.n}
+                  </div>
+
+                  <div className="mt-8 w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-md md:max-w-none">
+                    <h3 className="text-xl font-semibold text-slate-900">
+                      {s.title}
+                    </h3>
+                    <p className="mt-3 text-slate-500">{s.desc}</p>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900">
-                  {s.title}
-                </h3>
-                <p className="mt-3 text-slate-500">{s.desc}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
+
+
 
       {/* FAQ */}
       <section className="bg-white py-20">
@@ -390,11 +357,11 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               Our Commitment to Pet Parents
             </h2>
             <p className="mt-4 text-base leading-8 text-slate-600">
-              &quot;At SnoutIQ, we understand the anxiety when your pet isn&apos;t
-              feeling well. That&apos;s why we&apos;ve built a platform where
-              expert veterinary care is just minutes away. Every consultation is
-              backed by professional expertise and genuine care for your furry
-              family members.&quot;
+              &quot;At SnoutIQ, we understand the anxiety when your pet
+              isn&apos;t feeling well. That&apos;s why we&apos;ve built a
+              platform where expert veterinary care is just minutes away. Every
+              consultation is backed by professional expertise and genuine care
+              for your furry family members.&quot;
             </p>
           </div>
         </div>
