@@ -126,10 +126,12 @@ class AdminPanelController extends Controller
     public function excellExportTransactions(): View
     {
         $transactions = Transaction::query()
+            ->where('status', 'captured')
             ->where(function ($query) {
                 $query->where('type', 'excell_export_campaign')
                     ->orWhere('metadata->order_type', 'excell_export_campaign');
             })
+            ->whereHas('clinic') // skip rows whose clinic entry was deleted
             ->with([
                 'clinic:id,name',
                 'doctor:id,doctor_name,doctor_email,doctor_mobile',
