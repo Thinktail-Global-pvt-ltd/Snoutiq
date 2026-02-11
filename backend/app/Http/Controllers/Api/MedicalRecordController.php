@@ -219,12 +219,6 @@ class MedicalRecordController extends Controller
         }
 
         $clinicId = (int) $validated['clinic_id'];
-        if ((int) $user->last_vet_id !== $clinicId) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Patient is not linked to this clinic',
-            ], 422);
-        }
 
         $doctorId = $validated['doctor_id'] ?? null;
         $petId = $validated['pet_id'] ?? null;
