@@ -11,10 +11,14 @@ use App\Models\Doctor;
 use App\Models\CallSession;
 use App\Models\User;
 use App\Models\Pet;
+use App\Models\Prescription;
 use Illuminate\Support\Str;
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 
 class PaymentController extends Controller
 {
@@ -88,6 +92,7 @@ class PaymentController extends Controller
             // Fire WhatsApp notification only for video consult orders (best-effort)
             $whatsAppMeta = null;
             $vetWhatsAppMeta = null;
+            $prescriptionDocMeta = null;
             if (($notes['order_type'] ?? null) === 'video_consult') {
                 $whatsAppMeta = $this->notifyVideoConsultBooked(
                     context: $context,
@@ -99,6 +104,7 @@ class PaymentController extends Controller
                     notes: $notes,
                     amountInInr: $amountInInr
                 );
+                $prescriptionDocMeta = $this->sendDoctorPrescriptionDocument($context);
             } elseif (($notes['order_type'] ?? null) === 'excell_export_campaign') {
                 $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
                     context: $context,
@@ -119,6 +125,7 @@ class PaymentController extends Controller
                 'order_id' => $orderArr['id'],
                 'whatsapp' => $whatsAppMeta,
                 'vet_whatsapp' => $vetWhatsAppMeta,
+                'prescription_doc' => $prescriptionDocMeta,
                 'call_session' => $callSession ? [
                     'id' => $callSession->id,
                     'call_identifier' => $callSession->resolveIdentifier(),
@@ -224,6 +231,7 @@ class PaymentController extends Controller
             $amountInInr = $amount !== null ? (int) round(((int) $amount) / 100) : 0;
             $whatsAppMeta = null;
             $vetWhatsAppMeta = null;
+            $prescriptionDocMeta = null;
             try {
                 // Derive order type from notes or stored payment/transaction data
                 $orderType = $notes['order_type']
@@ -243,6 +251,8 @@ class PaymentController extends Controller
                         notes: $notes,
                         amountInInr: $amountInInr
                     );
+                    // Best-effort: send latest prescription PDF to the doctor
+                    $prescriptionDocMeta = $this->sendDoctorPrescriptionDocument($context);
                 } elseif ($orderType === 'excell_export_campaign') {
                     $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
                         context: $context,
@@ -273,6 +283,7 @@ class PaymentController extends Controller
                 ],
                 'whatsapp' => $whatsAppMeta,
                 'vet_whatsapp' => $vetWhatsAppMeta,
+                'prescription_doc' => $prescriptionDocMeta,
             ]);
 
         } catch (RazorpayError $e) {
@@ -961,6 +972,200 @@ class PaymentController extends Controller
         }
 
         return 'payment';
+    }
+
+    /**
+     * Generate and send latest prescription PDF to the doctor (best-effort).
+     */
+    protected function sendDoctorPrescriptionDocument(array $context): ?array
+    {
+        try {
+            $doctorId = $context['doctor_id'] ?? null;
+            $userId = $context['user_id'] ?? null;
+            $petId = $context['pet_id'] ?? null;
+
+            if (! $doctorId || ! $userId || ! $petId) {
+                return null;
+            }
+
+            $doctor = Doctor::find($doctorId);
+            if (! $doctor) {
+                return ['sent' => false, 'reason' => 'doctor_missing'];
+            }
+
+            $doctorPhone = $doctor->doctor_mobile ?? null;
+            if (! $doctorPhone && isset($doctor->doctor_phone)) {
+                $doctorPhone = $doctor->doctor_phone;
+            }
+            if (! $doctorPhone && isset($doctor->phone)) {
+                $doctorPhone = $doctor->phone;
+            }
+            if (! $doctorPhone && $doctor->vet_registeration_id) {
+                $doctorPhone = DB::table('vet_registerations_temp')
+                    ->where('id', $doctor->vet_registeration_id)
+                    ->value('mobile');
+            }
+            if (! $doctorPhone) {
+                return ['sent' => false, 'reason' => 'doctor_phone_missing'];
+            }
+
+            $prescription = \App\Models\Prescription::query()
+                ->where('user_id', $userId)
+                ->where('pet_id', $petId)
+                ->orderByDesc('id')
+                ->first();
+            if (! $prescription) {
+                return ['sent' => false, 'reason' => 'prescription_not_found'];
+            }
+
+            $user = User::find($userId);
+            $pet = Pet::find($petId);
+
+            $html = $this->buildPrescriptionHtml($prescription, $user, $pet, $doctor);
+            $pdf = $this->renderPdf($html);
+
+            $dir = 'prescriptions';
+            Storage::disk('public')->makeDirectory($dir);
+            $filename = 'prescription-'.$prescription->id.'-doctor.pdf';
+            $path = $dir.'/'.$filename;
+            Storage::disk('public')->put($path, $pdf);
+            $url = Storage::disk('public')->url($path);
+
+            $result = $this->whatsApp->sendDocument($doctorPhone, $url, $filename);
+
+            return ['sent' => true, 'to' => $doctorPhone, 'url' => $url, 'meta' => $result];
+        } catch (\Throwable $e) {
+            report($e);
+            return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
+        }
+    }
+
+    private function buildPrescriptionHtml($prescription, $user, $pet, $doctor): string
+    {
+        $parentName = $user?->name ?? 'Pet Parent';
+        $petName = $pet?->name ?? 'Pet';
+        $petType = $pet?->pet_type ?? $pet?->type ?? $pet?->breed ?? '';
+        $doctorName = $doctor?->doctor_name ?? 'Doctor';
+
+        $meds = [];
+        if (is_array($prescription->medications_json)) {
+            foreach ($prescription->medications_json as $idx => $med) {
+                $label = $med['name'] ?? ('Medicine '.($idx + 1));
+                $dose = $med['dosage'] ?? $med['dose'] ?? null;
+                $freq = $med['frequency'] ?? null;
+                $note = $med['note'] ?? null;
+                $parts = array_filter([$label, $dose, $freq]);
+                $meds[] = implode(' - ', $parts) . ($note ? (' ('.$note.')') : '');
+            }
+        }
+
+        $style = <<<CSS
+        body { font-family: DejaVu Sans, sans-serif; color: #111; }
+        h1 { font-size: 20px; margin: 0 0 8px; }
+        .meta { font-size: 12px; margin-bottom: 8px; }
+        .card { border: 1px solid #ddd; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
+        .label { font-weight: 600; }
+        ul { margin: 6px 0 0 18px; padding: 0; }
+        CSS;
+
+        $visit = array_filter([
+            $prescription->visit_category,
+            $prescription->case_severity,
+        ]);
+
+        $vitals = array_filter([
+            $prescription->temperature ? ('Temp: '.$prescription->temperature.($prescription->temperature_unit ?: '')) : null,
+            $prescription->weight ? ('Weight: '.$prescription->weight.' kg') : null,
+            $prescription->heart_rate ? ('Heart: '.$prescription->heart_rate.' bpm') : null,
+        ]);
+
+        $follow = array_filter([
+            $prescription->follow_up_date ? ('Date: '.$prescription->follow_up_date) : null,
+            $prescription->follow_up_type ? ('Type: '.$prescription->follow_up_type) : null,
+            $prescription->follow_up_notes ? ('Notes: '.$prescription->follow_up_notes) : null,
+        ]);
+
+        $home = $prescription->home_care ?: '';
+        $notes = $prescription->visit_notes ?: $prescription->content_html ?: '';
+
+        $medList = $meds ? '<ul><li>'.implode('</li><li>', array_map('htmlspecialchars', $meds)).'</li></ul>' : '<p>—</p>';
+        $followHtml = $follow ? '<ul><li>'.implode('</li><li>', array_map('htmlspecialchars', $follow)).'</li></ul>' : '<p>—</p>';
+        $vitalsHtml = $vitals ? '<ul><li>'.implode('</li><li>', array_map('htmlspecialchars', $vitals)).'</li></ul>' : '<p>—</p>';
+
+        return <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>{$style}</style>
+</head>
+<body>
+  <h1>Prescription</h1>
+  <div class="meta">
+    <div><span class="label">Pet parent:</span> {$this->e($parentName)}</div>
+    <div><span class="label">Pet:</span> {$this->e($petName)} {$this->e($petType)}</div>
+    <div><span class="label">Doctor:</span> {$this->e($doctorName)}</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Visit</div>
+    <div>{$this->e(implode(' | ', $visit) ?: '—')}</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Notes</div>
+    <div>{$this->e($notes)}</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Vitals</div>
+    {$vitalsHtml}
+  </div>
+
+  <div class="card">
+    <div class="label">Diagnosis</div>
+    <div>{$this->e($prescription->diagnosis ?: '—')}</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Treatment plan</div>
+    <div>{$this->e($prescription->treatment_plan ?: '—')}</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Medicines</div>
+    {$medList}
+  </div>
+
+  <div class="card">
+    <div class="label">Home care</div>
+    <div>{$this->e($home ?: '—')}</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Follow-up</div>
+    {$followHtml}
+  </div>
+</body>
+</html>
+HTML;
+    }
+
+    private function renderPdf(string $html): string
+    {
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'sans-serif');
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+        return $dompdf->output();
+    }
+
+    private function e(?string $text): string
+    {
+        return htmlspecialchars($text ?? '', ENT_QUOTES, 'UTF-8');
     }
 
     protected function findCallSession($identifier): ?CallSession
