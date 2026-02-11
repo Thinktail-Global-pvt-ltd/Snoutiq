@@ -40,8 +40,6 @@
                                     <th>Doctor</th>
                                     <th>User</th>
                                     <th>Pet</th>
-                                    <th>Payment Method</th>
-                                    <th>Reference</th>
                                     <th class="text-nowrap">Manual WhatsApp</th>
                                 </tr>
                             </thead>
@@ -90,8 +88,6 @@
                                                 <div class="text-muted small">Breed: {{ $txn->pet->breed ?? 'n/a' }}</div>
                                             @endif
                                         </td>
-                                        <td>{{ $txn->payment_method ?? '—' }}</td>
-                                        <td class="text-break" style="min-width: 140px;">{{ $txn->reference ?? '—' }}</td>
                                         <td class="text-nowrap">
                                             <div class="mb-2">
                                                 <label class="form-label mb-1 small text-muted">Parent msg</label>
