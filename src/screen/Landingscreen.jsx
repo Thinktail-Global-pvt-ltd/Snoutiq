@@ -4,18 +4,47 @@ import logo from "../assets/images/logo.png";
 import doctorSlide1 from "../assets/doctor1.jpeg";
 import doctorSlide2 from "../assets/doctor2.jpeg";
 import doctorSlide3 from "../assets/doctor3.jpeg";
+import doctorProfile4 from "../assets/doctor4.jpeg";
 import blogVaccination from "../assets/images/vaccination_schedule.jpeg";
 import blogTickFever from "../assets/images/tickfever.png";
 import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
 import { ArrowRight } from "lucide-react";
-import { Clock, ShieldCheck, Headphones } from "lucide-react";
+import { Clock, ShieldCheck } from "lucide-react";
 import { InstallCTA, IosInstallHint } from "../components/PwaInstallCTA";
 
-const HERO_SLIDES = [doctorSlide1, doctorSlide2, doctorSlide3];
+const DOCTOR_PROFILES = [
+  {
+    name: "Dr. S. K. Mishra",
+    degree: "B.V.Sc, MBA, PGDCTM, PGCVH, CSAD",
+    experience: "17+ years of experience",
+    image: doctorSlide1,
+  },
+  {
+    name: "Dr. Mohd Tosif",
+    degree: "B.V.Sc",
+    experience: "5+ years of experience",
+    image: doctorSlide2,
+  },
+  {
+    name: "Dr. Pooja Tarar",
+    degree: "M.V.Sc",
+    experience: "18+ years of experience",
+    image: doctorSlide3,
+  },
+  {
+    name: "Dr. Shashannk Goyal",
+    degree: "M.V.Sc (Surgery)",
+    experience: "10+ years of experience",
+    image: doctorProfile4,
+  },
+];
+
+const HERO_SLIDES = DOCTOR_PROFILES;
 
 const LandingScreen = ({ onStart, onVetAccess }) => {
   const [openFaq, setOpenFaq] = useState(null);
   const [activeSlide, setActiveSlide] = useState(0);
+  const activeDoctor = HERO_SLIDES[activeSlide] || HERO_SLIDES[0];
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -122,7 +151,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
         <div className="mx-auto max-w-6xl px-5">
-          <div className="flex items-center justify-between py-4 md:py-5">
+          <div className="flex items-center justify-between py-2 md:py-3">
             <button
               type="button"
               onClick={() => (typeof onStart === "function" ? onStart() : null)}
@@ -154,27 +183,26 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-16">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-8 md:py-10">
         <div className="pointer-events-none absolute -top-24 right-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
         <div className="relative mx-auto max-w-6xl px-5">
-          <div className="grid grid-cols-1 items-center gap-12 md:grid-cols-2">
+          <div className="grid grid-cols-1 items-center gap-6 md:grid-cols-2 md:gap-8 lg:gap-10">
             {/* Left */}
             <div>
-              <div className="inline-block rounded-full bg-[#EAF4FF] px-4 py-2 text-sm font-semibold text-[#1D4E89] shadow-sm">
+              <div className="inline-block rounded-full bg-[#EAF4FF] px-3 py-1.5 text-xs font-semibold text-[#1D4E89] shadow-sm sm:text-sm">
                 ⭐ Trusted by 100+ Pet Parents in India
               </div>
 
-              <h1 className="mt-5 text-4xl font-extrabold leading-tight text-slate-900 md:text-5xl">
+              <h1 className="mt-4 text-3xl font-extrabold leading-tight text-slate-900 md:text-4xl lg:text-[44px]">
                 Connect with a{" "}
                 <span className="text-[#3998de]">Verified Veterinarian</span> in less than
                 15 minutes.
               </h1>
 
-              <p className="mt-5 text-lg text-slate-500">
-                Professional video consultations for your pet&apos;s health
-                concerns. <br />Get expert guidance from licensed veterinarians across
-                India.
+              <p className="mt-4 text-base text-slate-500 md:text-lg">
+                Professional video consultations for your pet&apos;s health concerns.
+                Get expert guidance from licensed veterinarians across India.
               </p>
 
 
@@ -185,12 +213,12 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                   typeof onStart === "function" ? onStart() : null
                 }
                 className="
-    mt-7 
+    mt-5 
     inline-flex items-center justify-center gap-2
     rounded-xl 
     bg-[#3998de] 
-    px-10 py-4 
-    text-lg font-semibold text-white 
+    px-7 py-3 
+    text-base font-semibold text-white md:text-lg
     shadow-lg shadow-[#3998de]/30 
     transition 
     hover:bg-[#2F7FC0]
@@ -204,30 +232,29 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               <IosInstallHint className="mt-4 max-w-md" />
 
               {/* Stats */}
-              <div className="mt-8 grid grid-cols-3 gap-2 sm:gap-4">
+              <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-4">
                 {[
                   { n: "15min", l: "Average response time", icon: Clock },
                   { n: "100%", l: "Licensed and experienced vets", icon: ShieldCheck },
-                  { n: "24/7", l: "Available", icon: Headphones },
                 ].map((s, i) => (
                   <div
                     key={i}
-                    className="rounded-xl border border-white/70 bg-white/90 px-3 py-3 shadow-sm hover:shadow-md transition sm:px-5 sm:py-5"
+                    className="rounded-xl border border-white/70 bg-white/90 px-3 py-2 shadow-sm hover:shadow-md transition sm:px-4 sm:py-4"
                   >
                     {/* Icon */}
                     <div className="mb-2 sm:mb-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full bg-[#3998de]/10">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-[#3998de]/10">
                         <s.icon className="w-4 h-4 sm:w-5 sm:h-5 text-[#3998de]" />
                       </div>
                     </div>
 
                     {/* Number */}
-                    <div className="text-xl sm:text-3xl font-extrabold text-[#3998de] leading-tight">
+                    <div className="text-lg sm:text-2xl font-extrabold text-[#3998de] leading-tight">
                       {s.n}
                     </div>
 
                     {/* Label */}
-                    <div className="text-[10px] sm:text-sm text-slate-500 mt-1 leading-snug">
+                    <div className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-snug">
                       {s.l}
                     </div>
                   </div>
@@ -237,10 +264,10 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
 
             {/* Right (Doctor Image) */}
             <div className="w-full">
-              <div className="relative mx-auto w-full max-w-md">
+              <div className="relative mx-auto w-full max-w-xs sm:max-w-sm md:max-w-md">
                 <div className="absolute -top-6 right-10 h-20 w-20 rounded-full bg-[#3998de]/15 blur-2xl" />
                 <div className="absolute -bottom-8 left-6 h-24 w-24 rounded-full bg-[#3998de]/10 blur-2xl" />
-                <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-4 shadow-[0_25px_60px_rgba(15,118,110,0.08)] md:p-6">
+                <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-3 shadow-[0_25px_60px_rgba(15,118,110,0.08)] md:p-4">
                   <div className="relative overflow-hidden rounded-2xl">
                     <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm">
                       <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -251,19 +278,29 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                       style={{ transform: `translateX(-${activeSlide * 100}%)` }}
                     >
                       {HERO_SLIDES.map((slide, index) => (
-                        <div key={slide} className="min-w-full">
+                        <div key={slide.name} className="min-w-full">
                           <img
-                            src={slide}
-                            alt={`Veterinarian ${index + 1}`}
-                            className="h-auto w-full object-cover"
+                            src={slide.image}
+                            alt={slide.name}
+                            className="h-56 w-full object-cover object-center sm:h-64 md:h-72"
                             loading={index === 0 ? "eager" : "lazy"}
                           />
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="mt-4 text-center text-sm font-semibold text-[#3998de]">
-                    24/7 Availability
+                  <div className="mt-3 text-center">
+                    <div className="text-sm font-semibold text-slate-900 md:text-base">
+                      {activeDoctor?.name}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-500 md:text-xs">
+                      {activeDoctor?.degree}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-[#EAF4FF] px-3 py-1 text-[11px] font-semibold text-[#1D4E89]">
+                        {activeDoctor?.experience}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -272,14 +309,15 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
         </div>
       </section>
 
+
       {/* Features */}
-      <section className="bg-white py-20">
+      <section className="bg-white py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-5">
-          <h2 className="text-center text-4xl font-bold text-slate-900">
+          <h2 className="text-center text-3xl font-bold text-slate-900 md:text-4xl">
             Why Choose Telemedicine for Your Pet?
           </h2>
 
-          <div className="mt-12 grid grid-cols-1 gap-10 md:grid-cols-3">
+          <div className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-3">
             {[
               {
                 icon: "⏱️",
@@ -314,15 +352,17 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
             ].map((f, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                className="rounded-2xl border border-slate-100 bg-white p-6 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
               >
-                <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200 text-4xl">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200 text-3xl">
                   {f.icon}
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900">
+                <h3 className="text-lg font-semibold text-slate-900 md:text-xl">
                   {f.title}
                 </h3>
-                <p className="mt-3 text-[15px] text-slate-500">{f.desc}</p>
+                <p className="mt-2 text-sm text-slate-500 md:text-[15px]">
+                  {f.desc}
+                </p>
               </div>
             ))}
           </div>
@@ -330,17 +370,17 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       </section>
 
       {/* How it works */}
-      <section className="bg-slate-50 py-20">
+      <section className="bg-slate-50 py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-5">
-          <h2 className="text-center text-4xl font-bold text-slate-900">
+          <h2 className="text-center text-3xl font-bold text-slate-900 md:text-4xl">
             How It Works
           </h2>
 
-          <div className="relative mt-20">
+          <div className="relative mt-12 md:mt-16">
             <div className="absolute left-1/2 top-0 bottom-0 hidden w-px -translate-x-1/2 bg-[#3998de]/20 md:hidden" />
             <div className="absolute left-1/2 top-6 hidden h-px w-[70%] -translate-x-1/2 bg-[#3998de]/20 md:block" />
 
-            <div className="relative grid gap-12 md:grid-cols-3">
+            <div className="relative grid gap-8 md:grid-cols-3 md:gap-10">
               {[
                 {
                   n: "1",
@@ -363,8 +403,8 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                     {s.n}
                   </div>
 
-                  <div className="mt-8 w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-md md:max-w-none">
-                    <h3 className="text-xl font-semibold text-slate-900">
+                  <div className="mt-6 w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-6 text-center shadow-md md:max-w-none">
+                    <h3 className="text-lg font-semibold text-slate-900 md:text-xl">
                       {s.title}
                     </h3>
                     <p className="mt-3 text-slate-500">{s.desc}</p>
@@ -379,10 +419,10 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
 
 
       {/* Blog */}
-      <section className="bg-white py-20">
+      <section className="bg-white py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-5">
           <div className="text-center">
-            <h2 className="text-4xl font-bold text-slate-900">
+            <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">
               Pet Care Resources
             </h2>
             <p className="mt-3 text-base text-slate-500">
@@ -390,21 +430,21 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
             {blogPosts.map((post) => (
               <a
                 key={post.link}
                 href={post.link}
                 className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
               >
-                <div className="h-48 w-full overflow-hidden bg-slate-50">
+                <div className="h-44 w-full overflow-hidden bg-slate-50">
                   <img
                     src={post.image}
                     alt={post.title}
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   />
                 </div>
-                <div className="flex flex-1 flex-col p-6">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-center gap-3 text-xs text-slate-400">
                     <span className="rounded-full bg-[#3998de]/10 px-3 py-1 text-[#3998de]">
                       {post.category}
@@ -426,13 +466,13 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       </section>
 
       {/* FAQ */}
-      <section className="bg-white py-20">
+      <section className="bg-white py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-5">
-          <h2 className="text-center text-4xl font-bold text-slate-900">
+          <h2 className="text-center text-3xl font-bold text-slate-900 md:text-4xl">
             Common Questions
           </h2>
 
-          <div className="mx-auto mt-12 max-w-3xl">
+          <div className="mx-auto mt-10 max-w-3xl">
             {faqs.map((item, idx) => {
               const isOpen = openFaq === idx;
               return (
@@ -443,7 +483,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                   <button
                     type="button"
                     onClick={() => toggleFaq(idx)}
-                    className="flex w-full items-center justify-between bg-slate-50 px-5 py-5 text-left font-semibold text-slate-900 hover:bg-slate-100"
+                    className="flex w-full items-center justify-between bg-slate-50 px-4 py-4 text-left font-semibold text-slate-900 hover:bg-slate-100"
                   >
                     <span className="pr-4">{item.q}</span>
                     <span className="text-xl font-bold text-[#3998de]">
@@ -451,7 +491,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                     </span>
                   </button>
                   {isOpen && (
-                    <div className="px-5 py-5 text-slate-500">{item.a}</div>
+                    <div className="px-4 py-4 text-slate-500">{item.a}</div>
                   )}
                 </div>
               );
@@ -461,14 +501,14 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       </section>
 
       {/* Promise */}
-      <section className="bg-gradient-to-br from-blue-100 to-blue-200 py-16">
+      <section className="bg-gradient-to-br from-blue-100 to-blue-200 py-14 md:py-16">
         <div className="mx-auto max-w-6xl px-5">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="text-5xl">❤️</div>
-            <h2 className="mt-4 text-3xl font-bold text-slate-900">
+            <div className="text-4xl">❤️</div>
+            <h2 className="mt-4 text-2xl font-bold text-slate-900 md:text-3xl">
               Our Commitment to Pet Parents
             </h2>
-            <p className="mt-4 text-base leading-8 text-slate-600">
+            <p className="mt-4 text-sm leading-7 text-slate-600 md:text-base md:leading-8">
               &quot;At SnoutIQ, we understand the anxiety when your pet
               isn&apos;t feeling well. That&apos;s why we&apos;ve built a
               platform where expert veterinary care is just minutes away. Every
@@ -480,7 +520,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       </section>
 
       {/* Disclaimer */}
-      <section className="border-t border-slate-200 bg-slate-50 py-10">
+      <section className="border-t border-slate-200 bg-slate-50 py-8 md:py-10">
         <div className="mx-auto max-w-6xl px-5">
           <div className="mx-auto max-w-4xl text-center text-sm text-slate-500">
             <strong className="mb-2 block text-slate-900">
@@ -501,9 +541,9 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 py-12 text-white">
+      <footer className="bg-slate-900 py-10 text-white">
         <div className="mx-auto max-w-6xl px-5">
-          <div className="mb-10 rounded-xl bg-white/5 p-6">
+          <div className="mb-10 rounded-xl bg-white/5 p-5">
             <h4 className="text-lg font-semibold">Important Medical & Legal Disclaimer</h4>
             <p className="mt-3 text-sm text-slate-200">
               <strong>NO ONLINE PRESCRIPTIONS:</strong> SnoutIQ does not prescribe,
