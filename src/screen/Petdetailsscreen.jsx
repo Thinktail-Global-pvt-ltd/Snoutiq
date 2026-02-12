@@ -955,6 +955,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                     </div>
 
                     <label
+                      htmlFor="petUploadGallery"
                       className={[
                         "flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 md:h-48 md:rounded-2xl",
                         isDragging
@@ -990,14 +991,38 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           Supports JPG, PNG, MP4, PDF (max 50MB)
                         </p>
                       </div>
-
+                    </label>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <input
+                        id="petUploadCamera"
+                        type="file"
+                        className="hidden"
+                        onChange={handlePhotoUpload}
+                        accept="image/*"
+                        capture="environment"
+                      />
+                      <label
+                        htmlFor="petUploadCamera"
+                        className="inline-flex items-center gap-2 rounded-full border border-[#3998de]/30 bg-white px-3 py-1.5 text-xs font-semibold text-[#3998de] shadow-sm transition hover:border-[#3998de]/60"
+                      >
+                        <Camera className="h-4 w-4" />
+                        Camera
+                      </label>
+                      <input
+                        id="petUploadGallery"
                         type="file"
                         className="hidden"
                         onChange={handlePhotoUpload}
                         accept="image/*,video/*,.pdf"
                       />
-                    </label>
+                      <label
+                        htmlFor="petUploadGallery"
+                        className="inline-flex items-center gap-2 rounded-full border border-[#3998de]/30 bg-white px-3 py-1.5 text-xs font-semibold text-[#3998de] shadow-sm transition hover:border-[#3998de]/60"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Gallery
+                      </label>
+                    </div>
 
                     {/* Preview + meta */}
                     {uploadFile && (

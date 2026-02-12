@@ -54,6 +54,30 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
         q: "Will I receive documentation after the consultation?",
         a: "Yes. You'll receive a consultation summary with the veterinarian's assessment, recommendations, and any suggested follow-up actions. This can be shared with your regular veterinarian if needed.",
       },
+      {
+        q: "When is the payment charged?",
+        a: "Payment is required at the time of booking to confirm your online video consultation with the selected doctor.",
+      },
+      {
+        q: "Is the consultation fee refundable?",
+        a: "Consultation fees are non-refundable once the session has started or the doctor has connected. If the doctor does not return your video call within 30 minutes of the scheduled time, you may contact support to review your case for a refund.",
+      },
+      {
+        q: "What if the doctor does not call me?",
+        a: "Please wait up to 30 minutes from the scheduled consultation time. If the doctor has not connected within this period, you can reach out to SnoutIQ support for assistance.",
+      },
+      {
+        q: "What if I miss the doctor’s call?",
+        a: "If you do not answer the doctor’s call at the scheduled time, the consultation will be considered completed and the fee will not be refunded.",
+      },
+      {
+        q: "How will the consultation take place?",
+        a: "The consultation will be conducted via video call through the doctor’s registered WhatsApp number. Please ensure your phone is reachable and your internet connection is stable at the scheduled time.",
+      },
+      {
+        q: "Is my payment secure?",
+        a: "Yes. All payments are processed through secure and encrypted payment gateways.",
+      },
     ],
     [],
   );

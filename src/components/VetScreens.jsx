@@ -619,16 +619,16 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
       <VetHeader onBack={onBack} title="Vet Partner Login" subtitle="Welcome back to SnoutIQ" />
 
       <PageWrap>
-        <div className="flex-1 px-6 py-8 flex flex-col justify-center max-w-md mx-auto w-full md:max-w-2xl md:px-0 md:py-16">
-          <div className="text-center mb-8 md:mb-12">
-            <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-xl shadow-blue-500/30 transform hover:scale-105 transition-transform">
+        <div className="flex-1 px-6 py-6 flex flex-col justify-start max-w-md mx-auto w-full md:max-w-lg md:px-0 md:py-10 md:justify-center">
+          <div className="text-center mb-4 md:mb-6">
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-3 shadow-sm">
               <img src={logo} alt="SnoutIQ" className="w-10 h-10 md:w-12 md:h-12 object-contain" />
             </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Welcome back, Doctor</h2>
-            <p className="text-gray-500 md:text-lg">Securely access your practice dashboard</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 tracking-tight">Welcome back, Doctor</h2>
+            <p className="text-xs text-gray-500 md:text-sm">Securely access your practice dashboard</p>
           </div>
 
-          <div className={`${CARD_CLASS} p-6 md:p-8 space-y-6`}>
+          <div className={`${CARD_CLASS} p-5 md:p-6 space-y-5`}>
             {step === "mobile" ? (
               <>
                 <div className="space-y-2">
@@ -636,7 +636,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
                     Mobile Number
                   </label>
                   <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50 focus-within:ring-2 focus-within:ring-[#0B4D67]/20 focus-within:border-[#0B4D67] focus-within:bg-white transition-all">
-                    <span className="text-gray-500 font-medium px-4 border-r border-gray-200 py-3.5">
+                    <span className="text-gray-500 font-medium px-4 border-r border-gray-200 py-3">
                       +91
                     </span>
                     <input
@@ -644,7 +644,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
                       value={mobile}
                       onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
                       placeholder="Enter 10-digit mobile number"
-                      className="flex-1 px-4 py-3.5 bg-transparent outline-none font-medium text-gray-900 placeholder:text-gray-400"
+                      className="flex-1 px-4 py-3 bg-transparent outline-none font-medium text-gray-900 placeholder:text-gray-400"
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
@@ -656,7 +656,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
                   onClick={handleSendOtp}
                   disabled={mobile.length < 10 || isSending}
                   fullWidth
-                  className="md:text-lg md:py-4 md:rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-300 shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="md:text-base md:py-3.5 md:rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-300 shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSending ? (
                     <span className="flex items-center justify-center gap-2">
@@ -679,7 +679,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     placeholder="Enter 6-digit OTP"
-                    className="w-full px-4 py-3.5 text-center text-2xl tracking-[0.5em] border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400 placeholder:tracking-normal"
+                    className="w-full px-4 py-3 text-center text-xl md:text-2xl tracking-[0.5em] border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400 placeholder:tracking-normal"
                   />
                   <p className="text-xs text-center text-gray-500 mt-2">
                     OTP sent to +91 {mobile}
@@ -690,7 +690,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
                   onClick={handleVerifyOtp}
                   disabled={otp.length < 6 || isVerifying}
                   fullWidth
-                  className="md:text-lg md:py-4 md:rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-300 shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="md:text-base md:py-3.5 md:rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-300 shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isVerifying ? (
                     <span className="flex items-center justify-center gap-2">
@@ -733,7 +733,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
             )}
           </div>
 
-          <div className="mt-8 text-center">
+          <div className="mt-5 text-center">
             <p className="text-gray-500 text-sm md:text-base">New to SnoutIQ?</p>
             <button 
               onClick={onRegisterClick} 
@@ -1235,7 +1235,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                 </div>
 
                 <div className="flex flex-col md:flex-row items-center gap-8">
-                  <div className="relative">
+                  <div className="relative flex flex-col items-center gap-3">
                     <div className="h-32 w-32 md:h-40 md:w-40 rounded-2xl border-3 border-[#0B4D67]/20 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden shadow-lg">
                       {doctorImagePreview ? (
                         <img
@@ -1250,19 +1250,37 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                         </div>
                       )}
                     </div>
-                    <input
-                      id="doctorImageUpload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleDoctorImageFile}
-                    />
-                    <label
-                      htmlFor="doctorImageUpload"
-                      className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white flex items-center justify-center cursor-pointer shadow-lg transition-colors"
-                    >
-                      <Camera size={18} />
-                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="doctorImageCamera"
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleDoctorImageFile}
+                      />
+                      <label
+                        htmlFor="doctorImageCamera"
+                        className="inline-flex items-center gap-2 rounded-full border border-[#0B4D67]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0B4D67] shadow-sm transition hover:border-[#0B4D67]/40"
+                      >
+                        <Camera size={14} />
+                        Camera
+                      </label>
+                      <input
+                        id="doctorImageGallery"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleDoctorImageFile}
+                      />
+                      <label
+                        htmlFor="doctorImageGallery"
+                        className="inline-flex items-center gap-2 rounded-full border border-[#0B4D67]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0B4D67] shadow-sm transition hover:border-[#0B4D67]/40"
+                      >
+                        <Upload size={14} />
+                        Gallery
+                      </label>
+                    </div>
                   </div>
 
                   <div className="flex-1 text-center md:text-left space-y-3">
