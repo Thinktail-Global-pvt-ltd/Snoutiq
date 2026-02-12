@@ -141,34 +141,6 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 India.
               </p>
 
-              {/* Vets display */}
-              {/* <div className="mt-6 flex items-center gap-4 rounded-2xl bg-white/70 px-4 py-3 shadow-sm ring-1 ring-white/60">
-                <div className="flex items-center">
-                  {["Dr", "Dr", "Dr", "Dr"].map((t, i) => (
-                    <div
-                      key={i}
-                      className={`-ml-2 flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-white text-sm font-bold text-white shadow-sm ${
-                        i === 0 ? "ml-0" : ""
-                      }`}
-                      style={{
-                        background: "linear-gradient(135deg, #2563eb, #7c3aed)",
-                      }}
-                    >
-                      {t}
-                    </div>
-                  ))}
-                  <div className="-ml-2 flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-white bg-[#EAF4FF] text-sm font-bold text-[#1D4E89] shadow-sm">
-                    +6
-                  </div>
-                </div>
-
-                <div className="text-sm">
-                  <div className="font-semibold text-slate-900">
-                    10 Verified Veterinarians
-                  </div>
-                  <div className="text-slate-500">Ready to help your pet</div>
-                </div>
-              </div> */}
 
               {/* CTA */}
               <button

@@ -5,7 +5,7 @@
 // - Send doctor_image as a URL string.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import imageCompression from "browser-image-compression";
 import { Button } from "./Button";
 import { apiBaseUrl, apiPost } from "../lib/api";
@@ -125,6 +125,14 @@ const normalizeId = (value) => {
   const num = Number(value);
   if (!Number.isFinite(num) || num <= 0) return "";
   return String(num);
+};
+
+const normalizeDoctorName = (value) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const withoutPrefix = trimmed.replace(/^dr\.?\s*/i, "").trim();
+  if (!withoutPrefix) return "";
+  return `Dr. ${withoutPrefix}`;
 };
 
 const fetchClinicIdForDoctor = async (doctorId, authToken = "", signal) => {
@@ -733,6 +741,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
 
 export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState({
     vetFullName: "Dr. ",
     clinicName: "",
@@ -887,14 +896,76 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   };
 
   const normalizedDegree = form.degree === "Other" ? form.degreeOther.trim() : form.degree;
-  const normalizeDoctorName = (value) => {
-    const trimmed = value.trim();
-    if (!trimmed) return "";
-    const withoutPrefix = trimmed.replace(/^dr\.?\s*/i, "").trim();
-    if (!withoutPrefix) return "";
-    return `Dr. ${withoutPrefix}`;
-  };
   const doctorNameReady = normalizeDoctorName(form.vetFullName);
+
+  useEffect(() => {
+    const storedAuth = loadVetAuth();
+    const stateAuth = location?.state?.auth || location?.state?.doctor || location?.state?.prefill;
+    const source = stateAuth || storedAuth;
+    if (!source) return;
+
+    const doctor = source?.doctor || source;
+    const rawName =
+      doctor?.doctor_name ||
+      doctor?.name ||
+      source?.doctor_name ||
+      source?.name ||
+      "";
+    const rawEmail =
+      doctor?.doctor_email ||
+      doctor?.email ||
+      source?.doctor_email ||
+      source?.email ||
+      "";
+    const rawPhone =
+      doctor?.doctor_mobile ||
+      doctor?.phone ||
+      source?.doctor_mobile ||
+      source?.phone ||
+      "";
+    const rawClinic =
+      source?.clinic_name ||
+      source?.vet_name ||
+      doctor?.clinic_name ||
+      doctor?.vet_name ||
+      "";
+    const rawCity = source?.vet_city || doctor?.vet_city || "";
+    const normalizedName = normalizeDoctorName(rawName);
+    const digits = String(rawPhone || "").replace(/\D/g, "");
+
+    if (!normalizedName && !rawEmail && !digits && !rawClinic && !rawCity) return;
+
+    setForm((prev) => {
+      let updated = false;
+      const next = { ...prev };
+      const prevName = prev.vetFullName.trim();
+      const prevNameLower = prevName.toLowerCase();
+      if (
+        normalizedName &&
+        (!prevName || prevNameLower === "dr." || prevNameLower === "dr")
+      ) {
+        next.vetFullName = normalizedName;
+        updated = true;
+      }
+      if (rawClinic && !prev.clinicName.trim()) {
+        next.clinicName = rawClinic;
+        updated = true;
+      }
+      if (rawEmail && !prev.email.trim()) {
+        next.email = rawEmail;
+        updated = true;
+      }
+      if (rawCity && !prev.vetCity.trim()) {
+        next.vetCity = rawCity;
+        updated = true;
+      }
+      if (digits && !prev.whatsappNumber.trim()) {
+        next.whatsappNumber = digits;
+        updated = true;
+      }
+      return updated ? next : prev;
+    });
+  }, [location.state]);
 
   const selectedSpecs = specializations.filter((spec) => spec !== "Other");
   if (specializations.includes("Other") && specializationOther.trim()) {
