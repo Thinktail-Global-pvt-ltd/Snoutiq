@@ -14,6 +14,9 @@ use App\Models\Transaction;
 use Illuminate\Contracts\View\View;
 use App\Services\CallAnalyticsService;
 use App\Services\DoctorAvailabilityService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
 class AdminPanelController extends Controller
@@ -80,6 +83,58 @@ class AdminPanelController extends Controller
         $doctors = Doctor::with('clinic')->orderBy('doctor_name')->get();
 
         return view('admin.doctors', compact('doctors'));
+    }
+
+    public function excellExportDoctors(): View
+    {
+        $doctors = Doctor::query()
+            ->where('exported_from_excell', 1)
+            ->with('clinic')
+            ->orderBy('doctor_name')
+            ->get();
+
+        return view('admin.excell-export-doctors', compact('doctors'));
+    }
+
+    public function updateDoctorImage(Request $request, Doctor $doctor)
+    {
+        if ($doctor->exported_from_excell != 1) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'doctor_image' => ['required'],
+        ]);
+
+        $path = null;
+
+        if ($request->hasFile('doctor_image') && $request->file('doctor_image')->isValid()) {
+            File::ensureDirectoryExists(public_path('photo'));
+            $file = $request->file('doctor_image');
+            $fileName = 'doctor_' . $doctor->id . '_' . time() . '.' . $file->extension();
+            $file->move(public_path('photo'), $fileName);
+            $path = 'photo/' . $fileName;
+        } elseif (is_string($validated['doctor_image']) && str_starts_with($validated['doctor_image'], 'data:image')) {
+            File::ensureDirectoryExists(public_path('photo'));
+            $fileName = 'doctor_' . $doctor->id . '_' . time() . '.png';
+            $img = preg_replace('/^data:image\/\w+;base64,/', '', $validated['doctor_image']);
+            $img = str_replace(' ', '+', $img);
+            File::put(public_path('photo/') . $fileName, base64_decode($img));
+            $path = 'photo/' . $fileName;
+        }
+
+        if (! $path) {
+            return back()->withErrors(['doctor_image' => 'Invalid image provided.']);
+        }
+
+        if ($doctor->doctor_image && File::exists(public_path($doctor->doctor_image))) {
+            File::delete(public_path($doctor->doctor_image));
+        }
+
+        $doctor->doctor_image = $path;
+        $doctor->save();
+
+        return back()->with('status', 'Doctor image updated.');
     }
 
     public function onlineDoctors(): View

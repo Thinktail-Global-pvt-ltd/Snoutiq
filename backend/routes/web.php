@@ -222,6 +222,8 @@ Route::prefix('admin')->group(function () {
         Route::get('/pet-parents', [AdminPetParentController::class, 'index'])->name('admin.pet-parents');
         Route::get('/pets', [AdminPanelController::class, 'pets'])->name('admin.pets');
         Route::get('/doctors', [AdminPanelController::class, 'doctors'])->name('admin.doctors');
+        Route::get('/doctors/excell-export', [AdminPanelController::class, 'excellExportDoctors'])->name('admin.doctors.excell-export');
+        Route::post('/doctors/{doctor}/image', [AdminPanelController::class, 'updateDoctorImage'])->name('admin.doctors.image');
         Route::get('/online-doctors', [AdminPanelController::class, 'onlineDoctors'])->name('admin.online-doctors');
     Route::get('/vet-registrations', [AdminPanelController::class, 'vetRegistrations'])->name('admin.vet-registrations');
         Route::get('/vet-registration-report', VetRegistrationReportPageController::class)->name('admin.vet-registration-report');
