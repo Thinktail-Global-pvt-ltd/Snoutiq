@@ -294,7 +294,7 @@ Route::get('/exported_from_excell_doctors', function () {
 Route::post('/user-pet-observation', function (Request $request) {
     $data = $request->validate([
         'name' => ['required', 'string', 'max:255'],
-        'phone' => ['required', 'string', 'max:20', 'unique:users,phone'],
+        'phone' => ['required', 'string', 'max:20'],
         'breed' => ['required', 'string', 'max:255'],
         'dob' => ['nullable', 'date'],
         'type' => ['required', 'string', 'max:100'],
@@ -312,21 +312,47 @@ Route::post('/user-pet-observation', function (Request $request) {
 
     $result = DB::transaction(function () use ($data, $uploadedFile) {
         $phoneDigits = preg_replace('/\\D+/', '', $data['phone']);
-        $baseEmail = 'pp_'.$phoneDigits.'@snoutiq.local';
-        $email = $baseEmail;
-        $suffix = 1;
-        while (User::where('email', $email)->exists()) {
-            $email = 'pp_'.$phoneDigits.'_'.$suffix.'@snoutiq.local';
-            $suffix++;
-        }
 
-        $user = User::create([
-            'name' => $data['name'],
-            'phone' => $data['phone'],
-            'email' => $email,
-            'role' => 'pet_parent',
-            'password' => Hash::make('123456'),
-        ]);
+        // Find existing user by phone (normalized) or exact match
+        $existingUser = User::query()
+            ->whereRaw("REGEXP_REPLACE(phone, '[^0-9]', '') = ?", [$phoneDigits])
+            ->orWhere('phone', $data['phone'])
+            ->first();
+
+        if ($existingUser) {
+            $user = $existingUser;
+            // Update basic fields, keep existing email unless missing
+            $user->name = $data['name'];
+            $user->phone = $data['phone'];
+            if (empty($user->email)) {
+                $user->email = 'pp_'.$phoneDigits.'@snoutiq.local';
+            }
+            $user->role = 'pet_parent';
+            $user->save();
+
+            // Replace existing pets with a fresh record
+            $existingPetIds = $user->pets()->pluck('id');
+            if ($existingPetIds->isNotEmpty()) {
+                UserObservation::whereIn('pet_id', $existingPetIds)->delete();
+                $user->pets()->delete();
+            }
+        } else {
+            $baseEmail = 'pp_'.$phoneDigits.'@snoutiq.local';
+            $email = $baseEmail;
+            $suffix = 1;
+            while (User::where('email', $email)->exists()) {
+                $email = 'pp_'.$phoneDigits.'_'.$suffix.'@snoutiq.local';
+                $suffix++;
+            }
+
+            $user = User::create([
+                'name' => $data['name'],
+                'phone' => $data['phone'],
+                'email' => $email,
+                'role' => 'pet_parent',
+                'password' => Hash::make('123456'),
+            ]);
+        }
 
         $pet = new Pet();
         $pet->user_id = $user->id;

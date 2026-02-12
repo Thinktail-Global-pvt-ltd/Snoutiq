@@ -230,6 +230,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/bookings', [AdminPanelController::class, 'bookings'])->name('admin.bookings');
         Route::get('/analytics/video', [AdminPanelController::class, 'videoAnalytics'])->name('admin.analytics.video');
         Route::get('/analytics/pincode-heatmap', [AdminPanelController::class, 'pincodeHeatmap'])->name('admin.analytics.pincode-heatmap');
+        Route::get('/whatsapp-templates', [AdminPanelController::class, 'whatsappTemplates'])->name('admin.whatsapp.templates');
         Route::get('/transactions/excell-export', [AdminPanelController::class, 'excellExportTransactions'])->name('admin.transactions.excell-export');
         Route::get('/supports', [AdminPanelController::class, 'supports'])->name('admin.supports');
         Route::get('/sp/{user}', [AdminPanelController::class, 'serviceProviderProfile'])->name('admin.sp.profile');
