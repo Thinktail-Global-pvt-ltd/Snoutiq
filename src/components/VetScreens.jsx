@@ -20,6 +20,11 @@ import {
   History,
   Lock,
   FileText,
+  Download,
+  ExternalLink,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
   User,
   Pill,
   X,
@@ -120,6 +125,9 @@ const PAYOUT_OPTIONS = [
 ];
 
 const IMAGE_URL_LIMIT = 500;
+const DOC_ZOOM_MIN = 1;
+const DOC_ZOOM_MAX = 4;
+const DOC_ZOOM_STEP = 0.25;
 
 const normalizeId = (value) => {
   const num = Number(value);
@@ -176,6 +184,9 @@ const blockNumberInput = (e) => {
 const handleNumberWheel = (e) => {
   e.currentTarget.blur();
 };
+
+const clampDocZoom = (value) =>
+  Math.min(DOC_ZOOM_MAX, Math.max(DOC_ZOOM_MIN, value));
 
 // -------------- Image Compression --------------
 
@@ -1830,6 +1841,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [showPrescriptionSuccessModal, setShowPrescriptionSuccessModal] = useState(false);
   const prescriptionSuccessTimer = useRef(null);
   const [docPreviewUrl, setDocPreviewUrl] = useState("");
+  const [docZoom, setDocZoom] = useState(DOC_ZOOM_MIN);
   const refreshTimerRef = useRef(null);
   const isFirstLoadRef = useRef(true);
   const [prescriptionForm, setPrescriptionForm] = useState({
@@ -1938,6 +1950,18 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     return `${base}/${cleanPath}`;
   };
 
+  const getDocFilename = (url) => {
+    if (!url) return "document";
+    try {
+      const parsed = new URL(url);
+      const name = parsed.pathname.split("/").filter(Boolean).pop();
+      return name || "document";
+    } catch {
+      const parts = String(url).split("/").filter(Boolean);
+      return parts[parts.length - 1] || "document";
+    }
+  };
+
   const isImageUrl = (url) =>
     /^data:image\//i.test(url || "") ||
     /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url || "");
@@ -2013,6 +2037,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   };
 
   const openPatientModal = (transaction) => {
+    console.log("Consultation Overview API data:", transaction);
     setActiveTransaction(transaction);
     setShowPatientModal(true);
   };
@@ -2160,11 +2185,34 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const handleDocPreview = (url) => {
     if (!url) return;
     if (isImageUrl(url)) {
+      setDocZoom(DOC_ZOOM_MIN);
       setDocPreviewUrl(url);
     } else {
       window.open(url, "_blank", "noopener,noreferrer");
     }
   };
+
+  const closeDocPreview = () => {
+    setDocPreviewUrl("");
+  };
+
+  const zoomInDoc = () =>
+    setDocZoom((prev) => clampDocZoom(prev + DOC_ZOOM_STEP));
+
+  const zoomOutDoc = () =>
+    setDocZoom((prev) => clampDocZoom(prev - DOC_ZOOM_STEP));
+
+  const resetDocZoom = () => setDocZoom(DOC_ZOOM_MIN);
+
+  const openDocInNewTab = () => {
+    if (!docPreviewUrl) return;
+    window.open(docPreviewUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const docFilename = useMemo(
+    () => getDocFilename(docPreviewUrl),
+    [docPreviewUrl]
+  );
 
   useEffect(() => {
     if (!showPrescriptionSuccessModal) return undefined;
@@ -2636,13 +2684,38 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Pet Document</h4>
                 {(() => {
                   const docUrl = toDocUrl(activeTransaction?.pet?.pet_doc2);
+                  const hasImage = docUrl && isImageUrl(docUrl);
                   return docUrl ? (
                     <button
+                      type="button"
                       onClick={() => handleDocPreview(docUrl)}
-                      className="flex items-center gap-2 text-[#0B4D67] hover:text-[#1A6F8F] font-medium"
+                      className="w-full text-left rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-[#0B4D67]/40 hover:shadow-sm"
                     >
-                      <FileText size={16} />
-                      View Document
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0B4D67]/10">
+                          <FileText size={20} className="text-[#0B4D67]" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900">
+                            Document available
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Tap to preview, zoom, or download.
+                          </p>
+                        </div>
+                        <span className="text-xs font-semibold text-[#0B4D67]">
+                          Open
+                        </span>
+                      </div>
+                      {hasImage ? (
+                        <div className="mt-3 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                          <img
+                            src={docUrl}
+                            alt="Pet document preview"
+                            className="h-40 w-full object-cover"
+                          />
+                        </div>
+                      ) : null}
                     </button>
                   ) : (
                     <p className="text-sm text-gray-500">No document uploaded</p>
@@ -2658,6 +2731,85 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {docPreviewUrl && (
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4 text-white">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <FileText size={18} />
+                Document Preview
+              </div>
+              <button
+                onClick={closeDocPreview}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                aria-label="Close document preview"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-white px-6 py-3 text-xs text-gray-500">
+              <div className="font-medium">{docFilename}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={zoomOutDoc}
+                  disabled={docZoom <= DOC_ZOOM_MIN}
+                  className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <ZoomOut size={14} />
+                  Zoom out
+                </button>
+                <button
+                  type="button"
+                  onClick={zoomInDoc}
+                  disabled={docZoom >= DOC_ZOOM_MAX}
+                  className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <ZoomIn size={14} />
+                  Zoom in
+                </button>
+                <button
+                  type="button"
+                  onClick={resetDocZoom}
+                  className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-gray-600 transition hover:bg-gray-50"
+                >
+                  <RotateCcw size={14} />
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={openDocInNewTab}
+                  className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-gray-600 transition hover:bg-gray-50"
+                >
+                  <ExternalLink size={14} />
+                  Open in new tab
+                </button>
+                <a
+                  href={docPreviewUrl}
+                  download={docFilename}
+                  className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-gray-600 transition hover:bg-gray-50"
+                >
+                  <Download size={14} />
+                  Download
+                </a>
+              </div>
+            </div>
+            <div className="max-h-[75vh] overflow-auto bg-black/5 p-4">
+              <img
+                src={docPreviewUrl}
+                alt="Uploaded document"
+                className="w-full rounded-2xl bg-white"
+                style={{
+                  transform: `scale(${docZoom})`,
+                  transformOrigin: "center center",
+                }}
+              />
             </div>
           </div>
         </div>
