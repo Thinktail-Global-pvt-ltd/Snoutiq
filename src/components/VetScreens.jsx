@@ -983,28 +983,81 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   const breakReady = noBreakTime || breakTimes.length > 0;
 
-  const canSubmit =
-    agreed &&
+  const basicComplete = Boolean(
     doctorNameReady &&
-    form.clinicName.trim() &&
-    whatsappReady &&
-    form.email.trim() &&
-    form.shortIntro.trim() &&
-    form.vetCity.trim() &&
+      form.clinicName.trim() &&
+      whatsappReady &&
+      form.email.trim() &&
+      form.shortIntro.trim() &&
+      form.vetCity.trim() &&
+      imageReady &&
+      !imageError &&
+      !isImageProcessing
+  );
+
+  const professionalComplete = Boolean(
     form.doctorLicense.trim() &&
-    imageReady &&
-    degreeReady &&
-    form.yearsOfExperience.trim() &&
-    selectedSpecs.length > 0 &&
-    form.responseTimeDay &&
-    form.responseTimeNight &&
-    breakReady &&
+      degreeReady &&
+      form.yearsOfExperience.trim() &&
+      selectedSpecs.length > 0
+  );
+
+  const availabilityComplete = Boolean(
+    form.responseTimeDay && form.responseTimeNight && breakReady
+  );
+
+  const pricingComplete = Boolean(
     dayPrice &&
-    nightPrice &&
-    form.freeFollowUp &&
-    payoutReady &&
-    !imageError &&
-    !isImageProcessing;
+      nightPrice &&
+      form.freeFollowUp &&
+      payoutReady &&
+      agreement1 &&
+      agreement2
+  );
+
+  const progressSteps = useMemo(() => {
+    const steps = [
+      { id: 1, label: "Basic Details", complete: basicComplete },
+      { id: 2, label: "Professional", complete: professionalComplete },
+      { id: 3, label: "Availability", complete: availabilityComplete },
+      { id: 4, label: "Pricing", complete: pricingComplete },
+    ];
+    const firstIncompleteIndex = steps.findIndex((step) => !step.complete);
+    const activeStepId =
+      firstIncompleteIndex === -1
+        ? steps[steps.length - 1].id
+        : steps[firstIncompleteIndex].id;
+    return steps.map((step) => ({
+      ...step,
+      active: step.id === activeStepId && !step.complete,
+    }));
+  }, [basicComplete, professionalComplete, availabilityComplete, pricingComplete]);
+
+  const stepCircleClass = (step) =>
+    [
+      "w-10 h-10 rounded-full flex items-center justify-center font-semibold",
+      step.complete || step.active
+        ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white"
+        : "bg-gray-200 text-gray-600",
+    ].join(" ");
+
+  const stepLabelClass = (step) =>
+    step.complete || step.active
+      ? "font-medium text-gray-700"
+      : "font-medium text-gray-500";
+
+  const stepLineClass = (isComplete) =>
+    [
+      "w-16 h-0.5",
+      isComplete ? "bg-gradient-to-r from-blue-600 to-blue-500" : "bg-gray-200",
+    ].join(" ");
+
+  const canSubmit =
+    basicComplete &&
+    professionalComplete &&
+    availabilityComplete &&
+    pricingComplete &&
+    agreed;
 
   const handleRegisterSuccessLogin = () => {
     setShowRegisterSuccessModal(false);
@@ -1139,25 +1192,19 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
           {/* Progress Steps */}
           <div className="hidden md:flex items-center justify-center mb-12">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white flex items-center justify-center font-semibold">1</div>
-                <span className="font-medium text-gray-700">Basic Details</span>
-              </div>
-              <div className="w-16 h-0.5 bg-gray-200"></div>
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-semibold">2</div>
-                <span className="font-medium text-gray-500">Professional</span>
-              </div>
-              <div className="w-16 h-0.5 bg-gray-200"></div>
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-semibold">3</div>
-                <span className="font-medium text-gray-500">Availability</span>
-              </div>
-              <div className="w-16 h-0.5 bg-gray-200"></div>
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-semibold">4</div>
-                <span className="font-medium text-gray-500">Pricing</span>
-              </div>
+              {progressSteps.map((step, index) => (
+                <React.Fragment key={step.id}>
+                  <div className="flex items-center gap-2">
+                    <div className={stepCircleClass(step)}>
+                      {step.complete ? <CheckCircle2 size={18} /> : step.id}
+                    </div>
+                    <span className={stepLabelClass(step)}>{step.label}</span>
+                  </div>
+                  {index < progressSteps.length - 1 && (
+                    <div className={stepLineClass(progressSteps[index].complete)} />
+                  )}
+                </React.Fragment>
+              ))}
             </div>
           </div>
 

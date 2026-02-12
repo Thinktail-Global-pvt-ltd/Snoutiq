@@ -4,8 +4,25 @@ import { isIos, isInStandaloneMode } from "../iosPwa";
 
 export function InstallCTA({ className = "" }) {
   const { canInstall, promptInstall } = usePwaInstall();
+  const isIosDevice = typeof window !== "undefined" && isIos();
+  const isStandalone = typeof window !== "undefined" && isInStandaloneMode();
 
   const onClick = async () => {
+    if (isIosDevice && !isStandalone) {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        try {
+          await navigator.share({
+            title: document.title,
+            url: window.location.href,
+          });
+        } catch {
+          // ignore share dismissal
+        }
+      } else {
+        alert("iPhone par install ke liye: Share > Add to Home Screen");
+      }
+      return;
+    }
     if (!canInstall) {
       alert("Install option browser criteria ke baad enable hota hai.");
       return;
