@@ -319,7 +319,7 @@ export default function CallLab() {
   // ---------------- UI ----------------
 
   return (
-    <div style={{ maxWidth: 980, margin: "24px auto", padding: 16, fontFamily: "system-ui" }}>
+    <div style={{ maxWidth: 980, margin: "24px auto", padding: 16, fontFamily: "var(--font-body)" }}>
       <h2>Call Lab (React)</h2>
       <div style={{ opacity: 0.7, marginBottom: 8 }}>
         Local + Production compatible. Token optional.

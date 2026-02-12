@@ -419,7 +419,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
 
 
       {/* Blog */}
-      <section className="bg-white py-16 md:py-20">
+      <section className="bg-white py-16 md:py-10">
         <div className="mx-auto max-w-6xl px-5">
           <div className="text-center">
             <h2 className="text-3xl font-bold text-slate-900 md:text-4xl">
@@ -466,7 +466,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       </section>
 
       {/* FAQ */}
-      <section className="bg-white py-16 md:py-20">
+      <section className="bg-white py-10 md:py-10">
         <div className="mx-auto max-w-6xl px-5">
           <h2 className="text-center text-3xl font-bold text-slate-900 md:text-4xl">
             Common Questions

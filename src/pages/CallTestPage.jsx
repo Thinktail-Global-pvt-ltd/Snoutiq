@@ -772,7 +772,7 @@ export default function CallPage() {
       backgroundColor: "#0f172a",
       overflow: "hidden",
       color: "white",
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+      fontFamily: "var(--font-body)"
     }}>
       
       {showPermissionModal && <PermissionModal />}

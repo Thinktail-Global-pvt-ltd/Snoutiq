@@ -314,7 +314,7 @@ const CallRecordingDemo = () => {
         background: "linear-gradient(135deg, #020617 0%, #0f172a 45%, #111827 100%)",
         color: "white",
         padding: 32,
-        fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        fontFamily: "var(--font-body)",
       }}
     >
       <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ display: "none" }} />

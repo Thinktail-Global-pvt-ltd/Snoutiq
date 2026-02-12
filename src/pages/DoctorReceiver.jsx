@@ -257,7 +257,7 @@ function Chip({ children, ok }) {
 }
 
 const styles = {
-  page: { padding: 24, fontFamily: "system-ui", maxWidth: 980, margin: "0 auto" },
+  page: { padding: 24, fontFamily: "var(--font-body)", maxWidth: 980, margin: "0 auto" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 12 },
   row: { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14, alignItems: "center" },
   label: { fontWeight: 900, marginBottom: 6 },
