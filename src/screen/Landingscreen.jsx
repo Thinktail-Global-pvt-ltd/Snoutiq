@@ -101,14 +101,14 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               />
             </button>
 
-            <div className="flex items-center gap-3">
-              <InstallCTA className="rounded-full px-4 py-1.5 text-sm" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <InstallCTA className="rounded-full px-3 py-1 text-xs whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-sm" />
               <button
                 type="button"
                 onClick={() =>
                   typeof onVetAccess === "function" ? onVetAccess() : null
                 }
-                className="rounded-full border border-[#3998de]/30 px-4 py-1.5 text-sm font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10"
+                className="rounded-full border border-[#3998de]/30 px-3 py-1 text-xs font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10 whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-sm"
               >
                 🩺 Vet Access
               </button>
@@ -126,18 +126,18 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
             {/* Left */}
             <div>
               <div className="inline-block rounded-full bg-[#EAF4FF] px-4 py-2 text-sm font-semibold text-[#1D4E89] shadow-sm">
-                ⭐ Trusted by 1000+ Pet Parents
+                ⭐ Trusted by 100+ Pet Parents in India
               </div>
 
               <h1 className="mt-5 text-4xl font-extrabold leading-tight text-slate-900 md:text-5xl">
                 Connect with a{" "}
-                <span className="text-[#3998de]">verified veterinarian</span> in
-                15 minutes
+                <span className="text-[#3998de]">Verified Veterinarian</span> in less than
+                15 minutes.
               </h1>
 
               <p className="mt-5 text-lg text-slate-500">
                 Professional video consultations for your pet&apos;s health
-                concerns. Get expert guidance from licensed veterinarians across
+                concerns. <br />Get expert guidance from licensed veterinarians across
                 India.
               </p>
 
@@ -168,7 +168,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               <IosInstallHint className="mt-4 max-w-md" />
 
               {/* Stats */}
-              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <div className="mt-8 grid grid-cols-3 gap-2 sm:gap-4">
                 {[
                   { n: "15min", l: "Average response time", icon: Clock },
                   { n: "100%", l: "Licensed and experienced vets", icon: ShieldCheck },
@@ -176,22 +176,24 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 ].map((s, i) => (
                   <div
                     key={i}
-                    className="rounded-xl border border-white/70 bg-white/90 px-5 py-5 shadow-sm hover:shadow-md transition"
+                    className="rounded-xl border border-white/70 bg-white/90 px-3 py-3 shadow-sm hover:shadow-md transition sm:px-5 sm:py-5"
                   >
                     {/* Icon */}
-                    <div className="mb-3">
-                      <div className="w-10 h-10 flex items-center justify-center rounded-full bg-[#3998de]/10">
-                        <s.icon className="w-5 h-5 text-[#3998de]" />
+                    <div className="mb-2 sm:mb-3">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full bg-[#3998de]/10">
+                        <s.icon className="w-4 h-4 sm:w-5 sm:h-5 text-[#3998de]" />
                       </div>
                     </div>
 
                     {/* Number */}
-                    <div className="text-3xl font-extrabold text-[#3998de]">
+                    <div className="text-xl sm:text-3xl font-extrabold text-[#3998de] leading-tight">
                       {s.n}
                     </div>
 
                     {/* Label */}
-                    <div className="text-sm text-slate-500 mt-1">{s.l}</div>
+                    <div className="text-[10px] sm:text-sm text-slate-500 mt-1 leading-snug">
+                      {s.l}
+                    </div>
                   </div>
                 ))}
               </div>
