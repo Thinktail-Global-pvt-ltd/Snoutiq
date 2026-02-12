@@ -200,24 +200,54 @@ class PaymentController extends Controller
         ];
 
         try {
-            $endpoint = rtrim((string) config('app.url'), '/') . '/api/push/test';
-            $apiResponse = Http::acceptJson()->post($endpoint, [
-                'token' => (string) $latestToken,
-                'title' => $title,
-                'body' => $body,
-                'data' => $data,
-            ]);
+            $baseUrl = rtrim((string) config('app.url'), '/');
+            $candidates = array_values(array_unique(array_filter([
+                $baseUrl !== '' ? $baseUrl . '/api/push/test' : null,
+                $baseUrl !== '' ? $baseUrl . '/backend/api/push/test' : null,
+            ])));
 
-            if (! $apiResponse->successful()) {
-                return [
-                    'sent' => false,
-                    'reason' => 'push_api_failed',
-                    'doctor_id' => $doctorId,
-                    'fcm_token' => (string) $latestToken,
+            $lastFailure = null;
+            foreach ($candidates as $endpoint) {
+                $apiResponse = Http::acceptJson()
+                    ->asJson()
+                    ->timeout(8)
+                    ->post($endpoint, [
+                        'token' => (string) $latestToken,
+                        'title' => $title,
+                        'body' => $body,
+                        'data' => $data,
+                    ]);
+
+                $payload = $apiResponse->json();
+                $pushMarkedSent = is_array($payload)
+                    && (($payload['sent'] ?? false) === true || ($payload['success'] ?? false) === true);
+
+                if ($apiResponse->successful() && $pushMarkedSent) {
+                    return [
+                        'sent' => true,
+                        'doctor_id' => $doctorId,
+                        'doctor_name' => Doctor::where('id', $doctorId)->value('doctor_name'),
+                        'fcm_token' => (string) $latestToken,
+                        'push_endpoint' => $endpoint,
+                    ];
+                }
+
+                $lastFailure = [
                     'status_code' => $apiResponse->status(),
-                    'response' => $apiResponse->json(),
+                    'response' => $payload,
+                    'push_endpoint' => $endpoint,
                 ];
             }
+
+            return [
+                'sent' => false,
+                'reason' => 'push_api_failed',
+                'doctor_id' => $doctorId,
+                'fcm_token' => (string) $latestToken,
+                'status_code' => $lastFailure['status_code'] ?? null,
+                'response' => $lastFailure['response'] ?? null,
+                'push_endpoint' => $lastFailure['push_endpoint'] ?? null,
+            ];
         } catch (\Throwable $e) {
             report($e);
             return [
@@ -228,13 +258,6 @@ class PaymentController extends Controller
                 'message' => $e->getMessage(),
             ];
         }
-
-        return [
-            'sent' => true,
-            'doctor_id' => $doctorId,
-            'doctor_name' => Doctor::where('id', $doctorId)->value('doctor_name'),
-            'fcm_token' => (string) $latestToken,
-        ];
     }
 
     // POST /api/rzp/verify

@@ -1,7 +1,9 @@
 // src/screen/Landingscreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import logo from "../assets/images/logo.png";
-import doctorHero from "../assets/images/doctor_1.png";
+import doctorSlide1 from "../assets/doctor1.jpeg";
+import doctorSlide2 from "../assets/doctor2.jpeg";
+import doctorSlide3 from "../assets/doctor3.jpeg";
 import blogVaccination from "../assets/images/vaccination_schedule.jpeg";
 import blogTickFever from "../assets/images/tickfever.png";
 import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
@@ -9,8 +11,18 @@ import { ArrowRight } from "lucide-react";
 import { Clock, ShieldCheck, Headphones } from "lucide-react";
 import { InstallCTA, IosInstallHint } from "../components/PwaInstallCTA";
 
+const HERO_SLIDES = [doctorSlide1, doctorSlide2, doctorSlide3];
+
 const LandingScreen = ({ onStart, onVetAccess }) => {
   const [openFaq, setOpenFaq] = useState(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length);
+    }, 3500);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const faqs = useMemo(
     () => [
@@ -205,16 +217,29 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 <div className="absolute -top-6 right-10 h-20 w-20 rounded-full bg-[#3998de]/15 blur-2xl" />
                 <div className="absolute -bottom-8 left-6 h-24 w-24 rounded-full bg-[#3998de]/10 blur-2xl" />
                 <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-4 shadow-[0_25px_60px_rgba(15,118,110,0.08)] md:p-6">
-                  <div className="absolute right-4 top-4 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700">
-                    Online
+                  <div className="relative overflow-hidden rounded-2xl">
+                    <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      Online
+                    </div>
+                    <div
+                      className="flex transition-transform duration-700 ease-in-out"
+                      style={{ transform: `translateX(-${activeSlide * 100}%)` }}
+                    >
+                      {HERO_SLIDES.map((slide, index) => (
+                        <div key={slide} className="min-w-full">
+                          <img
+                            src={slide}
+                            alt={`Veterinarian ${index + 1}`}
+                            className="h-auto w-full object-cover"
+                            loading={index === 0 ? "eager" : "lazy"}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <img
-                    src={doctorHero}
-                    alt="Veterinarian"
-                    className="h-auto w-full rounded-2xl object-cover"
-                  />
                   <div className="mt-4 text-center text-sm font-semibold text-[#3998de]">
-                    Video Consultation
+                    24/7 Availability
                   </div>
                 </div>
               </div>
@@ -415,7 +440,7 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       <section className="bg-gradient-to-br from-blue-100 to-blue-200 py-16">
         <div className="mx-auto max-w-6xl px-5">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="text-5xl">💙</div>
+            <div className="text-5xl">❤️</div>
             <h2 className="mt-4 text-3xl font-bold text-slate-900">
               Our Commitment to Pet Parents
             </h2>
@@ -501,8 +526,9 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
 
             <div>
               <h4 className="text-lg font-semibold">Contact</h4>
-              <p className="mt-3 text-sm text-slate-300">Email: hello@snoutiq.com</p>
-              <p className="text-sm text-slate-300">Service Area: India</p>
+              <p className="mt-3 text-sm text-slate-300">Email: admin@snoutiq.com</p>
+                <p className="text-sm text-slate-300">Mobile: +91 85880 07466</p>
+              <p className="text-sm text-slate-300">Service Area: Pan India</p>
               <p className="mt-4 text-sm font-semibold text-rose-200">
                 For emergencies, visit your nearest veterinary clinic immediately.
               </p>
@@ -523,21 +549,15 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 <a className="block hover:text-white" href="/cookie-policy">
                   Cookie Policy
                 </a>
-                <a className="block hover:text-white" href="#">
-                  Veterinary Council Registration
-                </a>
-                <a className="block hover:text-white" href="#">
-                  Google Policy Compliance
-                </a>
               </div>
             </div>
           </div>
 
           <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-slate-400">
-            <p>© 2025 SnoutIQ. Professional veterinary teleconsultation services.</p>
+            <p>© 2026 SnoutIQ. Professional veterinary teleconsultation services.</p>
             <p className="mt-2">
               All veterinarians are licensed professionals registered with the
-              Veterinary Council of India.
+              Veterinary Council of India or state veterinary councils.
             </p>
             <p className="mt-2 font-semibold">
               We do not prescribe medications or provide online prescriptions.
