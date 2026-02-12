@@ -213,6 +213,7 @@ class PaymentController extends Controller
                     'sent' => false,
                     'reason' => 'push_api_failed',
                     'doctor_id' => $doctorId,
+                    'fcm_token' => (string) $latestToken,
                     'status_code' => $apiResponse->status(),
                     'response' => $apiResponse->json(),
                 ];
@@ -223,6 +224,7 @@ class PaymentController extends Controller
                 'sent' => false,
                 'reason' => 'exception',
                 'doctor_id' => $doctorId,
+                'fcm_token' => (string) $latestToken,
                 'message' => $e->getMessage(),
             ];
         }
@@ -231,6 +233,7 @@ class PaymentController extends Controller
             'sent' => true,
             'doctor_id' => $doctorId,
             'doctor_name' => Doctor::where('id', $doctorId)->value('doctor_name'),
+            'fcm_token' => (string) $latestToken,
         ];
     }
 
