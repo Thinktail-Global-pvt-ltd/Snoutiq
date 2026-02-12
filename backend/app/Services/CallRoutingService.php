@@ -6,14 +6,22 @@ use App\Events\CallRequested;
 use App\Events\CallStatusUpdated;
 use App\Jobs\RingTimeoutJob;
 use App\Models\Call;
+use App\Models\DoctorFcmToken;
+use App\Services\Push\FcmService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
+use Throwable;
 
 class CallRoutingService
 {
     private const ONLINE_SET = 'doctors:online';
     private const BUSY_KEY = 'doctor:%d:busy';
+
+    public function __construct(private readonly FcmService $fcm)
+    {
+    }
 
     public function markDoctorOnline(int $doctorId): void
     {
@@ -78,6 +86,7 @@ class CallRoutingService
 
         $this->markDoctorBusy($doctorId, (int) config('calls.busy_ttl', 300));
         event(new CallRequested($call));
+        $this->notifyDoctorCallRequested($call);
         RingTimeoutJob::dispatch($call->id)->delay(now()->addSeconds(config('calls.ring_timeout', 30)));
 
         return $call;
@@ -129,5 +138,44 @@ class CallRoutingService
             'missed_at' => now(),
         ]);
         $this->markDoctorFree($call->doctor_id);
+    }
+
+    private function notifyDoctorCallRequested(Call $call): void
+    {
+        try {
+            $tokens = DoctorFcmToken::query()
+                ->where('doctor_id', $call->doctor_id)
+                ->pluck('token')
+                ->filter()
+                ->values()
+                ->all();
+
+            if (empty($tokens)) {
+                Log::info('call.push.no_tokens', [
+                    'doctor_id' => $call->doctor_id,
+                    'call_id' => $call->id,
+                ]);
+                return;
+            }
+
+            $title = 'Snoutiq Incoming Call';
+            $body = 'A pet parent is requesting a consultation.';
+            $data = [
+                'type' => 'call_request',
+                'call_id' => (string) $call->id,
+                'doctor_id' => (string) $call->doctor_id,
+                'patient_id' => (string) $call->patient_id,
+                'channel' => (string) ($call->channel ?? ''),
+                'deepLink' => '/vet-dashboard',
+            ];
+
+            $this->fcm->sendMulticast($tokens, $title, $body, $data);
+        } catch (Throwable $e) {
+            Log::error('call.push.failed', [
+                'doctor_id' => $call->doctor_id,
+                'call_id' => $call->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

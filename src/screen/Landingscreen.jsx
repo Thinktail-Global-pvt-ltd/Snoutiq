@@ -7,6 +7,7 @@ import blogTickFever from "../assets/images/tickfever.png";
 import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
 import { ArrowRight } from "lucide-react";
 import { Clock, ShieldCheck, Headphones } from "lucide-react";
+import { InstallCTA, IosInstallHint } from "../components/PwaInstallCTA";
 
 const LandingScreen = ({ onStart, onVetAccess }) => {
   const [openFaq, setOpenFaq] = useState(null);
@@ -100,15 +101,18 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               />
             </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                typeof onVetAccess === "function" ? onVetAccess() : null
-              }
-              className="rounded-full border border-[#3998de]/30 px-4 py-1.5 text-sm font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10"
-            >
-              🩺 Vet Access
-            </button>
+            <div className="flex items-center gap-3">
+              <InstallCTA className="rounded-full px-4 py-1.5 text-sm" />
+              <button
+                type="button"
+                onClick={() =>
+                  typeof onVetAccess === "function" ? onVetAccess() : null
+                }
+                className="rounded-full border border-[#3998de]/30 px-4 py-1.5 text-sm font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10"
+              >
+                🩺 Vet Access
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -188,6 +192,8 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 Consult a Veterinarian
                 <ArrowRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
               </button>
+
+              <IosInstallHint className="mt-4 max-w-md" />
 
               {/* Stats */}
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -571,3 +577,6 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
 };
 
 export default LandingScreen;
+
+
+

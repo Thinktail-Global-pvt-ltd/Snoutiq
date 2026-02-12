@@ -1,7 +1,6 @@
 import { getMessaging, getToken, isSupported, onMessage } from "firebase/messaging";
-
-
 import { getFirebaseApp, firebaseConfig } from "../config/firebaseConfig";
+import { apiBaseUrl } from "./api";
 
 
 let messagingSetupPromise = null;
@@ -12,7 +11,7 @@ const registerMessagingServiceWorker = async () => {
   }
 
   try {
-    return await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    return await navigator.serviceWorker.register("/service-worker.js");
   } catch (error) {
     console.error("[FCM] Service worker registration failed:", error);
     return null;
@@ -94,4 +93,44 @@ export const subscribeToForegroundMessages = async (callback) => {
   }
 
   return onMessage(setup.messaging, callback);
+};
+
+export const registerDoctorPush = async (doctorId, authToken = "") => {
+  if (!doctorId) {
+    throw new Error("Missing doctor ID");
+  }
+
+  const token = await requestFcmToken();
+  if (!token) {
+    throw new Error("No FCM token available");
+  }
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
+  const res = await fetch(`${apiBaseUrl()}/api/doctor/save-fcm-token`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      doctor_id: doctorId,
+      fcm_token: token,
+    }),
+  });
+
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const data = await res.json();
+      message = data?.message || data?.error || message;
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
+  }
+
+  return token;
 };

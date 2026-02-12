@@ -8,12 +8,14 @@ use Razorpay\Api\Errors\Error as RazorpayError;
 use App\Models\Payment;
 use App\Models\Transaction;
 use App\Models\Doctor;
+use App\Models\DoctorFcmToken;
 use App\Models\CallSession;
 use App\Models\User;
 use App\Models\Pet;
 use App\Models\Prescription;
 use Illuminate\Support\Str;
 use App\Services\WhatsAppService;
+use App\Services\Push\FcmService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -27,13 +29,14 @@ class PaymentController extends Controller
     private string $secret;
     private array $doctorClinicCache = [];
     private ?WhatsAppService $whatsApp = null;
+    private FcmService $fcm;
 
-    public function __construct(WhatsAppService $whatsApp)
+    public function __construct(WhatsAppService $whatsApp, FcmService $fcm)
     {
         $this->key    = trim((string) (config('services.razorpay.key') ?? '')) ?: 'rzp_test_1nhE9190sR3rkP';
         $this->secret = trim((string) (config('services.razorpay.secret') ?? '')) ?: 'L6CPZlUwrKQpdC9N3TRX8gIh';
         $this->whatsApp = $whatsApp;
-
+        $this->fcm = $fcm;
 
     }
 
@@ -232,6 +235,7 @@ class PaymentController extends Controller
             $whatsAppMeta = null;
             $vetWhatsAppMeta = null;
             $prescriptionDocMeta = null;
+            $vetPushMeta = null;
             try {
                 // Derive order type from notes or stored payment/transaction data
                 $orderType = $notes['order_type']
@@ -265,6 +269,14 @@ class PaymentController extends Controller
                         amountInInr: $amountInInr
                     );
                 }
+
+                $vetPushMeta = $this->notifyDoctorPaymentCaptured(
+                    context: $context,
+                    notes: $notes,
+                    amountInInr: $amountInInr,
+                    status: $status,
+                    orderType: $orderType
+                );
             } catch (\Throwable $e) {
                 report($e);
             }
@@ -284,6 +296,7 @@ class PaymentController extends Controller
                 'whatsapp' => $whatsAppMeta,
                 'vet_whatsapp' => $vetWhatsAppMeta,
                 'prescription_doc' => $prescriptionDocMeta,
+                'vet_push' => $vetPushMeta,
             ]);
 
         } catch (RazorpayError $e) {
@@ -873,6 +886,90 @@ class PaymentController extends Controller
             report($e);
             return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Send a push notification to the doctor after successful payment.
+     */
+    protected function notifyDoctorPaymentCaptured(
+        array $context,
+        array $notes,
+        int $amountInInr,
+        ?string $status,
+        ?string $orderType = null
+    ): array {
+        if (! $this->isSuccessfulPaymentStatus($status)) {
+            return ['sent' => false, 'reason' => 'payment_not_captured'];
+        }
+
+        $doctorId = $context['doctor_id'] ?? null;
+        if (! $doctorId) {
+            return ['sent' => false, 'reason' => 'doctor_missing'];
+        }
+
+        $tokens = DoctorFcmToken::query()
+            ->where('doctor_id', $doctorId)
+            ->pluck('token')
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($tokens)) {
+            return ['sent' => false, 'reason' => 'token_missing'];
+        }
+
+        $petName = null;
+        if (! empty($context['pet_id'])) {
+            $petName = Pet::where('id', $context['pet_id'])->value('name');
+        }
+
+        $parentName = null;
+        if (! empty($context['user_id'])) {
+            $parentName = User::where('id', $context['user_id'])->value('name');
+        }
+
+        $title = 'Payment received';
+        $bodyParts = ['Consultation payment confirmed'];
+        if ($petName) {
+            $bodyParts[] = "for {$petName}";
+        }
+        if ($parentName) {
+            $bodyParts[] = "by {$parentName}";
+        }
+        $body = implode(' ', $bodyParts);
+
+        $data = [
+            'type' => 'payment_received',
+            'order_type' => (string) ($orderType ?? $notes['order_type'] ?? ''),
+            'doctor_id' => (string) $doctorId,
+            'user_id' => (string) ($context['user_id'] ?? ''),
+            'pet_id' => (string) ($context['pet_id'] ?? ''),
+            'amount_inr' => (string) $amountInInr,
+            'call_id' => (string) ($context['call_identifier'] ?? ''),
+            'deepLink' => '/vet-dashboard',
+        ];
+
+        try {
+            $this->fcm->sendMulticast($tokens, $title, $body, $data);
+        } catch (\Throwable $e) {
+            report($e);
+            return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
+        }
+
+        return [
+            'sent' => true,
+            'token_count' => count($tokens),
+        ];
+    }
+
+    protected function isSuccessfulPaymentStatus(?string $status): bool
+    {
+        $normalized = strtolower(trim((string) $status));
+        if ($normalized === '') {
+            return false;
+        }
+
+        return in_array($normalized, ['captured', 'authorized', 'paid', 'success', 'verified'], true);
     }
 
     protected function resolveTransactionContext(Request $request, array $notes = []): array

@@ -1,12 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Header, ProgressBar } from "../components/Sharedcomponents";
-import { Clock, Zap } from "lucide-react";
+import { Clock, Zap, ChevronRight } from "lucide-react";
 
 const API_URL = "https://snoutiq.com/backend/api/exported_from_excell_doctors";
 
-const FALLBACK_AVATAR =
-  "https://ui-avatars.com/api/?name=Vet&background=E5E7EB&color=111827&size=128";
+const normalizeImageUrl = (value) => {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "";
+  const lower = trimmed.toLowerCase();
+  if (lower === "null" || lower === "undefined") return "";
+  return trimmed;
+};
+
+const getInitial = (name = "") => {
+  const trimmed = String(name).trim();
+  return trimmed ? trimmed[0].toUpperCase() : "V";
+};
 
 const parseListField = (value) => {
   if (!value) return [];
@@ -112,7 +123,7 @@ const buildVetsFromApi = (apiData = []) => {
         qualification: doc?.degree || "Vet",
         experience: toNumber(doc?.years_of_experience, 0),
 
-        image: doc?.doctor_image || FALLBACK_AVATAR,
+        image: normalizeImageUrl(doc?.doctor_image),
 
         priceDay: toNumber(doc?.video_day_rate, 0),
         priceNight: toNumber(doc?.video_night_rate, 0),
@@ -138,11 +149,53 @@ const buildVetsFromApi = (apiData = []) => {
   return list;
 };
 
+/** ---------- UI helpers (only styling) ---------- */
+
+const SkeletonCard = () => (
+  <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div className="h-1 bg-gradient-to-r from-blue-600 to-blue-500" />
+    <div className="p-5 md:p-7">
+      <div className="flex items-start gap-4">
+        <div className="h-16 w-16 rounded-full bg-slate-100 animate-pulse" />
+        <div className="flex-1">
+          <div className="h-4 w-2/3 bg-slate-100 rounded animate-pulse" />
+          <div className="mt-2 h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+          <div className="mt-3 h-3 w-3/4 bg-slate-100 rounded animate-pulse" />
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-4 flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="h-5 w-20 bg-slate-100 rounded animate-pulse" />
+          <div className="h-3 w-28 bg-slate-100 rounded animate-pulse" />
+        </div>
+        <div className="h-10 w-32 bg-slate-100 rounded-2xl animate-pulse" />
+      </div>
+    </div>
+  </div>
+);
+
+const Pill = ({ children }) => (
+  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 md:text-xs">
+    {children}
+  </span>
+);
+
 const VetsScreen = ({ petDetails, onSelect, onBack }) => {
   const [vets, setVets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errMsg, setErrMsg] = useState("");
   const [activeBioVet, setActiveBioVet] = useState(null);
+  const [brokenImages, setBrokenImages] = useState(() => new Set());
+
+  const markImageBroken = (id) => {
+    if (!id) return;
+    setBrokenImages((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -179,14 +232,12 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
     };
   }, []);
 
-  // ✅ No filters/sort UI — but we can still keep a stable order (lowest price first)
   const sortedVets = useMemo(() => {
     const base = [...vets];
 
     const specialtyScore = (v) =>
       petDetails?.type && v.specialties?.includes(petDetails.type) ? 1 : 0;
 
-    // Specialist first, then lowest price (simple + clean)
     return base.sort((a, b) => {
       const aMatch = specialtyScore(a);
       const bMatch = specialtyScore(b);
@@ -197,157 +248,183 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
   }, [vets, petDetails]);
 
   return (
-    <div className="min-h-screen bg-calm-bg flex flex-col animate-slide-up md:bg-gradient-to-b md:from-calm-bg md:to-white">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <Header onBack={onBack} title="Available Vets" />
 
-      <div className="w-full">
-        <div className="flex-1 px-4 py-6 pb-20 overflow-y-auto no-scrollbar md:px-10 lg:px-16 md:py-12">
-          <ProgressBar current={2} total={3} />
+      {/* top spacing + container */}
+      <div className="flex-1 px-4 py-6 pb-20 overflow-y-auto no-scrollbar md:px-10 lg:px-16 md:py-10">
+        <ProgressBar current={2} total={3} />
 
-          {/* Context Header */}
-          <div className="mb-4 flex flex-col gap-2 mt-6 md:mt-10">
-            <div className="flex items-start md:items-end justify-between gap-4">
-              <div className="min-w-0">
-                <h2 className="text-lg font-bold text-stone-800 md:text-4xl md:leading-[1.15]">
-                  {petDetails?.name
-                    ? `Vets for ${petDetails.name}`
-                    : "Available Vets"}
-                </h2>
-                <p className="hidden md:block text-base text-stone-500 mt-2 max-w-3xl">
-                  Choose a vet based on specialty match and consult price.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg md:px-3 md:py-2 md:text-sm md:rounded-xl">
-                  <Zap size={12} fill="currentColor" className="md:hidden" />
-                  <Zap size={16} fill="currentColor" className="hidden md:block" />
-                  <span>Fast response</span>
-                </div>
-              </div>
+        {/* Title block */}
+        <div className="mt-6 md:mt-10">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-slate-900">
+                {petDetails?.name ? `Vets for ${petDetails.name}` : "Available Vets"}
+              </h2>
+              <p className="mt-2 text-sm md:text-base text-slate-500 max-w-3xl">
+                Choose a vet based on specialty match and consult price.
+              </p>
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-stone-500 bg-stone-100 p-2 rounded-lg px-3 md:text-base md:px-4 md:py-3 md:rounded-2xl">
-              <Clock size={14} className="md:hidden" />
-              <Clock size={18} className="hidden md:block" />
-              <span>
-                Average response time: <strong>8 mins</strong>
-              </span>
+            <div className="shrink-0 flex items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-emerald-700 text-xs md:text-sm font-semibold border border-emerald-100">
+                <Zap size={16} fill="currentColor" />
+                <span>Fast response</span>
+              </div>
             </div>
           </div>
 
-          {/* Loading / Error */}
-          {loading ? (
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 md:p-8 md:rounded-3xl">
-              <div className="text-stone-700 font-semibold">Loading vets...</div>
-              <div className="text-stone-500 text-sm mt-1">Please wait a moment.</div>
-            </div>
-          ) : errMsg ? (
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 md:p-8 md:rounded-3xl">
-              <div className="text-red-600 font-semibold">{errMsg}</div>
-              <div className="text-stone-500 text-sm mt-2">Try again or check network.</div>
-            </div>
-          ) : sortedVets.length === 0 ? (
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 md:p-8 md:rounded-3xl">
-              <div className="text-stone-700 font-semibold">No vets found.</div>
-              <div className="text-stone-500 text-sm mt-1">Please try again later.</div>
-            </div>
-          ) : (
-            <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-8 lg:grid-cols-3">
-              {sortedVets.map((vet) => {
-                const isSpecialist =
-                  petDetails?.type && vet.specialties?.includes(petDetails.type);
-                const showDayPrice = isDayTime();
-                const priceLabel = showDayPrice
-                  ? "Day consult (8 AM - 8 PM)"
-                  : "Night consult (8 PM - 8 AM)";
-                const priceValue = showDayPrice ? vet.priceDay : vet.priceNight;
+          <div className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 border border-slate-200 shadow-sm text-slate-600">
+            <Clock size={18} />
+            <span className="text-sm md:text-base">
+              Average response time: <strong className="text-slate-900">8 mins</strong>
+            </span>
+          </div>
+        </div>
 
-                return (
-                  <div
-                    key={vet.id}
-                    className="bg-white p-4 rounded-2xl shadow-sm flex flex-col gap-4 relative overflow-hidden transition-all border border-stone-100 hover:shadow-md md:p-7 md:rounded-3xl"
-                  >
-                    <div className="flex gap-4 mt-4 md:mt-10">
-                      <img
-                        src={vet.image}
-                        alt={vet.name}
-                        className="w-16 h-16 rounded-full object-cover border-2 border-stone-50 md:w-16 md:h-16 lg:w-18 lg:h-18"
-                      />
+        {/* States */}
+        {loading ? (
+          <div className="mt-8 grid gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : errMsg ? (
+          <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
+            <div className="text-red-600 font-bold">{errMsg}</div>
+            <div className="text-slate-500 text-sm mt-2">
+              Try again or check network.
+            </div>
+          </div>
+        ) : sortedVets.length === 0 ? (
+          <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
+            <div className="text-slate-900 font-bold">No vets found.</div>
+            <div className="text-slate-500 text-sm mt-2">
+              Please try again later.
+            </div>
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
+            {sortedVets.map((vet) => {
+              const isSpecialist =
+                petDetails?.type && vet.specialties?.includes(petDetails.type);
+
+              const showDayPrice = isDayTime();
+              const priceLabel = showDayPrice
+                ? "Day consult (8 AM - 8 PM)"
+                : "Night consult (8 PM - 8 AM)";
+              const priceValue = showDayPrice ? vet.priceDay : vet.priceNight;
+
+              const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
+              const initials = getInitial(vet.name);
+
+              return (
+                <div
+                  key={vet.id}
+                  className="relative bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg transition-all overflow-hidden"
+                >
+                  <div className="h-[3px] bg-gradient-to-r from-blue-600 to-blue-500" />
+
+                  <div className="p-5 md:p-6 flex flex-col gap-4 min-h-[220px]">
+                    <div className="flex items-start gap-4">
+                      {showImage ? (
+                        <img
+                          src={vet.image}
+                          alt={vet.name}
+                          onError={() => markImageBroken(vet.id)}
+                          className="w-14 h-14 md:w-16 md:h-16 rounded-2xl object-cover border border-slate-200 bg-slate-50"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 text-white flex items-center justify-center text-lg md:text-xl font-extrabold">
+                          {initials}
+                        </div>
+                      )}
 
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-stone-800 text-lg flex items-center gap-2 md:text-xl">
-                          <span className="truncate">{vet.name}</span>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="text-base md:text-lg font-extrabold text-slate-900 truncate">
+                              {vet.name}
+                            </h3>
+                            <p className="mt-0.5 text-xs md:text-sm text-slate-600">
+                              <span className="font-semibold">{vet.qualification}</span>
+                              <span className="text-slate-300 mx-1">*</span>
+                              {vet.experience} yrs exp
+                            </p>
+                          </div>
 
-                          {isSpecialist && (
-                            <span className="shrink-0 text-[10px] bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded font-medium border border-stone-200 md:text-xs md:px-2 md:py-1 md:rounded-lg">
+                          {isSpecialist ? (
+                            <span className="shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] md:text-xs font-semibold text-slate-700">
                               {petDetails?.type === "exotic"
                                 ? "Exotic Specialist"
                                 : `${petDetails?.type} Specialist`}
                             </span>
-                          )}
-                        </h3>
+                          ) : null}
+                        </div>
 
-                        <p className="text-xs text-stone-500 mb-1 md:text-sm">
-                          {vet.qualification} • {vet.experience} yrs exp
-                        </p>
-
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-stone-400 md:text-sm">
+                        <div className="mt-2 flex items-start justify-between gap-3">
+                          <p className="text-xs md:text-sm text-slate-500 leading-5 line-clamp-2">
                             {vet.clinicName}
                           </p>
+
                           <button
                             type="button"
                             onClick={() => setActiveBioVet(vet)}
-                            className="text-xs font-semibold text-[#3998de] hover:underline md:text-sm"
+                            className="shrink-0 whitespace-nowrap text-xs md:text-sm font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
                           >
-                            View bio
+                            View bio <span className="text-blue-400">{">"}</span>
                           </button>
                         </div>
                       </div>
                     </div>
 
-                    <div className="border-t border-stone-100 pt-3 flex items-center justify-between md:pt-5">
-                      <div className="flex flex-col">
-                        <span className="text-lg font-bold text-stone-900 md:text-2xl">
-                          {formatPrice(priceValue)}
-                        </span>
-                        <span className="text-xs text-stone-400 md:text-sm">
-                          {priceLabel}
-                        </span>
-                      </div>
+                    <div className="mt-auto">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xl md:text-2xl font-extrabold text-slate-900 leading-none">
+                            {formatPrice(priceValue)}
+                          </div>
+                          <div className="mt-1 text-[11px] md:text-sm text-slate-500">
+                            {priceLabel}
+                          </div>
+                        </div>
 
-                      <Button
-                        onClick={() => onSelect(vet)}
-                        className="py-2 px-6 text-sm md:py-3 md:px-8 md:text-base md:rounded-2xl bg-stone-800"
-                      >
-                        Consult Now
-                      </Button>
+                        <Button
+                          onClick={() => onSelect(vet)}
+                          className="whitespace-nowrap shrink-0 h-9 md:h-10 px-4 md:px-5 text-xs md:text-sm rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm"
+                        >
+                          Consult Now
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-          <div className="hidden md:block h-10" />
-        </div>
+        <div className="hidden md:block h-10" />
       </div>
 
+      {/* Bio Modal */}
       {activeBioVet ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <p className="text-xs uppercase text-stone-400">Doctor Bio</p>
-                <h3 className="text-lg font-bold text-stone-800 md:text-xl">
+                <p className="text-xs uppercase tracking-wide text-slate-400">
+                  Doctor Bio
+                </p>
+                <h3 className="text-lg font-extrabold text-slate-900 md:text-xl">
                   {activeBioVet.name}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveBioVet(null)}
-                className="rounded-full bg-stone-100 px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-200 md:text-sm"
+                className="rounded-full bg-slate-100 px-4 py-2 text-xs md:text-sm font-semibold text-slate-700 hover:bg-slate-200"
               >
                 Close
               </button>
@@ -355,46 +432,62 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
 
             <div className="max-h-[80vh] overflow-y-auto p-6 md:p-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                <img
-                  src={activeBioVet.image}
-                  alt={activeBioVet.name}
-                  className="h-24 w-24 rounded-2xl object-cover border border-stone-100"
-                />
-                <div className="flex-1 space-y-3">
+                {activeBioVet?.image && !brokenImages.has(activeBioVet.id) ? (
+                  <img
+                    src={activeBioVet.image}
+                    alt={activeBioVet.name}
+                    onError={() => markImageBroken(activeBioVet.id)}
+                    className="h-24 w-24 rounded-2xl object-cover border border-slate-200 bg-slate-50"
+                  />
+                ) : (
+                  <div className="h-24 w-24 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 text-white flex items-center justify-center text-2xl font-extrabold">
+                    {getInitial(activeBioVet?.name)}
+                  </div>
+                )}
+
+                <div className="flex-1 space-y-4">
                   <div>
-                    <div className="text-xs uppercase text-stone-400">Clinic</div>
-                    <div className="text-sm font-semibold text-stone-800">
+                    <div className="text-xs uppercase tracking-wide text-slate-400">
+                      Clinic
+                    </div>
+                    <div className="text-sm font-bold text-slate-900">
                       {activeBioVet.clinicName || "Clinic"}
                     </div>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <div className="text-xs uppercase text-stone-400">
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs uppercase tracking-wide text-slate-400">
                         Qualification
                       </div>
-                      <div className="text-sm text-stone-700">
+                      <div className="mt-1 text-sm text-slate-800 font-semibold">
                         {activeBioVet.qualification || "Not available"}
                       </div>
                     </div>
-                    <div>
-                      <div className="text-xs uppercase text-stone-400">
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs uppercase tracking-wide text-slate-400">
                         Experience
                       </div>
-                      <div className="text-sm text-stone-700">
+                      <div className="mt-1 text-sm text-slate-800 font-semibold">
                         {activeBioVet.experience || 0} years
                       </div>
                     </div>
-                    <div>
-                      <div className="text-xs uppercase text-stone-400">License</div>
-                      <div className="text-sm text-stone-700">
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs uppercase tracking-wide text-slate-400">
+                        License
+                      </div>
+                      <div className="mt-1 text-sm text-slate-700">
                         {activeBioVet.raw?.doctor_license || "Not available"}
                       </div>
                     </div>
-                    <div>
-                      <div className="text-xs uppercase text-stone-400">
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs uppercase tracking-wide text-slate-400">
                         Follow-up
                       </div>
-                      <div className="text-sm text-stone-700">
+                      <div className="mt-1 text-sm text-slate-700">
                         {activeBioVet.followUp || "Not available"}
                       </div>
                     </div>
@@ -403,48 +496,65 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               </div>
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
-                  <div className="text-xs uppercase text-stone-400">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="text-xs uppercase tracking-wide text-slate-400">
                     Specializations
                   </div>
-                  <div className="mt-2 text-sm text-stone-700">
+                  <div className="mt-2 text-sm text-slate-700">
                     {formatList(activeBioVet.specializationList)}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
-                  <div className="text-xs uppercase text-stone-400">Availability</div>
-                  <div className="mt-2 space-y-1 text-sm text-stone-700">
-                    <div>Day response: {activeBioVet.responseDay || "Not available"}</div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="text-xs uppercase tracking-wide text-slate-400">
+                    Availability
+                  </div>
+                  <div className="mt-2 space-y-1 text-sm text-slate-700">
                     <div>
-                      Night response: {activeBioVet.responseNight || "Not available"}
+                      Day response:{" "}
+                      <span className="font-semibold text-slate-900">
+                        {activeBioVet.responseDay || "Not available"}
+                      </span>
+                    </div>
+                    <div>
+                      Night response:{" "}
+                      <span className="font-semibold text-slate-900">
+                        {activeBioVet.responseNight || "Not available"}
+                      </span>
                     </div>
                     <div>
                       Break:{" "}
-                      {activeBioVet.breakTimes?.length
-                        ? activeBioVet.breakTimes.join(", ")
-                        : "No break time"}
+                      <span className="font-semibold text-slate-900">
+                        {activeBioVet.breakTimes?.length
+                          ? activeBioVet.breakTimes.join(", ")
+                          : "No break time"}
+                      </span>
                     </div>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
-                  <div className="text-xs uppercase text-stone-400">Consult Fees</div>
-                  <div className="mt-2 space-y-1 text-sm text-stone-700">
-                    <div>Day (8 AM - 8 PM): {formatPrice(activeBioVet.priceDay)}</div>
-                    <div>
-                      Night (8 PM - 8 AM): {formatPrice(activeBioVet.priceNight)}
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 md:col-span-2">
+                  <div className="text-xs uppercase tracking-wide text-slate-400">
+                    Consult Fees
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2 text-sm text-slate-700">
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                      Day (8 AM - 8 PM):{" "}
+                      <span className="font-extrabold text-slate-900">
+                        {formatPrice(activeBioVet.priceDay)}
+                      </span>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                      Night (8 PM - 8 AM):{" "}
+                      <span className="font-extrabold text-slate-900">
+                        {formatPrice(activeBioVet.priceNight)}
+                      </span>
                     </div>
                   </div>
                 </div>
-                {/* <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
-                  <div className="text-xs uppercase text-stone-400">Contact</div>
-                  <div className="mt-2 space-y-1 text-sm text-stone-700">
-                    <div>Email: {activeBioVet.raw?.doctor_email || "Not available"}</div>
-                    <div>Phone: {activeBioVet.raw?.doctor_mobile || "Not available"}</div>
-                  </div>
-                </div> */}
               </div>
 
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex justify-end gap-3">
                 <Button onClick={() => setActiveBioVet(null)} className="px-6">
                   Close
                 </Button>

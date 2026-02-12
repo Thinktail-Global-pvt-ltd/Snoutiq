@@ -24,9 +24,9 @@ try {
 
     const notificationOptions = {
       body,
-      icon: payload.notification?.icon || "/favicon-192.png",
+      icon: payload.notification?.icon || "/icons/icon-192.png",
       data: payload.data || {},
-      badge: "/favicon-192.png",
+      badge: "/icons/icon-192.png",
     };
 
     self.registration.showNotification(title, notificationOptions);

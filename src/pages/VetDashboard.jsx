@@ -1,6 +1,7 @@
-import React, { lazy, Suspense, useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { loadVetAuth, saveVetAuth } from "../lib/vetAuth";
+import { registerDoctorPush } from "../lib/firebaseMessaging";
 
 const VetDashboardScreen = lazy(() =>
   import("../components/VetScreens").then((m) => ({
@@ -27,6 +28,7 @@ const VetDashboard = () => {
   const location = useLocation();
   const incomingAuth = location.state?.auth;
   const [auth, setAuth] = useState(() => incomingAuth || loadVetAuth());
+  const pushRegisteredRef = useRef(null);
 
   useEffect(() => {
     if (incomingAuth) {
@@ -41,6 +43,31 @@ const VetDashboard = () => {
     if (stored) {
       setAuth(stored);
     }
+  }, [auth]);
+
+  useEffect(() => {
+    const doctorId =
+      auth?.doctor_id ||
+      auth?.doctor?.id ||
+      auth?.doctor?.doctor_id ||
+      auth?.doctor?.doctorId;
+    if (!doctorId) return;
+
+    if (pushRegisteredRef.current === doctorId) {
+      return;
+    }
+    pushRegisteredRef.current = doctorId;
+
+    const authToken =
+      auth?.token ||
+      auth?.access_token ||
+      auth?.doctor?.token ||
+      auth?.doctor?.access_token ||
+      "";
+
+    registerDoctorPush(doctorId, authToken).catch((error) => {
+      console.warn("[FCM] Doctor push registration failed:", error);
+    });
   }, [auth]);
 
   const handleLogin = (payload) => {
