@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\Transaction;
 use App\Models\Doctor;
 use App\Models\DoctorFcmToken;
+use App\Models\DeviceToken;
 use App\Models\CallSession;
 use App\Models\User;
 use App\Models\Pet;
@@ -51,6 +52,7 @@ class PaymentController extends Controller
         $request->validate([
             'amount' => 'nullable|integer|min:1',
             'clinic_id' => 'nullable|integer',
+            'doctor_id' => 'nullable|integer',
             'service_id' => 'nullable|string',
             'order_type' => 'nullable|string',
             'vet_slug' => 'nullable|string',
@@ -92,6 +94,12 @@ class PaymentController extends Controller
                 context: $context
             );
 
+            $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
+                doctorId: $context['doctor_id'] ?? null,
+                notes: $notes,
+                amountInInr: $amountInInr
+            );
+
             // Fire WhatsApp notification only for video consult orders (best-effort)
             $whatsAppMeta = null;
             $vetWhatsAppMeta = null;
@@ -126,6 +134,7 @@ class PaymentController extends Controller
                 'key'      => $this->key,
                 'order'    => $orderArr,
                 'order_id' => $orderArr['id'],
+                'doctor_push' => $doctorOrderPushMeta,
                 'whatsapp' => $whatsAppMeta,
                 'vet_whatsapp' => $vetWhatsAppMeta,
                 'prescription_doc' => $prescriptionDocMeta,
@@ -149,6 +158,54 @@ class PaymentController extends Controller
                 'error'   => $e->getMessage(),
             ], 500);
         }
+    }
+
+    protected function notifyDoctorOrderCreated(?int $doctorId, array $notes, int $amountInInr): array
+    {
+        if (! $doctorId) {
+            return ['sent' => false, 'reason' => 'doctor_missing'];
+        }
+
+        $latestToken = DeviceToken::query()
+            ->where('user_id', $doctorId)
+            ->where('meta->owner_model', Doctor::class)
+            ->whereNotNull('token')
+            ->where('token', '!=', '')
+            ->orderByRaw('COALESCE(last_seen_at, updated_at, created_at) DESC')
+            ->value('token');
+
+        if (! $latestToken) {
+            $latestToken = DeviceToken::query()
+                ->where('user_id', $doctorId)
+                ->whereNotNull('token')
+                ->where('token', '!=', '')
+                ->orderByRaw('COALESCE(last_seen_at, updated_at, created_at) DESC')
+                ->value('token');
+        }
+
+        if (! $latestToken) {
+            return ['sent' => false, 'reason' => 'token_missing'];
+        }
+
+        $title = 'New order created';
+        $body = 'A new consultation order is created and awaiting payment confirmation.';
+
+        $data = [
+            'type' => 'payment_order_created',
+            'order_type' => (string) ($notes['order_type'] ?? ''),
+            'doctor_id' => (string) $doctorId,
+            'amount_inr' => (string) $amountInInr,
+            'deepLink' => '/vet-dashboard',
+        ];
+
+        try {
+            $this->fcm->sendToToken((string) $latestToken, $title, $body, $data);
+        } catch (\Throwable $e) {
+            report($e);
+            return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
+        }
+
+        return ['sent' => true];
     }
 
     // POST /api/rzp/verify
