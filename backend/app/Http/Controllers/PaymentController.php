@@ -18,6 +18,7 @@ use Illuminate\Support\Str;
 use App\Services\WhatsAppService;
 use App\Services\Push\FcmService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Dompdf\Dompdf;
@@ -163,7 +164,7 @@ class PaymentController extends Controller
     protected function notifyDoctorOrderCreated(?int $doctorId, array $notes, int $amountInInr): array
     {
         if (! $doctorId) {
-            return ['sent' => false, 'reason' => 'doctor_missing'];
+            return ['sent' => false, 'reason' => 'doctor_missing', 'doctor_id' => null];
         }
 
         $latestToken = DeviceToken::query()
@@ -184,7 +185,7 @@ class PaymentController extends Controller
         }
 
         if (! $latestToken) {
-            return ['sent' => false, 'reason' => 'token_missing'];
+            return ['sent' => false, 'reason' => 'token_missing', 'doctor_id' => $doctorId];
         }
 
         $title = 'New order created';
@@ -199,13 +200,38 @@ class PaymentController extends Controller
         ];
 
         try {
-            $this->fcm->sendToToken((string) $latestToken, $title, $body, $data);
+            $endpoint = rtrim((string) config('app.url'), '/') . '/api/push/test';
+            $apiResponse = Http::acceptJson()->post($endpoint, [
+                'token' => (string) $latestToken,
+                'title' => $title,
+                'body' => $body,
+                'data' => $data,
+            ]);
+
+            if (! $apiResponse->successful()) {
+                return [
+                    'sent' => false,
+                    'reason' => 'push_api_failed',
+                    'doctor_id' => $doctorId,
+                    'status_code' => $apiResponse->status(),
+                    'response' => $apiResponse->json(),
+                ];
+            }
         } catch (\Throwable $e) {
             report($e);
-            return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
+            return [
+                'sent' => false,
+                'reason' => 'exception',
+                'doctor_id' => $doctorId,
+                'message' => $e->getMessage(),
+            ];
         }
 
-        return ['sent' => true];
+        return [
+            'sent' => true,
+            'doctor_id' => $doctorId,
+            'doctor_name' => Doctor::where('id', $doctorId)->value('doctor_name'),
+        ];
     }
 
     // POST /api/rzp/verify
