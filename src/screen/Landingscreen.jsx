@@ -10,7 +10,6 @@ import blogTickFever from "../assets/images/tickfever.png";
 import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
 import { ArrowRight } from "lucide-react";
 import { Clock, ShieldCheck } from "lucide-react";
-import { InstallCTA, IosInstallHint } from "../components/PwaInstallCTA";
 
 const DOCTOR_PROFILES = [
   {
@@ -23,13 +22,14 @@ const DOCTOR_PROFILES = [
     name: "Dr. Mohd Tosif",
     degree: "B.V.Sc",
     experience: "5+ years of experience",
-    image: doctorSlide2,
+     image: doctorSlide3,
   },
   {
     name: "Dr. Pooja Tarar",
     degree: "M.V.Sc",
     experience: "18+ years of experience",
-    image: doctorSlide3,
+   
+    image: doctorSlide2,
   },
   {
     name: "Dr. Shashannk Goyal",
@@ -167,7 +167,6 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
             </button>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <InstallCTA className="rounded-full px-3 py-1 text-xs whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-sm" />
               <button
                 type="button"
                 onClick={() =>
@@ -228,8 +227,6 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 Consult a Veterinarian
                 <ArrowRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
               </button>
-
-              <IosInstallHint className="mt-4 max-w-md" />
 
               {/* Stats */}
               <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-4">

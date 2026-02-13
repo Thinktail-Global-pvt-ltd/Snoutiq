@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 const API_URL = "https://snoutiq.com/backend/api/exported_from_excell_doctors";
+const BACKEND_BASE = "https://snoutiq.com/backend";
 
 /* ---------------- helpers ---------------- */
 
@@ -20,9 +21,29 @@ const normalizeImageUrl = (value) => {
   if (!value) return "";
   const trimmed = String(value).trim();
   if (!trimmed) return "";
+
   const lower = trimmed.toLowerCase();
   if (lower === "null" || lower === "undefined") return "";
-  return trimmed;
+
+  // ✅ already absolute (http/https/data)
+  if (
+    lower.startsWith("http://") ||
+    lower.startsWith("https://") ||
+    lower.startsWith("data:")
+  ) {
+    return trimmed;
+  }
+
+  // ✅ handle "/photo/..." or "photo/..."
+  let cleaned = trimmed.replace(/^\/+/, "");
+
+  // ✅ avoid backend/backend if API gives "backend/photo/.."
+  if (cleaned.toLowerCase().startsWith("backend/")) {
+    cleaned = cleaned.slice("backend/".length);
+  }
+
+  // ✅ Ensure proper path construction
+  return `${BACKEND_BASE}/${cleaned}`;
 };
 
 const getInitials = (name = "") => {
@@ -114,12 +135,12 @@ const buildVetsFromApi = (apiData = []) => {
         qualification: doc?.degree || "Vet",
         experience: toNumber(doc?.years_of_experience, 0),
 
+        // ✅ important: make sure this becomes full URL
         image: normalizeImageUrl(doc?.doctor_image),
 
         priceDay: toNumber(doc?.video_day_rate, 0),
         priceNight: toNumber(doc?.video_night_rate, 0),
 
-        // not in API -> safe defaults
         rating: 4.6,
         reviews: 178,
         consultations: 120,
@@ -296,6 +317,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               const priceValue = showDayPrice ? vet.priceDay : vet.priceNight;
               const price = formatPrice(priceValue);
 
+              // ✅ IMPORTANT: image will be like https://snoutiq.com/backend/photo/...
               const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
               const initials = getInitials(vet.name);
 
@@ -306,17 +328,16 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                   key={vet.id}
                   className="rounded-3xl border border-slate-200 bg-white shadow-sm hover:shadow-lg transition-all overflow-hidden"
                 >
-                  {/* top accent */}
                   <div className="h-1 bg-gradient-to-r from-teal-500 to-emerald-500" />
 
                   <div className="p-5">
-                    {/* header row */}
                     <div className="flex gap-4">
-                      {/* avatar */}
                       {showImage ? (
                         <img
                           src={vet.image}
                           alt={vet.name}
+                          loading="lazy"
+                          crossOrigin="anonymous"
                           onError={() => markImageBroken(vet.id)}
                           className="h-16 w-16 rounded-2xl object-cover border border-slate-200 bg-slate-50"
                         />
@@ -326,7 +347,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         </div>
                       )}
 
-                      {/* name + meta */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
@@ -351,7 +371,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                             )}
                           </div>
 
-                          {/* rating */}
                           <div className="shrink-0 text-right">
                             <div className="inline-flex items-center gap-1 text-slate-700">
                               <Star size={16} className="text-amber-500" />
@@ -367,9 +386,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       </div>
                     </div>
 
-                    {/* info rows */}
                     <div className="mt-4 space-y-3">
-                      {/* ✅ Education + Experience together */}
                       <InfoRow
                         icon={GraduationCap}
                         label="Education"
@@ -394,7 +411,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       />
                     </div>
 
-                    {/* ✅ Bio preview lines */}
                     {bioPreview ? (
                       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
@@ -406,9 +422,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       </div>
                     ) : null}
 
-                    {/* bottom actions */}
                     <div className="mt-4 flex items-center justify-between gap-3">
-                      {/* ✅ View bio text improved */}
                       <button
                         type="button"
                         onClick={() => setActiveBioVet(vet)}
@@ -417,7 +431,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         View full profile <ChevronRight size={16} />
                       </button>
 
-                      {/* ✅ Price inside button */}
                       <Button
                         onClick={() => onSelect(vet)}
                         className="h-11 px-5 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-sm text-sm inline-flex items-center gap-3"
@@ -444,11 +457,9 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
         <div className="hidden md:block h-10" />
       </div>
 
-      {/* ===================== BIO MODAL (IMPROVED) ===================== */}
       {activeBioVet ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
-            {/* Header */}
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/90 backdrop-blur px-5 py-4 md:px-7">
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wider text-slate-400">
@@ -472,16 +483,16 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               </button>
             </div>
 
-            {/* Body */}
             <div className="max-h-[82vh] overflow-y-auto p-5 md:p-7">
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 md:p-7">
                 <div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-8">
-                  {/* ✅ Bigger image */}
                   <div className="shrink-0">
                     {activeBioVet?.image && !brokenImages.has(activeBioVet.id) ? (
                       <img
                         src={activeBioVet.image}
                         alt={activeBioVet.name}
+                        loading="lazy"
+                        crossOrigin="anonymous"
                         onError={() => markImageBroken(activeBioVet.id)}
                         className="h-36 w-36 md:h-44 md:w-44 rounded-3xl object-cover border border-slate-200 bg-white shadow-sm"
                       />
@@ -492,7 +503,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                     )}
                   </div>
 
-                  {/* Quick info cards */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
@@ -528,7 +538,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       </div>
                     </div>
 
-                    {/* Fees */}
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-slate-200 bg-white p-4">
                         <div className="text-[11px] uppercase tracking-wide text-slate-400">
@@ -563,7 +572,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                   </div>
                 </div>
 
-                {/* Bio + Specialization */}
                 <div className="mt-5 grid gap-4 md:grid-cols-5">
                   <div className="md:col-span-3 rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
                     <div className="text-[11px] uppercase tracking-wider text-slate-400">
@@ -574,7 +582,9 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                     </div>
 
                     <div className="mt-4 text-sm leading-6 text-slate-700 whitespace-pre-line">
-                      {activeBioVet.bio?.trim() ? activeBioVet.bio.trim() : "Bio not available yet."}
+                      {activeBioVet.bio?.trim()
+                        ? activeBioVet.bio.trim()
+                        : "Bio not available yet."}
                     </div>
                   </div>
 
@@ -627,7 +637,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
           </div>
         </div>
       ) : null}
-      {/* =========================================================== */}
     </div>
   );
 };

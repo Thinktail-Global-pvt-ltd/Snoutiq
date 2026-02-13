@@ -8,7 +8,6 @@ import {
   FileText,
   Image,
   Upload,
-  Video,
   Star,
   User,
   Phone,
@@ -148,7 +147,7 @@ const formatPhone = (value) => {
 
 /**
  * ✅ Client-side image compression (web)
- * - Only compresses images (jpeg/png/webp). Video/PDF are sent as-is.
+ * - Only compresses images (jpeg/png/webp). PDFs are sent as-is.
  * - Returns a NEW File (compressed) to append in FormData.
  */
 const compressImageFile = async (
@@ -234,6 +233,23 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     if (!file) return;
 
     setSubmitError("");
+
+    const lowerName = file.name?.toLowerCase() || "";
+    const isVideo =
+      file.type?.startsWith("video/") ||
+      /\.(mp4|mov|avi|mkv|webm)$/i.test(lowerName);
+    if (isVideo) {
+      setSubmitError("Video uploads are not supported. Please upload a photo or PDF.");
+      return;
+    }
+
+    const isImage = file.type?.startsWith("image/");
+    const isPdf =
+      file.type === "application/pdf" || lowerName.endsWith(".pdf");
+    if (!isImage && !isPdf) {
+      setSubmitError("Please upload a JPG, PNG, or PDF file.");
+      return;
+    }
 
     if (file.type?.startsWith("image/")) {
       const url = URL.createObjectURL(file);
@@ -357,20 +373,17 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
   const uploadKind = useMemo(() => {
     if (!uploadFile?.type) return "file";
     if (uploadFile.type.startsWith("image/")) return "image";
-    if (uploadFile.type.startsWith("video/")) return "video";
     if (uploadFile.type === "application/pdf") return "pdf";
     return "file";
   }, [uploadFile]);
   
   const uploadIcon = useMemo(() => {
     if (uploadKind === "image") return <Image className="w-4 h-4" />;
-    if (uploadKind === "video") return <Video className="w-4 h-4" />;
     return <FileText className="w-4 h-4" />;
   }, [uploadKind]);
   
   const uploadLabel = useMemo(() => {
     if (uploadKind === "image") return "Image";
-    if (uploadKind === "video") return "Video";
     if (uploadKind === "pdf") return "PDF";
     return "File";
   }, [uploadKind]);
@@ -402,7 +415,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     if (!details.lastDaysEnergy) return "Please select energy level";
     if (!details.lastDaysAppetite) return "Please select appetite level";
     if (!details.mood) return "Please select mood";
-    if (!details.hasPhoto || !uploadFile) return "Please upload a photo or video";
+    if (!details.hasPhoto || !uploadFile) return "Please upload a photo or PDF";
     return "";
   };
 
@@ -949,7 +962,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         <Camera size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">Photo or Video</h3>
+                        <h3 className="font-semibold text-gray-900 text-lg">Photo or Document</h3>
                         <p className="text-xs text-gray-500">Show us what's happening</p>
                       </div>
                     </div>
@@ -980,7 +993,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           <>
                             <Upload className="w-10 h-10 text-[#3998de] mb-3 md:w-12 md:h-12" />
                             <p className="mb-1 text-sm text-gray-700 font-medium md:text-base">
-                              {isDragging ? "Drop to upload" : "Upload photo or video"}
+                              {isDragging ? "Drop to upload" : "Upload photo or document"}
                             </p>
                           </>
                         )}
@@ -988,7 +1001,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           {isDragging ? "Release to start upload" : "Drag & drop or click to browse"}
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
-                          Supports JPG, PNG, MP4, PDF (max 50MB)
+                          Supports JPG, PNG, PDF (max 50MB)
                         </p>
                       </div>
                     </label>
@@ -1013,7 +1026,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         type="file"
                         className="hidden"
                         onChange={handlePhotoUpload}
-                        accept="image/*,video/*,.pdf"
+                        accept="image/*,.pdf"
                       />
                       <label
                         htmlFor="petUploadGallery"
@@ -1075,8 +1088,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                     )}
 
                     <p className="text-sm text-gray-500 flex items-center gap-2 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
-                      <Video size={16} className="text-[#3998de]" />
-                      <span className="text-xs">💡 Tip: A short 5-10 second video is very helpful for movement issues</span>
+                      <Image size={16} className="text-[#3998de]" />
+                      <span className="text-xs">💡 Tip: Clear, well-lit photos help vets assess faster</span>
                     </p>
                   </section>
 
@@ -1218,7 +1231,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Camera size={14} className="text-gray-500" />
-                            <span className="text-xs font-medium text-gray-500 uppercase">Photo/Video</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase">Photo/Document</span>
                           </div>
                           <span
                             className={[

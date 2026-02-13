@@ -10,6 +10,7 @@ import imageCompression from "browser-image-compression";
 import { Button } from "./Button";
 import { apiBaseUrl, apiPost } from "../lib/api";
 import { clearVetAuth, loadVetAuth, saveVetAuth } from "../lib/vetAuth";
+import { InstallCTA } from "./PwaInstallCTA";
 import {
   ChevronLeft,
   Camera,
@@ -59,31 +60,48 @@ import logo from "../assets/images/logo.png";
 
 // ---------------- UI Helpers ----------------
 
-const VetHeader = ({ onBack, title, subtitle }) => (
+const VetHeader = ({
+  onBack,
+  title,
+  subtitle,
+  logoSrc,
+  logoAlt = "SnoutIQ",
+  actions,
+}) => (
   <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg border-b border-gray-100 shadow-sm">
-    <div className="px-6 py-4 flex items-center md:px-12 lg:px-20 md:py-6">
-      {onBack ? (
-        <button
-          onClick={onBack}
-          className="p-2 -ml-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/30"
-          aria-label="Go back"
-        >
-          <ChevronLeft size={24} />
-        </button>
-      ) : (
-        <div className="w-10" />
-      )}
+    <div className="px-6 py-3 md:px-12 lg:px-20 md:py-4">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+        <div className="flex items-center">
+          {onBack ? (
+            <button
+              onClick={onBack}
+              className="p-2 -ml-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/30"
+              aria-label="Go back"
+            >
+              <ChevronLeft size={24} />
+            </button>
+          ) : (
+            <div className="w-10" />
+          )}
+        </div>
 
-      <div className="flex-1 text-center">
-        <h1 className="font-bold text-xl text-gray-900 md:text-2xl">
-          {title}
-        </h1>
-        {subtitle && (
-          <p className="text-xs text-gray-500 mt-1 md:text-sm">{subtitle}</p>
-        )}
+        <div className="flex items-center justify-center gap-3">
+          <div className="text-center">
+            <h1 className="font-bold text-lg text-gray-900 md:text-xl">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="text-xs text-gray-500 mt-1 md:text-sm">
+                {subtitle}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end">
+          {actions || <div className="w-10" />}
+        </div>
       </div>
-
-      <div className="w-10" />
     </div>
   </div>
 );
@@ -616,14 +634,19 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex flex-col">
-      <VetHeader onBack={onBack} title="Vet Partner Login" subtitle="Welcome back to SnoutIQ" />
+      <VetHeader
+        onBack={onBack}
+        title="Vet Partner Login"
+        subtitle="Welcome back to SnoutIQ"
+        logoSrc={logo}
+        actions={
+          <InstallCTA className="rounded-full px-4 py-2 text-xs whitespace-nowrap sm:text-sm" />
+        }
+      />
 
       <PageWrap>
         <div className="flex-1 px-6 py-6 flex flex-col justify-start max-w-md mx-auto w-full md:max-w-lg md:px-0 md:py-10 md:justify-center">
           <div className="text-center mb-4 md:mb-6">
-            <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-3 shadow-sm">
-              <img src={logo} alt="SnoutIQ" className="w-10 h-10 md:w-12 md:h-12 object-contain" />
-            </div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 tracking-tight">Welcome back, Doctor</h2>
             <p className="text-xs text-gray-500 md:text-sm">Securely access your practice dashboard</p>
           </div>
@@ -838,6 +861,24 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     const hour12 = ((hours + 11) % 12) + 1;
     const period = hours >= 12 ? "PM" : "AM";
     return `${hour12}:${String(minutes).padStart(2, "0")} ${period}`;
+  };
+
+  const openTimePicker = (inputRef) => {
+    if (noBreakTime) return;
+    const input = inputRef?.current;
+    if (!input) return;
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+    input.focus();
+  };
+
+  const handleTimePickerKey = (inputRef) => (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openTimePicker(inputRef);
+    }
   };
 
   const addBreakTime = () => {
@@ -1196,6 +1237,10 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         onBack={onBack} 
         title="Partner Registration" 
         subtitle="Join India's trusted veterinary network" 
+        logoSrc={logo}
+        actions={
+          <InstallCTA className="rounded-full px-4 py-2 text-xs whitespace-nowrap sm:text-sm" />
+        }
       />
 
       <PageWrap>
@@ -1654,8 +1699,18 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-[1fr,1fr,auto] items-center">
-                      <div className="relative">
-                        <Clock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <div
+                        className="relative"
+                        role="button"
+                        tabIndex={noBreakTime ? -1 : 0}
+                        aria-disabled={noBreakTime}
+                        onClick={() => openTimePicker(breakStartRef)}
+                        onKeyDown={handleTimePickerKey(breakStartRef)}
+                      >
+                        <Clock
+                          size={18}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10 pointer-events-none"
+                        />
                         <div className="relative">
                           <span className="block w-full px-4 py-3.5 pl-12 rounded-xl border border-gray-200 bg-gray-50 text-sm">
                             {breakStart ? formatTimeLabel(breakStart) : "Select start time"}
@@ -1666,13 +1721,24 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                             value={breakStart}
                             onChange={(e) => setBreakStart(e.target.value)}
                             disabled={noBreakTime}
+                            aria-label="Break start time"
                             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                           />
                         </div>
                       </div>
 
-                      <div className="relative">
-                        <Clock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <div
+                        className="relative"
+                        role="button"
+                        tabIndex={noBreakTime ? -1 : 0}
+                        aria-disabled={noBreakTime}
+                        onClick={() => openTimePicker(breakEndRef)}
+                        onKeyDown={handleTimePickerKey(breakEndRef)}
+                      >
+                        <Clock
+                          size={18}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10 pointer-events-none"
+                        />
                         <div className="relative">
                           <span className="block w-full px-4 py-3.5 pl-12 rounded-xl border border-gray-200 bg-gray-50 text-sm">
                             {breakEnd ? formatTimeLabel(breakEnd) : "Select end time"}
@@ -1683,6 +1749,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                             value={breakEnd}
                             onChange={(e) => setBreakEnd(e.target.value)}
                             disabled={noBreakTime}
+                            aria-label="Break end time"
                             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                           />
                         </div>
