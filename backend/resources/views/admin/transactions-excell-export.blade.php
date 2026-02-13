@@ -40,6 +40,7 @@
                                     <th>Doctor</th>
                                     <th>User</th>
                                     <th>Pet</th>
+                                    <th>Details</th>
                                     <th class="text-nowrap">Manual WhatsApp</th>
                                 </tr>
                             </thead>
@@ -51,7 +52,10 @@
                                         $parentPhone = $txn->user->phone ?? 'N/A';
                                         $petName = $txn->pet->name ?? 'Pet';
                                         $petType = $txn->pet->pet_type ?? $txn->pet->type ?? $txn->pet->breed ?? 'Pet';
-                                        $issue = $txn->metadata['issue'] ?? $txn->metadata['concern'] ?? $txn->pet->reported_symptom ?? 'N/A';
+                                        $issue = trim((string) ($txn->pet->reported_symptom ?? ''));
+                                        if ($issue === '') {
+                                            $issue = 'N/A';
+                                        }
                                         $responseMinutes = (int) ($txn->metadata['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
                                         $amountInr = $formatInr($txn->amount_paise);
                                         $parentMsg = "Hi {$parentName}, your {$petType} {$petName} is booked with {$doctorName}. They'll respond within {$responseMinutes} minutes. Amount paid ₹{$amountInr}. Vet: {$doctorName}. - SnoutIQ";
@@ -88,6 +92,23 @@
                                                 <div class="text-muted small">Breed: {{ $txn->pet->breed ?? 'n/a' }}</div>
                                             @endif
                                         </td>
+                                        <td>
+                                            @if($txn->pet_id && $txn->user_id)
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-dark"
+                                                    data-action="view-details"
+                                                    data-pet-id="{{ $txn->pet_id }}"
+                                                    data-user-id="{{ $txn->user_id }}"
+                                                    data-pet-name="{{ $txn->pet->name ?? 'Pet' }}"
+                                                    data-transaction-id="{{ $txn->id }}"
+                                                >
+                                                    View Details
+                                                </button>
+                                            @else
+                                                <span class="text-muted small">Unavailable</span>
+                                            @endif
+                                        </td>
                                         <td class="text-nowrap">
                                             <div class="mb-2">
                                                 <label class="form-label mb-1 small text-muted">Parent msg</label>
@@ -114,10 +135,124 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="petTimelineModal" tabindex="-1" aria-labelledby="petTimelineModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="petTimelineModalLabel">Pet Timeline</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="petTimelineMeta" class="small text-muted mb-3"></div>
+                <div id="petTimelineContent" class="small text-muted">Click "View Details" to load timeline.</div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
+    const timelinePathPrefix = (() => {
+        const path = window.location.pathname || '';
+        if (path.startsWith('/backend/')) return '/backend';
+        if (path === '/backend' || path === '/backend/') return '/backend';
+        return '';
+    })();
+    const TIMELINE_API_URL = `${window.location.origin}${timelinePathPrefix}/api/pets/consult-timeline`;
+    const timelineModalEl = document.getElementById('petTimelineModal');
+    const timelineTitleEl = document.getElementById('petTimelineModalLabel');
+    const timelineMetaEl = document.getElementById('petTimelineMeta');
+    const timelineContentEl = document.getElementById('petTimelineContent');
+    const timelineModal = timelineModalEl ? new bootstrap.Modal(timelineModalEl) : null;
+
+    function escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value).replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
+    function formatTimelineDate(value) {
+        if (!value) return '—';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '—';
+        return date.toLocaleString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function sourceBadgeClass(source) {
+        if (source === 'appointments') return 'text-bg-warning';
+        if (source === 'transactions') return 'text-bg-info';
+        if (source === 'prescriptions') return 'text-bg-success';
+        return 'text-bg-secondary';
+    }
+
+    function sourceLabel(source) {
+        if (source === 'appointments') return 'Appointment';
+        if (source === 'transactions') return 'Transaction';
+        if (source === 'prescriptions') return 'Prescription';
+        return 'Record';
+    }
+
+    function summaryHtml(entry) {
+        const record = entry?.record || {};
+        if (entry?.source === 'transactions') {
+            const amountPaise = Number(record.amount_paise || 0);
+            const amountInr = Number.isFinite(amountPaise) ? (amountPaise / 100).toFixed(2) : '0.00';
+            return `
+                <div>Status: <strong>${escapeHtml(record.status || 'n/a')}</strong></div>
+                <div>Type: <strong>${escapeHtml(record.type || 'n/a')}</strong></div>
+                <div>Amount: <strong>₹${escapeHtml(amountInr)}</strong></div>
+            `;
+        }
+        if (entry?.source === 'appointments') {
+            return `
+                <div>Status: <strong>${escapeHtml(record.status || 'n/a')}</strong></div>
+                <div>Scheduled: <strong>${escapeHtml(record.schedule_time || record.scheduled_for || '—')}</strong></div>
+                <div>Doctor ID: <strong>${escapeHtml(record.doctor_id || '—')}</strong></div>
+            `;
+        }
+        if (entry?.source === 'prescriptions') {
+            return `
+                <div>Doctor ID: <strong>${escapeHtml(record.doctor_id || '—')}</strong></div>
+                <div>Prescription ID: <strong>#${escapeHtml(record.id || entry.record_id || '—')}</strong></div>
+            `;
+        }
+        return `<div>Record ID: <strong>#${escapeHtml(entry?.record_id || '—')}</strong></div>`;
+    }
+
+    function renderTimeline(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+            timelineContentEl.innerHTML = '<div class="text-muted">No timeline events found for this pet/user pair.</div>';
+            return;
+        }
+
+        timelineContentEl.innerHTML = `
+            <div class="d-flex flex-column gap-2">
+                ${data.map((entry) => `
+                    <div class="border rounded p-2">
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                            <span class="badge ${sourceBadgeClass(entry?.source)}">${escapeHtml(sourceLabel(entry?.source))}</span>
+                            <span class="text-muted">${escapeHtml(formatTimelineDate(entry?.created_at))}</span>
+                        </div>
+                        ${summaryHtml(entry)}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
     function copyTemplate(btn) {
         const text = btn.getAttribute('data-body') || '';
         navigator.clipboard.writeText(text).then(() => {
@@ -132,5 +267,47 @@
             }, 1200);
         }).catch(() => alert('Copy failed, please copy manually.'));
     }
+
+    document.addEventListener('click', async (event) => {
+        const btn = event.target.closest('[data-action="view-details"]');
+        if (!btn) return;
+
+        const petId = btn.getAttribute('data-pet-id');
+        const userId = btn.getAttribute('data-user-id');
+        const petName = btn.getAttribute('data-pet-name') || 'Pet';
+        const transactionId = btn.getAttribute('data-transaction-id') || '—';
+
+        if (!petId || !userId || !timelineModal) {
+            alert('Pet details unavailable for this row.');
+            return;
+        }
+
+        timelineTitleEl.textContent = `${petName} Timeline`;
+        timelineMetaEl.textContent = `Transaction #${transactionId} | Pet ID: ${petId} | User ID: ${userId}`;
+        timelineContentEl.innerHTML = '<div class="text-muted">Loading timeline...</div>';
+        timelineModal.show();
+
+        btn.disabled = true;
+        try {
+            const query = new URLSearchParams({ pet_id: String(petId), user_id: String(userId) });
+            const response = await fetch(`${TIMELINE_API_URL}?${query.toString()}`, {
+                credentials: 'include',
+            });
+
+            if (!response.ok) {
+                throw new Error(`Timeline fetch failed (${response.status})`);
+            }
+
+            const payload = await response.json();
+            const timeline = payload?.data?.timeline || [];
+            const counts = payload?.counts || {};
+            timelineMetaEl.textContent = `Transaction #${transactionId} | Pet ID: ${petId} | User ID: ${userId} | Appointments: ${counts.appointments || 0}, Transactions: ${counts.transactions || 0}, Prescriptions: ${counts.prescriptions || 0}`;
+            renderTimeline(timeline);
+        } catch (error) {
+            timelineContentEl.innerHTML = `<div class="text-danger">Unable to load timeline. ${escapeHtml(error?.message || '')}</div>`;
+        } finally {
+            btn.disabled = false;
+        }
+    });
 </script>
 @endpush
