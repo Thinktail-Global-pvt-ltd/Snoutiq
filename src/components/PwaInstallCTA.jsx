@@ -1,13 +1,86 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { usePwaInstall } from "../usePwaInstall";
 import { isIos, isInStandaloneMode } from "../iosPwa";
 
+const INSTALL_FLAG_KEY = "snoutiq_pwa_installed";
+
+const readInstallFlag = () => {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(INSTALL_FLAG_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+const writeInstallFlag = () => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(INSTALL_FLAG_KEY, "1");
+  } catch {
+    // ignore storage errors
+  }
+};
+
+const usePwaInstalled = () => {
+  const [hasInstalled, setHasInstalled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return isInStandaloneMode() || readInstallFlag();
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncInstalled = () => {
+      const standalone = isInStandaloneMode();
+      if (standalone) writeInstallFlag();
+      setHasInstalled(standalone || readInstallFlag());
+    };
+
+    syncInstalled();
+
+    const onAppInstalled = () => {
+      writeInstallFlag();
+      setHasInstalled(true);
+    };
+
+    window.addEventListener("appinstalled", onAppInstalled);
+
+    const mql = window.matchMedia("(display-mode: standalone)");
+    const onChange = () => syncInstalled();
+    if (mql?.addEventListener) {
+      mql.addEventListener("change", onChange);
+    } else if (mql?.addListener) {
+      mql.addListener(onChange);
+    }
+
+    return () => {
+      window.removeEventListener("appinstalled", onAppInstalled);
+      if (mql?.removeEventListener) {
+        mql.removeEventListener("change", onChange);
+      } else if (mql?.removeListener) {
+        mql.removeListener(onChange);
+      }
+    };
+  }, []);
+
+  const markInstalled = () => {
+    writeInstallFlag();
+    setHasInstalled(true);
+  };
+
+  return { hasInstalled, markInstalled };
+};
+
 export function InstallCTA({ className = "" }) {
   const { canInstall, promptInstall } = usePwaInstall();
-  const isIosDevice = typeof window !== "undefined" && isIos();
-  const isStandalone = typeof window !== "undefined" && isInStandaloneMode();
+  const { hasInstalled, markInstalled } = usePwaInstalled();
+
+  if (hasInstalled) return null;
 
   const onClick = async () => {
+    const isIosDevice = typeof window !== "undefined" && isIos();
+    const isStandalone = typeof window !== "undefined" && isInStandaloneMode();
     if (isIosDevice && !isStandalone) {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         try {
@@ -27,7 +100,8 @@ export function InstallCTA({ className = "" }) {
       alert("Install option browser criteria ke baad enable hota hai.");
       return;
     }
-    await promptInstall();
+    const accepted = await promptInstall();
+    if (accepted) markInstalled();
   };
 
   return (
@@ -47,8 +121,10 @@ export function InstallCTA({ className = "" }) {
 }
 
 export function IosInstallHint({ className = "" }) {
+  const { hasInstalled } = usePwaInstalled();
+
   if (typeof window === "undefined") return null;
-  if (!isIos() || isInStandaloneMode()) return null;
+  if (!isIos() || isInStandaloneMode() || hasInstalled) return null;
 
   return (
     <div

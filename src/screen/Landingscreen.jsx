@@ -193,13 +193,13 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 ⭐ Trusted by 100+ Pet Parents in India
               </div>
 
-              <h1 className="mt-4 text-3xl font-extrabold leading-tight text-slate-900 md:text-4xl lg:text-[44px]">
+              <h1 className="mt-4 text-3xl font-extrabold leading-[1.4] text-slate-900 md:text-4xl lg:text-[44px]">
                 Connect with a{" "}
                 <span className="text-[#3998de]">Verified Veterinarian</span> in less than
                 15 minutes.
               </h1>
 
-              <p className="mt-4 text-base text-slate-500 md:text-lg">
+              <p className="mt-4 text-base leading-relaxed text-slate-500 md:text-lg">
                 Professional video consultations for your pet&apos;s health concerns.
                 Get expert guidance from licensed veterinarians across India.
               </p>
