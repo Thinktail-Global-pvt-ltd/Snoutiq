@@ -1960,6 +1960,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const prescriptionSuccessTimer = useRef(null);
   const [docPreviewUrl, setDocPreviewUrl] = useState("");
   const [docZoom, setDocZoom] = useState(DOC_ZOOM_MIN);
+  const [observationImages, setObservationImages] = useState([]);
+  const [observationLoading, setObservationLoading] = useState(false);
+  const [observationError, setObservationError] = useState("");
   const refreshTimerRef = useRef(null);
   const isFirstLoadRef = useRef(true);
   const [prescriptionForm, setPrescriptionForm] = useState({
@@ -2084,6 +2087,11 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     /^data:image\//i.test(url || "") ||
     /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url || "");
 
+  const getObservationImageUrl = (observation) => {
+    const raw = observation?.image_blob_url || observation?.image_url || "";
+    return toDocUrl(raw);
+  };
+
   const statusClass = (status) => {
     const key = (status || "").toLowerCase();
     if (key === "pending") return "bg-amber-50 text-amber-700 border-amber-200";
@@ -2138,6 +2146,58 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
         clinicIdRaw || normalizeId(metadata?.clinic_id || notes?.clinic_id),
     };
   };
+
+  useEffect(() => {
+    if (!showPatientModal || !activeTransaction) {
+      setObservationImages([]);
+      setObservationLoading(false);
+      setObservationError("");
+      return;
+    }
+
+    const { userId, petId } = resolveTransactionIds(activeTransaction);
+    if (!userId || !petId) {
+      setObservationImages([]);
+      setObservationLoading(false);
+      setObservationError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const url = `${apiBaseUrl()}/api/user-per-observationss?pet_id=${encodeURIComponent(
+      petId
+    )}&user_id=${encodeURIComponent(userId)}&limit=20`;
+
+    setObservationLoading(true);
+    setObservationError("");
+
+    fetch(url, { signal: controller.signal })
+      .then((res) => res.json())
+      .then((data) => {
+        const observations = data?.data?.observations || data?.observations || [];
+        const images = observations
+          .map((obs) => {
+            const imageUrl = getObservationImageUrl(obs);
+            if (!imageUrl) return null;
+            return {
+              id: obs?.id || imageUrl,
+              url: imageUrl,
+              name: obs?.image_name || "",
+              timestamp: obs?.timestamp || obs?.created_at || "",
+              notes: obs?.notes || "",
+            };
+          })
+          .filter(Boolean);
+        setObservationImages(images);
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") return;
+        setObservationError("Unable to load observation images.");
+      })
+      .finally(() => setObservationLoading(false));
+
+    return () => controller.abort();
+  }, [showPatientModal, activeTransaction]);
 
   const resetPrescriptionForm = () => {
     setPrescriptionForm({
@@ -2795,6 +2855,47 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 <div className="bg-gray-50 rounded-xl p-4 mb-4">
                   <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Reported Symptoms</h4>
                   <p className="text-gray-700">{activeTransaction.pet.reported_symptom}</p>
+                </div>
+              )}
+
+              {(observationLoading || observationError || observationImages.length > 0) && (
+                <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Observation Images</h4>
+                  {observationLoading ? (
+                    <p className="text-sm text-gray-500">Loading observation images...</p>
+                  ) : observationError ? (
+                    <p className="text-sm text-rose-600">{observationError}</p>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {observationImages.map((image) => (
+                        <button
+                          key={image.id}
+                          type="button"
+                          onClick={() => handleDocPreview(image.url)}
+                          className="text-left rounded-2xl border border-gray-200 bg-white p-3 transition hover:border-[#0B4D67]/40 hover:shadow-sm"
+                        >
+                          <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                            <img
+                              src={image.url}
+                              alt={image.name || "Observation image"}
+                              className="h-40 w-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                          {image.timestamp ? (
+                            <p className="mt-2 text-xs text-gray-500">
+                              {formatDate(image.timestamp)}
+                            </p>
+                          ) : null}
+                          {image.notes ? (
+                            <p className="mt-1 text-sm text-gray-700 line-clamp-2">
+                              {image.notes}
+                            </p>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
