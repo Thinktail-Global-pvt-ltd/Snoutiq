@@ -1146,6 +1146,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         doctor_mobile: form.whatsappNumber.trim(),
         doctor_license: form.doctorLicense.trim(),
         doctor_image: trimmedImageUrl || undefined,
+        bio: form.shortIntro.trim(),
         degree: degreeReady,
         years_of_experience: form.yearsOfExperience.trim(),
         specialization_select_all_that_apply: selectedSpecs,
