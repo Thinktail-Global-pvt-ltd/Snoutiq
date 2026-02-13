@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
 import { Header, PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
@@ -215,8 +215,11 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
   const [dogBreeds, setDogBreeds] = useState([]);
   const [catBreeds, setCatBreeds] = useState([]);
+  const [breedSearch, setBreedSearch] = useState("");
+  const [breedDropdownOpen, setBreedDropdownOpen] = useState(false);
   const [loadingBreeds, setLoadingBreeds] = useState(false);
   const [breedError, setBreedError] = useState("");
+  const breedDropdownRef = useRef(null);
 
   const applyUploadFile = async (file) => {
     if (!file) return;
@@ -386,6 +389,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       setCatBreeds([]);
     }
 
+    setBreedSearch("");
+    setBreedDropdownOpen(false);
+
     if (details.type === "exotic") {
       setDetails((p) => ({ ...p, breed: "" }));
     } else {
@@ -393,11 +399,43 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     }
   }, [details.type]);
 
+  useEffect(() => {
+    if (!breedDropdownOpen) return;
+    const handleClick = (event) => {
+      if (
+        breedDropdownRef.current &&
+        !breedDropdownRef.current.contains(event.target)
+      ) {
+        setBreedDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [breedDropdownOpen]);
+
   const breedOptions = useMemo(() => {
     if (details.type === "dog") return dogBreeds;
     if (details.type === "cat") return catBreeds;
     return [];
   }, [details.type, dogBreeds, catBreeds]);
+
+  const filteredBreedOptions = useMemo(() => {
+    const term = breedSearch.trim().toLowerCase();
+    if (!term) return breedOptions;
+    const filtered = breedOptions.filter((b) =>
+      String(b?.label || "").toLowerCase().includes(term)
+    );
+    if (details.breed && !filtered.some((b) => b.value === details.breed)) {
+      const selected = breedOptions.find((b) => b.value === details.breed);
+      if (selected) return [selected, ...filtered];
+    }
+    return filtered;
+  }, [breedOptions, breedSearch, details.breed]);
+
+  const selectedBreedLabel = useMemo(() => {
+    if (!details.breed) return "";
+    return breedOptions.find((b) => b.value === details.breed)?.label || "";
+  }, [details.breed, breedOptions]);
 
   const showBreed = details.type === "dog" || details.type === "cat";
   const isExotic = details.type === "exotic";
@@ -747,29 +785,68 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                             Breed <span className="text-red-500">*</span>
                           </label>
 
-                          <div className="relative">
-                            <select
-                              value={details.breed}
-                              onChange={(e) =>
-                                setDetails((p) => ({ ...p, breed: e.target.value }))
+                          <div className="relative" ref={breedDropdownRef}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                !loadingBreeds && breedOptions.length
+                                  ? setBreedDropdownOpen((prev) => !prev)
+                                  : null
                               }
+                              className={`${selectBase} text-left`}
                               disabled={loadingBreeds || breedOptions.length === 0}
-                              className={selectBase}
                             >
-                              <option value="">
-                                  {loadingBreeds
-                                    ? `Loading ${details.type} breeds...`
-                                    : `Select ${details.type} breed`}
-                              </option>
-                              {breedOptions.map((b) => (
-                                <option key={b.value} value={b.value}>
-                                  {b.label}
-                                </option>
-                              ))}
-                            </select>
+                              {loadingBreeds
+                                ? `Loading ${details.type} breeds...`
+                                : selectedBreedLabel || `Select ${details.type} breed`}
+                            </button>
                             <ChevronDown
                               className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
                             />
+
+                            {breedDropdownOpen ? (
+                              <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
+                                <div className="p-2 border-b border-gray-100">
+                                  <input
+                                    type="text"
+                                    value={breedSearch}
+                                    onChange={(e) => setBreedSearch(e.target.value)}
+                                    placeholder={`Search ${details.type} breeds`}
+                                    className={fieldBase}
+                                    autoFocus
+                                  />
+                                </div>
+                                <div className="max-h-56 overflow-auto">
+                                  {filteredBreedOptions.length ? (
+                                    filteredBreedOptions.map((b) => (
+                                      <button
+                                        key={b.value}
+                                        type="button"
+                                        onClick={() => {
+                                          setDetails((p) => ({
+                                            ...p,
+                                            breed: b.value,
+                                          }));
+                                          setBreedDropdownOpen(false);
+                                          setBreedSearch("");
+                                        }}
+                                        className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
+                                          details.breed === b.value
+                                            ? "bg-gray-50 font-semibold text-gray-900"
+                                            : "text-gray-700"
+                                        }`}
+                                      >
+                                        {b.label}
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className="px-4 py-2 text-sm text-gray-500">
+                                      No breeds found
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
 
                           {breedError && (
