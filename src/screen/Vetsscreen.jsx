@@ -25,6 +25,13 @@ const normalizeImageUrl = (value) => {
   const lower = trimmed.toLowerCase();
   if (lower === "null" || lower === "undefined") return "";
 
+  if (lower.includes("https://snoutiq.com/https://snoutiq.com/")) {
+    return trimmed.replace(
+      "https://snoutiq.com/https://snoutiq.com/",
+      "https://snoutiq.com/"
+    );
+  }
+
   // ✅ already absolute (http/https/data)
   if (
     lower.startsWith("http://") ||
@@ -45,6 +52,9 @@ const normalizeImageUrl = (value) => {
   // ✅ Ensure proper path construction
   return `${BACKEND_BASE}/${cleaned}`;
 };
+
+const getDoctorImageSource = (doc) =>
+  doc?.doctor_image_blob_url || doc?.doctor_image_url || doc?.doctor_image || "";
 
 const getInitials = (name = "") => {
   const s = String(name).trim();
@@ -135,8 +145,8 @@ const buildVetsFromApi = (apiData = []) => {
         qualification: doc?.degree || "Vet",
         experience: toNumber(doc?.years_of_experience, 0),
 
-        // ✅ important: make sure this becomes full URL
-        image: normalizeImageUrl(doc?.doctor_image),
+        // ✅ use blob endpoint when available, fallback to other URL fields
+        image: normalizeImageUrl(getDoctorImageSource(doc)),
 
         priceDay: toNumber(doc?.video_day_rate, 0),
         priceNight: toNumber(doc?.video_night_rate, 0),
