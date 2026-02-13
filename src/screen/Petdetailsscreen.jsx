@@ -25,18 +25,6 @@ import {
   Clock,
 } from "lucide-react";
 
-const CAT_BREEDS = [
-  { label: "Indian Street Cat", value: "indian_street_cat" },
-  { label: "Persian", value: "persian" },
-  { label: "Siamese", value: "siamese" },
-  { label: "Maine Coon", value: "maine_coon" },
-  { label: "Bengal", value: "bengal" },
-  { label: "Ragdoll", value: "ragdoll" },
-  { label: "British Shorthair", value: "british_shorthair" },
-  { label: "Sphynx", value: "sphynx" },
-  { label: "Mixed / Other", value: "other" },
-];
-
 const ENERGY_OPTIONS = [
   { label: "Normal", value: "normal" },
   { label: "Lower than usual", value: "low" },
@@ -226,6 +214,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
   const [submitError, setSubmitError] = useState("");
 
   const [dogBreeds, setDogBreeds] = useState([]);
+  const [catBreeds, setCatBreeds] = useState([]);
   const [loadingBreeds, setLoadingBreeds] = useState(false);
   const [breedError, setBreedError] = useState("");
 
@@ -346,11 +335,55 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       }
     };
 
-    if (details.type === "dog") fetchDogBreeds();
+    const fetchCatBreeds = async () => {
+      setBreedError("");
+      setLoadingBreeds(true);
+
+      try {
+        const res = await fetch("https://api.thecatapi.com/v1/breeds", {
+          method: "GET",
+        });
+        const data = await res.json();
+
+        if (Array.isArray(data) && data.length) {
+          const list = data
+            .map((breed) => ({
+              label: breed?.name || "Unknown",
+              value: breed?.name || breed?.id || "unknown",
+            }))
+            .filter((item) => item.label);
+
+          list.sort((a, b) => a.label.localeCompare(b.label));
+          list.push({ label: "Mixed / Other", value: "other" });
+
+          setCatBreeds(list);
+        } else {
+          setCatBreeds([{ label: "Mixed / Other", value: "other" }]);
+          setBreedError("Could not load cat breeds (using defaults).");
+        }
+      } catch (err) {
+        setCatBreeds([{ label: "Mixed / Other", value: "other" }]);
+        setBreedError("Network error while loading cat breeds.");
+      } finally {
+        setLoadingBreeds(false);
+      }
+    };
+
+    if (details.type === "dog") {
+      fetchDogBreeds();
+    } else if (details.type === "cat") {
+      fetchCatBreeds();
+    } else {
+      setBreedError("");
+      setLoadingBreeds(false);
+    }
 
     if (details.type !== "dog") {
       setDogBreeds([]);
-      setBreedError("");
+    }
+
+    if (details.type !== "cat") {
+      setCatBreeds([]);
     }
 
     if (details.type === "exotic") {
@@ -362,9 +395,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
   const breedOptions = useMemo(() => {
     if (details.type === "dog") return dogBreeds;
-    if (details.type === "cat") return CAT_BREEDS;
+    if (details.type === "cat") return catBreeds;
     return [];
-  }, [details.type, dogBreeds]);
+  }, [details.type, dogBreeds, catBreeds]);
 
   const showBreed = details.type === "dog" || details.type === "cat";
   const isExotic = details.type === "exotic";
@@ -720,16 +753,13 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                               onChange={(e) =>
                                 setDetails((p) => ({ ...p, breed: e.target.value }))
                               }
-                              disabled={
-                                (details.type === "dog" && loadingBreeds) ||
-                                breedOptions.length === 0
-                              }
+                              disabled={loadingBreeds || breedOptions.length === 0}
                               className={selectBase}
                             >
                               <option value="">
-                                {details.type === "dog" && loadingBreeds
-                                  ? "Loading dog breeds..."
-                                  : `Select ${details.type} breed`}
+                                  {loadingBreeds
+                                    ? `Loading ${details.type} breeds...`
+                                    : `Select ${details.type} breed`}
                               </option>
                               {breedOptions.map((b) => (
                                 <option key={b.value} value={b.value}>

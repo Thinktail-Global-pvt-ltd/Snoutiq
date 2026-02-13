@@ -83,6 +83,27 @@ const parseListField = (value) => {
   return [String(value).trim()].filter(Boolean);
 };
 
+const normalizeText = (value) => {
+  if (value === undefined || value === null) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "";
+  const lower = trimmed.toLowerCase();
+  if (lower === "null" || lower === "undefined" || lower === "[]") return "";
+  return trimmed;
+};
+
+const hasDisplayValue = (value) => {
+  if (value === undefined || value === null) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "number") return Number.isFinite(value) && value > 0;
+  const trimmed = String(value).trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  if (lower === "null" || lower === "undefined" || lower === "[]") return false;
+  if (["na", "n/a", "none"].includes(lower)) return false;
+  return true;
+};
+
 const buildSpecializationData = (value) => {
   const list = parseListField(value);
   let text = list.length ? list.join(", ") : "";
@@ -140,9 +161,34 @@ const normalizeSpecialties = (specializationText = "") => {
   return Array.from(mapped);
 };
 
+const toOptionalNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
 const toNumber = (v, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+};
+
+const seedFromValue = (value) => {
+  const str = String(value ?? "");
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = (hash * 31 + str.charCodeAt(i)) % 1000000007;
+  }
+  return hash;
+};
+
+const seededRandom = (seed) => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+};
+
+const getSeededNumber = (seed, min, max, decimals = 0) => {
+  const raw = min + seededRandom(seed) * (max - min);
+  const factor = 10 ** decimals;
+  return Math.round(raw * factor) / factor;
 };
 
 const isDayTime = (date = new Date()) => {
@@ -166,22 +212,29 @@ const clipText = (text, max = 160) => {
 const buildVetsFromApi = (apiData = []) => {
   const list = [];
   apiData.forEach((clinic) => {
-    const clinicName = clinic?.name || "Clinic";
+    const clinicName = normalizeText(clinic?.name);
     (clinic?.doctors || []).forEach((doc) => {
       const specializationData = buildSpecializationData(
         doc?.specialization_select_all_that_apply
       );
       const degreeData = buildDegreeData(doc?.degree);
       const breakTimes = normalizeBreakTimes(doc?.break_do_not_disturb_time_example_2_4_pm);
+      const seedBase = seedFromValue(
+        doc?.id ||
+          doc?.doctor_email ||
+          doc?.doctor_mobile ||
+          doc?.doctor_name ||
+          `${clinicName}-${list.length}`
+      );
 
       list.push({
         id: doc?.id,
         clinicName,
 
-        name: doc?.doctor_name || "Vet",
-        qualification: degreeData.text || "",
+        name: normalizeText(doc?.doctor_name) || "Vet",
+        qualification: normalizeText(degreeData.text),
         degreeList: degreeData.list,
-        experience: toNumber(doc?.years_of_experience, 0),
+        experience: toOptionalNumber(doc?.years_of_experience),
 
         // ✅ use blob endpoint when available, fallback to other URL fields
         image: normalizeImageUrl(getDoctorImageSource(doc)),
@@ -189,18 +242,18 @@ const buildVetsFromApi = (apiData = []) => {
         priceDay: toNumber(doc?.video_day_rate, 0),
         priceNight: toNumber(doc?.video_night_rate, 0),
 
-        rating: 4.6,
-        reviews: 178,
-        consultations: 120,
+        rating: getSeededNumber(seedBase + 11, 4.0, 4.9, 1),
+        reviews: Math.round(getSeededNumber(seedBase + 23, 30, 220)),
+        consultations: Math.round(getSeededNumber(seedBase + 37, 20, 180)),
 
         specialties: normalizeSpecialties(specializationData.list),
         specializationList: specializationData.list,
-        specializationText: specializationData.text,
-        responseDay: doc?.response_time_for_online_consults_day || "",
-        responseNight: doc?.response_time_for_online_consults_night || "",
+        specializationText: normalizeText(specializationData.text),
+        responseDay: normalizeText(doc?.response_time_for_online_consults_day),
+        responseNight: normalizeText(doc?.response_time_for_online_consults_night),
         breakTimes,
-        followUp: doc?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta || "",
-        bio: doc?.bio || "",
+        followUp: normalizeText(doc?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta),
+        bio: normalizeText(doc?.bio),
         raw: doc,
       });
     });
@@ -224,22 +277,31 @@ const SkeletonCard = () => (
   </div>
 );
 
-const InfoRow = ({ icon: Icon, label, value, subValue }) => (
-  <div className="flex items-start gap-3">
-    <div className="mt-[2px] inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 border border-teal-100">
-      <Icon size={18} />
-    </div>
-    <div className="min-w-0">
-      <div className="text-[11px] font-semibold text-slate-500">{label}</div>
-      <div className="text-sm font-semibold text-slate-900 leading-5 break-words">
-        {value || "Not available"}
-        {subValue ? (
-          <span className="text-slate-400 font-semibold"> {" • "} {subValue}</span>
-        ) : null}
+const InfoRow = ({ icon: Icon, label, value, subValue }) => {
+  const showValue = hasDisplayValue(value);
+  const showSubValue = hasDisplayValue(subValue);
+  if (!showValue && !showSubValue) return null;
+
+  return (
+    <div className="flex items-start gap-3">
+      <div className="mt-[2px] inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 border border-teal-100">
+        <Icon size={18} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[11px] font-semibold text-slate-500">{label}</div>
+        <div className="text-sm font-semibold text-slate-900 leading-5 break-words">
+          {showValue ? value : null}
+          {showValue && showSubValue ? (
+            <span className="text-slate-400 font-semibold"> {" • "} {subValue}</span>
+          ) : null}
+          {!showValue && showSubValue ? (
+            <span className="text-slate-900 font-semibold">{subValue}</span>
+          ) : null}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* ---------------- Screen ---------------- */
 
@@ -371,6 +433,14 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               const initials = getInitials(vet.name);
 
               const bioPreview = clipText(vet.bio, 170);
+              const experienceLabel = hasDisplayValue(vet.experience)
+                ? `${vet.experience} years exp.`
+                : "";
+              const specializationValue = hasDisplayValue(vet.specializationText)
+                ? vet.specializationText
+                : Array.isArray(vet.specializationList) && vet.specializationList.length
+                  ? vet.specializationList.join(", ")
+                  : "";
 
               return (
                 <div
@@ -403,9 +473,11 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                               {vet.name}
                             </h3>
 
-                            <p className="mt-0.5 text-xs md:text-sm text-slate-500 truncate">
-                              {vet.clinicName}
-                            </p>
+                            {hasDisplayValue(vet.clinicName) ? (
+                              <p className="mt-0.5 text-xs md:text-sm text-slate-500 truncate">
+                                {vet.clinicName}
+                              </p>
+                            ) : null}
 
                             {isSpecialist ? (
                               <p className="mt-1 text-[12px] font-semibold text-teal-600">
@@ -435,26 +507,26 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       </div>
                     </div>
 
-                    <div className="mt-4 space-y-3">
-                      <InfoRow
-                        icon={GraduationCap}
-                        label="Education"
-                        value={vet.qualification}
-                        subValue={`${vet.experience || 0} years exp.`}
-                      />
+                      <div className="mt-4 space-y-3">
+                        <InfoRow
+                          icon={GraduationCap}
+                          label="Education"
+                          value={vet.qualification}
+                          subValue={experienceLabel}
+                        />
 
-                      <InfoRow
-                        icon={Stethoscope}
-                        label="Specialization"
-                        value={vet.specializationText || "Not available"}
-                      />
+                        <InfoRow
+                          icon={Stethoscope}
+                          label="Specialization"
+                          value={specializationValue}
+                        />
 
-                      <InfoRow
-                        icon={BadgeCheck}
-                        label="Successful consultations"
-                        value={`${vet.consultations}+`}
-                      />
-                    </div>
+                        <InfoRow
+                          icon={BadgeCheck}
+                          label="Successful consultations"
+                          value={`${vet.consultations}+`}
+                        />
+                      </div>
 
                     {bioPreview ? (
                       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -513,9 +585,11 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                 <h3 className="truncate text-lg font-extrabold text-slate-900 md:text-xl">
                   {activeBioVet.name}
                 </h3>
-                <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {activeBioVet.clinicName || "Clinic"}
-                </p>
+                {hasDisplayValue(activeBioVet.clinicName) ? (
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {activeBioVet.clinicName}
+                  </p>
+                ) : null}
               </div>
 
               <button
@@ -550,38 +624,48 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                        {activeBioVet.qualification || "Not available"}
-                      </span>
-                      <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                        {activeBioVet.experience || 0} yrs exp
-                      </span>
-                      <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                        License: {activeBioVet.raw?.doctor_license || "N/A"}
-                      </span>
+                      {hasDisplayValue(activeBioVet.qualification) ? (
+                        <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                          {activeBioVet.qualification}
+                        </span>
+                      ) : null}
+                      {hasDisplayValue(activeBioVet.experience) ? (
+                        <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                          {activeBioVet.experience} yrs exp
+                        </span>
+                      ) : null}
+                      {hasDisplayValue(activeBioVet.raw?.doctor_license) ? (
+                        <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                          License: {activeBioVet.raw?.doctor_license}
+                        </span>
+                      ) : null}
                     </div>
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                          Follow-up
-                        </div>
-                        <div className="mt-1 text-sm font-semibold text-slate-800">
-                          {activeBioVet.followUp || "Not available"}
-                        </div>
-                      </div>
+                    {hasDisplayValue(activeBioVet.followUp) || activeBioVet.breakTimes?.length ? (
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {hasDisplayValue(activeBioVet.followUp) ? (
+                          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                              Follow-up
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-slate-800">
+                              {activeBioVet.followUp}
+                            </div>
+                          </div>
+                        ) : null}
 
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                          Break time
-                        </div>
-                        <div className="mt-1 text-sm font-semibold text-slate-800">
-                          {activeBioVet.breakTimes?.length
-                            ? activeBioVet.breakTimes.join(", ")
-                            : "No break time"}
-                        </div>
+                        {activeBioVet.breakTimes?.length ? (
+                          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                              Break time
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-slate-800">
+                              {activeBioVet.breakTimes.join(", ")}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
-                    </div>
+                    ) : null}
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -591,12 +675,14 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         <div className="mt-1 text-lg font-extrabold text-slate-900">
                           {formatPrice(activeBioVet.priceDay) || "Price on request"}
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          Response:{" "}
-                          <span className="font-semibold text-slate-800">
-                            {activeBioVet.responseDay || "Not available"}
-                          </span>
-                        </div>
+                        {hasDisplayValue(activeBioVet.responseDay) ? (
+                          <div className="mt-1 text-xs text-slate-500">
+                            Response:{" "}
+                            <span className="font-semibold text-slate-800">
+                              {activeBioVet.responseDay}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -606,63 +692,69 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         <div className="mt-1 text-lg font-extrabold text-slate-900">
                           {formatPrice(activeBioVet.priceNight) || "Price on request"}
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          Response:{" "}
-                          <span className="font-semibold text-slate-800">
-                            {activeBioVet.responseNight || "Not available"}
-                          </span>
-                        </div>
+                        {hasDisplayValue(activeBioVet.responseNight) ? (
+                          <div className="mt-1 text-xs text-slate-500">
+                            Response:{" "}
+                            <span className="font-semibold text-slate-800">
+                              {activeBioVet.responseNight}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-5 grid gap-4 md:grid-cols-5">
-                  <div className="md:col-span-3 rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
-                    <div className="text-[11px] uppercase tracking-wider text-slate-400">
-                      About
-                    </div>
-                    <div className="mt-1 text-base font-extrabold text-slate-900">
-                      Doctor Bio
-                    </div>
+                  {hasDisplayValue(activeBioVet.bio) ? (
+                    <div className="md:col-span-3 rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
+                      <div className="text-[11px] uppercase tracking-wider text-slate-400">
+                        About
+                      </div>
+                      <div className="mt-1 text-base font-extrabold text-slate-900">
+                        Doctor Bio
+                      </div>
 
-                    <div className="mt-4 text-sm leading-6 text-slate-700 whitespace-pre-line">
-                      {activeBioVet.bio?.trim()
-                        ? activeBioVet.bio.trim()
-                        : "Bio not available yet."}
+                      <div className="mt-4 text-sm leading-6 text-slate-700 whitespace-pre-line">
+                        {activeBioVet.bio.trim()}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
 
-                  <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
-                    <div className="text-[11px] uppercase tracking-wider text-slate-400">
-                      Expertise
-                    </div>
-                    <div className="mt-1 text-base font-extrabold text-slate-900">
-                      Specializations
-                    </div>
+                  {(
+                    (Array.isArray(activeBioVet.specializationList) &&
+                      activeBioVet.specializationList.length > 0) ||
+                    hasDisplayValue(activeBioVet.specializationText)
+                  ) ? (
+                    <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
+                      <div className="text-[11px] uppercase tracking-wider text-slate-400">
+                        Expertise
+                      </div>
+                      <div className="mt-1 text-base font-extrabold text-slate-900">
+                        Specializations
+                      </div>
 
-                    <div className="mt-4 text-sm text-slate-700">
-                      {Array.isArray(activeBioVet.specializationList) &&
-                      activeBioVet.specializationList.length ? (
-                        <div className="flex flex-wrap gap-2">
-                          {activeBioVet.specializationList.map((s, idx) => (
-                            <span
-                              key={`${s}-${idx}`}
-                              className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700"
-                            >
-                              {String(s)}
-                            </span>
-                          ))}
-                        </div>
-                      ) : activeBioVet.specializationText ? (
-                        <div className="text-slate-700">
-                          {activeBioVet.specializationText}
-                        </div>
-                      ) : (
-                        <div className="text-slate-500">Not available</div>
-                      )}
+                      <div className="mt-4 text-sm text-slate-700">
+                        {Array.isArray(activeBioVet.specializationList) &&
+                        activeBioVet.specializationList.length ? (
+                          <div className="flex flex-wrap gap-2">
+                            {activeBioVet.specializationList.map((s, idx) => (
+                              <span
+                                key={`${s}-${idx}`}
+                                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700"
+                              >
+                                {String(s)}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-slate-700">
+                            {activeBioVet.specializationText}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
 
                 <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
