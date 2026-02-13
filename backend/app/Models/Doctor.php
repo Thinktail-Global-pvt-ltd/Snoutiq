@@ -18,11 +18,17 @@ class Doctor extends Model
         'doctor_license',
         'doctor_document',
         'doctor_image',
+        'doctor_image_blob',
+        'doctor_image_mime',
         'toggle_availability',
         'doctor_status',
         'doctors_price',
         'video_day_rate',
         'video_night_rate',
+    ];
+
+    protected $hidden = [
+        'doctor_image_blob',
     ];
 
     /**

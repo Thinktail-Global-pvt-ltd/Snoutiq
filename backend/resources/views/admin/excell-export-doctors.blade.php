@@ -50,16 +50,20 @@
                                 @foreach($doctors as $doctor)
                                     @php
                                         $clinic = $doctor->clinic;
-                                        $imagePath = ltrim((string) $doctor->doctor_image, '/');
-                                        $baseUrl = rtrim((string) config('app.url'), '/');
-                                        if ($baseUrl === '') {
-                                            $baseUrl = rtrim(url('/'), '/');
+                                        $blobImageUrl = null;
+                                        if (!empty($doctor->doctor_image_blob)) {
+                                            $blobMime = $doctor->doctor_image_mime ?: 'image/png';
+                                            $blobImageUrl = 'data:' . $blobMime . ';base64,' . base64_encode($doctor->doctor_image_blob);
                                         }
+                                        $imagePath = ltrim((string) $doctor->doctor_image, '/');
+                                        $rootUrl = rtrim(url('/'), '/');
                                         $publicImageUrl = null;
+                                        $plainImageUrl = null;
                                         if (!empty($doctor->doctor_image)) {
                                             $publicImageUrl = preg_match('/^https?:\/\//i', (string) $doctor->doctor_image)
                                                 ? (string) $doctor->doctor_image
-                                                : $baseUrl . '/' . $imagePath;
+                                                : $rootUrl . '/backend/' . $imagePath;
+                                            $plainImageUrl = $rootUrl . '/' . $imagePath;
                                         }
                                     @endphp
                                     <tr>
@@ -72,14 +76,27 @@
                                             <div class="small text-muted">{{ $clinic->city ?? '—' }} @if(!empty($clinic?->pincode)) • {{ $clinic->pincode }} @endif</div>
                                         </td>
                                         <td style="width:160px">
-                                            @if($publicImageUrl)
-                                                <img src="{{ $publicImageUrl }}" class="img-fluid rounded border" alt="doctor photo">
+                                            @if($blobImageUrl)
+                                                <img
+                                                    src="{{ $blobImageUrl }}"
+                                                    class="img-fluid rounded border"
+                                                    alt="doctor photo"
+                                                >
+                                            @elseif($publicImageUrl)
+                                                <img
+                                                    src="{{ $publicImageUrl }}"
+                                                    onerror="this.onerror=null;this.src='{{ $plainImageUrl }}';"
+                                                    class="img-fluid rounded border"
+                                                    alt="doctor photo"
+                                                >
                                             @else
                                                 <span class="text-muted small">No image</span>
                                             @endif
                                         </td>
                                         <td style="width:260px">
-                                            @if($publicImageUrl)
+                                            @if($blobImageUrl)
+                                                <span class="badge text-bg-success-subtle text-success-emphasis">Stored in DB blob</span>
+                                            @elseif($publicImageUrl)
                                                 <code class="small text-break">{{ $publicImageUrl }}</code>
                                             @else
                                                 <span class="text-muted small">—</span>
