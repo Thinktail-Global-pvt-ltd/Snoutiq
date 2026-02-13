@@ -44,6 +44,17 @@ return [
         'secret' => env('DOCTOR_NOTIFICATION_SECRET'),
     ],
 
+    'whatsapp' => [
+        'templates' => [
+            'vet_new_video_consult' => env('WHATSAPP_TEMPLATE_VET_NEW_VIDEO_CONSULT', 'appointment_confirmation_v2'),
+            'vet_new_video_consult_language' => env('WHATSAPP_TEMPLATE_VET_NEW_VIDEO_CONSULT_LANGUAGE', 'en'),
+            'vet_sla_reminder' => env('WHATSAPP_TEMPLATE_VET_SLA_REMINDER', 'vet_sla_reminder'),
+            // Backward-compatible alias used in older flows/commands.
+            'vet_response_reminder' => env('WHATSAPP_TEMPLATE_VET_RESPONSE_REMINDER', 'vet_sla_reminder'),
+            'pp_booking_confirmed' => env('WHATSAPP_TEMPLATE_PP_BOOKING_CONFIRMED', 'pp_booking_confirmed'),
+        ],
+    ],
+
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
@@ -93,5 +104,13 @@ return [
 
     'google_identity' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
+    ],
+
+    'vetcompass' => [
+        'base_url' => env('VETCOMPASS_BASE_URL', 'https://vetcompass.herokuapp.com/api/1.0'),
+        'client_id' => env('VETCOMPASS_CLIENT_ID'),
+        // Expected to be the full header value sent to vetcompass-hmac-authorisation.
+        'hmac_header' => env('VETCOMPASS_HMAC_HEADER'),
+        'session_uuid' => env('VETCOMPASS_SESSION_UUID'),
     ],
 ];

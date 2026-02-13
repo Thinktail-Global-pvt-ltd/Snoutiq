@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 class SendVetResponseReminders extends Command
 {
     protected $signature = 'notifications:vet-response-reminders {--txn_id=}';
-    protected $description = 'Send WhatsApp reminders to pet parents when vet has not opened the video consult case in time.';
+    protected $description = 'Send WhatsApp SLA reminders to vets when response window is 5 minutes away.';
 
     public function __construct(private readonly WhatsAppService $whatsApp)
     {
@@ -36,12 +36,15 @@ class SendVetResponseReminders extends Command
                 ->limit(1)
                 ->get();
         } else {
+            $responseWindowMinutes = max((int) config('app.video_consult_response_minutes', 15), 5);
+            $triggerAgeMinutes = max($responseWindowMinutes - 5, 0);
+
             $query = Transaction::query()
                 ->whereIn('type', ['video_consult', 'excell_export_campaign'])
                 ->whereIn('status', ['pending', 'initiated', 'created', 'authorized', 'captured', 'paid', 'success', 'successful'])
                 ->whereRaw("COALESCE(JSON_EXTRACT(metadata, '$.vet_response_reminder_sent_at'), '') = ''")
-                ->where('created_at', '<=', $now->copy()->subMinutes(15))
-                ->where('created_at', '>=', $now->copy()->subMinutes(20));
+                ->where('created_at', '<=', $now->copy()->subMinutes($triggerAgeMinutes))
+                ->where('created_at', '>', $now->copy()->subMinutes($triggerAgeMinutes + 1));
 
             $rows = $query->limit(200)->get();
         }
@@ -54,11 +57,17 @@ class SendVetResponseReminders extends Command
 
         $sent = 0;
         foreach ($rows as $txn) {
+            $doctor = $txn->doctor;
+            $user = $txn->user;
+            $pet = $txn->pet;
+
             $petName = $txn->pet?->name ?? 'your pet';
-            $remaining = 3; // minutes left window
+            $petBreed = $pet?->breed ?? $pet?->pet_type ?? $pet?->type ?? 'Pet';
+            $vetName = $doctor?->doctor_name ?? 'Doctor';
+            $parentName = $user?->name ?? 'Pet Parent';
+            $remaining = 5; // reminder is sent 5 minutes before SLA
 
             // Target doctor instead of user
-            $doctor = $txn->doctor;
             $phone = null;
             if ($doctor) {
                 $phone = $doctor->doctor_mobile
@@ -77,19 +86,25 @@ class SendVetResponseReminders extends Command
                 [
                     'type' => 'body',
                     'parameters' => [
+                        ['type' => 'text', 'text' => $vetName],
+                        ['type' => 'text', 'text' => $parentName],
                         ['type' => 'text', 'text' => $petName],
+                        ['type' => 'text', 'text' => $petBreed],
                         ['type' => 'text', 'text' => (string) $remaining],
                     ],
                 ],
             ];
 
             $templateCandidates = array_values(array_filter([
+                config('services.whatsapp.templates.vet_sla_reminder') ?? null,
                 config('services.whatsapp.templates.vet_response_reminder') ?? null,
+                'vet_sla_reminder',
+                'VET_SLA_REMINDER',
                 'VET_RESPONSE_REMINDER',
                 'vet_response_reminder',
             ]));
 
-            $languageCandidates = ['en_US', 'en_GB', 'en'];
+            $languageCandidates = ['en', 'en_US', 'en_GB'];
             $lastError = null;
             $sentThis = false;
 

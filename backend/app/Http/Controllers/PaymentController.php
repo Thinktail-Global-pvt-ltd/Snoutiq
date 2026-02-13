@@ -116,11 +116,7 @@ class PaymentController extends Controller
             $vetWhatsAppMeta = null;
             $prescriptionDocMeta = null;
             if (($notes['order_type'] ?? null) === 'video_consult') {
-                $whatsAppMeta = $this->notifyVideoConsultBooked(
-                    context: $context,
-                    notes: $notes,
-                    amountInInr: $amountInInr
-                );
+                // For video consults: notify vet immediately at order creation.
                 $vetWhatsAppMeta = $this->notifyVetVideoConsultBooked(
                     context: $context,
                     notes: $notes,
@@ -366,19 +362,13 @@ class PaymentController extends Controller
                     ?? ($record->raw_response['notes']['orderType'] ?? null)
                     ?? ($record->raw_response['notes']['type'] ?? null);
 
-                if ($orderType === 'video_consult') {
-                    $whatsAppMeta = $this->notifyVideoConsultBooked(
+                if ($orderType === 'video_consult' && $this->isSuccessfulPaymentStatus($status)) {
+                    // On successful payment, confirm booking to pet parent.
+                    $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
                         context: $context,
                         notes: $notes,
                         amountInInr: $amountInInr
                     );
-                    $vetWhatsAppMeta = $this->notifyVetVideoConsultBooked(
-                        context: $context,
-                        notes: $notes,
-                        amountInInr: $amountInInr
-                    );
-                    // Best-effort: send latest prescription PDF to the doctor
-                    $prescriptionDocMeta = $this->sendDoctorPrescriptionDocument($context);
                 } elseif ($orderType === 'excell_export_campaign') {
                     $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
                         context: $context,
@@ -923,6 +913,7 @@ class PaymentController extends Controller
 
             $petName = $pet?->name ?? 'Pet';
             $species = $pet?->pet_type ?? $pet?->type ?? 'Pet';
+            $breed = $pet?->breed ?? $species;
 
             $ageText = null;
             if ($pet?->pet_age !== null) {
@@ -943,42 +934,41 @@ class PaymentController extends Controller
             $issue = $notes['summary'] ?? $notes['reason'] ?? $notes['concern'] ?? 'Video consult';
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 20));
 
-            $components = [
-                [
-                    'type' => 'body',
-                    'parameters' => [
-                        ['type' => 'text', 'text' => $petName],                 // {{1}} PetName
-                        ['type' => 'text', 'text' => $species],                 // {{2}} Species
-                        ['type' => 'text', 'text' => $ageText],                 // {{3}} Age
-                        ['type' => 'text', 'text' => $parentName],              // {{4}} PetParentName
-                        ['type' => 'text', 'text' => $issue],                   // {{5}} ShortIssueSummary
-                        ['type' => 'text', 'text' => (string) $amountInInr],    // {{6}} Amount
-                        ['type' => 'text', 'text' => (string) $responseMinutes] // {{7}} ResponseTime minutes
-                    ],
-                ],
-            ];
-
             // Try provided + configured + common template name variants to avoid translation-name mismatch
             $templateCandidates = array_values(array_filter([
                 $notes['vet_template'] ?? null,
+                'appointment_confirmation_v2',
                 config('services.whatsapp.templates.vet_new_video_consult') ?? null,
                 'VET_NEW_VIDEO_CONSULT',
                 'vet_new_video_consult',
             ]));
 
-            // language fallbacks: provided -> config -> en_US -> en_GB -> en
+            // language fallbacks: provided -> config -> en -> en_US -> en_GB
             $languageCandidates = array_values(array_filter([
                 $notes['vet_template_language'] ?? null,
                 config('services.whatsapp.templates.vet_new_video_consult_language') ?? null,
+                'en',
                 'en_US',
                 'en_GB',
-                'en',
             ]));
 
             $lastError = null;
             foreach ($templateCandidates as $tpl) {
                 foreach ($languageCandidates as $lang) {
                     try {
+                        $components = $this->buildVetTemplateComponents(
+                            template: $tpl,
+                            doctorName: $doctor->doctor_name ?: 'Doctor',
+                            parentName: $parentName,
+                            petName: $petName,
+                            breed: $breed,
+                            species: $species,
+                            ageText: $ageText,
+                            issue: $issue,
+                            amountInInr: $amountInInr,
+                            responseMinutes: $responseMinutes
+                        );
+
                         $this->whatsApp->sendTemplate(
                             $this->normalizePhone($doctorPhone),
                             $tpl,
@@ -1008,6 +998,50 @@ class PaymentController extends Controller
             report($e);
             return ['sent' => false, 'reason' => 'exception', 'message' => $e->getMessage()];
         }
+    }
+
+    protected function buildVetTemplateComponents(
+        string $template,
+        string $doctorName,
+        string $parentName,
+        string $petName,
+        string $breed,
+        string $species,
+        string $ageText,
+        string $issue,
+        int $amountInInr,
+        int $responseMinutes
+    ): array {
+        $templateKey = strtolower(trim($template));
+
+        // New vet confirmation templates use 5 params:
+        // 1=VetName, 2=PetParentName, 3=PetName, 4=Breed/Type, 5=SLA minutes.
+        if (in_array($templateKey, ['appointment_confirmation_v2', 'vet_sla_reminder'], true)) {
+            return [[
+                'type' => 'body',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $doctorName],
+                    ['type' => 'text', 'text' => $parentName],
+                    ['type' => 'text', 'text' => $petName],
+                    ['type' => 'text', 'text' => $breed],
+                    ['type' => 'text', 'text' => (string) $responseMinutes],
+                ],
+            ]];
+        }
+
+        // Legacy vet_new_video_consult style with 7 params.
+        return [[
+            'type' => 'body',
+            'parameters' => [
+                ['type' => 'text', 'text' => $petName],
+                ['type' => 'text', 'text' => $species],
+                ['type' => 'text', 'text' => $ageText],
+                ['type' => 'text', 'text' => $parentName],
+                ['type' => 'text', 'text' => $issue],
+                ['type' => 'text', 'text' => (string) $amountInInr],
+                ['type' => 'text', 'text' => (string) $responseMinutes],
+            ],
+        ]];
     }
 
     /**
