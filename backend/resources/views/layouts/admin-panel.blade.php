@@ -10,13 +10,19 @@
     <style>
         body { background: #f3f4f8; min-height: 100vh; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
         .admin-shell { display: flex; min-height: 100vh; }
-        .admin-sidebar { width: 260px; background: linear-gradient(180deg, #0f172a 0%, #1f2937 100%); color: #f9fafb; display: flex; flex-direction: column; padding: 2rem 1.5rem; }
+        .admin-sidebar { width: 260px; background: linear-gradient(180deg, #0f172a 0%, #1f2937 100%); color: #f9fafb; display: flex; flex-direction: column; padding: 2rem 1.5rem; flex-shrink: 0; }
+        .admin-sidebar-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
         .admin-sidebar .brand { font-size: 1.25rem; font-weight: 600; margin-bottom: 2rem; }
         .admin-sidebar .brand span { display: block; font-size: 0.85rem; font-weight: 400; color: rgba(255, 255, 255, 0.65); margin-top: .35rem; }
+        .admin-sidebar-close { border: 0; border-radius: 0.5rem; background: rgba(255, 255, 255, 0.14); color: #fff; width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; }
         .admin-nav a { color: rgba(255,255,255,0.75); border-radius: 0.75rem; padding: 0.65rem 1rem; text-decoration: none; font-weight: 500; display: block; transition: background 0.2s ease, color 0.2s ease; }
         .admin-nav a.active, .admin-nav a:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
         .admin-main { flex: 1; display: flex; flex-direction: column; }
         .admin-header { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 1.25rem 2rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+        .admin-header .page-title { min-width: 0; }
+        .admin-header .page-title h1 { overflow-wrap: anywhere; }
+        .admin-header .header-meta { display: flex; align-items: center; gap: 0.75rem; color: #6b7280; }
+        .admin-menu-btn { border-radius: 0.6rem; }
         .admin-content { flex: 1; padding: 2rem; }
         .avatar-sm { width: 3rem; height: 3rem; }
         .admin-sidebar .logout-btn { margin-top: auto; }
@@ -38,11 +44,57 @@
         .admin-shell--no-sidebar { display: block; }
         .admin-shell--no-sidebar .admin-main { max-width: 1200px; margin: 0 auto; }
         .admin-shell--no-sidebar .admin-header { border-radius: 0 0 18px 18px; margin-bottom: 1.5rem; }
+        .admin-sidebar-overlay { display: none; }
+        .admin-content .table-responsive { border-radius: 0.9rem; }
         @media (max-width: 991px) {
-            .admin-shell { flex-direction: column; }
-            .admin-sidebar { width: 100%; flex-direction: row; align-items: center; gap: 1rem; padding: 1.5rem; }
-            .admin-nav { display: flex; gap: 0.5rem; }
-            .admin-nav a { padding: 0.5rem 0.75rem; }
+            body.admin-sidebar-open { overflow: hidden; }
+            .admin-shell { display: block; }
+            .admin-sidebar-overlay {
+                display: block;
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, 0.5);
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.2s ease;
+                z-index: 1040;
+            }
+            .admin-sidebar-overlay.is-open {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .admin-sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: min(84vw, 320px);
+                transform: translateX(-105%);
+                transition: transform 0.25s ease;
+                z-index: 1050;
+                padding: 1.25rem 1rem;
+                overflow-y: auto;
+            }
+            .admin-sidebar.is-open { transform: translateX(0); }
+            .admin-sidebar .brand { margin-bottom: 1rem; }
+            .admin-nav { display: block; }
+            .admin-nav a { padding: 0.58rem 0.78rem; }
+            .admin-header {
+                padding: 0.85rem 0.9rem;
+                gap: 0.55rem;
+                justify-content: flex-start;
+            }
+            .admin-header .page-title { flex: 1; }
+            .admin-header .page-title h1 { font-size: 1.05rem; margin: 0; }
+            .admin-header .header-meta { margin-left: auto; gap: 0.45rem; font-size: 0.8rem; }
+            .admin-content { padding: 0.95rem 0.7rem 1.25rem; }
+            .admin-content .card { border-radius: 14px; }
+            .admin-shell--no-sidebar .admin-header { border-radius: 0; margin-bottom: 0; }
+        }
+        @media (max-width: 575px) {
+            .admin-header .header-meta .badge { display: none; }
+            .admin-header .header-meta small { font-size: 0.72rem; }
+            .admin-sidebar { width: min(88vw, 320px); }
         }
     </style>
 </head>
@@ -50,10 +102,18 @@
 @php $hideSidebar = trim($__env->yieldContent('hide-sidebar')) === 'true'; @endphp
 <div class="admin-shell {{ $hideSidebar ? 'admin-shell--no-sidebar' : '' }}">
     @unless($hideSidebar)
-    <aside class="admin-sidebar">
-        <div class="brand">
-            SnoutIQ Admin
-            <span>Signed in as {{ session('admin_email', config('admin.email')) }}</span>
+    <div id="adminSidebarOverlay" class="admin-sidebar-overlay"></div>
+    @endunless
+    @unless($hideSidebar)
+    <aside id="adminSidebar" class="admin-sidebar">
+        <div class="admin-sidebar-head">
+            <div class="brand">
+                SnoutIQ Admin
+                <span>Signed in as {{ session('admin_email', config('admin.email')) }}</span>
+            </div>
+            <button type="button" id="adminSidebarClose" class="admin-sidebar-close d-lg-none" aria-label="Close menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <nav class="admin-nav mb-4">
             <a href="{{ route('founder.dashboard') }}" target="_blank" rel="noopener" class="{{ request()->is('founder/dashboard') ? 'active' : '' }}">
@@ -89,8 +149,15 @@
     @endunless
     <main class="admin-main">
         <header class="admin-header">
-            <h1 class="h4 mb-0">@yield('page-title', 'Admin Dashboard')</h1>
-            <div class="d-flex align-items-center gap-3 text-muted">
+            @unless($hideSidebar)
+            <button type="button" id="adminSidebarToggle" class="btn btn-dark btn-sm admin-menu-btn d-lg-none" aria-label="Open menu">
+                <i class="bi bi-list"></i>
+            </button>
+            @endunless
+            <div class="page-title">
+                <h1 class="h4 mb-0">@yield('page-title', 'Admin Dashboard')</h1>
+            </div>
+            <div class="header-meta">
                 <span class="badge text-bg-dark">Admin access</span>
                 <small>{{ now()->format('d M Y') }}</small>
             </div>
@@ -101,6 +168,43 @@
     </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script>
+(() => {
+    const sidebar = document.getElementById('adminSidebar');
+    const overlay = document.getElementById('adminSidebarOverlay');
+    const openBtn = document.getElementById('adminSidebarToggle');
+    const closeBtn = document.getElementById('adminSidebarClose');
+
+    if (!sidebar || !overlay || !openBtn || !closeBtn) return;
+
+    const isMobile = () => window.matchMedia('(max-width: 991.98px)').matches;
+    const openSidebar = () => {
+        sidebar.classList.add('is-open');
+        overlay.classList.add('is-open');
+        document.body.classList.add('admin-sidebar-open');
+    };
+    const closeSidebar = () => {
+        sidebar.classList.remove('is-open');
+        overlay.classList.remove('is-open');
+        document.body.classList.remove('admin-sidebar-open');
+    };
+
+    openBtn.addEventListener('click', openSidebar);
+    closeBtn.addEventListener('click', closeSidebar);
+    overlay.addEventListener('click', closeSidebar);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeSidebar();
+    });
+    sidebar.querySelectorAll('a').forEach((link) => {
+        link.addEventListener('click', () => {
+            if (isMobile()) closeSidebar();
+        });
+    });
+    window.addEventListener('resize', () => {
+        if (!isMobile()) closeSidebar();
+    });
+})();
+</script>
 @stack('scripts')
 </body>
 </html>
