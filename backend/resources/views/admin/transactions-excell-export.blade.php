@@ -111,6 +111,7 @@
                                                     data-user-id="{{ $txn->user_id }}"
                                                     data-pet-name="{{ $petRecord->name ?? 'Pet' }}"
                                                     data-transaction-id="{{ $txn->id }}"
+                                                    data-reported-symptom="{{ $issue }}"
                                                 >
                                                     View Details
                                                 </button>
@@ -154,6 +155,7 @@
             </div>
             <div class="modal-body">
                 <div id="petTimelineMeta" class="small text-muted mb-3"></div>
+                <div id="petTimelineSymptom" class="small mb-3"></div>
                 <div id="petTimelineContent" class="small text-muted">Click "View Details" to load timeline.</div>
             </div>
         </div>
@@ -173,6 +175,7 @@
     const timelineModalEl = document.getElementById('petTimelineModal');
     const timelineTitleEl = document.getElementById('petTimelineModalLabel');
     const timelineMetaEl = document.getElementById('petTimelineMeta');
+    const timelineSymptomEl = document.getElementById('petTimelineSymptom');
     const timelineContentEl = document.getElementById('petTimelineContent');
     const timelineModal = timelineModalEl ? new bootstrap.Modal(timelineModalEl) : null;
 
@@ -262,6 +265,16 @@
         `;
     }
 
+    function renderReportedSymptom(symptom) {
+        const text = String(symptom || '').trim();
+        timelineSymptomEl.innerHTML = `
+            <div class="border rounded p-2 bg-light">
+                <div class="text-muted mb-1">Reported Symptom</div>
+                <div class="text-dark">${escapeHtml(text || 'N/A')}</div>
+            </div>
+        `;
+    }
+
     function copyTemplate(btn) {
         const text = btn.getAttribute('data-body') || '';
         navigator.clipboard.writeText(text).then(() => {
@@ -285,6 +298,7 @@
         const userId = btn.getAttribute('data-user-id');
         const petName = btn.getAttribute('data-pet-name') || 'Pet';
         const transactionId = btn.getAttribute('data-transaction-id') || '—';
+        const reportedSymptom = btn.getAttribute('data-reported-symptom') || '';
 
         if (!petId || !userId || !timelineModal) {
             alert('Pet details unavailable for this row.');
@@ -293,6 +307,7 @@
 
         timelineTitleEl.textContent = `${petName} Timeline`;
         timelineMetaEl.textContent = `Transaction #${transactionId} | Pet ID: ${petId} | User ID: ${userId}`;
+        renderReportedSymptom(reportedSymptom);
         timelineContentEl.innerHTML = '<div class="text-muted">Loading timeline...</div>';
         timelineModal.show();
 
