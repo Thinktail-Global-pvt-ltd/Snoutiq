@@ -2,6 +2,102 @@
 
 @section('page-title', 'Excel Export Transactions')
 
+@push('styles')
+<style>
+    .excel-export-table td,
+    .excel-export-table th {
+        vertical-align: top;
+    }
+    .excel-export-table textarea {
+        min-height: 76px;
+        resize: vertical;
+    }
+    .excel-export-table .text-muted.small {
+        line-height: 1.35;
+    }
+    @media (max-width: 991.98px) {
+        .excel-export-summary {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+        .excel-export-badges {
+            width: 100%;
+            flex-wrap: wrap;
+        }
+        .excel-export-badges .badge {
+            width: auto;
+            max-width: 100%;
+            white-space: normal;
+            text-align: left;
+        }
+        .excel-export-table thead {
+            display: none;
+        }
+        .excel-export-table,
+        .excel-export-table tbody,
+        .excel-export-table tr,
+        .excel-export-table td {
+            display: block;
+            width: 100%;
+        }
+        .excel-export-table tr {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.85rem;
+            margin-bottom: 0.9rem;
+            box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06);
+            overflow: hidden;
+        }
+        .excel-export-table td {
+            border: 0;
+            border-bottom: 1px dashed #e5e7eb;
+            padding: 0.7rem 0.8rem;
+            position: relative;
+            padding-left: 42%;
+            min-height: 2.65rem;
+            overflow-wrap: anywhere;
+        }
+        .excel-export-table td:last-child {
+            border-bottom: 0;
+        }
+        .excel-export-table td::before {
+            content: attr(data-label);
+            position: absolute;
+            left: 0.8rem;
+            top: 0.72rem;
+            width: calc(42% - 1rem);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: #64748b;
+            line-height: 1.25;
+        }
+        .excel-export-table td[data-label="Manual WhatsApp"] textarea {
+            min-height: 90px;
+        }
+        .excel-export-table td[data-label="Manual WhatsApp"] .d-flex {
+            justify-content: flex-start !important;
+        }
+        .excel-export-table td[data-label="Details"] .btn {
+            width: 100%;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .excel-export-table td {
+            padding-left: 0.72rem;
+            padding-top: 2.05rem;
+        }
+        .excel-export-table td::before {
+            position: static;
+            display: block;
+            width: 100%;
+            margin-bottom: 0.33rem;
+        }
+    }
+</style>
+@endpush
+
 @section('content')
 @php
     $totalPaise = $transactions->sum('amount_paise');
@@ -21,12 +117,12 @@
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
-                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3 excel-export-summary">
                     <div>
                         <h2 class="h5 mb-1">Excel Export Campaign Transactions</h2>
                         <p class="text-muted mb-0">All payments where <code>type</code> or <code>metadata.order_type</code> equals <strong>excell_export_campaign</strong>.</p>
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 excel-export-badges">
                         <span class="badge text-bg-primary-subtle text-primary-emphasis px-3 py-2">{{ number_format($transactions->count()) }} records</span>
                         <span class="badge text-bg-success-subtle text-success-emphasis px-3 py-2">₹{{ $formatInr($totalPaise) }} collected</span>
                     </div>
@@ -39,7 +135,7 @@
                     </div>
                 @else
                     <div class="table-responsive">
-                        <table class="table table-sm align-middle">
+                        <table class="table table-sm align-middle excel-export-table">
                             <thead class="table-light">
                                 <tr>
                                     <th>ID</th>
@@ -83,17 +179,17 @@
                                         $vetMsg = "Hi Dr. {$doctorName}, a new consultation is assigned. Pet: {$petName} ({$petType}). Parent: {$parentName} ({$parentPhone}). Issue: {$issue}. Prescription: (add link if any). Please respond within {$responseMinutes} mins. - SnoutIQ";
                                     @endphp
                                     <tr>
-                                        <td>#{{ $txn->id }}</td>
-                                        <td class="text-nowrap">{{ optional($txn->created_at)->format('d M Y, H:i') ?? '—' }}</td>
-                                        <td>
+                                        <td data-label="ID">#{{ $txn->id }}</td>
+                                        <td class="text-nowrap" data-label="Created">{{ optional($txn->created_at)->format('d M Y, H:i') ?? '—' }}</td>
+                                        <td data-label="Status">
                                             <span class="badge text-bg-light text-uppercase">{{ $txn->status ?? 'n/a' }}</span>
                                         </td>
-                                        <td class="fw-semibold">₹{{ $formatInr($txn->amount_paise) }}</td>
-                                        <td>
+                                        <td class="fw-semibold" data-label="Amount (₹)">₹{{ $formatInr($txn->amount_paise) }}</td>
+                                        <td data-label="Clinic">
                                             {{ $txn->clinic->name ?? '—' }}
                                             <div class="text-muted small">ID: {{ $txn->clinic_id ?? '—' }}</div>
                                         </td>
-                                        <td>
+                                        <td data-label="Doctor">
                                             {{ $txn->doctor->doctor_name ?? '—' }}
                                             <div class="text-muted small">
                                                 @if($txn->doctor)
@@ -104,21 +200,21 @@
                                                 @endif
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-label="User">
                                             {{ $txn->user->name ?? '—' }}
                                             <div class="text-muted small">
                                                 <div>Email: {{ $txn->user->email ?? '—' }}</div>
                                                 <div>Phone: {{ $txn->user->phone ?? '—' }}</div>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-label="Pet">
                                             {{ $petRecord->name ?? '—' }}
                                             @if($petRecord)
                                                 <div class="text-muted small">Breed: {{ $petRecord->breed ?? 'n/a' }}</div>
                                                 <div class="text-muted small">DOB: {{ $petDob }}</div>
                                             @endif
                                         </td>
-                                        <td>
+                                        <td data-label="Details">
                                             @if(($petRecord?->id || $txn->pet_id) && $txn->user_id)
                                                 <button
                                                     type="button"
@@ -139,7 +235,7 @@
                                                 <span class="text-muted small">Unavailable</span>
                                             @endif
                                         </td>
-                                        <td class="text-nowrap">
+                                        <td class="text-nowrap" data-label="Manual WhatsApp">
                                             <div class="mb-2">
                                                 <label class="form-label mb-1 small text-muted">Parent msg</label>
                                                 <textarea class="form-control form-control-sm" rows="3" readonly>{{ $parentMsg }}</textarea>
