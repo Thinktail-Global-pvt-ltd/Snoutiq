@@ -127,7 +127,7 @@ const SPECIALIZATION_OPTIONS = [
   "Other",
 ];
 
-const DEGREE_OPTIONS = ["BVSc", "MVSc", "PHD", "Other"];
+const DEGREE_OPTIONS = ["BVSc", "MVSc", "PhD", "Other"];
 
 const RESPONSE_TIME_DAY_OPTIONS = ["0 to 15 mins", "15 to 20 mins", "20 to 30 mins"];
 const RESPONSE_TIME_NIGHT_OPTIONS = ["0 to 15 mins", "15 to 20 mins", "20 to 30 mins"];
@@ -974,7 +974,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   if (degreeSelections.includes("Other") && form.degreeOther.trim()) {
     normalizedDegrees.push(form.degreeOther.trim());
   }
-  const degreePayload = Array.from(new Set(normalizedDegrees)).join(", ");
+  const degreePayload = Array.from(new Set(normalizedDegrees));
   const doctorNameReady = normalizeDoctorName(form.vetFullName);
 
   useEffect(() => {
@@ -1052,7 +1052,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   }
 
   const payoutReady = form.payoutDetail.trim();
-  const degreeReady = Boolean(degreePayload);
+  const degreeReady = degreePayload.length > 0;
   const whatsappReady = form.whatsappNumber.trim().length >= 10;
 
   const trimmedImageUrl = form.doctorImageUrl.trim();

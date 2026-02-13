@@ -100,6 +100,23 @@ const buildSpecializationData = (value) => {
   return { list, text };
 };
 
+const buildDegreeData = (value) => {
+  const list = parseListField(value);
+  let text = list.length ? list.join(", ") : "";
+  if (!text) {
+    const raw = String(value || "").trim();
+    const lower = raw.toLowerCase();
+    if (raw && lower !== "null" && lower !== "undefined" && lower !== "[]") {
+      if (raw.startsWith("[") && raw.endsWith("]")) {
+        text = raw.slice(1, -1).replace(/["']/g, "").trim();
+      } else {
+        text = raw;
+      }
+    }
+  }
+  return { list, text };
+};
+
 const normalizeBreakTimes = (value) => {
   const list = parseListField(value);
   return list.filter((item) => {
@@ -154,6 +171,7 @@ const buildVetsFromApi = (apiData = []) => {
       const specializationData = buildSpecializationData(
         doc?.specialization_select_all_that_apply
       );
+      const degreeData = buildDegreeData(doc?.degree);
       const breakTimes = normalizeBreakTimes(doc?.break_do_not_disturb_time_example_2_4_pm);
 
       list.push({
@@ -161,7 +179,8 @@ const buildVetsFromApi = (apiData = []) => {
         clinicName,
 
         name: doc?.doctor_name || "Vet",
-        qualification: doc?.degree || "Vet",
+        qualification: degreeData.text || "",
+        degreeList: degreeData.list,
         experience: toNumber(doc?.years_of_experience, 0),
 
         // ✅ use blob endpoint when available, fallback to other URL fields
