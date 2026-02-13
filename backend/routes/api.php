@@ -1520,6 +1520,15 @@ Route::prefix('user')->group(function () {
         ->name('api.user.observations.image');
 });
 
+// Backward/alternate endpoint naming used by client integrations
+Route::get('/user-per-observationss', [UserObservationController::class, 'index'])
+    ->name('api.user-per-observationss.index');
+Route::post('/user-per-observationss', [UserObservationController::class, 'store'])
+    ->name('api.user-per-observationss.store');
+Route::get('/user-per-observationss/{observation}/image', [UserObservationController::class, 'image'])
+    ->whereNumber('observation')
+    ->name('api.user-per-observationss.image');
+
 
 // Agora RTC token for joining the call
 Route::post('/agora/token', [CoreCallController::class, 'generateToken']);

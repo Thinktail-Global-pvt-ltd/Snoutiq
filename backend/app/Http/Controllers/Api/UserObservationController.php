@@ -172,7 +172,7 @@ class UserObservationController extends Controller
     protected function serializeObservation(UserObservation $observation): array
     {
         $imageBlobUrl = $this->observationImageBlobColumnsReady() && !empty($observation->image_blob)
-            ? route('api.user.observations.image', ['observation' => $observation->id])
+            ? route('api.user-per-observationss.image', ['observation' => $observation->id])
             : null;
 
         return [
