@@ -732,6 +732,7 @@ Route::post('/excell-export/import', function (Request $request) {
         'doctor_license' => ['nullable', 'string', 'max:255'],
         'doctor_image' => ['nullable', 'string', 'max:500'],
         'doctor_image_file' => ['nullable', 'file', 'image', 'max:5120'],
+        'bio' => ['nullable', 'string', 'max:5000'],
         'degree' => ['nullable', 'string', 'max:255'],
         'years_of_experience' => ['nullable', 'string', 'max:50'],
         'specialization_select_all_that_apply' => ['nullable', 'array'],
@@ -795,6 +796,9 @@ Route::post('/excell-export/import', function (Request $request) {
         $doctor->doctor_mobile = $data['doctor_mobile'] ?? null;
         $doctor->doctor_license = $data['doctor_license'] ?? null;
         $doctor->doctor_image = $doctorImageUrl;
+        if (Schema::hasColumn('doctors', 'bio')) {
+            $doctor->bio = $data['bio'] ?? null;
+        }
         $doctor->degree = $data['degree'] ?? null;
         $doctor->years_of_experience = $data['years_of_experience'] ?? null;
         $doctor->specialization_select_all_that_apply = isset($data['specialization_select_all_that_apply'])
@@ -832,6 +836,7 @@ Route::post('/excell-export/import', function (Request $request) {
                 'doctor_mobile',
                 'doctor_license',
                 'doctor_image',
+                'bio',
                 'degree',
                 'years_of_experience',
                 'specialization_select_all_that_apply',
