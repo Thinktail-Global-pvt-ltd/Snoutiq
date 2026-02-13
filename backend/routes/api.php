@@ -77,6 +77,7 @@ use App\Http\Controllers\Api\V1\VaccinationSlotController as V1VaccinationSlotCo
 use App\Http\Controllers\Api\V1\VaccinationBookingController as V1VaccinationBookingController;
 use App\Http\Controllers\Api\V1\VaccinationPaymentController as V1VaccinationPaymentController;
 use App\Http\Controllers\Api\ClinicFinancialsController;
+use App\Http\Controllers\Api\PetConsultTimelineController;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
@@ -166,6 +167,7 @@ Route::get('/vet-registrations/report', [VetRegistrationReportController::class,
 
 // Financials (clinic dashboard KPIs + charts + transactions)
 Route::get('/financials', [ClinicFinancialsController::class, 'show'])->name('api.clinic.financials');
+Route::get('/pets/consult-timeline', [PetConsultTimelineController::class, 'index'])->name('api.pets.consult-timeline');
 
 
 Route::get('/agora/appid', function () {
