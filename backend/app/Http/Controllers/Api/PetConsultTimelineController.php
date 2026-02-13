@@ -21,10 +21,17 @@ class PetConsultTimelineController extends Controller
         $data = $request->validate([
             'pet_id' => ['required', 'integer'],
             'user_id' => ['required', 'integer'],
+            'transaction_scope' => ['nullable', 'string'],
+            'transaction_id' => ['nullable', 'integer'],
         ]);
 
         $petId = (int) $data['pet_id'];
         $userId = (int) $data['user_id'];
+        $anchorTransactionId = isset($data['transaction_id']) ? (int) $data['transaction_id'] : null;
+        $transactionScope = strtolower((string) ($data['transaction_scope'] ?? 'consult'));
+        if (!in_array($transactionScope, ['consult', 'all'], true)) {
+            $transactionScope = 'consult';
+        }
 
         $appointments = Appointment::query()
             ->where('pet_id', $petId)
@@ -35,12 +42,21 @@ class PetConsultTimelineController extends Controller
             })
             ->values();
 
-        $transactions = Transaction::query()
-            ->where('type', 'video_consult')
-            ->where('pet_id', $petId)
+        $transactionsQuery = Transaction::query()
             ->where('user_id', $userId)
-            ->orderByDesc('created_at')
-            ->get();
+            ->where(function ($query) use ($petId, $anchorTransactionId) {
+                $query->where('pet_id', $petId);
+                if ($anchorTransactionId) {
+                    $query->orWhere('id', $anchorTransactionId);
+                }
+            })
+            ->orderByDesc('created_at');
+
+        if ($transactionScope === 'consult') {
+            $transactionsQuery->where('type', 'video_consult');
+        }
+
+        $transactions = $transactionsQuery->get();
 
         $prescriptionsQuery = Prescription::query()
             ->where('user_id', $userId);
@@ -63,6 +79,8 @@ class PetConsultTimelineController extends Controller
             'filters' => [
                 'pet_id' => $petId,
                 'user_id' => $userId,
+                'transaction_scope' => $transactionScope,
+                'transaction_id' => $anchorTransactionId,
             ],
             'counts' => [
                 'appointments' => $appointments->count(),

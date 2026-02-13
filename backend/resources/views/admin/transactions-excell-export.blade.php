@@ -313,7 +313,12 @@
 
         btn.disabled = true;
         try {
-            const query = new URLSearchParams({ pet_id: String(petId), user_id: String(userId) });
+            const query = new URLSearchParams({
+                pet_id: String(petId),
+                user_id: String(userId),
+                transaction_scope: 'all',
+                transaction_id: String(transactionId),
+            });
             const response = await fetch(`${TIMELINE_API_URL}?${query.toString()}`, {
                 credentials: 'include',
             });
