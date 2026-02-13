@@ -8,6 +8,7 @@ import doctorProfile4 from "../assets/doctor4.jpeg";
 import blogVaccination from "../assets/images/vaccination_schedule.jpeg";
 import blogTickFever from "../assets/images/tickfever.png";
 import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
+import appPhoneMock from "../assets/mobile UI.jpeg";
 import { ArrowRight } from "lucide-react";
 import { Clock, ShieldCheck } from "lucide-react";
 
@@ -208,24 +209,16 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               {/* CTA */}
               <button
                 type="button"
-                onClick={() =>
-                  typeof onStart === "function" ? onStart() : null
-                }
+                onClick={() => (typeof onStart === "function" ? onStart() : null)}
                 className="
-    mt-5 
-    inline-flex items-center justify-center gap-2
-    rounded-xl 
-    bg-[#3998de] 
-    px-7 py-3 
-    text-base font-semibold text-white md:text-lg
-    shadow-lg shadow-[#3998de]/30 
-    transition 
+    group mt-5 inline-flex items-center justify-center gap-2
+    rounded-xl bg-[#3998de] px-7 py-3 text-base font-semibold text-white md:text-lg
+    shadow-lg shadow-[#3998de]/30 transition
     hover:bg-[#2F7FC0]
-    hover:gap-3
   "
               >
                 Consult a Veterinarian
-                <ArrowRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
+                <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
               </button>
 
               {/* Stats */}
@@ -300,6 +293,126 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* App Download */}
+      <section className="bg-gradient-to-b from-white via-white to-[#f5f9ff] py-12 md:py-16">
+        <div className="mx-auto max-w-6xl px-5">
+          <div className="grid items-center gap-10 md:grid-cols-2 md:gap-12">
+            {/* Left: Phone Mock */}
+            <div className="order-2 md:order-1">
+              <div className="relative mx-auto max-w-[360px]">
+                <div className="absolute -inset-8 rounded-[36px] bg-[#3998de]/10 blur-2xl" />
+                <div className="relative rounded-[32px] bg-gradient-to-b from-slate-900 to-slate-800 p-3 shadow-[0_30px_70px_rgba(15,23,42,0.18)]">
+                  <div className="rounded-[28px] bg-white p-2">
+                    <div className="overflow-hidden rounded-[24px] border border-slate-100 bg-white">
+                      <img
+                        src={appPhoneMock}
+                        alt="SnoutIQ App Preview"
+                        className="h-auto w-full object-contain"
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Copy + Buttons */}
+            <div className="order-1 md:order-2">
+              <h2 className="text-3xl font-extrabold text-slate-900 md:text-4xl">
+                Get SnoutIQ on Your Phone
+              </h2>
+
+              <p className="mt-3 text-base leading-relaxed text-slate-500 md:text-lg">
+                Access veterinary care anytime, anywhere. Download our app for instant
+                consultations with verified vets.
+              </p>
+
+              {/* Store Buttons */}
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <a
+                  href="https://play.google.com/store/apps/details?id=com.petai.snoutiq"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="
+                    group inline-flex items-center justify-center gap-3 rounded-2xl
+                    bg-slate-900 px-5 py-3 text-white shadow-lg shadow-slate-900/25
+                    transition hover:-translate-y-0.5 hover:bg-black
+                  "
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
+                    <svg
+                      viewBox="0 0 512 512"
+                      className="h-5 w-5"
+                      aria-hidden="true"
+                    >
+                      <path d="M96 64l256 192-256 192V64z" fill="#34A853" />
+                      <path d="M96 64l160 120-48 48L96 64z" fill="#FBBC04" />
+                      <path d="M256 328l-48-48 48-48 160 120L256 328z" fill="#4285F4" />
+                      <path d="M208 232l48-48 48 48-48 48-48-48z" fill="#EA4335" />
+                    </svg>
+                  </span>
+                  <span className="text-left leading-tight">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
+                      Get it on
+                    </span>
+                    <span className="block text-base font-extrabold">Google Play</span>
+                  </span>
+                </a>
+
+                <div
+                  className="
+                    inline-flex cursor-not-allowed items-center justify-center gap-3 rounded-2xl
+                    border border-slate-200 bg-slate-100 px-5 py-3 text-slate-400
+                  "
+                  title="Coming soon"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-5 w-5 text-slate-400"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M16.365 1.43c0 1.14-.52 2.29-1.36 3.03-.83.76-2.17 1.35-3.25 1.26-.14-1.08.4-2.22 1.16-2.98.83-.82 2.24-1.42 3.45-1.31zm5.32 16.65c-.28.64-.42.93-.78 1.5-.51.84-1.23 1.88-2.12 1.9-.79.02-1-.51-2.08-.51-1.08 0-1.33.49-2.12.53-.86.03-1.52-.95-2.03-1.79-1.43-2.34-1.58-5.08-.7-6.45.62-.97 1.6-1.54 2.52-1.54.94 0 1.54.52 2.32.52.76 0 1.22-.52 2.32-.52.82 0 1.7.45 2.32 1.22-2.04 1.12-1.71 4.05.35 5.14z"
+                      />
+                    </svg>
+                  </span>
+                  <span className="text-left leading-tight">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Coming soon
+                    </span>
+                    <span className="block text-base font-extrabold">App Store</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Mini Features */}
+              <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                {[
+                  { title: "Quick Nearby Clinic Access", icon: "📍" },
+                  { title: "Vet Available", icon: "👨‍⚕️" },
+                  { title: "Digital Records", icon: "📁" },
+                  { title: "Reminders", icon: "⏰" },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-sm"
+                  >
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#3998de]/10 text-lg">
+                      {item.icon}
+                    </div>
+                    <div className="mt-3 text-xs font-semibold text-slate-700">
+                      {item.title}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

@@ -13,6 +13,17 @@ import Header from "../components/Header";
 
 const LIBRARIES = ["places"];
 
+const normalizeDoctorNameInput = (value = "") => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  return trimmed.replace(/^dr\.?\s+/i, "");
+};
+
+const formatDoctorName = (value = "") => {
+  const cleaned = normalizeDoctorNameInput(value);
+  return cleaned ? `Dr. ${cleaned}` : "";
+};
+
 const DoctorRegistration = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -582,12 +593,13 @@ const DoctorRegistration = () => {
 
   const handleDoctorChange = (index, field, value) => {
     const updatedDoctors = [...doctors];
-    updatedDoctors[index][field] = value;
+    updatedDoctors[index][field] =
+      field === "doctor_name" ? normalizeDoctorNameInput(value) : value;
     setDoctors(updatedDoctors);
 
     // Validate the field
     if (touched[`${field}_${index}`]) {
-      const error = validateField(field, value);
+      const error = validateField(field, updatedDoctors[index][field]);
       setErrors({ ...errors, [`${field}_${index}`]: error });
     }
   };
@@ -815,7 +827,10 @@ const DoctorRegistration = () => {
 
       // Add doctors data
       doctors.forEach((doctor, index) => {
-        formData.append(`doctors[${index}][doctor_name]`, doctor.doctor_name);
+        formData.append(
+          `doctors[${index}][doctor_name]`,
+          formatDoctorName(doctor.doctor_name)
+        );
         formData.append(`doctors[${index}][doctor_email]`, doctor.doctor_email);
         formData.append(
           `doctors[${index}][doctor_mobile]`,
@@ -2322,20 +2337,25 @@ const DoctorRegistration = () => {
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                       Doctor Name *
                                     </label>
-                                    <input
-                                      type="text"
-                                      value={doctor.doctor_name}
-                                      onChange={(e) =>
-                                        handleDoctorChange(
-                                          index,
-                                          "doctor_name",
-                                          e.target.value
-                                        )
-                                      }
-                                      placeholder="Enter doctor name"
-                                      required
-                                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                    />
+                                    <div className="flex">
+                                      <span className="inline-flex items-center px-3 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-gray-600 text-sm">
+                                        Dr.
+                                      </span>
+                                      <input
+                                        type="text"
+                                        value={doctor.doctor_name}
+                                        onChange={(e) =>
+                                          handleDoctorChange(
+                                            index,
+                                            "doctor_name",
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="Enter doctor name"
+                                        required
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                      />
+                                    </div>
                                   </div>
 
                                   {/* Doctor Email */}
