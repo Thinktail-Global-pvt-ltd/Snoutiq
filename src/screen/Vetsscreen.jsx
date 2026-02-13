@@ -83,6 +83,23 @@ const parseListField = (value) => {
   return [String(value).trim()].filter(Boolean);
 };
 
+const buildSpecializationData = (value) => {
+  const list = parseListField(value);
+  let text = list.length ? list.join(", ") : "";
+  if (!text) {
+    const raw = String(value || "").trim();
+    const lower = raw.toLowerCase();
+    if (raw && lower !== "null" && lower !== "undefined" && lower !== "[]") {
+      if (raw.startsWith("[") && raw.endsWith("]")) {
+        text = raw.slice(1, -1).replace(/["']/g, "").trim();
+      } else {
+        text = raw;
+      }
+    }
+  }
+  return { list, text };
+};
+
 const normalizeBreakTimes = (value) => {
   const list = parseListField(value);
   return list.filter((item) => {
@@ -134,7 +151,9 @@ const buildVetsFromApi = (apiData = []) => {
   apiData.forEach((clinic) => {
     const clinicName = clinic?.name || "Clinic";
     (clinic?.doctors || []).forEach((doc) => {
-      const specializationList = parseListField(doc?.specialization_select_all_that_apply);
+      const specializationData = buildSpecializationData(
+        doc?.specialization_select_all_that_apply
+      );
       const breakTimes = normalizeBreakTimes(doc?.break_do_not_disturb_time_example_2_4_pm);
 
       list.push({
@@ -155,8 +174,9 @@ const buildVetsFromApi = (apiData = []) => {
         reviews: 178,
         consultations: 120,
 
-        specialties: normalizeSpecialties(specializationList),
-        specializationList,
+        specialties: normalizeSpecialties(specializationData.list),
+        specializationList: specializationData.list,
+        specializationText: specializationData.text,
         responseDay: doc?.response_time_for_online_consults_day || "",
         responseNight: doc?.response_time_for_online_consults_night || "",
         breakTimes,
@@ -407,11 +427,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       <InfoRow
                         icon={Stethoscope}
                         label="Specialization"
-                        value={
-                          Array.isArray(vet.specializationList) && vet.specializationList.length
-                            ? vet.specializationList.join(", ")
-                            : "Not available"
-                        }
+                        value={vet.specializationText || "Not available"}
                       />
 
                       <InfoRow
@@ -618,6 +634,10 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                               {String(s)}
                             </span>
                           ))}
+                        </div>
+                      ) : activeBioVet.specializationText ? (
+                        <div className="text-slate-700">
+                          {activeBioVet.specializationText}
                         </div>
                       ) : (
                         <div className="text-slate-500">Not available</div>
