@@ -116,6 +116,12 @@ class PaymentController extends Controller
             $vetWhatsAppMeta = null;
             $prescriptionDocMeta = null;
             if (($notes['order_type'] ?? null) === 'video_consult') {
+                // Also notify pet parent on create-order using pp_booking_confirmed.
+                $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
+                    context: $context,
+                    notes: $notes,
+                    amountInInr: $amountInInr
+                );
                 // For video consults: notify vet immediately at order creation.
                 $vetWhatsAppMeta = $this->notifyVetVideoConsultBooked(
                     context: $context,
