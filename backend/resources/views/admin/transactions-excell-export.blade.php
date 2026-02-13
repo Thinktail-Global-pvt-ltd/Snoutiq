@@ -6,6 +6,16 @@
 @php
     $totalPaise = $transactions->sum('amount_paise');
     $formatInr = fn ($paise) => number_format(($paise ?? 0) / 100, 2);
+    $formatPetDob = static function ($value) {
+        if (empty($value)) {
+            return 'N/A';
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->format('d M Y');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
+    };
 @endphp
 <div class="row g-4">
     <div class="col-12">
@@ -58,6 +68,8 @@
                                         $parentPhone = $txn->user->phone ?? 'N/A';
                                         $petName = $petRecord->name ?? 'Pet';
                                         $petType = $petRecord->pet_type ?? $petRecord->type ?? $petRecord->breed ?? 'Pet';
+                                        $petDob = $formatPetDob($petRecord->pet_dob ?? $petRecord->dob ?? null);
+                                        $doctorMobile = $txn->doctor->doctor_mobile ?? 'N/A';
                                         $issue = trim((string) ($petFromTransaction->reported_symptom ?? ''));
                                         if ($issue === '') {
                                             $issue = trim((string) ($fallbackPetWithIssue->reported_symptom ?? $petRecord->reported_symptom ?? ''));
@@ -85,7 +97,8 @@
                                             {{ $txn->doctor->doctor_name ?? '—' }}
                                             <div class="text-muted small">
                                                 @if($txn->doctor)
-                                                    {{ $txn->doctor->doctor_email ?? $txn->doctor->doctor_mobile ?? '—' }}
+                                                    <div>Email: {{ $txn->doctor->doctor_email ?? '—' }}</div>
+                                                    <div>Mobile: {{ $txn->doctor->doctor_mobile ?? '—' }}</div>
                                                 @else
                                                     —
                                                 @endif
@@ -99,6 +112,7 @@
                                             {{ $petRecord->name ?? '—' }}
                                             @if($petRecord)
                                                 <div class="text-muted small">Breed: {{ $petRecord->breed ?? 'n/a' }}</div>
+                                                <div class="text-muted small">DOB: {{ $petDob }}</div>
                                             @endif
                                         </td>
                                         <td>
@@ -112,6 +126,8 @@
                                                     data-pet-name="{{ $petRecord->name ?? 'Pet' }}"
                                                     data-transaction-id="{{ $txn->id }}"
                                                     data-reported-symptom="{{ $issue }}"
+                                                    data-pet-dob="{{ $petDob }}"
+                                                    data-doctor-mobile="{{ $doctorMobile }}"
                                                 >
                                                     View Details
                                                 </button>
@@ -155,6 +171,7 @@
             </div>
             <div class="modal-body">
                 <div id="petTimelineMeta" class="small text-muted mb-3"></div>
+                <div id="petTimelineDetails" class="small mb-3"></div>
                 <div id="petTimelineSymptom" class="small mb-3"></div>
                 <div id="petTimelineContent" class="small text-muted">Click "View Details" to load timeline.</div>
             </div>
@@ -175,6 +192,7 @@
     const timelineModalEl = document.getElementById('petTimelineModal');
     const timelineTitleEl = document.getElementById('petTimelineModalLabel');
     const timelineMetaEl = document.getElementById('petTimelineMeta');
+    const timelineDetailsEl = document.getElementById('petTimelineDetails');
     const timelineSymptomEl = document.getElementById('petTimelineSymptom');
     const timelineContentEl = document.getElementById('petTimelineContent');
     const timelineModal = timelineModalEl ? new bootstrap.Modal(timelineModalEl) : null;
@@ -275,6 +293,19 @@
         `;
     }
 
+    function renderPetDetails(petDob, doctorMobile) {
+        const dobText = String(petDob || '').trim() || 'N/A';
+        const mobileText = String(doctorMobile || '').trim() || 'N/A';
+        timelineDetailsEl.innerHTML = `
+            <div class="border rounded p-2 bg-light">
+                <div class="d-flex flex-column gap-1">
+                    <div><span class="text-muted">Pet DOB:</span> <strong>${escapeHtml(dobText)}</strong></div>
+                    <div><span class="text-muted">Doctor Mobile:</span> <strong>${escapeHtml(mobileText)}</strong></div>
+                </div>
+            </div>
+        `;
+    }
+
     function copyTemplate(btn) {
         const text = btn.getAttribute('data-body') || '';
         navigator.clipboard.writeText(text).then(() => {
@@ -299,6 +330,8 @@
         const petName = btn.getAttribute('data-pet-name') || 'Pet';
         const transactionId = btn.getAttribute('data-transaction-id') || '—';
         const reportedSymptom = btn.getAttribute('data-reported-symptom') || '';
+        const petDob = btn.getAttribute('data-pet-dob') || '';
+        const doctorMobile = btn.getAttribute('data-doctor-mobile') || '';
 
         if (!petId || !userId || !timelineModal) {
             alert('Pet details unavailable for this row.');
@@ -307,6 +340,7 @@
 
         timelineTitleEl.textContent = `${petName} Timeline`;
         timelineMetaEl.textContent = `Transaction #${transactionId} | Pet ID: ${petId} | User ID: ${userId}`;
+        renderPetDetails(petDob, doctorMobile);
         renderReportedSymptom(reportedSymptom);
         timelineContentEl.innerHTML = '<div class="text-muted">Loading timeline...</div>';
         timelineModal.show();

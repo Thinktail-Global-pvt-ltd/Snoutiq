@@ -223,6 +223,14 @@ class AdminPanelController extends Controller
 
     public function excellExportTransactions(): View
     {
+        $petColumns = ['id', 'user_id', 'name', 'breed', 'pet_type', 'reported_symptom'];
+        if (Schema::hasColumn('pets', 'pet_dob')) {
+            $petColumns[] = 'pet_dob';
+        }
+        if (Schema::hasColumn('pets', 'dob')) {
+            $petColumns[] = 'dob';
+        }
+
         $transactions = Transaction::query()
             ->where('status', 'captured')
             ->where(function ($query) {
@@ -233,16 +241,18 @@ class AdminPanelController extends Controller
             ->with([
                 'clinic:id,name',
                 'doctor:id,doctor_name,doctor_email,doctor_mobile',
-                'user' => function ($query) {
+                'user' => function ($query) use ($petColumns) {
                     $query->select('id', 'name', 'email', 'phone')
                         ->with([
-                            'pets' => function ($petQuery) {
-                                $petQuery->select('id', 'user_id', 'name', 'breed', 'pet_type', 'reported_symptom')
+                            'pets' => function ($petQuery) use ($petColumns) {
+                                $petQuery->select($petColumns)
                                     ->orderByDesc('id');
                             },
                         ]);
                 },
-                'pet:id,user_id,name,breed,pet_type,reported_symptom',
+                'pet' => function ($query) use ($petColumns) {
+                    $query->select($petColumns);
+                },
             ])
             ->orderByDesc('created_at')
             ->get();
