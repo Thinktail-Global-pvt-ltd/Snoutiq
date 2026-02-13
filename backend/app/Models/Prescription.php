@@ -39,6 +39,7 @@ class Prescription extends Model
         'follow_up_type',
         'follow_up_notes',
         'pet_id',
+        'video_appointment_id',
     ];
 
     protected $casts = [

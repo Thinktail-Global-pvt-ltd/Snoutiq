@@ -56,6 +56,7 @@ class MedicalRecordController extends Controller
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
             'pet_id' => ['nullable', 'integer'],
+            'video_appointment_id' => ['nullable', 'integer', 'exists:video_apointment,id'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
 
@@ -152,12 +153,14 @@ class MedicalRecordController extends Controller
             'follow_up_type' => $validated['follow_up_type'] ?? $prescription->follow_up_type,
             'follow_up_notes' => $validated['follow_up_notes'] ?? $prescription->follow_up_notes,
             'pet_id' => $petId ?? $prescription->pet_id,
+            'video_appointment_id' => $validated['video_appointment_id'] ?? $prescription->video_appointment_id,
             'medications_json' => $medsJson ?? $prescription->medications_json,
         ]);
         if ($recordFilePath) {
             $prescription->image_path = $recordFilePath;
         }
         $prescription->save();
+        $this->markVideoApointmentCompleted($validated['video_appointment_id'] ?? $prescription->video_appointment_id ?? null);
         $this->markCallSessionCompleted($validated['call_session'] ?? null);
 
         if ($petId) {
@@ -207,6 +210,7 @@ class MedicalRecordController extends Controller
             'follow_up_type' => ['nullable', 'string', 'max:255'],
             'follow_up_notes' => ['nullable', 'string'],
             'pet_id' => ['nullable', 'integer'],
+            'video_appointment_id' => ['nullable', 'integer', 'exists:video_apointment,id'],
             'record_file' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
 
@@ -298,6 +302,7 @@ class MedicalRecordController extends Controller
             'follow_up_type' => $validated['follow_up_type'] ?? null,
             'follow_up_notes' => $validated['follow_up_notes'] ?? null,
             'pet_id' => $petId,
+            'video_appointment_id' => $validated['video_appointment_id'] ?? null,
             'medications_json' => $this->decodeMedicationsInput($request->input('medications_json'))
                 ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
@@ -310,6 +315,7 @@ class MedicalRecordController extends Controller
             ], 500);
         }
 
+        $this->markVideoApointmentCompleted($validated['video_appointment_id'] ?? $prescription->video_appointment_id ?? null);
         if ($petId) {
             $this->updatePetHealthState($user->id, $petId, ($validated['diagnosis_status'] ?? '') === 'chronic', $validated['disease_name'] ?? $validated['diagnosis'] ?? null);
         }
@@ -608,6 +614,32 @@ class MedicalRecordController extends Controller
         DB::table('call_sessions')
             ->where('channel_name', $channelName)
             ->update(['is_completed' => 1, 'updated_at' => now()]);
+    }
+
+    private function markVideoApointmentCompleted($videoApointmentId): void
+    {
+        $videoApointmentId = (int) $videoApointmentId;
+        if ($videoApointmentId <= 0) {
+            return;
+        }
+        if (!Schema::hasTable('video_apointment')) {
+            return;
+        }
+
+        $updates = [];
+        if (Schema::hasColumn('video_apointment', 'is_completed')) {
+            $updates['is_completed'] = 1;
+        }
+        if (Schema::hasColumn('video_apointment', 'is_complete')) {
+            $updates['is_complete'] = 1;
+        }
+        if (empty($updates)) {
+            return;
+        }
+
+        DB::table('video_apointment')
+            ->where('id', $videoApointmentId)
+            ->update($updates);
     }
 
     private function maybeStructureMedicines(?string $raw, ?string $diagnosis, ?string $notes): ?array

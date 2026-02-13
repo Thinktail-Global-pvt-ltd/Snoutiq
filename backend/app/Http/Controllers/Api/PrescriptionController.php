@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Pet;
@@ -358,6 +359,7 @@ class PrescriptionController extends Controller
         $data = $request->only([
             'doctor_id',
             'user_id',
+            'video_appointment_id',
             'content_html',
             'next_medicine_day',
             'next_visit_day',
@@ -368,6 +370,7 @@ class PrescriptionController extends Controller
         $validator = Validator::make(array_merge($data, ['image' => $request->file('image')]), [
             'doctor_id'    => 'required|integer|min:1',
             'user_id'      => 'required|integer|min:1',
+            'video_appointment_id' => 'nullable|integer|exists:video_apointment,id',
             'content_html' => 'required|string',
             'next_medicine_day' => 'nullable|date',
             'next_visit_day'    => 'nullable|date',
@@ -416,6 +419,7 @@ class PrescriptionController extends Controller
         }
 
         $prescription = Prescription::create($data);
+        $this->markVideoApointmentCompleted($prescription->video_appointment_id ?? null);
 
         // Build URL with optional backend prefix
         $appUrl = rtrim(config('app.url') ?? env('APP_URL', ''), '/');
@@ -461,5 +465,31 @@ class PrescriptionController extends Controller
         }
 
         return url($path);
+    }
+
+    private function markVideoApointmentCompleted($videoApointmentId): void
+    {
+        $videoApointmentId = (int) $videoApointmentId;
+        if ($videoApointmentId <= 0) {
+            return;
+        }
+        if (!Schema::hasTable('video_apointment')) {
+            return;
+        }
+
+        $updates = [];
+        if (Schema::hasColumn('video_apointment', 'is_completed')) {
+            $updates['is_completed'] = 1;
+        }
+        if (Schema::hasColumn('video_apointment', 'is_complete')) {
+            $updates['is_complete'] = 1;
+        }
+        if (empty($updates)) {
+            return;
+        }
+
+        DB::table('video_apointment')
+            ->where('id', $videoApointmentId)
+            ->update($updates);
     }
 }
