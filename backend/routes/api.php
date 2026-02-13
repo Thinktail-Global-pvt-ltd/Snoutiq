@@ -733,7 +733,8 @@ Route::post('/excell-export/import', function (Request $request) {
         'doctor_image' => ['nullable', 'string', 'max:500'],
         'doctor_image_file' => ['nullable', 'file', 'image', 'max:5120'],
         'bio' => ['nullable', 'string', 'max:5000'],
-        'degree' => ['nullable', 'string', 'max:255'],
+        'degree' => ['nullable'],
+        'degree.*' => ['nullable', 'string', 'max:255'],
         'years_of_experience' => ['nullable', 'string', 'max:50'],
         'specialization_select_all_that_apply' => ['nullable', 'array'],
         'specialization_select_all_that_apply.*' => ['nullable', 'string'],
@@ -789,6 +790,22 @@ Route::post('/excell-export/import', function (Request $request) {
         }
         $vet->save();
 
+        $degreeInput = $data['degree'] ?? null;
+        $degreeCsv = null;
+        if (is_array($degreeInput)) {
+            $degreeParts = array_map(fn ($item) => trim((string) $item), $degreeInput);
+            $degreeParts = array_values(array_filter($degreeParts, fn ($item) => $item !== ''));
+            $degreeParts = array_values(array_unique($degreeParts));
+            $degreeCsv = !empty($degreeParts) ? implode(', ', $degreeParts) : null;
+        } elseif (is_string($degreeInput)) {
+            $degreeParts = preg_split('/\s*,\s*/', $degreeInput);
+            $degreeParts = is_array($degreeParts) ? $degreeParts : [$degreeInput];
+            $degreeParts = array_map(fn ($item) => trim((string) $item), $degreeParts);
+            $degreeParts = array_values(array_filter($degreeParts, fn ($item) => $item !== ''));
+            $degreeParts = array_values(array_unique($degreeParts));
+            $degreeCsv = !empty($degreeParts) ? implode(', ', $degreeParts) : null;
+        }
+
         $doctor = new Doctor();
         $doctor->vet_registeration_id = $vet->id;
         $doctor->doctor_name = $data['doctor_name'];
@@ -799,7 +816,7 @@ Route::post('/excell-export/import', function (Request $request) {
         if (Schema::hasColumn('doctors', 'bio')) {
             $doctor->bio = $data['bio'] ?? null;
         }
-        $doctor->degree = $data['degree'] ?? null;
+        $doctor->degree = $degreeCsv;
         $doctor->years_of_experience = $data['years_of_experience'] ?? null;
         $doctor->specialization_select_all_that_apply = isset($data['specialization_select_all_that_apply'])
             ? json_encode(array_values(array_filter($data['specialization_select_all_that_apply'])))
