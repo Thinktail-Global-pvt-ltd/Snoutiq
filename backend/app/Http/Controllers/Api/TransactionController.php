@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\CallSession;
 use App\Models\DeviceToken;
 use App\Models\Transaction;
+use App\Models\VideoApointment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class TransactionController extends Controller
 {
@@ -40,13 +42,18 @@ class TransactionController extends Controller
             doctorId: (int) $data['doctor_id'],
             userIds: $transactions->pluck('user_id')->filter()->unique()
         );
+        $latestVideoApointments = $this->latestVideoApointmentsForUsers(
+            doctorId: (int) $data['doctor_id'],
+            userIds: $transactions->pluck('user_id')->filter()->unique()
+        );
 
         $deviceTokensByUser = $this->deviceTokensForUsers($transactions, $latestSessions);
 
-        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $deviceTokensByUser) {
+        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser) {
             $user = $tx->user;
             $pet = $tx->pet;
             $callSession = $latestSessions->get($tx->user_id);
+            $videoApointment = $latestVideoApointments->get((int) $tx->user_id);
             $deviceTokens = $deviceTokensByUser->get((int) $tx->user_id)
                 ?: ($callSession ? $deviceTokensByUser->get((int) $callSession->patient_id, []) : []);
 
@@ -77,6 +84,8 @@ class TransactionController extends Controller
                 ] : null,
                 'call_session' => $callSession ? $this->formatCallSession($callSession) : null,
                 'call_session_is_completed' => $callSession ? (bool) ($callSession->is_completed ?? false) : null,
+                'video_appointment' => $videoApointment ? $this->formatVideoApointment($videoApointment) : null,
+                'video_appointment_is_completed' => $videoApointment ? (bool) ($videoApointment->is_completed ?? false) : null,
             ];
         });
 
@@ -150,6 +159,26 @@ class TransactionController extends Controller
             ->map(fn ($group) => $group->first());
     }
 
+    /**
+     * Fetch the latest video_apointment row for each user for a given doctor.
+     */
+    protected function latestVideoApointmentsForUsers(int $doctorId, $userIds)
+    {
+        if ($userIds->isEmpty() || !Schema::hasTable('video_apointment')) {
+            return collect();
+        }
+
+        $rows = VideoApointment::query()
+            ->where('doctor_id', $doctorId)
+            ->whereIn('user_id', $userIds)
+            ->orderByDesc('id')
+            ->get();
+
+        return $rows
+            ->groupBy(fn (VideoApointment $row) => (int) $row->user_id)
+            ->map(fn ($group) => $group->first());
+    }
+
     protected function deviceTokensForUsers($transactions, $latestSessions)
     {
         $userIds = collect()
@@ -189,6 +218,22 @@ class TransactionController extends Controller
             'is_completed' => $session->is_completed ?? null,
             'created_at' => optional($session->created_at)->toIso8601String(),
             'updated_at' => optional($session->updated_at)->toIso8601String(),
+        ];
+    }
+
+    protected function formatVideoApointment(VideoApointment $videoApointment): array
+    {
+        return [
+            'id' => $videoApointment->id,
+            'order_id' => $videoApointment->order_id,
+            'pet_id' => $videoApointment->pet_id,
+            'user_id' => $videoApointment->user_id,
+            'doctor_id' => $videoApointment->doctor_id,
+            'clinic_id' => $videoApointment->clinic_id,
+            'call_session' => $videoApointment->call_session,
+            'is_completed' => (bool) ($videoApointment->is_completed ?? false),
+            'created_at' => optional($videoApointment->created_at)->toIso8601String(),
+            'updated_at' => optional($videoApointment->updated_at)->toIso8601String(),
         ];
     }
 }
