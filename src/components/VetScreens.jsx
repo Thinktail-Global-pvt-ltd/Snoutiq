@@ -34,7 +34,7 @@ import {
   Stethoscope,
   Award,
   Calendar,
-  Phone,
+  MessageCircle,
   Mail,
   MapPin,
   Briefcase,
@@ -783,7 +783,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     whatsappNumber: "",
     email: "",
     vetCity: "",
-    degree: "",
+    degree: [],
     degreeOther: "",
     yearsOfExperience: "",
     doctorLicense: "",
@@ -852,6 +852,21 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     setSpecializations((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
     );
+  };
+
+  const toggleDegree = (value) => {
+    setForm((prev) => {
+      const current = Array.isArray(prev.degree) ? prev.degree : [];
+      const isSelected = current.includes(value);
+      const next = isSelected
+        ? current.filter((item) => item !== value)
+        : [...current, value];
+      return {
+        ...prev,
+        degree: next,
+        degreeOther: value === "Other" && isSelected ? "" : prev.degreeOther,
+      };
+    });
   };
 
   const formatTimeLabel = (value) => {
@@ -947,7 +962,19 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     setImageError("");
   };
 
-  const normalizedDegree = form.degree === "Other" ? form.degreeOther.trim() : form.degree;
+  const degreeSelections = Array.isArray(form.degree)
+    ? form.degree
+    : form.degree
+      ? [form.degree]
+      : [];
+  const normalizedDegrees = degreeSelections
+    .filter((degree) => degree !== "Other")
+    .map((degree) => degree.trim())
+    .filter(Boolean);
+  if (degreeSelections.includes("Other") && form.degreeOther.trim()) {
+    normalizedDegrees.push(form.degreeOther.trim());
+  }
+  const degreePayload = Array.from(new Set(normalizedDegrees)).join(", ");
   const doctorNameReady = normalizeDoctorName(form.vetFullName);
 
   useEffect(() => {
@@ -1025,7 +1052,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   }
 
   const payoutReady = form.payoutDetail.trim();
-  const degreeReady = normalizedDegree.trim();
+  const degreeReady = Boolean(degreePayload);
   const whatsappReady = form.whatsappNumber.trim().length >= 10;
 
   const trimmedImageUrl = form.doctorImageUrl.trim();
@@ -1037,7 +1064,6 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   const basicComplete = Boolean(
     doctorNameReady &&
-      form.clinicName.trim() &&
       whatsappReady &&
       form.email.trim() &&
       form.shortIntro.trim() &&
@@ -1137,7 +1163,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
       const breakPayload = noBreakTime ? ["No"] : breakTimes;
 
       const payload = {
-        vet_name: form.clinicName.trim(),
+        vet_name: form.clinicName.trim() || undefined,
         vet_email: form.email.trim(),
         vet_mobile: form.whatsappNumber.trim(),
         vet_city: form.vetCity.trim(),
@@ -1147,7 +1173,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         doctor_license: form.doctorLicense.trim(),
         doctor_image: trimmedImageUrl || undefined,
         bio: form.shortIntro.trim(),
-        degree: degreeReady,
+        degree: degreePayload,
         years_of_experience: form.yearsOfExperience.trim(),
         specialization_select_all_that_apply: selectedSpecs,
         response_time_for_online_consults_day: form.responseTimeDay,
@@ -1409,10 +1435,9 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     />
                     <input
                       type="text"
-                      placeholder="Enter clinic/hospital name"
+                      placeholder="Enter clinic/hospital name (optional)"
                       value={form.clinicName}
                       onChange={updateForm("clinicName")}
-                      required
                       className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
                     />
                   </div>
@@ -1433,40 +1458,47 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="relative">
-                      <MapPin
-                        size={18}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Enter your city"
-                        value={form.vetCity}
-                        onChange={updateForm("vetCity")}
-                        required
-                        className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
-                      />
+                    <div className="flex flex-col gap-1">
+                      <div className="relative">
+                        <MapPin
+                          size={18}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Enter your city"
+                          value={form.vetCity}
+                          onChange={updateForm("vetCity")}
+                          required
+                          className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                        />
+                      </div>
                     </div>
-                    <div className="relative">
-                      <Phone
-                        size={18}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                      />
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        placeholder="Enter WhatsApp number"
-                        value={form.whatsappNumber}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            whatsappNumber: e.target.value.replace(/\D/g, ""),
-                          }))
-                        }
-                        required
-                        className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
-                      />
+                    <div className="flex flex-col gap-1">
+                      <div className="relative">
+                        <MessageCircle
+                          size={18}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none"
+                        />
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          placeholder="Enter WhatsApp number"
+                          value={form.whatsappNumber}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              whatsappNumber: e.target.value.replace(/\D/g, ""),
+                            }))
+                          }
+                          required
+                          className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                        />
+                      </div>
+                      <p className="pl-12 text-xs text-gray-500">
+                        This number will be used for all communication purposes.
+                      </p>
                     </div>
                   </div>
 
@@ -1521,25 +1553,23 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                 <div className="space-y-3">
                   <label className="block text-sm font-medium text-gray-700">
-                    Degree / Qualification *
+                    Degree / Qualification (Select all that apply) *
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {DEGREE_OPTIONS.map((degree) => (
                       <label
                         key={degree}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm cursor-pointer transition-all ${
-                          form.degree === degree
+                          degreeSelections.includes(degree)
                             ? "border-[#0B4D67] bg-[#0B4D67]/5 text-[#0B4D67]"
                             : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300"
                         }`}
                       >
                         <input
-                          type="radio"
-                          name="degree"
+                          type="checkbox"
                           value={degree}
-                          checked={form.degree === degree}
-                          onChange={updateForm("degree")}
-                          required
+                          checked={degreeSelections.includes(degree)}
+                          onChange={() => toggleDegree(degree)}
                           className="hidden"
                         />
                         {degree}
@@ -1547,7 +1577,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     ))}
                   </div>
 
-                  {form.degree === "Other" && (
+                  {degreeSelections.includes("Other") && (
                     <input
                       type="text"
                       placeholder="Specify your degree"
