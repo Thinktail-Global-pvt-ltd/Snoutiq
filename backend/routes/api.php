@@ -732,6 +732,7 @@ Route::post('/excell-export/import', function (Request $request) {
         'doctor_license' => ['nullable', 'string', 'max:255'],
         'doctor_image' => ['nullable', 'string', 'max:500'],
         'doctor_image_file' => ['nullable', 'file', 'image', 'max:5120'],
+        'doctor_image_base64' => ['nullable', 'string'],
         'bio' => ['nullable', 'string', 'max:5000'],
         'degree' => ['nullable'],
         'degree.*' => ['nullable', 'string', 'max:255'],
@@ -749,6 +750,29 @@ Route::post('/excell-export/import', function (Request $request) {
     ]);
 
     $doctorImageUrl = $data['doctor_image'] ?? null;
+    $doctorImageBlob = null;
+    $doctorImageMime = null;
+
+    $extractBlobFromDataUri = static function (?string $value): array {
+        if (!$value || !str_starts_with($value, 'data:image')) {
+            return [null, null];
+        }
+
+        if (!preg_match('/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/s', $value, $matches)) {
+            return [null, null];
+        }
+
+        $mime = strtolower(trim($matches[1]));
+        $rawBase64 = str_replace(' ', '+', $matches[2]);
+        $binary = base64_decode($rawBase64, true);
+
+        if ($binary === false) {
+            return [null, null];
+        }
+
+        return [$binary, $mime];
+    };
+
     if ($request->hasFile('doctor_image_file')) {
         $file = $request->file('doctor_image_file');
         if (! $file->isValid()) {
@@ -757,6 +781,9 @@ Route::post('/excell-export/import', function (Request $request) {
                 'message' => $file->getErrorMessage() ?: 'Invalid upload.',
             ], 422);
         }
+
+        $doctorImageBlob = $file->get();
+        $doctorImageMime = $file->getMimeType() ?: ($file->getClientMimeType() ?: 'image/jpeg');
 
         $storedPath = $file->store('vet-photos', 'public');
         if (! $storedPath) {
@@ -771,9 +798,27 @@ Route::post('/excell-export/import', function (Request $request) {
             $publicBase .= '/backend';
         }
         $doctorImageUrl = $publicBase.'/'.ltrim($storedPath, '/');
+    } elseif (!empty($data['doctor_image_base64'])) {
+        [$doctorImageBlob, $doctorImageMime] = $extractBlobFromDataUri((string) $data['doctor_image_base64']);
+        if (!$doctorImageBlob || !$doctorImageMime) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid doctor_image_base64 data URI.',
+            ], 422);
+        }
+    } elseif (is_string($doctorImageUrl) && str_starts_with($doctorImageUrl, 'data:image')) {
+        [$doctorImageBlob, $doctorImageMime] = $extractBlobFromDataUri($doctorImageUrl);
+        if (!$doctorImageBlob || !$doctorImageMime) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid doctor_image data URI.',
+            ], 422);
+        }
+        // Avoid storing data URI string in the doctor_image path column.
+        $doctorImageUrl = null;
     }
 
-    $result = DB::transaction(function () use ($data, $doctorImageUrl) {
+    $result = DB::transaction(function () use ($data, $doctorImageUrl, $doctorImageBlob, $doctorImageMime) {
         $vet = new VetRegisterationTemp();
         $vet->name = $data['vet_name'];
         $vet->email = $data['vet_email'] ?? null;
@@ -813,6 +858,10 @@ Route::post('/excell-export/import', function (Request $request) {
         $doctor->doctor_mobile = $data['doctor_mobile'] ?? null;
         $doctor->doctor_license = $data['doctor_license'] ?? null;
         $doctor->doctor_image = $doctorImageUrl;
+        if ($doctorImageBlob && $doctorImageMime && Schema::hasColumn('doctors', 'doctor_image_blob') && Schema::hasColumn('doctors', 'doctor_image_mime')) {
+            $doctor->doctor_image_blob = $doctorImageBlob;
+            $doctor->doctor_image_mime = $doctorImageMime;
+        }
         if (Schema::hasColumn('doctors', 'bio')) {
             $doctor->bio = $data['bio'] ?? null;
         }
@@ -853,6 +902,7 @@ Route::post('/excell-export/import', function (Request $request) {
                 'doctor_mobile',
                 'doctor_license',
                 'doctor_image',
+                'doctor_image_mime',
                 'bio',
                 'degree',
                 'years_of_experience',
