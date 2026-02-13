@@ -10,9 +10,11 @@ use App\Models\GroomerBooking;
 use App\Models\GroomerEmployee;
 use App\Models\GroomerService;
 use App\Models\UserPet;
+use App\Models\VideoApointment;
    use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
   use Razorpay\Api\Api;
 
 
@@ -20,6 +22,16 @@ class RazorpayController  extends Controller
 {
     public function createOrder(Request $request)
     {
+        $request->validate([
+            'amount' => 'required|integer|min:1',
+            'pet_id' => 'nullable|integer',
+            'user_id' => 'nullable|integer',
+            'doctor_id' => 'nullable|integer',
+            'clinic_id' => 'nullable|integer',
+            'call_session' => 'nullable|string',
+            'call_session_id' => 'nullable|string',
+        ]);
+
         $api = new Api(
             config('services.razorpay.key'),
             config('services.razorpay.secret')
@@ -30,6 +42,27 @@ class RazorpayController  extends Controller
             'amount' => $request->amount * 100, // Amount in paisa
             'currency' => 'INR',
         ]);
+
+        if (Schema::hasTable('video_apointment')) {
+            $callSession = $request->input('call_session') ?: $request->input('call_session_id');
+            $hasAnyLink = $request->filled('pet_id')
+                || $request->filled('user_id')
+                || $request->filled('doctor_id')
+                || $request->filled('clinic_id')
+                || !empty($callSession);
+
+            if ($hasAnyLink) {
+                VideoApointment::create([
+                    'order_id' => $order->id ?? null,
+                    'pet_id' => $request->input('pet_id'),
+                    'user_id' => $request->input('user_id'),
+                    'doctor_id' => $request->input('doctor_id'),
+                    'clinic_id' => $request->input('clinic_id'),
+                    'call_session' => $callSession ?: null,
+                    'is_completed' => false,
+                ]);
+            }
+        }
 
         return response()->json([
             'order_id' => $order->id,

@@ -14,6 +14,7 @@ use App\Models\CallSession;
 use App\Models\User;
 use App\Models\Pet;
 use App\Models\Prescription;
+use App\Models\VideoApointment;
 use Illuminate\Support\Str;
 use App\Services\WhatsAppService;
 use App\Services\Push\FcmService;
@@ -54,10 +55,12 @@ class PaymentController extends Controller
             'amount' => 'nullable|integer|min:1',
             'clinic_id' => 'nullable|integer',
             'doctor_id' => 'nullable|integer',
+            'user_id' => 'nullable|integer',
             'service_id' => 'nullable|string',
             'order_type' => 'nullable|string',
             'vet_slug' => 'nullable|string',
             'call_session_id' => 'nullable|string',
+            'call_session' => 'nullable|string',
             'pet_id' => 'nullable|integer',
         ]);
 
@@ -93,6 +96,13 @@ class PaymentController extends Controller
                 order: $orderArr,
                 notes: $notes,
                 context: $context
+            );
+            $this->recordVideoApointmentOrder(
+                request: $request,
+                order: $orderArr,
+                context: $context,
+                callSession: $callSession,
+                notes: $notes
             );
 
             $doctorOrderPushMeta = $this->notifyDoctorOrderCreated(
@@ -592,7 +602,7 @@ class PaymentController extends Controller
             'vet_slug' => ['vet_slug'],
             'order_type' => ['order_type', 'orderType', 'type', 'payment_type'],
             'service_id' => ['service_id'],
-            'call_session_id' => ['call_session_id', 'callSessionId', 'call_id', 'callId'],
+            'call_session_id' => ['call_session', 'call_session_id', 'callSessionId', 'call_id', 'callId'],
             'clinic_id' => ['clinic_id', 'clinicId'],
             'doctor_id' => ['doctor_id', 'doctorId'],
             'user_id' => ['user_id', 'userId', 'patient_id', 'patientId'],
@@ -1084,7 +1094,7 @@ class PaymentController extends Controller
     protected function resolveTransactionContext(Request $request, array $notes = []): array
     {
         $context = [
-            'call_identifier' => $this->firstFilled($request, ['call_session_id', 'callSessionId', 'call_id', 'callId'], $notes),
+            'call_identifier' => $this->firstFilled($request, ['call_session', 'call_session_id', 'callSessionId', 'call_id', 'callId'], $notes),
             'clinic_id' => $this->toNullableInt($this->firstFilled($request, ['clinic_id', 'clinicId'], $notes)),
             'doctor_id' => $this->toNullableInt($this->firstFilled($request, ['doctor_id', 'doctorId'], $notes)),
             'user_id' => $this->toNullableInt($this->firstFilled($request, ['user_id', 'userId', 'patient_id', 'patientId'], $notes)),
@@ -1475,5 +1485,47 @@ HTML;
         $session->save();
 
         return $session;
+    }
+
+    protected function recordVideoApointmentOrder(
+        Request $request,
+        array $order,
+        array $context,
+        ?CallSession $callSession = null,
+        array $notes = []
+    ): void {
+        if (!Schema::hasTable('video_apointment')) {
+            return;
+        }
+
+        $callSessionIdentifier = $callSession?->resolveIdentifier()
+            ?: ($context['call_identifier'] ?? null)
+            ?: $this->firstFilled($request, ['call_session', 'call_session_id', 'callSessionId', 'call_id', 'callId'], $notes);
+
+        $payload = [
+            'order_id' => $order['id'] ?? null,
+            'pet_id' => $context['pet_id'] ?? null,
+            'user_id' => $context['user_id'] ?? null,
+            'doctor_id' => $context['doctor_id'] ?? null,
+            'clinic_id' => $context['clinic_id'] ?? null,
+            'call_session' => $callSessionIdentifier ?: null,
+            'is_completed' => false,
+        ];
+
+        $hasAnyLink = $payload['pet_id']
+            || $payload['user_id']
+            || $payload['doctor_id']
+            || $payload['clinic_id']
+            || $payload['call_session'];
+
+        if (!$hasAnyLink) {
+            return;
+        }
+
+        try {
+            VideoApointment::create($payload);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }
