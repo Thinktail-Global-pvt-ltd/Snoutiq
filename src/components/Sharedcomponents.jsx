@@ -1,5 +1,7 @@
 import React from "react";
-import { ChevronLeft } from "lucide-react";
+import { CheckCircle2, ChevronLeft } from "lucide-react";
+
+export const PET_FLOW_STEPS = ["Pet Details", "Choose Vet", "Payment"];
 
 export const Header = ({ onBack, title }) => (
   <div
@@ -39,21 +41,93 @@ export const Header = ({ onBack, title }) => (
   </div>
 );
 
-export const ProgressBar = ({ current = 1, total = 3 }) => (
-  <div className="flex gap-2 mb-6 px-1 md:px-0 md:mb-10 md:gap-3">
-    {Array.from({ length: total }).map((_, i) => (
-      <div
-        key={i}
-        className={`
-          h-1.5 rounded-full flex-1 transition-all duration-500
-          md:h-2
-          ${
-            i < current
-              ? "bg-gradient-to-r from-[#3998de] to-[#3998de]"
-              : "bg-stone-200"
-          }
-        `}
-      />
-    ))}
-  </div>
-);
+export const ProgressBar = ({ current = 1, total = 3, steps }) => {
+  const stepLabels = Array.isArray(steps) && steps.length ? steps : null;
+  const count = stepLabels ? stepLabels.length : total;
+  const safeCurrent = Math.min(Math.max(current, 1), count);
+
+  const bar = (
+    <div className="flex gap-2 mb-6 px-1 md:px-0 md:mb-10 md:gap-3 md:hidden">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className={`
+            h-1.5 rounded-full flex-1 transition-all duration-500
+            md:h-2
+            ${
+              i < safeCurrent
+                ? "bg-gradient-to-r from-[#3998de] to-[#3998de]"
+                : "bg-stone-200"
+            }
+          `}
+        />
+      ))}
+    </div>
+  );
+
+  if (!stepLabels) {
+    return (
+      <div className="flex gap-2 mb-6 px-1 md:px-0 md:mb-10 md:gap-3">
+        {Array.from({ length: count }).map((_, i) => (
+          <div
+            key={i}
+            className={`
+              h-1.5 rounded-full flex-1 transition-all duration-500
+              md:h-2
+              ${
+                i < safeCurrent
+                  ? "bg-gradient-to-r from-[#3998de] to-[#3998de]"
+                  : "bg-stone-200"
+              }
+            `}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  const circleClass = (complete, active) =>
+    [
+      "w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold",
+      complete || active
+        ? "bg-gradient-to-r from-[#3998de] to-[#3998de] text-white"
+        : "bg-gray-200 text-gray-600",
+    ].join(" ");
+
+  const labelClass = (complete, active) =>
+    complete || active ? "font-medium text-gray-700" : "font-medium text-gray-500";
+
+  const lineClass = (isComplete) =>
+    [
+      "w-16 h-0.5",
+      isComplete ? "bg-gradient-to-r from-[#3998de] to-[#3998de]" : "bg-gray-200",
+    ].join(" ");
+
+  return (
+    <div className="w-full">
+      {bar}
+      <div className="hidden md:flex items-center justify-center mb-10">
+        <div className="flex items-center gap-4">
+          {stepLabels.map((label, index) => {
+            const stepIndex = index + 1;
+            const complete = stepIndex < safeCurrent;
+            const active = stepIndex === safeCurrent;
+            return (
+              <React.Fragment key={`${label}-${stepIndex}`}>
+                <div className="flex items-center gap-2">
+                  <div className={circleClass(complete, active)}>
+                    {complete ? <CheckCircle2 size={18} /> : stepIndex}
+                  </div>
+                  <span className={labelClass(complete, active)}>{label}</span>
+                </div>
+                {index < stepLabels.length - 1 ? (
+                  <div className={lineClass(complete)} />
+                ) : null}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};

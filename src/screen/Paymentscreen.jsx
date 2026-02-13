@@ -527,7 +527,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
-import { Header, ProgressBar } from "../components/Sharedcomponents";
+import { Header, PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
 import { apiPost } from "../lib/api";
 import {
   ShieldCheck,
@@ -811,7 +811,7 @@ export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) =
 
       <div className="w-full">
         <div className="flex-1 px-4 py-6 overflow-y-auto md:px-10 md:py-12 lg:px-16">
-          <ProgressBar current={3} total={3} />
+          <ProgressBar current={3} steps={PET_FLOW_STEPS} />
 
           <div className="mt-6 md:grid md:grid-cols-12 md:gap-10 lg:gap-14">
             <div className="md:col-span-7 lg:col-span-7">

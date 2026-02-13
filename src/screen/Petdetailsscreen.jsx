@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
-import { Header, ProgressBar } from "../components/Sharedcomponents";
+import { Header, PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
 import {
   CheckCircle2,
   ChevronDown,
@@ -553,8 +553,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
         <div className="flex-1 px-6 py-6 pb-32 overflow-y-auto no-scrollbar md:px-12 lg:px-20 md:py-12">
           <div className="md:max-w-none">
             <div className="md:flex md:items-center md:justify-between md:gap-6">
-              <ProgressBar current={1} total={3} />
-              <div className="hidden md:block text-sm text-gray-500 bg-white px-4 py-2 rounded-full border border-gray-100">
+              <ProgressBar current={1} steps={PET_FLOW_STEPS} />
+              <div className="hidden text-sm text-gray-500 bg-white px-4 py-2 rounded-full border border-gray-100">
                 ⏱️ Takes less than 2 minutes
               </div>
             </div>

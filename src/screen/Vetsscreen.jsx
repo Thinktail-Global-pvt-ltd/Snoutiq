@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
-import { Header, ProgressBar } from "../components/Sharedcomponents";
+import { Header, PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
 import {
   Clock,
   Zap,
@@ -292,7 +292,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
       <Header onBack={onBack} title="Available Vets" />
 
       <div className="flex-1 px-4 py-6 pb-20 overflow-y-auto no-scrollbar md:px-10 lg:px-16 md:py-10">
-        <ProgressBar current={2} total={3} />
+        <ProgressBar current={2} steps={PET_FLOW_STEPS} />
 
         <div className="mt-6 md:mt-10">
           <div className="flex items-start justify-between gap-4">
