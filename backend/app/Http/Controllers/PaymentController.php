@@ -97,7 +97,7 @@ class PaymentController extends Controller
                 notes: $notes,
                 context: $context
             );
-            $this->recordVideoApointmentOrder(
+            $videoApointment = $this->recordVideoApointmentOrder(
                 request: $request,
                 order: $orderArr,
                 context: $context,
@@ -149,6 +149,9 @@ class PaymentController extends Controller
                 'whatsapp' => $whatsAppMeta,
                 'vet_whatsapp' => $vetWhatsAppMeta,
                 'prescription_doc' => $prescriptionDocMeta,
+                'video_appointment' => $videoApointment ? [
+                    'id' => $videoApointment->id,
+                ] : null,
                 'call_session' => $callSession ? [
                     'id' => $callSession->id,
                     'call_identifier' => $callSession->resolveIdentifier(),
@@ -1493,9 +1496,14 @@ HTML;
         array $context,
         ?CallSession $callSession = null,
         array $notes = []
-    ): void {
+    ): ?VideoApointment {
         if (!Schema::hasTable('video_apointment')) {
-            return;
+            return null;
+        }
+
+        $orderType = strtolower((string) $this->resolveTransactionType($notes));
+        if (!in_array($orderType, ['video_consult', 'excell_export_campaign'], true)) {
+            return null;
         }
 
         $callSessionIdentifier = $callSession?->resolveIdentifier()
@@ -1519,13 +1527,14 @@ HTML;
             || $payload['call_session'];
 
         if (!$hasAnyLink) {
-            return;
+            return null;
         }
 
         try {
-            VideoApointment::create($payload);
+            return VideoApointment::create($payload);
         } catch (\Throwable $e) {
             report($e);
+            return null;
         }
     }
 }

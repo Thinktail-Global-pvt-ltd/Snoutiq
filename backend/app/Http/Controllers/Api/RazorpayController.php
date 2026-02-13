@@ -30,6 +30,7 @@ class RazorpayController  extends Controller
             'clinic_id' => 'nullable|integer',
             'call_session' => 'nullable|string',
             'call_session_id' => 'nullable|string',
+            'order_type' => 'nullable|string',
         ]);
 
         $api = new Api(
@@ -43,7 +44,10 @@ class RazorpayController  extends Controller
             'currency' => 'INR',
         ]);
 
-        if (Schema::hasTable('video_apointment')) {
+        $orderType = strtolower((string) $request->input('order_type', ''));
+        $shouldStoreVideoApointment = in_array($orderType, ['video_consult', 'excell_export_campaign'], true);
+
+        if (Schema::hasTable('video_apointment') && $shouldStoreVideoApointment) {
             $callSession = $request->input('call_session') ?: $request->input('call_session_id');
             $hasAnyLink = $request->filled('pet_id')
                 || $request->filled('user_id')
