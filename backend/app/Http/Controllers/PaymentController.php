@@ -1016,9 +1016,21 @@ class PaymentController extends Controller
     ): array {
         $templateKey = strtolower(trim($template));
 
-        // New vet confirmation templates use 5 params:
-        // 1=VetName, 2=PetParentName, 3=PetName, 4=Breed/Type, 5=SLA minutes.
-        if (in_array($templateKey, ['appointment_confirmation_v2', 'vet_sla_reminder'], true)) {
+        // appointment_confirmation_v2 expects 4 body params.
+        if ($templateKey === 'appointment_confirmation_v2') {
+            return [[
+                'type' => 'body',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $doctorName],
+                    ['type' => 'text', 'text' => $parentName],
+                    ['type' => 'text', 'text' => $petName],
+                    ['type' => 'text', 'text' => $breed],
+                ],
+            ]];
+        }
+
+        // vet_sla_reminder expects 5 body params.
+        if ($templateKey === 'vet_sla_reminder') {
             return [[
                 'type' => 'body',
                 'parameters' => [
