@@ -42,12 +42,26 @@
                                     <th scope="col">Doctor</th>
                                     <th scope="col">Clinic</th>
                                     <th scope="col">Current Photo</th>
+                                    <th scope="col">Public URL</th>
                                     <th scope="col" class="text-end">Upload / Replace</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($doctors as $doctor)
-                                    @php $clinic = $doctor->clinic; @endphp
+                                    @php
+                                        $clinic = $doctor->clinic;
+                                        $imagePath = ltrim((string) $doctor->doctor_image, '/');
+                                        $baseUrl = rtrim((string) config('app.url'), '/');
+                                        if ($baseUrl === '') {
+                                            $baseUrl = rtrim(url('/'), '/');
+                                        }
+                                        $publicImageUrl = null;
+                                        if (!empty($doctor->doctor_image)) {
+                                            $publicImageUrl = preg_match('/^https?:\/\//i', (string) $doctor->doctor_image)
+                                                ? (string) $doctor->doctor_image
+                                                : $baseUrl . '/' . $imagePath;
+                                        }
+                                    @endphp
                                     <tr>
                                         <td>
                                             <div class="fw-semibold">{{ $doctor->doctor_name ?? 'Unnamed' }}</div>
@@ -58,18 +72,25 @@
                                             <div class="small text-muted">{{ $clinic->city ?? '—' }} @if(!empty($clinic?->pincode)) • {{ $clinic->pincode }} @endif</div>
                                         </td>
                                         <td style="width:160px">
-                                            @if($doctor->doctor_image)
-                                                <img src="/{{ $doctor->doctor_image }}" class="img-fluid rounded border" alt="doctor photo">
+                                            @if($publicImageUrl)
+                                                <img src="{{ $publicImageUrl }}" class="img-fluid rounded border" alt="doctor photo">
                                             @else
                                                 <span class="text-muted small">No image</span>
                                             @endif
                                         </td>
-                                        <td class="text-end" style="width:300px">
+                                        <td style="width:260px">
+                                            @if($publicImageUrl)
+                                                <code class="small text-break">{{ $publicImageUrl }}</code>
+                                            @else
+                                                <span class="text-muted small">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end" style="width:320px">
                                             <form action="{{ route('admin.doctors.image', $doctor) }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column gap-2">
                                                 @csrf
-                                                <div class="form-text text-start">Upload file <em>or</em> paste base64 data URI:</div>
+                                                <div class="form-text text-start">Upload file <em>or</em> paste base64:</div>
                                                 <input type="file" name="doctor_image" accept="image/*" class="form-control">
-                                                <textarea name="doctor_image" class="form-control" rows="2" placeholder="data:image/png;base64,..."></textarea>
+                                                <textarea name="doctor_image_base64" class="form-control" rows="2" placeholder="data:image/png;base64,..."></textarea>
                                                 <button type="submit" class="btn btn-sm btn-primary">Save image</button>
                                             </form>
                                         </td>
