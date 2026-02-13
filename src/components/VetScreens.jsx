@@ -2087,6 +2087,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     /^data:image\//i.test(url || "") ||
     /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url || "");
 
+  const isImageMime = (value) =>
+    String(value || "").toLowerCase().startsWith("image/");
+
+  const isBackendUrl = (url) => {
+    if (!url) return false;
+    const base = apiBaseUrl().replace(/\/+$/, "");
+    return String(url).startsWith(base);
+  };
+
   const getObservationImageUrl = (observation) => {
     const raw = observation?.image_blob_url || observation?.image_url || "";
     return toDocUrl(raw);
@@ -2178,11 +2187,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
         const images = observations
           .map((obs) => {
             const imageUrl = getObservationImageUrl(obs);
-            if (!imageUrl) return null;
+            if (!imageUrl || !isBackendUrl(imageUrl)) return null;
             return {
               id: obs?.id || imageUrl,
               url: imageUrl,
               name: obs?.image_name || "",
+              mime: obs?.image_mime || "",
               timestamp: obs?.timestamp || obs?.created_at || "",
               notes: obs?.notes || "",
             };
@@ -2360,9 +2370,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     resetPrescriptionForm();
   };
 
-  const handleDocPreview = (url) => {
+  const handleDocPreview = (url, mime) => {
     if (!url) return;
-    if (isImageUrl(url)) {
+    if (isImageMime(mime) || isImageUrl(url)) {
       setDocZoom(DOC_ZOOM_MIN);
       setDocPreviewUrl(url);
     } else {
@@ -2871,7 +2881,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         <button
                           key={image.id}
                           type="button"
-                          onClick={() => handleDocPreview(image.url)}
+                          onClick={() => handleDocPreview(image.url, image.mime)}
                           className="text-left rounded-2xl border border-gray-200 bg-white p-3 transition hover:border-[#0B4D67]/40 hover:shadow-sm"
                         >
                           <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
