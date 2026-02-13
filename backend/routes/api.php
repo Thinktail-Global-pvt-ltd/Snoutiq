@@ -136,6 +136,7 @@ use App\Http\Controllers\Api\VetController;
 use App\Http\Controllers\Api\AdminOnboardingStatusController;
 use App\Http\Controllers\Api\VetLeadController;
 use App\Http\Controllers\Api\ClinicDetailsController;
+// (imports already declared above)
 
 Route::get('/vets', [VetController::class, 'index']);        // All vets
 Route::get('/vets/by-referral/{code}', [VetController::class, 'showByReferral'])->name('api.vets.by-referral');
@@ -1143,6 +1144,47 @@ Route::post('/reviews', [ReviewController::class, 'store']);
 // ---- Doctor status/availability updates by vet_registerations_temp.id ----
 Route::post('/doctor/update-status', [DoctorStatusController::class, 'updateByVet']);
 Route::patch('/doctors/{doctor}/status', [DoctorStatusController::class, 'updateDoctor']);
+
+// One-off: insert vet + doctor from "Video Consult Pricing and active doctors" sheet (Dr Parvinder Singh Rathee)
+Route::post('/dev/seed-parvinder-rathee', function () {
+    $vetData = [
+        'name' => 'Dr Parvinder Singh Rathee Clinic',
+        'email' => 'parvinder.singh.rathee@example.com',
+        'mobile' => '9876543210',
+        'city' => 'Gurgaon',
+        'pincode' => '122001',
+        'exported_from_excell' => 1,
+        'password' => '123456',
+    ];
+
+    $doctorData = [
+        'doctor_name' => 'Dr Parvinder Singh Rathee',
+        'doctor_email' => 'parvinder.singh.rathee@example.com',
+        'doctor_mobile' => '9876543210',
+        'degree' => 'BVSc & AH',
+        'years_of_experience' => '10+',
+        'specialization_select_all_that_apply' => 'General Medicine, Surgery',
+        'video_day_rate' => 499,
+        'video_night_rate' => 699,
+        'exported_from_excell' => 1,
+        'password' => '123456',
+        'doctor_password' => '123456',
+    ];
+
+    return DB::transaction(function () use ($vetData, $doctorData) {
+        $vet = VetRegisterationTemp::create($vetData);
+
+        $doctorData['vet_registeration_id'] = $vet->id;
+        $doctor = Doctor::create($doctorData);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Seeded vet and doctor for Dr Parvinder Singh Rathee',
+            'vet' => $vet,
+            'doctor' => $doctor,
+        ], 201);
+    });
+});
 
 Route::delete('/chat-rooms/{chat_room_token}', [GeminiChatController::class, 'deleteRoom']);
 Route::get('/gemini/describe-pet', [AuthController::class, 'describePetImage']);
