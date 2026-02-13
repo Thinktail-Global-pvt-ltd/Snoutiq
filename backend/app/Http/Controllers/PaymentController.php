@@ -934,23 +934,25 @@ class PaymentController extends Controller
             $issue = $notes['summary'] ?? $notes['reason'] ?? $notes['concern'] ?? 'Video consult';
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 20));
 
-            // Try provided + configured + common template name variants to avoid translation-name mismatch
-            $templateCandidates = array_values(array_filter([
-                $notes['vet_template'] ?? null,
-                'appointment_confirmation_v2',
-                config('services.whatsapp.templates.vet_new_video_consult') ?? null,
-                'VET_NEW_VIDEO_CONSULT',
-                'vet_new_video_consult',
-            ]));
+            $requestedTemplate = strtolower(trim((string) ($notes['vet_template'] ?? '')));
+            if (in_array($requestedTemplate, ['vet_new_video_consult', 'vet_new_consultation_assigned'], true)) {
+                $requestedTemplate = 'appointment_confirmation_v2';
+            }
 
-            // language fallbacks: provided -> config -> en -> en_US -> en_GB
-            $languageCandidates = array_values(array_filter([
-                $notes['vet_template_language'] ?? null,
-                config('services.whatsapp.templates.vet_new_video_consult_language') ?? null,
-                'en',
-                'en_US',
-                'en_GB',
-            ]));
+            $configuredTemplate = strtolower(trim((string) (config('services.whatsapp.templates.vet_new_video_consult') ?? '')));
+            if (in_array($configuredTemplate, ['vet_new_video_consult', 'vet_new_consultation_assigned'], true)) {
+                $configuredTemplate = 'appointment_confirmation_v2';
+            }
+
+            // Force to new approved template family only.
+            $templateCandidates = array_values(array_unique(array_filter([
+                $requestedTemplate ?: null,
+                $configuredTemplate ?: null,
+                'appointment_confirmation_v2',
+            ])));
+
+            // Approved translation is available in "en".
+            $languageCandidates = ['en'];
 
             $lastError = null;
             foreach ($templateCandidates as $tpl) {
