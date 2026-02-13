@@ -22,6 +22,10 @@ class TransactionController extends Controller
         $transactions = Transaction::query()
             ->where('type', 'video_consult')
             ->where('doctor_id', $data['doctor_id'])
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', 'pending');
+            })
             ->with([
                 'user' => fn ($q) => $q->select('id', 'name'),
                 'user.deviceTokens:id,user_id,token',
