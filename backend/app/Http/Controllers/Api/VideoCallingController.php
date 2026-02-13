@@ -29,7 +29,7 @@ class VideoCallingController extends Controller
         $userId = $request->query('user_id');
 
         if (!$userId) {
-            return response()->json([
+            return $this->jsonResponse([
                 'status' => 'error',
                 'message' => 'user_id is required',
             ], 422);
@@ -37,7 +37,7 @@ class VideoCallingController extends Controller
 
         $user = User::query()->select('id', 'last_vet_id')->find($userId);
         if (!$user) {
-            return response()->json([
+            return $this->jsonResponse([
                 'status' => 'error',
                 'message' => 'User not found',
             ], 404);
@@ -52,7 +52,7 @@ class VideoCallingController extends Controller
         $nearby = $nearbyResponse->getData(true);
         $featured = $this->buildFeaturedData($user);
 
-        return response()->json([
+        return $this->jsonResponse([
             'status' => 'success',
             'date' => $nearby['date'] ?? null,
             'day' => $nearby['day'] ?? null,
@@ -73,19 +73,19 @@ class VideoCallingController extends Controller
         if ($dayInput !== null && $dayInput !== '') {
             $normalizedDay = $this->normalizeDayOfWeek((string) $dayInput);
             if ($normalizedDay === null) {
-                return response()->json(['status' => 'error', 'error' => 'day must be a valid weekday name'], 422);
+                return $this->jsonResponse(['status' => 'error', 'error' => 'day must be a valid weekday name'], 422);
             }
         }
 
         if (!$userId) {
-            return response()->json([
+            return $this->jsonResponse([
                 'status' => 'error',
                 'message' => 'user_id is required'
             ], 422);
         }
 
         if ($date === '' && $normalizedDay === null) {
-            return response()->json([
+            return $this->jsonResponse([
                 'status' => 'success',
                 'date'   => null,
                 'day'    => null,
@@ -101,11 +101,11 @@ class VideoCallingController extends Controller
             ->first();
 
         if (!$user) {
-            return response()->json(['status' => 'error', 'message' => 'User not found'], 404);
+            return $this->jsonResponse(['status' => 'error', 'message' => 'User not found'], 404);
         }
 
         if ($user->latitude === null || $user->longitude === null || $user->latitude === '' || $user->longitude === '') {
-            return response()->json(['status' => 'error', 'message' => 'User lat/long missing'], 422);
+            return $this->jsonResponse(['status' => 'error', 'message' => 'User lat/long missing'], 422);
         }
 
         // 2) Numbers ensure karo
@@ -130,7 +130,7 @@ class VideoCallingController extends Controller
             ->get();
 
         if ($vets->isEmpty()) {
-            return response()->json([
+            return $this->jsonResponse([
                 'status' => 'success',
                 'date'   => $date === '' ? null : $date,
                 'day'    => $normalizedDay,
@@ -147,7 +147,7 @@ class VideoCallingController extends Controller
             ->get();
 
         if ($doctors->isEmpty()) {
-            return response()->json([
+            return $this->jsonResponse([
                 'status' => 'success',
                 'date'   => $date === '' ? null : $date,
                 'day'    => $normalizedDay,
@@ -165,7 +165,7 @@ class VideoCallingController extends Controller
             ->pluck('doctor_id');
 
         if ($activeDoctorIds->isEmpty()) {
-            return response()->json([
+            return $this->jsonResponse([
                 'status' => 'success',
                 'date'   => $date === '' ? null : $date,
                 'day'    => $normalizedDay,
@@ -243,7 +243,7 @@ class VideoCallingController extends Controller
             $dataPayload = $this->transformToDoctorPayload($filteredVets, $availableDoctorsByVet, $doctors, $referralByVet);
         }
 
-        return response()->json([
+        return $this->jsonResponse([
             'status' => 'success',
             'date'   => $date === '' ? null : $date,
             'day'    => $normalizedDay,
@@ -276,7 +276,7 @@ class VideoCallingController extends Controller
                 continue;
             }
 
-            $vetArray = json_decode(json_encode($vet), true);
+            $vetArray = (array) $vet;
             $clinicId = $vetArray['id'] ?? null;
 
             foreach ($doctorIds as $doctorId) {
@@ -377,5 +377,16 @@ class VideoCallingController extends Controller
                 'doctors' => $doctorsData,
             ],
         ];
+    }
+
+    private function jsonResponse(array $payload, int $status = 200)
+    {
+        // Replace malformed bytes during JSON encoding instead of throwing.
+        return response()->json(
+            $payload,
+            $status,
+            [],
+            JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+        );
     }
 }
