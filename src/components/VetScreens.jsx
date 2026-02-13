@@ -1161,9 +1161,10 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
     try {
       const breakPayload = noBreakTime ? ["No"] : breakTimes;
+      const vetNamePayload = form.clinicName.trim() || doctorNameReady;
 
       const payload = {
-        vet_name: form.clinicName.trim() || undefined,
+        vet_name: vetNamePayload,
         vet_email: form.email.trim(),
         vet_mobile: form.whatsappNumber.trim(),
         vet_city: form.vetCity.trim(),
