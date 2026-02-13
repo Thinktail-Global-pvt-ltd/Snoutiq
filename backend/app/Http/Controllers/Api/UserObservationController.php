@@ -72,11 +72,59 @@ class UserObservationController extends Controller
             'symptoms.*' => ['string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'timestamp' => ['nullable', 'date'],
+            'image' => ['nullable', 'file', 'image', 'max:10240'],
+            'file' => ['nullable', 'file', 'image', 'max:10240'],
+            'image_base64' => ['nullable', 'string'],
         ]);
 
         $observedAt = $validated['timestamp'] ?? null;
+        $blobColumnsReady = $this->observationImageBlobColumnsReady();
 
-        $observation = UserObservation::create([
+        $imageBlob = null;
+        $imageMime = null;
+        $imageName = null;
+
+        $imageFile = $request->file('image') ?: $request->file('file');
+        if ($imageFile) {
+            if (!$blobColumnsReady) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Observation image blob columns are missing. Please run migrations.',
+                ], 500);
+            }
+
+            if (!$imageFile->isValid()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid image upload.',
+                ], 422);
+            }
+
+            $imageBlob = $imageFile->get();
+            $imageMime = $imageFile->getMimeType() ?: ($imageFile->getClientMimeType() ?: 'image/jpeg');
+            $imageName = $imageFile->getClientOriginalName() ?: null;
+        } elseif (!empty($validated['image_base64'])) {
+            if (!$blobColumnsReady) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Observation image blob columns are missing. Please run migrations.',
+                ], 500);
+            }
+
+            [$decodedBlob, $decodedMime] = $this->extractBlobFromDataUri((string) $validated['image_base64']);
+            if (!$decodedBlob || !$decodedMime) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid image_base64 data URI.',
+                ], 422);
+            }
+
+            $imageBlob = $decodedBlob;
+            $imageMime = $decodedMime;
+            $imageName = 'observation-image';
+        }
+
+        $payload = [
             'user_id' => $petOwnerId ?: $userId,
             'pet_id' => $petId,
             'eating' => $validated['eating'] ?? null,
@@ -86,7 +134,15 @@ class UserObservationController extends Controller
             'symptoms' => $validated['symptoms'] ?? [],
             'notes' => $validated['notes'] ?? null,
             'observed_at' => $observedAt ? Carbon::parse($observedAt) : now(),
-        ]);
+        ];
+
+        if ($blobColumnsReady) {
+            $payload['image_blob'] = $imageBlob;
+            $payload['image_mime'] = $imageMime;
+            $payload['image_name'] = $imageName;
+        }
+
+        $observation = UserObservation::create($payload);
 
         return response()->json([
             'success' => true,
@@ -94,20 +150,76 @@ class UserObservationController extends Controller
         ], 201);
     }
 
+    public function image(Request $request, UserObservation $observation)
+    {
+        if ($request->user() && $observation->user_id && (int) $request->user()->id !== (int) $observation->user_id) {
+            return response()->json(['success' => false, 'message' => 'You cannot view another user\'s observation image.'], 403);
+        }
+
+        if (!$this->observationImageBlobColumnsReady() || empty($observation->image_blob)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Observation image not found.',
+            ], 404);
+        }
+
+        return response($observation->image_blob, 200, [
+            'Content-Type' => $observation->image_mime ?: 'image/jpeg',
+            'Cache-Control' => 'public, max-age=604800',
+        ]);
+    }
+
     protected function serializeObservation(UserObservation $observation): array
     {
+        $imageBlobUrl = $this->observationImageBlobColumnsReady() && !empty($observation->image_blob)
+            ? route('api.user.observations.image', ['observation' => $observation->id])
+            : null;
+
         return [
             'id' => $observation->id,
             'user_id' => $observation->user_id,
+            'pet_id' => $observation->pet_id,
             'eating' => $observation->eating,
             'appetite' => $observation->appetite,
             'energy' => $observation->energy,
             'mood' => $observation->mood,
             'symptoms' => $observation->symptoms ?? [],
             'notes' => $observation->notes,
+            'image_mime' => $observation->image_mime,
+            'image_name' => $observation->image_name,
+            'image_blob_url' => $imageBlobUrl,
+            'image_url' => $imageBlobUrl,
             'timestamp' => optional($observation->observed_at)->toIso8601String(),
             'created_at' => optional($observation->created_at)->toIso8601String(),
         ];
+    }
+
+    protected function observationImageBlobColumnsReady(): bool
+    {
+        return Schema::hasTable('user_observations')
+            && Schema::hasColumn('user_observations', 'image_blob')
+            && Schema::hasColumn('user_observations', 'image_mime');
+    }
+
+    protected function extractBlobFromDataUri(string $value): array
+    {
+        if ($value === '' || !str_starts_with($value, 'data:image')) {
+            return [null, null];
+        }
+
+        if (!preg_match('/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/s', $value, $matches)) {
+            return [null, null];
+        }
+
+        $mime = strtolower(trim($matches[1]));
+        $rawBase64 = str_replace(' ', '+', $matches[2]);
+        $decoded = base64_decode($rawBase64, true);
+
+        if ($decoded === false) {
+            return [null, null];
+        }
+
+        return [$decoded, $mime];
     }
 
     protected function resolveUserAndPet(Request $request, bool $fetchPet = false): array

@@ -1515,6 +1515,9 @@ Route::prefix('public')->group(function(){
 Route::prefix('user')->group(function () {
     Route::get('/observations', [UserObservationController::class, 'index']);
     Route::post('/observations', [UserObservationController::class, 'store']);
+    Route::get('/observations/{observation}/image', [UserObservationController::class, 'image'])
+        ->whereNumber('observation')
+        ->name('api.user.observations.image');
 });
 
 

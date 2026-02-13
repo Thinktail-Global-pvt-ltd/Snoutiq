@@ -19,7 +19,14 @@ class UserObservation extends Model
         'mood',
         'symptoms',
         'notes',
+        'image_blob',
+        'image_mime',
+        'image_name',
         'observed_at',
+    ];
+
+    protected $hidden = [
+        'image_blob',
     ];
 
     protected $casts = [
