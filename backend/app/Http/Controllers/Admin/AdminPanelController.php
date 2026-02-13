@@ -237,12 +237,12 @@ class AdminPanelController extends Controller
                     $query->select('id', 'name', 'email', 'phone')
                         ->with([
                             'pets' => function ($petQuery) {
-                                $petQuery->select('id', 'user_id', 'name', 'breed', 'pet_type', 'type', 'reported_symptom')
+                                $petQuery->select('id', 'user_id', 'name', 'breed', 'pet_type', 'reported_symptom')
                                     ->orderByDesc('id');
                             },
                         ]);
                 },
-                'pet:id,user_id,name,breed,pet_type,type,reported_symptom',
+                'pet:id,user_id,name,breed,pet_type,reported_symptom',
             ])
             ->orderByDesc('created_at')
             ->get();
