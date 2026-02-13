@@ -47,12 +47,21 @@
                             <tbody>
                                 @foreach($transactions as $txn)
                                     @php
+                                        $userPets = $txn->user?->pets ?? collect();
+                                        $petFromTransaction = $txn->pet;
+                                        $fallbackPetWithIssue = $userPets->first(function ($pet) {
+                                            return trim((string) ($pet->reported_symptom ?? '')) !== '';
+                                        });
+                                        $petRecord = $petFromTransaction ?? $fallbackPetWithIssue ?? $userPets->first();
                                         $doctorName = $txn->doctor->doctor_name ?? 'Doctor';
                                         $parentName = $txn->user->name ?? 'Pet Parent';
                                         $parentPhone = $txn->user->phone ?? 'N/A';
-                                        $petName = $txn->pet->name ?? 'Pet';
-                                        $petType = $txn->pet->pet_type ?? $txn->pet->type ?? $txn->pet->breed ?? 'Pet';
-                                        $issue = trim((string) ($txn->pet->reported_symptom ?? ''));
+                                        $petName = $petRecord->name ?? 'Pet';
+                                        $petType = $petRecord->pet_type ?? $petRecord->type ?? $petRecord->breed ?? 'Pet';
+                                        $issue = trim((string) ($petFromTransaction->reported_symptom ?? ''));
+                                        if ($issue === '') {
+                                            $issue = trim((string) ($fallbackPetWithIssue->reported_symptom ?? $petRecord->reported_symptom ?? ''));
+                                        }
                                         if ($issue === '') {
                                             $issue = 'N/A';
                                         }
@@ -87,20 +96,20 @@
                                             <div class="text-muted small">{{ $txn->user->email ?? $txn->user->phone ?? '—' }}</div>
                                         </td>
                                         <td>
-                                            {{ $txn->pet->name ?? '—' }}
-                                            @if($txn->pet)
-                                                <div class="text-muted small">Breed: {{ $txn->pet->breed ?? 'n/a' }}</div>
+                                            {{ $petRecord->name ?? '—' }}
+                                            @if($petRecord)
+                                                <div class="text-muted small">Breed: {{ $petRecord->breed ?? 'n/a' }}</div>
                                             @endif
                                         </td>
                                         <td>
-                                            @if($txn->pet_id && $txn->user_id)
+                                            @if(($petRecord?->id || $txn->pet_id) && $txn->user_id)
                                                 <button
                                                     type="button"
                                                     class="btn btn-sm btn-outline-dark"
                                                     data-action="view-details"
-                                                    data-pet-id="{{ $txn->pet_id }}"
+                                                    data-pet-id="{{ $petRecord->id ?? $txn->pet_id }}"
                                                     data-user-id="{{ $txn->user_id }}"
-                                                    data-pet-name="{{ $txn->pet->name ?? 'Pet' }}"
+                                                    data-pet-name="{{ $petRecord->name ?? 'Pet' }}"
                                                     data-transaction-id="{{ $txn->id }}"
                                                 >
                                                     View Details

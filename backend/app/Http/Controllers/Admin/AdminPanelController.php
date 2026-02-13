@@ -233,8 +233,16 @@ class AdminPanelController extends Controller
             ->with([
                 'clinic:id,name',
                 'doctor:id,doctor_name,doctor_email,doctor_mobile',
-                'user:id,name,email,phone',
-                'pet',
+                'user' => function ($query) {
+                    $query->select('id', 'name', 'email', 'phone')
+                        ->with([
+                            'pets' => function ($petQuery) {
+                                $petQuery->select('id', 'user_id', 'name', 'breed', 'pet_type', 'type', 'reported_symptom')
+                                    ->orderByDesc('id');
+                            },
+                        ]);
+                },
+                'pet:id,user_id,name,breed,pet_type,type,reported_symptom',
             ])
             ->orderByDesc('created_at')
             ->get();
