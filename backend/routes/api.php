@@ -273,6 +273,21 @@ Route::get('/doctor/profile', function (Request $request) {
 });
 
 // Exported-from-excel vets with doctors
+Route::get('/doctors/{doctor}/blob-image', function (Doctor $doctor) {
+    if (empty($doctor->doctor_image_blob)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Doctor blob image not found.',
+        ], 404);
+    }
+
+    return response($doctor->doctor_image_blob, 200, [
+        'Content-Type' => $doctor->doctor_image_mime ?: 'image/jpeg',
+        'Content-Disposition' => 'inline; filename="doctor-' . $doctor->id . '.jpg"',
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+})->whereNumber('doctor')->name('api.doctors.blob-image');
+
 Route::get('/exported_from_excell_doctors', function () {
     $vets = VetRegisterationTemp::query()
         ->where('exported_from_excell', 1)
@@ -287,9 +302,34 @@ Route::get('/exported_from_excell_doctors', function () {
             'exported_from_excell',
         ]);
 
+    $baseAppUrl = rtrim((string) config('app.url'), '/');
+    if ($baseAppUrl === '') {
+        $baseAppUrl = rtrim(url('/'), '/');
+    }
+
+    $data = $vets->map(function (VetRegisterationTemp $vet) use ($baseAppUrl) {
+        $payload = $vet->toArray();
+        $payload['doctors'] = $vet->doctors->map(function (Doctor $doctor) use ($baseAppUrl) {
+            $doctorPayload = $doctor->toArray();
+
+            $imagePath = ltrim((string) ($doctor->doctor_image ?? ''), '/');
+            $doctorPayload['doctor_image_url'] = $imagePath !== ''
+                ? $baseAppUrl . '/' . $imagePath
+                : null;
+
+            $doctorPayload['doctor_image_blob_url'] = !empty($doctor->doctor_image_blob)
+                ? route('api.doctors.blob-image', ['doctor' => $doctor->id])
+                : null;
+
+            return $doctorPayload;
+        })->values();
+
+        return $payload;
+    })->values();
+
     return response()->json([
         'success' => true,
-        'data' => $vets,
+        'data' => $data,
     ]);
 })->name('exported_from_excell_doctors');
 
