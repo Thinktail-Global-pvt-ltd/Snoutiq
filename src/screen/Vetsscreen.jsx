@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
-import { Header, PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
+import {
+  Header,
+  PET_FLOW_STEPS,
+  ProgressBar,
+} from "../components/Sharedcomponents";
 import {
   Clock,
   Zap,
@@ -49,12 +53,14 @@ const normalizeImageUrl = (value) => {
     cleaned = cleaned.slice("backend/".length);
   }
 
-  // ✅ Ensure proper path construction
   return `${BACKEND_BASE}/${cleaned}`;
 };
 
 const getDoctorImageSource = (doc) =>
-  doc?.doctor_image_blob_url || doc?.doctor_image_url || doc?.doctor_image || "";
+  doc?.doctor_image_blob_url ||
+  doc?.doctor_image_url ||
+  doc?.doctor_image ||
+  "";
 
 const getInitials = (name = "") => {
   const s = String(name).trim();
@@ -66,19 +72,25 @@ const getInitials = (name = "") => {
 
 const parseListField = (value) => {
   if (!value) return [];
-  if (Array.isArray(value)) return value.map((x) => String(x).trim()).filter(Boolean);
+  if (Array.isArray(value))
+    return value.map((x) => String(x).trim()).filter(Boolean);
+
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (!trimmed) return [];
     if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
       try {
         const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) return parsed.map((x) => String(x).trim()).filter(Boolean);
+        if (Array.isArray(parsed))
+          return parsed.map((x) => String(x).trim()).filter(Boolean);
       } catch {
         // ignore
       }
     }
-    return trimmed.split(",").map((x) => x.trim()).filter(Boolean);
+    return trimmed
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
   }
   return [String(value).trim()].filter(Boolean);
 };
@@ -143,19 +155,32 @@ const normalizeBreakTimes = (value) => {
   return list.filter((item) => {
     const cleaned = String(item).toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!cleaned) return false;
-    if (["no", "none", "nil", "na", "n/a", "noany", "notavailable"].includes(cleaned)) return false;
+    if (
+      ["no", "none", "nil", "na", "n/a", "noany", "notavailable"].includes(
+        cleaned
+      )
+    )
+      return false;
     if (cleaned.startsWith("no")) return false;
     return true;
   });
 };
 
 const normalizeSpecialties = (specializationText = "") => {
-  const raw = parseListField(specializationText).map((s) => String(s).toLowerCase()).filter(Boolean);
+  const raw = parseListField(specializationText)
+    .map((s) => String(s).toLowerCase())
+    .filter(Boolean);
+
   const mapped = new Set();
   raw.forEach((t) => {
     if (t.includes("dog")) mapped.add("dog");
     if (t.includes("cat")) mapped.add("cat");
-    if (t.includes("exotic") || t.includes("bird") || t.includes("rabbit") || t.includes("turtle"))
+    if (
+      t.includes("exotic") ||
+      t.includes("bird") ||
+      t.includes("rabbit") ||
+      t.includes("turtle")
+    )
       mapped.add("exotic");
   });
   return Array.from(mapped);
@@ -209,16 +234,25 @@ const clipText = (text, max = 160) => {
   return `${s.slice(0, max).trim()}…`;
 };
 
+/**
+ * ✅ IMPORTANT CHANGES:
+ * 1) HIDE DEMO/INVALID vets: if day OR night rate <= 1 => do not show
+ * 2) Keep priceDay/priceNight numbers
+ */
 const buildVetsFromApi = (apiData = []) => {
   const list = [];
   apiData.forEach((clinic) => {
     const clinicName = normalizeText(clinic?.name);
+
     (clinic?.doctors || []).forEach((doc) => {
       const specializationData = buildSpecializationData(
         doc?.specialization_select_all_that_apply
       );
       const degreeData = buildDegreeData(doc?.degree);
-      const breakTimes = normalizeBreakTimes(doc?.break_do_not_disturb_time_example_2_4_pm);
+      const breakTimes = normalizeBreakTimes(
+        doc?.break_do_not_disturb_time_example_2_4_pm
+      );
+
       const seedBase = seedFromValue(
         doc?.id ||
           doc?.doctor_email ||
@@ -226,6 +260,13 @@ const buildVetsFromApi = (apiData = []) => {
           doc?.doctor_name ||
           `${clinicName}-${list.length}`
       );
+
+      const priceDay = toNumber(doc?.video_day_rate, 0);
+      const priceNight = toNumber(doc?.video_night_rate, 0);
+
+      // ✅ hide demo/invalid pricing doctors (₹1 or less)
+      // e.g. Demo account don’t book (1.00)
+      if (priceDay <= 1 || priceNight <= 1) return;
 
       list.push({
         id: doc?.id,
@@ -239,8 +280,8 @@ const buildVetsFromApi = (apiData = []) => {
         // ✅ use blob endpoint when available, fallback to other URL fields
         image: normalizeImageUrl(getDoctorImageSource(doc)),
 
-        priceDay: toNumber(doc?.video_day_rate, 0),
-        priceNight: toNumber(doc?.video_night_rate, 0),
+        priceDay,
+        priceNight,
 
         rating: getSeededNumber(seedBase + 11, 4.0, 4.9, 1),
         reviews: Math.round(getSeededNumber(seedBase + 23, 30, 220)),
@@ -249,15 +290,22 @@ const buildVetsFromApi = (apiData = []) => {
         specialties: normalizeSpecialties(specializationData.list),
         specializationList: specializationData.list,
         specializationText: normalizeText(specializationData.text),
+
         responseDay: normalizeText(doc?.response_time_for_online_consults_day),
-        responseNight: normalizeText(doc?.response_time_for_online_consults_night),
+        responseNight: normalizeText(
+          doc?.response_time_for_online_consults_night
+        ),
+
         breakTimes,
-        followUp: normalizeText(doc?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta),
+        followUp: normalizeText(
+          doc?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta
+        ),
         bio: normalizeText(doc?.bio),
         raw: doc,
       });
     });
   });
+
   return list;
 };
 
@@ -292,7 +340,10 @@ const InfoRow = ({ icon: Icon, label, value, subValue }) => {
         <div className="text-sm font-semibold text-slate-900 leading-5 break-words">
           {showValue ? value : null}
           {showValue && showSubValue ? (
-            <span className="text-slate-400 font-semibold"> {" • "} {subValue}</span>
+            <span className="text-slate-400 font-semibold">
+              {" "}
+              {" • "} {subValue}
+            </span>
           ) : null}
           {!showValue && showSubValue ? (
             <span className="text-slate-900 font-semibold">{subValue}</span>
@@ -364,7 +415,12 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
       const bMatch = specialtyScore(b);
       if (aMatch && !bMatch) return -1;
       if (!aMatch && bMatch) return 1;
-      return (a.priceDay || 0) - (b.priceDay || 0);
+
+      // sort by price of current slot (day/night) so list is meaningful
+      const isDay = isDayTime();
+      const aPrice = isDay ? a.priceDay : a.priceNight;
+      const bPrice = isDay ? b.priceDay : b.priceNight;
+      return (aPrice || 0) - (bPrice || 0);
     });
   }, [vets, petDetails]);
 
@@ -379,7 +435,9 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-slate-900">
-                {petDetails?.name ? `Vets for ${petDetails.name}` : "Available Vets"}
+                {petDetails?.name
+                  ? `Vets for ${petDetails.name}`
+                  : "Available Vets"}
               </h2>
               <p className="mt-2 text-sm md:text-base text-slate-500 max-w-3xl">
                 Choose a vet based on your pet and consult price.
@@ -397,7 +455,8 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
           <div className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 border border-slate-200 shadow-sm text-slate-600">
             <Clock size={18} />
             <span className="text-sm md:text-base">
-              Average response time: <strong className="text-slate-900">8 mins</strong>
+              Average response time:{" "}
+              <strong className="text-slate-900">8 mins</strong>
             </span>
           </div>
         </div>
@@ -411,12 +470,16 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
         ) : errMsg ? (
           <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
             <div className="text-red-600 font-bold">{errMsg}</div>
-            <div className="text-slate-500 text-sm mt-2">Try again or check network.</div>
+            <div className="text-slate-500 text-sm mt-2">
+              Try again or check network.
+            </div>
           </div>
         ) : sortedVets.length === 0 ? (
           <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
             <div className="text-slate-900 font-bold">No vets found.</div>
-            <div className="text-slate-500 text-sm mt-2">Please try again later.</div>
+            <div className="text-slate-500 text-sm mt-2">
+              Please try again later.
+            </div>
           </div>
         ) : (
           <div className="mt-8 grid gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
@@ -428,7 +491,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               const priceValue = showDayPrice ? vet.priceDay : vet.priceNight;
               const price = formatPrice(priceValue);
 
-              // ✅ IMPORTANT: image will be like https://snoutiq.com/backend/photo/...
               const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
               const initials = getInitials(vet.name);
 
@@ -438,9 +500,10 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                 : "";
               const specializationValue = hasDisplayValue(vet.specializationText)
                 ? vet.specializationText
-                : Array.isArray(vet.specializationList) && vet.specializationList.length
-                  ? vet.specializationList.join(", ")
-                  : "";
+                : Array.isArray(vet.specializationList) &&
+                  vet.specializationList.length
+                ? vet.specializationList.join(", ")
+                : "";
 
               return (
                 <div
@@ -507,26 +570,26 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       </div>
                     </div>
 
-                      <div className="mt-4 space-y-3">
-                        <InfoRow
-                          icon={GraduationCap}
-                          label="Education"
-                          value={vet.qualification}
-                          subValue={experienceLabel}
-                        />
+                    <div className="mt-4 space-y-3">
+                      <InfoRow
+                        icon={GraduationCap}
+                        label="Education"
+                        value={vet.qualification}
+                        subValue={experienceLabel}
+                      />
 
-                        <InfoRow
-                          icon={Stethoscope}
-                          label="Specialization"
-                          value={specializationValue}
-                        />
+                      <InfoRow
+                        icon={Stethoscope}
+                        label="Specialization"
+                        value={specializationValue}
+                      />
 
-                        <InfoRow
-                          icon={BadgeCheck}
-                          label="Successful consultations"
-                          value={`${vet.consultations}+`}
-                        />
-                      </div>
+                      <InfoRow
+                        icon={BadgeCheck}
+                        label="Successful consultations"
+                        value={`${vet.consultations}+`}
+                      />
+                    </div>
 
                     {bioPreview ? (
                       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -548,11 +611,24 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         View full profile <ChevronRight size={16} />
                       </button>
 
+                      {/* ✅ IMPORTANT: Day time => day price booking, Night time => night price booking */}
                       <Button
-                        onClick={() => onSelect(vet)}
+                        onClick={() =>
+                          onSelect?.({
+                            ...vet,
+                            bookingRateType: showDayPrice ? "day" : "night",
+                            bookingPrice: priceValue,
+                          })
+                        }
                         className="h-11 px-5 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-sm text-sm inline-flex items-center gap-3"
                       >
                         <span className="font-semibold">Consult Now</span>
+
+                        {/* optional small label */}
+                        <span className="text-[11px] font-semibold text-white/80">
+                          {showDayPrice ? "Day" : "Night"}
+                        </span>
+
                         {price ? (
                           <span className="ml-1 rounded-xl bg-white/15 px-3 py-1 text-[13px] font-extrabold">
                             {price}
@@ -606,7 +682,8 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 md:p-7">
                 <div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-8">
                   <div className="shrink-0">
-                    {activeBioVet?.image && !brokenImages.has(activeBioVet.id) ? (
+                    {activeBioVet?.image &&
+                    !brokenImages.has(activeBioVet.id) ? (
                       <img
                         src={activeBioVet.image}
                         alt={activeBioVet.name}
@@ -641,7 +718,8 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       ) : null}
                     </div>
 
-                    {hasDisplayValue(activeBioVet.followUp) || activeBioVet.breakTimes?.length ? (
+                    {hasDisplayValue(activeBioVet.followUp) ||
+                    activeBioVet.breakTimes?.length ? (
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
                         {hasDisplayValue(activeBioVet.followUp) ? (
                           <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -673,7 +751,8 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           Day consult (8 AM - 8 PM)
                         </div>
                         <div className="mt-1 text-lg font-extrabold text-slate-900">
-                          {formatPrice(activeBioVet.priceDay) || "Price on request"}
+                          {formatPrice(activeBioVet.priceDay) ||
+                            "Price on request"}
                         </div>
                         {hasDisplayValue(activeBioVet.responseDay) ? (
                           <div className="mt-1 text-xs text-slate-500">
@@ -690,7 +769,8 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           Night consult (8 PM - 8 AM)
                         </div>
                         <div className="mt-1 text-lg font-extrabold text-slate-900">
-                          {formatPrice(activeBioVet.priceNight) || "Price on request"}
+                          {formatPrice(activeBioVet.priceNight) ||
+                            "Price on request"}
                         </div>
                         {hasDisplayValue(activeBioVet.responseNight) ? (
                           <div className="mt-1 text-xs text-slate-500">
@@ -721,11 +801,9 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                     </div>
                   ) : null}
 
-                  {(
-                    (Array.isArray(activeBioVet.specializationList) &&
-                      activeBioVet.specializationList.length > 0) ||
-                    hasDisplayValue(activeBioVet.specializationText)
-                  ) ? (
+                  {(Array.isArray(activeBioVet.specializationList) &&
+                    activeBioVet.specializationList.length > 0) ||
+                  hasDisplayValue(activeBioVet.specializationText) ? (
                     <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
                       <div className="text-[11px] uppercase tracking-wider text-slate-400">
                         Expertise
@@ -762,11 +840,20 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                     Close
                   </Button>
 
+                  {/* ✅ IMPORTANT: Proceed uses correct slot price (day/night) */}
                   <Button
                     onClick={() => {
                       const v = activeBioVet;
                       setActiveBioVet(null);
-                      onSelect?.(v);
+
+                      const isDay = isDayTime();
+                      const bookingPrice = isDay ? v.priceDay : v.priceNight;
+
+                      onSelect?.({
+                        ...v,
+                        bookingRateType: isDay ? "day" : "night",
+                        bookingPrice,
+                      });
                     }}
                     className="px-6 bg-teal-600 hover:bg-teal-700 inline-flex items-center gap-2"
                   >
