@@ -696,7 +696,9 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 'reference' => $t->reference,
                 'status' => $t->status,
                 'amount_paise' => $grossPaise,
-                'amount_inr' => $grossPaise / 100,
+                // Keep amount_inr net so existing frontends auto-show post-deduction value.
+                'amount_inr' => $netPaise / 100,
+                'gross_amount_inr' => $grossPaise / 100,
                 'amount_after_deduction_paise' => $netPaise,
                 'amount_after_deduction_inr' => $netPaise / 100,
                 'net_amount_inr' => $netPaise / 100,
@@ -719,7 +721,9 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'deduction_rate' => $deductionRate,
         'total_transactions' => $count,
         'total_amount_paise' => $totalPaise,
-        'total_amount_inr' => $totalPaise / 100,
+        // Keep total_amount_inr net so existing frontends auto-show post-deduction value.
+        'total_amount_inr' => $totalPaiseAfterDeduction / 100,
+        'gross_total_amount_inr' => $totalPaise / 100,
         'total_amount_after_deduction_paise' => $totalPaiseAfterDeduction,
         'total_amount_after_deduction_inr' => $totalPaiseAfterDeduction / 100,
         'transactions' => $transactions,
