@@ -655,8 +655,10 @@ Route::get('/excell-export/transactions', function (Request $request) {
 
     $row = $query->first();
 
+    $deductionRate = 0.25;
     $count = (int) ($row->total ?? 0);
     $totalPaise = (int) ($row->total_paise ?? 0);
+    $totalPaiseAfterDeduction = (int) max(round($totalPaise * (1 - $deductionRate)), 0);
 
     // Detailed list
     $transactions = Transaction::query()
@@ -687,12 +689,17 @@ Route::get('/excell-export/transactions', function (Request $request) {
         ->limit(200)
         ->get()
         ->map(function (Transaction $t) {
+            $grossPaise = (int) ($t->amount_paise ?? 0);
+            $netPaise = (int) max(round($grossPaise * 0.75), 0);
             return [
                 'id' => $t->id,
                 'reference' => $t->reference,
                 'status' => $t->status,
-                'amount_paise' => $t->amount_paise,
-                'amount_inr' => $t->amount_paise / 100,
+                'amount_paise' => $grossPaise,
+                'amount_inr' => $grossPaise / 100,
+                'amount_after_deduction_paise' => $netPaise,
+                'amount_after_deduction_inr' => $netPaise / 100,
+                'net_amount_inr' => $netPaise / 100,
                 'payment_method' => $t->payment_method,
                 'type' => $t->type ?? ($t->metadata['order_type'] ?? null),
                 'metadata' => $t->metadata,
@@ -709,9 +716,12 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'doctor_id' => $data['doctor_id'],
         'clinic_id' => $data['clinic_id'],
         'order_type' => 'excell_export_campaign',
+        'deduction_rate' => $deductionRate,
         'total_transactions' => $count,
         'total_amount_paise' => $totalPaise,
         'total_amount_inr' => $totalPaise / 100,
+        'total_amount_after_deduction_paise' => $totalPaiseAfterDeduction,
+        'total_amount_after_deduction_inr' => $totalPaiseAfterDeduction / 100,
         'transactions' => $transactions,
     ]);
 })->name('excell_export.transactions');
