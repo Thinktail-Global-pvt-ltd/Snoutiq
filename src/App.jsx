@@ -146,6 +146,9 @@ function App() {
           <Routes>
             {/* Home page - will redirect authenticated users to dashboard */}
             <Route path="/" element={<HomePage />} />
+            <Route path="/20+vetsonline" element={<HomePage />} />
+            <Route path="/whychooseteleconsult" element={<HomePage />} />
+            <Route path="/howwework" element={<HomePage />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/vet-register-success" element={<VetRegisterSuccess />} />
             <Route path="/vet-dashboard" element={<VetDashboard />} />

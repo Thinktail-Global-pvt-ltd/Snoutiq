@@ -211,7 +211,7 @@ class MedicalRecordController extends Controller
             'follow_up_notes' => ['nullable', 'string'],
             'pet_id' => ['nullable', 'integer'],
             'video_appointment_id' => ['nullable', 'integer', 'exists:video_apointment,id'],
-            'record_file' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
+            'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
 
         $user = User::query()->select('id', 'last_vet_id')->find($validated['user_id']);
@@ -253,27 +253,32 @@ class MedicalRecordController extends Controller
             }
         }
 
-        $file = $request->file('record_file');
-        if (!$file || !$file->isValid()) {
-            return response()->json([
-                'success' => false,
-                'error' => $file ? $file->getErrorMessage() : 'File upload failed',
-            ], 422);
-        }
-        $filePayload = $this->storeRecordFile($file);
-        if (!$filePayload) {
-            return response()->json([
-                'success' => false,
-                'error' => 'File upload failed',
-            ], 500);
+        $recordFilePath = '';
+        $filePayload = null;
+        if ($request->hasFile('record_file')) {
+            $file = $request->file('record_file');
+            if (!$file || !$file->isValid()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $file ? $file->getErrorMessage() : 'File upload failed',
+                ], 422);
+            }
+            $filePayload = $this->storeRecordFile($file);
+            if (!$filePayload) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'File upload failed',
+                ], 500);
+            }
+            $recordFilePath = $filePayload['path'];
         }
         $record = MedicalRecord::create([
             'user_id' => $user->id,
             'doctor_id' => $doctorId,
             'vet_registeration_id' => $clinicId,
-            'file_path' => $filePayload['path'],
-            'file_name' => $filePayload['name'],
-            'mime_type' => $filePayload['mime'],
+            'file_path' => $recordFilePath,
+            'file_name' => $filePayload['name'] ?? null,
+            'mime_type' => $filePayload['mime'] ?? null,
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -306,7 +311,9 @@ class MedicalRecordController extends Controller
             'medications_json' => $this->decodeMedicationsInput($request->input('medications_json'))
                 ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
-        $prescriptionPayload['image_path'] = $filePayload['path'];
+        if ($recordFilePath !== '') {
+            $prescriptionPayload['image_path'] = $recordFilePath;
+        }
         $prescription = Prescription::create($prescriptionPayload);
         if (!$prescription || !$prescription->exists) {
             return response()->json([
@@ -740,8 +747,13 @@ PROMPT;
             ->first();
     }
 
-    protected function buildRecordUrl(string $filePath): string
+    protected function buildRecordUrl(?string $filePath): ?string
     {
+        $filePath = trim((string) $filePath);
+        if ($filePath === '') {
+            return null;
+        }
+
         $diskUrl = Storage::disk('public')->url($filePath);
         $path = parse_url($diskUrl, PHP_URL_PATH) ?? $diskUrl;
         $path = '/' . ltrim($path, '/');

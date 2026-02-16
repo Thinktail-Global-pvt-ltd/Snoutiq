@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 // Lazy screens (default exports)
 const LandingScreen = lazy(() => import("../screen/Landingscreen"));
 const PetDetailsScreen = lazy(() => import("../screen/Petdetailsscreen"));
-const VetsScreen = lazy(() => import("../screen/Vetsscreen"));
 
 // Payment has named exports
 const PaymentScreen = lazy(() =>
@@ -60,8 +59,7 @@ const Home = () => {
   const backMap = useMemo(
     () => ({
       details: "landing",
-      vets: "details",
-      payment: "vets",
+      payment: "details",
       confirmation: "payment",
 
       "vet-login": "landing",
@@ -83,9 +81,6 @@ const Home = () => {
       setPetDetails(null);
       setSelectedVet(null);
     }
-    if (screen === "vets") {
-      setSelectedVet(null);
-    }
   }, [screen]);
 
   // Render routes in a clean map
@@ -94,8 +89,11 @@ const Home = () => {
       case "landing":
         return (
           <LandingScreen
-            onStart={() => setScreen("details")}
             onVetAccess={() => navigate("/auth")}
+            onSelectVet={(vet) => {
+              setSelectedVet(vet);
+              setScreen("details");
+            }}
           />
         );
 
@@ -105,18 +103,6 @@ const Home = () => {
             onBack={goBack}
             onSubmit={(details) => {
               setPetDetails(details);
-              setScreen("vets");
-            }}
-          />
-        );
-
-      case "vets":
-        return (
-          <VetsScreen
-            petDetails={petDetails}
-            onBack={goBack}
-            onSelect={(vet) => {
-              setSelectedVet(vet);
               setScreen("payment");
             }}
           />
@@ -172,8 +158,11 @@ const Home = () => {
       default:
         return (
           <LandingScreen
-            onStart={() => setScreen("details")}
             onVetAccess={() => navigate("/auth")}
+            onSelectVet={(vet) => {
+              setSelectedVet(vet);
+              setScreen("details");
+            }}
           />
         );
     }

@@ -621,7 +621,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
         <div className="flex-1 px-6 py-6 pb-32 overflow-y-auto no-scrollbar md:px-12 lg:px-20 md:py-12">
           <div className="md:max-w-none">
             <div className="md:flex md:items-center md:justify-between md:gap-6">
-              <ProgressBar current={1} steps={PET_FLOW_STEPS} />
+              <ProgressBar current={2} steps={PET_FLOW_STEPS} />
               <div className="hidden text-sm text-gray-500 bg-white px-4 py-2 rounded-full border border-gray-100">
                 ⏱️ Takes less than 2 minutes
               </div>
@@ -1476,7 +1476,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           Submitting...
                         </span>
                       ) : (
-                        "See Available Vets"
+                        "Continue to Payment"
                       )}
                     </Button>
 
@@ -1493,7 +1493,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       </p>
                     ) : (
                       <p className="text-sm text-gray-500 mt-4 text-center">
-                        ✓ All fields completed. Ready to find your vet!
+                        ✓ All fields completed. Ready for payment.
                       </p>
                     )}
                   </div>
@@ -1519,7 +1519,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                 : "bg-[#3998de] hover:bg-[#3998de]/90 text-white shadow-lg"
             }
           >
-            {submitting ? "Submitting..." : "See available vets"}
+            {submitting ? "Submitting..." : "Continue to Payment"}
           </Button>
           {!isValid && (
             <p className="text-xs text-red-600 text-center px-2">
@@ -1533,3 +1533,4 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 };
 
 export default PetDetailsScreen;
+

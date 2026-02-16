@@ -239,7 +239,7 @@ const clipText = (text, max = 160) => {
  * 1) HIDE DEMO/INVALID vets: if day OR night rate <= 1 => do not show
  * 2) Keep priceDay/priceNight numbers
  */
-const buildVetsFromApi = (apiData = []) => {
+export const buildVetsFromApi = (apiData = []) => {
   const list = [];
   apiData.forEach((clinic) => {
     const clinicName = normalizeText(clinic?.name);
@@ -429,7 +429,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
       <Header onBack={onBack} title="Available Vets" />
 
       <div className="flex-1 px-4 py-6 pb-20 overflow-y-auto no-scrollbar md:px-10 lg:px-16 md:py-10">
-        <ProgressBar current={2} steps={PET_FLOW_STEPS} />
+        <ProgressBar current={1} steps={PET_FLOW_STEPS} />
 
         <div className="mt-6 md:mt-10">
           <div className="flex items-start justify-between gap-4">

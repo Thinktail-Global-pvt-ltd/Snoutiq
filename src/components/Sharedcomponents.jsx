@@ -1,7 +1,7 @@
 import React from "react";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 
-export const PET_FLOW_STEPS = ["Pet Details", "Choose Vet", "Payment"];
+export const PET_FLOW_STEPS = ["Choose Vet", "Pet Details", "Payment"];
 
 export const Header = ({ onBack, title }) => (
   <div
