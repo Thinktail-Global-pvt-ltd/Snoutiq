@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
-import { Header, PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
+import {
+  Header,
+  PET_FLOW_STEPS,
+  ProgressBar,
+} from "../components/Sharedcomponents";
 import { apiPost } from "../lib/api";
 import {
   ShieldCheck,
@@ -50,18 +54,44 @@ const stripEmpty = (payload) =>
     )
   );
 
-export const PaymentScreen = ({ vet, petDetails, paymentMeta, onPay, onBack }) => {
-const fee = Number(
-  vet?.bookingPrice ??
-    (vet?.bookingRateType === "night" ? vet?.priceNight : vet?.priceDay)
-) || 0;
+const isDayTime = (date = new Date()) => {
+  const hour = date.getHours();
+  return hour >= 8 && hour < 20;
+};
 
-const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Day (8 AM - 8 PM)";
+export const PaymentScreen = ({
+  vet,
+  petDetails,
+  paymentMeta,
+  onPay,
+  onBack,
+}) => {
+  // ✅ slot decide: priority -> bookingRateType (from selection)
+  // fallback -> current time (if parent didn't pass)
+  const rateType = useMemo(() => {
+    if (vet?.bookingRateType === "day" || vet?.bookingRateType === "night") {
+      return vet.bookingRateType;
+    }
+    return isDayTime() ? "day" : "night";
+  }, [vet?.bookingRateType]);
 
+  // ✅ fee: priority -> bookingPrice (from selection), fallback -> rateType price
+  const fee = useMemo(() => {
+    const booking = Number(vet?.bookingPrice);
+    if (Number.isFinite(booking) && booking > 0) return booking;
+
+    const fallback = Number(rateType === "night" ? vet?.priceNight : vet?.priceDay);
+    if (Number.isFinite(fallback) && fallback > 0) return fallback;
+
+    return 0;
+  }, [vet?.bookingPrice, vet?.priceDay, vet?.priceNight, rateType]);
+
+  const slotLabel =
+    rateType === "night" ? "Night (8 PM - 8 AM)" : "Day (8 AM - 8 PM)";
 
   // ✅ TESTING: remove service charge for now
   const service = 0;
-  const total = fee; // (or fee + service, but service is 0)
+  const total = fee;
 
   const [isPaying, setIsPaying] = useState(false);
   const [gatewayReady, setGatewayReady] = useState(false);
@@ -183,6 +213,9 @@ const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Da
       )
     );
 
+    // ✅ optional: pass rateType to backend if you want (only if backend supports)
+    // booking_rate_type: rateType,
+
     return stripEmpty({
       order_type: orderType,
       clinic_id: clinicId,
@@ -209,12 +242,22 @@ const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Da
 
   const handlePay = async () => {
     if (isPaying) return;
+
     if (!acknowledged) {
-      updateStatus("error", "Please acknowledge the consultation notice to proceed.");
+      updateStatus(
+        "error",
+        "Please acknowledge the consultation notice to proceed."
+      );
       return;
     }
+
     if (!gatewayReady || typeof window === "undefined" || !window.Razorpay) {
       updateStatus("error", "Payment gateway failed to load. Please refresh.");
+      return;
+    }
+
+    if (!total || total <= 0) {
+      updateStatus("error", "Invalid consultation amount.");
       return;
     }
 
@@ -222,7 +265,7 @@ const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Da
     updateStatus("info", "Creating order...");
 
     try {
-      // ✅ amount now ONLY actual fee (no +20)
+      // ✅ amount = total (keep same as your current backend expectation)
       const order = await apiPost("/api/create-order", {
         amount: Math.round(total),
         ...paymentContext,
@@ -240,7 +283,7 @@ const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Da
         order_id: orderId,
         name: "Snoutiq Veterinary Consultation",
         description: vet?.name
-          ? `Video consultation with ${vet.name}`
+          ? `Video consultation with ${vet.name} (${rateType.toUpperCase()} slot)`
           : "Video consultation",
         handler: async (response) => {
           updateStatus("info", "Verifying payment...");
@@ -285,6 +328,9 @@ const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Da
     }
   };
 
+  const doctorDisplayName = vet?.name?.split(" ")[1] || vet?.name || "Vet";
+  const imageSrc = vet?.image || "";
+
   return (
     <div className="min-h-screen bg-calm-bg flex flex-col animate-slide-up md:bg-gradient-to-b md:from-calm-bg md:to-white">
       <Header onBack={onBack} title="Secure Payment" />
@@ -296,18 +342,24 @@ const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Da
           <div className="mt-6 md:grid md:grid-cols-12 md:gap-10 lg:gap-14">
             <div className="md:col-span-7 lg:col-span-7">
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-brand-100 mb-6 flex gap-4 items-center md:p-7 md:rounded-3xl">
-                <img
-                  src={vet?.image}
-                  alt={vet?.name}
-                  className="w-12 h-12 rounded-full object-cover md:w-16 md:h-16"
-                />
+                {imageSrc ? (
+                  <img
+                    src={imageSrc}
+                    alt={vet?.name || "Vet"}
+                    className="w-12 h-12 rounded-full object-cover md:w-16 md:h-16"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-stone-200" />
+                )}
 
                 <div className="flex-1">
                   <h3 className="font-bold text-stone-800 text-sm md:text-lg lg:text-xl">
-                    Consulting Dr. {vet?.name?.split(" ")[1] || vet?.name}
+                    Consulting Dr. {doctorDisplayName}
                   </h3>
                   <p className="text-xs text-stone-500 md:text-base">
-                    Video Consultation • 15 mins
+                    Video Consultation • 15 mins •{" "}
+                    <span className="font-semibold">{slotLabel}</span>
                   </p>
                 </div>
 
@@ -364,7 +416,6 @@ const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Da
                     <span>₹{fee}</span>
                   </div>
 
-                  {/* ✅ TESTING: hide service charge row */}
                   {service > 0 ? (
                     <div className="flex justify-between text-sm text-stone-600 md:text-base">
                       <span>Service Charge</span>
@@ -435,6 +486,7 @@ const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Da
                   <p className="text-sm text-center text-stone-400 mt-3 flex items-center justify-center gap-2">
                     <ShieldCheck size={16} /> Secure UPI / Card Payment
                   </p>
+
                   {statusMessage ? (
                     <p className={`text-sm text-center mt-2 ${statusClassName}`}>
                       {statusMessage}
@@ -461,9 +513,11 @@ const slotLabel = vet?.bookingRateType === "night" ? "Night (8 PM - 8 AM)" : "Da
             Start <ArrowRight size={18} />
           </span>
         </Button>
+
         <p className="text-[10px] text-center text-stone-400 mt-2 flex items-center justify-center gap-1">
           <ShieldCheck size={10} /> Secure UPI / Card Payment
         </p>
+
         {statusMessage ? (
           <p className={`text-xs text-center mt-2 ${statusClassName}`}>
             {statusMessage}
@@ -516,9 +570,7 @@ export const ConfirmationScreen = ({ vet }) => {
           </h2>
 
           <p className="text-stone-500 mb-8 max-w-[250px] mx-auto md:max-w-2xl md:text-lg">
-            <strong className="text-stone-700">
-              {vet?.name || "Your vet"}
-            </strong>{" "}
+            <strong className="text-stone-700">{vet?.name || "Your vet"}</strong>{" "}
             has been notified and will respond in about 10-15 minutes.
           </p>
 
@@ -579,4 +631,3 @@ export const ConfirmationScreen = ({ vet }) => {
     </div>
   );
 };
-
