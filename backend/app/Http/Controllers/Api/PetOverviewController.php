@@ -229,16 +229,35 @@ class PetOverviewController extends Controller
             return null;
         }
 
-        return [
-            'id' => $obs->id,
-            'observed_at' => $obs->observed_at,
-            'eating' => $obs->eating,
-            'appetite' => $obs->appetite,
-            'energy' => $obs->energy,
-            'mood' => $obs->mood,
-            'symptoms' => $obs->symptoms ? json_decode($obs->symptoms, true) : [],
-            'notes' => $obs->notes,
-        ];
+        return $this->serializeObservationRow($obs);
+    }
+
+    private function serializeObservationRow(object $obs): array
+    {
+        $data = (array) $obs;
+
+        if (array_key_exists('symptoms', $data) && is_string($data['symptoms'])) {
+            $decodedSymptoms = json_decode($data['symptoms'], true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $data['symptoms'] = $decodedSymptoms;
+            }
+        }
+
+        $hasBlobColumn = Schema::hasColumn('user_observations', 'image_blob');
+        $hasMimeColumn = Schema::hasColumn('user_observations', 'image_mime');
+        $hasImageBlob = $hasBlobColumn && !empty($obs->image_blob);
+
+        $data['image_blob_url'] = ($hasBlobColumn && $hasMimeColumn && $hasImageBlob)
+            ? route('api.user-per-observationss.image', ['observation' => $obs->id])
+            : null;
+        $data['image_url'] = $data['image_blob_url'];
+
+        if ($hasBlobColumn && array_key_exists('image_blob', $data)) {
+            unset($data['image_blob']);
+            $data['image_blob_present'] = $hasImageBlob;
+        }
+
+        return $data;
     }
 
     private function normalizeScore($value): ?int
