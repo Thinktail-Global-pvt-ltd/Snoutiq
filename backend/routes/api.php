@@ -443,6 +443,7 @@ Route::post('/user-pet-observation', function (Request $request) {
         'breed' => ['required', 'string', 'max:255'],
         'dob' => ['nullable', 'date'],
         'type' => ['required', 'string', 'max:100'],
+        'gender' => ['nullable', 'string', 'max:50'],
         'pet_name' => ['nullable', 'string', 'max:255'],
         'reported_symptom' => ['nullable', 'string'],
         'pet_doc2' => ['nullable', 'string'],
@@ -512,6 +513,14 @@ Route::post('/user-pet-observation', function (Request $request) {
         if (Schema::hasColumn('pets', 'type')) {
             $pet->type = $data['type'];
         }
+        if (!empty($data['gender'])) {
+            if (Schema::hasColumn('pets', 'pet_gender')) {
+                $pet->pet_gender = $data['gender'];
+            }
+            if (Schema::hasColumn('pets', 'gender')) {
+                $pet->gender = $data['gender'];
+            }
+        }
         if (!empty($data['dob'])) {
             if (Schema::hasColumn('pets', 'pet_dob')) {
                 $pet->pet_dob = $data['dob'];
@@ -548,7 +557,7 @@ Route::post('/user-pet-observation', function (Request $request) {
 
         return [
             'user' => $user->only(['id', 'name', 'phone', 'email']),
-            'pet' => $pet->only(['id', 'user_id', 'name', 'breed', 'pet_type', 'type', 'pet_dob', 'dob', 'reported_symptom', 'pet_doc2']),
+            'pet' => $pet->only(['id', 'user_id', 'name', 'breed', 'pet_type', 'type', 'pet_gender', 'gender', 'pet_dob', 'dob', 'reported_symptom', 'pet_doc2']),
             'observation' => $observation->only(['id', 'user_id', 'pet_id', 'appetite', 'energy', 'mood', 'observed_at']),
         ];
     });
