@@ -41,7 +41,6 @@ import {
   Shield,
   LogOut,
   TrendingUp,
-  Activity,
 } from "lucide-react";
 import logo from "../assets/images/logo.png";
 
@@ -1174,6 +1173,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const urlReady =
     trimmedImageUrl.length > 0 && trimmedImageUrl.length <= IMAGE_URL_LIMIT;
   const imageReady = Boolean(doctorImageFile) || urlReady;
+  const imageValid = !isImageProcessing && (!imageReady || !imageError);
 
   const breakReady = noBreakTime || breakTimes.length > 0;
 
@@ -1183,9 +1183,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     form.email.trim() &&
     form.shortIntro.trim() &&
     form.vetCity.trim() &&
-    imageReady &&
-    !imageError &&
-    !isImageProcessing,
+    imageValid,
   );
 
   const professionalComplete = Boolean(
@@ -1269,8 +1267,6 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
     if (!canSubmit) {
       setShowErrors(true);
-      if (!imageReady)
-        setImageError("Please upload a photo or add a valid URL.");
       return;
     }
 
@@ -1290,10 +1286,10 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         finalDoctorImageUrl = await uploadDoctorImageAndGetUrl(doctorImageFile);
       }
 
-      if (!finalDoctorImageUrl) {
-        throw new Error("Please upload a doctor photo (required).");
-      }
-      if (finalDoctorImageUrl.length > IMAGE_URL_LIMIT) {
+      if (
+        finalDoctorImageUrl &&
+        finalDoctorImageUrl.length > IMAGE_URL_LIMIT
+      ) {
         throw new Error(
           `Image URL must be ${IMAGE_URL_LIMIT} characters or less.`,
         );
@@ -2126,9 +2122,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     visitCategory: "Follow-up",
     caseSeverity: "general",
     notes: "",
-    temperature: "",
-    weight: "",
-    heartRate: "",
     medications: [{ name: "", dosage: "", frequency: "", duration: "" }],
     recordFile: null,
   });
@@ -2379,9 +2372,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       visitCategory: "Follow-up",
       caseSeverity: "general",
       notes: "",
-      temperature: "",
-      weight: "",
-      heartRate: "",
       medications: [{ name: "", dosage: "", frequency: "", duration: "" }],
       recordFile: null,
     });
@@ -2494,9 +2484,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     fd.append("visit_category", prescriptionForm.visitCategory);
     fd.append("case_severity", prescriptionForm.caseSeverity);
     fd.append("notes", prescriptionForm.notes);
-    fd.append("temperature", String(prescriptionForm.temperature));
-    fd.append("weight", String(prescriptionForm.weight));
-    fd.append("heart_rate", String(prescriptionForm.heartRate));
     fd.append("medications_json", JSON.stringify(medsPayload));
     if (prescriptionForm.recordFile) {
       fd.append("record_file", prescriptionForm.recordFile);
@@ -3403,7 +3390,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         <select
                           value={prescriptionForm.visitCategory}
                           onChange={updatePrescriptionField("visitCategory")}
-                          required
                           className={INPUT_BASE_CLASS}
                         >
                           <option value="Follow-up">Follow-up</option>
@@ -3420,7 +3406,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         <select
                           value={prescriptionForm.caseSeverity}
                           onChange={updatePrescriptionField("caseSeverity")}
-                          required
                           className={INPUT_BASE_CLASS}
                         >
                           <option value="general">General</option>
@@ -3437,64 +3422,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         value={prescriptionForm.notes}
                         onChange={updatePrescriptionField("notes")}
                         rows={4}
-                        required
                         placeholder="Enter diagnosis, observations, and treatment plan..."
                         className={`${INPUT_BASE_CLASS} resize-none`}
                       />
-                    </div>
-                  </div>
-
-                  {/* Vitals */}
-                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
-                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                      <Activity size={16} className="text-[#0B4D67]" />
-                      Vital Signs
-                    </h4>
-                    <div className="grid sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Temperature (°C)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          value={prescriptionForm.temperature}
-                          onChange={updatePrescriptionField("temperature")}
-                          required
-                          placeholder="38.5"
-                          className={INPUT_BASE_CLASS}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Weight (kg)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          value={prescriptionForm.weight}
-                          onChange={updatePrescriptionField("weight")}
-                          required
-                          placeholder="5.2"
-                          className={INPUT_BASE_CLASS}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Heart Rate (bpm)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={prescriptionForm.heartRate}
-                          onChange={updatePrescriptionField("heartRate")}
-                          required
-                          placeholder="120"
-                          className={INPUT_BASE_CLASS}
-                        />
-                      </div>
                     </div>
                   </div>
 

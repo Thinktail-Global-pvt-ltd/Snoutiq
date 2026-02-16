@@ -113,16 +113,16 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
   );
 
   const getConsultFeeByTime = () => {
-  const now = new Date();
-  const hour = now.getHours(); // 0-23
+    const now = new Date();
+    const hour = now.getHours(); // 0-23
 
-  // Day: 8 AM (08) to 8 PM (20)
-  const isDay = hour >= 8 && hour < 20;
+    // Day: 8 AM (08) to 8 PM (20)
+    const isDay = hour >= 8 && hour < 20;
 
-  return isDay
-    ? { label: "Day", time: "8 AM – 8 PM", price: 500 }
-    : { label: "Night", time: "8 PM – 8 AM", price: 650 };
-};
+    return isDay
+      ? { label: "Day", time: "8 AM – 8 PM", price: 500 }
+      : { label: "Night", time: "8 PM – 8 AM", price: 650 };
+  };
 
   const blogPosts = useMemo(
     () => [
@@ -218,34 +218,38 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 India.
               </p>
               {/* Pricing (Day/Night) */}
-{(() => {
-  const fee = getConsultFeeByTime();
+              {(() => {
+                const fee = getConsultFeeByTime();
 
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
-      <span className="inline-flex items-center rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-        Consultation Fee
-      </span>
+                return (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                      Consultation Fee
+                    </span>
 
-      <span className="inline-flex items-center rounded-full bg-[#EAF4FF] border border-[#3998de]/20 px-3 py-1 text-xs font-semibold text-[#1D4E89] shadow-sm">
-        {activeDoctor?.experience}
-      </span>
+                    <span className="inline-flex items-center rounded-full bg-[#EAF4FF] border border-[#3998de]/20 px-3 py-1 text-xs font-semibold text-[#1D4E89] shadow-sm">
+                      {activeDoctor?.experience}
+                    </span>
 
-      <span className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
-        <span
-          className={`h-2 w-2 rounded-full ${
-            fee.label === "Day" ? "bg-amber-400" : "bg-indigo-400"
-          }`}
-        />
-        {fee.label} Fee{" "}
-        <span className="font-medium text-slate-500">({fee.time})</span> : ₹{fee.price}
-      </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          fee.label === "Day" ? "bg-amber-400" : "bg-indigo-400"
+                        }`}
+                      />
+                      {fee.label} Fee{" "}
+                      <span className="font-medium text-slate-500">
+                        ({fee.time})
+                      </span>{" "}
+                      : ₹{fee.price}
+                    </span>
 
-      <span className="text-xs text-slate-400">(Taxes may apply)</span>
-    </div>
-  );
-})()}
-
+                    <span className="text-xs text-slate-400">
+                      (Taxes may apply)
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* CTA */}
               <button
