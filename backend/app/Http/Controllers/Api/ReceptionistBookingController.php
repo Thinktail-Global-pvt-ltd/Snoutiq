@@ -321,6 +321,7 @@ class ReceptionistBookingController extends Controller
             ->get();
 
         $rows = $rows->map(function ($row) {
+            $row->notes_payment = $this->extractNotesPaymentStatus($row->notes ?? null);
             $row->patient_id = $this->extractPatientId($row->notes ?? null);
             unset($row->notes);
             return $row;
@@ -356,6 +357,32 @@ class ReceptionistBookingController extends Controller
         }
 
         return null;
+    }
+
+    private function extractNotesPaymentStatus(?string $notes): bool
+    {
+        if (!$notes) {
+            return false;
+        }
+
+        $decoded = json_decode($notes, true);
+        if (!is_array($decoded)) {
+            return false;
+        }
+
+        $amountPaise = isset($decoded['amount_paise']) && is_numeric($decoded['amount_paise'])
+            ? (int) $decoded['amount_paise']
+            : 0;
+        $paymentId = trim((string) ($decoded['razorpay_payment_id'] ?? ''));
+        $orderId = trim((string) ($decoded['razorpay_order_id'] ?? ''));
+        $signature = trim((string) ($decoded['razorpay_signature'] ?? ''));
+
+        // Treat mocked payment ids like pay_new as unpaid.
+        $isMockPayment = in_array(strtolower($paymentId), ['pay_new', 'new', 'test'], true);
+        $hasValidPaymentId = $paymentId !== '' && ! $isMockPayment;
+        $hasOrderAndSignature = $orderId !== '' && $signature !== '';
+
+        return $amountPaise > 0 && $hasValidPaymentId && $hasOrderAndSignature;
     }
 
     public function storePatient(Request $request)
