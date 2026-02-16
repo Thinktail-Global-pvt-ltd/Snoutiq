@@ -603,6 +603,7 @@ class AuthController extends Controller
 
             $lastVetSlug = $this->ensureLastVetSlug($existingUser);
             [$pets, $userPets] = $this->loadRelatedPets($existingUser);
+            $pets = $this->withPetDoc2BlobUrls($pets);
             $latestChat = $existingUser ? Chat::where('user_id', $existingUser->id)->latest()->first() : null;
             $latestCallSession = $this->latestCallSessionForUser($existingUser);
             $overviewPetId = $this->resolvePetIdForOverview($request, $pets);
@@ -661,6 +662,7 @@ class AuthController extends Controller
         $this->markPhoneVerified($user, $normalizedPhone, $otpEntry);
         $lastVetSlug = $this->ensureLastVetSlug($user);
         [$pets, $userPets] = $this->loadRelatedPets($user);
+        $pets = $this->withPetDoc2BlobUrls($pets);
         $latestChat = Chat::where('user_id', $user->id)->latest()->first();
         $latestCallSession = $this->latestCallSessionForUser($user);
         $overviewPetId = $this->resolvePetIdForOverview($request, $pets);
@@ -937,7 +939,8 @@ public function register(Request $request)
         'message'    => 'User registered successfully (updated)',
         'user'       => $user,
         'pet'        => $pet,
-        'pet_doc2_blob_url' => $this->userPetDoc2BlobUrl($user),
+        'pet_doc2_blob_url' => $pet ? $this->petDoc2BlobUrl($pet) : $this->userPetDoc2BlobUrl($user),
+        'user_pet_doc2_blob_url' => $this->userPetDoc2BlobUrl($user),
         'token'      => $plainToken,
         'token_type' => 'Bearer',
     ], 200);
@@ -965,6 +968,32 @@ public function register(Request $request)
         return response($blob, 200, [
             'Content-Type' => $mime,
             'Content-Disposition' => 'inline; filename="user-' . $user->id . '-pet-doc2"',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
+    public function petDoc2Blob(Pet $pet)
+    {
+        if (! $this->petPetDoc2BlobColumnsReady()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet doc2 blob columns are missing. Please run migrations.',
+            ], 500);
+        }
+
+        $blob = $pet->getRawOriginal('pet_doc2_blob');
+        if ($blob === null || $blob === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_doc2 blob not found for this pet.',
+            ], 404);
+        }
+
+        $mime = $pet->pet_doc2_mime ?: 'application/octet-stream';
+
+        return response($blob, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="pet-' . $pet->id . '-pet-doc2"',
             'Cache-Control' => 'public, max-age=86400',
         ]);
     }
@@ -1236,6 +1265,31 @@ private function userPetDoc2BlobUrl(?User $user): ?string
     }
 
     return route('api.users.pet-doc2-blob', ['user' => $user->id]);
+}
+
+private function petDoc2BlobUrl(?Pet $pet): ?string
+{
+    if (! $pet || ! $this->petPetDoc2BlobColumnsReady()) {
+        return null;
+    }
+
+    $blob = $pet->getRawOriginal('pet_doc2_blob');
+    if ($blob === null || $blob === '') {
+        return null;
+    }
+
+    return route('api.pets.pet-doc2-blob', ['pet' => $pet->id]);
+}
+
+private function withPetDoc2BlobUrls(Collection $pets): Collection
+{
+    return $pets->map(function ($pet) {
+        if ($pet instanceof Pet) {
+            $pet->setAttribute('pet_doc2_blob_url', $this->petDoc2BlobUrl($pet));
+        }
+
+        return $pet;
+    });
 }
 
 /**

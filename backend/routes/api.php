@@ -1534,6 +1534,9 @@ Route::post('/auth/register',   [AuthController::class, 'register']);
 Route::get('/auth/users/{user}/pet-doc2-blob', [AuthController::class, 'userPetDoc2Blob'])
     ->whereNumber('user')
     ->name('api.users.pet-doc2-blob');
+Route::get('/auth/pets/{pet}/pet-doc2-blob', [AuthController::class, 'petDoc2Blob'])
+    ->whereNumber('pet')
+    ->name('api.pets.pet-doc2-blob');
 Route::post('/auth/register-via-mobile', [AuthController::class, 'registerViaMobile']);
 Route::post('/auth/initial-register', [AuthController::class, 'createInitialRegistration']);
 Route::post('/auth/initial-register-mobile', [AuthController::class, 'createInitialRegistrationMobile']);
