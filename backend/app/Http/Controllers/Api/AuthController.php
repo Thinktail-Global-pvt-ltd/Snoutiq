@@ -816,6 +816,10 @@ public function register(Request $request)
     $existingDoc2 = $user->pet_doc2;
     $existingSummary = $user->summary;
     $ownerName = $request->input('pet_owner_name') ?? $request->input('fullName') ?? $user->name;
+    $userBlobColumnsReady = $this->userPetDoc2BlobColumnsReady();
+    $petBlobColumnsReady = $this->petPetDoc2BlobColumnsReady();
+    $hasNewDoc2Upload = $request->hasFile('pet_doc2');
+    [$doc2Blob, $doc2Mime] = $this->extractPetDocumentBlob($request, 'pet_doc2');
 
     $doc1Path = null;
     $doc2Path = null;
@@ -851,7 +855,7 @@ public function register(Request $request)
     }
 
     try {
-        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petWeight, $ownerName) {
+        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petWeight, $ownerName, $userBlobColumnsReady, $petBlobColumnsReady, $hasNewDoc2Upload, $doc2Blob, $doc2Mime) {
             // ✅ Update user with final details
             $user->fill([
                 'name'        => $ownerName,
@@ -865,6 +869,11 @@ public function register(Request $request)
                 'latitude'    => $latitude ?? $request->latitude ?? $user->latitude,
                 'longitude'   => $longitude ?? $request->longitude ?? $user->longitude,
             ]);
+
+            if ($userBlobColumnsReady && $hasNewDoc2Upload && $doc2Blob !== null) {
+                $user->pet_doc2_blob = $doc2Blob;
+                $user->pet_doc2_mime = $doc2Mime;
+            }
 
             // Persist core fields even if api_token_* columns are missing
             $user->save();
@@ -892,6 +901,10 @@ public function register(Request $request)
             }
             if ($petWeight !== null) {
                 $petAttributes['weight'] = $petWeight;
+            }
+            if ($petBlobColumnsReady && $hasNewDoc2Upload && $doc2Blob !== null) {
+                $petAttributes['pet_doc2_blob'] = $doc2Blob;
+                $petAttributes['pet_doc2_mime'] = $doc2Mime;
             }
 
             $existingPet = Pet::where('user_id', $user->id)->first();
@@ -924,10 +937,37 @@ public function register(Request $request)
         'message'    => 'User registered successfully (updated)',
         'user'       => $user,
         'pet'        => $pet,
+        'pet_doc2_blob_url' => $this->userPetDoc2BlobUrl($user),
         'token'      => $plainToken,
         'token_type' => 'Bearer',
     ], 200);
 }
+
+    public function userPetDoc2Blob(User $user)
+    {
+        if (! $this->userPetDoc2BlobColumnsReady()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_doc2 blob columns are missing. Please run migrations.',
+            ], 500);
+        }
+
+        $blob = $user->getRawOriginal('pet_doc2_blob');
+        if ($blob === null || $blob === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'pet_doc2 blob not found.',
+            ], 404);
+        }
+
+        $mime = $user->pet_doc2_mime ?: 'application/octet-stream';
+
+        return response($blob, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="user-' . $user->id . '-pet-doc2"',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
 
 
     public function register_latest_backup(Request $request)
@@ -1151,6 +1191,51 @@ private function storePetDocument(Request $request, string $field): array
     $relativePath = 'backend/uploads/pet_docs/'.$docName;
 
     return [$relativePath, $uploadPath.'/'.$docName];
+}
+
+private function extractPetDocumentBlob(Request $request, string $field): array
+{
+    if (! $request->hasFile($field)) {
+        return [null, null];
+    }
+
+    $file = $request->file($field);
+    if (! $file || ! $file->isValid()) {
+        return [null, null];
+    }
+
+    return [
+        $file->get(),
+        $file->getMimeType() ?: ($file->getClientMimeType() ?: 'application/octet-stream'),
+    ];
+}
+
+private function userPetDoc2BlobColumnsReady(): bool
+{
+    return Schema::hasTable('users')
+        && Schema::hasColumn('users', 'pet_doc2_blob')
+        && Schema::hasColumn('users', 'pet_doc2_mime');
+}
+
+private function petPetDoc2BlobColumnsReady(): bool
+{
+    return Schema::hasTable('pets')
+        && Schema::hasColumn('pets', 'pet_doc2_blob')
+        && Schema::hasColumn('pets', 'pet_doc2_mime');
+}
+
+private function userPetDoc2BlobUrl(?User $user): ?string
+{
+    if (! $user || ! $this->userPetDoc2BlobColumnsReady()) {
+        return null;
+    }
+
+    $blob = $user->getRawOriginal('pet_doc2_blob');
+    if ($blob === null || $blob === '') {
+        return null;
+    }
+
+    return route('api.users.pet-doc2-blob', ['user' => $user->id]);
 }
 
 /**

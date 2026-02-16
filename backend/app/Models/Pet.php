@@ -24,6 +24,8 @@ class Pet extends Model
         'is_neutered',
         'pet_doc1',
         'pet_doc2',
+        'pet_doc2_blob',
+        'pet_doc2_mime',
         'pet_card_for_ai',
         'video_calling_upload_file',
         'weight',
@@ -47,6 +49,10 @@ class Pet extends Model
         'vaccination_date' => 'date',
         'vaccine_reminder_status' => 'array',
         'dog_disease_payload' => 'array',
+    ];
+
+    protected $hidden = [
+        'pet_doc2_blob',
     ];
 
     public function owner(): BelongsTo
