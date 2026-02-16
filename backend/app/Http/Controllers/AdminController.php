@@ -211,6 +211,9 @@ class AdminController extends Controller
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
         }
 
+        $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
+        [$petDocBlob, $petDocMime] = $blobSourceField ? $this->extractPetDocumentBlob($request, $blobSourceField) : [null, null];
+        $blobColumnsReady = $this->petDoc2BlobColumnsReady();
         $uploadedDoc1 = $this->storePetDocument($request, 'pet_doc1');
         $uploadedDoc2 = $this->storePetDocument($request, 'pet_doc2');
 
@@ -219,9 +222,6 @@ class AdminController extends Controller
         if (($pet_doc2 === null || $pet_doc2 === '') && ($pet_doc1 !== null && $pet_doc1 !== '')) {
             $pet_doc2 = $pet_doc1;
         }
-        $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
-        [$petDocBlob, $petDocMime] = $blobSourceField ? $this->extractPetDocumentBlob($request, $blobSourceField) : [null, null];
-        $blobColumnsReady = $this->petDoc2BlobColumnsReady();
 
         return DB::transaction(function () use (
             $userId,
@@ -327,6 +327,8 @@ class AdminController extends Controller
             $params[] = $neuteredFlag;
         }
 
+        $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
+        [$petDocBlob, $petDocMime] = $blobSourceField ? $this->extractPetDocumentBlob($request, $blobSourceField) : [null, null];
         $doc1Upload = $this->storePetDocument($request, 'pet_doc1');
         $doc2Upload = $this->storePetDocument($request, 'pet_doc2');
 
@@ -358,8 +360,6 @@ class AdminController extends Controller
             $params[] = $petDoc2Value;
         }
 
-        $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
-        [$petDocBlob, $petDocMime] = $blobSourceField ? $this->extractPetDocumentBlob($request, $blobSourceField) : [null, null];
         if ($this->petDoc2BlobColumnsReady() && $petDocBlob !== null) {
             $sets[] = "`pet_doc2_blob` = ?";
             $params[] = $petDocBlob;
