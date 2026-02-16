@@ -541,18 +541,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                                 {vet.clinicName}
                               </p>
                             ) : null}
-
-                            {isSpecialist ? (
-                              <p className="mt-1 text-[12px] font-semibold text-teal-600">
-                                {petDetails?.type === "exotic"
-                                  ? "Exotic care"
-                                  : `${petDetails?.type} care`}
-                              </p>
-                            ) : (
-                              <p className="mt-1 text-[12px] font-semibold text-slate-400">
-                                Online consultation
-                              </p>
-                            )}
                           </div>
 
                           <div className="shrink-0 text-right">
@@ -625,11 +613,11 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         <span className="font-semibold">Consult Now</span>
 
                         {/* optional small label */}
-                        <span className="text-[11px] font-semibold text-white/80">
+                        {/* <span className="text-[11px] font-semibold text-white/80">
                           {showDayPrice ? "Day" : "Night"}
-                        </span>
+                        </span> */}
 
-                        {price ? (
+                        {/* {price ? (
                           <span className="ml-1 rounded-xl bg-white/15 px-3 py-1 text-[13px] font-extrabold">
                             {price}
                           </span>
@@ -637,7 +625,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           <span className="ml-1 rounded-xl bg-white/15 px-3 py-1 text-[12px] font-bold">
                             Ask
                           </span>
-                        )}
+                        )} */}
                       </Button>
                     </div>
                   </div>

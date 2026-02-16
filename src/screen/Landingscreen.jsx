@@ -23,13 +23,13 @@ const DOCTOR_PROFILES = [
     name: "Dr. Mohd Tosif",
     degree: "B.V.Sc",
     experience: "5+ years of experience",
-     image: doctorSlide3,
+    image: doctorSlide3,
   },
   {
     name: "Dr. Pooja Tarar",
     degree: "M.V.Sc",
     experience: "18+ years of experience",
-   
+
     image: doctorSlide2,
   },
   {
@@ -111,6 +111,18 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
     ],
     [],
   );
+
+  const getConsultFeeByTime = () => {
+  const now = new Date();
+  const hour = now.getHours(); // 0-23
+
+  // Day: 8 AM (08) to 8 PM (20)
+  const isDay = hour >= 8 && hour < 20;
+
+  return isDay
+    ? { label: "Day", time: "8 AM – 8 PM", price: 500 }
+    : { label: "Night", time: "8 PM – 8 AM", price: 650 };
+};
 
   const blogPosts = useMemo(
     () => [
@@ -196,20 +208,51 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
 
               <h1 className="mt-4 text-3xl font-extrabold leading-[1.4] text-slate-900 md:text-4xl lg:text-[44px]">
                 Connect with a{" "}
-                <span className="text-[#3998de]">Verified Veterinarian</span> in less than
-                15 minutes.
+                <span className="text-[#3998de]">Verified Veterinarian</span> in
+                less than 15 minutes.
               </h1>
 
               <p className="mt-4 text-base leading-relaxed text-slate-500 md:text-lg">
-                Professional video consultations for your pet&apos;s health concerns.
-                Get expert guidance from licensed veterinarians across India.
+                Professional video consultations for your pet&apos;s health
+                concerns. Get expert guidance from licensed veterinarians across
+                India.
               </p>
+              {/* Pricing (Day/Night) */}
+{(() => {
+  const fee = getConsultFeeByTime();
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2">
+      <span className="inline-flex items-center rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+        Consultation Fee
+      </span>
+
+      <span className="inline-flex items-center rounded-full bg-[#EAF4FF] border border-[#3998de]/20 px-3 py-1 text-xs font-semibold text-[#1D4E89] shadow-sm">
+        {activeDoctor?.experience}
+      </span>
+
+      <span className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
+        <span
+          className={`h-2 w-2 rounded-full ${
+            fee.label === "Day" ? "bg-amber-400" : "bg-indigo-400"
+          }`}
+        />
+        {fee.label} Fee{" "}
+        <span className="font-medium text-slate-500">({fee.time})</span> : ₹{fee.price}
+      </span>
+
+      <span className="text-xs text-slate-400">(Taxes may apply)</span>
+    </div>
+  );
+})()}
 
 
               {/* CTA */}
               <button
                 type="button"
-                onClick={() => (typeof onStart === "function" ? onStart() : null)}
+                onClick={() =>
+                  typeof onStart === "function" ? onStart() : null
+                }
                 className="
     group mt-5 inline-flex items-center justify-center gap-2
     rounded-xl bg-[#3998de] px-7 py-3 text-base font-semibold text-white md:text-lg
@@ -225,7 +268,11 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-4">
                 {[
                   { n: "15min", l: "Average response time", icon: Clock },
-                  { n: "100%", l: "Licensed and experienced vets", icon: ShieldCheck },
+                  {
+                    n: "100%",
+                    l: "Licensed and experienced vets",
+                    icon: ShieldCheck,
+                  },
                 ].map((s, i) => (
                   <div
                     key={i}
@@ -265,7 +312,9 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                     </div>
                     <div
                       className="flex transition-transform duration-700 ease-in-out"
-                      style={{ transform: `translateX(-${activeSlide * 100}%)` }}
+                      style={{
+                        transform: `translateX(-${activeSlide * 100}%)`,
+                      }}
                     >
                       {HERO_SLIDES.map((slide, index) => (
                         <div key={slide.name} className="min-w-full">
@@ -329,8 +378,8 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
               </h2>
 
               <p className="mt-3 text-base leading-relaxed text-slate-500 md:text-lg">
-                Access veterinary care anytime, anywhere. Download our app for instant
-                consultations with verified vets.
+                Access veterinary care anytime, anywhere. Download our app for
+                instant consultations with verified vets.
               </p>
 
               {/* Store Buttons */}
@@ -353,15 +402,23 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                     >
                       <path d="M96 64l256 192-256 192V64z" fill="#34A853" />
                       <path d="M96 64l160 120-48 48L96 64z" fill="#FBBC04" />
-                      <path d="M256 328l-48-48 48-48 160 120L256 328z" fill="#4285F4" />
-                      <path d="M208 232l48-48 48 48-48 48-48-48z" fill="#EA4335" />
+                      <path
+                        d="M256 328l-48-48 48-48 160 120L256 328z"
+                        fill="#4285F4"
+                      />
+                      <path
+                        d="M208 232l48-48 48 48-48 48-48-48z"
+                        fill="#EA4335"
+                      />
                     </svg>
                   </span>
                   <span className="text-left leading-tight">
                     <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
                       Get it on
                     </span>
-                    <span className="block text-base font-extrabold">Google Play</span>
+                    <span className="block text-base font-extrabold">
+                      Google Play
+                    </span>
                   </span>
                 </a>
 
@@ -388,7 +445,9 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                     <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       Coming soon
                     </span>
-                    <span className="block text-base font-extrabold">App Store</span>
+                    <span className="block text-base font-extrabold">
+                      App Store
+                    </span>
                   </span>
                 </div>
               </div>
@@ -418,7 +477,6 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
           </div>
         </div>
       </section>
-
 
       {/* Features */}
       <section className="bg-white py-16 md:py-20">
@@ -525,8 +583,6 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
           </div>
         </div>
       </section>
-
-
 
       {/* Blog */}
       <section className="bg-white py-16 md:py-10">
@@ -654,32 +710,34 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
       <footer className="bg-slate-900 py-10 text-white">
         <div className="mx-auto max-w-6xl px-5">
           <div className="mb-10 rounded-xl bg-white/5 p-5">
-            <h4 className="text-lg font-semibold">Important Medical & Legal Disclaimer</h4>
+            <h4 className="text-lg font-semibold">
+              Important Medical & Legal Disclaimer
+            </h4>
             <p className="mt-3 text-sm text-slate-200">
-              <strong>NO ONLINE PRESCRIPTIONS:</strong> SnoutIQ does not prescribe,
-              dispense, or sell any medications. We do not provide online
-              prescriptions under any circumstances. All medication needs must be
-              addressed through in-person veterinary clinics with proper physical
-              examination.
+              <strong>NO ONLINE PRESCRIPTIONS:</strong> SnoutIQ does not
+              prescribe, dispense, or sell any medications. We do not provide
+              online prescriptions under any circumstances. All medication needs
+              must be addressed through in-person veterinary clinics with proper
+              physical examination.
             </p>
             <p className="mt-3 text-sm text-slate-200">
               <strong>CONSULTATION ONLY:</strong> SnoutIQ provides professional
-              veterinary teletriage and consultation services only. Our service is
-              designed to help pet parents understand their pet&apos;s condition and
-              determine appropriate next steps, including when to seek in-person
-              veterinary care.
+              veterinary teletriage and consultation services only. Our service
+              is designed to help pet parents understand their pet&apos;s
+              condition and determine appropriate next steps, including when to
+              seek in-person veterinary care.
             </p>
             <p className="mt-3 text-sm text-slate-200">
               <strong>NOT FOR EMERGENCIES:</strong> This service is not suitable
-              for veterinary emergencies. For emergencies, trauma, severe symptoms,
-              or life-threatening conditions, please visit your nearest veterinary
-              emergency clinic immediately.
+              for veterinary emergencies. For emergencies, trauma, severe
+              symptoms, or life-threatening conditions, please visit your
+              nearest veterinary emergency clinic immediately.
             </p>
             <p className="mt-3 text-sm text-slate-200">
-              <strong>LICENSED PROFESSIONALS:</strong> All veterinarians on SnoutIQ
-              are licensed professionals registered with the Veterinary Council of
-              India. However, video consultations cannot replace comprehensive
-              physical examinations.
+              <strong>LICENSED PROFESSIONALS:</strong> All veterinarians on
+              SnoutIQ are licensed professionals registered with the Veterinary
+              Council of India. However, video consultations cannot replace
+              comprehensive physical examinations.
             </p>
           </div>
 
@@ -687,8 +745,8 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
             <div>
               <h4 className="text-lg font-semibold">SnoutIQ</h4>
               <p className="mt-3 text-sm text-slate-300">
-                Professional veterinary teleconsultation and triage services across
-                India.
+                Professional veterinary teleconsultation and triage services
+                across India.
               </p>
               <p className="mt-4 text-sm text-slate-300">
                 <strong>Service Type:</strong> Consultation &amp; Triage Only
@@ -700,11 +758,14 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
 
             <div>
               <h4 className="text-lg font-semibold">Contact</h4>
-              <p className="mt-3 text-sm text-slate-300">Email: admin@snoutiq.com</p>
-                <p className="text-sm text-slate-300">Mobile: +91 85880 07466</p>
+              <p className="mt-3 text-sm text-slate-300">
+                Email: admin@snoutiq.com
+              </p>
+              <p className="text-sm text-slate-300">Mobile: +91 85880 07466</p>
               <p className="text-sm text-slate-300">Service Area: Pan India</p>
               <p className="mt-4 text-sm font-semibold text-rose-200">
-                For emergencies, visit your nearest veterinary clinic immediately.
+                For emergencies, visit your nearest veterinary clinic
+                immediately.
               </p>
             </div>
 
@@ -717,7 +778,10 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
                 <a className="block hover:text-white" href="/privacy-policy">
                   Privacy Policy
                 </a>
-                <a className="block hover:text-white" href="/medical-data-consent">
+                <a
+                  className="block hover:text-white"
+                  href="/medical-data-consent"
+                >
                   Medical Disclaimer
                 </a>
                 <a className="block hover:text-white" href="/cookie-policy">
@@ -728,7 +792,9 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
           </div>
 
           <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-slate-400">
-            <p>© 2026 SnoutIQ. Professional veterinary teleconsultation services.</p>
+            <p>
+              © 2026 SnoutIQ. Professional veterinary teleconsultation services.
+            </p>
             <p className="mt-2">
               All veterinarians are licensed professionals registered with the
               Veterinary Council of India or state veterinary councils.
@@ -745,6 +811,3 @@ const LandingScreen = ({ onStart, onVetAccess }) => {
 };
 
 export default LandingScreen;
-
-
-

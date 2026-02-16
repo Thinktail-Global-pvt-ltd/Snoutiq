@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
-import { Header, PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
+import {
+  Header,
+  PET_FLOW_STEPS,
+  ProgressBar,
+} from "../components/Sharedcomponents";
 import {
   CheckCircle2,
   ChevronDown,
   FileText,
   Image,
   Upload,
-  Star,
   User,
   Phone,
   Calendar,
@@ -47,6 +50,12 @@ const MOOD_OPTIONS = [
   { label: "Playful", value: "playful" },
 ];
 
+// ✅ NEW: Gender options
+const GENDER_OPTIONS = [
+  { label: "Male", value: "male" },
+  { label: "Female", value: "female" },
+];
+
 const formatBreedName = (breedKey, subBreed = null) => {
   const cap = (s) =>
     String(s)
@@ -75,26 +84,15 @@ const calcAgeFromDob = (dob) => {
   let months = today.getMonth() - birth.getMonth();
   let days = today.getDate() - birth.getDate();
 
-  if (days < 0) {
-    months -= 1;
-  }
-
+  if (days < 0) months -= 1;
   if (months < 0) {
     years -= 1;
     months += 12;
   }
 
-  if (years <= 0 && months <= 0) {
-    return "Less than 1 month";
-  }
-
-  if (years <= 0) {
-    return `${months} mo${months === 1 ? "" : "s"}`;
-  }
-
-  if (months === 0) {
-    return `${years} yr${years === 1 ? "" : "s"}`;
-  }
+  if (years <= 0 && months <= 0) return "Less than 1 month";
+  if (years <= 0) return `${months} mo${months === 1 ? "" : "s"}`;
+  if (months === 0) return `${years} yr${years === 1 ? "" : "s"}`;
 
   return `${years} yr${years === 1 ? "" : "s"} ${months} mo${
     months === 1 ? "" : "s"
@@ -179,7 +177,6 @@ const compressImageFile = async (
   });
 
   if (!blob) return file;
-
   if (blob.size >= file.size) return file;
 
   const ext = outputMime === "image/webp" ? "webp" : "jpg";
@@ -197,6 +194,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     type: null,
     breed: "",
     petDob: "",
+    // ✅ NEW: gender (required)
+    gender: "",
     problemText: "",
     mood: "calm",
     petDoc2: "",
@@ -231,13 +230,14 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       file.type?.startsWith("video/") ||
       /\.(mp4|mov|avi|mkv|webm)$/i.test(lowerName);
     if (isVideo) {
-      setSubmitError("Video uploads are not supported. Please upload a photo or PDF.");
+      setSubmitError(
+        "Video uploads are not supported. Please upload a photo or PDF."
+      );
       return;
     }
 
     const isImage = file.type?.startsWith("image/");
-    const isPdf =
-      file.type === "application/pdf" || lowerName.endsWith(".pdf");
+    const isPdf = file.type === "application/pdf" || lowerName.endsWith(".pdf");
     if (!isImage && !isPdf) {
       setSubmitError("Please upload a JPG, PNG, or PDF file.");
       return;
@@ -275,18 +275,14 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     await applyUploadFile(f);
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
+  const handleDragOver = (e) => e.preventDefault();
 
   const handleDragEnter = (e) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
+  const handleDragLeave = () => setIsDragging(false);
 
   useEffect(() => {
     const fetchDogBreeds = async () => {
@@ -294,9 +290,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       setLoadingBreeds(true);
 
       try {
-        const res = await fetch("https://snoutiq.com/backend/api/dog-breeds/all", {
-          method: "GET",
-        });
+        const res = await fetch(
+          "https://snoutiq.com/backend/api/dog-breeds/all",
+          { method: "GET" }
+        );
         const data = await res.json();
 
         if (data?.status === "success" && data?.breeds) {
@@ -317,7 +314,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
           });
 
           list.sort((a, b) => a.label.localeCompare(b.label));
-          list.push({ label: "Mixed Breed", value: "mixed_breed" }, { label: "Other", value: "other" });
+          list.push(
+            { label: "Mixed Breed", value: "mixed_breed" },
+            { label: "Other", value: "other" }
+          );
 
           setDogBreeds(list);
         } else {
@@ -372,31 +372,21 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       }
     };
 
-    if (details.type === "dog") {
-      fetchDogBreeds();
-    } else if (details.type === "cat") {
-      fetchCatBreeds();
-    } else {
+    if (details.type === "dog") fetchDogBreeds();
+    else if (details.type === "cat") fetchCatBreeds();
+    else {
       setBreedError("");
       setLoadingBreeds(false);
     }
 
-    if (details.type !== "dog") {
-      setDogBreeds([]);
-    }
-
-    if (details.type !== "cat") {
-      setCatBreeds([]);
-    }
+    if (details.type !== "dog") setDogBreeds([]);
+    if (details.type !== "cat") setCatBreeds([]);
 
     setBreedSearch("");
     setBreedDropdownOpen(false);
 
-    if (details.type === "exotic") {
-      setDetails((p) => ({ ...p, breed: "" }));
-    } else {
-      setDetails((p) => ({ ...p, exoticType: "" }));
-    }
+    if (details.type === "exotic") setDetails((p) => ({ ...p, breed: "" }));
+    else setDetails((p) => ({ ...p, exoticType: "" }));
   }, [details.type]);
 
   useEffect(() => {
@@ -440,31 +430,33 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
   const showBreed = details.type === "dog" || details.type === "cat";
   const isExotic = details.type === "exotic";
   const approxAge = useMemo(() => calcAgeFromDob(details.petDob), [details.petDob]);
-  
+
   const uploadKind = useMemo(() => {
     if (!uploadFile?.type) return "file";
     if (uploadFile.type.startsWith("image/")) return "image";
     if (uploadFile.type === "application/pdf") return "pdf";
     return "file";
   }, [uploadFile]);
-  
+
   const uploadIcon = useMemo(() => {
     if (uploadKind === "image") return <Image className="w-4 h-4" />;
     return <FileText className="w-4 h-4" />;
   }, [uploadKind]);
-  
+
   const uploadLabel = useMemo(() => {
     if (uploadKind === "image") return "Image";
     if (uploadKind === "pdf") return "PDF";
     return "File";
   }, [uploadKind]);
 
+  // ✅ UPDATED: gender required
   const isValid =
     details.ownerName.trim().length > 0 &&
     details.ownerMobile.replace(/\D/g, "").length === 10 &&
     details.name.trim().length > 0 &&
     details.type !== null &&
     details.petDob &&
+    details.gender && // ✅ required
     (!showBreed || details.breed) &&
     (!isExotic || details.exoticType.trim().length > 0) &&
     details.problemText.trim().length > 10 &&
@@ -476,13 +468,17 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
   const getSubmitTooltip = () => {
     if (!details.ownerName.trim()) return "Please enter owner name";
-    if (details.ownerMobile.replace(/\D/g, "").length !== 10) return "Please enter 10-digit mobile number";
+    if (details.ownerMobile.replace(/\D/g, "").length !== 10)
+      return "Please enter 10-digit mobile number";
     if (!details.name.trim()) return "Please enter your pet's name";
     if (!details.type) return "Please select pet type";
-    if (isExotic && !details.exoticType.trim()) return "Please specify your exotic pet type";
+    if (!details.gender) return "Please select pet gender"; // ✅ NEW
+    if (isExotic && !details.exoticType.trim())
+      return "Please specify your exotic pet type";
     if (showBreed && !details.breed) return "Please select breed";
     if (!details.petDob) return "Please select pet's date of birth";
-    if (details.problemText.trim().length <= 10) return "Please describe the problem in detail (minimum 10 characters)";
+    if (details.problemText.trim().length <= 10)
+      return "Please describe the problem in detail (minimum 10 characters)";
     if (!details.lastDaysEnergy) return "Please select energy level";
     if (!details.lastDaysAppetite) return "Please select appetite level";
     if (!details.mood) return "Please select mood";
@@ -508,9 +504,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
         fileToSend = compressed;
 
         setUploadMeta((prev) =>
-          prev
-            ? { ...prev, compressedSize: compressed?.size ?? null }
-            : prev
+          prev ? { ...prev, compressedSize: compressed?.size ?? null } : prev
         );
       }
 
@@ -521,6 +515,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       fd.append("dob", details.petDob || "");
       fd.append("pet_name", details.name || "");
 
+      // ✅ NEW: send to backend with key "gender"
+      fd.append("gender", details.gender || "");
+
       const breedValue =
         details.type === "exotic"
           ? details.exoticType.trim()
@@ -530,26 +527,18 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       fd.append("reported_symptom", details.problemText || "");
       fd.append("appetite", details.lastDaysAppetite || "");
       fd.append("energy", details.lastDaysEnergy || "");
-
       fd.append("mood", details.mood || "calm");
 
-      if (details.petDoc2?.trim()) {
-        fd.append("pet_doc2", details.petDoc2.trim());
-      }
+      if (details.petDoc2?.trim()) fd.append("pet_doc2", details.petDoc2.trim());
+      if (fileToSend) fd.append("file", fileToSend);
 
-      if (fileToSend) {
-        fd.append("file", fileToSend);
-      }
-
-      const res = await fetch("https://snoutiq.com/backend/api/user-pet-observation", {
-        method: "POST",
-        body: fd,
-      });
+      const res = await fetch(
+        "https://snoutiq.com/backend/api/user-pet-observation",
+        { method: "POST", body: fd }
+      );
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.message || "Failed to submit observation");
-      }
+      if (!res.ok) throw new Error(data?.message || "Failed to submit observation");
 
       const observation = data?.data ?? data ?? {};
       const userId = toNumber(
@@ -584,6 +573,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
           data?.data?.data?.pet?.id
         )
       );
+
       const nextPayload = {
         ...details,
         observation,
@@ -606,19 +596,26 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     };
   }, [uploadPreviewUrl]);
 
-  // Get icon for pet type
   const getPetTypeIcon = (type) => {
-    switch(type) {
-      case 'dog': return <Dog size={20} />;
-      case 'cat': return <Cat size={20} />;
-      case 'exotic': return <Rabbit size={20} />;
-      default: return <PawPrint size={20} />;
+    switch (type) {
+      case "dog":
+        return <Dog size={20} />;
+      case "cat":
+        return <Cat size={20} />;
+      case "exotic":
+        return <Rabbit size={20} />;
+      default:
+        return <PawPrint size={20} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col">
-      <Header onBack={onBack} title="Tell us about your pet" subtitle="Help us understand your pet's needs" />
+      <Header
+        onBack={onBack}
+        title="Tell us about your pet"
+        subtitle="Help us understand your pet's needs"
+      />
 
       <div className="w-full">
         <div className="flex-1 px-6 py-6 pb-32 overflow-y-auto no-scrollbar md:px-12 lg:px-20 md:py-12">
@@ -634,15 +631,19 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
               {/* LEFT COLUMN - Main Form */}
               <div className="md:col-span-7 lg:col-span-7">
                 <div className="space-y-8">
-                  {/* Owner details - Enhanced */}
+                  {/* Owner details */}
                   <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 md:p-8 space-y-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#3998de]/10 flex items-center justify-center">
                         <User size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">Owner details</h3>
-                        <p className="text-xs text-gray-500">Used only for appointment updates</p>
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          Owner details
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          Used only for appointment updates
+                        </p>
                       </div>
                     </div>
 
@@ -660,7 +661,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                             type="text"
                             value={details.ownerName}
                             onChange={(e) =>
-                              setDetails((p) => ({ ...p, ownerName: e.target.value }))
+                              setDetails((p) => ({
+                                ...p,
+                                ownerName: e.target.value,
+                              }))
                             }
                             placeholder="Enter your full name"
                             className={`${fieldBase} pl-12 md:pl-12`}
@@ -670,7 +674,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
-                          Pet Owner Mobile <span className="text-red-500">*</span>
+                          Pet Owner Mobile{" "}
+                          <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
                           <Phone
@@ -707,22 +712,27 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                     </div>
                   </section>
 
-                  {/* Pet details - Enhanced */}
+                  {/* Pet details */}
                   <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 md:p-8 space-y-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#3998de]/10 flex items-center justify-center">
                         <PawPrint size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">Pet details</h3>
-                        <p className="text-xs text-gray-500">Tell us about your furry friend</p>
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          Pet details
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          Tell us about your furry friend
+                        </p>
                       </div>
                     </div>
 
                     <div className="space-y-5">
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
-                          Pet's Name <span className="text-red-500">*</span>
+                          Pet&apos;s Name{" "}
+                          <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
                           <PawPrint
@@ -767,7 +777,13 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                                   : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100",
                               ].join(" ")}
                             >
-                              <div className={details.type === type ? "text-[#3998de]" : "text-gray-500"}>
+                              <div
+                                className={
+                                  details.type === type
+                                    ? "text-[#3998de]"
+                                    : "text-gray-500"
+                                }
+                              >
                                 {getPetTypeIcon(type)}
                               </div>
                               <span className="capitalize text-sm font-medium md:text-base">
@@ -775,6 +791,34 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                               </span>
                             </button>
                           ))}
+                        </div>
+                      </div>
+
+                      {/* ✅ NEW: Gender (required) */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Gender <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Heart
+                            size={18}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                          />
+                          <select
+                            value={details.gender}
+                            onChange={(e) =>
+                              setDetails((p) => ({ ...p, gender: e.target.value }))
+                            }
+                            className={`${selectBase} pl-12 md:pl-12`}
+                          >
+                            <option value="">Select gender</option>
+                            {GENDER_OPTIONS.map((g) => (
+                              <option key={g.value} value={g.value}>
+                                {g.label}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                         </div>
                       </div>
 
@@ -798,11 +842,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                             >
                               {loadingBreeds
                                 ? `Loading ${details.type} breeds...`
-                                : selectedBreedLabel || `Select ${details.type} breed`}
+                                : selectedBreedLabel ||
+                                  `Select ${details.type} breed`}
                             </button>
-                            <ChevronDown
-                              className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
-                            />
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
 
                             {breedDropdownOpen ? (
                               <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
@@ -823,10 +866,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                                         key={b.value}
                                         type="button"
                                         onClick={() => {
-                                          setDetails((p) => ({
-                                            ...p,
-                                            breed: b.value,
-                                          }));
+                                          setDetails((p) => ({ ...p, breed: b.value }));
                                           setBreedDropdownOpen(false);
                                           setBreedSearch("");
                                         }}
@@ -862,7 +902,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       {isExotic && (
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Which exotic pet? <span className="text-red-500">*</span>
+                            Which exotic pet?{" "}
+                            <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
                             <Rabbit
@@ -873,7 +914,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                               type="text"
                               value={details.exoticType}
                               onChange={(e) =>
-                                setDetails((p) => ({ ...p, exoticType: e.target.value }))
+                                setDetails((p) => ({
+                                  ...p,
+                                  exoticType: e.target.value,
+                                }))
                               }
                               placeholder="e.g. Parrot, Rabbit, Turtle, Guinea pig"
                               className={`${fieldBase} pl-12 md:pl-12`}
@@ -888,7 +932,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       {/* DOB */}
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
-                          Pet's Date of Birth <span className="text-red-500">*</span>
+                          Pet&apos;s Date of Birth{" "}
+                          <span className="text-red-500">*</span>
                         </label>
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
@@ -910,8 +955,12 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
                           <div className="hidden md:flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-5 py-3">
                             <div>
-                              <div className="text-sm font-medium text-gray-700">Approximate age</div>
-                              <div className="text-xs text-gray-500">Auto-calculated from DOB</div>
+                              <div className="text-sm font-medium text-gray-700">
+                                Approximate age
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Auto-calculated from DOB
+                              </div>
                             </div>
                             <div className="text-lg font-bold text-[#3998de]">
                               {calcAgeFromDob(details.petDob) || "—"}
@@ -927,28 +976,36 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                     </div>
                   </section>
 
-                  {/* Describe problem - Enhanced */}
+                  {/* Describe problem */}
                   <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 md:p-8 space-y-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#3998de]/10 flex items-center justify-center">
                         <FileText size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">Describe the problem</h3>
-                        <p className="text-xs text-gray-500">Help us understand what's happening</p>
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          Describe the problem
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          Help us understand what&apos;s happening
+                        </p>
                       </div>
                     </div>
 
                     <div className="space-y-5">
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
-                          What symptoms are you noticing? <span className="text-red-500">*</span>
+                          What symptoms are you noticing?{" "}
+                          <span className="text-red-500">*</span>
                         </label>
 
                         <textarea
                           value={details.problemText}
                           onChange={(e) =>
-                            setDetails((p) => ({ ...p, problemText: e.target.value }))
+                            setDetails((p) => ({
+                              ...p,
+                              problemText: e.target.value,
+                            }))
                           }
                           placeholder="Example: My dog has been limping since yesterday, not putting weight on front leg, and cries when touched. He's also less active than usual..."
                           rows={4}
@@ -1044,7 +1101,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                             <select
                               value={details.mood}
                               onChange={(e) =>
-                                setDetails((p) => ({ ...p, mood: e.target.value }))
+                                setDetails((p) => ({
+                                  ...p,
+                                  mood: e.target.value,
+                                }))
                               }
                               className={`${selectBase} pl-12 md:pl-12`}
                             >
@@ -1062,15 +1122,19 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                     </div>
                   </section>
 
-                  {/* Upload - Enhanced */}
+                  {/* Upload */}
                   <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 md:p-8 space-y-5">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#3998de]/10 flex items-center justify-center">
                         <Camera size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">Photo or Document</h3>
-                        <p className="text-xs text-gray-500">Show us what's happening</p>
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          Photo or Document
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          Show us what&apos;s happening
+                        </p>
                       </div>
                     </div>
 
@@ -1081,7 +1145,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         isDragging
                           ? "border-[#3998de] bg-[#3998de]/5 ring-4 ring-[#3998de]/10"
                           : "border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400",
-                        details.hasPhoto && uploadFile ? "bg-emerald-50/30 border-emerald-300" : "",
+                        details.hasPhoto && uploadFile
+                          ? "bg-emerald-50/30 border-emerald-300"
+                          : "",
                       ].join(" ")}
                       onDragEnter={handleDragEnter}
                       onDragOver={handleDragOver}
@@ -1100,18 +1166,23 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           <>
                             <Upload className="w-10 h-10 text-[#3998de] mb-3 md:w-12 md:h-12" />
                             <p className="mb-1 text-sm text-gray-700 font-medium md:text-base">
-                              {isDragging ? "Drop to upload" : "Upload photo or document"}
+                              {isDragging
+                                ? "Drop to upload"
+                                : "Upload photo or document"}
                             </p>
                           </>
                         )}
                         <p className="text-xs text-gray-500 md:text-sm">
-                          {isDragging ? "Release to start upload" : "Drag & drop or click to browse"}
+                          {isDragging
+                            ? "Release to start upload"
+                            : "Drag & drop or click to browse"}
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
                           Supports JPG, PNG, PDF (max 50MB)
                         </p>
                       </div>
                     </label>
+
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <input
                         id="petUploadCamera"
@@ -1128,6 +1199,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         <Camera className="h-4 w-4" />
                         Camera
                       </label>
+
                       <input
                         id="petUploadGallery"
                         type="file"
@@ -1144,7 +1216,6 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       </label>
                     </div>
 
-                    {/* Preview + meta */}
                     {uploadFile && (
                       <div className="mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <div className="flex items-start gap-3">
@@ -1158,10 +1229,17 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                                   {uploadFile.name}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
-                                  {uploadLabel} • {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
+                                  {uploadLabel} •{" "}
+                                  {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
                                   {uploadMeta?.compressedSize && (
                                     <span className="text-emerald-600 ml-1">
-                                      → {(uploadMeta.compressedSize / 1024 / 1024).toFixed(2)} MB (compressed)
+                                      →{" "}
+                                      {(
+                                        uploadMeta.compressedSize /
+                                        1024 /
+                                        1024
+                                      ).toFixed(2)}{" "}
+                                      MB (compressed)
                                     </span>
                                   )}
                                 </p>
@@ -1196,7 +1274,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
                     <p className="text-sm text-gray-500 flex items-center gap-2 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
                       <Image size={16} className="text-[#3998de]" />
-                      <span className="text-xs">💡 Tip: Clear, well-lit photos help vets assess faster</span>
+                      <span className="text-xs">
+                        💡 Tip: Clear, well-lit photos help vets assess faster
+                      </span>
                     </p>
                   </section>
 
@@ -1220,8 +1300,12 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         <FileText size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">Quick Summary</h3>
-                        <p className="text-xs text-gray-500">Review your information</p>
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          Quick Summary
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          Review your information
+                        </p>
                       </div>
                     </div>
 
@@ -1230,7 +1314,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       <div className="bg-gray-50 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <User size={14} className="text-gray-500" />
-                          <span className="text-xs font-medium text-gray-500 uppercase">Owner</span>
+                          <span className="text-xs font-medium text-gray-500 uppercase">
+                            Owner
+                          </span>
                         </div>
                         <div className="space-y-1.5">
                           <div className="flex justify-between">
@@ -1252,7 +1338,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       <div className="bg-gray-50 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <PawPrint size={14} className="text-gray-500" />
-                          <span className="text-xs font-medium text-gray-500 uppercase">Pet</span>
+                          <span className="text-xs font-medium text-gray-500 uppercase">
+                            Pet
+                          </span>
                         </div>
                         <div className="space-y-1.5">
                           <div className="flex justify-between">
@@ -1267,11 +1355,20 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                               {details.type || "—"}
                             </span>
                           </div>
+
+                          {/* ✅ NEW: Gender in summary */}
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-500">Gender</span>
+                            <span className="text-sm font-medium text-gray-900 capitalize">
+                              {details.gender || "—"}
+                            </span>
+                          </div>
+
                           {showBreed && (
                             <div className="flex justify-between">
                               <span className="text-xs text-gray-500">Breed</span>
                               <span className="text-sm font-medium text-gray-900 capitalize">
-                                {details.breed?.replace(/_/g, ' ') || "—"}
+                                {details.breed?.replace(/_/g, " ") || "—"}
                               </span>
                             </div>
                           )}
@@ -1296,19 +1393,21 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       <div className="bg-gray-50 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Activity size={14} className="text-gray-500" />
-                          <span className="text-xs font-medium text-gray-500 uppercase">Health Status</span>
+                          <span className="text-xs font-medium text-gray-500 uppercase">
+                            Health Status
+                          </span>
                         </div>
                         <div className="space-y-1.5">
                           <div className="flex justify-between">
                             <span className="text-xs text-gray-500">Energy</span>
                             <span className="text-sm font-medium text-gray-900 capitalize">
-                              {details.lastDaysEnergy?.replace(/_/g, ' ') || "—"}
+                              {details.lastDaysEnergy?.replace(/_/g, " ") || "—"}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-xs text-gray-500">Appetite</span>
                             <span className="text-sm font-medium text-gray-900 capitalize">
-                              {details.lastDaysAppetite?.replace(/_/g, ' ') || "—"}
+                              {details.lastDaysAppetite?.replace(/_/g, " ") || "—"}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -1325,7 +1424,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         <div className="bg-gray-50 rounded-xl p-4">
                           <div className="flex items-center gap-2 mb-2">
                             <FileText size={14} className="text-gray-500" />
-                            <span className="text-xs font-medium text-gray-500 uppercase">Problem</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase">
+                              Problem
+                            </span>
                           </div>
                           <p className="text-sm text-gray-700 line-clamp-3">
                             {details.problemText}
@@ -1338,7 +1439,9 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Camera size={14} className="text-gray-500" />
-                            <span className="text-xs font-medium text-gray-500 uppercase">Photo/Document</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase">
+                              Photo/Document
+                            </span>
                           </div>
                           <span
                             className={[

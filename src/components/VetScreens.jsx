@@ -16,7 +16,6 @@ import {
   Camera,
   CheckCircle2,
   Clock,
-  DollarSign,
   AlertCircle,
   History,
   Lock,
@@ -38,27 +37,15 @@ import {
   Mail,
   MapPin,
   Briefcase,
-  GraduationCap,
-  Heart,
-  Users,
   Star,
   Shield,
   LogOut,
   TrendingUp,
   Activity,
-  Video,
-  Moon,
-  Sun,
 } from "lucide-react";
 import logo from "../assets/images/logo.png";
 
-/**
- * Notes:
- * - Upload image to get a URL.
- * - Send doctor_image as a URL string.
- */
-
-// ---------------- UI Helpers ----------------
+/* ---------------- UI Helpers ---------------- */
 
 const VetHeader = ({
   onBack,
@@ -86,6 +73,7 @@ const VetHeader = ({
         </div>
 
         <div className="flex items-center justify-center gap-3">
+          {/* logoSrc reserved (if you want to show logo) */}
           <div className="text-center">
             <h1 className="font-bold text-lg text-gray-900 md:text-xl">
               {title}
@@ -113,7 +101,7 @@ const PageWrap = ({ children }) => (
 const INPUT_BASE_CLASS =
   "w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 md:text-base md:px-5 md:py-4 md:rounded-2xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400 hover:border-gray-300";
 
-const CARD_CLASS = 
+const CARD_CLASS =
   "bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(11,77,103,0.08)] transition-all duration-300";
 
 const SPECIALIZATION_OPTIONS = [
@@ -129,8 +117,16 @@ const SPECIALIZATION_OPTIONS = [
 
 const DEGREE_OPTIONS = ["BVSc", "MVSc", "PhD", "Other"];
 
-const RESPONSE_TIME_DAY_OPTIONS = ["0 to 15 mins", "15 to 20 mins", "20 to 30 mins"];
-const RESPONSE_TIME_NIGHT_OPTIONS = ["0 to 15 mins", "15 to 20 mins", "20 to 30 mins"];
+const RESPONSE_TIME_DAY_OPTIONS = [
+  "0 to 15 mins",
+  "15 to 20 mins",
+  "20 to 30 mins",
+];
+const RESPONSE_TIME_NIGHT_OPTIONS = [
+  "0 to 15 mins",
+  "15 to 20 mins",
+  "20 to 30 mins",
+];
 
 const FOLLOW_UP_OPTIONS = [
   { value: "yes", label: "Yes - free follow-up within 3 days" },
@@ -169,12 +165,14 @@ const fetchClinicIdForDoctor = async (doctorId, authToken = "", signal) => {
       : { Accept: "application/json" };
     const res = await fetch(
       `${apiBaseUrl()}/api/doctor/profile?doctor_id=${encodeURIComponent(doctorId)}`,
-      { headers, credentials: "include", signal }
+      { headers, credentials: "include", signal },
     );
     if (!res.ok) return "";
     const data = await res.json().catch(() => ({}));
     return normalizeId(
-      data?.data?.vet_registeration_id || data?.data?.clinic?.id || data?.clinic?.id
+      data?.data?.vet_registeration_id ||
+        data?.data?.clinic?.id ||
+        data?.clinic?.id,
     );
   } catch (error) {
     if (error?.name === "AbortError") return "";
@@ -206,7 +204,7 @@ const handleNumberWheel = (e) => {
 const clampDocZoom = (value) =>
   Math.min(DOC_ZOOM_MAX, Math.max(DOC_ZOOM_MIN, value));
 
-// -------------- Image Compression --------------
+/* -------------- Image Compression + Upload -------------- */
 
 const compressToFile = async (file) => {
   if (!file || !file.type?.startsWith("image/")) {
@@ -252,13 +250,11 @@ const uploadDoctorImageAndGetUrl = async (file) => {
   return url;
 };
 
-// ---------------- Pricing Section ----------------
+/* ---------------- Pricing Section ---------------- */
 
 const PricingSection = ({
   dayPrice,
   nightPrice,
-  setDayPrice,
-  setNightPrice,
   dayMath,
   nightMath,
   form,
@@ -274,13 +270,33 @@ const PricingSection = ({
   handleSubmit,
 }) => (
   <section className={`${CARD_CLASS} p-6 space-y-6 md:p-8`}>
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-full bg-[#0B4D67]/10 flex items-center justify-center">
-        <DollarSign size={20} className="text-[#0B4D67]" />
+    <div className="flex items-start gap-3">
+      <div className="w-10 h-10 rounded-full bg-[#0B4D67]/10 flex items-center justify-center shrink-0">
+        <span className="text-[#0B4D67] font-extrabold text-lg leading-none">
+          ₹
+        </span>
       </div>
-      <div>
-        <h3 className="font-semibold text-gray-900 text-lg">Pricing & Commission</h3>
-        <p className="text-xs text-gray-500">Set your consultation fees</p>
+
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h3 className="font-semibold text-gray-900 text-lg leading-tight">
+            Pricing & Commission
+          </h3>
+
+          <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600">
+            Standard payout policy
+          </span>
+        </div>
+
+        <p className="mt-1 text-xs text-gray-500 leading-relaxed">
+          The SnoutIQ platform follows a standardized payout structure aligned
+          with prevailing market practices to ensure fair compensation, platform
+          sustainability, and continued service quality.
+        </p>
+
+        <p className="mt-2 text-xs font-medium text-gray-600">
+          Current consultation pricing and payouts are as follows:
+        </p>
       </div>
     </div>
 
@@ -290,25 +306,36 @@ const PricingSection = ({
           Day Consultation Price (6 AM - 8 PM) *
         </label>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
+            ₹
+          </span>
           <input
             type="number"
             value={dayPrice}
-            onChange={(e) => setDayPrice(e.target.value)}
+            disabled
+            readOnly
             onKeyDown={blockNumberInput}
             onWheel={handleNumberWheel}
-            min="0"
-            placeholder="Enter day consultation price"
-            required
-            className="w-full pl-8 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50 text-base font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400"
+            className="w-full pl-8 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-100 text-base font-medium text-gray-900 cursor-not-allowed opacity-80"
           />
         </div>
+
         {dayMath && (
           <div className="mt-2 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
             <div className="flex justify-between text-xs">
-              <span className="text-emerald-700 font-medium">Your earnings: ₹{dayMath.earning}</span>
-              <span className="text-emerald-600/70">Platform fee: ₹{dayMath.commission}</span>
+              <span className="text-emerald-700 font-medium">
+                Your earnings: ₹{dayMath.earning}
+              </span>
+              <span className="text-emerald-600/70">
+                Platform fee: ₹{dayMath.commission}
+              </span>
             </div>
+
+            <p className="mt-2 text-[11px] text-emerald-700/80 leading-relaxed">
+              A flat platform fee of ₹{dayMath.commission} is charged per
+              consultation. You receive ₹{dayMath.earning} and SnoutIQ receives
+              ₹{dayMath.commission}.
+            </p>
           </div>
         )}
       </div>
@@ -318,25 +345,37 @@ const PricingSection = ({
           Night Consultation Price (8 PM - 6 AM) *
         </label>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
+            ₹
+          </span>
           <input
             type="number"
             value={nightPrice}
-            onChange={(e) => setNightPrice(e.target.value)}
+            disabled
+            readOnly
             onKeyDown={blockNumberInput}
             onWheel={handleNumberWheel}
-            min="0"
-            placeholder="Enter night consultation price"
-            required
-            className="w-full pl-8 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50 text-base font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400"
+            className="w-full pl-8 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-100 text-base font-medium text-gray-900 cursor-not-allowed opacity-80"
           />
         </div>
+
         {nightMath && (
           <div className="mt-2 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
             <div className="flex justify-between text-xs">
-              <span className="text-emerald-700 font-medium">Your earnings: ₹{nightMath.earning}</span>
-              <span className="text-emerald-600/70">Platform fee: ₹{nightMath.commission}</span>
+              <span className="text-emerald-700 font-medium">
+                Your earnings: ₹{nightMath.earning}
+              </span>
+              <span className="text-emerald-600/70">
+                Platform fee: ₹{nightMath.commission}
+              </span>
             </div>
+
+            {/* FIX: was wrongly using dayMath */}
+            <p className="mt-2 text-[11px] text-emerald-700/80 leading-relaxed">
+              A flat platform fee of ₹{nightMath.commission} is charged per
+              consultation. You receive ₹{nightMath.earning} and SnoutIQ
+              receives ₹{nightMath.commission}.
+            </p>
           </div>
         )}
       </div>
@@ -390,11 +429,16 @@ const PricingSection = ({
           </label>
         ))}
       </div>
+
       <input
         type="text"
         value={form.payoutDetail}
         onChange={updateForm("payoutDetail")}
-        placeholder={form.payoutMethod === "upi" ? "Enter your UPI ID (e.g., doctor@okhdfcbank)" : "Enter payout details"}
+        placeholder={
+          form.payoutMethod === "upi"
+            ? "Enter your UPI ID (e.g., doctor@okhdfcbank)"
+            : "Enter payout details"
+        }
         required
         className={INPUT_BASE_CLASS}
       />
@@ -403,12 +447,24 @@ const PricingSection = ({
     <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100">
       <div className="flex items-center gap-2 mb-2">
         <Shield size={16} className="text-amber-600" />
-        <h4 className="text-xs font-semibold uppercase text-amber-800">Commission Structure</h4>
+        <h4 className="text-xs font-semibold uppercase text-amber-800">
+          Commission Structure
+        </h4>
       </div>
       <ul className="text-xs text-amber-800/80 space-y-1.5 pl-4">
         <li className="flex items-start gap-2">
           <span className="text-amber-600">•</span>
-          <span>We charge 25% OR ₹99 per consultation (whichever is higher)</span>
+          <span>
+            These charges and payout amounts are determined based on industry
+            benchmarks, operational costs, and platform service provisions.
+            SnoutIQ reserves the right to review, revise, or update the
+            consultation pricing and payout structure from time to time, at its
+            sole discretion, in response to market conditions, business
+            requirements, and to ensure maximum long-term benefits for doctors
+            using the platform. By continuing to provide services on SnoutIQ,
+            doctors acknowledge and agree to the applicable payout structure and
+            any future revisions.
+          </span>
         </li>
         <li className="flex items-start gap-2">
           <span className="text-amber-600">•</span>
@@ -430,9 +486,18 @@ const PricingSection = ({
           className="mt-1 w-4 h-4 text-[#0B4D67] border-gray-300 rounded focus:ring-[#0B4D67]/30"
         />
         <span className="text-sm text-gray-600 leading-relaxed">
-          I understand Snoutiq charges 25% or ₹99 per consultation (whichever is higher)
+          These charges and payout amounts are determined based on industry
+            benchmarks, operational costs, and platform service provisions.
+            SnoutIQ reserves the right to review, revise, or update the
+            consultation pricing and payout structure from time to time, at its
+            sole discretion, in response to market conditions, business
+            requirements, and to ensure maximum long-term benefits for doctors
+            using the platform. By continuing to provide services on SnoutIQ,
+            doctors acknowledge and agree to the applicable payout structure and
+            any future revisions.
         </span>
       </label>
+
       <label className="flex gap-3 items-start p-2 cursor-pointer rounded-xl hover:bg-gray-50 transition-colors">
         <input
           type="checkbox"
@@ -441,7 +506,8 @@ const PricingSection = ({
           className="mt-1 w-4 h-4 text-[#0B4D67] border-gray-300 rounded focus:ring-[#0B4D67]/30"
         />
         <span className="text-sm text-gray-600 leading-relaxed">
-          I understand earnings will be settled weekly to my registered payout method
+          I understand earnings will be settled weekly to my registered payout
+          method
         </span>
       </label>
     </div>
@@ -464,19 +530,14 @@ const PricingSection = ({
       <Button
         onClick={handleSubmit}
         fullWidth
-        disabled={!canSubmit || submitting}
+        disabled={!canSubmit}
         className={`md:text-lg md:py-4 md:rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-300 ${
-          !canSubmit || submitting ? "opacity-50 cursor-not-allowed" : "shadow-lg shadow-blue-500/30"
+          !canSubmit
+            ? "opacity-50 cursor-not-allowed"
+            : "shadow-lg shadow-blue-500/30"
         }`}
       >
-        {submitting ? (
-          <span className="flex items-center justify-center gap-2">
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Submitting Application...
-          </span>
-        ) : (
-          "Submit Application"
-        )}
+        Submit Application
       </Button>
     </div>
 
@@ -487,7 +548,7 @@ const PricingSection = ({
   </section>
 );
 
-// ---------------- 1) Vet Login Screen ----------------
+/* ---------------- 1) Vet Login Screen ---------------- */
 
 export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
   const navigate = useNavigate();
@@ -511,7 +572,10 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
       if (onLogin) {
         onLogin(storedAuth);
       } else {
-        navigate("/vet-dashboard", { replace: true, state: { auth: storedAuth } });
+        navigate("/vet-dashboard", {
+          replace: true,
+          state: { auth: storedAuth },
+        });
       }
     }
   }, [navigate, onLogin]);
@@ -528,11 +592,14 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
         res?.data?.request_id ||
         res?.data?.requestId ||
         "";
-      if (!nextRequestId) throw new Error("Request ID not received. Please try again.");
+      if (!nextRequestId)
+        throw new Error("Request ID not received. Please try again.");
       setRequestId(nextRequestId);
       setStep("otp");
     } catch (error) {
-      setErrorMessage(error?.message || "Failed to send OTP. Please try again.");
+      setErrorMessage(
+        error?.message || "Failed to send OTP. Please try again.",
+      );
     } finally {
       setIsSending(false);
     }
@@ -554,7 +621,8 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
         otp,
         request_id: requestId,
       });
-      if (res?.success === false) throw new Error(res?.message || "OTP verification failed.");
+      if (res?.success === false)
+        throw new Error(res?.message || "OTP verification failed.");
 
       const doctor = res?.doctor || res?.data?.doctor || null;
       const doctorId =
@@ -569,6 +637,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
         res?.data?.doctor?.doctor_id ||
         res?.data?.doctor?.doctorId ||
         "";
+
       const clinicId =
         res?.clinic_id ||
         res?.clinicId ||
@@ -594,23 +663,32 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
         normalizedClinicId = await fetchClinicIdForDoctor(normalizedDoctorId);
       }
 
-      const doctorProfile =
-        doctor || {
-          doctor_name: res?.doctor_name || res?.name || res?.data?.doctor_name || "",
-          doctor_email: res?.doctor_email || res?.email || res?.data?.doctor_email || "",
-          doctor_mobile: res?.doctor_mobile || mobile,
-        };
+      const doctorProfile = doctor || {
+        doctor_name:
+          res?.doctor_name || res?.name || res?.data?.doctor_name || "",
+        doctor_email:
+          res?.doctor_email || res?.email || res?.data?.doctor_email || "",
+        doctor_mobile: res?.doctor_mobile || mobile,
+      };
 
       const authPayload = {
         phone: mobile,
         request_id: requestId,
         doctor_id: normalizedDoctorId || doctorId,
         clinic_id: normalizedClinicId || clinicId,
-        token: res?.token || res?.access_token || res?.data?.token || res?.data?.access_token || "",
+        token:
+          res?.token ||
+          res?.access_token ||
+          res?.data?.token ||
+          res?.data?.access_token ||
+          "",
         doctor: {
           ...doctorProfile,
           ...(normalizedDoctorId
-            ? { id: Number(normalizedDoctorId), doctor_id: Number(normalizedDoctorId) }
+            ? {
+                id: Number(normalizedDoctorId),
+                doctor_id: Number(normalizedDoctorId),
+              }
             : {}),
           ...(normalizedClinicId
             ? {
@@ -623,7 +701,10 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
 
       saveVetAuth(authPayload);
       onLogin?.(authPayload);
-      navigate("/vet-dashboard", { replace: true, state: { auth: authPayload } });
+      navigate("/vet-dashboard", {
+        replace: true,
+        state: { auth: authPayload },
+      });
       ensureDashboardLoaded();
     } catch (error) {
       setErrorMessage(error?.message || "OTP verification failed.");
@@ -647,8 +728,12 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
       <PageWrap>
         <div className="flex-1 px-6 py-6 flex flex-col justify-start max-w-md mx-auto w-full md:max-w-lg md:px-0 md:py-10 md:justify-center">
           <div className="text-center mb-4 md:mb-6">
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 tracking-tight">Welcome back, Doctor</h2>
-            <p className="text-xs text-gray-500 md:text-sm">Securely access your practice dashboard</p>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-1 tracking-tight">
+              Welcome back, Doctor
+            </h2>
+            <p className="text-xs text-gray-500 md:text-sm">
+              Securely access your practice dashboard
+            </p>
           </div>
 
           <div className={`${CARD_CLASS} p-5 md:p-6 space-y-5`}>
@@ -665,7 +750,11 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
                     <input
                       type="tel"
                       value={mobile}
-                      onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      onChange={(e) =>
+                        setMobile(
+                          e.target.value.replace(/\D/g, "").slice(0, 10),
+                        )
+                      }
                       placeholder="Enter 10-digit mobile number"
                       className="flex-1 px-4 py-3 bg-transparent outline-none font-medium text-gray-900 placeholder:text-gray-400"
                     />
@@ -700,7 +789,9 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
                   <input
                     type="text"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    onChange={(e) =>
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
                     placeholder="Enter 6-digit OTP"
                     className="w-full px-4 py-3 text-center text-xl md:text-2xl tracking-[0.5em] border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400 placeholder:tracking-normal"
                   />
@@ -757,9 +848,11 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
           </div>
 
           <div className="mt-5 text-center">
-            <p className="text-gray-500 text-sm md:text-base">New to SnoutIQ?</p>
-            <button 
-              onClick={onRegisterClick} 
+            <p className="text-gray-500 text-sm md:text-base">
+              New to SnoutIQ?
+            </p>
+            <button
+              onClick={onRegisterClick}
               className="text-[#0B4D67] font-semibold text-sm hover:text-[#1A6F8F] hover:underline mt-1 md:text-lg transition-colors"
             >
               Register as a Partner →
@@ -771,7 +864,7 @@ export const VetLoginScreen = ({ onLogin, onRegisterClick, onBack }) => {
   );
 };
 
-// ---------------- 2) Vet Registration Screen ----------------
+/* ---------------- 2) Vet Registration Screen ---------------- */
 
 export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const navigate = useNavigate();
@@ -801,8 +894,11 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const [breakEnd, setBreakEnd] = useState("");
   const [breakTimes, setBreakTimes] = useState([]);
   const [noBreakTime, setNoBreakTime] = useState(false);
-  const [dayPrice, setDayPrice] = useState("");
-  const [nightPrice, setNightPrice] = useState("");
+
+  // locked pricing (as you had)
+  const [dayPrice] = useState("500");
+  const [nightPrice] = useState("650");
+
   const [agreement1, setAgreement1] = useState(false);
   const [agreement2, setAgreement2] = useState(false);
 
@@ -810,17 +906,19 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const [doctorImagePreview, setDoctorImagePreview] = useState("");
   const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [imageError, setImageError] = useState("");
-  const [showImageUrl, setShowImageUrl] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [showErrors, setShowErrors] = useState(false);
-  const [showRegisterSuccessModal, setShowRegisterSuccessModal] = useState(false);
+  const [showRegisterSuccessModal, setShowRegisterSuccessModal] =
+    useState(false);
+
   const breakStartRef = useRef(null);
   const breakEndRef = useRef(null);
 
   const agreed = agreement1 && agreement2;
-  const updateForm = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  const updateForm = (key) => (e) =>
+    setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   useEffect(() => {
     if (doctorImageFile) {
@@ -837,12 +935,17 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     return undefined;
   }, [doctorImageFile, form.doctorImageUrl]);
 
+  // Your updated pricing logic
+  const PLATFORM_FEE_FLAT = 200;
+
   const calculateCommission = (priceStr) => {
-    const price = parseFloat(priceStr);
-    if (isNaN(price) || price === 0) return null;
-    const commission = Math.max(price * 0.25, 99);
+    const price = Number(priceStr);
+    if (!Number.isFinite(price) || price <= 0) return null;
+
+    const commission = Math.min(PLATFORM_FEE_FLAT, price); // safety
     const earning = price - commission;
-    return { commission: Math.ceil(commission), earning: Math.floor(earning) };
+
+    return { commission, earning };
   };
 
   const dayMath = calculateCommission(dayPrice);
@@ -850,7 +953,9 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   const toggleSpecialization = (value) => {
     setSpecializations((prev) =>
-      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+      prev.includes(value)
+        ? prev.filter((item) => item !== value)
+        : [...prev, value],
     );
   };
 
@@ -861,6 +966,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
       const next = isSelected
         ? current.filter((item) => item !== value)
         : [...current, value];
+
       return {
         ...prev,
         degree: next,
@@ -932,14 +1038,13 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     try {
       const compressedFile = await compressToFile(file);
       setDoctorImageFile(compressedFile);
-      setShowImageUrl(false);
+      // clear URL if using file
       setForm((prev) => ({ ...prev, doctorImageUrl: "" }));
     } catch (err) {
       setDoctorImageFile(null);
       setImageError(
-        err?.message || "Image compression failed. Please try another image."
+        err?.message || "Image compression failed. Please try another image.",
       );
-      setShowImageUrl(true);
     } finally {
       setIsImageProcessing(false);
     }
@@ -949,6 +1054,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     const nextValue = e.target.value;
     setForm((prev) => ({ ...prev, doctorImageUrl: nextValue }));
     setDoctorImageFile(null);
+
     if (nextValue.trim().length > IMAGE_URL_LIMIT) {
       setImageError(`Image URL must be ${IMAGE_URL_LIMIT} characters or less.`);
     } else {
@@ -967,19 +1073,25 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     : form.degree
       ? [form.degree]
       : [];
+
   const normalizedDegrees = degreeSelections
     .filter((degree) => degree !== "Other")
     .map((degree) => degree.trim())
     .filter(Boolean);
+
   if (degreeSelections.includes("Other") && form.degreeOther.trim()) {
     normalizedDegrees.push(form.degreeOther.trim());
   }
+
   const degreePayload = Array.from(new Set(normalizedDegrees));
   const doctorNameReady = normalizeDoctorName(form.vetFullName);
 
   useEffect(() => {
     const storedAuth = loadVetAuth();
-    const stateAuth = location?.state?.auth || location?.state?.doctor || location?.state?.prefill;
+    const stateAuth =
+      location?.state?.auth ||
+      location?.state?.doctor ||
+      location?.state?.prefill;
     const source = stateAuth || storedAuth;
     if (!source) return;
 
@@ -1009,16 +1121,19 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
       doctor?.vet_name ||
       "";
     const rawCity = source?.vet_city || doctor?.vet_city || "";
+
     const normalizedName = normalizeDoctorName(rawName);
     const digits = String(rawPhone || "").replace(/\D/g, "");
 
-    if (!normalizedName && !rawEmail && !digits && !rawClinic && !rawCity) return;
+    if (!normalizedName && !rawEmail && !digits && !rawClinic && !rawCity)
+      return;
 
     setForm((prev) => {
       let updated = false;
       const next = { ...prev };
       const prevName = prev.vetFullName.trim();
       const prevNameLower = prevName.toLowerCase();
+
       if (
         normalizedName &&
         (!prevName || prevNameLower === "dr." || prevNameLower === "dr")
@@ -1064,33 +1179,33 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   const basicComplete = Boolean(
     doctorNameReady &&
-      whatsappReady &&
-      form.email.trim() &&
-      form.shortIntro.trim() &&
-      form.vetCity.trim() &&
-      imageReady &&
-      !imageError &&
-      !isImageProcessing
+    whatsappReady &&
+    form.email.trim() &&
+    form.shortIntro.trim() &&
+    form.vetCity.trim() &&
+    imageReady &&
+    !imageError &&
+    !isImageProcessing,
   );
 
   const professionalComplete = Boolean(
     form.doctorLicense.trim() &&
-      degreeReady &&
-      form.yearsOfExperience.trim() &&
-      selectedSpecs.length > 0
+    degreeReady &&
+    form.yearsOfExperience.trim() &&
+    selectedSpecs.length > 0,
   );
 
   const availabilityComplete = Boolean(
-    form.responseTimeDay && form.responseTimeNight && breakReady
+    form.responseTimeDay && form.responseTimeNight && breakReady,
   );
 
   const pricingComplete = Boolean(
     dayPrice &&
-      nightPrice &&
-      form.freeFollowUp &&
-      payoutReady &&
-      agreement1 &&
-      agreement2
+    nightPrice &&
+    form.freeFollowUp &&
+    payoutReady &&
+    agreement1 &&
+    agreement2,
   );
 
   const progressSteps = useMemo(() => {
@@ -1105,11 +1220,17 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
       firstIncompleteIndex === -1
         ? steps[steps.length - 1].id
         : steps[firstIncompleteIndex].id;
+
     return steps.map((step) => ({
       ...step,
       active: step.id === activeStepId && !step.complete,
     }));
-  }, [basicComplete, professionalComplete, availabilityComplete, pricingComplete]);
+  }, [
+    basicComplete,
+    professionalComplete,
+    availabilityComplete,
+    pricingComplete,
+  ]);
 
   const stepCircleClass = (step) =>
     [
@@ -1139,19 +1260,17 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   const handleRegisterSuccessLogin = () => {
     setShowRegisterSuccessModal(false);
-    if (onSubmit) {
-      onSubmit();
-    }
+    onSubmit?.();
     navigate("/auth", { replace: true, state: { mode: "login" } });
   };
 
   const handleSubmit = async () => {
     if (submitting) return;
+
     if (!canSubmit) {
       setShowErrors(true);
-      if (!imageReady) {
-        setImageError((prev) => prev || "Please upload a photo or add a valid URL.");
-      }
+      if (!imageReady)
+        setImageError("Please upload a photo or add a valid URL.");
       return;
     }
 
@@ -1164,6 +1283,22 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
       const clinicNameValue = form.clinicName.trim();
       const vetNamePayload = clinicNameValue ? clinicNameValue : null;
 
+      // FIX: doctor_image MUST be a string URL.
+      // If user selected a file, upload it first to get URL.
+      let finalDoctorImageUrl = trimmedImageUrl || "";
+      if (doctorImageFile) {
+        finalDoctorImageUrl = await uploadDoctorImageAndGetUrl(doctorImageFile);
+      }
+
+      if (!finalDoctorImageUrl) {
+        throw new Error("Please upload a doctor photo (required).");
+      }
+      if (finalDoctorImageUrl.length > IMAGE_URL_LIMIT) {
+        throw new Error(
+          `Image URL must be ${IMAGE_URL_LIMIT} characters or less.`,
+        );
+      }
+
       const payload = {
         vet_name: vetNamePayload,
         vet_email: form.email.trim(),
@@ -1173,7 +1308,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         doctor_email: form.email.trim(),
         doctor_mobile: form.whatsappNumber.trim(),
         doctor_license: form.doctorLicense.trim(),
-        doctor_image: trimmedImageUrl || undefined,
+        doctor_image: finalDoctorImageUrl, // ✅ ALWAYS STRING
         bio: form.shortIntro.trim(),
         degree: degreePayload,
         years_of_experience: form.yearsOfExperience.trim(),
@@ -1184,43 +1319,18 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         do_you_offer_a_free_follow_up_within_3_days_after_a_consulta:
           form.freeFollowUp === "yes" ? "Yes" : "No",
         commission_and_agreement: agreed ? "Agreed" : "Not agreed",
-        video_day_rate: Number(dayPrice),
-        video_night_rate: Number(nightPrice),
+        video_day_rate: 500,
+        video_night_rate: 650,
         short_intro: form.shortIntro.trim(),
         preferred_payout_method: form.payoutMethod,
         preferred_payout_detail: payoutReady,
       };
 
-      let data = null;
-      if (doctorImageFile) {
-        const fd = new FormData();
-        Object.entries(payload).forEach(([key, value]) => {
-          if (Array.isArray(value)) {
-            value.forEach((item) => fd.append(`${key}[]`, item));
-            return;
-          }
-          if (value !== undefined && value !== null && value !== "") {
-            fd.append(key, String(value));
-          }
-        });
-        fd.append("doctor_image_file", doctorImageFile);
-
-        const res = await fetch(`${apiBaseUrl()}/api/excell-export/import`, {
-          method: "POST",
-          body: fd,
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || json?.success === false) {
-          throw new Error(json?.message || "Registration failed. Please try again.");
-        }
-        data = json;
-      } else {
-        if (trimmedImageUrl && trimmedImageUrl.length > IMAGE_URL_LIMIT) {
-          throw new Error(
-            `Image URL must be ${IMAGE_URL_LIMIT} characters or less.`
-          );
-        }
-        data = await apiPost("/api/excell-export/import", payload);
+      const data = await apiPost("/api/excell-export/import", payload);
+      if (data?.success === false) {
+        throw new Error(
+          data?.message || "Registration failed. Please try again.",
+        );
       }
 
       setShowRegisterSuccessModal(true);
@@ -1229,11 +1339,9 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
       setSubmitError(message);
       if (
         message.toLowerCase().includes("image") ||
-        message.toLowerCase().includes("upload") ||
-        doctorImageFile
+        message.toLowerCase().includes("upload")
       ) {
         setImageError(message);
-        setShowImageUrl(true);
       }
     } finally {
       setSubmitting(false);
@@ -1243,8 +1351,6 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const pricingProps = {
     dayPrice,
     nightPrice,
-    setDayPrice,
-    setNightPrice,
     dayMath,
     nightMath,
     form,
@@ -1262,10 +1368,10 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col">
-      <VetHeader 
-        onBack={onBack} 
-        title="Partner Registration" 
-        subtitle="Join India's trusted veterinary network" 
+      <VetHeader
+        onBack={onBack}
+        title="Partner Registration"
+        subtitle="Join India's trusted veterinary network"
         logoSrc={logo}
         actions={
           <InstallCTA className="rounded-full px-4 py-2 text-xs whitespace-nowrap sm:text-sm" />
@@ -1286,7 +1392,9 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     <span className={stepLabelClass(step)}>{step.label}</span>
                   </div>
                   {index < progressSteps.length - 1 && (
-                    <div className={stepLineClass(progressSteps[index].complete)} />
+                    <div
+                      className={stepLineClass(progressSteps[index].complete)}
+                    />
                   )}
                 </React.Fragment>
               ))}
@@ -1294,7 +1402,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
           </div>
 
           <div className="space-y-8 md:space-y-0 md:grid md:grid-cols-12 md:gap-8 lg:gap-12">
-            {/* LEFT COLUMN - Main Form */}
+            {/* LEFT COLUMN */}
             <div className="md:col-span-7 lg:col-span-8 space-y-8">
               {/* Profile Image Section */}
               <section className={`${CARD_CLASS} p-6 md:p-8`}>
@@ -1303,8 +1411,12 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     <Camera size={20} className="text-[#0B4D67]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-lg">Profile Photo</h3>
-                    <p className="text-xs text-gray-500">Upload a professional photo for your profile</p>
+                    <h3 className="font-semibold text-gray-900 text-lg">
+                      Profile Photo
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Upload a professional photo for your profile
+                    </p>
                   </div>
                 </div>
 
@@ -1319,11 +1431,17 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                         />
                       ) : (
                         <div className="text-center">
-                          <User size={48} className="mx-auto text-gray-400 mb-2" />
-                          <span className="text-xs font-medium text-gray-500">No photo</span>
+                          <User
+                            size={48}
+                            className="mx-auto text-gray-400 mb-2"
+                          />
+                          <span className="text-xs font-medium text-gray-500">
+                            No photo
+                          </span>
                         </div>
                       )}
                     </div>
+
                     <div className="flex items-center gap-2">
                       <input
                         id="doctorImageCamera"
@@ -1340,6 +1458,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                         <Camera size={14} />
                         Camera
                       </label>
+
                       <input
                         id="doctorImageGallery"
                         type="file"
@@ -1355,11 +1474,22 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                         Gallery
                       </label>
                     </div>
+
+                    {/* Optional: URL input (keep if you want) */}
+                    {/* <input
+                      type="text"
+                      value={form.doctorImageUrl}
+                      onChange={handleDoctorImageUrlChange}
+                      placeholder="Or paste image URL"
+                      className={`${INPUT_BASE_CLASS} mt-3`}
+                    /> */}
                   </div>
 
                   <div className="flex-1 text-center md:text-left space-y-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Professional photo guidelines</p>
+                      <p className="text-sm font-medium text-gray-700">
+                        Professional photo guidelines
+                      </p>
                       <ul className="text-xs text-gray-500 mt-2 space-y-1">
                         <li className="flex items-center gap-2">
                           <CheckCircle2 size={12} className="text-green-500" />
@@ -1409,8 +1539,12 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     <User size={20} className="text-[#0B4D67]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-lg">Basic Information</h3>
-                    <p className="text-xs text-gray-500">Your personal and clinic details</p>
+                    <h3 className="font-semibold text-gray-900 text-lg">
+                      Basic Information
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Your personal and clinic details
+                    </p>
                   </div>
                 </div>
 
@@ -1460,22 +1594,21 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1">
-                      <div className="relative">
-                        <MapPin
-                          size={18}
-                          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Enter your city"
-                          value={form.vetCity}
-                          onChange={updateForm("vetCity")}
-                          required
-                          className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
-                        />
-                      </div>
+                    <div className="relative">
+                      <MapPin
+                        size={18}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Enter your city"
+                        value={form.vetCity}
+                        onChange={updateForm("vetCity")}
+                        required
+                        className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                      />
                     </div>
+
                     <div className="flex flex-col gap-1">
                       <div className="relative">
                         <MessageCircle
@@ -1521,7 +1654,8 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
                   <p className="text-xs text-gray-500 flex items-center gap-1.5 bg-gray-50 p-3 rounded-xl">
                     <Lock size={12} className="text-[#0B4D67]" />
-                    Your contact details are kept private and never shared directly
+                    Your contact details are kept private and never shared
+                    directly
                   </p>
                 </div>
               </section>
@@ -1533,8 +1667,12 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     <Stethoscope size={20} className="text-[#0B4D67]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-lg">Professional Credentials</h3>
-                    <p className="text-xs text-gray-500">Your qualifications and expertise</p>
+                    <h3 className="font-semibold text-gray-900 text-lg">
+                      Professional Credentials
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Your qualifications and expertise
+                    </p>
                   </div>
                 </div>
 
@@ -1592,7 +1730,10 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                 </div>
 
                 <div className="relative">
-                  <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Calendar
+                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
                   <input
                     type="number"
                     placeholder="Enter years of professional experience"
@@ -1651,8 +1792,12 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                     <Clock size={20} className="text-[#0B4D67]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-lg">Availability & Timing</h3>
-                    <p className="text-xs text-gray-500">Set your consultation response times</p>
+                    <h3 className="font-semibold text-gray-900 text-lg">
+                      Availability & Timing
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Set your consultation response times
+                    </p>
                   </div>
                 </div>
 
@@ -1746,7 +1891,9 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                         />
                         <div className="relative">
                           <span className="block w-full px-4 py-3.5 pl-12 rounded-xl border border-gray-200 bg-gray-50 text-sm">
-                            {breakStart ? formatTimeLabel(breakStart) : "Select start time"}
+                            {breakStart
+                              ? formatTimeLabel(breakStart)
+                              : "Select start time"}
                           </span>
                           <input
                             ref={breakStartRef}
@@ -1774,7 +1921,9 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                         />
                         <div className="relative">
                           <span className="block w-full px-4 py-3.5 pl-12 rounded-xl border border-gray-200 bg-gray-50 text-sm">
-                            {breakEnd ? formatTimeLabel(breakEnd) : "Select end time"}
+                            {breakEnd
+                              ? formatTimeLabel(breakEnd)
+                              : "Select end time"}
                           </span>
                           <input
                             ref={breakEndRef}
@@ -1822,7 +1971,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
               </section>
             </div>
 
-            {/* RIGHT COLUMN - Pricing & Submit */}
+            {/* RIGHT COLUMN */}
             <div className="md:col-span-5 lg:col-span-4 space-y-6">
               <div className="md:sticky md:top-28 space-y-6">
                 <PricingSection {...pricingProps} />
@@ -1859,11 +2008,13 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
               Application Submitted!
             </h3>
             <p className="text-gray-600 mb-6">
-              Thank you for joining SnoutIQ. Our team will review your application and activate your profile within 24-48 hours.
+              Thank you for joining SnoutIQ. Our team will review your
+              application and activate your profile within 24-48 hours.
             </p>
             <div className="bg-emerald-50 rounded-xl p-4 mb-6">
               <p className="text-sm text-emerald-800">
-                <strong>Next steps:</strong> You'll receive an email confirmation once your profile is verified.
+                <strong>Next steps:</strong> You'll receive an email
+                confirmation once your profile is verified.
               </p>
             </div>
             <Button
@@ -1880,7 +2031,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   );
 };
 
-// ---------------- 3) Pending Approval Screen ----------------
+/* ---------------- 3) Pending Approval Screen ---------------- */
 
 export const VetPendingScreen = ({ onHome }) => {
   return (
@@ -1898,7 +2049,8 @@ export const VetPendingScreen = ({ onHome }) => {
               Thanks for submitting your application, Doctor!
             </p>
             <p className="text-gray-500">
-              We're reviewing your credentials and will activate your profile within 24-48 hours.
+              We're reviewing your credentials and will activate your profile
+              within 24-48 hours.
             </p>
           </div>
 
@@ -1908,8 +2060,12 @@ export const VetPendingScreen = ({ onHome }) => {
                 <Shield size={24} className="text-[#0B4D67]" />
               </div>
               <div className="text-left">
-                <h3 className="font-semibold text-gray-900">Verification in progress</h3>
-                <p className="text-sm text-gray-500">We'll notify you via SMS and email</p>
+                <h3 className="font-semibold text-gray-900">
+                  Verification in progress
+                </h3>
+                <p className="text-sm text-gray-500">
+                  We'll notify you via SMS and email
+                </p>
               </div>
             </div>
 
@@ -1942,7 +2098,7 @@ export const VetPendingScreen = ({ onHome }) => {
   );
 };
 
-// ---------------- 4) Vet Dashboard Screen ----------------
+/* ---------------- 4) Vet Dashboard Screen ---------------- */
 
 export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [auth, setAuth] = useState(() => authFromProps || loadVetAuth());
@@ -1956,7 +2112,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [prescriptionSubmitting, setPrescriptionSubmitting] = useState(false);
   const [prescriptionError, setPrescriptionError] = useState("");
   const [prescriptionSuccess, setPrescriptionSuccess] = useState(false);
-  const [showPrescriptionSuccessModal, setShowPrescriptionSuccessModal] = useState(false);
+  const [showPrescriptionSuccessModal, setShowPrescriptionSuccessModal] =
+    useState(false);
   const prescriptionSuccessTimer = useRef(null);
   const [docPreviewUrl, setDocPreviewUrl] = useState("");
   const [docZoom, setDocZoom] = useState(DOC_ZOOM_MIN);
@@ -2051,13 +2208,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       }
     }
     const fallback = formatPetText(
-      transaction?.pet?.breed || transaction?.pet?.pet_type
+      transaction?.pet?.breed || transaction?.pet?.pet_type,
     );
     if (name) {
       return name;
     }
     const metaName =
-      transaction?.metadata?.notes?.pet_name || transaction?.metadata?.pet_name || "";
+      transaction?.metadata?.notes?.pet_name ||
+      transaction?.metadata?.pet_name ||
+      "";
     return metaName ? String(metaName) : fallback || "Not available";
   };
 
@@ -2088,7 +2247,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url || "");
 
   const isImageMime = (value) =>
-    String(value || "").toLowerCase().startsWith("image/");
+    String(value || "")
+      .toLowerCase()
+      .startsWith("image/");
 
   const isBackendUrl = (url) => {
     if (!url) return false;
@@ -2124,7 +2285,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     auth?.doctor_id ||
       auth?.doctor?.id ||
       auth?.doctor?.doctor_id ||
-      auth?.doctor?.doctorId
+      auth?.doctor?.doctorId,
   );
 
   const clinicIdRaw = normalizeId(
@@ -2132,7 +2293,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       auth?.doctor?.clinic_id ||
       auth?.doctor?.vet_registeration_id ||
       auth?.doctor?.vet_registration_id ||
-      auth?.doctor?.clinicId
+      auth?.doctor?.clinicId,
   );
 
   const authToken =
@@ -2146,11 +2307,14 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     const metadata = transaction?.metadata || {};
     const notes = metadata?.notes || {};
     return {
-      userId: transaction?.user?.id || metadata?.user_id || notes?.user_id || "",
+      userId:
+        transaction?.user?.id || metadata?.user_id || notes?.user_id || "",
       petId: transaction?.pet?.id || metadata?.pet_id || notes?.pet_id || "",
       doctorId:
         doctorId ||
-        normalizeId(transaction?.doctor?.id || metadata?.doctor_id || notes?.doctor_id),
+        normalizeId(
+          transaction?.doctor?.id || metadata?.doctor_id || notes?.doctor_id,
+        ),
       clinicId:
         clinicIdRaw || normalizeId(metadata?.clinic_id || notes?.clinic_id),
     };
@@ -2174,7 +2338,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
     const controller = new AbortController();
     const url = `${apiBaseUrl()}/api/user-per-observationss?pet_id=${encodeURIComponent(
-      petId
+      petId,
     )}&user_id=${encodeURIComponent(userId)}&limit=20`;
 
     setObservationLoading(true);
@@ -2183,7 +2347,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     fetch(url, { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
-        const observations = data?.data?.observations || data?.observations || [];
+        const observations =
+          data?.data?.observations || data?.observations || [];
         const images = observations
           .map((obs) => {
             const imageUrl = getObservationImageUrl(obs);
@@ -2264,7 +2429,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     setPrescriptionForm((prev) => ({
       ...prev,
       medications: prev.medications.map((med, idx) =>
-        idx === index ? { ...med, [key]: value } : med
+        idx === index ? { ...med, [key]: value } : med,
       ),
     }));
   };
@@ -2272,7 +2437,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const addMedication = () => {
     setPrescriptionForm((prev) => ({
       ...prev,
-      medications: [...prev.medications, { name: "", dosage: "", frequency: "", duration: "" }],
+      medications: [
+        ...prev.medications,
+        { name: "", dosage: "", frequency: "", duration: "" },
+      ],
     }));
   };
 
@@ -2299,9 +2467,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     setPrescriptionError("");
     setPrescriptionSuccess(false);
 
-    const { userId, petId, doctorId, clinicId } = resolveTransactionIds(activeTransaction);
+    const { userId, petId, doctorId, clinicId } =
+      resolveTransactionIds(activeTransaction);
     if (!userId || !clinicId) {
-      setPrescriptionError("Missing patient or clinic data. Please refresh and try again.");
+      setPrescriptionError(
+        "Missing patient or clinic data. Please refresh and try again.",
+      );
       setPrescriptionSubmitting(false);
       return;
     }
@@ -2399,7 +2570,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
   const docFilename = useMemo(
     () => getDocFilename(docPreviewUrl),
-    [docPreviewUrl]
+    [docPreviewUrl],
   );
 
   useEffect(() => {
@@ -2443,7 +2614,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           const resolvedClinicId = await fetchClinicIdForDoctor(
             doctorId,
             authToken,
-            controller.signal
+            controller.signal,
           );
           if (resolvedClinicId && resolvedClinicId !== clinicIdRaw) {
             setAuth((prev) => ({
@@ -2464,7 +2635,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
         }
 
         const url = `${apiBaseUrl()}/api/excell-export/transactions?doctor_id=${encodeURIComponent(
-          doctorId
+          doctorId,
         )}&clinic_id=${encodeURIComponent(clinicId)}`;
         const headers = authToken
           ? { Authorization: `Bearer ${authToken}`, Accept: "application/json" }
@@ -2484,7 +2655,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           console.log("Vet dashboard data:", data);
         }
         setDashboardData(data);
-        setTransactions(Array.isArray(data?.transactions) ? data.transactions : []);
+        setTransactions(
+          Array.isArray(data?.transactions) ? data.transactions : [],
+        );
       } catch (error) {
         if (error?.name !== "AbortError") {
           setLoadError(error?.message || "Failed to load transactions.");
@@ -2527,9 +2700,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     onLogout?.();
   };
 
-  const doctorName = auth?.doctor?.doctor_name || auth?.doctor_name || auth?.doctor?.name || "Doctor";
-  const doctorEmail = auth?.doctor?.doctor_email || auth?.doctor_email || auth?.email || "";
-  const doctorPhone = auth?.doctor?.doctor_mobile || auth?.doctor_mobile || auth?.phone || "";
+  const doctorName =
+    auth?.doctor?.doctor_name ||
+    auth?.doctor_name ||
+    auth?.doctor?.name ||
+    "Doctor";
+  const doctorEmail =
+    auth?.doctor?.doctor_email || auth?.doctor_email || auth?.email || "";
+  const doctorPhone =
+    auth?.doctor?.doctor_mobile || auth?.doctor_mobile || auth?.phone || "";
 
   const initials =
     doctorName
@@ -2540,35 +2719,54 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       .join("")
       .toUpperCase() || "DR";
 
-  const { totalAmount, totalTransactions, pendingCount, completedCount, failedCount, latestTransactions, lastUpdated } =
-    useMemo(() => {
-      const totalAmountValue = dashboardData?.total_amount_inr ?? 0;
-      const totalTransactionsValue = dashboardData?.total_transactions ?? transactions.length;
-      const pendingValue = transactions.filter((item) => (item?.status || "").toLowerCase() === "pending").length;
-      const completedValue = transactions.filter((item) =>
-        ["paid", "success", "captured", "completed"].includes((item?.status || "").toLowerCase())
-      ).length;
-      const failedValue = transactions.filter((item) =>
-        ["failed", "cancelled", "canceled", "refunded"].includes((item?.status || "").toLowerCase())
-      ).length;
+  const {
+    totalAmount,
+    totalTransactions,
+    pendingCount,
+    completedCount,
+    failedCount,
+    latestTransactions,
+    lastUpdated,
+  } = useMemo(() => {
+    const totalAmountValue = dashboardData?.total_amount_inr ?? 0;
+    const totalTransactionsValue =
+      dashboardData?.total_transactions ?? transactions.length;
+    const pendingValue = transactions.filter(
+      (item) => (item?.status || "").toLowerCase() === "pending",
+    ).length;
+    const completedValue = transactions.filter((item) =>
+      ["paid", "success", "captured", "completed"].includes(
+        (item?.status || "").toLowerCase(),
+      ),
+    ).length;
+    const failedValue = transactions.filter((item) =>
+      ["failed", "cancelled", "canceled", "refunded"].includes(
+        (item?.status || "").toLowerCase(),
+      ),
+    ).length;
 
-      const latest = transactions
-        .slice()
-        .sort((a, b) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
-        .slice(0, 6);
+    const latest = transactions
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(b?.created_at || 0).getTime() -
+          new Date(a?.created_at || 0).getTime(),
+      )
+      .slice(0, 6);
 
-      const lastUpdatedValue = latest[0]?.updated_at || latest[0]?.created_at || "";
+    const lastUpdatedValue =
+      latest[0]?.updated_at || latest[0]?.created_at || "";
 
-      return {
-        totalAmount: totalAmountValue,
-        totalTransactions: totalTransactionsValue,
-        pendingCount: pendingValue,
-        completedCount: completedValue,
-        failedCount: failedValue,
-        latestTransactions: latest,
-        lastUpdated: lastUpdatedValue,
-      };
-    }, [dashboardData, transactions]);
+    return {
+      totalAmount: totalAmountValue,
+      totalTransactions: totalTransactionsValue,
+      pendingCount: pendingValue,
+      completedCount: completedValue,
+      failedCount: failedValue,
+      latestTransactions: latest,
+      lastUpdated: lastUpdatedValue,
+    };
+  }, [dashboardData, transactions]);
 
   return (
     <div
@@ -2581,21 +2779,28 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-xl">
-                <span className="text-2xl md:text-3xl font-bold">{initials}</span>
+                <span className="text-2xl md:text-3xl font-bold">
+                  {initials}
+                </span>
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold mb-1">{doctorName}</h1>
+                <h1 className="text-2xl md:text-3xl font-bold mb-1">
+                  {doctorName}
+                </h1>
                 <div className="flex items-center gap-2 text-white/80 text-sm">
                   <Shield size={16} />
                   <span>Verified Veterinary Partner</span>
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <div className="hidden md:flex items-center gap-2 text-white/70 text-sm bg-white/10 px-4 py-2 rounded-xl">
                 <Clock size={16} />
-                <span>Last updated: {isLoading ? "Loading..." : formatDate(lastUpdated)}</span>
+                <span>
+                  Last updated:{" "}
+                  {isLoading ? "Loading..." : formatDate(lastUpdated)}
+                </span>
               </div>
               <button
                 onClick={handleLogout}
@@ -2610,18 +2815,28 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
-              <p className="text-white/70 text-xs uppercase mb-1">Total Earnings</p>
-              <p className="text-2xl md:text-3xl font-bold">{isLoading ? "..." : formatAmount(totalAmount)}</p>
+              <p className="text-white/70 text-xs uppercase mb-1">
+                Total Earnings
+              </p>
+              <p className="text-2xl md:text-3xl font-bold">
+                {isLoading ? "..." : formatAmount(totalAmount)}
+              </p>
               <p className="text-white/60 text-xs mt-1">All time</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
-              <p className="text-white/70 text-xs uppercase mb-1">Consultations</p>
-              <p className="text-2xl md:text-3xl font-bold">{isLoading ? "..." : totalTransactions}</p>
+              <p className="text-white/70 text-xs uppercase mb-1">
+                Consultations
+              </p>
+              <p className="text-2xl md:text-3xl font-bold">
+                {isLoading ? "..." : totalTransactions}
+              </p>
               <p className="text-white/60 text-xs mt-1">Total transactions</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
               <p className="text-white/70 text-xs uppercase mb-1">Pending</p>
-              <p className="text-2xl md:text-3xl font-bold">{isLoading ? "..." : pendingCount}</p>
+              <p className="text-2xl md:text-3xl font-bold">
+                {isLoading ? "..." : pendingCount}
+              </p>
               <p className="text-white/60 text-xs mt-1">Awaiting action</p>
             </div>
           </div>
@@ -2662,19 +2877,28 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 ) : latestTransactions.length > 0 ? (
                   <div className="divide-y divide-gray-100">
                     {latestTransactions.map((item, idx) => {
-                      const amountInr = item?.amount_inr ?? (item?.amount_paise ? item.amount_paise / 100 : 0);
+                      const amountInr =
+                        item?.amount_inr ??
+                        (item?.amount_paise ? item.amount_paise / 100 : 0);
                       const petName = resolvePetName(item);
                       const { userId, clinicId } = resolveTransactionIds(item);
                       const canOpenPrescription = Boolean(userId && clinicId);
                       const canView = Boolean(item?.user || item?.pet);
 
                       return (
-                        <div key={item?.id || idx} className="p-5 hover:bg-gray-50/50 transition-colors">
+                        <div
+                          key={item?.id || idx}
+                          className="p-5 hover:bg-gray-50/50 transition-colors"
+                        >
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold text-gray-900">{item?.user?.name || "Pet Parent"}</span>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${statusClass(item?.status)}`}>
+                                <span className="font-semibold text-gray-900">
+                                  {item?.user?.name || "Pet Parent"}
+                                </span>
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-medium border ${statusClass(item?.status)}`}
+                                >
                                   {statusLabel(item?.status)}
                                 </span>
                               </div>
@@ -2685,14 +2909,21 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                 <span>{item?.pet?.breed || "Pet"}</span>
                               </div>
                               <div className="flex items-center gap-2 text-xs text-gray-400">
-                                <span>Ref: {item?.reference || item?.metadata?.order_id || "N/A"}</span>
+                                <span>
+                                  Ref:{" "}
+                                  {item?.reference ||
+                                    item?.metadata?.order_id ||
+                                    "N/A"}
+                                </span>
                                 <span>•</span>
                                 <span>{formatDate(item?.created_at)}</span>
                               </div>
                             </div>
-                            
+
                             <div className="flex items-center gap-3">
-                              <span className="font-bold text-gray-900">{formatAmount(amountInr)}</span>
+                              <span className="font-bold text-gray-900">
+                                {formatAmount(amountInr)}
+                              </span>
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => openPatientModal(item)}
@@ -2720,8 +2951,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                       <History size={24} className="text-gray-400" />
                     </div>
-                    <p className="text-gray-600 font-medium">No consultations yet</p>
-                    <p className="text-sm text-gray-400 mt-1">Your consultations will appear here</p>
+                    <p className="text-gray-600 font-medium">
+                      No consultations yet
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Your consultations will appear here
+                    </p>
                   </div>
                 )}
               </div>
@@ -2741,26 +2976,36 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 </h3>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs text-gray-400 uppercase mb-1">Doctor Name</p>
+                    <p className="text-xs text-gray-400 uppercase mb-1">
+                      Doctor Name
+                    </p>
                     <p className="font-medium text-gray-900">{doctorName}</p>
                   </div>
                   {doctorEmail && (
                     <div>
-                      <p className="text-xs text-gray-400 uppercase mb-1">Email</p>
+                      <p className="text-xs text-gray-400 uppercase mb-1">
+                        Email
+                      </p>
                       <p className="text-sm text-gray-700">{doctorEmail}</p>
                     </div>
                   )}
                   {doctorPhone && (
                     <div>
-                      <p className="text-xs text-gray-400 uppercase mb-1">Phone</p>
+                      <p className="text-xs text-gray-400 uppercase mb-1">
+                        Phone
+                      </p>
                       <p className="text-sm text-gray-700">{doctorPhone}</p>
                     </div>
                   )}
                   <div className="pt-2 border-t border-gray-100">
-                    <p className="text-xs text-gray-400 uppercase mb-1">Account Status</p>
+                    <p className="text-xs text-gray-400 uppercase mb-1">
+                      Account Status
+                    </p>
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                      <span className="text-sm font-medium text-emerald-700">Active</span>
+                      <span className="text-sm font-medium text-emerald-700">
+                        Active
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2772,7 +3017,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     <Star size={20} className="text-amber-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-amber-800 mb-1">Pro Tip</h4>
+                    <h4 className="font-semibold text-amber-800 mb-1">
+                      Pro Tip
+                    </h4>
                     <ul className="mt-2 space-y-2 text-xs text-amber-700">
                       {[
                         "Respond to consultations promptly",
@@ -2781,13 +3028,17 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         "Only the registered doctor should conduct video consultations",
                       ].map((tip) => (
                         <li key={tip} className="flex items-start gap-2">
-                          <CheckCircle2 size={14} className="mt-0.5 text-amber-500" />
+                          <CheckCircle2
+                            size={14}
+                            className="mt-0.5 text-amber-500"
+                          />
                           <span className="leading-relaxed">{tip}</span>
                         </li>
                       ))}
                     </ul>
                     <p className="mt-3 text-xs text-amber-700 leading-relaxed">
-                      Following these steps helps avoid cancellations and ensures a smooth experience.
+                      Following these steps helps avoid cancellations and
+                      ensures a smooth experience.
                     </p>
                   </div>
                 </div>
@@ -2803,11 +3054,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-500">Completed</p>
-                    <p className="text-xl font-bold text-gray-900">{completedCount}</p>
+                    <p className="text-xl font-bold text-gray-900">
+                      {completedCount}
+                    </p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-500">Failed</p>
-                    <p className="text-xl font-bold text-gray-900">{failedCount}</p>
+                    <p className="text-xl font-bold text-gray-900">
+                      {failedCount}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -2827,7 +3082,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 </div>
                 <div>
                   <p className="text-white/70 text-xs">Patient Details</p>
-                  <h3 className="text-white font-semibold">Consultation Overview</h3>
+                  <h3 className="text-white font-semibold">
+                    Consultation Overview
+                  </h3>
                 </div>
               </div>
               <button
@@ -2841,21 +3098,45 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
             <div className="p-6 max-h-[70vh] overflow-y-auto">
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-3">Pet Parent</h4>
-                  <p className="font-semibold text-gray-900">{activeTransaction?.user?.name || "Not available"}</p>
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+                    Pet Parent
+                  </h4>
+                  <p className="font-semibold text-gray-900">
+                    {activeTransaction?.user?.name || "Not available"}
+                  </p>
                   {activeTransaction?.user?.phone && (
-                    <p className="text-sm text-gray-600 mt-1">📱 {formatPhone(activeTransaction.user.phone)}</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      📱 {formatPhone(activeTransaction.user.phone)}
+                    </p>
                   )}
                 </div>
 
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-3">Pet Details</h4>
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+                    Pet Details
+                  </h4>
                   <div className="space-y-2">
-                    <p className="text-sm"><span className="text-gray-500">Name:</span> <span className="font-medium">{resolvePetName(activeTransaction)}</span></p>
-                    <p className="text-sm"><span className="text-gray-500">Breed:</span> {formatPetText(activeTransaction?.pet?.breed) || "Not available"}</p>
-                    <p className="text-sm"><span className="text-gray-500">Type:</span> {formatPetText(activeTransaction?.pet?.pet_type) || "Not available"}</p>
+                    <p className="text-sm">
+                      <span className="text-gray-500">Name:</span>{" "}
+                      <span className="font-medium">
+                        {resolvePetName(activeTransaction)}
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="text-gray-500">Breed:</span>{" "}
+                      {formatPetText(activeTransaction?.pet?.breed) ||
+                        "Not available"}
+                    </p>
+                    <p className="text-sm">
+                      <span className="text-gray-500">Type:</span>{" "}
+                      {formatPetText(activeTransaction?.pet?.pet_type) ||
+                        "Not available"}
+                    </p>
                     {activeTransaction?.pet?.pet_dob && (
-                      <p className="text-sm"><span className="text-gray-500">DOB:</span> {formatDob(activeTransaction.pet.pet_dob)}</p>
+                      <p className="text-sm">
+                        <span className="text-gray-500">DOB:</span>{" "}
+                        {formatDob(activeTransaction.pet.pet_dob)}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -2863,16 +3144,26 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
               {activeTransaction?.pet?.reported_symptom && (
                 <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Reported Symptoms</h4>
-                  <p className="text-gray-700">{activeTransaction.pet.reported_symptom}</p>
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">
+                    Reported Symptoms
+                  </h4>
+                  <p className="text-gray-700">
+                    {activeTransaction.pet.reported_symptom}
+                  </p>
                 </div>
               )}
 
-              {(observationLoading || observationError || observationImages.length > 0) && (
+              {(observationLoading ||
+                observationError ||
+                observationImages.length > 0) && (
                 <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Observation Images</h4>
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">
+                    Observation Images
+                  </h4>
                   {observationLoading ? (
-                    <p className="text-sm text-gray-500">Loading observation images...</p>
+                    <p className="text-sm text-gray-500">
+                      Loading observation images...
+                    </p>
                   ) : observationError ? (
                     <p className="text-sm text-rose-600">{observationError}</p>
                   ) : (
@@ -2881,7 +3172,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         <button
                           key={image.id}
                           type="button"
-                          onClick={() => handleDocPreview(image.url, image.mime)}
+                          onClick={() =>
+                            handleDocPreview(image.url, image.mime)
+                          }
                           className="text-left rounded-2xl border border-gray-200 bg-white p-3 transition hover:border-[#0B4D67]/40 hover:shadow-sm"
                         >
                           <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
@@ -2910,7 +3203,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
               )}
 
               <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Pet Document</h4>
+                <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">
+                  Pet Document
+                </h4>
                 {(() => {
                   const docUrl = toDocUrl(activeTransaction?.pet?.pet_doc2);
                   const hasImage = docUrl && isImageUrl(docUrl);
@@ -2947,7 +3242,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       ) : null}
                     </button>
                   ) : (
-                    <p className="text-sm text-gray-500">No document uploaded</p>
+                    <p className="text-sm text-gray-500">
+                      No document uploaded
+                    </p>
                   );
                 })()}
               </div>
@@ -3066,7 +3363,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
               </button>
             </div>
 
-            <form onSubmit={handlePrescriptionSubmit} className="p-6 max-h-[70vh] overflow-y-auto">
+            <form
+              onSubmit={handlePrescriptionSubmit}
+              className="p-6 max-h-[70vh] overflow-y-auto"
+            >
               <div className="grid lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                   {/* Patient Info Summary */}
@@ -3074,10 +3374,16 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs text-gray-400">Patient</p>
-                        <p className="font-semibold text-gray-900">{activeTransaction?.user?.name || "Pet Parent"}</p>
-                        <p className="text-sm text-gray-600">{resolvePetName(activeTransaction)}</p>
+                        <p className="font-semibold text-gray-900">
+                          {activeTransaction?.user?.name || "Pet Parent"}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {resolvePetName(activeTransaction)}
+                        </p>
                       </div>
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-medium border ${statusClass(activeTransaction?.status)}`}>
+                      <span
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border ${statusClass(activeTransaction?.status)}`}
+                      >
                         {statusLabel(activeTransaction?.status)}
                       </span>
                     </div>
@@ -3091,7 +3397,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </h4>
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Visit Category</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Visit Category
+                        </label>
                         <select
                           value={prescriptionForm.visitCategory}
                           onChange={updatePrescriptionField("visitCategory")}
@@ -3099,12 +3407,16 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           className={INPUT_BASE_CLASS}
                         >
                           <option value="Follow-up">Follow-up</option>
-                          <option value="New Consultation">New Consultation</option>
+                          <option value="New Consultation">
+                            New Consultation
+                          </option>
                           <option value="Emergency">Emergency</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Case Severity</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Case Severity
+                        </label>
                         <select
                           value={prescriptionForm.caseSeverity}
                           onChange={updatePrescriptionField("caseSeverity")}
@@ -3118,7 +3430,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Clinical Notes</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Clinical Notes
+                      </label>
                       <textarea
                         value={prescriptionForm.notes}
                         onChange={updatePrescriptionField("notes")}
@@ -3138,7 +3452,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </h4>
                     <div className="grid sm:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Temperature (°C)</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Temperature (°C)
+                        </label>
                         <input
                           type="number"
                           step="0.1"
@@ -3151,7 +3467,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Weight (kg)</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Weight (kg)
+                        </label>
                         <input
                           type="number"
                           step="0.1"
@@ -3164,7 +3482,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Heart Rate (bpm)</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Heart Rate (bpm)
+                        </label>
                         <input
                           type="number"
                           min="0"
@@ -3186,142 +3506,156 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </h4>
                     <div className="space-y-3">
                       {prescriptionForm.medications.map((medication, index) => (
-                        <div key={index} className="grid sm:grid-cols-5 gap-2 items-start">
-                         
-                            <input
-                              type="text"
-                              value={medication.name}
-                              onChange={updateMedication(index, "name")}
-                              placeholder="Medicine name"
-                              className={INPUT_BASE_CLASS}
-                            />
-                            <input
-                              type="text"
-                              value={medication.dosage}
-                              onChange={updateMedication(index, "dosage")}
-                              placeholder="Dosage"
-                              className={INPUT_BASE_CLASS}
-                            />
-                            <input
-                              type="text"
-                              value={medication.frequency}
-                              onChange={updateMedication(index, "frequency")}
-                              placeholder="Frequency"
-                              className={INPUT_BASE_CLASS}
-                            />
-                            <input
-                              type="text"
-                              value={medication.duration}
-                              onChange={updateMedication(index, "duration")}
-                              placeholder="Duration"
-                              className={INPUT_BASE_CLASS}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeMedication(index)}
-                              className="rounded-full border border-stone-200 px-3 py-2 text-xs text-stone-500 hover:bg-stone-50 sm:col-span-2 lg:col-span-1 w-full lg:w-auto lg:justify-self-end"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={addMedication}
-                        className="rounded-full border border-stone-200 px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 w-full sm:w-auto"
-                      >
-                        + Add medication
-                      </button>
+                        <div
+                          key={index}
+                          className="grid sm:grid-cols-5 gap-2 items-start"
+                        >
+                          <input
+                            type="text"
+                            value={medication.name}
+                            onChange={updateMedication(index, "name")}
+                            placeholder="Medicine name"
+                            className={INPUT_BASE_CLASS}
+                          />
+                          <input
+                            type="text"
+                            value={medication.dosage}
+                            onChange={updateMedication(index, "dosage")}
+                            placeholder="Dosage"
+                            className={INPUT_BASE_CLASS}
+                          />
+                          <input
+                            type="text"
+                            value={medication.frequency}
+                            onChange={updateMedication(index, "frequency")}
+                            placeholder="Frequency"
+                            className={INPUT_BASE_CLASS}
+                          />
+                          <input
+                            type="text"
+                            value={medication.duration}
+                            onChange={updateMedication(index, "duration")}
+                            placeholder="Duration"
+                            className={INPUT_BASE_CLASS}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeMedication(index)}
+                            className="rounded-full border border-stone-200 px-3 py-2 text-xs text-stone-500 hover:bg-stone-50 sm:col-span-2 lg:col-span-1 w-full lg:w-auto lg:justify-self-end"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
                     </div>
+                    <button
+                      type="button"
+                      onClick={addMedication}
+                      className="rounded-full border border-stone-200 px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 w-full sm:w-auto"
+                    >
+                      + Add medication
+                    </button>
+                  </div>
 
-                    <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3 shadow-sm">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
-                        <Upload size={16} /> Attach Record (optional)
-                      </div>
-                      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-6 text-center text-xs text-stone-500 hover:border-[#3998de] hover:text-[#3998de]">
-                        <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg"
-                          onChange={handleRecordFile}
-                          className="hidden"
-                        />
-                        <span className="font-semibold">Upload report file</span>
-                        <span className="text-[10px] text-stone-400">
-                          {prescriptionForm.recordFile?.name || "PDF, PNG, JPG supported"}
+                  <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3 shadow-sm">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
+                      <Upload size={16} /> Attach Record (optional)
+                    </div>
+                    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-6 text-center text-xs text-stone-500 hover:border-[#3998de] hover:text-[#3998de]">
+                      <input
+                        type="file"
+                        accept=".pdf,.png,.jpg,.jpeg"
+                        onChange={handleRecordFile}
+                        className="hidden"
+                      />
+                      <span className="font-semibold">Upload report file</span>
+                      <span className="text-[10px] text-stone-400">
+                        {prescriptionForm.recordFile?.name ||
+                          "PDF, PNG, JPG supported"}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <aside className="space-y-4 lg:sticky lg:top-4 self-start">
+                  <div className="rounded-2xl border border-stone-100 bg-white p-4 shadow-sm">
+                    <div className="text-xs uppercase text-stone-400">
+                      Consult Summary
+                    </div>
+                    <div className="mt-3 space-y-2 text-sm text-stone-700">
+                      <div className="flex items-center justify-between">
+                        <span>Reference</span>
+                        <span className="max-w-[140px] truncate font-semibold text-stone-900">
+                          {activeTransaction?.reference ||
+                            activeTransaction?.metadata?.order_id ||
+                            "NA"}
                         </span>
-                      </label>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Amount</span>
+                        <span className="font-semibold text-stone-900">
+                          {formatAmount(
+                            activeTransaction?.amount_inr ??
+                              (activeTransaction?.amount_paise
+                                ? activeTransaction.amount_paise / 100
+                                : 0),
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Date</span>
+                        <span className="font-semibold text-stone-900">
+                          {formatDate(activeTransaction?.created_at)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <aside className="space-y-4 lg:sticky lg:top-4 self-start">
-                    <div className="rounded-2xl border border-stone-100 bg-white p-4 shadow-sm">
-                      <div className="text-xs uppercase text-stone-400">Consult Summary</div>
-                      <div className="mt-3 space-y-2 text-sm text-stone-700">
-                        <div className="flex items-center justify-between">
-                          <span>Reference</span>
-                          <span className="max-w-[140px] truncate font-semibold text-stone-900">
-                            {activeTransaction?.reference ||
-                              activeTransaction?.metadata?.order_id ||
-                              "NA"}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Amount</span>
-                          <span className="font-semibold text-stone-900">
-                            {formatAmount(
-                              activeTransaction?.amount_inr ??
-                                (activeTransaction?.amount_paise ? activeTransaction.amount_paise / 100 : 0)
-                            )}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Date</span>
-                          <span className="font-semibold text-stone-900">
-                            {formatDate(activeTransaction?.created_at)}
-                          </span>
-                        </div>
-                      </div>
+                  <div className="rounded-2xl border border-stone-100 bg-white p-4 shadow-sm">
+                    <div className="text-xs uppercase text-stone-400">
+                      Submission
                     </div>
+                    <p className="mt-2 text-xs text-stone-500">
+                      Please ensure all fields are complete before saving the
+                      prescription.
+                    </p>
+                  </div>
 
-                    <div className="rounded-2xl border border-stone-100 bg-white p-4 shadow-sm">
-                      <div className="text-xs uppercase text-stone-400">Submission</div>
-                      <p className="mt-2 text-xs text-stone-500">
-                        Please ensure all fields are complete before saving the prescription.
-                      </p>
+                  {prescriptionError ? (
+                    <div className="flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
+                      <AlertCircle size={16} />
+                      <span>{prescriptionError}</span>
                     </div>
+                  ) : null}
 
-                    {prescriptionError ? (
-                      <div className="flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
-                        <AlertCircle size={16} />
-                        <span>{prescriptionError}</span>
-                      </div>
-                    ) : null}
-
-                    <div className="flex flex-col gap-3">
-                      <button
-                        type="button"
-                        onClick={closePrescriptionModal}
-                        className="rounded-full border border-stone-200 px-5 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={prescriptionSubmitting}
-                        className={`rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 px-6 py-2 text-sm font-semibold text-white ${
-                          prescriptionSubmitting ? "opacity-60 cursor-not-allowed" : ""
-                        }`}
-                      >
-                        {prescriptionSubmitting ? "Saving..." : "Save Prescription"}
-                      </button>
-                    </div>
-                  </aside>
-                </div>
-              </form>
-            </div>
+                  <div className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={closePrescriptionModal}
+                      className="rounded-full border border-stone-200 px-5 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={prescriptionSubmitting}
+                      className={`rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 px-6 py-2 text-sm font-semibold text-white ${
+                        prescriptionSubmitting
+                          ? "opacity-60 cursor-not-allowed"
+                          : ""
+                      }`}
+                    >
+                      {prescriptionSubmitting
+                        ? "Saving..."
+                        : "Save Prescription"}
+                    </button>
+                  </div>
+                </aside>
+              </div>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
       {showPrescriptionSuccessModal ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
