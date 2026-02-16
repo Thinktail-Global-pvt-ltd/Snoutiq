@@ -58,40 +58,34 @@ const VETS_API_URL =
   "https://snoutiq.com/backend/api/exported_from_excell_doctors";
 const REVIEWS = [
   {
-    name: "Riya S.",
-    city: "Chennai",
+    name: "Aditi Sharma - Dog: Bruno (Labrador)",
+    city: "India",
     rating: 5,
-    text: "Got connected in 6 minutes. Very helpful doctor.",
+    text: "Bruno suddenly started vomiting late at night and I panicked. Within 10 minutes I was connected to a vet on Snoutiq. The doctor calmly guided me step by step and told me what to monitor. It saved us an unnecessary emergency visit.",
   },
   {
-    name: "Amit K.",
-    city: "Hyderabad",
+    name: "Rohan Mehta - Dog: Coco (Shih Tzu)",
+    city: "India",
     rating: 5,
-    text: "Clear guidance and follow-up support.",
+    text: "I was honestly skeptical about online consultation, but the vet was extremely professional. Coco had a skin allergy issue and we got clear guidance immediately. Very convenient and worth the price.",
   },
   {
-    name: "Sneha M.",
-    city: "Pune",
-    rating: 4.8,
-    text: "Much better than clinic waiting.",
-  },
-  {
-    name: "Priya D.",
-    city: "Mumbai",
+    name: "Sneha Iyer - Dog: Simba (Golden Retriever)",
+    city: "India",
     rating: 5,
-    text: "Saved my dog's life with quick advice.",
+    text: "Simba wasn't eating and I was worried. The vet explained possible causes and gave proper advice on what to do next. The response time was fast and the whole process felt smooth and trustworthy.",
   },
   {
-    name: "Rahul V.",
-    city: "Delhi",
-    rating: 4.9,
-    text: "Professional and caring veterinarian.",
-  },
-  {
-    name: "Anjali T.",
-    city: "Bangalore",
+    name: "Arjun Verma - Dog: Tyson (German Shepherd)",
+    city: "India",
     rating: 5,
-    text: "Best telemedicine experience for pets.",
+    text: "Booked a night consultation around 11 PM. I didn't expect someone to respond so quickly. The doctor was experienced and practical. This is genuinely helpful when clinics are closed.",
+  },
+  {
+    name: "Neha Kapoor - Dog: Bella (Indie Mix)",
+    city: "India",
+    rating: 5,
+    text: "Bella had mild diarrhea and I didn't want to overreact. The vet helped me understand diet changes and warning signs. It gave me peace of mind without stepping out of home.",
   },
 ];
 
