@@ -216,6 +216,9 @@ class AdminController extends Controller
 
         $pet_doc1   = $uploadedDoc1 ?? $request->input('pet_doc1');
         $pet_doc2   = $uploadedDoc2 ?? $request->input('pet_doc2');
+        if (($pet_doc2 === null || $pet_doc2 === '') && ($pet_doc1 !== null && $pet_doc1 !== '')) {
+            $pet_doc2 = $pet_doc1;
+        }
         $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
         [$petDocBlob, $petDocMime] = $blobSourceField ? $this->extractPetDocumentBlob($request, $blobSourceField) : [null, null];
         $blobColumnsReady = $this->petDoc2BlobColumnsReady();
@@ -325,21 +328,34 @@ class AdminController extends Controller
         }
 
         $doc1Upload = $this->storePetDocument($request, 'pet_doc1');
+        $doc2Upload = $this->storePetDocument($request, 'pet_doc2');
+
+        $petDoc1Value = null;
+        $petDoc2Value = null;
+
         if ($doc1Upload) {
-            $sets[] = "`pet_doc1` = ?";
-            $params[] = $doc1Upload;
+            $petDoc1Value = $doc1Upload;
         } elseif ($request->has('pet_doc1')) {
-            $sets[] = "`pet_doc1` = ?";
-            $params[] = $request->input('pet_doc1');
+            $petDoc1Value = $request->input('pet_doc1');
         }
 
-        $doc2Upload = $this->storePetDocument($request, 'pet_doc2');
         if ($doc2Upload) {
-            $sets[] = "`pet_doc2` = ?";
-            $params[] = $doc2Upload;
+            $petDoc2Value = $doc2Upload;
         } elseif ($request->has('pet_doc2')) {
+            $petDoc2Value = $request->input('pet_doc2');
+        } elseif ($petDoc1Value !== null && $petDoc1Value !== '') {
+            // Keep pet_doc2 in sync when only pet_doc1 is provided.
+            $petDoc2Value = $petDoc1Value;
+        }
+
+        if ($petDoc1Value !== null) {
+            $sets[] = "`pet_doc1` = ?";
+            $params[] = $petDoc1Value;
+        }
+
+        if ($petDoc2Value !== null) {
             $sets[] = "`pet_doc2` = ?";
-            $params[] = $request->input('pet_doc2');
+            $params[] = $petDoc2Value;
         }
 
         $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
