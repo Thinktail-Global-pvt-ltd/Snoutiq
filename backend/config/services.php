@@ -113,4 +113,9 @@ return [
         'hmac_header' => env('VETCOMPASS_HMAC_HEADER'),
         'session_uuid' => env('VETCOMPASS_SESSION_UUID'),
     ],
+
+    'catapi' => [
+        'base_url' => env('CAT_API_BASE_URL', 'https://api.thecatapi.com/v1'),
+        'key' => env('CAT_API_KEY', 'live_EcJoIUWAeJuDuodSIODIa2lBKst4Sg3gvWkq7Lcf2BKkW2ZyHDTcmVvylWZsXbuH'),
+    ],
 ];

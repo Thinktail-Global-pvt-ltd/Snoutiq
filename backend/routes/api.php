@@ -1295,6 +1295,64 @@ Route::get('/users', [AdminController::class, 'getUsers']);
 
 Route::get('/dog-breed/{breed}', [\App\Http\Controllers\Api\DogBreedController::class, 'getBreedImage']);
 Route::get('/dog-breeds/all', [\App\Http\Controllers\Api\DogBreedController::class, 'allBreeds']);
+Route::get('/cat-breeds/with-indian', function () {
+    $baseUrl = rtrim((string) config('services.catapi.base_url', 'https://api.thecatapi.com/v1'), '/');
+    $apiKey = trim((string) config('services.catapi.key', ''));
+
+    if ($apiKey === '') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Cat API key missing',
+        ], 500);
+    }
+
+    $response = \Illuminate\Support\Facades\Http::withHeaders([
+        'x-api-key' => $apiKey,
+        'Accept' => 'application/json',
+    ])->timeout(20)->get($baseUrl . '/breeds');
+
+    if (! $response->successful()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to fetch breeds from TheCatAPI',
+            'status' => $response->status(),
+            'error' => $response->json('message') ?? $response->body(),
+        ], 502);
+    }
+
+    $breeds = $response->json();
+    if (!is_array($breeds)) {
+        $breeds = [];
+    }
+
+    $indianBreed = [
+        'id' => 'indian_cat',
+        'name' => 'Indian Cat',
+        'origin' => 'India',
+        'country_code' => 'IN',
+        'temperament' => 'Adaptable, Intelligent, Social',
+        'description' => 'Indian domestic cat breed profile (custom addition by SnoutIQ).',
+        'life_span' => '12 - 16',
+    ];
+
+    $exists = collect($breeds)->contains(function ($breed) {
+        $id = strtolower(trim((string) data_get($breed, 'id', '')));
+        $name = strtolower(trim((string) data_get($breed, 'name', '')));
+        return $id === 'indian_cat' || $name === 'indian cat';
+    });
+
+    if (! $exists) {
+        $breeds[] = $indianBreed;
+    }
+
+    return response()->json([
+        'success' => true,
+        'source' => 'thecatapi',
+        'custom_added' => ! $exists,
+        'count' => count($breeds),
+        'data' => $breeds,
+    ]);
+})->name('cat_breeds.with_indian');
 
 
 
