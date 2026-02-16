@@ -333,6 +333,108 @@ Route::get('/exported_from_excell_doctors', function () {
     ]);
 })->name('exported_from_excell_doctors');
 
+// Bulk update video rates for doctors imported from excel
+Route::match(['get', 'post'], '/excell-export/doctors/update-video-rates', function (Request $request) {
+    $configuredSecret = trim((string) (config('services.notifications.secret') ?? ''));
+    if ($configuredSecret !== '') {
+        $incomingSecret = trim((string) ($request->header('X-Admin-Secret') ?? $request->input('secret') ?? ''));
+        if (!hash_equals($configuredSecret, $incomingSecret)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
+    }
+
+    if (!Schema::hasTable('doctors')) {
+        return response()->json([
+            'success' => false,
+            'message' => 'doctors table not found',
+        ], 500);
+    }
+    if (!Schema::hasColumn('doctors', 'exported_from_excell')) {
+        return response()->json([
+            'success' => false,
+            'message' => 'doctors.exported_from_excell column not found',
+        ], 500);
+    }
+    if (!Schema::hasColumn('doctors', 'video_day_rate') || !Schema::hasColumn('doctors', 'video_night_rate')) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Rate columns missing on doctors table',
+        ], 500);
+    }
+
+    $payload = $request->validate([
+        'day_rate' => ['nullable', 'numeric', 'min:0'],
+        'night_rate' => ['nullable', 'numeric', 'min:0'],
+        'dry_run' => ['nullable', 'boolean'],
+    ]);
+
+    $dayRate = (float) ($payload['day_rate'] ?? 500);
+    $nightRate = (float) ($payload['night_rate'] ?? 650);
+    $dryRun = filter_var($payload['dry_run'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+    $query = Doctor::query()
+        ->where(function ($q) {
+            $q->where('exported_from_excell', 1)
+                ->orWhere('exported_from_excell', '1');
+        })
+        ->orderBy('id');
+
+    $matched = (clone $query)->count();
+    if ($matched === 0) {
+        return response()->json([
+            'success' => true,
+            'message' => 'No doctors found with exported_from_excell = 1',
+            'matched' => 0,
+            'updated' => 0,
+            'day_rate' => $dayRate,
+            'night_rate' => $nightRate,
+            'dry_run' => $dryRun,
+        ]);
+    }
+
+    $updated = 0;
+    $processed = 0;
+    $sample = [];
+
+    $query->chunkById(200, function ($rows) use (&$updated, &$processed, &$sample, $dayRate, $nightRate, $dryRun) {
+        foreach ($rows as $doctor) {
+            $processed++;
+            if (count($sample) < 10) {
+                $sample[] = [
+                    'id' => $doctor->id,
+                    'doctor_name' => $doctor->doctor_name,
+                    'old_day_rate' => $doctor->video_day_rate,
+                    'old_night_rate' => $doctor->video_night_rate,
+                ];
+            }
+
+            if ($dryRun) {
+                continue;
+            }
+
+            $doctor->video_day_rate = $dayRate;
+            $doctor->video_night_rate = $nightRate;
+            $doctor->save();
+            $updated++;
+        }
+    });
+
+    return response()->json([
+        'success' => true,
+        'message' => $dryRun ? 'Dry run complete' : 'Video rates updated successfully',
+        'matched' => $matched,
+        'processed' => $processed,
+        'updated' => $dryRun ? 0 : $updated,
+        'day_rate' => $dayRate,
+        'night_rate' => $nightRate,
+        'dry_run' => $dryRun,
+        'sample' => $sample,
+    ]);
+})->name('excell_export.doctors.update_video_rates');
+
 // Create user + pet + observation
 Route::post('/user-pet-observation', function (Request $request) {
     $data = $request->validate([
