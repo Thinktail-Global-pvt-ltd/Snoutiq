@@ -149,6 +149,7 @@ function App() {
             <Route path="/20+vetsonline" element={<HomePage />} />
             <Route path="/whychooseteleconsult" element={<HomePage />} />
             <Route path="/howwework" element={<HomePage />} />
+            <Route path="/commitment" element={<HomePage />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/vet-register-success" element={<VetRegisterSuccess />} />
             <Route path="/vet-dashboard" element={<VetDashboard />} />

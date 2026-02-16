@@ -195,6 +195,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const vetSectionRef = useRef(null);
   const whyChooseRef = useRef(null);
   const howWeWorkRef = useRef(null);
+  const commitmentRef = useRef(null);
   const activeRouteRef = useRef("");
   const [vets, setVets] = useState([]);
   const [vetsLoading, setVetsLoading] = useState(true);
@@ -249,6 +250,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       "/20+vetsonline": vetSectionRef,
       "/whychooseteleconsult": whyChooseRef,
       "/howwework": howWeWorkRef,
+      "/commitment": commitmentRef,
     };
 
     const targetRef = routeMap[window.location.pathname];
@@ -267,6 +269,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       { ref: vetSectionRef, path: "/20+vetsonline" },
       { ref: whyChooseRef, path: "/whychooseteleconsult" },
       { ref: howWeWorkRef, path: "/howwework" },
+      { ref: commitmentRef, path: "/commitment" },
     ];
 
     const observer = new IntersectionObserver(
@@ -538,6 +541,13 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                   className="transition hover:text-slate-900"
                 >
                   How It Works
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollToSection(commitmentRef, "/commitment")}
+                  className="transition hover:text-slate-900"
+                >
+                  Our Commitment
                 </button>
               </nav>
               <button
@@ -1472,7 +1482,11 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </section>
 
       {/* Promise */}
-      <section className="bg-gradient-to-br from-blue-100 to-blue-200 py-14 md:py-16">
+      <section
+        ref={commitmentRef}
+        id="commitment"
+        className="bg-gradient-to-br from-blue-100 to-blue-200 py-14 md:py-16"
+      >
         <div className="mx-auto max-w-6xl px-5">
           <div className="mx-auto max-w-4xl text-center">
             <div className="text-4xl">❤️</div>
