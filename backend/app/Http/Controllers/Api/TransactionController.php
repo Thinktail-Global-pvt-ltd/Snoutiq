@@ -20,6 +20,18 @@ class TransactionController extends Controller
         ]);
 
         $limit = (int) ($data['limit'] ?? 50);
+        $petColumns = ['id', 'name'];
+        if (Schema::hasTable('pets')) {
+            if (Schema::hasColumn('pets', 'pet_doc2')) {
+                $petColumns[] = 'pet_doc2';
+            }
+            if (Schema::hasColumn('pets', 'pet_doc2_blob')) {
+                $petColumns[] = 'pet_doc2_blob';
+            }
+            if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
+                $petColumns[] = 'pet_doc2_mime';
+            }
+        }
 
         $transactions = Transaction::query()
             ->where('type', 'video_consult')
@@ -31,7 +43,7 @@ class TransactionController extends Controller
             ->with([
                 'user' => fn ($q) => $q->select('id', 'name'),
                 'user.deviceTokens:id,user_id,token',
-                'pet:id,name',
+                'pet' => fn ($q) => $q->select($petColumns),
                 'doctor:id,doctor_name',
             ])
             ->orderByDesc('id')
@@ -64,6 +76,9 @@ class TransactionController extends Controller
                     : [];
             }
 
+            $petBlobUrl = $pet ? $this->petDoc2BlobUrl($pet) : null;
+            $petDoc2Url = $pet ? $this->absolutePetDoc2Url($pet->pet_doc2 ?? null) : null;
+
             return [
                 'id' => $tx->id,
                 'user_id' => $tx->user_id,
@@ -81,6 +96,10 @@ class TransactionController extends Controller
                 'pet' => $pet ? [
                     'id' => $pet->id,
                     'name' => $pet->name,
+                    'pet_doc2' => $pet->pet_doc2 ?? null,
+                    'pet_doc2_blob_url' => $petBlobUrl,
+                    'pet_doc2_url' => $petDoc2Url,
+                    'pet_image_url' => $petBlobUrl ?: $petDoc2Url,
                 ] : null,
                 'call_session' => $callSession ? $this->formatCallSession($callSession) : null,
                 'call_session_is_completed' => $callSession ? (bool) ($callSession->is_completed ?? false) : null,
@@ -235,5 +254,44 @@ class TransactionController extends Controller
             'created_at' => optional($videoApointment->created_at)->toIso8601String(),
             'updated_at' => optional($videoApointment->updated_at)->toIso8601String(),
         ];
+    }
+
+    protected function petDoc2BlobUrl($pet): ?string
+    {
+        if (! $pet || ! Schema::hasTable('pets') || ! Schema::hasColumn('pets', 'pet_doc2_blob')) {
+            return null;
+        }
+
+        $blob = $pet->getRawOriginal('pet_doc2_blob');
+        if ($blob === null || $blob === '') {
+            return null;
+        }
+
+        return route('api.pets.pet-doc2-blob', ['pet' => $pet->id]);
+    }
+
+    protected function absolutePetDoc2Url(?string $path): ?string
+    {
+        if ($path === null) {
+            return null;
+        }
+
+        $path = trim($path);
+        if ($path === '') {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+
+        $path = ltrim($path, '/');
+        $base = rtrim(url('/'), '/');
+
+        if (str_starts_with($path, 'backend/') && str_ends_with($base, '/backend')) {
+            $path = substr($path, strlen('backend/'));
+        }
+
+        return $base . '/' . $path;
     }
 }
