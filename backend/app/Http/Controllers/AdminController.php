@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use App\Services\Ai\DogDiseaseSuggester;
 
 class AdminController extends Controller
@@ -150,16 +151,35 @@ class AdminController extends Controller
     // list pets for a user
     public function listPets(Request $request, $userId)
     {
-        $pets = DB::select('SELECT * FROM pets WHERE user_id = ? ORDER BY id DESC', [$userId]);
-        return response()->json(['status'=>'success','data'=>$pets]);
+        $pets = DB::table('pets')
+            ->select($this->safePetSelectColumns())
+            ->where('user_id', $userId)
+            ->orderByDesc('id')
+            ->get()
+            ->map(function ($pet) {
+                $pet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $pet->id);
+                return $pet;
+            })
+            ->values();
+
+        return response()->json(['status' => 'success', 'data' => $pets]);
     }
 
     // get one pet (for edit)
     public function getPet(Request $request, $petId)
     {
-        $row = DB::select('SELECT * FROM pets WHERE id = ? LIMIT 1', [$petId]);
-        if (!$row) return response()->json(['status'=>'error','message'=>'Pet not found'], 404);
-        return response()->json(['status'=>'success','data'=>$row[0]]);
+        $pet = DB::table('pets')
+            ->select($this->safePetSelectColumns())
+            ->where('id', $petId)
+            ->first();
+
+        if (! $pet) {
+            return response()->json(['status' => 'error', 'message' => 'Pet not found'], 404);
+        }
+
+        $pet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $pet->id);
+
+        return response()->json(['status' => 'success', 'data' => $pet]);
     }
 
     /**
@@ -196,6 +216,9 @@ class AdminController extends Controller
 
         $pet_doc1   = $uploadedDoc1 ?? $request->input('pet_doc1');
         $pet_doc2   = $uploadedDoc2 ?? $request->input('pet_doc2');
+        $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
+        [$petDocBlob, $petDocMime] = $blobSourceField ? $this->extractPetDocumentBlob($request, $blobSourceField) : [null, null];
+        $blobColumnsReady = $this->petDoc2BlobColumnsReady();
 
         return DB::transaction(function () use (
             $userId,
@@ -210,7 +233,10 @@ class AdminController extends Controller
             $weight,
             $isNeutered,
             $pet_doc1,
-            $pet_doc2
+            $pet_doc2,
+            $blobColumnsReady,
+            $petDocBlob,
+            $petDocMime
         ) {
             // Insert the new pet (idempotent)
             DB::statement(
@@ -247,13 +273,34 @@ class AdminController extends Controller
                 ]
             );
 
-            // return the row
-            $pet = DB::select(
-                'SELECT * FROM pets WHERE user_id = ? AND name = ? AND breed = ? AND pet_age = ? AND pet_gender = ? LIMIT 1',
-                [$userId, $name, $breed, $pet_age, $pet_gender]
-            );
+            $pet = DB::table('pets')
+                ->select($this->safePetSelectColumns())
+                ->where('user_id', $userId)
+                ->where('name', $name)
+                ->where('breed', $breed)
+                ->where('pet_age', $pet_age)
+                ->where('pet_gender', $pet_gender)
+                ->orderByDesc('id')
+                ->first();
 
-            return response()->json(['status'=>'success','data'=>$pet ? $pet[0] : null]);
+            if ($pet && $blobColumnsReady && $petDocBlob !== null) {
+                DB::table('pets')->where('id', (int) $pet->id)->update([
+                    'pet_doc2_blob' => $petDocBlob,
+                    'pet_doc2_mime' => $petDocMime,
+                    'updated_at' => now(),
+                ]);
+
+                $pet = DB::table('pets')
+                    ->select($this->safePetSelectColumns())
+                    ->where('id', (int) $pet->id)
+                    ->first();
+            }
+
+            if ($pet) {
+                $pet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $pet->id);
+            }
+
+            return response()->json(['status' => 'success', 'data' => $pet]);
         });
     }
 
@@ -295,6 +342,15 @@ class AdminController extends Controller
             $params[] = $request->input('pet_doc2');
         }
 
+        $blobSourceField = $request->hasFile('pet_doc2') ? 'pet_doc2' : ($request->hasFile('pet_doc1') ? 'pet_doc1' : null);
+        [$petDocBlob, $petDocMime] = $blobSourceField ? $this->extractPetDocumentBlob($request, $blobSourceField) : [null, null];
+        if ($this->petDoc2BlobColumnsReady() && $petDocBlob !== null) {
+            $sets[] = "`pet_doc2_blob` = ?";
+            $params[] = $petDocBlob;
+            $sets[] = "`pet_doc2_mime` = ?";
+            $params[] = $petDocMime;
+        }
+
         if (!$sets) return response()->json(['status'=>'error','message'=>'No fields to update'], 422);
 
         $sql = 'UPDATE pets SET '.implode(',', $sets).', updated_at = NOW() WHERE id = ?';
@@ -303,8 +359,16 @@ class AdminController extends Controller
         $n = DB::update($sql, $params);
         if (!$n) return response()->json(['status'=>'error','message'=>'Pet not found or unchanged'], 404);
 
-        $row = DB::select('SELECT * FROM pets WHERE id = ? LIMIT 1', [$petId]);
-        return response()->json(['status'=>'success','data'=>$row[0]]);
+        $pet = DB::table('pets')
+            ->select($this->safePetSelectColumns())
+            ->where('id', $petId)
+            ->first();
+
+        if ($pet) {
+            $pet->pet_doc2_blob_url = $this->petDoc2BlobUrl((int) $pet->id);
+        }
+
+        return response()->json(['status' => 'success', 'data' => $pet]);
     }
 
     // delete pet
@@ -473,6 +537,60 @@ class AdminController extends Controller
         $file->move($uploadPath, $docName);
 
         return 'backend/uploads/pet_docs/'.$docName;
+    }
+
+    private function extractPetDocumentBlob(Request $request, string $field): array
+    {
+        if (! $request->hasFile($field)) {
+            return [null, null];
+        }
+
+        $file = $request->file($field);
+        if (! $file || ! $file->isValid()) {
+            return [null, null];
+        }
+
+        return [
+            $file->get(),
+            $file->getMimeType() ?: ($file->getClientMimeType() ?: 'application/octet-stream'),
+        ];
+    }
+
+    private function petDoc2BlobColumnsReady(): bool
+    {
+        return Schema::hasTable('pets')
+            && Schema::hasColumn('pets', 'pet_doc2_blob')
+            && Schema::hasColumn('pets', 'pet_doc2_mime');
+    }
+
+    private function petDoc2BlobUrl(int $petId): ?string
+    {
+        if (! $this->petDoc2BlobColumnsReady()) {
+            return null;
+        }
+
+        $hasBlob = DB::table('pets')
+            ->where('id', $petId)
+            ->whereNotNull('pet_doc2_blob')
+            ->exists();
+
+        if (! $hasBlob) {
+            return null;
+        }
+
+        return route('api.pets.pet-doc2-blob', ['pet' => $petId]);
+    }
+
+    private function safePetSelectColumns(): array
+    {
+        if (! Schema::hasTable('pets')) {
+            return ['id', 'user_id', 'name', 'breed', 'pet_age', 'pet_gender', 'pet_doc1', 'pet_doc2', 'created_at', 'updated_at'];
+        }
+
+        $columns = Schema::getColumnListing('pets');
+        $columns = array_values(array_filter($columns, fn (string $column) => $column !== 'pet_doc2_blob'));
+
+        return $columns ?: ['id'];
     }
 
     private function buildPetSummaryPrompt(object $pet, array $prescriptions): string
