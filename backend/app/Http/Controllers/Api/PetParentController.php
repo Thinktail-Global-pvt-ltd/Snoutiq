@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -23,12 +24,13 @@ class PetParentController extends Controller
     // 🔹 Delete Pet Parent (User) by ID
     public function destroy($id)
     {
-        $deleted = DB::table('users')->where('id', $id)->delete();
-
-        if ($deleted) {
-            return response()->json(['message' => 'Pet Parent deleted successfully']);
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json(['message' => 'Pet Parent not found'], 404);
         }
 
-        return response()->json(['message' => 'Pet Parent not found'], 404);
+        $user->delete();
+
+        return response()->json(['message' => 'Pet Parent deleted successfully']);
     }
 }

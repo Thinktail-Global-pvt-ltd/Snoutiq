@@ -4,8 +4,9 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class User extends Authenticatable
 {
@@ -21,6 +22,52 @@ class User extends Authenticatable
     protected $hidden = ['password','remember_token','api_token_hash','pet_doc2_blob'];
 
     protected $casts  = ['pet_age' => 'integer'];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (User $user): void {
+            DB::transaction(function () use ($user): void {
+                $petIds = collect();
+                if (Schema::hasTable('pets') && Schema::hasColumn('pets', 'user_id')) {
+                    $petIds = Pet::query()
+                        ->where('user_id', $user->id)
+                        ->pluck('id');
+                }
+
+                if (Schema::hasTable('user_observations')) {
+                    if (Schema::hasColumn('user_observations', 'user_id')) {
+                        UserObservation::query()
+                            ->where('user_id', $user->id)
+                            ->delete();
+                    }
+                    if ($petIds->isNotEmpty() && Schema::hasColumn('user_observations', 'pet_id')) {
+                        UserObservation::query()
+                            ->whereIn('pet_id', $petIds)
+                            ->delete();
+                    }
+                }
+
+                if (Schema::hasTable('prescriptions')) {
+                    if (Schema::hasColumn('prescriptions', 'user_id')) {
+                        Prescription::query()
+                            ->where('user_id', $user->id)
+                            ->delete();
+                    }
+                    if ($petIds->isNotEmpty() && Schema::hasColumn('prescriptions', 'pet_id')) {
+                        Prescription::query()
+                            ->whereIn('pet_id', $petIds)
+                            ->delete();
+                    }
+                }
+
+                if (Schema::hasTable('pets') && Schema::hasColumn('pets', 'user_id')) {
+                    Pet::query()
+                        ->where('user_id', $user->id)
+                        ->delete();
+                }
+            });
+        });
+    }
 
     // // auto-hash password
     // public function setPasswordAttribute($value)
