@@ -130,22 +130,22 @@ export const VetRegisterScreen: React.FC<{
   const [nightPrice, setNightPrice] = useState<string>('');
   const [isNightShift, setIsNightShift] = useState(false);
 
-  // Commission Logic: Max(25%, 99)
-  const calculateCommission = (priceStr: string) => {
+  // Commission Logic: fixed platform fee (day 150, night 200)
+  const calculateCommission = (priceStr: string, baseFee: number) => {
     const price = parseFloat(priceStr);
     if (isNaN(price) || price === 0) return null;
     
-    const commission = Math.max(price * 0.25, 99);
-    const earning = price - commission;
+    const commission = Math.min(baseFee, price);
+    const earning = Math.max(price - commission, 0);
     
     return {
-      commission: Math.ceil(commission),
-      earning: Math.floor(earning)
+      commission: Math.round(commission),
+      earning: Math.round(earning)
     };
   };
 
-  const dayMath = calculateCommission(dayPrice);
-  const nightMath = calculateCommission(nightPrice);
+  const dayMath = calculateCommission(dayPrice, 150);
+  const nightMath = calculateCommission(nightPrice, 200);
 
   return (
     <div className="min-h-screen bg-calm-bg flex flex-col animate-slide-up">
@@ -309,7 +309,7 @@ export const VetRegisterScreen: React.FC<{
                 <DollarSign size={12} /> Commission Structure
               </h4>
               <ul className="text-xs text-amber-900/80 space-y-1 list-disc pl-4">
-                <li>We charge 25% OR ₹99 per consultation (whichever is higher).</li>
+                <li>We charge ₹150 on day consults and ₹200 on night consults.</li>
                 <li>The remaining amount is yours.</li>
                 <li>No monthly subscription fees.</li>
               </ul>

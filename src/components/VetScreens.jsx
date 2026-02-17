@@ -934,21 +934,22 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     return undefined;
   }, [doctorImageFile, form.doctorImageUrl]);
 
-  // Your updated pricing logic
-  const PLATFORM_FEE_FLAT = 200;
+  // Pricing logic: fixed platform fee (day 150, night 200)
+  const PLATFORM_FEE_DAY = 150;
+  const PLATFORM_FEE_NIGHT = 200;
 
-  const calculateCommission = (priceStr) => {
+  const calculateCommission = (priceStr, platformFee) => {
     const price = Number(priceStr);
     if (!Number.isFinite(price) || price <= 0) return null;
 
-    const commission = Math.min(PLATFORM_FEE_FLAT, price); // safety
+    const commission = Math.min(platformFee, price); // safety
     const earning = price - commission;
 
     return { commission, earning };
   };
 
-  const dayMath = calculateCommission(dayPrice);
-  const nightMath = calculateCommission(nightPrice);
+  const dayMath = calculateCommission(dayPrice, PLATFORM_FEE_DAY);
+  const nightMath = calculateCommission(nightPrice, PLATFORM_FEE_NIGHT);
 
   const toggleSpecialization = (value) => {
     setSpecializations((prev) =>
