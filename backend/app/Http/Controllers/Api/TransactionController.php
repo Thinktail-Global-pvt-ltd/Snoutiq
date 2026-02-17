@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CallSession;
 use App\Models\DeviceToken;
+use App\Models\Prescription;
 use App\Models\Transaction;
 use App\Models\VideoApointment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Collection;
 
 class TransactionController extends Controller
 {
@@ -34,7 +36,7 @@ class TransactionController extends Controller
         }
 
         $transactions = Transaction::query()
-            ->where('type', 'video_consult')
+            ->whereIn('type', ['video_consult', 'video_call', 'video call', 'appointment'])
             ->where('doctor_id', $data['doctor_id'])
             ->where(function ($query) {
                 $query->whereNull('status')
@@ -50,6 +52,8 @@ class TransactionController extends Controller
             ->limit($limit)
             ->get();
 
+        $prescriptionChannelSet = $this->prescriptionChannelSetForTransactions($transactions);
+
         $latestSessions = $this->latestCallSessionsForUsers(
             doctorId: (int) $data['doctor_id'],
             userIds: $transactions->pluck('user_id')->filter()->unique()
@@ -61,7 +65,7 @@ class TransactionController extends Controller
 
         $deviceTokensByUser = $this->deviceTokensForUsers($transactions, $latestSessions);
 
-        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser) {
+        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser, $prescriptionChannelSet) {
             $user = $tx->user;
             $pet = $tx->pet;
             $callSession = $latestSessions->get($tx->user_id);
@@ -78,16 +82,24 @@ class TransactionController extends Controller
 
             $petBlobUrl = $pet ? $this->petDoc2BlobUrl($pet) : null;
             $petDoc2Url = $pet ? $this->absolutePetDoc2Url($pet->pet_doc2 ?? null) : null;
+            $requiresPrescription = $this->transactionRequiresPrescription((string) ($tx->type ?? ''));
+            $hasPrescription = $requiresPrescription
+                ? $this->hasMatchingPrescriptionForTransaction($tx, $prescriptionChannelSet)
+                : true;
+            $effectiveAmountPaise = $hasPrescription ? (int) ($tx->amount_paise ?? 0) : 0;
 
             return [
                 'id' => $tx->id,
                 'user_id' => $tx->user_id,
                 'doctor_id' => $tx->doctor_id,
-                'amount_paise' => $tx->amount_paise,
+                'amount_paise' => $effectiveAmountPaise,
+                'original_amount_paise' => (int) ($tx->amount_paise ?? 0),
                 'status' => $tx->status,
                 'type' => $tx->type,
                 'payment_method' => $tx->payment_method,
                 'reference' => $tx->reference,
+                'channel_name' => $tx->channel_name ?? null,
+                'prescription_present' => $hasPrescription,
                 'created_at' => optional($tx->created_at)->toIso8601String(),
                 'updated_at' => optional($tx->updated_at)->toIso8601String(),
                 'user_name' => $user->name ?? null,
@@ -113,6 +125,54 @@ class TransactionController extends Controller
             'count' => $payload->count(),
             'data' => $payload,
         ]);
+    }
+
+    protected function prescriptionChannelSetForTransactions(Collection $transactions): Collection
+    {
+        if (
+            $transactions->isEmpty()
+            || !Schema::hasTable('prescriptions')
+            || !Schema::hasColumn('prescriptions', 'call_session')
+            || !Schema::hasTable('transactions')
+            || !Schema::hasColumn('transactions', 'channel_name')
+        ) {
+            return collect();
+        }
+
+        $channels = $transactions
+            ->filter(fn (Transaction $tx) => $this->transactionRequiresPrescription((string) ($tx->type ?? '')))
+            ->pluck('channel_name')
+            ->filter(fn ($channel) => is_string($channel) && trim($channel) !== '')
+            ->map(fn (string $channel) => trim($channel))
+            ->unique()
+            ->values();
+
+        if ($channels->isEmpty()) {
+            return collect();
+        }
+
+        return Prescription::query()
+            ->whereIn('call_session', $channels)
+            ->pluck('call_session')
+            ->filter(fn ($channel) => is_string($channel) && trim($channel) !== '')
+            ->mapWithKeys(fn (string $channel) => [trim($channel) => true]);
+    }
+
+    protected function transactionRequiresPrescription(string $type): bool
+    {
+        $normalized = strtolower(trim($type));
+
+        return in_array($normalized, ['video_consult', 'video_call', 'video call', 'appointment'], true);
+    }
+
+    protected function hasMatchingPrescriptionForTransaction(Transaction $tx, Collection $prescriptionChannelSet): bool
+    {
+        $channel = is_string($tx->channel_name ?? null) ? trim((string) $tx->channel_name) : '';
+        if ($channel === '') {
+            return false;
+        }
+
+        return $prescriptionChannelSet->has($channel);
     }
 
     /**
