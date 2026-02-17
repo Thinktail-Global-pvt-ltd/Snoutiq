@@ -53,19 +53,28 @@ class TransactionController extends Controller
             ->get();
 
         $prescriptionChannelSet = $this->prescriptionChannelSetForTransactions($transactions);
+        $filteredTransactions = $transactions
+            ->filter(function (Transaction $tx) use ($prescriptionChannelSet) {
+                if (! $this->transactionRequiresPrescription((string) ($tx->type ?? ''))) {
+                    return true;
+                }
+
+                return $this->hasMatchingPrescriptionForTransaction($tx, $prescriptionChannelSet);
+            })
+            ->values();
 
         $latestSessions = $this->latestCallSessionsForUsers(
             doctorId: (int) $data['doctor_id'],
-            userIds: $transactions->pluck('user_id')->filter()->unique()
+            userIds: $filteredTransactions->pluck('user_id')->filter()->unique()
         );
         $latestVideoApointments = $this->latestVideoApointmentsForUsers(
             doctorId: (int) $data['doctor_id'],
-            userIds: $transactions->pluck('user_id')->filter()->unique()
+            userIds: $filteredTransactions->pluck('user_id')->filter()->unique()
         );
 
-        $deviceTokensByUser = $this->deviceTokensForUsers($transactions, $latestSessions);
+        $deviceTokensByUser = $this->deviceTokensForUsers($filteredTransactions, $latestSessions);
 
-        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser, $prescriptionChannelSet) {
+        $payload = $filteredTransactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser, $prescriptionChannelSet) {
             $user = $tx->user;
             $pet = $tx->pet;
             $callSession = $latestSessions->get($tx->user_id);
