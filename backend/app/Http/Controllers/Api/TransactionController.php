@@ -53,28 +53,19 @@ class TransactionController extends Controller
             ->get();
 
         $prescriptionChannelSet = $this->prescriptionChannelSetForTransactions($transactions);
-        $filteredTransactions = $transactions
-            ->filter(function (Transaction $tx) use ($prescriptionChannelSet) {
-                if (! $this->transactionRequiresPrescription((string) ($tx->type ?? ''))) {
-                    return true;
-                }
-
-                return $this->hasMatchingPrescriptionForTransaction($tx, $prescriptionChannelSet);
-            })
-            ->values();
 
         $latestSessions = $this->latestCallSessionsForUsers(
             doctorId: (int) $data['doctor_id'],
-            userIds: $filteredTransactions->pluck('user_id')->filter()->unique()
+            userIds: $transactions->pluck('user_id')->filter()->unique()
         );
         $latestVideoApointments = $this->latestVideoApointmentsForUsers(
             doctorId: (int) $data['doctor_id'],
-            userIds: $filteredTransactions->pluck('user_id')->filter()->unique()
+            userIds: $transactions->pluck('user_id')->filter()->unique()
         );
 
-        $deviceTokensByUser = $this->deviceTokensForUsers($filteredTransactions, $latestSessions);
+        $deviceTokensByUser = $this->deviceTokensForUsers($transactions, $latestSessions);
 
-        $payload = $filteredTransactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser, $prescriptionChannelSet) {
+        $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser, $prescriptionChannelSet) {
             $user = $tx->user;
             $pet = $tx->pet;
             $callSession = $latestSessions->get($tx->user_id);
@@ -95,20 +86,17 @@ class TransactionController extends Controller
             $hasPrescription = $requiresPrescription
                 ? $this->hasMatchingPrescriptionForTransaction($tx, $prescriptionChannelSet)
                 : true;
-            $effectiveAmountPaise = $hasPrescription ? (int) ($tx->amount_paise ?? 0) : 0;
 
             return [
                 'id' => $tx->id,
                 'user_id' => $tx->user_id,
                 'doctor_id' => $tx->doctor_id,
-                'amount_paise' => $effectiveAmountPaise,
-                'original_amount_paise' => (int) ($tx->amount_paise ?? 0),
+                'amount_paise' => (int) ($tx->amount_paise ?? 0),
                 'status' => $tx->status,
                 'type' => $tx->type,
                 'payment_method' => $tx->payment_method,
                 'reference' => $tx->reference,
-                'channel_name' => $tx->channel_name ?? null,
-                'prescription_present' => $hasPrescription,
+                'prescription_send' => $hasPrescription,
                 'created_at' => optional($tx->created_at)->toIso8601String(),
                 'updated_at' => optional($tx->updated_at)->toIso8601String(),
                 'user_name' => $user->name ?? null,
