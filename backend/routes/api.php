@@ -458,8 +458,18 @@ Route::post('/user-pet-observation', function (Request $request) {
     ]);
 
     $uploadedFile = $request->file('file');
+    $petDoc2BlobColumnsReady = Schema::hasTable('pets')
+        && Schema::hasColumn('pets', 'pet_doc2_blob')
+        && Schema::hasColumn('pets', 'pet_doc2_mime');
 
-    $result = DB::transaction(function () use ($data, $uploadedFile) {
+    if ($uploadedFile && ! $petDoc2BlobColumnsReady) {
+        return response()->json([
+            'success' => false,
+            'message' => 'pet_doc2 blob columns are missing. Please run migrations.',
+        ], 500);
+    }
+
+    $result = DB::transaction(function () use ($data, $uploadedFile, $petDoc2BlobColumnsReady) {
         $phoneDigits = preg_replace('/\\D+/', '', $data['phone']);
 
         // Find existing user by phone (normalized) or exact match
@@ -551,10 +561,23 @@ Route::post('/user-pet-observation', function (Request $request) {
                 }
                 $publicUrl = $publicBase.'/'.ltrim($storedPath, '/');
                 $pet->pet_doc2 = $publicUrl;
+
+                if ($petDoc2BlobColumnsReady) {
+                    $pet->pet_doc2_blob = $file->get();
+                    $pet->pet_doc2_mime = $file->getMimeType() ?: ($file->getClientMimeType() ?: 'application/octet-stream');
+                }
             }
         }
 
         $pet->save();
+
+        $petDoc2BlobUrl = null;
+        if ($petDoc2BlobColumnsReady) {
+            $blob = $pet->getRawOriginal('pet_doc2_blob');
+            if ($blob !== null && $blob !== '') {
+                $petDoc2BlobUrl = route('api.pets.pet-doc2-blob', ['pet' => $pet->id], true);
+            }
+        }
 
         $petPayload = $pet->only([
             'id',
@@ -570,6 +593,7 @@ Route::post('/user-pet-observation', function (Request $request) {
             'reported_symptom',
             'pet_doc2',
         ]);
+        $petPayload['pet_doc2_blob_url'] = $petDoc2BlobUrl;
         if (Schema::hasColumn('pets', 'is_neutered')) {
             $petPayload['is_neutered'] = $pet->is_neutered;
         }
@@ -895,6 +919,8 @@ Route::post('/excell-export/import', function (Request $request) {
         'years_of_experience' => ['nullable', 'string', 'max:50'],
         'specialization_select_all_that_apply' => ['nullable', 'array'],
         'specialization_select_all_that_apply.*' => ['nullable', 'string'],
+        'languages_spoken' => ['nullable', 'array'],
+        'languages_spoken.*' => ['nullable', 'string', 'max:255'],
         'response_time_for_online_consults_day' => ['nullable', 'string', 'max:255'],
         'response_time_for_online_consults_night' => ['nullable', 'string', 'max:255'],
         'break_do_not_disturb_time_example_2_4_pm' => ['nullable', 'array'],
@@ -1026,6 +1052,11 @@ Route::post('/excell-export/import', function (Request $request) {
         $doctor->specialization_select_all_that_apply = isset($data['specialization_select_all_that_apply'])
             ? json_encode(array_values(array_filter($data['specialization_select_all_that_apply'])))
             : null;
+        if (Schema::hasColumn('doctors', 'languages_spoken')) {
+            $doctor->languages_spoken = isset($data['languages_spoken'])
+                ? json_encode(array_values(array_filter($data['languages_spoken'])))
+                : null;
+        }
         $doctor->response_time_for_online_consults_day = $data['response_time_for_online_consults_day'] ?? null;
         $doctor->response_time_for_online_consults_night = $data['response_time_for_online_consults_night'] ?? null;
         $doctor->break_do_not_disturb_time_example_2_4_pm = isset($data['break_do_not_disturb_time_example_2_4_pm'])
@@ -1063,6 +1094,7 @@ Route::post('/excell-export/import', function (Request $request) {
                 'degree',
                 'years_of_experience',
                 'specialization_select_all_that_apply',
+                'languages_spoken',
                 'response_time_for_online_consults_day',
                 'response_time_for_online_consults_night',
                 'break_do_not_disturb_time_example_2_4_pm',
