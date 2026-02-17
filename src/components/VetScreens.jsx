@@ -114,6 +114,22 @@ const SPECIALIZATION_OPTIONS = [
   "Other",
 ];
 
+const LANGUAGE_OPTIONS = [
+  "English",
+  "Hindi",
+  "Hinglish",
+  "Punjabi",
+  "Marathi",
+  "Bengali",
+  "Tamil",
+  "Telugu",
+  "Kannada",
+  "Malayalam",
+  "Gujarati",
+  "Urdu",
+  "Other",
+];
+
 const DEGREE_OPTIONS = ["BVSc", "MVSc", "PhD", "Other"];
 
 const RESPONSE_TIME_DAY_OPTIONS = [
@@ -889,6 +905,8 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   const [specializations, setSpecializations] = useState([]);
   const [specializationOther, setSpecializationOther] = useState("");
+  const [languages, setLanguages] = useState([]);
+  const [languageOther, setLanguageOther] = useState("");
   const [breakStart, setBreakStart] = useState("");
   const [breakEnd, setBreakEnd] = useState("");
   const [breakTimes, setBreakTimes] = useState([]);
@@ -1165,6 +1183,10 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   if (specializations.includes("Other") && specializationOther.trim()) {
     selectedSpecs.push(specializationOther.trim());
   }
+  const selectedLanguages = languages.filter((lang) => lang !== "Other");
+  if (languages.includes("Other") && languageOther.trim()) {
+    selectedLanguages.push(languageOther.trim());
+  }
 
   const payoutReady = form.payoutDetail.trim();
   const degreeReady = degreePayload.length > 0;
@@ -1191,7 +1213,8 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     form.doctorLicense.trim() &&
     degreeReady &&
     form.yearsOfExperience.trim() &&
-    selectedSpecs.length > 0,
+    selectedSpecs.length > 0 &&
+    selectedLanguages.length > 0,
   );
 
   const availabilityComplete = Boolean(
@@ -1263,6 +1286,14 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     navigate("/auth", { replace: true, state: { mode: "login" } });
   };
 
+  const toggleLanguage = (value) => {
+    setLanguages((prev) =>
+      prev.includes(value)
+        ? prev.filter((item) => item !== value)
+        : [...prev, value],
+    );
+  };
+
   const handleSubmit = async () => {
     if (submitting) return;
 
@@ -1310,6 +1341,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         degree: degreePayload,
         years_of_experience: form.yearsOfExperience.trim(),
         specialization_select_all_that_apply: selectedSpecs,
+        languages_spoken: selectedLanguages,
         response_time_for_online_consults_day: form.responseTimeDay,
         response_time_for_online_consults_night: form.responseTimeNight,
         break_do_not_disturb_time_example_2_4_pm: breakPayload,
@@ -1775,6 +1807,43 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                       placeholder="Specify other specialization"
                       value={specializationOther}
                       onChange={(e) => setSpecializationOther(e.target.value)}
+                      required
+                      className={INPUT_BASE_CLASS}
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Languages Spoken (Select all that apply) *
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {LANGUAGE_OPTIONS.map((lang) => (
+                      <label
+                        key={lang}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm cursor-pointer transition-all ${
+                          languages.includes(lang)
+                            ? "border-[#0B4D67] bg-[#0B4D67]/5 text-[#0B4D67]"
+                            : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={languages.includes(lang)}
+                          onChange={() => toggleLanguage(lang)}
+                        />
+                        {lang}
+                      </label>
+                    ))}
+                  </div>
+
+                  {languages.includes("Other") && (
+                    <input
+                      type="text"
+                      placeholder="Specify other language"
+                      value={languageOther}
+                      onChange={(e) => setLanguageOther(e.target.value)}
                       required
                       className={INPUT_BASE_CLASS}
                     />

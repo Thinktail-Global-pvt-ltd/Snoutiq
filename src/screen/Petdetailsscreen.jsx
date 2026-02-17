@@ -55,6 +55,10 @@ const GENDER_OPTIONS = [
   { label: "Male", value: "male" },
   { label: "Female", value: "female" },
 ];
+const YES_NO_OPTIONS = [
+  { label: "Yes", value: "1" },
+  { label: "No", value: "0" },
+];
 
 const formatBreedName = (breedKey, subBreed = null) => {
   const cap = (s) =>
@@ -203,6 +207,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     lastDaysEnergy: "",
     lastDaysAppetite: "",
     hasPhoto: false,
+    isNeutered: "",
+    vaccinatedYesNo: "",
   });
 
   const [uploadFile, setUploadFile] = useState(null);
@@ -528,6 +534,12 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       fd.append("appetite", details.lastDaysAppetite || "");
       fd.append("energy", details.lastDaysEnergy || "");
       fd.append("mood", details.mood || "calm");
+      if (details.isNeutered !== "") {
+        fd.append("is_neutered", details.isNeutered);
+      }
+      if (details.vaccinatedYesNo !== "") {
+        fd.append("vaccenated_yes_no", details.vaccinatedYesNo);
+      }
 
       if (details.petDoc2?.trim()) fd.append("pet_doc2", details.petDoc2.trim());
       if (fileToSend) fd.append("file", fileToSend);
@@ -973,6 +985,68 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           DOB helps the vet understand age-specific health risks
                         </p>
                       </div>
+
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Is your pet neutered?
+                          </label>
+                          <div className="relative">
+                            <CheckCircle2
+                              size={18}
+                              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                            />
+                            <select
+                              value={details.isNeutered}
+                              onChange={(e) =>
+                                setDetails((p) => ({
+                                  ...p,
+                                  isNeutered: e.target.value,
+                                }))
+                              }
+                              className={`${selectBase} pl-12 md:pl-12`}
+                            >
+                              <option value="">Select</option>
+                              {YES_NO_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Vaccinated?
+                          </label>
+                          <div className="relative">
+                            <Shield
+                              size={18}
+                              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                            />
+                            <select
+                              value={details.vaccinatedYesNo}
+                              onChange={(e) =>
+                                setDetails((p) => ({
+                                  ...p,
+                                  vaccinatedYesNo: e.target.value,
+                                }))
+                              }
+                              className={`${selectBase} pl-12 md:pl-12`}
+                            >
+                              <option value="">Select</option>
+                              {YES_NO_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </section>
 
@@ -1216,6 +1290,33 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       </label>
                     </div>
 
+                    <div className="mt-4 space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Additional document URL (optional)
+                      </label>
+                      <div className="relative">
+                        <FileText
+                          size={18}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                        />
+                        <input
+                          type="url"
+                          value={details.petDoc2}
+                          onChange={(e) =>
+                            setDetails((p) => ({
+                              ...p,
+                              petDoc2: e.target.value,
+                            }))
+                          }
+                          placeholder="https://example.com/report.png"
+                          className={`${fieldBase} pl-12 md:pl-12`}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Paste a report link if you already have one
+                      </p>
+                    </div>
+
                     {uploadFile && (
                       <div className="mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <div className="flex items-start gap-3">
@@ -1384,6 +1485,30 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                             <span className="text-xs text-gray-500">Age</span>
                             <span className="text-sm font-medium text-gray-900">
                               {approxAge || "—"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-500">
+                              Neutered
+                            </span>
+                            <span className="text-sm font-medium text-gray-900">
+                              {details.isNeutered === "1"
+                                ? "Yes"
+                                : details.isNeutered === "0"
+                                ? "No"
+                                : "—"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-500">
+                              Vaccinated
+                            </span>
+                            <span className="text-sm font-medium text-gray-900">
+                              {details.vaccinatedYesNo === "1"
+                                ? "Yes"
+                                : details.vaccinatedYesNo === "0"
+                                ? "No"
+                                : "—"}
                             </span>
                           </div>
                         </div>
