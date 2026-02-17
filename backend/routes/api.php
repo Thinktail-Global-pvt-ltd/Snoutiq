@@ -452,6 +452,9 @@ Route::post('/user-pet-observation', function (Request $request) {
         'enery' => ['nullable', 'string'], // input typo handled
         'energy' => ['nullable', 'string'],
         'mood' => ['nullable', 'string'],
+        'is_neutered' => ['nullable', 'boolean'],
+        'vaccenated_yes_no' => ['nullable', 'boolean'],
+        'vaccinated_yes_no' => ['nullable', 'boolean'],
     ]);
 
     $uploadedFile = $request->file('file');
@@ -529,6 +532,13 @@ Route::post('/user-pet-observation', function (Request $request) {
                 $pet->dob = $data['dob'];
             }
         }
+        if (array_key_exists('is_neutered', $data) && Schema::hasColumn('pets', 'is_neutered')) {
+            $pet->is_neutered = (int) ((bool) $data['is_neutered']);
+        }
+        $vaccinatedYesNo = $data['vaccenated_yes_no'] ?? $data['vaccinated_yes_no'] ?? null;
+        if ($vaccinatedYesNo !== null && Schema::hasColumn('pets', 'vaccenated_yes_no')) {
+            $pet->vaccenated_yes_no = (int) ((bool) $vaccinatedYesNo);
+        }
 
         // Handle optional file upload and set pet_doc2
         if ($uploadedFile) {
@@ -546,6 +556,27 @@ Route::post('/user-pet-observation', function (Request $request) {
 
         $pet->save();
 
+        $petPayload = $pet->only([
+            'id',
+            'user_id',
+            'name',
+            'breed',
+            'pet_type',
+            'type',
+            'pet_gender',
+            'gender',
+            'pet_dob',
+            'dob',
+            'reported_symptom',
+            'pet_doc2',
+        ]);
+        if (Schema::hasColumn('pets', 'is_neutered')) {
+            $petPayload['is_neutered'] = $pet->is_neutered;
+        }
+        if (Schema::hasColumn('pets', 'vaccenated_yes_no')) {
+            $petPayload['vaccenated_yes_no'] = $pet->vaccenated_yes_no;
+        }
+
         $observation = new UserObservation();
         $observation->user_id = $user->id;
         $observation->pet_id = $pet->id;
@@ -557,7 +588,7 @@ Route::post('/user-pet-observation', function (Request $request) {
 
         return [
             'user' => $user->only(['id', 'name', 'phone', 'email']),
-            'pet' => $pet->only(['id', 'user_id', 'name', 'breed', 'pet_type', 'type', 'pet_gender', 'gender', 'pet_dob', 'dob', 'reported_symptom', 'pet_doc2']),
+            'pet' => $petPayload,
             'observation' => $observation->only(['id', 'user_id', 'pet_id', 'appetite', 'energy', 'mood', 'observed_at']),
         ];
     });
