@@ -18,6 +18,7 @@ class Transaction extends Model
         'amount_paise',
         'status',
         'type',
+        'channel_name',
         'payment_method',
         'reference',
         'metadata',

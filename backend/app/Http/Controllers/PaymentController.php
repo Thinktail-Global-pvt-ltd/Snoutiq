@@ -61,6 +61,7 @@ class PaymentController extends Controller
             'vet_slug' => 'nullable|string',
             'call_session_id' => 'nullable|string',
             'call_session' => 'nullable|string',
+            'channel_name' => 'nullable|string',
             'pet_id' => 'nullable|integer',
         ]);
 
@@ -77,6 +78,7 @@ class PaymentController extends Controller
                 $notes['call_session_id'] = $callSession->resolveIdentifier();
                 $notes['channel_name'] = $callSession->channel_name;
                 $context['call_identifier'] = $callSession->resolveIdentifier();
+                $context['channel_name'] = $callSession->channel_name;
             }
         }
 
@@ -448,36 +450,42 @@ class PaymentController extends Controller
         $context['clinic_id'] = $clinicId;
         $doctorId = $context['doctor_id'] ?? null;
         $userId = $context['user_id'] ?? null;
+        $channelName = $context['channel_name'] ?? ($notes['channel_name'] ?? null);
+        $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
 
         $transactionType = $this->resolveTransactionType($notes);
 
         try {
-            Transaction::updateOrCreate(
-                ['reference' => $orderId],
-                [
-                    'clinic_id' => $clinicId,
+            $payload = [
+                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
+                'user_id' => $userId,
+                'pet_id' => $context['pet_id'] ?? null,
+                'amount_paise' => (int) ($order['amount'] ?? 0),
+                'status' => 'pending',
+                'type' => $transactionType,
+                'payment_method' => null,
+                'reference' => $orderId,
+                'metadata' => [
+                    'order_type' => $transactionType,
+                    'order_id' => $orderId,
+                    'currency' => $order['currency'] ?? 'INR',
+                    'notes' => $notes,
+                    'receipt' => $order['receipt'] ?? null,
+                    'call_id' => $context['call_identifier'] ?? null,
+                    'channel_name' => $channelName,
                     'doctor_id' => $doctorId,
+                    'clinic_id' => $clinicId,
                     'user_id' => $userId,
                     'pet_id' => $context['pet_id'] ?? null,
-                    'amount_paise' => (int) ($order['amount'] ?? 0),
-                    'status' => 'pending',
-                    'type' => $transactionType,
-                    'payment_method' => null,
-                    'reference' => $orderId,
-                    'metadata' => [
-                        'order_type' => $transactionType,
-                        'order_id' => $orderId,
-                        'currency' => $order['currency'] ?? 'INR',
-                        'notes' => $notes,
-                        'receipt' => $order['receipt'] ?? null,
-                        'call_id' => $context['call_identifier'] ?? null,
-                        'doctor_id' => $doctorId,
-                        'clinic_id' => $clinicId,
-                        'user_id' => $userId,
-                        'pet_id' => $context['pet_id'] ?? null,
-                    ],
-                ]
-            );
+                ],
+            ];
+
+            if ($hasChannelNameColumn) {
+                $payload['channel_name'] = $channelName;
+            }
+
+            Transaction::updateOrCreate(['reference' => $orderId], $payload);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -498,6 +506,8 @@ class PaymentController extends Controller
         $userId = $context['user_id'] ?? null;
         $petId = $context['pet_id'] ?? null;
         $callId = $context['call_identifier'] ?? null;
+        $channelName = $context['channel_name'] ?? ($notes['channel_name'] ?? null);
+        $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
         $transactionType = $this->resolveTransactionType($notes);
 
         try {
@@ -525,12 +535,17 @@ class PaymentController extends Controller
                     'contact' => $contact,
                     'notes' => $notes,
                     'call_id' => $callId,
+                    'channel_name' => $channelName,
                     'doctor_id' => $doctorId,
                     'clinic_id' => $clinicId,
                     'user_id' => $userId,
                     'pet_id' => $petId,
                 ],
             ];
+
+            if ($hasChannelNameColumn) {
+                $payload['channel_name'] = $channelName;
+            }
 
             $transaction = null;
 
@@ -602,6 +617,7 @@ class PaymentController extends Controller
             'order_type' => ['order_type', 'orderType', 'type', 'payment_type'],
             'service_id' => ['service_id'],
             'call_session_id' => ['call_session', 'call_session_id', 'callSessionId', 'call_id', 'callId'],
+            'channel_name' => ['channel_name', 'channelName'],
             'clinic_id' => ['clinic_id', 'clinicId'],
             'doctor_id' => ['doctor_id', 'doctorId'],
             'user_id' => ['user_id', 'userId', 'patient_id', 'patientId'],
@@ -1152,6 +1168,7 @@ class PaymentController extends Controller
     {
         $context = [
             'call_identifier' => $this->firstFilled($request, ['call_session', 'call_session_id', 'callSessionId', 'call_id', 'callId'], $notes),
+            'channel_name' => $this->firstFilled($request, ['channel_name', 'channelName'], $notes),
             'clinic_id' => $this->toNullableInt($this->firstFilled($request, ['clinic_id', 'clinicId'], $notes)),
             'doctor_id' => $this->toNullableInt($this->firstFilled($request, ['doctor_id', 'doctorId'], $notes)),
             'user_id' => $this->toNullableInt($this->firstFilled($request, ['user_id', 'userId', 'patient_id', 'patientId'], $notes)),
@@ -1167,6 +1184,7 @@ class PaymentController extends Controller
         if ($session) {
             $context['doctor_id'] ??= $session->doctor_id ? (int) $session->doctor_id : null;
             $context['user_id'] ??= $session->patient_id ? (int) $session->patient_id : null;
+            $context['channel_name'] ??= $session->channel_name ?: null;
 
             if ($session->relationLoaded('doctor') && $session->doctor) {
                 $context['clinic_id'] ??= $session->doctor->vet_registeration_id
