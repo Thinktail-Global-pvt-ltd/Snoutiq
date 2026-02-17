@@ -5,9 +5,6 @@ import doctorSlide1 from "../assets/doctor1.jpeg";
 import doctorSlide2 from "../assets/doctor2.jpeg";
 import doctorSlide3 from "../assets/doctor3.jpeg";
 import doctorProfile4 from "../assets/doctor4.jpeg";
-import blogVaccination from "../assets/images/vaccination_schedule.jpeg";
-import blogTickFever from "../assets/images/tickfever.png";
-import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
 import appPhoneMock from "../assets/mobile UI.jpeg";
 import { Button } from "../components/Button";
 import {
@@ -31,12 +28,16 @@ const DOCTOR_PROFILES = [
     degree: "B.V.Sc, MBA, PGDCTM, PGCVH, CSAD",
     experience: "17+ years of experience",
     image: doctorSlide1,
+    width: 960,
+    height: 1166,
   },
   {
     name: "Dr. Mohd Tosif",
     degree: "B.V.Sc",
     experience: "5+ years of experience",
     image: doctorSlide3,
+    width: 960,
+    height: 1280,
   },
   {
     name: "Dr. Pooja Tarar",
@@ -44,12 +45,16 @@ const DOCTOR_PROFILES = [
     experience: "18+ years of experience",
 
     image: doctorSlide2,
+    width: 960,
+    height: 1060,
   },
   {
     name: "Dr. Shashannk Goyal",
     degree: "M.V.Sc (Surgery)",
     experience: "10+ years of experience",
     image: doctorProfile4,
+    width: 960,
+    height: 1096,
   },
 ];
 
@@ -460,39 +465,6 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       : { label: "Night", time: "8 PM – 8 AM", price: 650 };
   };
 
-  const blogPosts = useMemo(
-    () => [
-      {
-        title: "Vaccination Schedule for Pets in India",
-        excerpt:
-          "Complete, vet-approved vaccine timeline with essential boosters for dogs and cats.",
-        link: "/blog/vaccination-schedule-for-pets-in-india",
-        image: blogVaccination,
-        category: "Pet Health",
-        readTime: "5 min read",
-      },
-      {
-        title: "Symptoms of Tick Fever in Dogs",
-        excerpt:
-          "Learn the early warning signs, prevention tips, and when to seek care.",
-        link: "/blog/symptoms-of-tick-fever-in-dogs",
-        image: blogTickFever,
-        category: "Dog Care",
-        readTime: "7 min read",
-      },
-      {
-        title: "First Aid Tips Every Pet Parent Should Know",
-        excerpt:
-          "Practical first-aid steps for common pet emergencies before you reach a vet.",
-        link: "/blog/first-aid-tips-every-pet-parent-should-know",
-        image: blogFirstAid,
-        category: "Emergency",
-        readTime: "6 min read",
-      },
-    ],
-    [],
-  );
-
   const toggleFaq = (idx) => setOpenFaq((prev) => (prev === idx ? null : idx));
 
   return (
@@ -512,6 +484,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 src={logo}
                 alt="SnoutIQ"
                 className="h-6 w-auto object-contain drop-shadow-sm md:h-6 lg:h-6"
+                width={124}
+                height={24}
+                decoding="async"
               />
             </button>
 
@@ -702,8 +677,12 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                           <img
                             src={slide.image}
                             alt={slide.name}
+                            width={slide.width}
+                            height={slide.height}
                             className="h-44 w-full object-cover object-center sm:h-52 md:h-60"
                             loading={index === 0 ? "eager" : "lazy"}
+                            decoding="async"
+                            fetchPriority={index === 0 ? "high" : "low"}
                           />
                         </div>
                       ))}
@@ -879,6 +858,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                             src={vet.image}
                             alt={vet.name}
                             loading="lazy"
+                            decoding="async"
+                            fetchPriority="low"
+                            width={64}
+                            height={64}
                             crossOrigin="anonymous"
                             onError={() => markImageBroken(vet.id)}
                             className="h-16 w-16 rounded-2xl object-cover border border-slate-200 bg-slate-50"
@@ -1015,6 +998,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                         src={activeBioVet.image}
                         alt={activeBioVet.name}
                         loading="lazy"
+                        decoding="async"
+                        fetchPriority="low"
+                        width={176}
+                        height={176}
                         crossOrigin="anonymous"
                         onError={() => markImageBroken(activeBioVet.id)}
                         className="h-36 w-36 md:h-44 md:w-44 rounded-3xl object-cover border border-slate-200 bg-white shadow-sm"
@@ -1200,6 +1187,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                         alt="SnoutIQ App Preview"
                         className="h-auto w-full object-contain"
                         loading="lazy"
+                        decoding="async"
+                        width={717}
+                        height={1542}
                       />
                     </div>
                   </div>
