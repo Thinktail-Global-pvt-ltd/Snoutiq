@@ -112,19 +112,23 @@ class VideoCallingController extends Controller
         $lat = (float) $user->latitude;
         $lng = (float) $user->longitude;
         $radiusKm = 100;
+        $clinicLatExpr = "COALESCE(vet_registerations_temp.lat, CASE WHEN JSON_VALID(vet_registerations_temp.coordinates) THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(vet_registerations_temp.coordinates, '$[0]')) AS DECIMAL(10,7)) ELSE NULL END)";
+        $clinicLngExpr = "COALESCE(vet_registerations_temp.lng, CASE WHEN JSON_VALID(vet_registerations_temp.coordinates) THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(vet_registerations_temp.coordinates, '$[1]')) AS DECIMAL(10,7)) ELSE NULL END)";
 
         // 3) Haversine with bindings
         $vets = DB::table('vet_registerations_temp')
             ->select('vet_registerations_temp.*')
+            ->selectRaw("{$clinicLatExpr} AS resolved_lat")
+            ->selectRaw("{$clinicLngExpr} AS resolved_lng")
             ->selectRaw("
                 (6371 * acos(
-                    cos(radians(?)) * cos(radians(vet_registerations_temp.lat)) *
-                    cos(radians(vet_registerations_temp.lng) - radians(?)) +
-                    sin(radians(?)) * sin(radians(vet_registerations_temp.lat))
+                    cos(radians(?)) * cos(radians({$clinicLatExpr})) *
+                    cos(radians({$clinicLngExpr}) - radians(?)) +
+                    sin(radians(?)) * sin(radians({$clinicLatExpr}))
                 )) AS distance
             ", [$lat, $lng, $lat])
-            ->whereNotNull('vet_registerations_temp.lat')
-            ->whereNotNull('vet_registerations_temp.lng')
+            ->whereRaw("{$clinicLatExpr} IS NOT NULL")
+            ->whereRaw("{$clinicLngExpr} IS NOT NULL")
             ->having('distance', '<=', $radiusKm)
             ->orderBy('distance', 'asc')
             ->get();
