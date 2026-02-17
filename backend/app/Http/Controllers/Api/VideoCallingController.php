@@ -147,6 +147,25 @@ class VideoCallingController extends Controller
             ->get();
 
         if ($doctors->isEmpty()) {
+            if ($mode === 'vet') {
+                $referralByVet = $this->buildReferralByVet($vets);
+                $dataPayload = $vets
+                    ->values()
+                    ->map(function ($vet) use ($referralByVet) {
+                        $vet->referral_code = $referralByVet[$vet->id] ?? null;
+                        return $vet;
+                    });
+
+                return $this->jsonResponse([
+                    'status' => 'success',
+                    'date'   => $date === '' ? null : $date,
+                    'day'    => $normalizedDay,
+                    'data'   => $dataPayload,
+                    'available_doctors_by_vet' => new \stdClass(),
+                    'referral_by_vet' => (object) $referralByVet,
+                ]);
+            }
+
             return $this->jsonResponse([
                 'status' => 'success',
                 'date'   => $date === '' ? null : $date,
@@ -165,6 +184,25 @@ class VideoCallingController extends Controller
             ->pluck('doctor_id');
 
         if ($activeDoctorIds->isEmpty()) {
+            if ($mode === 'vet') {
+                $referralByVet = $this->buildReferralByVet($vets);
+                $dataPayload = $vets
+                    ->values()
+                    ->map(function ($vet) use ($referralByVet) {
+                        $vet->referral_code = $referralByVet[$vet->id] ?? null;
+                        return $vet;
+                    });
+
+                return $this->jsonResponse([
+                    'status' => 'success',
+                    'date'   => $date === '' ? null : $date,
+                    'day'    => $normalizedDay,
+                    'data'   => $dataPayload,
+                    'available_doctors_by_vet' => new \stdClass(),
+                    'referral_by_vet' => (object) $referralByVet,
+                ]);
+            }
+
             return $this->jsonResponse([
                 'status' => 'success',
                 'date'   => $date === '' ? null : $date,
@@ -230,9 +268,10 @@ class VideoCallingController extends Controller
             return true;
         });
 
-        $referralByVet = $this->buildReferralByVet($filteredVets);
+        $vetsForPayload = $mode === 'doctor' ? $filteredVets : $vets;
+        $referralByVet = $this->buildReferralByVet($vetsForPayload);
 
-        $dataPayload = $filteredVets
+        $dataPayload = $vetsForPayload
             ->values()
             ->map(function ($vet) use ($referralByVet) {
                 $vet->referral_code = $referralByVet[$vet->id] ?? null;
