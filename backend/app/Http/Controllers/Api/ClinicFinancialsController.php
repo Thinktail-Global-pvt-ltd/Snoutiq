@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Prescription;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class ClinicFinancialsController extends Controller
@@ -64,15 +67,17 @@ class ClinicFinancialsController extends Controller
         }
 
         $transactions = $query->get();
+        $prescriptionChannelSet = $this->prescriptionChannelSetForTransactions($transactions);
 
         // Transform rows for API consumers
-        $normalized = $transactions->map(function (Transaction $txn) {
+        $normalized = $transactions->map(function (Transaction $txn) use ($prescriptionChannelSet) {
             $createdAt   = optional($txn->created_at)->timezone('Asia/Kolkata');
             $type        = $this->normalizeType($txn);
             $gross       = ((int) ($txn->amount_paise ?? 0)) / 100;
             $commissionPct = $this->numeric(data_get($txn->metadata, 'commission_pct') ?? data_get($txn->metadata, 'commission_percent'));
             $commission  = round($gross * ($commissionPct / 100), 2);
             $net         = round($gross - $commission, 2);
+            $prescriptionSend = $this->hasMatchingPrescriptionForTransaction($txn, $prescriptionChannelSet);
 
             $user   = $txn->user;
             $pet    = data_get($user, 'pets.0.name') ?? data_get($txn->metadata, 'pet_name') ?? '-';
@@ -102,11 +107,16 @@ class ClinicFinancialsController extends Controller
                     ?? data_get($txn->metadata, 'service')
                     ?? $txn->type
                     ?? '-',
+                'channel_name'   => $txn->channel_name ?? null,
+                'prescription_send' => $prescriptionSend,
             ];
         });
 
         // Apply in-memory filters for lightweight searches/labels
         $filtered = $normalized->filter(function (array $txn) use ($status, $type, $search) {
+            if (!($txn['prescription_send'] ?? false)) {
+                return false;
+            }
             if ($status && $txn['status'] !== $status) {
                 return false;
             }
@@ -209,11 +219,51 @@ class ClinicFinancialsController extends Controller
             'transactions'  => $filtered,
             'counts'        => [
                 'total'    => $filtered->count(),
-                'payments' => $normalized->count(),
+                'payments' => $filtered->count(),
             ],
         ];
 
         return response()->json($response);
+    }
+
+    protected function prescriptionChannelSetForTransactions(Collection $transactions): Collection
+    {
+        if (
+            $transactions->isEmpty()
+            || !Schema::hasTable('prescriptions')
+            || !Schema::hasColumn('prescriptions', 'call_session')
+            || !Schema::hasTable('transactions')
+            || !Schema::hasColumn('transactions', 'channel_name')
+        ) {
+            return collect();
+        }
+
+        $channels = $transactions
+            ->pluck('channel_name')
+            ->filter(fn ($channel) => is_string($channel) && trim($channel) !== '')
+            ->map(fn (string $channel) => trim($channel))
+            ->unique()
+            ->values();
+
+        if ($channels->isEmpty()) {
+            return collect();
+        }
+
+        return Prescription::query()
+            ->whereIn('call_session', $channels)
+            ->pluck('call_session')
+            ->filter(fn ($channel) => is_string($channel) && trim($channel) !== '')
+            ->mapWithKeys(fn (string $channel) => [trim($channel) => true]);
+    }
+
+    protected function hasMatchingPrescriptionForTransaction(Transaction $tx, Collection $prescriptionChannelSet): bool
+    {
+        $channel = is_string($tx->channel_name ?? null) ? trim((string) $tx->channel_name) : '';
+        if ($channel === '') {
+            return false;
+        }
+
+        return $prescriptionChannelSet->has($channel);
     }
 
     private function parseDate($value): ?Carbon
@@ -274,4 +324,3 @@ class ClinicFinancialsController extends Controller
         return $raw ?: 'other';
     }
 }
-
