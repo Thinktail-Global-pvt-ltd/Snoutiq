@@ -903,64 +903,134 @@ class PaymentController extends Controller
                 return ['sent' => false, 'reason' => 'doctor_phone_missing', 'doctor_id' => $doctorId];
             }
 
+            $normalizedDoctorPhone = $this->normalizePhone($doctorPhone);
+            if (! $normalizedDoctorPhone) {
+                return ['sent' => false, 'reason' => 'doctor_phone_invalid', 'doctor_id' => $doctorId];
+            }
+
             $user = $context['user_id'] ? User::find($context['user_id']) : null;
             $pet = $context['pet_id'] ? Pet::find($context['pet_id']) : null;
 
             $petName = $pet?->name ?? 'Pet';
-            $petType = $pet?->pet_type ?? $pet?->type ?? $pet?->breed ?? 'Pet';
+            $species = $pet?->pet_type ?? $pet?->type ?? 'Pet';
+            $breed = $pet?->breed ?? $species;
+
+            $ageText = null;
+            if ($pet?->pet_age !== null) {
+                $ageText = $pet->pet_age . ' yrs';
+            } elseif ($pet?->pet_age_months !== null) {
+                $ageText = $pet->pet_age_months . ' months';
+            } elseif ($pet?->pet_dob) {
+                try {
+                    $months = \Carbon\Carbon::parse($pet->pet_dob)->diffInMonths(now());
+                    $ageText = $months >= 12 ? floor($months / 12) . ' yrs' : $months . ' months';
+                } catch (\Throwable $e) {
+                    $ageText = null;
+                }
+            }
+            $ageText = $ageText ?: '-';
+
             $parentName = $user?->name ?? 'Pet Parent';
             $parentPhone = $user?->phone ?? 'N/A';
 
             $issue = $notes['issue'] ?? $notes['concern'] ?? $pet?->reported_symptom ?? 'N/A';
-
-            // Always set media to the prescription PDF link (latest)
-            $userId = $context['user_id'] ?? null;
-            $petId = $context['pet_id'] ?? null;
-            $base = rtrim((string) config('app.url'), '/');
-            if (! str_ends_with($base, '/backend')) {
-                $base .= '/backend';
-            }
-            $mediaString = $base . '/api/consultation/prescription/pdf?user_id=' . ($userId ?? '0') . '&pet_id=' . ($petId ?? '0');
-
             $responseMinutes = (int) ($notes['response_time_minutes'] ?? config('app.video_consult_response_minutes', 15));
 
-            // Template: vet_new_consultation_assigned (language: en)
-            // {{1}} Vet name
-            // {{2}} Pet name
-            // {{3}} Pet type/breed
-            // {{4}} Pet parent name
-            // {{5}} WhatsApp number
-            // {{6}} Issue/concern
-            // {{7}} Media attached (string)
-            // {{8}} Response time
-            $components = [
-                [
-                    'type' => 'body',
-                    'parameters' => [
-                        ['type' => 'text', 'text' => $doctor->doctor_name ?: 'Doctor'], // {{1}}
-                        ['type' => 'text', 'text' => $petName],                         // {{2}}
-                        ['type' => 'text', 'text' => $petType],                         // {{3}}
-                        ['type' => 'text', 'text' => $parentName],                      // {{4}}
-                        ['type' => 'text', 'text' => $parentPhone],                     // {{5}}
-                        ['type' => 'text', 'text' => $issue],                           // {{6}}
-                        ['type' => 'text', 'text' => $mediaString],                     // {{7}}
-                        ['type' => 'text', 'text' => (string) $responseMinutes],        // {{8}}
-                    ],
-                ],
-            ];
+            // Keep old template as last fallback; primary path uses the currently approved template family.
+            $requestedTemplate = strtolower(trim((string) ($notes['vet_template'] ?? '')));
+            if (in_array($requestedTemplate, ['vet_new_video_consult', 'vet_new_consultation_assigned'], true)) {
+                $requestedTemplate = 'appointment_confirmation_v2';
+            }
 
-            $this->whatsApp->sendTemplate(
-                $this->normalizePhone($doctorPhone),
+            $configuredTemplate = strtolower(trim((string) (config('services.whatsapp.templates.vet_new_video_consult') ?? '')));
+            if (in_array($configuredTemplate, ['vet_new_video_consult', 'vet_new_consultation_assigned'], true)) {
+                $configuredTemplate = 'appointment_confirmation_v2';
+            }
+
+            $templateCandidates = array_values(array_unique(array_filter([
+                $requestedTemplate ?: null,
+                $configuredTemplate ?: null,
+                'appointment_confirmation_v2',
                 'vet_new_consultation_assigned',
-                $components,
-                'en'
-            );
+            ])));
+
+            $configuredLanguage = trim((string) (config('services.whatsapp.templates.vet_new_video_consult_language') ?? 'en'));
+            $languageCandidates = array_values(array_unique(array_filter([
+                $configuredLanguage !== '' ? $configuredLanguage : null,
+                'en',
+                'en_US',
+            ])));
+
+            $lastError = null;
+            foreach ($templateCandidates as $tpl) {
+                foreach ($languageCandidates as $lang) {
+                    try {
+                        if ($tpl === 'vet_new_consultation_assigned') {
+                            // Legacy template expects 8 body params.
+                            $userId = $context['user_id'] ?? null;
+                            $petId = $context['pet_id'] ?? null;
+                            $base = rtrim((string) config('app.url'), '/');
+                            if (! str_ends_with($base, '/backend')) {
+                                $base .= '/backend';
+                            }
+                            $mediaString = $base . '/api/consultation/prescription/pdf?user_id=' . ($userId ?? '0') . '&pet_id=' . ($petId ?? '0');
+
+                            $components = [[
+                                'type' => 'body',
+                                'parameters' => [
+                                    ['type' => 'text', 'text' => $doctor->doctor_name ?: 'Doctor'],
+                                    ['type' => 'text', 'text' => $petName],
+                                    ['type' => 'text', 'text' => $breed],
+                                    ['type' => 'text', 'text' => $parentName],
+                                    ['type' => 'text', 'text' => $parentPhone],
+                                    ['type' => 'text', 'text' => $issue],
+                                    ['type' => 'text', 'text' => $mediaString],
+                                    ['type' => 'text', 'text' => (string) $responseMinutes],
+                                ],
+                            ]];
+                        } else {
+                            $components = $this->buildVetTemplateComponents(
+                                template: $tpl,
+                                doctorName: $doctor->doctor_name ?: 'Doctor',
+                                parentName: $parentName,
+                                petName: $petName,
+                                breed: $breed,
+                                species: $species,
+                                ageText: $ageText,
+                                issue: $issue,
+                                amountInInr: $amountInInr,
+                                responseMinutes: $responseMinutes
+                            );
+                        }
+
+                        $this->whatsApp->sendTemplate(
+                            $normalizedDoctorPhone,
+                            $tpl,
+                            $components,
+                            $lang
+                        );
+
+                        return [
+                            'sent' => true,
+                            'to' => $normalizedDoctorPhone,
+                            'template' => $tpl,
+                            'language' => $lang,
+                            'doctor_id' => $doctorId,
+                        ];
+                    } catch (\RuntimeException $ex) {
+                        $lastError = $ex->getMessage();
+                    }
+                }
+            }
 
             return [
-                'sent' => true,
-                'to' => $this->normalizePhone($doctorPhone),
-                'template' => 'vet_new_consultation_assigned',
-                'language' => 'en',
+                'sent' => false,
+                'reason' => 'template_failed',
+                'doctor_id' => $doctorId,
+                'to' => $normalizedDoctorPhone,
+                'message' => $lastError ?: 'No WhatsApp template candidate succeeded',
+                'attempted_templates' => $templateCandidates,
+                'attempted_languages' => $languageCandidates,
             ];
         } catch (\Throwable $e) {
             report($e);
