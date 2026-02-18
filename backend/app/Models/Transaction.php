@@ -16,6 +16,9 @@ class Transaction extends Model
         'user_id',
         'pet_id',
         'amount_paise',
+        'actual_amount_paid_by_consumer_paise',
+        'payment_to_snoutiq_paise',
+        'payment_to_doctor_paise',
         'status',
         'type',
         'channel_name',
@@ -26,6 +29,10 @@ class Transaction extends Model
 
     protected $casts = [
         'metadata' => 'array',
+        'amount_paise' => 'integer',
+        'actual_amount_paid_by_consumer_paise' => 'integer',
+        'payment_to_snoutiq_paise' => 'integer',
+        'payment_to_doctor_paise' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

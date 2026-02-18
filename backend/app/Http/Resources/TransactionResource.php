@@ -20,6 +20,15 @@ class TransactionResource extends JsonResource
                 ];
             }),
             'amountPaise' => (int) $this->amount_paise,
+            'actualAmountPaidByConsumerPaise' => $this->actual_amount_paid_by_consumer_paise !== null
+                ? (int) $this->actual_amount_paid_by_consumer_paise
+                : null,
+            'paymentToSnoutiqPaise' => $this->payment_to_snoutiq_paise !== null
+                ? (int) $this->payment_to_snoutiq_paise
+                : null,
+            'paymentToDoctorPaise' => $this->payment_to_doctor_paise !== null
+                ? (int) $this->payment_to_doctor_paise
+                : null,
             'status' => $this->status,
             'type' => $this->type,
             'paymentMethod' => $this->payment_method,
@@ -28,4 +37,3 @@ class TransactionResource extends JsonResource
         ];
     }
 }
-

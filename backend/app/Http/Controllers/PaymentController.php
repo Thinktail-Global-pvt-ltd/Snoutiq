@@ -454,6 +454,8 @@ class PaymentController extends Controller
         $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
 
         $transactionType = $this->resolveTransactionType($notes);
+        $payoutBreakup = $this->buildExcelExportPayoutBreakup((int) ($order['amount'] ?? 0), $transactionType);
+        $payoutColumns = $this->transactionPayoutColumnMap();
 
         try {
             $payload = [
@@ -480,6 +482,20 @@ class PaymentController extends Controller
                     'pet_id' => $context['pet_id'] ?? null,
                 ],
             ];
+
+            if ($payoutBreakup) {
+                $payload['metadata']['payout_breakup'] = $payoutBreakup;
+
+                foreach ([
+                    'actual_amount_paid_by_consumer_paise',
+                    'payment_to_snoutiq_paise',
+                    'payment_to_doctor_paise',
+                ] as $column) {
+                    if ($payoutColumns[$column] ?? false) {
+                        $payload[$column] = (int) $payoutBreakup[$column];
+                    }
+                }
+            }
 
             if ($hasChannelNameColumn) {
                 $payload['channel_name'] = $channelName;
@@ -509,6 +525,8 @@ class PaymentController extends Controller
         $channelName = $context['channel_name'] ?? ($notes['channel_name'] ?? null);
         $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
         $transactionType = $this->resolveTransactionType($notes);
+        $payoutBreakup = $this->buildExcelExportPayoutBreakup((int) ($amount ?? 0), $transactionType);
+        $payoutColumns = $this->transactionPayoutColumnMap();
 
         try {
             $reference = $payment->razorpay_payment_id ?? $payment->razorpay_order_id;
@@ -543,6 +561,20 @@ class PaymentController extends Controller
                 ],
             ];
 
+            if ($payoutBreakup) {
+                $payload['metadata']['payout_breakup'] = $payoutBreakup;
+
+                foreach ([
+                    'actual_amount_paid_by_consumer_paise',
+                    'payment_to_snoutiq_paise',
+                    'payment_to_doctor_paise',
+                ] as $column) {
+                    if ($payoutColumns[$column] ?? false) {
+                        $payload[$column] = (int) $payoutBreakup[$column];
+                    }
+                }
+            }
+
             if ($hasChannelNameColumn) {
                 $payload['channel_name'] = $channelName;
             }
@@ -566,6 +598,44 @@ class PaymentController extends Controller
         } catch (\Throwable $e) {
             report($e);
         }
+    }
+
+    protected function transactionPayoutColumnMap(): array
+    {
+        if (!Schema::hasTable('transactions')) {
+            return [
+                'actual_amount_paid_by_consumer_paise' => false,
+                'payment_to_snoutiq_paise' => false,
+                'payment_to_doctor_paise' => false,
+            ];
+        }
+
+        return [
+            'actual_amount_paid_by_consumer_paise' => Schema::hasColumn('transactions', 'actual_amount_paid_by_consumer_paise'),
+            'payment_to_snoutiq_paise' => Schema::hasColumn('transactions', 'payment_to_snoutiq_paise'),
+            'payment_to_doctor_paise' => Schema::hasColumn('transactions', 'payment_to_doctor_paise'),
+        ];
+    }
+
+    protected function buildExcelExportPayoutBreakup(int $grossPaise, string $transactionType): ?array
+    {
+        if (strtolower(trim($transactionType)) !== 'excell_export_campaign') {
+            return null;
+        }
+
+        $grossPaise = max(0, (int) $grossPaise);
+        $gstPaise = (int) round($grossPaise * 0.18);
+        $netAfterGstPaise = max(0, $grossPaise - $gstPaise);
+        $snoutiqSharePaise = min(20000, $netAfterGstPaise); // Rs 200 fixed share for Snoutiq
+        $doctorSharePaise = max(0, $netAfterGstPaise - $snoutiqSharePaise);
+
+        return [
+            'actual_amount_paid_by_consumer_paise' => $grossPaise,
+            'gst_paise' => $gstPaise,
+            'amount_after_gst_paise' => $netAfterGstPaise,
+            'payment_to_snoutiq_paise' => $snoutiqSharePaise,
+            'payment_to_doctor_paise' => $doctorSharePaise,
+        ];
     }
 
     protected function resolveClinicId(Request $request, array $notes, array $context = []): ?int

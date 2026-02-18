@@ -92,6 +92,15 @@ class TransactionController extends Controller
                 'user_id' => $tx->user_id,
                 'doctor_id' => $tx->doctor_id,
                 'amount_paise' => (int) ($tx->amount_paise ?? 0),
+                'actual_amount_paid_by_consumer_paise' => $tx->actual_amount_paid_by_consumer_paise !== null
+                    ? (int) $tx->actual_amount_paid_by_consumer_paise
+                    : null,
+                'payment_to_snoutiq_paise' => $tx->payment_to_snoutiq_paise !== null
+                    ? (int) $tx->payment_to_snoutiq_paise
+                    : null,
+                'payment_to_doctor_paise' => $tx->payment_to_doctor_paise !== null
+                    ? (int) $tx->payment_to_doctor_paise
+                    : null,
                 'status' => $tx->status,
                 'type' => $tx->type,
                 'payment_method' => $tx->payment_method,
@@ -186,27 +195,37 @@ class TransactionController extends Controller
 
         $limit = (int) ($data['limit'] ?? 50);
         $type = $data['type'] ?? 'video_consult';
+        $selectColumns = [
+            'id',
+            'user_id',
+            'pet_id',
+            'doctor_id',
+            'clinic_id',
+            'amount_paise',
+            'status',
+            'type',
+            'payment_method',
+            'reference',
+            'metadata',
+            'created_at',
+            'updated_at',
+        ];
+        if (Schema::hasColumn('transactions', 'actual_amount_paid_by_consumer_paise')) {
+            $selectColumns[] = 'actual_amount_paid_by_consumer_paise';
+        }
+        if (Schema::hasColumn('transactions', 'payment_to_snoutiq_paise')) {
+            $selectColumns[] = 'payment_to_snoutiq_paise';
+        }
+        if (Schema::hasColumn('transactions', 'payment_to_doctor_paise')) {
+            $selectColumns[] = 'payment_to_doctor_paise';
+        }
 
         $tx = Transaction::query()
             ->where('user_id', $data['user_id'])
             ->when($type, fn ($q) => $q->where('type', $type))
             ->orderByDesc('id')
             ->limit($limit)
-            ->get([
-                'id',
-                'user_id',
-                'pet_id',
-                'doctor_id',
-                'clinic_id',
-                'amount_paise',
-                'status',
-                'type',
-                'payment_method',
-                'reference',
-                'metadata',
-                'created_at',
-                'updated_at',
-            ]);
+            ->get($selectColumns);
 
         return response()->json([
             'success' => true,
