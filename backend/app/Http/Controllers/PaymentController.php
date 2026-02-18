@@ -461,7 +461,11 @@ class PaymentController extends Controller
         $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
 
         $transactionType = $this->resolveTransactionType($notes);
-        $payoutBreakup = $this->buildExcelExportPayoutBreakup((int) ($order['amount'] ?? 0), $transactionType);
+        $payoutBreakup = $this->buildExcelExportPayoutBreakup(
+            grossPaise: (int) ($order['amount'] ?? 0),
+            transactionType: $transactionType,
+            notes: $notes
+        );
         $payoutColumns = $this->transactionPayoutColumnMap();
 
         try {
@@ -532,7 +536,11 @@ class PaymentController extends Controller
         $channelName = $context['channel_name'] ?? ($notes['channel_name'] ?? null);
         $hasChannelNameColumn = Schema::hasColumn('transactions', 'channel_name');
         $transactionType = $this->resolveTransactionType($notes);
-        $payoutBreakup = $this->buildExcelExportPayoutBreakup((int) ($amount ?? 0), $transactionType);
+        $payoutBreakup = $this->buildExcelExportPayoutBreakup(
+            grossPaise: (int) ($amount ?? 0),
+            transactionType: $transactionType,
+            notes: $notes
+        );
         $payoutColumns = $this->transactionPayoutColumnMap();
 
         try {
@@ -624,16 +632,27 @@ class PaymentController extends Controller
         ];
     }
 
-    protected function buildExcelExportPayoutBreakup(int $grossPaise, string $transactionType): ?array
+    protected function buildExcelExportPayoutBreakup(int $grossPaise, string $transactionType, array $notes = []): ?array
     {
         if (strtolower(trim($transactionType)) !== 'excell_export_campaign') {
             return null;
         }
 
         $grossPaise = max(0, (int) $grossPaise);
-        // Client sends GST-inclusive amount (e.g. 590 for base 500). Reverse-calculate base first.
-        $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
-        $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
+        $gstNumber = trim((string) ($notes['gst_number'] ?? $notes['gstNumber'] ?? ''));
+        $gstNumberGiven = $notes['gst_number_given'] ?? $notes['gstNumberGiven'] ?? null;
+        $shouldSkipGstDeduction = $gstNumber !== '' && $this->isTruthyFlag($gstNumberGiven);
+
+        if ($shouldSkipGstDeduction) {
+            // If GST number is provided and flagged by client, do not reverse-cut GST from paid amount.
+            $amountBeforeGstPaise = $grossPaise;
+            $gstPaise = 0;
+        } else {
+            // Default flow: client amount is GST-inclusive (e.g. 590 for base 500), reverse-calculate base first.
+            $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
+            $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
+        }
+
         $snoutiqSharePaise = min(20000, $amountBeforeGstPaise); // Rs 200 fixed share for Snoutiq
         $doctorSharePaise = max(0, $amountBeforeGstPaise - $snoutiqSharePaise);
 
@@ -642,6 +661,7 @@ class PaymentController extends Controller
             'gst_paise' => $gstPaise,
             'amount_after_gst_paise' => $amountBeforeGstPaise,
             'amount_before_gst_paise' => $amountBeforeGstPaise,
+            'gst_deducted_from_amount' => ! $shouldSkipGstDeduction,
             'payment_to_snoutiq_paise' => $snoutiqSharePaise,
             'payment_to_doctor_paise' => $doctorSharePaise,
         ];
@@ -701,6 +721,8 @@ class PaymentController extends Controller
             'doctor_id' => ['doctor_id', 'doctorId'],
             'user_id' => ['user_id', 'userId', 'patient_id', 'patientId'],
             'pet_id' => ['pet_id', 'petId'],
+            'gst_number' => ['gst_number', 'gstNumber'],
+            'gst_number_given' => ['gst_number_given', 'gstNumberGiven'],
             'vet_template' => ['vet_template', 'vetTemplate', 'vet_template_name'],
             'vet_template_language' => ['vet_template_language', 'vetTemplateLanguage'],
         ];
@@ -1555,6 +1577,24 @@ class PaymentController extends Controller
         }
 
         return null;
+    }
+
+    protected function isTruthyFlag($value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value === 1;
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+            return in_array($normalized, ['1', 'true', 'yes', 'y'], true);
+        }
+
+        return false;
     }
 
     protected function lookupDoctorClinicId(?int $doctorId): ?int
