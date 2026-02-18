@@ -150,6 +150,37 @@
                                         $doctorOptions = $allDoctors;
                                         $currentDoctorId = (int) ($txn->doctor_id ?? 0);
                                         $transactionType = $txn->type ?? data_get($txn->metadata, 'order_type', 'n/a');
+                                        $metadata = is_array($txn->metadata) ? $txn->metadata : [];
+                                        $latestDbLog = $latestAssignmentLogs->get($txn->id);
+                                        $lastAssignment = data_get($metadata, 'last_doctor_assignment');
+                                        if (!is_array($lastAssignment) && $latestDbLog) {
+                                            $lastAssignment = [
+                                                'previous_doctor_id' => $latestDbLog->previous_doctor_id ?? null,
+                                                'new_doctor_id' => $latestDbLog->new_doctor_id ?? null,
+                                                'changed_at' => $latestDbLog->created_at ?? null,
+                                            ];
+                                        }
+                                        $assignmentHistory = data_get($metadata, 'doctor_assignment_logs', []);
+                                        if (!is_array($assignmentHistory)) {
+                                            $assignmentHistory = [];
+                                        }
+                                        $hasTransfer = (is_array($lastAssignment) && !empty($lastAssignment['previous_doctor_id']))
+                                            || !empty($assignmentHistory)
+                                            || (bool) $latestDbLog;
+                                        $lastDoctorId = is_array($lastAssignment)
+                                            ? ($lastAssignment['previous_doctor_id'] ?? null)
+                                            : null;
+                                        if ((!$lastDoctorId || !is_numeric($lastDoctorId)) && !empty($assignmentHistory)) {
+                                            $lastHistoryEntry = collect($assignmentHistory)->last();
+                                            if (is_array($lastHistoryEntry) && !empty($lastHistoryEntry['previous_doctor_id'])) {
+                                                $lastDoctorId = $lastHistoryEntry['previous_doctor_id'];
+                                            }
+                                        }
+                                        if ((!$lastDoctorId || !is_numeric($lastDoctorId)) && $latestDbLog && !empty($latestDbLog->previous_doctor_id)) {
+                                            $lastDoctorId = $latestDbLog->previous_doctor_id;
+                                        }
+                                        $lastDoctorId = (is_numeric($lastDoctorId) && (int) $lastDoctorId > 0) ? (int) $lastDoctorId : null;
+                                        $lastDoctorName = $lastDoctorId ? ($doctorNameLookup[$lastDoctorId] ?? null) : null;
                                     @endphp
                                     <tr>
                                         <td data-label="ID">#{{ $txn->id }}</td>
@@ -168,6 +199,14 @@
                                             <div class="text-muted small">
                                                 <div>ID: {{ $txn->doctor_id ?? '—' }}</div>
                                                 <div>Phone: {{ $txn->doctor->doctor_mobile ?? '—' }}</div>
+                                                <div>Last Doctor (Before Transfer):
+                                                    @if($lastDoctorId)
+                                                        {{ $lastDoctorName ?? 'Doctor' }} (ID: {{ $lastDoctorId }})
+                                                    @else
+                                                        N/A
+                                                    @endif
+                                                </div>
+                                                <div>Transfer Available: {{ $hasTransfer ? 'Yes' : 'No' }}</div>
                                             </div>
                                         </td>
                                         <td data-label="User">

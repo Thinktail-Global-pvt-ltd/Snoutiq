@@ -298,7 +298,10 @@ class AdminPanelController extends Controller
             ->orderBy('doctor_name')
             ->get();
 
-        return view('admin.appointment-transactions', compact('transactions', 'allDoctors'));
+        $latestAssignmentLogs = $this->latestTransactionDoctorAssignmentLogs($transactions);
+        $doctorNameLookup = $this->doctorNameLookupForTransactions($transactions, $latestAssignmentLogs);
+
+        return view('admin.appointment-transactions', compact('transactions', 'allDoctors', 'latestAssignmentLogs', 'doctorNameLookup'));
     }
 
     public function updateAppointmentTransactionDoctor(Request $request, Transaction $transaction): RedirectResponse
@@ -410,6 +413,74 @@ class AdminPanelController extends Controller
 
         return in_array($type, ['video_consult', 'excell_export_campaign'], true)
             || in_array($orderType, ['video_consult', 'excell_export_campaign'], true);
+    }
+
+    private function latestTransactionDoctorAssignmentLogs(Collection $transactions): Collection
+    {
+        if (!Schema::hasTable('transaction_doctor_assignment_logs') || $transactions->isEmpty()) {
+            return collect();
+        }
+
+        $transactionIds = $transactions->pluck('id')->filter()->map(fn ($id) => (int) $id)->values();
+        if ($transactionIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('transaction_doctor_assignment_logs')
+            ->whereIn('transaction_id', $transactionIds)
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('transaction_id')
+            ->map(fn (Collection $group) => $group->first());
+    }
+
+    private function doctorNameLookupForTransactions(Collection $transactions, Collection $latestAssignmentLogs): array
+    {
+        $doctorIds = collect();
+
+        foreach ($transactions as $transaction) {
+            $doctorIds->push($transaction->doctor_id);
+
+            $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
+            $lastAssignment = data_get($metadata, 'last_doctor_assignment');
+            if (is_array($lastAssignment)) {
+                $doctorIds->push($lastAssignment['previous_doctor_id'] ?? null);
+                $doctorIds->push($lastAssignment['new_doctor_id'] ?? null);
+            }
+
+            $history = data_get($metadata, 'doctor_assignment_logs', []);
+            if (is_array($history)) {
+                foreach ($history as $entry) {
+                    if (!is_array($entry)) {
+                        continue;
+                    }
+                    $doctorIds->push($entry['previous_doctor_id'] ?? null);
+                    $doctorIds->push($entry['new_doctor_id'] ?? null);
+                }
+            }
+
+            $dbLog = $latestAssignmentLogs->get($transaction->id);
+            if ($dbLog) {
+                $doctorIds->push($dbLog->previous_doctor_id ?? null);
+                $doctorIds->push($dbLog->new_doctor_id ?? null);
+            }
+        }
+
+        $ids = $doctorIds
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return Doctor::query()
+            ->whereIn('id', $ids)
+            ->pluck('doctor_name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(int) $id => $name])
+            ->all();
     }
 
     private function getOnlineClinics(?Collection $activeClinicIds = null): Collection
