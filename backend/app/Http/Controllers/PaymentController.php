@@ -624,15 +624,17 @@ class PaymentController extends Controller
         }
 
         $grossPaise = max(0, (int) $grossPaise);
-        $gstPaise = (int) round($grossPaise * 0.18);
-        $netAfterGstPaise = max(0, $grossPaise - $gstPaise);
-        $snoutiqSharePaise = min(20000, $netAfterGstPaise); // Rs 200 fixed share for Snoutiq
-        $doctorSharePaise = max(0, $netAfterGstPaise - $snoutiqSharePaise);
+        // Client sends GST-inclusive amount (e.g. 590 for base 500). Reverse-calculate base first.
+        $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
+        $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
+        $snoutiqSharePaise = min(20000, $amountBeforeGstPaise); // Rs 200 fixed share for Snoutiq
+        $doctorSharePaise = max(0, $amountBeforeGstPaise - $snoutiqSharePaise);
 
         return [
             'actual_amount_paid_by_consumer_paise' => $grossPaise,
             'gst_paise' => $gstPaise,
-            'amount_after_gst_paise' => $netAfterGstPaise,
+            'amount_after_gst_paise' => $amountBeforeGstPaise,
+            'amount_before_gst_paise' => $amountBeforeGstPaise,
             'payment_to_snoutiq_paise' => $snoutiqSharePaise,
             'payment_to_doctor_paise' => $doctorSharePaise,
         ];
