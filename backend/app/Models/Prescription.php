@@ -17,6 +17,7 @@ class Prescription extends Model
         'visit_category',
         'case_severity',
         'visit_notes',
+        'doctor_treatment',
         'content_html',
         'image_path',
         'next_medicine_day',

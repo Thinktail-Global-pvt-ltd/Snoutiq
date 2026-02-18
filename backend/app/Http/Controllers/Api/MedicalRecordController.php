@@ -37,6 +37,7 @@ class MedicalRecordController extends Controller
             'doctor_id' => ['nullable', 'integer', 'exists:doctors,id'],
             'clinic_id' => ['required', 'integer', 'exists:vet_registerations_temp,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'doctor_treatment' => ['nullable', 'string'],
             'visit_category' => ['nullable', 'string', 'max:255'],
             'case_severity' => ['nullable', 'string', 'max:255'],
             'temperature' => ['nullable', 'numeric'],
@@ -59,6 +60,7 @@ class MedicalRecordController extends Controller
             'video_appointment_id' => ['nullable', 'integer', 'exists:video_apointment,id'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
+        $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
 
         $recordFilePath = null;
 
@@ -129,7 +131,7 @@ class MedicalRecordController extends Controller
         $diseaseName = $validated['disease_name'] ?? $validated['diagnosis'] ?? null;
         $isChronic = ($validated['diagnosis_status'] ?? '') === 'chronic';
 
-        $prescription->fill([
+        $prescriptionPayload = [
             'medical_record_id' => $record->id,
             'user_id' => $record->user_id,
             'doctor_id' => $record->doctor_id ?? 0,
@@ -155,7 +157,11 @@ class MedicalRecordController extends Controller
             'pet_id' => $petId ?? $prescription->pet_id,
             'video_appointment_id' => $validated['video_appointment_id'] ?? $prescription->video_appointment_id,
             'medications_json' => $medsJson ?? $prescription->medications_json,
-        ]);
+        ];
+        if ($hasDoctorTreatmentColumn) {
+            $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? $prescription->doctor_treatment;
+        }
+        $prescription->fill($prescriptionPayload);
         if ($recordFilePath) {
             $prescription->image_path = $recordFilePath;
         }
@@ -191,6 +197,7 @@ class MedicalRecordController extends Controller
             'doctor_id' => ['nullable', 'integer', 'exists:doctors,id'],
             'clinic_id' => ['required', 'integer', 'exists:vet_registerations_temp,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'doctor_treatment' => ['nullable', 'string'],
             'visit_category' => ['nullable', 'string', 'max:255'],
             'case_severity' => ['nullable', 'string', 'max:255'],
             'temperature' => ['nullable', 'numeric'],
@@ -213,6 +220,7 @@ class MedicalRecordController extends Controller
             'video_appointment_id' => ['nullable', 'integer', 'exists:video_apointment,id'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
+        $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
 
         $user = User::query()->select('id', 'last_vet_id')->find($validated['user_id']);
         if (!$user) {
@@ -311,6 +319,9 @@ class MedicalRecordController extends Controller
             'medications_json' => $this->decodeMedicationsInput($request->input('medications_json'))
                 ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
+        if ($hasDoctorTreatmentColumn) {
+            $prescriptionPayload['doctor_treatment'] = $validated['doctor_treatment'] ?? null;
+        }
         if ($recordFilePath !== '') {
             $prescriptionPayload['image_path'] = $recordFilePath;
         }

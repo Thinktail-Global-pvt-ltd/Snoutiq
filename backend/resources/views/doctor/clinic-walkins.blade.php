@@ -833,6 +833,10 @@
       <div class="pv-card" id="pv-notes-card">
         <div class="pv-cardTitle">Visit Notes</div>
         <textarea id="record-notes" name="notes" class="pv-input pv-textarea" placeholder="Reason for visit / brief notes"></textarea>
+        <div class="pv-field" style="margin-top:10px">
+          <label class="pv-label" for="doctor-treatment">Doctor Treatment</label>
+          <textarea id="doctor-treatment" name="doctor_treatment" class="pv-input pv-textarea" placeholder="Doctor treatment details"></textarea>
+        </div>
       </div>
 
       <div class="pv-card pv-critical" data-critical id="pv-clinical-card">
@@ -1390,6 +1394,7 @@
       visit_notes: rx.visit_notes || '',
       diagnosis: rx.diagnosis || '',
       diagnosis_status: rx.diagnosis_status || '',
+      doctor_treatment: rx.doctor_treatment || '',
       treatment_plan: rx.treatment_plan || '',
       home_care: rx.home_care || '',
       medications_html: formatMedicationList(rx.medications_json),
@@ -1439,6 +1444,7 @@
     if (ctx.diagnosis || ctx.diagnosis_status) {
       rows.push({ label: 'Diagnosis', value: `${escapeHtml(ctx.diagnosis || '-')}${ctx.diagnosis_status ? ' (' + escapeHtml(ctx.diagnosis_status) + ')' : ''}` });
     }
+    if (ctx.doctor_treatment) rows.push({ label: 'Doctor treatment', value: escapeHtml(ctx.doctor_treatment) });
     if (ctx.treatment_plan) rows.push({ label: 'Treatment', value: escapeHtml(ctx.treatment_plan) });
     if (ctx.home_care) rows.push({ label: 'Home care', value: escapeHtml(ctx.home_care) });
     if (ctx.follow_up_date || ctx.follow_up_type) {
@@ -1906,6 +1912,9 @@
       if (prescription.diagnosis || prescription.diagnosis_status) {
         detailPairs.push({ label: 'Diagnosis', value: `${escapeHtml(prescription.diagnosis || '-')} (${escapeHtml(prescription.diagnosis_status || '-')})` });
       }
+      if (prescription.doctor_treatment) {
+        detailPairs.push({ label: 'Doctor treatment', value: escapeHtml(prescription.doctor_treatment) });
+      }
       if (prescription.treatment_plan) {
         detailPairs.push({ label: 'Treatment', value: escapeHtml(prescription.treatment_plan) });
       }
@@ -2140,6 +2149,7 @@
     mapValue('exam-notes', prescription.exam_notes ?? '');
     mapValue('diagnosis', prescription.diagnosis ?? '');
     mapValue('diagnosis-status', prescription.diagnosis_status ?? '');
+    mapValue('doctor-treatment', prescription.doctor_treatment ?? '');
     mapValue('treatment-plan', prescription.treatment_plan ?? '');
     mapValue('home-care', prescription.home_care ?? '');
     mapValue('follow-up-date', prescription.follow_up_date ?? '');
