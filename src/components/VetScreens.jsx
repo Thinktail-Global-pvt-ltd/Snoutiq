@@ -2192,6 +2192,13 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     visitCategory: "Follow-up",
     caseSeverity: "general",
     notes: "",
+    doctorTreatment: "",
+    diagnosis: "",
+    diagnosisStatus: "",
+    treatmentPlan: "",
+    homeCare: "",
+    followUpDate: "",
+    followUpType: "",
     medications: [{ name: "", dosage: "", frequency: "", duration: "" }],
     recordFile: null,
   });
@@ -2442,6 +2449,13 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       visitCategory: "Follow-up",
       caseSeverity: "general",
       notes: "",
+      doctorTreatment: "",
+      diagnosis: "",
+      diagnosisStatus: "",
+      treatmentPlan: "",
+      homeCare: "",
+      followUpDate: "",
+      followUpType: "",
       medications: [{ name: "", dosage: "", frequency: "", duration: "" }],
       recordFile: null,
     });
@@ -2540,11 +2554,11 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     const medsPayload = prescriptionForm.medications
       .map((med) => ({
         name: med.name.trim(),
-        dosage: med.dosage.trim(),
+        dose: med.dosage.trim(),
         frequency: med.frequency.trim(),
         duration: med.duration.trim(),
       }))
-      .filter((med) => med.name || med.dosage || med.frequency || med.duration);
+      .filter((med) => med.name || med.dose || med.frequency || med.duration);
 
     const fd = new FormData();
     fd.append("user_id", String(userId));
@@ -2554,6 +2568,27 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     fd.append("visit_category", prescriptionForm.visitCategory);
     fd.append("case_severity", prescriptionForm.caseSeverity);
     fd.append("notes", prescriptionForm.notes);
+    if (prescriptionForm.doctorTreatment.trim()) {
+      fd.append("doctor_treatment", prescriptionForm.doctorTreatment.trim());
+    }
+    if (prescriptionForm.diagnosis.trim()) {
+      fd.append("diagnosis", prescriptionForm.diagnosis.trim());
+    }
+    if (prescriptionForm.diagnosisStatus) {
+      fd.append("diagnosis_status", prescriptionForm.diagnosisStatus);
+    }
+    if (prescriptionForm.treatmentPlan.trim()) {
+      fd.append("treatment_plan", prescriptionForm.treatmentPlan.trim());
+    }
+    if (prescriptionForm.homeCare.trim()) {
+      fd.append("home_care", prescriptionForm.homeCare.trim());
+    }
+    if (prescriptionForm.followUpDate) {
+      fd.append("follow_up_date", prescriptionForm.followUpDate);
+    }
+    if (prescriptionForm.followUpType.trim()) {
+      fd.append("follow_up_type", prescriptionForm.followUpType.trim());
+    }
     fd.append("medications_json", JSON.stringify(medsPayload));
     if (prescriptionForm.recordFile) {
       fd.append("record_file", prescriptionForm.recordFile);
@@ -3484,6 +3519,35 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         </select>
                       </div>
                     </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Diagnosis
+                        </label>
+                        <input
+                          type="text"
+                          value={prescriptionForm.diagnosis}
+                          onChange={updatePrescriptionField("diagnosis")}
+                          placeholder="Diagnosis summary"
+                          className={INPUT_BASE_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Diagnosis Status
+                        </label>
+                        <select
+                          value={prescriptionForm.diagnosisStatus}
+                          onChange={updatePrescriptionField("diagnosisStatus")}
+                          className={INPUT_BASE_CLASS}
+                        >
+                          <option value="">Select status</option>
+                          <option value="ongoing">Ongoing</option>
+                          <option value="resolved">Resolved</option>
+                          <option value="chronic">Chronic</option>
+                        </select>
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Clinical Notes
@@ -3495,6 +3559,67 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         placeholder="Enter diagnosis, observations, and treatment plan..."
                         className={`${INPUT_BASE_CLASS} resize-none`}
                       />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Doctor Treatment
+                      </label>
+                      <textarea
+                        value={prescriptionForm.doctorTreatment}
+                        onChange={updatePrescriptionField("doctorTreatment")}
+                        rows={3}
+                        placeholder="Doctor treatment instructions"
+                        className={`${INPUT_BASE_CLASS} resize-none`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Treatment Plan
+                      </label>
+                      <textarea
+                        value={prescriptionForm.treatmentPlan}
+                        onChange={updatePrescriptionField("treatmentPlan")}
+                        rows={3}
+                        placeholder="Treatment plan"
+                        className={`${INPUT_BASE_CLASS} resize-none`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Home Care
+                      </label>
+                      <textarea
+                        value={prescriptionForm.homeCare}
+                        onChange={updatePrescriptionField("homeCare")}
+                        rows={3}
+                        placeholder="Home care guidance"
+                        className={`${INPUT_BASE_CLASS} resize-none`}
+                      />
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Follow-up Date
+                        </label>
+                        <input
+                          type="date"
+                          value={prescriptionForm.followUpDate}
+                          onChange={updatePrescriptionField("followUpDate")}
+                          className={INPUT_BASE_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Follow-up Type
+                        </label>
+                        <input
+                          type="text"
+                          value={prescriptionForm.followUpType}
+                          onChange={updatePrescriptionField("followUpType")}
+                          placeholder="clinic / video / chat"
+                          className={INPUT_BASE_CLASS}
+                        />
+                      </div>
                     </div>
                   </div>
 
