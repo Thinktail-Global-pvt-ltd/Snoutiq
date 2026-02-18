@@ -11,6 +11,22 @@
     .doctor-update-form .form-select {
         min-width: 260px;
     }
+    .transfer-badge {
+        font-weight: 700;
+        padding: 0.08rem 0.4rem;
+        border-radius: 0.3rem;
+        display: inline-block;
+    }
+    .transfer-badge.is-transferred {
+        color: #b91c1c;
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+    }
+    .transfer-badge.not-transferred {
+        color: #64748b;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
     @media (max-width: 991.98px) {
         .appointment-table thead {
             display: none;
@@ -206,7 +222,11 @@
                                                         N/A
                                                     @endif
                                                 </div>
-                                                <div>Transfer Available: {{ $hasTransfer ? 'Yes' : 'No' }}</div>
+                                                <div>Transfer Available:
+                                                    <span class="transfer-badge {{ $hasTransfer ? 'is-transferred' : 'not-transferred' }}">
+                                                        {{ $hasTransfer ? 'Yes' : 'No' }}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </td>
                                         <td data-label="User">
