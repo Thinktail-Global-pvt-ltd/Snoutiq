@@ -130,6 +130,7 @@
             <a href="{{ route('admin.vet-registration-report') }}" class="{{ request()->routeIs('admin.vet-registration-report') ? 'active' : '' }}">Vet Registration Report</a>
             <a href="{{ route('admin.bookings') }}" class="{{ request()->routeIs('admin.bookings') ? 'active' : '' }}">Bookings</a>
             <a href="{{ route('admin.transactions.excell-export') }}" class="{{ request()->routeIs('admin.transactions.excell-export') ? 'active' : '' }}">Excel Export Transactions</a>
+            <a href="{{ route('admin.transactions.appointments') }}" class="{{ request()->routeIs('admin.transactions.appointments') ? 'active' : '' }}">Appointment Transactions</a>
             <a href="{{ route('admin.whatsapp.templates') }}" class="{{ request()->routeIs('admin.whatsapp.templates') ? 'active' : '' }}">WhatsApp Templates</a>
             <a href="{{ route('admin.supports') }}" class="{{ request()->routeIs('admin.supports') ? 'active' : '' }}">Supports</a>
             <a href="{{ route('admin.video.slot-overview') }}" class="{{ request()->routeIs('admin.video.slot-overview') ? 'active' : '' }}">Video Slot Overview</a>

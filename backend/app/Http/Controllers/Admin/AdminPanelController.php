@@ -11,12 +11,13 @@ use App\Models\Pet;
 use App\Models\User;
 use App\Models\VetRegisterationTemp;
 use App\Models\Transaction;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\View\View;
 use App\Services\CallAnalyticsService;
 use App\Services\DoctorAvailabilityService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 
 class AdminPanelController extends Controller
@@ -258,6 +259,116 @@ class AdminPanelController extends Controller
             ->get();
 
         return view('admin.transactions-excell-export', compact('transactions'));
+    }
+
+    public function appointmentTransactions(): View
+    {
+        $petColumns = ['id', 'user_id', 'name', 'breed', 'pet_type', 'reported_symptom'];
+        if (Schema::hasColumn('pets', 'pet_dob')) {
+            $petColumns[] = 'pet_dob';
+        }
+        if (Schema::hasColumn('pets', 'dob')) {
+            $petColumns[] = 'dob';
+        }
+
+        $transactions = $this->appointmentTransactionsQuery()
+            ->with([
+                'clinic:id,name',
+                'doctor:id,vet_registeration_id,doctor_name,doctor_email,doctor_mobile',
+                'user' => function ($query) use ($petColumns) {
+                    $query->select('id', 'name', 'email', 'phone')
+                        ->with([
+                            'pets' => function ($petQuery) use ($petColumns) {
+                                $petQuery->select($petColumns)
+                                    ->orderByDesc('id');
+                            },
+                        ]);
+                },
+                'pet' => function ($query) use ($petColumns) {
+                    $query->select($petColumns);
+                },
+            ])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $allDoctors = Doctor::query()
+            ->select('id', 'vet_registeration_id', 'doctor_name', 'doctor_email', 'doctor_mobile', 'toggle_availability')
+            ->orderBy('doctor_name')
+            ->get();
+
+        $doctorsByClinic = $allDoctors->groupBy(static fn (Doctor $doctor) => (string) ($doctor->vet_registeration_id ?? 0));
+
+        return view('admin.appointment-transactions', compact('transactions', 'allDoctors', 'doctorsByClinic'));
+    }
+
+    public function updateAppointmentTransactionDoctor(Request $request, Transaction $transaction): RedirectResponse
+    {
+        if (! $this->isAppointmentTransaction($transaction)) {
+            return redirect()
+                ->route('admin.transactions.appointments')
+                ->withErrors(['doctor_id' => 'Only video consultation appointment transactions can be reassigned from this page.']);
+        }
+
+        $data = $request->validate([
+            'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
+        ]);
+
+        $doctor = Doctor::query()
+            ->select('id', 'vet_registeration_id', 'doctor_name')
+            ->findOrFail((int) $data['doctor_id']);
+
+        if (
+            $transaction->clinic_id
+            && $doctor->vet_registeration_id
+            && (int) $doctor->vet_registeration_id !== (int) $transaction->clinic_id
+        ) {
+            return redirect()
+                ->route('admin.transactions.appointments')
+                ->withErrors([
+                    'doctor_id' => sprintf(
+                        'Doctor %s (ID: %d) does not belong to clinic ID %d for transaction #%d.',
+                        $doctor->doctor_name ?? 'N/A',
+                        $doctor->id,
+                        $transaction->clinic_id,
+                        $transaction->id
+                    ),
+                ]);
+        }
+
+        $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
+        $metadata['doctor_id'] = (int) $doctor->id;
+
+        $transaction->doctor_id = (int) $doctor->id;
+        $transaction->metadata = $metadata;
+        $transaction->save();
+
+        return redirect()
+            ->route('admin.transactions.appointments')
+            ->with('status', sprintf(
+                'Doctor updated for transaction #%d. Assigned: %s (ID: %d).',
+                $transaction->id,
+                $doctor->doctor_name ?? 'N/A',
+                $doctor->id
+            ));
+    }
+
+    private function appointmentTransactionsQuery(): Builder
+    {
+        return Transaction::query()
+            ->where(function (Builder $query) {
+                $query->whereIn('type', ['video_consult', 'excell_export_campaign'])
+                    ->orWhere('metadata->order_type', 'video_consult')
+                    ->orWhere('metadata->order_type', 'excell_export_campaign');
+            });
+    }
+
+    private function isAppointmentTransaction(Transaction $transaction): bool
+    {
+        $type = strtolower((string) ($transaction->type ?? ''));
+        $orderType = strtolower((string) data_get($transaction->metadata, 'order_type', ''));
+
+        return in_array($type, ['video_consult', 'excell_export_campaign'], true)
+            || in_array($orderType, ['video_consult', 'excell_export_campaign'], true);
     }
 
     private function getOnlineClinics(?Collection $activeClinicIds = null): Collection
