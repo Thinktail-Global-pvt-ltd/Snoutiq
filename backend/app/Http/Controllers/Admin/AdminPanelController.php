@@ -297,9 +297,7 @@ class AdminPanelController extends Controller
             ->orderBy('doctor_name')
             ->get();
 
-        $doctorsByClinic = $allDoctors->groupBy(static fn (Doctor $doctor) => (string) ($doctor->vet_registeration_id ?? 0));
-
-        return view('admin.appointment-transactions', compact('transactions', 'allDoctors', 'doctorsByClinic'));
+        return view('admin.appointment-transactions', compact('transactions', 'allDoctors'));
     }
 
     public function updateAppointmentTransactionDoctor(Request $request, Transaction $transaction): RedirectResponse
@@ -325,38 +323,23 @@ class AdminPanelController extends Controller
                 ->withErrors(['doctor_id' => 'Please select a valid Excel-export doctor (exported_from_excell = 1).']);
         }
 
-        if (
-            $transaction->clinic_id
-            && $doctor->vet_registeration_id
-            && (int) $doctor->vet_registeration_id !== (int) $transaction->clinic_id
-        ) {
-            return redirect()
-                ->route('admin.transactions.appointments')
-                ->withErrors([
-                    'doctor_id' => sprintf(
-                        'Doctor %s (ID: %d) does not belong to clinic ID %d for transaction #%d.',
-                        $doctor->doctor_name ?? 'N/A',
-                        $doctor->id,
-                        $transaction->clinic_id,
-                        $transaction->id
-                    ),
-                ]);
-        }
-
         $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
         $metadata['doctor_id'] = (int) $doctor->id;
+        $metadata['clinic_id'] = $doctor->vet_registeration_id ? (int) $doctor->vet_registeration_id : null;
 
         $transaction->doctor_id = (int) $doctor->id;
+        $transaction->clinic_id = $doctor->vet_registeration_id ? (int) $doctor->vet_registeration_id : null;
         $transaction->metadata = $metadata;
         $transaction->save();
 
         return redirect()
             ->route('admin.transactions.appointments')
             ->with('status', sprintf(
-                'Doctor updated for transaction #%d. Assigned: %s (ID: %d).',
+                'Doctor/clinic updated for transaction #%d. Assigned: %s (ID: %d), Clinic ID: %s.',
                 $transaction->id,
                 $doctor->doctor_name ?? 'N/A',
-                $doctor->id
+                $doctor->id,
+                $transaction->clinic_id ?? 'NULL'
             ));
     }
 

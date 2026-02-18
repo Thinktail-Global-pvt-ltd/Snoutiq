@@ -147,8 +147,7 @@
                                         $petFromTransaction = $txn->pet;
                                         $petRecord = $petFromTransaction ?? $userPets->first();
                                         $petDob = $formatPetDob($petRecord->pet_dob ?? $petRecord->dob ?? null);
-                                        $clinicDoctors = $doctorsByClinic->get((string) ($txn->clinic_id ?? 0), collect());
-                                        $doctorOptions = $clinicDoctors->isNotEmpty() ? $clinicDoctors : $allDoctors;
+                                        $doctorOptions = $allDoctors;
                                         $currentDoctorId = (int) ($txn->doctor_id ?? 0);
                                         $transactionType = $txn->type ?? data_get($txn->metadata, 'order_type', 'n/a');
                                     @endphp
@@ -202,9 +201,6 @@
                                                     Update Doctor
                                                 </button>
                                             </form>
-                                            @if($txn->clinic_id && $clinicDoctors->isEmpty())
-                                                <div class="small text-warning mt-1">Clinic doctors not found. Showing all doctors.</div>
-                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
