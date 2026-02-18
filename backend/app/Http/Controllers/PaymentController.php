@@ -131,17 +131,6 @@ class PaymentController extends Controller
                     amountInInr: $amountInInr
                 );
                 $prescriptionDocMeta = $this->sendDoctorPrescriptionDocument($context);
-            } elseif (($notes['order_type'] ?? null) === 'excell_export_campaign') {
-                $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
-                    context: $context,
-                    notes: $notes,
-                    amountInInr: $amountInInr
-                );
-                $vetWhatsAppMeta = $this->notifyVetExcelExportCampaignAssigned(
-                    context: $context,
-                    notes: $notes,
-                    amountInInr: $amountInInr
-                );
             }
 
             return response()->json([
@@ -377,7 +366,7 @@ class PaymentController extends Controller
                         notes: $notes,
                         amountInInr: $amountInInr
                     );
-                } elseif ($orderType === 'excell_export_campaign') {
+                } elseif ($orderType === 'excell_export_campaign' && $this->isSuccessfulPaymentStatus($status)) {
                     $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
                         context: $context,
                         notes: $notes,
