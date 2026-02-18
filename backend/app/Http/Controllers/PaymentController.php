@@ -70,6 +70,7 @@ class PaymentController extends Controller
             'via' => 'snoutiq',
         ]);
         $context = $this->resolveTransactionContext($request, $notes);
+        $this->persistUserGstDetails($context['user_id'] ?? null, $notes);
         $callSession = null;
 
         if (($notes['order_type'] ?? null) === 'video_consult') {
@@ -332,6 +333,7 @@ class PaymentController extends Controller
                 paymentId: $data['razorpay_payment_id']
             );
             $notes = $this->mergeContextIntoNotes($notes, $context);
+            $this->persistUserGstDetails($context['user_id'] ?? null, $notes);
 
             // Upsert into DB (idempotent on payment_id)
             $record = Payment::updateOrCreate(
@@ -1541,6 +1543,37 @@ class PaymentController extends Controller
         return $notes;
     }
 
+    protected function persistUserGstDetails(?int $userId, array $notes): void
+    {
+        if (! $userId || !Schema::hasTable('users') || !Schema::hasColumn('users', 'gst_number')) {
+            return;
+        }
+
+        $gstNumber = trim((string) ($notes['gst_number'] ?? $notes['gstNumber'] ?? ''));
+        if ($gstNumber === '') {
+            return;
+        }
+
+        try {
+            $updates = ['gst_number' => $gstNumber];
+
+            if (Schema::hasColumn('users', 'gst_number_given')) {
+                $gstNumberGiven = $notes['gst_number_given'] ?? $notes['gstNumberGiven'] ?? null;
+                if ($gstNumberGiven !== null && $gstNumberGiven !== '') {
+                    $updates['gst_number_given'] = $this->toBoolInt($gstNumberGiven);
+                } else {
+                    $updates['gst_number_given'] = 1;
+                }
+            }
+
+            DB::table('users')
+                ->where('id', $userId)
+                ->update($updates);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     protected function firstFilled(Request $request, array $keys, array $notes = [])
     {
         foreach ($keys as $key) {
@@ -1567,6 +1600,20 @@ class PaymentController extends Controller
         }
 
         return null;
+    }
+
+    protected function toBoolInt($value): int
+    {
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+
+        if (is_numeric($value)) {
+            return ((int) $value) === 1 ? 1 : 0;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        return in_array($normalized, ['1', 'true', 'yes', 'y'], true) ? 1 : 0;
     }
 
     protected function lookupDoctorClinicId(?int $doctorId): ?int
