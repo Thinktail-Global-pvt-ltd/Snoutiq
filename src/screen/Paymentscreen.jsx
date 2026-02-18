@@ -99,6 +99,26 @@ export const PaymentScreen = ({
   const [statusMessage, setStatusMessage] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [gstNumber, setGstNumber] = useState(() =>
+    pickValue(
+      paymentMeta?.gst_number,
+      paymentMeta?.gstNumber,
+      petDetails?.gst_number,
+      petDetails?.gstNumber
+    ) || ""
+  );
+
+  useEffect(() => {
+    const nextGst = pickValue(
+      paymentMeta?.gst_number,
+      paymentMeta?.gstNumber,
+      petDetails?.gst_number,
+      petDetails?.gstNumber
+    );
+    if (typeof nextGst === "string" && nextGst.trim() && !gstNumber) {
+      setGstNumber(nextGst.trim());
+    }
+  }, [paymentMeta, petDetails, gstNumber]);
 
   useEffect(() => {
     let active = true;
@@ -213,6 +233,17 @@ export const PaymentScreen = ({
       )
     );
 
+    const gstNumberValue = pickValue(
+      gstNumber,
+      paymentMeta?.gst_number,
+      paymentMeta?.gstNumber,
+      petDetails?.gst_number,
+      petDetails?.gstNumber
+    );
+    const gstNumberCleaned =
+      typeof gstNumberValue === "string" ? gstNumberValue.trim() : gstNumberValue;
+    const hasGstNumber = Boolean(gstNumberCleaned);
+
     // ✅ optional: pass rateType to backend if you want (only if backend supports)
     // booking_rate_type: rateType,
 
@@ -225,8 +256,10 @@ export const PaymentScreen = ({
       pet_id: petId,
       doctor_id: doctorId,
       user_id: userId,
+      gst_number: hasGstNumber ? gstNumberCleaned : undefined,
+      gst_number_given: hasGstNumber ? 1 : undefined,
     });
-  }, [paymentMeta, petDetails, vet]);
+  }, [paymentMeta, petDetails, vet, gstNumber]);
 
   const statusClassName = useMemo(() => {
     if (statusType === "success") return "text-emerald-600";
@@ -434,6 +467,22 @@ export const PaymentScreen = ({
                     <span>Total to pay</span>
                     <span>₹{total}</span>
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4">
+                  <label className="block text-xs font-semibold text-stone-600">
+                    GST Number (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={gstNumber}
+                    onChange={(e) => setGstNumber(e.target.value)}
+                    placeholder="07ABCDE1234F1Z5"
+                    className="mt-2 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm text-stone-700 placeholder:text-stone-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                  <p className="mt-2 text-[11px] text-stone-400">
+                    We will add this GST number to the invoice if provided.
+                  </p>
                 </div>
 
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 md:text-sm">
