@@ -292,6 +292,7 @@ class AdminPanelController extends Controller
             ->get();
 
         $allDoctors = Doctor::query()
+            ->where('exported_from_excell', 1)
             ->select('id', 'vet_registeration_id', 'doctor_name', 'doctor_email', 'doctor_mobile', 'toggle_availability')
             ->orderBy('doctor_name')
             ->get();
@@ -310,12 +311,19 @@ class AdminPanelController extends Controller
         }
 
         $data = $request->validate([
-            'doctor_id' => ['required', 'integer', 'exists:doctors,id'],
+            'doctor_id' => ['required', 'integer'],
         ]);
 
         $doctor = Doctor::query()
             ->select('id', 'vet_registeration_id', 'doctor_name')
-            ->findOrFail((int) $data['doctor_id']);
+            ->where('exported_from_excell', 1)
+            ->find((int) $data['doctor_id']);
+
+        if (! $doctor) {
+            return redirect()
+                ->route('admin.transactions.appointments')
+                ->withErrors(['doctor_id' => 'Please select a valid Excel-export doctor (exported_from_excell = 1).']);
+        }
 
         if (
             $transaction->clinic_id
