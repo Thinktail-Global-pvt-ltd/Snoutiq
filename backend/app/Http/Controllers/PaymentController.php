@@ -311,9 +311,27 @@ class PaymentController extends Controller
                 // ignore network failure
             }
 
+            try {
+                $order = $api->order->fetch($data['razorpay_order_id']);
+                $orderNotes = $order->toArray()['notes'] ?? [];
+                if (is_array($orderNotes) && $orderNotes !== []) {
+                    // Keep payment notes preferred when both are present.
+                    $notes = array_replace($orderNotes, $notes);
+                }
+            } catch (\Throwable $e) {
+                // ignore network failure
+            }
+
             // Merge client-provided tags to ensure clinic linkage even if fetch fails
             $notes = $this->mergeClientNotes($request, $notes);
             $context = $this->resolveTransactionContext($request, $notes);
+            $context = $this->enrichVerificationContext(
+                context: $context,
+                notes: $notes,
+                orderId: $data['razorpay_order_id'],
+                paymentId: $data['razorpay_payment_id']
+            );
+            $notes = $this->mergeContextIntoNotes($notes, $context);
 
             // Upsert into DB (idempotent on payment_id)
             $record = Payment::updateOrCreate(
@@ -854,12 +872,12 @@ class PaymentController extends Controller
         try {
             $doctorId = $context['doctor_id'] ?? null;
             if (! $doctorId) {
-                return ['sent' => false, 'reason' => 'doctor_missing'];
+                return ['sent' => false, 'reason' => 'doctor_missing', 'doctor_id' => null];
             }
 
             $doctor = Doctor::find($doctorId);
             if (! $doctor) {
-                return ['sent' => false, 'reason' => 'doctor_missing'];
+                return ['sent' => false, 'reason' => 'doctor_missing', 'doctor_id' => $doctorId];
             }
 
             // Prefer doctor_mobile; fall back to doctor_phone/phone if those columns exist,
@@ -882,7 +900,7 @@ class PaymentController extends Controller
             }
 
             if (empty($doctorPhone)) {
-                return ['sent' => false, 'reason' => 'doctor_phone_missing'];
+                return ['sent' => false, 'reason' => 'doctor_phone_missing', 'doctor_id' => $doctorId];
             }
 
             $user = $context['user_id'] ? User::find($context['user_id']) : null;
@@ -1259,6 +1277,186 @@ class PaymentController extends Controller
         }
 
         return $context;
+    }
+
+    protected function enrichVerificationContext(array $context, array $notes, ?string $orderId, ?string $paymentId): array
+    {
+        $context = $this->hydrateContextFromTransactionReference($context, $orderId);
+        $context = $this->hydrateContextFromTransactionReference($context, $paymentId);
+        $context = $this->hydrateContextFromVideoApointment($context, $orderId);
+
+        if (! ($context['doctor_id'] ?? null)) {
+            $context['doctor_id'] = $this->toNullableInt($notes['doctor_id'] ?? $notes['doctorId'] ?? null);
+        }
+        if (! ($context['user_id'] ?? null)) {
+            $context['user_id'] = $this->toNullableInt($notes['user_id'] ?? $notes['userId'] ?? $notes['patient_id'] ?? $notes['patientId'] ?? null);
+        }
+        if (! ($context['pet_id'] ?? null)) {
+            $context['pet_id'] = $this->toNullableInt($notes['pet_id'] ?? $notes['petId'] ?? null);
+        }
+
+        if ((! ($context['doctor_id'] ?? null) || ! ($context['user_id'] ?? null))
+            && ($context['call_identifier'] ?? null || $context['channel_name'] ?? null)) {
+            $sessionIdentifier = $context['call_identifier'] ?? $context['channel_name'] ?? null;
+            $session = $this->findCallSession($sessionIdentifier);
+
+            if ($session) {
+                $context['doctor_id'] ??= $session->doctor_id ? (int) $session->doctor_id : null;
+                $context['user_id'] ??= $session->patient_id ? (int) $session->patient_id : null;
+                $context['channel_name'] ??= $session->channel_name ?: null;
+
+                if (! ($context['clinic_id'] ?? null) && $session->relationLoaded('doctor') && $session->doctor) {
+                    $context['clinic_id'] = $session->doctor->vet_registeration_id
+                        ? (int) $session->doctor->vet_registeration_id
+                        : null;
+                }
+            }
+        }
+
+        if (! ($context['clinic_id'] ?? null) && ($context['doctor_id'] ?? null)) {
+            $context['clinic_id'] = $this->lookupDoctorClinicId($context['doctor_id']);
+        }
+
+        return $context;
+    }
+
+    protected function hydrateContextFromTransactionReference(array $context, ?string $reference): array
+    {
+        $reference = trim((string) $reference);
+        if ($reference === '' || !Schema::hasTable('transactions')) {
+            return $context;
+        }
+
+        try {
+            $transaction = Transaction::query()
+                ->where('reference', $reference)
+                ->latest('id')
+                ->first();
+
+            if (! $transaction) {
+                return $context;
+            }
+
+            $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
+            $metadataNotes = isset($metadata['notes']) && is_array($metadata['notes'])
+                ? $metadata['notes']
+                : [];
+
+            if (! ($context['doctor_id'] ?? null)) {
+                $context['doctor_id'] = $this->toNullableInt(
+                    $transaction->doctor_id
+                    ?? ($metadata['doctor_id'] ?? null)
+                    ?? ($metadataNotes['doctor_id'] ?? $metadataNotes['doctorId'] ?? null)
+                );
+            }
+
+            if (! ($context['user_id'] ?? null)) {
+                $context['user_id'] = $this->toNullableInt(
+                    $transaction->user_id
+                    ?? ($metadata['user_id'] ?? null)
+                    ?? ($metadataNotes['user_id'] ?? $metadataNotes['userId'] ?? $metadataNotes['patient_id'] ?? $metadataNotes['patientId'] ?? null)
+                );
+            }
+
+            if (! ($context['pet_id'] ?? null)) {
+                $context['pet_id'] = $this->toNullableInt(
+                    $transaction->pet_id
+                    ?? ($metadata['pet_id'] ?? null)
+                    ?? ($metadataNotes['pet_id'] ?? $metadataNotes['petId'] ?? null)
+                );
+            }
+
+            if (! ($context['clinic_id'] ?? null)) {
+                $context['clinic_id'] = $this->toNullableInt(
+                    $transaction->clinic_id
+                    ?? ($metadata['clinic_id'] ?? null)
+                    ?? ($metadataNotes['clinic_id'] ?? $metadataNotes['clinicId'] ?? null)
+                );
+            }
+
+            if (! ($context['call_identifier'] ?? null)) {
+                $context['call_identifier'] = $metadata['call_id']
+                    ?? ($metadata['call_identifier'] ?? null)
+                    ?? ($metadataNotes['call_session_id'] ?? $metadataNotes['call_session'] ?? $metadataNotes['callSessionId'] ?? $metadataNotes['call_id'] ?? $metadataNotes['callId'] ?? null);
+            }
+
+            if (! ($context['channel_name'] ?? null)) {
+                $context['channel_name'] = $transaction->channel_name
+                    ?? ($metadata['channel_name'] ?? null)
+                    ?? ($metadataNotes['channel_name'] ?? $metadataNotes['channelName'] ?? null);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return $context;
+    }
+
+    protected function hydrateContextFromVideoApointment(array $context, ?string $orderId): array
+    {
+        $orderId = trim((string) $orderId);
+        if ($orderId === '' || !Schema::hasTable('video_apointment')) {
+            return $context;
+        }
+
+        try {
+            $videoApointment = VideoApointment::query()
+                ->where('order_id', $orderId)
+                ->latest('id')
+                ->first();
+
+            if (! $videoApointment) {
+                return $context;
+            }
+
+            if (! ($context['doctor_id'] ?? null)) {
+                $context['doctor_id'] = $this->toNullableInt($videoApointment->doctor_id);
+            }
+            if (! ($context['user_id'] ?? null)) {
+                $context['user_id'] = $this->toNullableInt($videoApointment->user_id);
+            }
+            if (! ($context['pet_id'] ?? null)) {
+                $context['pet_id'] = $this->toNullableInt($videoApointment->pet_id);
+            }
+            if (! ($context['clinic_id'] ?? null)) {
+                $context['clinic_id'] = $this->toNullableInt($videoApointment->clinic_id);
+            }
+            if (! ($context['call_identifier'] ?? null) && !empty($videoApointment->call_session)) {
+                $context['call_identifier'] = (string) $videoApointment->call_session;
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return $context;
+    }
+
+    protected function mergeContextIntoNotes(array $notes, array $context): array
+    {
+        foreach (['clinic_id', 'doctor_id', 'user_id', 'pet_id'] as $key) {
+            $value = $context[$key] ?? null;
+            if (($notes[$key] ?? null) === null || ($notes[$key] ?? '') === '') {
+                if ($value !== null && $value !== '') {
+                    $notes[$key] = (string) $value;
+                }
+            }
+        }
+
+        if (($notes['call_session_id'] ?? null) === null || ($notes['call_session_id'] ?? '') === '') {
+            $callIdentifier = $context['call_identifier'] ?? null;
+            if ($callIdentifier !== null && $callIdentifier !== '') {
+                $notes['call_session_id'] = (string) $callIdentifier;
+            }
+        }
+
+        if (($notes['channel_name'] ?? null) === null || ($notes['channel_name'] ?? '') === '') {
+            $channelName = $context['channel_name'] ?? null;
+            if ($channelName !== null && $channelName !== '') {
+                $notes['channel_name'] = (string) $channelName;
+            }
+        }
+
+        return $notes;
     }
 
     protected function firstFilled(Request $request, array $keys, array $notes = [])
