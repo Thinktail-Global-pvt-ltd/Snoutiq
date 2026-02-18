@@ -639,19 +639,9 @@ class PaymentController extends Controller
         }
 
         $grossPaise = max(0, (int) $grossPaise);
-        $gstNumber = trim((string) ($notes['gst_number'] ?? $notes['gstNumber'] ?? ''));
-        $gstNumberGiven = $notes['gst_number_given'] ?? $notes['gstNumberGiven'] ?? null;
-        $shouldSkipGstDeduction = $gstNumber !== '' && $this->isTruthyFlag($gstNumberGiven);
-
-        if ($shouldSkipGstDeduction) {
-            // If GST number is provided and flagged by client, do not reverse-cut GST from paid amount.
-            $amountBeforeGstPaise = $grossPaise;
-            $gstPaise = 0;
-        } else {
-            // Default flow: client amount is GST-inclusive (e.g. 590 for base 500), reverse-calculate base first.
-            $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
-            $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
-        }
+        // Always reverse-cut GST from paid amount.
+        $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
+        $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
 
         $snoutiqSharePaise = min(20000, $amountBeforeGstPaise); // Rs 200 fixed share for Snoutiq
         $doctorSharePaise = max(0, $amountBeforeGstPaise - $snoutiqSharePaise);
@@ -661,7 +651,7 @@ class PaymentController extends Controller
             'gst_paise' => $gstPaise,
             'amount_after_gst_paise' => $amountBeforeGstPaise,
             'amount_before_gst_paise' => $amountBeforeGstPaise,
-            'gst_deducted_from_amount' => ! $shouldSkipGstDeduction,
+            'gst_deducted_from_amount' => true,
             'payment_to_snoutiq_paise' => $snoutiqSharePaise,
             'payment_to_doctor_paise' => $doctorSharePaise,
         ];
@@ -1577,24 +1567,6 @@ class PaymentController extends Controller
         }
 
         return null;
-    }
-
-    protected function isTruthyFlag($value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_numeric($value)) {
-            return (int) $value === 1;
-        }
-
-        if (is_string($value)) {
-            $normalized = strtolower(trim($value));
-            return in_array($normalized, ['1', 'true', 'yes', 'y'], true);
-        }
-
-        return false;
     }
 
     protected function lookupDoctorClinicId(?int $doctorId): ?int
