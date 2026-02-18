@@ -18,6 +18,7 @@ use App\Services\DoctorAvailabilityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
 class AdminPanelController extends Controller
@@ -323,20 +324,69 @@ class AdminPanelController extends Controller
                 ->withErrors(['doctor_id' => 'Please select a valid Excel-export doctor (exported_from_excell = 1).']);
         }
 
-        $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
-        $metadata['doctor_id'] = (int) $doctor->id;
-        $metadata['clinic_id'] = $doctor->vet_registeration_id ? (int) $doctor->vet_registeration_id : null;
+        $previousDoctorId = $transaction->doctor_id ? (int) $transaction->doctor_id : null;
+        $previousClinicId = $transaction->clinic_id ? (int) $transaction->clinic_id : null;
+        $nextDoctorId = (int) $doctor->id;
+        $nextClinicId = $doctor->vet_registeration_id ? (int) $doctor->vet_registeration_id : null;
 
-        $transaction->doctor_id = (int) $doctor->id;
-        $transaction->clinic_id = $doctor->vet_registeration_id ? (int) $doctor->vet_registeration_id : null;
+        if ($previousDoctorId === $nextDoctorId && $previousClinicId === $nextClinicId) {
+            return redirect()
+                ->route('admin.transactions.appointments')
+                ->with('status', sprintf(
+                    'No change for transaction #%d. Doctor already assigned: %s (ID: %d).',
+                    $transaction->id,
+                    $doctor->doctor_name ?? 'N/A',
+                    $doctor->id
+                ));
+        }
+
+        $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
+        $metadata['doctor_id'] = $nextDoctorId;
+        $metadata['clinic_id'] = $nextClinicId;
+
+        $assignmentLogEntry = [
+            'changed_at' => now()->toIso8601String(),
+            'changed_by_user_id' => optional($request->user())->id,
+            'changed_by_name' => optional($request->user())->name,
+            'previous_doctor_id' => $previousDoctorId,
+            'previous_clinic_id' => $previousClinicId,
+            'new_doctor_id' => $nextDoctorId,
+            'new_clinic_id' => $nextClinicId,
+        ];
+
+        $history = data_get($metadata, 'doctor_assignment_logs', []);
+        if (!is_array($history)) {
+            $history = [];
+        }
+        $history[] = $assignmentLogEntry;
+        $metadata['doctor_assignment_logs'] = $history;
+        $metadata['last_doctor_assignment'] = $assignmentLogEntry;
+
+        $transaction->doctor_id = $nextDoctorId;
+        $transaction->clinic_id = $nextClinicId;
         $transaction->metadata = $metadata;
         $transaction->save();
+
+        if (Schema::hasTable('transaction_doctor_assignment_logs')) {
+            DB::table('transaction_doctor_assignment_logs')->insert([
+                'transaction_id' => $transaction->id,
+                'previous_doctor_id' => $previousDoctorId,
+                'previous_clinic_id' => $previousClinicId,
+                'new_doctor_id' => $nextDoctorId,
+                'new_clinic_id' => $nextClinicId,
+                'changed_by_user_id' => optional($request->user())->id,
+                'changed_by_name' => optional($request->user())->name,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         return redirect()
             ->route('admin.transactions.appointments')
             ->with('status', sprintf(
-                'Doctor/clinic updated for transaction #%d. Assigned: %s (ID: %d), Clinic ID: %s.',
+                'Doctor/clinic updated for transaction #%d. Previous Doctor ID: %s, Assigned: %s (ID: %d), Clinic ID: %s.',
                 $transaction->id,
+                $previousDoctorId ?? 'NULL',
                 $doctor->doctor_name ?? 'N/A',
                 $doctor->id,
                 $transaction->clinic_id ?? 'NULL'
