@@ -804,6 +804,7 @@
             <select id="visit-category" name="visit_category" class="pv-input">
               <option value="vaccination">Vaccination</option>
               <option value="consultation">Consultation</option>
+              <option value="video_consultation">Video Consultation</option>
               <option value="followup">Follow-up</option>
             </select>
           </div>
@@ -1005,6 +1006,7 @@
     recordForm: document.getElementById('record-form'),
     doctorSelect: document.getElementById('doctor-select'),
     recordPet: document.getElementById('record-pet'),
+    recordNotes: document.getElementById('record-notes'),
     medicationsList: document.getElementById('medications-list'),
     medicationsEmpty: document.getElementById('medications-empty'),
     medicationsJson: document.getElementById('medications-json'),
@@ -1278,8 +1280,18 @@
     card.classList.toggle('pv-hidden', !visible);
   }
 
+  function normalizeVisitCategoryValue(value) {
+    const raw = String(value ?? '').trim().toLowerCase();
+    if (!raw) return '';
+    if (raw === 'follow_up' || raw === 'followup') return 'followup';
+    if (raw === 'video_consult' || raw === 'video-consult' || raw === 'video_consultation' || raw === 'video consultation') {
+      return 'video_consultation';
+    }
+    return raw;
+  }
+
   function updateVisitCategoryUI(category) {
-    const cat = category || els.visitCategory?.value || '';
+    const cat = normalizeVisitCategoryValue(category || els.visitCategory?.value || '');
     if (!cat) {
       setCardVisible(els.clinicalCard, true);
       setCardVisible(els.diagnosisCard, true);
@@ -1288,11 +1300,12 @@
       return;
     }
     const isVaccination = cat === 'vaccination';
+    const isVideoConsultation = cat === 'video_consultation';
     const isFollowUp = cat === 'followup' || cat === 'follow_up';
 
-    setCardVisible(els.clinicalCard, !isVaccination);
-    setCardVisible(els.diagnosisCard, !isVaccination);
-    setCardVisible(els.treatmentCard, !isVaccination);
+    setCardVisible(els.clinicalCard, !isVaccination && !isVideoConsultation);
+    setCardVisible(els.diagnosisCard, !isVaccination && !isVideoConsultation);
+    setCardVisible(els.treatmentCard, !isVaccination || isVideoConsultation);
     setCardVisible(els.followupCard, true); // always shown but contextual
 
     if (isFollowUp && els['diagnosis-status']) {
@@ -1507,6 +1520,37 @@
     if (!raw) return null;
     const num = Number(raw);
     return Number.isFinite(num) ? num : null;
+  }
+
+  function getSelectedPet() {
+    const selectedPetId = getSelectedPetId();
+    if (!selectedPetId || !state.selectedId) return null;
+    const patient = state.patients.find((p) => Number(p.id) === Number(state.selectedId));
+    if (!patient) return null;
+    return getPatientPets(patient).find((pet) => Number(pet.id ?? pet.pet_id) === Number(selectedPetId)) || null;
+  }
+
+  function autofillVisitNotesFromSelectedPet({ onlyWhenEmpty = true } = {}) {
+    if (!els.recordNotes) return;
+    const selectedPet = getSelectedPet();
+    const symptom = String(selectedPet?.reported_symptom ?? '').trim();
+    const currentValue = String(els.recordNotes.value ?? '').trim();
+    const previousAutofill = String(els.recordNotes.dataset.autofillSymptom ?? '').trim();
+
+    if (!symptom) {
+      if (previousAutofill && currentValue === previousAutofill) {
+        els.recordNotes.value = '';
+      }
+      delete els.recordNotes.dataset.autofillSymptom;
+      return;
+    }
+
+    if (onlyWhenEmpty && currentValue && currentValue !== previousAutofill) {
+      return;
+    }
+
+    els.recordNotes.value = symptom;
+    els.recordNotes.dataset.autofillSymptom = symptom;
   }
 
   function renderTagFilters() {
@@ -2042,6 +2086,9 @@
   function resetRecordForm() {
     state.editingRecordId = null;
     els.recordForm?.reset();
+    if (els.recordNotes) {
+      delete els.recordNotes.dataset.autofillSymptom;
+    }
     if (els.caseSeverity) {
       els.caseSeverity.value = 'general';
     }
@@ -2076,16 +2123,15 @@
     if (recordUserInput) recordUserInput.value = rec.user_id;
     const recordFile = document.getElementById('record-file');
     if (recordFile) recordFile.required = false;
-    const normalizeVisitCategory = (val) => {
-      if (val === 'follow_up') return 'followup';
-      return val ?? '';
-    };
     const mapValue = (id, value) => {
       const el = document.getElementById(id);
       if (el) el.value = value ?? '';
     };
     mapValue('record-notes', rec.notes ?? prescription.visit_notes ?? '');
-    mapValue('visit-category', normalizeVisitCategory(prescription.visit_category));
+    if (els.recordNotes) {
+      delete els.recordNotes.dataset.autofillSymptom;
+    }
+    mapValue('visit-category', normalizeVisitCategoryValue(prescription.visit_category));
     mapValue('case-severity', prescription.case_severity ?? '');
     mapValue('doctor-select', rec.doctor_id ?? prescription.doctor_id ?? DEFAULT_DOCTOR_ID ?? '');
     mapValue('temperature', prescription.temperature ?? '');
@@ -2140,6 +2186,7 @@
       addMedication();
     }
     renderPetSelect(patient);
+    autofillVisitNotesFromSelectedPet({ onlyWhenEmpty: true });
     recomputeLastPostOp();
     if (els.doctorSelect && DEFAULT_DOCTOR_ID) {
       els.doctorSelect.value = DEFAULT_DOCTOR_ID;
@@ -2214,6 +2261,14 @@
     });
     els.recordPet?.addEventListener('change', () => {
       recomputeLastPostOp();
+      autofillVisitNotesFromSelectedPet({ onlyWhenEmpty: true });
+    });
+    els.recordNotes?.addEventListener('input', () => {
+      const autoFilled = String(els.recordNotes.dataset.autofillSymptom ?? '').trim();
+      if (!autoFilled) return;
+      if (String(els.recordNotes.value ?? '').trim() !== autoFilled) {
+        delete els.recordNotes.dataset.autofillSymptom;
+      }
     });
     renderFollowupContext();
 

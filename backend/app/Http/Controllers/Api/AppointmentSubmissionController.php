@@ -406,6 +406,67 @@ class AppointmentSubmissionController extends Controller
             ->get();
 
         $owner = $pet->owner;
+        $petPayload = $pet->toArray();
+        foreach (['vaccine_reminder_status', 'dog_disease_payload', 'medical_history', 'vaccination_log'] as $jsonField) {
+            if (array_key_exists($jsonField, $petPayload)) {
+                $petPayload[$jsonField] = $this->decodeJsonField($petPayload[$jsonField]);
+            }
+        }
+
+        $userLookup = $this->buildUserLookup($appointments);
+        $appointmentUserIds = [];
+        $patientUserByAppointment = [];
+        foreach ($appointments as $appointment) {
+            $notes = $this->decodeNotes($appointment->notes);
+            $patientUserId = $this->resolvePatientUserId($appointment, $notes, $userLookup);
+            if ($patientUserId) {
+                $appointmentUserIds[] = (int) $patientUserId;
+                $patientUserByAppointment[$appointment->id] = (int) $patientUserId;
+            }
+        }
+
+        $allUserIds = array_values(array_unique(array_filter(array_merge(
+            $appointmentUserIds,
+            $owner ? [(int) $owner->id] : []
+        ))));
+
+        $usersById = collect();
+        if (!empty($allUserIds)) {
+            $usersById = User::query()->whereIn('id', $allUserIds)->get()->keyBy('id');
+        }
+
+        $appointmentIds = $appointments->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $prescriptionsFull = $this->fetchPrescriptionsForPetAppointments((int) $pet->id, $allUserIds, $appointmentIds);
+
+        $prescriptionsByAppointment = [];
+        foreach ($prescriptionsFull as $prescription) {
+            $appointmentId = $prescription['video_appointment_id'] ?? null;
+            if (is_numeric($appointmentId)) {
+                $prescriptionsByAppointment[(int) $appointmentId][] = $prescription;
+            }
+        }
+
+        $appointmentsFull = $appointments->map(function (Appointment $appointment) use ($patientUserByAppointment, $usersById, $owner, $petPayload, $prescriptionsByAppointment) {
+            $patientUserId = $patientUserByAppointment[$appointment->id] ?? null;
+            $resolvedUser = null;
+            if ($patientUserId && $usersById->has($patientUserId)) {
+                $resolvedUser = $usersById->get($patientUserId)?->toArray();
+            } elseif ($owner) {
+                $resolvedUser = $owner->toArray();
+            }
+
+            $appointmentPayload = $appointment->toArray();
+            $appointmentPayload['notes_decoded'] = $this->decodeNotes($appointment->notes);
+
+            return [
+                'appointment' => $appointmentPayload,
+                'pet' => $petPayload,
+                'user' => $resolvedUser,
+                'clinic' => $appointment->clinic?->toArray(),
+                'doctor' => $appointment->doctor?->toArray(),
+                'prescriptions' => $prescriptionsByAppointment[$appointment->id] ?? [],
+            ];
+        })->values()->all();
 
         return response()->json([
             'success' => true,
@@ -421,6 +482,11 @@ class AppointmentSubmissionController extends Controller
                 ] : null,
                 'count' => $appointments->count(),
                 'appointments' => $this->formatAppointments($appointments),
+                'pet_full' => $petPayload,
+                'owner_full' => $owner?->toArray(),
+                'users_full' => $usersById->map(fn (User $user) => $user->toArray())->values()->all(),
+                'prescriptions_full' => $prescriptionsFull,
+                'appointments_full' => $appointmentsFull,
             ],
         ]);
     }
@@ -680,6 +746,61 @@ class AppointmentSubmissionController extends Controller
 
         $decoded = json_decode($value, true);
         return json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
+    }
+
+    private function fetchPrescriptionsForPetAppointments(int $petId, array $userIds, array $appointmentIds): array
+    {
+        if (!Schema::hasTable('prescriptions')) {
+            return [];
+        }
+
+        $hasPetId = Schema::hasColumn('prescriptions', 'pet_id');
+        $hasUserId = Schema::hasColumn('prescriptions', 'user_id');
+        $hasVideoAppointmentId = Schema::hasColumn('prescriptions', 'video_appointment_id');
+
+        if (!$hasPetId && !$hasUserId && !$hasVideoAppointmentId) {
+            return [];
+        }
+
+        $query = DB::table('prescriptions');
+        $query->where(function ($q) use ($hasPetId, $hasUserId, $hasVideoAppointmentId, $petId, $userIds, $appointmentIds) {
+            $hasCondition = false;
+
+            if ($hasPetId) {
+                $q->where('pet_id', $petId);
+                $hasCondition = true;
+            }
+
+            if ($hasUserId && !empty($userIds)) {
+                if ($hasCondition) {
+                    $q->orWhereIn('user_id', $userIds);
+                } else {
+                    $q->whereIn('user_id', $userIds);
+                }
+                $hasCondition = true;
+            }
+
+            if ($hasVideoAppointmentId && !empty($appointmentIds)) {
+                if ($hasCondition) {
+                    $q->orWhereIn('video_appointment_id', $appointmentIds);
+                } else {
+                    $q->whereIn('video_appointment_id', $appointmentIds);
+                }
+            }
+        });
+
+        return $query
+            ->orderByDesc('id')
+            ->get()
+            ->map(function ($row) {
+                $payload = (array) $row;
+                if (array_key_exists('medications_json', $payload)) {
+                    $payload['medications_json'] = $this->decodeJsonField($payload['medications_json']);
+                }
+                return $payload;
+            })
+            ->values()
+            ->all();
     }
 
     private function appointmentDateTime(Appointment $appointment, string $timezone): ?Carbon

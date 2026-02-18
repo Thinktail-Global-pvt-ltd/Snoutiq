@@ -232,6 +232,9 @@ class ClinicsController extends Controller
                 if (Schema::hasColumn('pets', 'weight')) {
                     $petColumns[] = 'weight';
                 }
+                if (Schema::hasColumn('pets', 'reported_symptom')) {
+                    $petColumns[] = 'reported_symptom';
+                }
 
                 $petRows = DB::table('pets')
                     ->select($petColumns)
