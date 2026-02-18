@@ -558,6 +558,7 @@ class AuthController extends Controller
             'token' => 'required|string',
             'otp'   => 'required|string',
             'phone' => 'required|string',
+            'referral_clinic_id' => 'nullable|integer',
             'pet_id' => 'nullable|integer',
             'petId' => 'nullable|integer',
             'lat'   => 'nullable|numeric',
@@ -581,6 +582,9 @@ class AuthController extends Controller
             return response()->json(['error' => 'Invalid or expired OTP'], 401);
         }
 
+        $referralClinicId = $request->input('referral_clinic_id');
+        $hasLastVetIdColumn = Schema::hasColumn('users', 'last_vet_id');
+
         [$latitude, $longitude] = $this->extractGeo($request);
 
         if ($otpEntry->is_verified) {
@@ -601,6 +605,17 @@ class AuthController extends Controller
                 }
             }
 
+            if (
+                $existingUser
+                && $hasLastVetIdColumn
+                && $referralClinicId !== null
+                && $referralClinicId !== ''
+                && empty($existingUser->last_vet_id)
+            ) {
+                $existingUser->last_vet_id = (int) $referralClinicId;
+                $existingUser->save();
+            }
+
             $lastVetSlug = $this->ensureLastVetSlug($existingUser);
             [$pets, $userPets] = $this->loadRelatedPets($existingUser);
             $pets = $this->withPetDoc2BlobUrls($pets);
@@ -613,6 +628,7 @@ class AuthController extends Controller
                 'message' => 'OTP already verified',
                 'user_id' => $existingUser?->id,
                 'user'    => $existingUser,
+                'last_vet_id' => $existingUser?->last_vet_id,
                 'last_vet_slug' => $lastVetSlug,
                 'slug' => $lastVetSlug,
                 'pets'    => $pets,
@@ -659,6 +675,16 @@ class AuthController extends Controller
             ], $geoUpdates))->save();
         }
 
+        if (
+            $hasLastVetIdColumn
+            && $referralClinicId !== null
+            && $referralClinicId !== ''
+            && empty($user->last_vet_id)
+        ) {
+            $user->last_vet_id = (int) $referralClinicId;
+            $user->save();
+        }
+
         $this->markPhoneVerified($user, $normalizedPhone, $otpEntry);
         $lastVetSlug = $this->ensureLastVetSlug($user);
         [$pets, $userPets] = $this->loadRelatedPets($user);
@@ -672,6 +698,7 @@ class AuthController extends Controller
             'message' => 'OTP verified successfully',
             'user_id' => $user->id,
             'user'    => $user,
+            'last_vet_id' => $user->last_vet_id,
             'last_vet_slug' => $lastVetSlug,
             'slug' => $lastVetSlug,
             'pets'    => $pets,
