@@ -20,7 +20,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { buildVetsFromApi } from "./Vetsscreen";
+import { buildVetsFromApi, loadVetsWithFallback } from "./Vetsscreen";
 
 const DOCTOR_PROFILES = [
   {
@@ -59,8 +59,6 @@ const DOCTOR_PROFILES = [
 ];
 
 const HERO_SLIDES = DOCTOR_PROFILES;
-const VETS_API_URL =
-  "https://snoutiq.com/backend/api/exported_from_excell_doctors";
 const REVIEWS = [
   {
     name: "Aditi Sharma - Dog: Bruno (Labrador)",
@@ -222,20 +220,16 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       setVetsLoading(true);
       setVetsError("");
       try {
-        const res = await fetch(VETS_API_URL);
-        const data = await res.json();
+        const data = await loadVetsWithFallback();
         if (!ignore) {
-          if (data?.success && Array.isArray(data?.data)) {
-            setVets(buildVetsFromApi(data.data));
-          } else {
-            setVets([]);
-            setVetsError("Could not load vets right now.");
-          }
+          const list = Array.isArray(data) ? buildVetsFromApi(data) : [];
+          setVets(list);
+          if (!list.length) setVetsError("");
         }
       } catch (error) {
         if (!ignore) {
           setVets([]);
-          setVetsError("Network error while loading vets.");
+          setVetsError(error?.message || "Network error while loading vets.");
         }
       } finally {
         if (!ignore) setVetsLoading(false);
