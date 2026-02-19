@@ -1,10 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+// src/screens/VetsScreen.jsx
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
-import {
-  Header,
-  PET_FLOW_STEPS,
-  ProgressBar,
-} from "../components/Sharedcomponents";
+import { Header, PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
 import {
   Clock,
   Zap,
@@ -16,10 +13,87 @@ import {
   X,
 } from "lucide-react";
 
-const API_URL = "https://snoutiq.com/backend/api/exported_from_excell_doctors";
-const BACKEND_BASE = "https://snoutiq.com/backend";
+/**
+ * ✅ Fixes in this full code:
+ * 1) Same-origin + fallback API URLs (works on mobile + desktop, www/non-www)
+ * 2) Strict JSON fetch (detects HTML/redirect/500 and shows real error)
+ * 3) cache: "no-store" + AbortController timeout
+ * 4) Retry button (no need to refresh manually)
+ */
+
+const API_PATH = "/backend/api/exported_from_excell_doctors";
+const DEFAULT_BACKEND_ORIGIN = "https://snoutiq.com";
 
 /* ---------------- helpers ---------------- */
+
+const getSafeOrigin = () => {
+  if (typeof window === "undefined") return DEFAULT_BACKEND_ORIGIN;
+  const origin = window.location.origin;
+  // local dev → still use production backend by default
+  if (origin.includes("localhost") || origin.includes("127.0.0.1")) return DEFAULT_BACKEND_ORIGIN;
+  return origin;
+};
+
+const BACKEND_BASE = `${getSafeOrigin()}/backend`;
+
+const buildApiCandidates = () => {
+  const origin = getSafeOrigin();
+  return Array.from(
+    new Set([
+      `${origin}${API_PATH}`,
+      `https://snoutiq.com${API_PATH}`,
+      `https://www.snoutiq.com${API_PATH}`,
+    ])
+  );
+};
+
+const fetchJsonStrict = async (url, { timeoutMs = 15000 } = {}) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+
+    const contentType = res.headers.get("content-type") || "";
+    const text = await res.text();
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${text.slice(0, 140)}`);
+    }
+    if (!contentType.includes("application/json")) {
+      throw new Error(`Non-JSON response (${contentType || "unknown"}): ${text.slice(0, 140)}`);
+    }
+
+    return JSON.parse(text);
+  } catch (e) {
+    if (e?.name === "AbortError") throw new Error("Request timed out. Please try again.");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const loadVetsWithFallback = async () => {
+  const candidates = buildApiCandidates();
+  let lastErr = null;
+
+  for (const url of candidates) {
+    try {
+      const json = await fetchJsonStrict(url);
+      if (json?.success && Array.isArray(json?.data)) return json.data;
+      lastErr = new Error("Invalid API response shape");
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
+  throw lastErr || new Error("Network error while loading vets.");
+};
 
 const normalizeImageUrl = (value) => {
   if (!value) return "";
@@ -29,6 +103,7 @@ const normalizeImageUrl = (value) => {
   const lower = trimmed.toLowerCase();
   if (lower === "null" || lower === "undefined") return "";
 
+  // fix duplicated prefix bug
   if (lower.includes("https://snoutiq.com/https://snoutiq.com/")) {
     return trimmed.replace(
       "https://snoutiq.com/https://snoutiq.com/",
@@ -36,19 +111,15 @@ const normalizeImageUrl = (value) => {
     );
   }
 
-  // ✅ already absolute (http/https/data)
-  if (
-    lower.startsWith("http://") ||
-    lower.startsWith("https://") ||
-    lower.startsWith("data:")
-  ) {
+  // already absolute
+  if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("data:")) {
     return trimmed;
   }
 
-  // ✅ handle "/photo/..." or "photo/..."
+  // handle "/photo/..." or "photo/..."
   let cleaned = trimmed.replace(/^\/+/, "");
 
-  // ✅ avoid backend/backend if API gives "backend/photo/.."
+  // avoid backend/backend if API gives "backend/photo/.."
   if (cleaned.toLowerCase().startsWith("backend/")) {
     cleaned = cleaned.slice("backend/".length);
   }
@@ -72,8 +143,7 @@ const getInitials = (name = "") => {
 
 const parseListField = (value) => {
   if (!value) return [];
-  if (Array.isArray(value))
-    return value.map((x) => String(x).trim()).filter(Boolean);
+  if (Array.isArray(value)) return value.map((x) => String(x).trim()).filter(Boolean);
 
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -81,16 +151,12 @@ const parseListField = (value) => {
     if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
       try {
         const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed))
-          return parsed.map((x) => String(x).trim()).filter(Boolean);
+        if (Array.isArray(parsed)) return parsed.map((x) => String(x).trim()).filter(Boolean);
       } catch {
         // ignore
       }
     }
-    return trimmed
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean);
+    return trimmed.split(",").map((x) => x.trim()).filter(Boolean);
   }
   return [String(value).trim()].filter(Boolean);
 };
@@ -155,12 +221,7 @@ const normalizeBreakTimes = (value) => {
   return list.filter((item) => {
     const cleaned = String(item).toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!cleaned) return false;
-    if (
-      ["no", "none", "nil", "na", "n/a", "noany", "notavailable"].includes(
-        cleaned
-      )
-    )
-      return false;
+    if (["no", "none", "nil", "na", "n/a", "noany", "notavailable"].includes(cleaned)) return false;
     if (cleaned.startsWith("no")) return false;
     return true;
   });
@@ -175,12 +236,7 @@ const normalizeSpecialties = (specializationText = "") => {
   raw.forEach((t) => {
     if (t.includes("dog")) mapped.add("dog");
     if (t.includes("cat")) mapped.add("cat");
-    if (
-      t.includes("exotic") ||
-      t.includes("bird") ||
-      t.includes("rabbit") ||
-      t.includes("turtle")
-    )
+    if (t.includes("exotic") || t.includes("bird") || t.includes("rabbit") || t.includes("turtle"))
       mapped.add("exotic");
   });
   return Array.from(mapped);
@@ -235,9 +291,9 @@ const clipText = (text, max = 160) => {
 };
 
 /**
- * ✅ IMPORTANT CHANGES:
- * 1) HIDE DEMO/INVALID vets: if day OR night rate <= 1 => do not show
- * 2) Keep priceDay/priceNight numbers
+ * ✅ IMPORTANT:
+ * - HIDE DEMO/INVALID vets: if day OR night rate <= 1 => do not show
+ * - Keep priceDay/priceNight numbers
  */
 export const buildVetsFromApi = (apiData = []) => {
   const list = [];
@@ -249,9 +305,7 @@ export const buildVetsFromApi = (apiData = []) => {
         doc?.specialization_select_all_that_apply
       );
       const degreeData = buildDegreeData(doc?.degree);
-      const breakTimes = normalizeBreakTimes(
-        doc?.break_do_not_disturb_time_example_2_4_pm
-      );
+      const breakTimes = normalizeBreakTimes(doc?.break_do_not_disturb_time_example_2_4_pm);
 
       const seedBase = seedFromValue(
         doc?.id ||
@@ -265,7 +319,6 @@ export const buildVetsFromApi = (apiData = []) => {
       const priceNight = toNumber(doc?.video_night_rate, 0);
 
       // ✅ hide demo/invalid pricing doctors (₹1 or less)
-      // e.g. Demo account don’t book (1.00)
       if (priceDay <= 1 || priceNight <= 1) return;
 
       list.push({
@@ -277,7 +330,6 @@ export const buildVetsFromApi = (apiData = []) => {
         degreeList: degreeData.list,
         experience: toOptionalNumber(doc?.years_of_experience),
 
-        // ✅ use blob endpoint when available, fallback to other URL fields
         image: normalizeImageUrl(getDoctorImageSource(doc)),
 
         priceDay,
@@ -292,14 +344,10 @@ export const buildVetsFromApi = (apiData = []) => {
         specializationText: normalizeText(specializationData.text),
 
         responseDay: normalizeText(doc?.response_time_for_online_consults_day),
-        responseNight: normalizeText(
-          doc?.response_time_for_online_consults_night
-        ),
+        responseNight: normalizeText(doc?.response_time_for_online_consults_night),
 
         breakTimes,
-        followUp: normalizeText(
-          doc?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta
-        ),
+        followUp: normalizeText(doc?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta),
         bio: normalizeText(doc?.bio),
         raw: doc,
       });
@@ -340,10 +388,7 @@ const InfoRow = ({ icon: Icon, label, value, subValue }) => {
         <div className="text-sm font-semibold text-slate-900 leading-5 break-words">
           {showValue ? value : null}
           {showValue && showSubValue ? (
-            <span className="text-slate-400 font-semibold">
-              {" "}
-              {" • "} {subValue}
-            </span>
+            <span className="text-slate-400 font-semibold"> {" • "} {subValue}</span>
           ) : null}
           {!showValue && showSubValue ? (
             <span className="text-slate-900 font-semibold">{subValue}</span>
@@ -363,47 +408,46 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
   const [activeBioVet, setActiveBioVet] = useState(null);
   const [brokenImages, setBrokenImages] = useState(() => new Set());
 
-  const markImageBroken = (id) => {
+  const markImageBroken = useCallback((id) => {
     if (!id) return;
     setBrokenImages((prev) => {
       const next = new Set(prev);
       next.add(id);
       return next;
     });
-  };
+  }, []);
+
+  const fetchVets = useCallback(async () => {
+    setLoading(true);
+    setErrMsg("");
+
+    try {
+      const data = await loadVetsWithFallback();
+      const list = buildVetsFromApi(data);
+      setVets(list);
+      if (!list.length) setErrMsg(""); // keep clean; "No vets found" UI will show
+    } catch (e) {
+      console.error("[VetsScreen] load failed:", e);
+      setVets([]);
+      setErrMsg(e?.message || "Network error while loading vets.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let ignore = false;
 
-    const load = async () => {
-      setLoading(true);
-      setErrMsg("");
-      try {
-        const res = await fetch(API_URL);
-        const json = await res.json();
-        if (!ignore) {
-          if (json?.success && Array.isArray(json?.data)) {
-            setVets(buildVetsFromApi(json.data));
-          } else {
-            setVets([]);
-            setErrMsg("Could not load vets right now.");
-          }
-        }
-      } catch {
-        if (!ignore) {
-          setVets([]);
-          setErrMsg("Network error while loading vets.");
-        }
-      } finally {
-        if (!ignore) setLoading(false);
-      }
+    const run = async () => {
+      if (ignore) return;
+      await fetchVets();
     };
 
-    load();
+    run();
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [fetchVets]);
 
   const sortedVets = useMemo(() => {
     const base = [...vets];
@@ -416,7 +460,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
       if (aMatch && !bMatch) return -1;
       if (!aMatch && bMatch) return 1;
 
-      // sort by price of current slot (day/night) so list is meaningful
       const isDay = isDayTime();
       const aPrice = isDay ? a.priceDay : a.priceNight;
       const bPrice = isDay ? b.priceDay : b.priceNight;
@@ -435,9 +478,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-slate-900">
-                {petDetails?.name
-                  ? `Vets for ${petDetails.name}`
-                  : "Available Vets"}
+                {petDetails?.name ? `Vets for ${petDetails.name}` : "Available Vets"}
               </h2>
               <p className="mt-2 text-sm md:text-base text-slate-500 max-w-3xl">
                 Choose a vet based on your pet and consult price.
@@ -455,8 +496,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
           <div className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 border border-slate-200 shadow-sm text-slate-600">
             <Clock size={18} />
             <span className="text-sm md:text-base">
-              Average response time:{" "}
-              <strong className="text-slate-900">8 mins</strong>
+              Average response time: <strong className="text-slate-900">8 mins</strong>
             </span>
           </div>
         </div>
@@ -470,26 +510,36 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
         ) : errMsg ? (
           <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
             <div className="text-red-600 font-bold">{errMsg}</div>
-            <div className="text-slate-500 text-sm mt-2">
-              Try again or check network.
+            <div className="text-slate-500 text-sm mt-2">Try again or check network.</div>
+
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={fetchVets}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+              >
+                Try again
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                Reload page
+              </button>
             </div>
           </div>
         ) : sortedVets.length === 0 ? (
           <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
             <div className="text-slate-900 font-bold">No vets found.</div>
-            <div className="text-slate-500 text-sm mt-2">
-              Please try again later.
-            </div>
+            <div className="text-slate-500 text-sm mt-2">Please try again later.</div>
           </div>
         ) : (
           <div className="mt-8 grid gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
             {sortedVets.map((vet) => {
-              const isSpecialist =
-                petDetails?.type && vet.specialties?.includes(petDetails.type);
-
               const showDayPrice = isDayTime();
               const priceValue = showDayPrice ? vet.priceDay : vet.priceNight;
-              const price = formatPrice(priceValue);
 
               const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
               const initials = getInitials(vet.name);
@@ -498,10 +548,10 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               const experienceLabel = hasDisplayValue(vet.experience)
                 ? `${vet.experience} years exp.`
                 : "";
+
               const specializationValue = hasDisplayValue(vet.specializationText)
                 ? vet.specializationText
-                : Array.isArray(vet.specializationList) &&
-                  vet.specializationList.length
+                : Array.isArray(vet.specializationList) && vet.specializationList.length
                 ? vet.specializationList.join(", ")
                 : "";
 
@@ -599,7 +649,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         View full profile <ChevronRight size={16} />
                       </button>
 
-                      {/* ✅ IMPORTANT: Day time => day price booking, Night time => night price booking */}
                       <Button
                         onClick={() =>
                           onSelect?.({
@@ -611,21 +660,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         className="h-11 px-5 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-sm text-sm inline-flex items-center gap-3"
                       >
                         <span className="font-semibold">Consult Now</span>
-
-                        {/* optional small label */}
-                        {/* <span className="text-[11px] font-semibold text-white/80">
-                          {showDayPrice ? "Day" : "Night"}
-                        </span> */}
-
-                        {/* {price ? (
-                          <span className="ml-1 rounded-xl bg-white/15 px-3 py-1 text-[13px] font-extrabold">
-                            {price}
-                          </span>
-                        ) : (
-                          <span className="ml-1 rounded-xl bg-white/15 px-3 py-1 text-[12px] font-bold">
-                            Ask
-                          </span>
-                        )} */}
                       </Button>
                     </div>
                   </div>
@@ -643,9 +677,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
           <div className="w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/90 backdrop-blur px-5 py-4 md:px-7">
               <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-wider text-slate-400">
-                  Vet Profile
-                </p>
+                <p className="text-[11px] uppercase tracking-wider text-slate-400">Vet Profile</p>
                 <h3 className="truncate text-lg font-extrabold text-slate-900 md:text-xl">
                   {activeBioVet.name}
                 </h3>
@@ -670,8 +702,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 md:p-7">
                 <div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-8">
                   <div className="shrink-0">
-                    {activeBioVet?.image &&
-                    !brokenImages.has(activeBioVet.id) ? (
+                    {activeBioVet?.image && !brokenImages.has(activeBioVet.id) ? (
                       <img
                         src={activeBioVet.image}
                         alt={activeBioVet.name}
@@ -706,8 +737,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       ) : null}
                     </div>
 
-                    {hasDisplayValue(activeBioVet.followUp) ||
-                    activeBioVet.breakTimes?.length ? (
+                    {hasDisplayValue(activeBioVet.followUp) || activeBioVet.breakTimes?.length ? (
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
                         {hasDisplayValue(activeBioVet.followUp) ? (
                           <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -739,8 +769,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           Day consult (8 AM - 8 PM)
                         </div>
                         <div className="mt-1 text-lg font-extrabold text-slate-900">
-                          {formatPrice(activeBioVet.priceDay) ||
-                            "Price on request"}
+                          {formatPrice(activeBioVet.priceDay) || "Price on request"}
                         </div>
                         {hasDisplayValue(activeBioVet.responseDay) ? (
                           <div className="mt-1 text-xs text-slate-500">
@@ -757,8 +786,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           Night consult (8 PM - 8 AM)
                         </div>
                         <div className="mt-1 text-lg font-extrabold text-slate-900">
-                          {formatPrice(activeBioVet.priceNight) ||
-                            "Price on request"}
+                          {formatPrice(activeBioVet.priceNight) || "Price on request"}
                         </div>
                         {hasDisplayValue(activeBioVet.responseNight) ? (
                           <div className="mt-1 text-xs text-slate-500">
@@ -814,9 +842,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                             ))}
                           </div>
                         ) : (
-                          <div className="text-slate-700">
-                            {activeBioVet.specializationText}
-                          </div>
+                          <div className="text-slate-700">{activeBioVet.specializationText}</div>
                         )}
                       </div>
                     </div>
@@ -828,7 +854,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                     Close
                   </Button>
 
-                  {/* ✅ IMPORTANT: Proceed uses correct slot price (day/night) */}
                   <Button
                     onClick={() => {
                       const v = activeBioVet;
