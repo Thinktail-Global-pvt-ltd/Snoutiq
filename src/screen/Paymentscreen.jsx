@@ -91,7 +91,10 @@ export const PaymentScreen = ({
 
   // ✅ TESTING: remove service charge for now
   const service = 0;
-  const total = fee;
+  const gstRate = 0.18;
+  const baseAmount = fee + service;
+  const gstAmount = Math.round(baseAmount * gstRate);
+  const total = baseAmount + gstAmount;
 
   const [isPaying, setIsPaying] = useState(false);
   const [gatewayReady, setGatewayReady] = useState(false);
@@ -455,6 +458,11 @@ export const PaymentScreen = ({
                       <span>₹{service}</span>
                     </div>
                   ) : null}
+
+                  <div className="flex justify-between text-sm text-stone-600 md:text-base">
+                    <span>GST (18%)</span>
+                    <span>₹{gstAmount}</span>
+                  </div>
 
                   <div className="flex justify-between text-sm md:text-base">
                     <span className="text-stone-600">Digital Prescription</span>
