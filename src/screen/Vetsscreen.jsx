@@ -13,14 +13,6 @@ import {
   X,
 } from "lucide-react";
 
-/**
- * ✅ Fixes in this full code:
- * 1) Same-origin + fallback API URLs (works on mobile + desktop, www/non-www)
- * 2) Strict JSON fetch (detects HTML/redirect/500 and shows real error)
- * 3) cache: "no-store" + AbortController timeout
- * 4) Retry button (no need to refresh manually)
- */
-
 const API_PATH = "/backend/api/exported_from_excell_doctors";
 const DEFAULT_BACKEND_ORIGIN = "https://snoutiq.com";
 
@@ -29,7 +21,6 @@ const DEFAULT_BACKEND_ORIGIN = "https://snoutiq.com";
 const getSafeOrigin = () => {
   if (typeof window === "undefined") return DEFAULT_BACKEND_ORIGIN;
   const origin = window.location.origin;
-  // local dev → still use production backend by default
   if (origin.includes("localhost") || origin.includes("127.0.0.1")) return DEFAULT_BACKEND_ORIGIN;
   return origin;
 };
@@ -62,9 +53,7 @@ const fetchJsonStrict = async (url, { timeoutMs = 15000 } = {}) => {
     const contentType = res.headers.get("content-type") || "";
     const text = await res.text();
 
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${text.slice(0, 140)}`);
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 140)}`);
     if (!contentType.includes("application/json")) {
       throw new Error(`Non-JSON response (${contentType || "unknown"}): ${text.slice(0, 140)}`);
     }
@@ -78,7 +67,7 @@ const fetchJsonStrict = async (url, { timeoutMs = 15000 } = {}) => {
   }
 };
 
-const loadVetsWithFallback = async () => {
+export const loadVetsWithFallback = async () => {
   const candidates = buildApiCandidates();
   let lastErr = null;
 
@@ -103,7 +92,6 @@ const normalizeImageUrl = (value) => {
   const lower = trimmed.toLowerCase();
   if (lower === "null" || lower === "undefined") return "";
 
-  // fix duplicated prefix bug
   if (lower.includes("https://snoutiq.com/https://snoutiq.com/")) {
     return trimmed.replace(
       "https://snoutiq.com/https://snoutiq.com/",
@@ -111,15 +99,11 @@ const normalizeImageUrl = (value) => {
     );
   }
 
-  // already absolute
   if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("data:")) {
     return trimmed;
   }
 
-  // handle "/photo/..." or "photo/..."
   let cleaned = trimmed.replace(/^\/+/, "");
-
-  // avoid backend/backend if API gives "backend/photo/.."
   if (cleaned.toLowerCase().startsWith("backend/")) {
     cleaned = cleaned.slice("backend/".length);
   }
@@ -318,7 +302,6 @@ export const buildVetsFromApi = (apiData = []) => {
       const priceDay = toNumber(doc?.video_day_rate, 0);
       const priceNight = toNumber(doc?.video_night_rate, 0);
 
-      // ✅ hide demo/invalid pricing doctors (₹1 or less)
       if (priceDay <= 1 || priceNight <= 1) return;
 
       list.push({
@@ -425,7 +408,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
       const data = await loadVetsWithFallback();
       const list = buildVetsFromApi(data);
       setVets(list);
-      if (!list.length) setErrMsg(""); // keep clean; "No vets found" UI will show
+      if (!list.length) setErrMsg("");
     } catch (e) {
       console.error("[VetsScreen] load failed:", e);
       setVets([]);
@@ -437,12 +420,10 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
 
   useEffect(() => {
     let ignore = false;
-
     const run = async () => {
       if (ignore) return;
       await fetchVets();
     };
-
     run();
     return () => {
       ignore = true;
@@ -771,14 +752,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         <div className="mt-1 text-lg font-extrabold text-slate-900">
                           {formatPrice(activeBioVet.priceDay) || "Price on request"}
                         </div>
-                        {hasDisplayValue(activeBioVet.responseDay) ? (
-                          <div className="mt-1 text-xs text-slate-500">
-                            Response:{" "}
-                            <span className="font-semibold text-slate-800">
-                              {activeBioVet.responseDay}
-                            </span>
-                          </div>
-                        ) : null}
                       </div>
 
                       <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -788,14 +761,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         <div className="mt-1 text-lg font-extrabold text-slate-900">
                           {formatPrice(activeBioVet.priceNight) || "Price on request"}
                         </div>
-                        {hasDisplayValue(activeBioVet.responseNight) ? (
-                          <div className="mt-1 text-xs text-slate-500">
-                            Response:{" "}
-                            <span className="font-semibold text-slate-800">
-                              {activeBioVet.responseNight}
-                            </span>
-                          </div>
-                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -859,12 +824,12 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       const v = activeBioVet;
                       setActiveBioVet(null);
 
-                      const isDay = isDayTime();
-                      const bookingPrice = isDay ? v.priceDay : v.priceNight;
+                      const day = isDayTime();
+                      const bookingPrice = day ? v.priceDay : v.priceNight;
 
                       onSelect?.({
                         ...v,
-                        bookingRateType: isDay ? "day" : "night",
+                        bookingRateType: day ? "day" : "night",
                         bookingPrice,
                       });
                     }}
