@@ -808,7 +808,7 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'clinic_id' => ['required', 'integer'],
     ]);
 
-    $query = Transaction::query()
+    $baseQuery = Transaction::query()
         ->where('doctor_id', $data['doctor_id'])
         ->where('clinic_id', $data['clinic_id'])
         ->where(function ($q) {
@@ -816,27 +816,31 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 $q->where('type', 'excell_export_campaign');
             }
             $q->orWhere('metadata->order_type', 'excell_export_campaign');
-        })
+        });
+
+    $query = (clone $baseQuery)
         ->selectRaw('count(*) as total, coalesce(sum(amount_paise),0) as total_paise');
+
+    if (Schema::hasColumn('transactions', 'payment_to_doctor_paise')) {
+        $query->selectRaw('coalesce(sum(payment_to_doctor_paise),0) as total_payment_to_doctor_paise');
+    }
 
     $row = $query->first();
 
     $deductionRate = 0.25;
     $count = (int) ($row->total ?? 0);
-    $totalPaise = (int) ($row->total_paise ?? 0);
-    $totalPaiseAfterDeduction = (int) max(round($totalPaise * (1 - $deductionRate)), 0);
+    $grossTotalPaise = (int) ($row->total_paise ?? 0);
+    $totalDoctorPayoutPaise = Schema::hasColumn('transactions', 'payment_to_doctor_paise')
+        ? (int) ($row->total_payment_to_doctor_paise ?? 0)
+        : 0;
+    if ($totalDoctorPayoutPaise === 0 && $grossTotalPaise > 0) {
+        // Backward compatible fallback for rows that may not have payout column populated.
+        $totalDoctorPayoutPaise = (int) max(round($grossTotalPaise * (1 - $deductionRate)), 0);
+    }
     $hasDoctorPayoutColumn = Schema::hasColumn('transactions', 'payment_to_doctor_paise');
 
     // Detailed list
-    $transactions = Transaction::query()
-        ->where('doctor_id', $data['doctor_id'])
-        ->where('clinic_id', $data['clinic_id'])
-        ->where(function ($q) {
-            if (Schema::hasColumn('transactions', 'type')) {
-                $q->where('type', 'excell_export_campaign');
-            }
-            $q->orWhere('metadata->order_type', 'excell_export_campaign');
-        })
+    $transactions = (clone $baseQuery)
         ->with([
             'user:id,name,phone,email',
             'doctor:id,doctor_name,doctor_email,doctor_mobile',
@@ -857,7 +861,6 @@ Route::get('/excell-export/transactions', function (Request $request) {
         ->get()
         ->map(function (Transaction $t) use ($hasDoctorPayoutColumn) {
             $grossPaise = (int) ($t->amount_paise ?? 0);
-            $netPaise = (int) max(round($grossPaise * 0.75), 0);
             $paymentToDoctorPaise = null;
 
             if ($hasDoctorPayoutColumn && $t->payment_to_doctor_paise !== null) {
@@ -873,7 +876,7 @@ Route::get('/excell-export/transactions', function (Request $request) {
 
             if ($paymentToDoctorPaise === null) {
                 // Backward compatible fallback for old transactions where payout columns were not stored.
-                $paymentToDoctorPaise = $netPaise;
+                $paymentToDoctorPaise = (int) max(round($grossPaise * 0.75), 0);
             }
 
             return [
@@ -882,11 +885,11 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 'status' => $t->status,
                 'amount_paise' => $grossPaise,
                 // Keep amount_inr net so existing frontends auto-show post-deduction value.
-                'amount_inr' => $netPaise / 100,
+                'amount_inr' => $paymentToDoctorPaise / 100,
                 'gross_amount_inr' => $grossPaise / 100,
-                'amount_after_deduction_paise' => $netPaise,
-                'amount_after_deduction_inr' => $netPaise / 100,
-                'net_amount_inr' => $netPaise / 100,
+                'amount_after_deduction_paise' => $paymentToDoctorPaise,
+                'amount_after_deduction_inr' => $paymentToDoctorPaise / 100,
+                'net_amount_inr' => $paymentToDoctorPaise / 100,
                 'payment_to_doctor_paise' => $paymentToDoctorPaise,
                 'payment_to_doctor_inr' => $paymentToDoctorPaise / 100,
                 'payment_method' => $t->payment_method,
@@ -907,12 +910,14 @@ Route::get('/excell-export/transactions', function (Request $request) {
         'order_type' => 'excell_export_campaign',
         'deduction_rate' => $deductionRate,
         'total_transactions' => $count,
-        'total_amount_paise' => $totalPaise,
+        'total_amount_paise' => $totalDoctorPayoutPaise,
         // Keep total_amount_inr net so existing frontends auto-show post-deduction value.
-        'total_amount_inr' => $totalPaiseAfterDeduction / 100,
-        'gross_total_amount_inr' => $totalPaise / 100,
-        'total_amount_after_deduction_paise' => $totalPaiseAfterDeduction,
-        'total_amount_after_deduction_inr' => $totalPaiseAfterDeduction / 100,
+        'total_amount_inr' => $totalDoctorPayoutPaise / 100,
+        'gross_total_amount_inr' => $grossTotalPaise / 100,
+        'total_amount_after_deduction_paise' => $totalDoctorPayoutPaise,
+        'total_amount_after_deduction_inr' => $totalDoctorPayoutPaise / 100,
+        'total_payment_to_doctor_paise' => $totalDoctorPayoutPaise,
+        'total_payment_to_doctor_inr' => $totalDoctorPayoutPaise / 100,
         'transactions' => $transactions,
     ]);
 })->name('excell_export.transactions');
