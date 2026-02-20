@@ -645,7 +645,7 @@ class PaymentController extends Controller
         $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
         $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
 
-        $snoutiqSharePaise = min(20000, $amountBeforeGstPaise); // Rs 200 fixed share for Snoutiq
+        $snoutiqSharePaise = $this->resolveExcelSnoutiqSharePaise($amountBeforeGstPaise);
         $doctorSharePaise = max(0, $amountBeforeGstPaise - $snoutiqSharePaise);
 
         return [
@@ -657,6 +657,26 @@ class PaymentController extends Controller
             'payment_to_snoutiq_paise' => $snoutiqSharePaise,
             'payment_to_doctor_paise' => $doctorSharePaise,
         ];
+    }
+
+    protected function resolveExcelSnoutiqSharePaise(int $amountBeforeGstPaise): int
+    {
+        $amountBeforeGstPaise = max(0, $amountBeforeGstPaise);
+
+        // Slab logic (after GST cut):
+        // 500 => 150 to Snoutiq, 350 to doctor
+        // 650 => 200 to Snoutiq, 450 to doctor
+        // Keep small tolerance for rounding variance.
+        if (abs($amountBeforeGstPaise - 50000) <= 250) {
+            return 15000;
+        }
+
+        if (abs($amountBeforeGstPaise - 65000) <= 250) {
+            return 20000;
+        }
+
+        // Fallback for unexpected values.
+        return min(20000, $amountBeforeGstPaise);
     }
 
     protected function resolveClinicId(Request $request, array $notes, array $context = []): ?int
