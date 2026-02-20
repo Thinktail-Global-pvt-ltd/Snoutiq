@@ -195,6 +195,7 @@ class TransactionController extends Controller
 
         $limit = (int) ($data['limit'] ?? 50);
         $type = $data['type'] ?? 'video_consult';
+        $hasTransactionChannelName = Schema::hasTable('transactions') && Schema::hasColumn('transactions', 'channel_name');
         $selectColumns = [
             'id',
             'user_id',
@@ -210,6 +211,9 @@ class TransactionController extends Controller
             'created_at',
             'updated_at',
         ];
+        if ($hasTransactionChannelName) {
+            $selectColumns[] = 'channel_name';
+        }
         if (Schema::hasColumn('transactions', 'actual_amount_paid_by_consumer_paise')) {
             $selectColumns[] = 'actual_amount_paid_by_consumer_paise';
         }
@@ -227,11 +231,54 @@ class TransactionController extends Controller
             ->limit($limit)
             ->get($selectColumns);
 
+        $prescriptionsByChannel = $this->prescriptionsByTransactionChannels($tx);
+        $payload = $tx->map(function (Transaction $transaction) use ($prescriptionsByChannel, $hasTransactionChannelName) {
+            $row = $transaction->toArray();
+            $channel = $hasTransactionChannelName && is_string($transaction->channel_name ?? null)
+                ? trim((string) $transaction->channel_name)
+                : '';
+            $row['prescriptions'] = $channel !== '' ? ($prescriptionsByChannel[$channel] ?? []) : [];
+
+            return $row;
+        })->values();
+
         return response()->json([
             'success' => true,
-            'count' => $tx->count(),
-            'data' => $tx,
+            'count' => $payload->count(),
+            'data' => $payload,
         ]);
+    }
+
+    protected function prescriptionsByTransactionChannels(Collection $transactions): array
+    {
+        if (
+            $transactions->isEmpty()
+            || !Schema::hasTable('transactions')
+            || !Schema::hasColumn('transactions', 'channel_name')
+            || !Schema::hasTable('prescriptions')
+            || !Schema::hasColumn('prescriptions', 'call_session')
+        ) {
+            return [];
+        }
+
+        $channels = $transactions
+            ->pluck('channel_name')
+            ->filter(fn ($channel) => is_string($channel) && trim($channel) !== '')
+            ->map(fn (string $channel) => trim($channel))
+            ->unique()
+            ->values();
+
+        if ($channels->isEmpty()) {
+            return [];
+        }
+
+        return Prescription::query()
+            ->whereIn('call_session', $channels)
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy(fn (Prescription $prescription) => trim((string) ($prescription->call_session ?? '')))
+            ->map(fn (Collection $group) => $group->values()->map(fn (Prescription $prescription) => $prescription->toArray())->all())
+            ->toArray();
     }
 
     /**
