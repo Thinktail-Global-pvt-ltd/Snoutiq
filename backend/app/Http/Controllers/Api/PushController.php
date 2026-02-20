@@ -381,6 +381,13 @@ class PushController extends Controller
 
         $normalizedCallId = trim((string) $callId);
         $isForce = (bool) ($validated['force'] ?? false);
+        if (!$isForce && $this->isTokenRingStopped($token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ringing is temporarily blocked for this token. Trigger force=1 to override.',
+                'token_blocked' => true,
+            ], 409);
+        }
         if ($normalizedCallId !== '') {
             if (!$isForce && $this->isRingStopped($normalizedCallId)) {
                 return response()->json([
@@ -394,6 +401,9 @@ class PushController extends Controller
             if ($isForce) {
                 $this->clearRingStopped($normalizedCallId);
             }
+        }
+        if ($isForce) {
+            $this->clearTokenRingStopped($token);
         }
 
         $channelName = $channelName ?: "agora_channel_{$callId}";
@@ -476,6 +486,7 @@ class PushController extends Controller
         $normalizedCallId = trim((string) ($callId ?? ''));
         $doctorIdInt = is_numeric((string) $doctorId) ? (int) $doctorId : null;
         $patientIdInt = is_numeric((string) $patientId) ? (int) $patientId : null;
+        $this->rememberTokenRingStopped($token);
         if ($normalizedCallId !== '') {
             $this->rememberRingStopped($normalizedCallId);
         }
@@ -512,6 +523,42 @@ class PushController extends Controller
         ]);
 
         $push->sendToToken($token, $title, $body, $data);
+        // Compatibility stop push for clients that only listen to incoming_call payloads.
+        $compatStopData = array_merge($data, [
+            'type' => 'incoming_call',
+            'event' => 'incoming_call',
+            'callId' => (string) ($callId ?? ''),
+            'doctorId' => (string) ($doctorId ?? ''),
+            'patientId' => (string) ($patientId ?? ''),
+            'channelName' => (string) ($channelName ?? ''),
+            'shouldRing' => '0',
+            'stopRinging' => '1',
+            'is_stop' => '1',
+        ]);
+        try {
+            $push->sendToToken($token, $title, $body, $compatStopData);
+        } catch (Throwable $e) {
+            \Log::warning('FCM compatibility stop ring push failed', [
+                'call_id' => $callId,
+                'doctor_id' => $doctorId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+        // Visible stop event for clients that ignore data-only callbacks in background.
+        $visibleStopData = $compatStopData;
+        $visibleStopData['type'] = 'incoming_call_end';
+        $visibleStopData['event'] = 'stop_ringing';
+        $visibleStopData['action'] = 'stop_ringing';
+        $visibleStopData['data_only'] = '0';
+        try {
+            $push->sendToToken($token, $title, $body, $visibleStopData);
+        } catch (Throwable $e) {
+            \Log::warning('FCM visible stop ring push failed', [
+                'call_id' => $callId,
+                'doctor_id' => $doctorId,
+                'error' => $e->getMessage(),
+            ]);
+        }
         $secondaryTokens = $this->sendStopToDoctorTokens(
             $push,
             $token,
@@ -561,6 +608,7 @@ class PushController extends Controller
         return response()->json([
             'success' => true,
             'ring_blocked' => $normalizedCallId !== '' ? $this->isRingStopped($normalizedCallId) : false,
+            'token_blocked' => $this->isTokenRingStopped($token),
             'stop_sent_count' => 1 + count($secondaryTokens),
             'missed_notification_sent' => $missedNotificationSent,
             'reverb_sync' => $reverbSync,
@@ -750,6 +798,11 @@ class PushController extends Controller
         return 'push:ring:stopped:' . trim($callId);
     }
 
+    private function tokenRingStopCacheKey(string $token): string
+    {
+        return 'push:ring:token-stopped:' . md5($this->normalizeToken($token));
+    }
+
     private function rememberRingStopped(string $callId): void
     {
         $normalized = trim($callId);
@@ -759,6 +812,17 @@ class PushController extends Controller
 
         // Keep stop flag for 15 min to block accidental re-rings on the same call_id.
         Cache::put($this->ringStopCacheKey($normalized), now()->toIso8601String(), now()->addMinutes(15));
+    }
+
+    private function rememberTokenRingStopped(string $token): void
+    {
+        $normalized = $this->normalizeToken($token);
+        if ($normalized === '') {
+            return;
+        }
+
+        // Block re-ringing this token briefly to prevent continuous loops.
+        Cache::put($this->tokenRingStopCacheKey($normalized), now()->toIso8601String(), now()->addMinutes(5));
     }
 
     private function isRingStopped(string $callId): bool
@@ -771,6 +835,16 @@ class PushController extends Controller
         return Cache::has($this->ringStopCacheKey($normalized));
     }
 
+    private function isTokenRingStopped(string $token): bool
+    {
+        $normalized = $this->normalizeToken($token);
+        if ($normalized === '') {
+            return false;
+        }
+
+        return Cache::has($this->tokenRingStopCacheKey($normalized));
+    }
+
     private function clearRingStopped(string $callId): void
     {
         $normalized = trim($callId);
@@ -779,6 +853,16 @@ class PushController extends Controller
         }
 
         Cache::forget($this->ringStopCacheKey($normalized));
+    }
+
+    private function clearTokenRingStopped(string $token): void
+    {
+        $normalized = $this->normalizeToken($token);
+        if ($normalized === '') {
+            return;
+        }
+
+        Cache::forget($this->tokenRingStopCacheKey($normalized));
     }
 
     private function normalizeToken(string $token): string
