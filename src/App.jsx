@@ -113,7 +113,7 @@ const ClinicsSolutionPage = lazy(() => import("./pages/ClinicsSolutionPage"));
 const AITriagePage = lazy(() => import("./pages/AITriagePage"));
 
 const HomePage = lazy(() => import("./components/Home"));
-const DoctorRegistration = lazy(() => import("./components/DoctorRegistration"));
+// const DoctorRegistration = lazy(() => import("./components/DoctorRegistration"));
 const ConsultationBooked = lazy(() => import("./pages/ConsultationBooked"));
 
 
@@ -164,7 +164,7 @@ function App() {
             <Route path="/terms-of-service" element={<TearmsCondition />} />
             <Route path="/cancellation-policy" element={<Cancelation />} />
             <Route path="/cookie-policy" element={<CookiePolicy />} />
-            <Route path="/vet-register" element={<DoctorRegistration />} />
+            {/* <Route path="/vet-register" element={<DoctorRegistration />} /> */}
             <Route
               path="/medical-data-consent"
               element={<MedicalDataConsent />}
