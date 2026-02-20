@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Call;
 use App\Models\CallSession;
 use App\Models\DeviceToken;
-use App\Models\DoctorFcmToken;
 use App\Services\Push\FcmService;
 use App\Support\DeviceTokenOwnerResolver;
 use Illuminate\Http\Request;
@@ -551,8 +550,8 @@ class PushController extends Controller
             return [];
         }
 
-        $tokens = DoctorFcmToken::query()
-            ->where('doctor_id', $doctorId)
+        $tokens = DeviceToken::query()
+            ->where('user_id', $doctorId)
             ->pluck('token')
             ->filter()
             ->map(fn ($value) => $this->normalizeToken((string) $value))
