@@ -223,17 +223,22 @@ class AdminPanelController extends Controller
         return view('admin.whatsapp-templates', compact('templates'));
     }
 
-    public function excellExportTransactions(): View
+    public function excellExportTransactions(Request $request)
     {
-        $petColumns = ['id', 'user_id', 'name', 'breed', 'pet_type', 'reported_symptom'];
-        if (Schema::hasColumn('pets', 'pet_dob')) {
-            $petColumns[] = 'pet_dob';
-        }
-        if (Schema::hasColumn('pets', 'dob')) {
-            $petColumns[] = 'dob';
+        $transactions = $this->excellExportTransactionsQuery()->get();
+
+        if (strtolower((string) $request->query('export')) === 'csv') {
+            return $this->streamExcellExportTransactionsCsv($transactions);
         }
 
-        $transactions = Transaction::query()
+        return view('admin.transactions-excell-export', compact('transactions'));
+    }
+
+    private function excellExportTransactionsQuery(): Builder
+    {
+        $petColumns = $this->excellExportPetColumns();
+
+        return Transaction::query()
             ->where('status', 'captured')
             ->where(function ($query) {
                 $query->where('type', 'excell_export_campaign')
@@ -256,10 +261,122 @@ class AdminPanelController extends Controller
                     $query->select($petColumns);
                 },
             ])
-            ->orderByDesc('created_at')
-            ->get();
+            ->orderByDesc('created_at');
+    }
 
-        return view('admin.transactions-excell-export', compact('transactions'));
+    private function excellExportPetColumns(): array
+    {
+        $petColumns = ['id', 'user_id', 'name', 'breed', 'pet_type', 'reported_symptom'];
+
+        if (Schema::hasColumn('pets', 'pet_dob')) {
+            $petColumns[] = 'pet_dob';
+        }
+        if (Schema::hasColumn('pets', 'dob')) {
+            $petColumns[] = 'dob';
+        }
+
+        return $petColumns;
+    }
+
+    private function resolveExcellExportPetRecord(Transaction $transaction): ?Pet
+    {
+        $userPets = $transaction->user?->pets ?? collect();
+        $petFromTransaction = $transaction->pet;
+        $fallbackPetWithIssue = $userPets->first(function ($pet) {
+            return trim((string) ($pet->reported_symptom ?? '')) !== '';
+        });
+
+        return $petFromTransaction ?? $fallbackPetWithIssue ?? $userPets->first();
+    }
+
+    private function formatExcellExportPetDob($value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
+    }
+
+    private function streamExcellExportTransactionsCsv(Collection $transactions)
+    {
+        $fileName = 'excel-export-transactions-' . now()->format('Ymd-His') . '.csv';
+        $headers = [
+            'Transaction ID',
+            'Created At',
+            'Status',
+            'Amount (INR)',
+            'Type',
+            'Order Type',
+            'Payment Method',
+            'Reference',
+            'Clinic ID',
+            'Clinic Name',
+            'Doctor ID',
+            'Doctor Name',
+            'Doctor Email',
+            'Doctor Mobile',
+            'User ID',
+            'User Name',
+            'User Email',
+            'User Phone',
+            'Pet ID',
+            'Pet Name',
+            'Pet Type',
+            'Pet Breed',
+            'Pet DOB',
+            'Reported Symptom',
+        ];
+
+        return response()->streamDownload(function () use ($transactions, $headers) {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, $headers);
+
+            foreach ($transactions as $transaction) {
+                $petRecord = $this->resolveExcellExportPetRecord($transaction);
+                $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
+                $issue = trim((string) ($transaction->pet?->reported_symptom ?? ''));
+                if ($issue === '') {
+                    $issue = trim((string) ($petRecord->reported_symptom ?? ''));
+                }
+                $petDob = $this->formatExcellExportPetDob($petRecord->pet_dob ?? $petRecord->dob ?? null);
+
+                fputcsv($output, [
+                    $transaction->id,
+                    optional($transaction->created_at)->format('Y-m-d H:i:s'),
+                    strtoupper((string) ($transaction->status ?? '')),
+                    number_format(((int) ($transaction->amount_paise ?? 0)) / 100, 2, '.', ''),
+                    $transaction->type,
+                    data_get($metadata, 'order_type'),
+                    $transaction->payment_method,
+                    $transaction->reference,
+                    $transaction->clinic_id,
+                    $transaction->clinic->name ?? null,
+                    $transaction->doctor_id,
+                    $transaction->doctor->doctor_name ?? null,
+                    $transaction->doctor->doctor_email ?? null,
+                    $transaction->doctor->doctor_mobile ?? null,
+                    $transaction->user_id,
+                    $transaction->user->name ?? null,
+                    $transaction->user->email ?? null,
+                    $transaction->user->phone ?? null,
+                    $petRecord->id ?? $transaction->pet_id,
+                    $petRecord->name ?? null,
+                    $petRecord->pet_type ?? $petRecord->type ?? $petRecord->breed ?? null,
+                    $petRecord->breed ?? null,
+                    $petDob,
+                    $issue !== '' ? $issue : null,
+                ]);
+            }
+
+            fclose($output);
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     public function appointmentTransactions(): View

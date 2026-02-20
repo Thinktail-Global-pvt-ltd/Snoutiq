@@ -122,9 +122,12 @@
                         <h2 class="h5 mb-1">Excel Export Campaign Transactions</h2>
                         <p class="text-muted mb-0">All payments where <code>type</code> or <code>metadata.order_type</code> equals <strong>excell_export_campaign</strong>.</p>
                     </div>
-                    <div class="d-flex gap-2 excel-export-badges">
+                    <div class="d-flex gap-2 excel-export-badges align-items-center">
                         <span class="badge text-bg-primary-subtle text-primary-emphasis px-3 py-2">{{ number_format($transactions->count()) }} records</span>
                         <span class="badge text-bg-success-subtle text-success-emphasis px-3 py-2">₹{{ $formatInr($totalPaise) }} collected</span>
+                        <a href="{{ route('admin.transactions.excell-export', ['export' => 'csv']) }}" class="btn btn-sm btn-outline-dark text-nowrap">
+                            Export CSV
+                        </a>
                     </div>
                 </div>
 
