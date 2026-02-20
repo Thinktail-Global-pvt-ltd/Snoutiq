@@ -825,6 +825,7 @@ Route::get('/excell-export/transactions', function (Request $request) {
     $count = (int) ($row->total ?? 0);
     $totalPaise = (int) ($row->total_paise ?? 0);
     $totalPaiseAfterDeduction = (int) max(round($totalPaise * (1 - $deductionRate)), 0);
+    $hasDoctorPayoutColumn = Schema::hasColumn('transactions', 'payment_to_doctor_paise');
 
     // Detailed list
     $transactions = Transaction::query()
@@ -854,9 +855,27 @@ Route::get('/excell-export/transactions', function (Request $request) {
         ->orderByDesc('id')
         ->limit(200)
         ->get()
-        ->map(function (Transaction $t) {
+        ->map(function (Transaction $t) use ($hasDoctorPayoutColumn) {
             $grossPaise = (int) ($t->amount_paise ?? 0);
             $netPaise = (int) max(round($grossPaise * 0.75), 0);
+            $paymentToDoctorPaise = null;
+
+            if ($hasDoctorPayoutColumn && $t->payment_to_doctor_paise !== null) {
+                $paymentToDoctorPaise = (int) $t->payment_to_doctor_paise;
+            }
+
+            if ($paymentToDoctorPaise === null) {
+                $fromMetadata = data_get($t->metadata, 'payout_breakup.payment_to_doctor_paise');
+                if (is_numeric($fromMetadata)) {
+                    $paymentToDoctorPaise = (int) $fromMetadata;
+                }
+            }
+
+            if ($paymentToDoctorPaise === null) {
+                // Backward compatible fallback for old transactions where payout columns were not stored.
+                $paymentToDoctorPaise = $netPaise;
+            }
+
             return [
                 'id' => $t->id,
                 'reference' => $t->reference,
@@ -868,6 +887,8 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 'amount_after_deduction_paise' => $netPaise,
                 'amount_after_deduction_inr' => $netPaise / 100,
                 'net_amount_inr' => $netPaise / 100,
+                'payment_to_doctor_paise' => $paymentToDoctorPaise,
+                'payment_to_doctor_inr' => $paymentToDoctorPaise / 100,
                 'payment_method' => $t->payment_method,
                 'type' => $t->type ?? ($t->metadata['order_type'] ?? null),
                 'metadata' => $t->metadata,
