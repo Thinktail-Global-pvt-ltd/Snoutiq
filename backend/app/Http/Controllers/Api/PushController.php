@@ -440,6 +440,8 @@ class PushController extends Controller
             'token' => ['required', 'string'],
             'title' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
+            'missed_title' => ['nullable', 'string'],
+            'missed_body' => ['nullable', 'string'],
             'data' => ['nullable', 'array'],
             'data.call_id' => ['nullable', 'string'],
             'data.doctor_id' => ['nullable'],
@@ -524,13 +526,46 @@ class PushController extends Controller
             $patientIdInt,
             trim((string) ($channelName ?: $channel ?: ''))
         );
+        $missedTitle = $validated['missed_title'] ?? 'Missed Consultation Call';
+        $missedBody = $validated['missed_body'] ?? 'The incoming call was ended.';
+        $missedData = [
+            'type' => 'missed_call',
+            'action' => 'show_missed_notification',
+            'event' => 'missed_call',
+            'status' => 'missed',
+            'call_status' => 'missed',
+            'should_ring' => '0',
+            'ringing' => '0',
+            'stop_ringing' => '1',
+            'call_id' => (string) ($callId ?? ''),
+            'doctor_id' => (string) ($doctorId ?? ''),
+            'patient_id' => (string) ($patientId ?? ''),
+            'channel' => (string) ($channel ?? ''),
+            'channel_name' => (string) ($channelName ?? ''),
+            'ended_at' => (string) now()->valueOf(),
+            // Keep this as notification+data so user gets a clear "missed" alert.
+            'data_only' => '0',
+        ];
+        $missedNotificationSent = false;
+        try {
+            $push->sendToToken($token, $missedTitle, $missedBody, $missedData);
+            $missedNotificationSent = true;
+        } catch (Throwable $e) {
+            \Log::warning('FCM missed call notification send failed', [
+                'call_id' => $callId,
+                'doctor_id' => $doctorId,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return response()->json([
             'success' => true,
             'ring_blocked' => $normalizedCallId !== '' ? $this->isRingStopped($normalizedCallId) : false,
             'stop_sent_count' => 1 + count($secondaryTokens),
+            'missed_notification_sent' => $missedNotificationSent,
             'reverb_sync' => $reverbSync,
             'data' => $data,
+            'missed_data' => $missedData,
         ]);
     }
 
