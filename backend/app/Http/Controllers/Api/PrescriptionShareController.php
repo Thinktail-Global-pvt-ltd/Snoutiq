@@ -95,15 +95,14 @@ class PrescriptionShareController extends Controller
 
     /**
      * GET /api/consultation/prescription/pdf
-     * Query: user_id, pet_id
-     * Streams the latest prescription as a PDF (generates from DB if no file exists).
+     * Query: prescription_id
+     * Streams the selected prescription as a PDF.
      */
     public function downloadLatest(Request $request)
     {
         try {
             $data = $request->validate([
-                'user_id' => ['required', 'integer'],
-                'pet_id' => ['required', 'integer'],
+                'prescription_id' => ['required', 'integer'],
             ]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'error' => 'validation_failed', 'message' => $e->getMessage()], 422);
@@ -111,9 +110,7 @@ class PrescriptionShareController extends Controller
 
         try {
             $prescription = Prescription::query()
-                ->where('user_id', $data['user_id'])
-                ->where('pet_id', $data['pet_id'])
-                ->orderByDesc('id')
+                ->where('id', (int) $data['prescription_id'])
                 ->first();
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'error' => 'query_failed', 'message' => $e->getMessage()], 500);
@@ -123,8 +120,8 @@ class PrescriptionShareController extends Controller
             return response()->json(['success' => false, 'error' => 'prescription_not_found'], 404);
         }
 
-        $user = User::find($data['user_id']);
-        $pet = Pet::find($data['pet_id']);
+        $user = $prescription->user_id ? User::find($prescription->user_id) : null;
+        $pet = $prescription->pet_id ? Pet::find($prescription->pet_id) : null;
         $doctor = $prescription->doctor_id ? Doctor::find($prescription->doctor_id) : null;
 
         // Always generate a fresh PDF from prescription text (ignore stored docs)
