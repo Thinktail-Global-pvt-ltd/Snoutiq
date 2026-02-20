@@ -502,14 +502,14 @@ const PricingSection = ({
         />
         <span className="text-sm text-gray-600 leading-relaxed">
           These charges and payout amounts are determined based on industry
-            benchmarks, operational costs, and platform service provisions.
-            SnoutIQ reserves the right to review, revise, or update the
-            consultation pricing and payout structure from time to time, at its
-            sole discretion, in response to market conditions, business
-            requirements, and to ensure maximum long-term benefits for doctors
-            using the platform. By continuing to provide services on SnoutIQ,
-            doctors acknowledge and agree to the applicable payout structure and
-            any future revisions.
+          benchmarks, operational costs, and platform service provisions.
+          SnoutIQ reserves the right to review, revise, or update the
+          consultation pricing and payout structure from time to time, at its
+          sole discretion, in response to market conditions, business
+          requirements, and to ensure maximum long-term benefits for doctors
+          using the platform. By continuing to provide services on SnoutIQ,
+          doctors acknowledge and agree to the applicable payout structure and
+          any future revisions.
         </span>
       </label>
 
@@ -1318,10 +1318,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         finalDoctorImageUrl = await uploadDoctorImageAndGetUrl(doctorImageFile);
       }
 
-      if (
-        finalDoctorImageUrl &&
-        finalDoctorImageUrl.length > IMAGE_URL_LIMIT
-      ) {
+      if (finalDoctorImageUrl && finalDoctorImageUrl.length > IMAGE_URL_LIMIT) {
         throw new Error(
           `Image URL must be ${IMAGE_URL_LIMIT} characters or less.`,
         );
@@ -2820,7 +2817,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     latestTransactions,
     lastUpdated,
   } = useMemo(() => {
-    const totalAmountValue = dashboardData?.total_amount_inr ?? 0;
+    const totalAmountValue = dashboardData?.total_amount_after_deduction_inr ?? 0;
     const totalTransactionsValue =
       dashboardData?.total_transactions ?? transactions.length;
     const pendingValue = transactions.filter(
@@ -2970,8 +2967,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                   <div className="divide-y divide-gray-100">
                     {latestTransactions.map((item, idx) => {
                       const amountInr =
-                        item?.amount_inr ??
-                        (item?.amount_paise ? item.amount_paise / 100 : 0);
+                        item?.payment_to_doctor_inr ??
+                        (item?.payment_to_doctor_paise
+                          ? item.payment_to_doctor_paise / 100
+                          : 0);
                       const petName = resolvePetName(item);
                       const { userId, clinicId } = resolveTransactionIds(item);
                       const canOpenPrescription = Boolean(userId && clinicId);
@@ -3720,9 +3719,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         <span>Amount</span>
                         <span className="font-semibold text-stone-900">
                           {formatAmount(
-                            activeTransaction?.amount_inr ??
-                              (activeTransaction?.amount_paise
-                                ? activeTransaction.amount_paise / 100
+                            activeTransaction?.payment_to_doctor_inr ??
+                              (activeTransaction?.payment_to_doctor_paise
+                                ? activeTransaction.payment_to_doctor_paise /
+                                  100
                                 : 0),
                           )}
                         </span>
