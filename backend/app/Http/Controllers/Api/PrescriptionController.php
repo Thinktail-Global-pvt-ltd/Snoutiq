@@ -245,6 +245,10 @@ class PrescriptionController extends Controller
             'pet_gender',
             'breed',
         ];
+        $hasPetWeightColumn = Schema::hasColumn('pets', 'weight');
+        if ($hasPetWeightColumn) {
+            $petColumns[] = 'weight';
+        }
 
         // Include optional columns only if they exist to avoid runtime errors on older schemas.
         if (Schema::hasColumn('pets', 'video_calling_upload_file')) {
@@ -270,7 +274,7 @@ class PrescriptionController extends Controller
         $pets = $petsQuery
             ->orderByDesc('id')
             ->get($petColumns)
-            ->map(function ($pet) {
+            ->map(function ($pet) use ($hasPetWeightColumn) {
                 // Surface vaccination info from dog_disease_payload if present.
                 $payload = $pet->dog_disease_payload ?? null;
                 if (is_string($payload)) {
@@ -280,6 +284,9 @@ class PrescriptionController extends Controller
                     }
                 }
                 $pet->vaccination = data_get($payload, 'vaccination');
+                if (!$hasPetWeightColumn) {
+                    $pet->weight = null;
+                }
                 return $pet;
             });
 
