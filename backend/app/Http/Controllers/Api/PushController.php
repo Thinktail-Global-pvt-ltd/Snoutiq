@@ -8,6 +8,7 @@ use App\Services\Push\FcmService;
 use App\Support\DeviceTokenOwnerResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Kreait\Firebase\Exception\MessagingException;
 use Throwable;
@@ -300,6 +301,7 @@ class PushController extends Controller
             'token' => ['required', 'string'],
             'title' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
+            'force' => ['nullable', 'boolean'],
             'data' => ['nullable', 'array'],
             'data.call_id' => ['nullable', 'string'],
             'data.doctor_id' => ['nullable'],
@@ -371,6 +373,23 @@ class PushController extends Controller
                 'now_ms' => $nowMs,
             ]);
             $expiresAtMs = now()->addSeconds(90)->valueOf();
+        }
+
+        $normalizedCallId = trim((string) $callId);
+        $isForce = (bool) ($validated['force'] ?? false);
+        if ($normalizedCallId !== '') {
+            if (!$isForce && $this->isRingStopped($normalizedCallId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ringing is stopped for this call_id. Trigger force=1 to override.',
+                    'call_id' => $normalizedCallId,
+                    'stopped' => true,
+                ], 409);
+            }
+
+            if ($isForce) {
+                $this->clearRingStopped($normalizedCallId);
+            }
         }
 
         $channelName = $channelName ?: "agora_channel_{$callId}";
@@ -448,13 +467,20 @@ class PushController extends Controller
 
         $title = $validated['title'] ?? 'Snoutiq Call Ended';
         $body = $validated['body'] ?? 'Incoming call cancelled';
+        $normalizedCallId = trim((string) ($callId ?? ''));
+        if ($normalizedCallId !== '') {
+            $this->rememberRingStopped($normalizedCallId);
+        }
 
         $data = [
             'type' => 'incoming_call_end',
             'action' => 'stop_ringing',
+            'event' => 'stop_ringing',
             'status' => 'ended',
+            'call_status' => 'ended',
             'should_ring' => '0',
             'ringing' => '0',
+            'stop_ringing' => '1',
             'call_id' => (string) ($callId ?? ''),
             'doctor_id' => (string) ($doctorId ?? ''),
             'patient_id' => (string) ($patientId ?? ''),
@@ -481,8 +507,45 @@ class PushController extends Controller
 
         return response()->json([
             'success' => true,
+            'ring_blocked' => $normalizedCallId !== '' ? $this->isRingStopped($normalizedCallId) : false,
             'data' => $data,
         ]);
+    }
+
+    private function ringStopCacheKey(string $callId): string
+    {
+        return 'push:ring:stopped:' . trim($callId);
+    }
+
+    private function rememberRingStopped(string $callId): void
+    {
+        $normalized = trim($callId);
+        if ($normalized === '') {
+            return;
+        }
+
+        // Keep stop flag for 15 min to block accidental re-rings on the same call_id.
+        Cache::put($this->ringStopCacheKey($normalized), now()->toIso8601String(), now()->addMinutes(15));
+    }
+
+    private function isRingStopped(string $callId): bool
+    {
+        $normalized = trim($callId);
+        if ($normalized === '') {
+            return false;
+        }
+
+        return Cache::has($this->ringStopCacheKey($normalized));
+    }
+
+    private function clearRingStopped(string $callId): void
+    {
+        $normalized = trim($callId);
+        if ($normalized === '') {
+            return;
+        }
+
+        Cache::forget($this->ringStopCacheKey($normalized));
     }
 
     private function normalizeToken(string $token): string
