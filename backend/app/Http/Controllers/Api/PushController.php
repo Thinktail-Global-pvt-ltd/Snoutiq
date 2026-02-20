@@ -2,8 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\CallSessionUpdated;
+use App\Events\CallStatusUpdated;
 use App\Http\Controllers\Controller;
+use App\Models\Call;
+use App\Models\CallSession;
 use App\Models\DeviceToken;
+use App\Models\DoctorFcmToken;
 use App\Services\Push\FcmService;
 use App\Support\DeviceTokenOwnerResolver;
 use Illuminate\Http\Request;
@@ -468,6 +473,8 @@ class PushController extends Controller
         $title = $validated['title'] ?? 'Snoutiq Call Ended';
         $body = $validated['body'] ?? 'Incoming call cancelled';
         $normalizedCallId = trim((string) ($callId ?? ''));
+        $doctorIdInt = is_numeric((string) $doctorId) ? (int) $doctorId : null;
+        $patientIdInt = is_numeric((string) $patientId) ? (int) $patientId : null;
         if ($normalizedCallId !== '') {
             $this->rememberRingStopped($normalizedCallId);
         }
@@ -504,12 +511,204 @@ class PushController extends Controller
         ]);
 
         $push->sendToToken($token, $title, $body, $data);
+        $secondaryTokens = $this->sendStopToDoctorTokens(
+            $push,
+            $token,
+            $doctorIdInt,
+            $title,
+            $body,
+            $data
+        );
+        $reverbSync = $this->syncStopRingState(
+            $normalizedCallId,
+            $doctorIdInt,
+            $patientIdInt,
+            trim((string) ($channelName ?: $channel ?: ''))
+        );
 
         return response()->json([
             'success' => true,
             'ring_blocked' => $normalizedCallId !== '' ? $this->isRingStopped($normalizedCallId) : false,
+            'stop_sent_count' => 1 + count($secondaryTokens),
+            'reverb_sync' => $reverbSync,
             'data' => $data,
         ]);
+    }
+
+    /**
+     * @param array<string,string> $data
+     * @return array<int,string>
+     */
+    private function sendStopToDoctorTokens(
+        FcmService $push,
+        string $primaryToken,
+        ?int $doctorId,
+        string $title,
+        string $body,
+        array $data
+    ): array {
+        if (!$doctorId || $doctorId <= 0) {
+            return [];
+        }
+
+        $tokens = DoctorFcmToken::query()
+            ->where('doctor_id', $doctorId)
+            ->pluck('token')
+            ->filter()
+            ->map(fn ($value) => $this->normalizeToken((string) $value))
+            ->unique()
+            ->values()
+            ->all();
+
+        $tokens = array_values(array_filter(
+            $tokens,
+            fn (string $candidate) => $candidate !== '' && $candidate !== $primaryToken
+        ));
+
+        foreach ($tokens as $extraToken) {
+            try {
+                $push->sendToToken($extraToken, $title, $body, $data);
+            } catch (Throwable $e) {
+                \Log::warning('FCM stop ring secondary token send failed', [
+                    'doctor_id' => $doctorId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $tokens;
+    }
+
+    private function syncStopRingState(
+        string $callId,
+        ?int $doctorId,
+        ?int $patientId,
+        ?string $channelName
+    ): array {
+        $result = [
+            'call_updated' => false,
+            'call_session_updated' => false,
+            'call_status_broadcast' => false,
+            'call_session_broadcast' => false,
+        ];
+
+        $now = now();
+        $normalizedChannel = trim((string) ($channelName ?? ''));
+
+        if ($callId !== '' && ctype_digit($callId)) {
+            try {
+                /** @var Call|null $call */
+                $call = Call::query()->find((int) $callId);
+                if ($call) {
+                    $terminalStatuses = [
+                        Call::STATUS_CANCELLED,
+                        Call::STATUS_ENDED,
+                        Call::STATUS_REJECTED,
+                        Call::STATUS_MISSED,
+                    ];
+
+                    if (!in_array($call->status, $terminalStatuses, true)) {
+                        $call->status = Call::STATUS_CANCELLED;
+                        $call->cancelled_at = $now;
+                        $call->save();
+                        $result['call_updated'] = true;
+                    }
+
+                    event(new CallStatusUpdated($call->fresh()));
+                    $result['call_status_broadcast'] = true;
+                }
+            } catch (Throwable $e) {
+                \Log::warning('stopRing call sync failed', [
+                    'call_id' => $callId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $channelCandidates = array_values(array_unique(array_filter([
+            $normalizedChannel !== '' ? $normalizedChannel : null,
+            $callId !== '' ? 'channel_' . $callId : null,
+            $callId !== '' ? 'agora_channel_' . $callId : null,
+            $callId !== '' ? 'agora_channel_call_' . preg_replace('/^call_/', '', $callId) : null,
+        ])));
+
+        $canLookupByIdentifier = $callId !== '' && CallSession::supportsColumn('call_identifier');
+        if ($canLookupByIdentifier || !empty($channelCandidates)) {
+            try {
+                $sessionQuery = CallSession::query();
+                $sessionQuery->where(function ($query) use ($canLookupByIdentifier, $callId, $channelCandidates) {
+                    if ($canLookupByIdentifier) {
+                        $query->where('call_identifier', $callId);
+                        if (!empty($channelCandidates)) {
+                            $query->orWhereIn('channel_name', $channelCandidates);
+                        }
+                        return;
+                    }
+
+                    $query->whereIn('channel_name', $channelCandidates);
+                });
+
+                /** @var CallSession|null $session */
+                $session = $sessionQuery->orderByDesc('id')->first();
+                if ($session) {
+                    $updates = ['status' => 'ended'];
+                    if (CallSession::supportsColumn('ended_at')) {
+                        $updates['ended_at'] = $now;
+                    }
+                    if ($doctorId && (int) ($session->doctor_id ?? 0) <= 0) {
+                        $updates['doctor_id'] = $doctorId;
+                    }
+                    if ($patientId && (int) ($session->patient_id ?? 0) <= 0) {
+                        $updates['patient_id'] = $patientId;
+                    }
+
+                    $session->fill($updates);
+                    $session->save();
+                    $result['call_session_updated'] = true;
+
+                    if (!$doctorId && (int) ($session->doctor_id ?? 0) > 0) {
+                        $doctorId = (int) $session->doctor_id;
+                    }
+                    if (!$patientId && (int) ($session->patient_id ?? 0) > 0) {
+                        $patientId = (int) $session->patient_id;
+                    }
+                    if ($normalizedChannel === '' && !empty($session->channel_name)) {
+                        $normalizedChannel = (string) $session->channel_name;
+                    }
+                }
+            } catch (Throwable $e) {
+                \Log::warning('stopRing call session sync failed', [
+                    'call_id' => $callId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($callId !== '') {
+            try {
+                event(new CallSessionUpdated([
+                    'callId' => $callId,
+                    'doctorId' => $doctorId,
+                    'patientId' => $patientId,
+                    'channel' => $normalizedChannel !== '' ? $normalizedChannel : null,
+                    'status' => 'ended',
+                    'endedAt' => $now->toIso8601String(),
+                    'event' => 'stop_ringing',
+                    'action' => 'stop_ringing',
+                    'ringing' => false,
+                    'shouldRing' => false,
+                ], 'status_update'));
+
+                $result['call_session_broadcast'] = true;
+            } catch (Throwable $e) {
+                \Log::warning('stopRing reverb broadcast failed', [
+                    'call_id' => $callId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $result;
     }
 
     private function ringStopCacheKey(string $callId): string
