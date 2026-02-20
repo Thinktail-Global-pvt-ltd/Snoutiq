@@ -307,10 +307,25 @@ Route::get('/exported_from_excell_doctors', function () {
         $baseAppUrl = rtrim(url('/'), '/');
     }
 
-    $data = $vets->map(function (VetRegisterationTemp $vet) use ($baseAppUrl) {
+    $doctorIds = $vets->flatMap(function (VetRegisterationTemp $vet) {
+        return $vet->doctors->pluck('id');
+    })->filter()->unique()->values();
+
+    $reviewsByDoctor = collect();
+    if (Schema::hasTable('reviews') && $doctorIds->isNotEmpty()) {
+        $reviews = \App\Models\Review::query()
+            ->whereIn('doctor_id', $doctorIds->all())
+            ->orderByDesc('id')
+            ->get(['id', 'user_id', 'doctor_id', 'points', 'comment', 'created_at', 'updated_at']);
+
+        $reviewsByDoctor = $reviews->groupBy('doctor_id');
+    }
+
+    $data = $vets->map(function (VetRegisterationTemp $vet) use ($baseAppUrl, $reviewsByDoctor) {
         $payload = $vet->toArray();
-        $payload['doctors'] = $vet->doctors->map(function (Doctor $doctor) use ($baseAppUrl) {
+        $payload['doctors'] = $vet->doctors->map(function (Doctor $doctor) use ($baseAppUrl, $reviewsByDoctor) {
             $doctorPayload = $doctor->toArray();
+            $doctorReviews = $reviewsByDoctor->get($doctor->id, collect());
 
             $imagePath = ltrim((string) ($doctor->doctor_image ?? ''), '/');
             $doctorPayload['doctor_image_url'] = $imagePath !== ''
@@ -320,6 +335,22 @@ Route::get('/exported_from_excell_doctors', function () {
             $doctorPayload['doctor_image_blob_url'] = !empty($doctor->doctor_image_blob)
                 ? route('api.doctors.blob-image', ['doctor' => $doctor->id])
                 : null;
+
+            $doctorPayload['reviews_count'] = (int) $doctorReviews->count();
+            $doctorPayload['average_review_points'] = $doctorReviews->isNotEmpty()
+                ? round((float) $doctorReviews->avg('points'), 2)
+                : null;
+            $doctorPayload['reviews'] = $doctorReviews->map(function (\App\Models\Review $review) {
+                return [
+                    'id' => $review->id,
+                    'user_id' => $review->user_id,
+                    'doctor_id' => $review->doctor_id,
+                    'points' => $review->points,
+                    'comment' => $review->comment,
+                    'created_at' => optional($review->created_at)->toIso8601String(),
+                    'updated_at' => optional($review->updated_at)->toIso8601String(),
+                ];
+            })->values();
 
             return $doctorPayload;
         })->values();
