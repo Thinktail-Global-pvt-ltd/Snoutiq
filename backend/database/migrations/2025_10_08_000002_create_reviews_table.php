@@ -17,6 +17,10 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['doctor_id', 'points']);
+
+            // Keep reviews linked with valid users and doctors.
+            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
+            $table->foreign('doctor_id')->references('id')->on('doctors')->cascadeOnDelete();
         });
     }
 
@@ -25,4 +29,3 @@ return new class extends Migration
         Schema::dropIfExists('reviews');
     }
 };
-
