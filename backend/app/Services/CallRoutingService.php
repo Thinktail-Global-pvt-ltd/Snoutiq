@@ -6,7 +6,7 @@ use App\Events\CallRequested;
 use App\Events\CallStatusUpdated;
 use App\Jobs\RingTimeoutJob;
 use App\Models\Call;
-use App\Models\DoctorFcmToken;
+use App\Models\DeviceToken;
 use App\Services\Push\FcmService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -34,7 +34,7 @@ class CallRoutingService
 
     public function markDoctorBusy(int $doctorId, int $seconds): void
     {
-        $busyTtl = max($seconds, (int) config('calls.ring_timeout', 30) + 5);
+        $busyTtl = max($seconds, $this->ringTimeoutSeconds() + 5);
         Redis::setex(sprintf(self::BUSY_KEY, $doctorId), $busyTtl, '1');
     }
 
@@ -84,10 +84,15 @@ class CallRoutingService
             'rtc' => $rtc,
         ]);
 
-        $this->markDoctorBusy($doctorId, (int) config('calls.busy_ttl', 300));
+        $busyTtl = (int) config('calls.busy_ttl', 300);
+        if ($busyTtl < 1) {
+            $busyTtl = 300;
+        }
+
+        $this->markDoctorBusy($doctorId, $busyTtl);
         event(new CallRequested($call));
         $this->notifyDoctorCallRequested($call);
-        RingTimeoutJob::dispatch($call->id)->delay(now()->addSeconds(config('calls.ring_timeout', 30)));
+        RingTimeoutJob::dispatch($call->id)->delay(now()->addSeconds($this->ringTimeoutSeconds()));
 
         return $call;
     }
@@ -143,10 +148,13 @@ class CallRoutingService
     private function notifyDoctorCallRequested(Call $call): void
     {
         try {
-            $tokens = DoctorFcmToken::query()
-                ->where('doctor_id', $call->doctor_id)
+            $tokens = DeviceToken::query()
+                ->where('user_id', $call->doctor_id)
                 ->pluck('token')
                 ->filter()
+                ->map(fn ($token) => trim(trim((string) $token), "\"'"))
+                ->filter(fn (string $token) => $token !== '')
+                ->unique()
                 ->values()
                 ->all();
 
@@ -177,5 +185,27 @@ class CallRoutingService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function ringTimeoutSeconds(): int
+    {
+        $raw = config('calls.ring_timeout', 30);
+
+        if (is_int($raw) || is_float($raw)) {
+            return max(1, (int) round($raw));
+        }
+
+        if (is_string($raw)) {
+            $trimmed = trim($raw);
+            if ($trimmed !== '' && is_numeric($trimmed)) {
+                return max(1, (int) round((float) $trimmed));
+            }
+
+            if (preg_match('/-?\d+(\.\d+)?/', $trimmed, $matches) === 1) {
+                return max(1, (int) round((float) $matches[0]));
+            }
+        }
+
+        return 30;
     }
 }

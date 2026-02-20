@@ -8,7 +8,6 @@ use Razorpay\Api\Errors\Error as RazorpayError;
 use App\Models\Payment;
 use App\Models\Transaction;
 use App\Models\Doctor;
-use App\Models\DoctorFcmToken;
 use App\Models\DeviceToken;
 use App\Models\CallSession;
 use App\Models\User;
@@ -1282,10 +1281,13 @@ class PaymentController extends Controller
             return ['sent' => false, 'reason' => 'doctor_missing'];
         }
 
-        $tokens = DoctorFcmToken::query()
-            ->where('doctor_id', $doctorId)
+        $tokens = DeviceToken::query()
+            ->where('user_id', $doctorId)
             ->pluck('token')
             ->filter()
+            ->map(fn ($token) => trim(trim((string) $token), "\"'"))
+            ->filter(fn (string $token) => $token !== '')
+            ->unique()
             ->values()
             ->all();
 
