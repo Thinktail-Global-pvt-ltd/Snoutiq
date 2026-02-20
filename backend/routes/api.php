@@ -1636,6 +1636,7 @@ Route::prefix('push')->group(function () {
     Route::delete('/register-token', [PushController::class, 'unregisterToken']);
     Route::post('/test', [PushController::class, 'testToToken']);
     Route::post('/ring', [PushController::class, 'ring']);
+    Route::post('/stop-ring', [PushController::class, 'stopRing']);
 });
 
 Route::post('/send-otp', [AuthController::class, 'send_otp']);

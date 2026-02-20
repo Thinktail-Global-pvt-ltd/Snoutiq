@@ -385,6 +385,7 @@ class PushController extends Controller
             'channel' => (string) $channel,
             'channel_name' => (string) $channelName,
             'expires_at' => (string) $expiresAtMs,
+            // Data-only keeps FCM high priority for Doze bypass; app must display UI
             'data_only' => '1',
         ];
 
@@ -399,6 +400,80 @@ class PushController extends Controller
                 'data' => $data,
                 'android' => ['priority' => 'high', 'ttl' => '90s'],
                 'apns' => ['headers' => ['apns-priority' => '10']],
+            ],
+        ]);
+
+        $push->sendToToken($token, $title, $body, $data);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    public function stopRing(Request $request, FcmService $push)
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string'],
+            'title' => ['nullable', 'string'],
+            'body' => ['nullable', 'string'],
+            'data' => ['nullable', 'array'],
+            'data.call_id' => ['nullable', 'string'],
+            'data.doctor_id' => ['nullable'],
+            'data.patient_id' => ['nullable'],
+            'data.channel' => ['nullable', 'string'],
+            'data.channel_name' => ['nullable', 'string'],
+            // Legacy fields (backward compatibility)
+            'call_id' => ['nullable', 'string'],
+            'doctor_id' => ['nullable'],
+            'patient_id' => ['nullable'],
+            'channel' => ['nullable', 'string'],
+            'channel_name' => ['nullable', 'string'],
+        ]);
+
+        $token = $this->normalizeToken($validated['token']);
+        if (!$this->isLikelyFcmToken($token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The provided token does not look like a valid FCM registration token.',
+            ], 422);
+        }
+
+        $dataBlock = $validated['data'] ?? [];
+        $callId = $dataBlock['call_id'] ?? $validated['call_id'] ?? null;
+        $doctorId = $dataBlock['doctor_id'] ?? $validated['doctor_id'] ?? null;
+        $patientId = $dataBlock['patient_id'] ?? $validated['patient_id'] ?? null;
+        $channel = $dataBlock['channel'] ?? $validated['channel'] ?? null;
+        $channelName = $dataBlock['channel_name'] ?? $validated['channel_name'] ?? null;
+
+        $title = $validated['title'] ?? 'Snoutiq Call Ended';
+        $body = $validated['body'] ?? 'Incoming call cancelled';
+
+        $data = [
+            'type' => 'incoming_call_end',
+            'action' => 'stop_ringing',
+            'status' => 'ended',
+            'should_ring' => '0',
+            'ringing' => '0',
+            'call_id' => (string) ($callId ?? ''),
+            'doctor_id' => (string) ($doctorId ?? ''),
+            'patient_id' => (string) ($patientId ?? ''),
+            'channel' => (string) ($channel ?? ''),
+            'channel_name' => (string) ($channelName ?? ''),
+            'expires_at' => (string) now()->valueOf(),
+            // Force data-only high priority so app can stop ringtone immediately.
+            'data_only' => '1',
+        ];
+
+        $tokenLast8 = strlen($token) >= 8 ? substr($token, -8) : $token;
+
+        \Log::info('FCM stop ring push attempt', [
+            'call_id' => $callId,
+            'doctor_id' => $doctorId,
+            'token_last8' => $tokenLast8,
+            'payload' => [
+                'token_last8' => $tokenLast8,
+                'data' => $data,
             ],
         ]);
 
