@@ -14,7 +14,6 @@ class DoctorAvailabilityStatusController extends Controller
         $validated = $request->validate([
             'timezone' => ['nullable', 'string', 'max:100'],
             'clinic_id' => ['nullable', 'integer'],
-            'exported_from_excell' => ['nullable', 'boolean'],
         ]);
 
         $timezone = (string) ($validated['timezone'] ?? config('app.timezone', 'UTC'));
@@ -31,21 +30,11 @@ class DoctorAvailabilityStatusController extends Controller
             $query->where('vet_registeration_id', (int) $validated['clinic_id']);
         }
 
-        if (array_key_exists('exported_from_excell', $validated) && $validated['exported_from_excell'] !== null) {
-            $wantsExported = (bool) $validated['exported_from_excell'];
-            if ($wantsExported) {
-                $query->where(function ($q) {
-                    $q->where('exported_from_excell', 1)
-                        ->orWhere('exported_from_excell', '1');
-                });
-            } else {
-                $query->where(function ($q) {
-                    $q->whereNull('exported_from_excell')
-                        ->orWhere('exported_from_excell', 0)
-                        ->orWhere('exported_from_excell', '0');
-                });
-            }
-        }
+        // Only include doctors imported from excel campaign.
+        $query->where(function ($q) {
+            $q->where('exported_from_excell', 1)
+                ->orWhere('exported_from_excell', '1');
+        });
 
         $doctors = $query
             ->orderBy('id')
@@ -266,4 +255,3 @@ class DoctorAvailabilityStatusController extends Controller
         return $currentMinute >= $startMinute || $currentMinute < $endMinute;
     }
 }
-
