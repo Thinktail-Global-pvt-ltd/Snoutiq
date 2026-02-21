@@ -574,7 +574,35 @@ Route::post('/user-pet-observation', function (Request $request) {
             }
         }
         if (array_key_exists('is_neutered', $data) && Schema::hasColumn('pets', 'is_neutered')) {
-            $pet->is_neutered = (int) ((bool) $data['is_neutered']);
+            $isNeutered = (bool) $data['is_neutered'];
+            $isNeuteredColumnType = null;
+            try {
+                $isNeuteredColumnType = Schema::getColumnType('pets', 'is_neutered');
+            } catch (\Throwable $e) {
+                $isNeuteredColumnType = null;
+            }
+
+            $isNeuteredColumnTypeNormalized = strtolower(trim((string) $isNeuteredColumnType));
+            $isEnumLikeNeuteredColumn = str_contains($isNeuteredColumnTypeNormalized, 'enum')
+                || in_array($isNeuteredColumnTypeNormalized, ['string', 'char', 'varchar'], true);
+
+            // Fallback: inspect raw column type when Schema::getColumnType is unavailable or generic.
+            if (! $isEnumLikeNeuteredColumn && ($isNeuteredColumnTypeNormalized === '' || $isNeuteredColumnTypeNormalized === 'unknown')) {
+                try {
+                    $columnMeta = DB::selectOne("SHOW COLUMNS FROM `pets` LIKE 'is_neutered'");
+                    $rawType = strtolower((string) ($columnMeta->Type ?? $columnMeta->type ?? ''));
+                    $isEnumLikeNeuteredColumn = str_contains($rawType, 'enum(');
+                } catch (\Throwable $e) {
+                    // Keep default numeric mapping when metadata lookup fails.
+                }
+            }
+
+            // Some DBs use enum('Y','N') while older ones may use tinyint/boolean.
+            if ($isEnumLikeNeuteredColumn) {
+                $pet->is_neutered = $isNeutered ? 'Y' : 'N';
+            } else {
+                $pet->is_neutered = $isNeutered ? 1 : 0;
+            }
         }
         $vaccinatedYesNo = $data['vaccenated_yes_no'] ?? $data['vaccinated_yes_no'] ?? null;
         if ($vaccinatedYesNo !== null && Schema::hasColumn('pets', 'vaccenated_yes_no')) {
