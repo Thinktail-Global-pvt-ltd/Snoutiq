@@ -239,7 +239,9 @@ class AdminPanelController extends Controller
         $petColumns = $this->excellExportPetColumns();
 
         return Transaction::query()
-            ->where('status', 'captured')
+            ->where(function ($query) {
+                $query->whereIn('status', ['captured', 'pending', 'CAPTURED', 'PENDING']);
+            })
             ->where(function ($query) {
                 $query->where('type', 'excell_export_campaign')
                     ->orWhere('metadata->order_type', 'excell_export_campaign');

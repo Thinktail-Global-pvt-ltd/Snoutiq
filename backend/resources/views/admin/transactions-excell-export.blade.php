@@ -100,7 +100,10 @@
 
 @section('content')
 @php
-    $totalPaise = $transactions->sum('amount_paise');
+    $capturedTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'captured');
+    $pendingTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'pending');
+    $totalPaise = $capturedTransactions->sum('amount_paise');
+    $pendingTotalPaise = $pendingTransactions->sum('amount_paise');
     $formatInr = fn ($paise) => number_format(($paise ?? 0) / 100, 2);
     $formatPetDob = static function ($value) {
         if (empty($value)) {
@@ -120,11 +123,13 @@
                 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3 excel-export-summary">
                     <div>
                         <h2 class="h5 mb-1">Excel Export Campaign Transactions</h2>
-                        <p class="text-muted mb-0">All payments where <code>type</code> or <code>metadata.order_type</code> equals <strong>excell_export_campaign</strong>.</p>
+                        <p class="text-muted mb-0">All <strong>captured + pending</strong> payments where <code>type</code> or <code>metadata.order_type</code> equals <strong>excell_export_campaign</strong>.</p>
                     </div>
                     <div class="d-flex gap-2 excel-export-badges align-items-center">
                         <span class="badge text-bg-primary-subtle text-primary-emphasis px-3 py-2">{{ number_format($transactions->count()) }} records</span>
                         <span class="badge text-bg-success-subtle text-success-emphasis px-3 py-2">₹{{ $formatInr($totalPaise) }} collected</span>
+                        <span class="badge text-bg-warning-subtle text-warning-emphasis px-3 py-2">{{ number_format($pendingTransactions->count()) }} pending</span>
+                        <span class="badge text-bg-warning-subtle text-warning-emphasis px-3 py-2">₹{{ $formatInr($pendingTotalPaise) }} pending amount</span>
                         <a href="{{ route('admin.transactions.excell-export', ['export' => 'csv']) }}" class="btn btn-sm btn-outline-dark text-nowrap">
                             Export CSV
                         </a>
@@ -180,12 +185,18 @@
                                         $amountInr = $formatInr($txn->amount_paise);
                                         $parentMsg = "Hi {$parentName}, your {$petType} {$petName} is booked with {$doctorName}. They'll respond within {$responseMinutes} minutes. Amount paid ₹{$amountInr}. Vet: {$doctorName}. - SnoutIQ";
                                         $vetMsg = "Hi Dr. {$doctorName}, a new consultation is assigned. Pet: {$petName} ({$petType}). Parent: {$parentName} ({$parentPhone}). Issue: {$issue}. Prescription: (add link if any). Please respond within {$responseMinutes} mins. - SnoutIQ";
+                                        $status = strtolower((string) ($txn->status ?? 'n/a'));
+                                        $statusClass = match ($status) {
+                                            'captured' => 'text-bg-success',
+                                            'pending' => 'text-bg-warning',
+                                            default => 'text-bg-light',
+                                        };
                                     @endphp
                                     <tr>
                                         <td data-label="ID">#{{ $txn->id }}</td>
                                         <td class="text-nowrap" data-label="Created">{{ optional($txn->created_at)->format('d M Y, H:i') ?? '—' }}</td>
                                         <td data-label="Status">
-                                            <span class="badge text-bg-light text-uppercase">{{ $txn->status ?? 'n/a' }}</span>
+                                            <span class="badge {{ $statusClass }} text-uppercase">{{ $txn->status ?? 'n/a' }}</span>
                                         </td>
                                         <td class="fw-semibold" data-label="Amount (₹)">₹{{ $formatInr($txn->amount_paise) }}</td>
                                         <td data-label="Clinic">
