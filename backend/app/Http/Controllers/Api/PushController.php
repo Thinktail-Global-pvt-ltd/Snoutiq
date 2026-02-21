@@ -313,6 +313,8 @@ class PushController extends Controller
             'data.patient_id' => ['nullable'],
             'data.channel' => ['nullable', 'string'],
             'data.channel_name' => ['nullable', 'string'],
+            'data.call_identifier' => ['nullable', 'string'],
+            'data.call_session_id' => ['nullable', 'string'],
             'data.expires_at' => ['nullable'],
             // Legacy fields (backward compatibility)
             'call_id' => ['nullable', 'string'],
@@ -320,6 +322,8 @@ class PushController extends Controller
             'patient_id' => ['nullable'],
             'channel' => ['nullable', 'string'],
             'channel_name' => ['nullable', 'string'],
+            'call_identifier' => ['nullable', 'string'],
+            'call_session_id' => ['nullable', 'string'],
             'expires_at' => ['nullable'],
         ]);
 
@@ -392,6 +396,64 @@ class PushController extends Controller
             }
         }
 
+        $callIdentifier = $request->input('data.call_identifier')
+            ?? $request->input('data.callIdentifier')
+            ?? $request->input('call_identifier')
+            ?? $request->input('callIdentifier');
+        if (is_string($callIdentifier)) {
+            $callIdentifier = trim($callIdentifier);
+            if ($callIdentifier === '') {
+                $callIdentifier = null;
+            }
+        } else {
+            $callIdentifier = null;
+        }
+
+        $callSessionId = $request->input('data.call_session_id')
+            ?? $request->input('data.callSessionId')
+            ?? $request->input('call_session_id')
+            ?? $request->input('callSessionId');
+        if (is_string($callSessionId)) {
+            $callSessionId = trim($callSessionId);
+            if ($callSessionId === '') {
+                $callSessionId = null;
+            }
+        } elseif (is_numeric($callSessionId)) {
+            $callSessionId = (string) $callSessionId;
+        } else {
+            $callSessionId = null;
+        }
+
+        if ($callIdentifier === null && is_string($callId)) {
+            $callIdString = trim($callId);
+            if ($callIdString !== '' && !ctype_digit($callIdString)) {
+                $callIdentifier = $callIdString;
+            }
+        }
+
+        if ($callIdentifier === null && $callSessionId !== null) {
+            $session = CallSession::query()->find($callSessionId);
+            if ($session && CallSession::supportsColumn('call_identifier')) {
+                $resolvedIdentifier = $session->call_identifier;
+                if (is_string($resolvedIdentifier)) {
+                    $resolvedIdentifier = trim($resolvedIdentifier);
+                    if ($resolvedIdentifier !== '') {
+                        $callIdentifier = $resolvedIdentifier;
+                    }
+                }
+            }
+        }
+
+        if ($callSessionId === null && $callIdentifier !== null && CallSession::supportsColumn('call_identifier')) {
+            $resolvedSessionId = CallSession::query()
+                ->where('call_identifier', $callIdentifier)
+                ->orderByDesc('id')
+                ->value('id');
+            if ($resolvedSessionId) {
+                $callSessionId = (string) $resolvedSessionId;
+            }
+        }
+
         if ($expiresAt !== null && !ctype_digit((string) $expiresAt)) {
             return response()->json([
                 'success' => false,
@@ -445,6 +507,11 @@ class PushController extends Controller
         $data = [
             'type' => 'incoming_call',
             'call_id' => (string) $callId,
+            'callId' => (string) $callId,
+            'call_identifier' => $callIdentifier ?? '',
+            'callIdentifier' => $callIdentifier ?? '',
+            'call_session_id' => $callSessionId ?? '',
+            'callSessionId' => $callSessionId ?? '',
             'doctor_id' => (string) $doctorId,
             'patient_id' => (string) $patientId,
             'doctor_name' => $doctorName ?? '',
