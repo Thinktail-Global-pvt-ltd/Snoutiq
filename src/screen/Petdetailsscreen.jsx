@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
 import { PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
+import { apiPost } from "../lib/api";
 import {
   CheckCircle2,
   ChevronDown,
@@ -563,15 +564,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     setOtpStatus("sending");
 
     try {
-      const res = await fetch("https://snoutiq.com/backend/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "whatsapp", value: phone }),
+      const data = await apiPost("/api/send-otp", {
+        type: "whatsapp",
+        value: phone,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.message || "Failed to send OTP.");
-      }
       if (!data?.token) {
         throw new Error("OTP token missing. Please try again.");
       }
@@ -614,13 +610,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
         payload.lat = location.lat;
         payload.lang = location.lang;
       }
-      const res = await fetch("https://snoutiq.com/backend/api/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      const data = await apiPost("/api/verify-otp", payload);
+      if (data?.success === false) {
         throw new Error(data?.error || data?.message || "OTP verification failed.");
       }
 
