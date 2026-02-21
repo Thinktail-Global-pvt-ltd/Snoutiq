@@ -7,6 +7,7 @@ use App\Events\CallStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Call;
 use App\Models\CallSession;
+use App\Models\Doctor;
 use App\Models\DeviceToken;
 use App\Services\Push\FcmService;
 use App\Support\DeviceTokenOwnerResolver;
@@ -360,6 +361,37 @@ class PushController extends Controller
             ], 422);
         }
 
+        $doctorName = $request->input('data.doctor_name')
+            ?? $request->input('data.doctorName')
+            ?? $request->input('data.callerName')
+            ?? $request->input('doctor_name')
+            ?? $request->input('doctorName')
+            ?? $request->input('callerName');
+
+        if (is_string($doctorName)) {
+            $doctorName = trim($doctorName);
+            if ($doctorName === '') {
+                $doctorName = null;
+            }
+        } else {
+            $doctorName = null;
+        }
+
+        if ($doctorName === null) {
+            $doctorIdLookup = is_numeric((string) $doctorId) ? (int) $doctorId : null;
+            if ($doctorIdLookup) {
+                $doctorName = Doctor::query()
+                    ->whereKey($doctorIdLookup)
+                    ->value('doctor_name');
+                if (is_string($doctorName)) {
+                    $doctorName = trim($doctorName);
+                    if ($doctorName === '') {
+                        $doctorName = null;
+                    }
+                }
+            }
+        }
+
         if ($expiresAt !== null && !ctype_digit((string) $expiresAt)) {
             return response()->json([
                 'success' => false,
@@ -415,6 +447,9 @@ class PushController extends Controller
             'call_id' => (string) $callId,
             'doctor_id' => (string) $doctorId,
             'patient_id' => (string) $patientId,
+            'doctor_name' => $doctorName ?? '',
+            'doctorName' => $doctorName ?? '',
+            'callerName' => $doctorName ?? '',
             'channel' => (string) $channel,
             'channel_name' => (string) $channelName,
             'expires_at' => (string) $expiresAtMs,
