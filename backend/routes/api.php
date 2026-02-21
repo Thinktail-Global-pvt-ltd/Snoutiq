@@ -2012,6 +2012,7 @@ Route::post('/bookings/{id}/rate', [\App\Http\Controllers\Api\BookingsController
 Route::post('/bookings/{id}/verify-payment', [\App\Http\Controllers\Api\BookingsController::class, 'verifyPayment']);
 Route::get('/doctors', [DoctorController::class, 'index']);
 Route::get('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slots']);
+Route::get('/doctors/availability-status', [\App\Http\Controllers\Api\DoctorAvailabilityStatusController::class, 'index']);
 Route::get('/doctors/{id}', [DoctorController::class, 'show']);
 Route::put('/doctors/{id}', [DoctorController::class, 'update']);
 Route::get('/doctors/{id}/bookings', [\App\Http\Controllers\Api\BookingsController::class, 'doctorBookings']);
