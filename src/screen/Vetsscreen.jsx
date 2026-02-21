@@ -276,7 +276,7 @@ const clipText = (text, max = 160) => {
 
 /**
  * ✅ IMPORTANT:
- * - HIDE DEMO/INVALID vets: if day OR night rate <= 1 => do not show
+ * - HIDE DEMO/INVALID vets: if day OR night rate <= 2 => do not show
  * - Keep priceDay/priceNight numbers
  */
 export const buildVetsFromApi = (apiData = []) => {
@@ -302,7 +302,7 @@ export const buildVetsFromApi = (apiData = []) => {
       const priceDay = toNumber(doc?.video_day_rate, 0);
       const priceNight = toNumber(doc?.video_night_rate, 0);
 
-      if (priceDay <= 1 || priceNight <= 1) return;
+      if (priceDay <= 2 || priceNight <= 2) return;
 
       list.push({
         id: doc?.id,
