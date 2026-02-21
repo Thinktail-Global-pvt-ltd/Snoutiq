@@ -726,10 +726,11 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       if (details.petDoc2?.trim()) fd.append("pet_doc2", details.petDoc2.trim());
       if (fileToSend) fd.append("file", fileToSend);
 
-      const res = await fetch(
-        "https://snoutiq.com/backend/api/user-pet-observation",
-        { method: "POST", body: fd }
-      );
+      const baseUrl = apiBaseUrl();
+      const res = await fetch(`${baseUrl}/api/user-pet-observation`, {
+        method: "POST",
+        body: fd,
+      });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Failed to submit observation");
@@ -1851,7 +1852,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <div className="hidden md:block rounded-xl border border-gray-200 bg-white p-5">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
                       <FileText size={20} className="text-[#3998de]" />
