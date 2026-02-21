@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
 import { PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
-import { apiPost } from "../lib/api";
+import { apiPost, apiBaseUrl } from "../lib/api";
 import {
   CheckCircle2,
   ChevronDown,
@@ -319,10 +319,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       setLoadingBreeds(true);
 
       try {
-        const res = await fetch(
-          "https://snoutiq.com/backend/api/dog-breeds/all",
-          { method: "GET" }
-        );
+        const baseUrl = apiBaseUrl();
+        const res = await fetch(`${baseUrl}/api/dog-breeds/all`, {
+          method: "GET",
+        });
         const data = await res.json();
 
         if (data?.status === "success" && data?.breeds) {
@@ -372,10 +372,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       setLoadingBreeds(true);
 
       try {
-        const res = await fetch(
-          "https://snoutiq.com/backend/api/cat-breeds/with-indian",
-          { method: "GET" }
-        );
+        const baseUrl = apiBaseUrl();
+        const res = await fetch(`${baseUrl}/api/cat-breeds/with-indian`, {
+          method: "GET",
+        });
         const data = await res.json();
 
         if (data?.success && Array.isArray(data?.data)) {
@@ -432,10 +432,10 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
     const fetchLiveStatus = async () => {
       try {
-        const res = await fetch(
-          "https://snoutiq.com/backend/api/doctors/availability-status",
-          { method: "GET" }
-        );
+        const baseUrl = apiBaseUrl();
+        const res = await fetch(`${baseUrl}/api/doctors/availability-status`, {
+          method: "GET",
+        });
         const data = await res.json();
         if (!active) return;
 
