@@ -132,6 +132,20 @@ const toNumber = (value) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+const getInitials = (name = "") => {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return "V";
+  const parts = trimmed.split(" ").filter(Boolean);
+  if (parts.length === 1) return parts[0][0]?.toUpperCase() || "V";
+  return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+};
+
+const formatExperience = (value) => {
+  const years = Number(value);
+  if (!Number.isFinite(years) || years <= 0) return "";
+  return `${years}+ yrs experience`;
+};
+
 const formatPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
   if (!digits) return "";
@@ -194,7 +208,7 @@ const compressImageFile = async (
   return new File([blob], safeName, { type: outputMime });
 };
 
-const PetDetailsScreen = ({ onSubmit, onBack }) => {
+const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
   const [details, setDetails] = useState({
     ownerName: "",
     ownerMobile: "",
@@ -804,6 +818,28 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     }
   };
 
+  const vetName = vet?.name || "Selected vet";
+  const vetQualification = vet?.qualification || "";
+  const vetExperience = formatExperience(vet?.experience);
+  const vetMetaLine =
+    vetQualification && vetExperience
+      ? `${vetQualification} - ${vetExperience}`
+      : vetQualification || vetExperience || "Details shown after payment";
+  const vetRating = Number.isFinite(Number(vet?.rating))
+    ? Number(vet?.rating).toFixed(1)
+    : "--";
+  const vetConsultations = Number.isFinite(Number(vet?.consultations))
+    ? Number(vet?.consultations)
+    : "--";
+  const vetResponse =
+    (vet?.bookingRateType === "night" ? vet?.responseNight : vet?.responseDay) ||
+    vet?.responseDay ||
+    vet?.responseNight ||
+    "";
+  const vetResponseText = vetResponse
+    ? `Responds in ${vetResponse}`
+    : "Responds quickly after payment";
+
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
       <div className="sticky top-0 z-40 border-b border-gray-200 bg-white">
@@ -845,7 +881,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         } online right now`}
                   </div>
                   <div className="text-xs text-white/80">
-                    Average response after payment: under 10 minutes
+                    Average response after payment: under 15 minutes
                   </div>
                 </div>
                 <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold">
@@ -1823,14 +1859,21 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
               <div className="space-y-6 md:sticky md:top-24 md:self-start">
                 <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
                   <div className="flex items-center gap-3 bg-[#2563eb] px-5 py-4 text-white">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-                      <User size={18} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold">Selected vet</div>
-                      <div className="text-xs text-white/80">
-                        Details shown after payment
+                    {vet?.image ? (
+                      <img
+                        src={vet.image}
+                        alt={vetName}
+                        className="h-10 w-10 rounded-full object-cover border border-white/30"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-xs font-semibold">
+                        {getInitials(vetName)}
                       </div>
+                    )}
+                    <div>
+                      <div className="text-sm font-semibold">{vetName}</div>
+                      <div className="text-xs text-white/80">{vetMetaLine}</div>
                       <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold">
                         Verified
                       </div>
@@ -1838,17 +1881,21 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                   </div>
                   <div className="grid grid-cols-2 gap-px bg-gray-100">
                     <div className="bg-white p-3 text-center">
-                      <div className="text-base font-semibold text-[#2563eb]">--</div>
+                      <div className="text-base font-semibold text-[#2563eb]">
+                        {vetConsultations}
+                      </div>
                       <div className="text-[10px] text-gray-500">Consultations</div>
                     </div>
                     <div className="bg-white p-3 text-center">
-                      <div className="text-base font-semibold text-[#2563eb]">--</div>
+                      <div className="text-base font-semibold text-[#2563eb]">
+                        {vetRating}
+                      </div>
                       <div className="text-[10px] text-gray-500">Avg rating</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 border-t border-gray-100 px-5 py-3 text-xs font-semibold text-emerald-700">
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    Responds quickly after payment
+                    {vetResponseText}
                   </div>
                 </div>
 

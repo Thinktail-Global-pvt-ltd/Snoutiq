@@ -101,6 +101,7 @@ const Home = () => {
         return (
           <PetDetailsScreen
             onBack={goBack}
+            vet={selectedVet}
             onSubmit={(details) => {
               setPetDetails(details);
               setScreen("payment");

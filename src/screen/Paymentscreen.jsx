@@ -493,7 +493,7 @@ export const PaymentScreen = ({
                     className="mt-1 h-4 w-4 accent-[#3998de]"
                   />
                   <div>
-                    <div className="font-semibold text-gray-700">
+                    <div className="font-bold text-gray-700">
                       I acknowledge and agree to proceed
                     </div>
                     <div className="text-gray-500">

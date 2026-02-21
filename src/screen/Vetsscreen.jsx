@@ -366,12 +366,12 @@ const InfoRow = ({ icon: Icon, label, value, subValue }) => {
       <div className="mt-[2px] inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 border border-teal-100">
         <Icon size={18} />
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-[11px] font-semibold text-slate-500">{label}</div>
-        <div className="text-sm font-semibold text-slate-900 leading-5 break-words">
+        <div className="text-sm font-semibold text-slate-900 leading-5 break-words line-clamp-2">
           {showValue ? value : null}
           {showValue && showSubValue ? (
-            <span className="text-slate-400 font-semibold"> {" • "} {subValue}</span>
+            <span className="text-slate-400 font-semibold">{" - "}{subValue}</span>
           ) : null}
           {!showValue && showSubValue ? (
             <span className="text-slate-900 font-semibold">{subValue}</span>
@@ -457,7 +457,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
 
         <div className="mt-6 md:mt-10">
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-slate-900">
                 {petDetails?.name ? `Vets for ${petDetails.name}` : "Available Vets"}
               </h2>
@@ -517,7 +517,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
             <div className="text-slate-500 text-sm mt-2">Please try again later.</div>
           </div>
         ) : (
-          <div className="mt-8 grid gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
+          <div className="mt-8 grid auto-rows-fr items-stretch gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
             {sortedVets.map((vet) => {
               const showDayPrice = isDayTime();
               const priceValue = showDayPrice ? vet.priceDay : vet.priceNight;
@@ -539,11 +539,11 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               return (
                 <div
                   key={vet.id}
-                  className="rounded-3xl border border-slate-200 bg-white shadow-sm hover:shadow-lg transition-all overflow-hidden"
+                  className="rounded-3xl border border-slate-200 bg-white shadow-sm hover:shadow-lg transition-all overflow-hidden flex flex-col h-full"
                 >
                   <div className="h-1 bg-gradient-to-r from-teal-500 to-emerald-500" />
 
-                  <div className="p-5">
+                  <div className="p-5 flex flex-col h-full">
                     <div className="flex gap-4">
                       {showImage ? (
                         <img
@@ -552,10 +552,10 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           loading="lazy"
                           crossOrigin="anonymous"
                           onError={() => markImageBroken(vet.id)}
-                          className="h-16 w-16 rounded-2xl object-cover border border-slate-200 bg-slate-50"
+                          className="h-16 w-16 rounded-2xl object-cover border border-slate-200 bg-slate-50 shrink-0"
                         />
                       ) : (
-                        <div className="h-16 w-16 rounded-2xl bg-amber-400 text-white flex items-center justify-center text-xl font-extrabold shadow-sm">
+                        <div className="h-16 w-16 rounded-2xl bg-amber-400 text-white flex items-center justify-center text-xl font-extrabold shadow-sm shrink-0">
                           {initials}
                         </div>
                       )}
@@ -575,13 +575,13 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           </div>
 
                           <div className="shrink-0 text-right">
-                            <div className="inline-flex items-center gap-1 text-slate-700">
-                              <Star size={16} className="text-amber-500" />
-                              <span className="text-sm font-extrabold">
+                            <div className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 border border-amber-100">
+                              <Star size={14} className="text-amber-500" />
+                              <span className="text-sm font-extrabold text-slate-900">
                                 {Number(vet.rating).toFixed(1)}
                               </span>
                             </div>
-                            <div className="text-[11px] text-slate-500">
+                            <div className="mt-1 text-[11px] text-slate-500">
                               ({vet.reviews} reviews)
                             </div>
                           </div>
@@ -610,18 +610,25 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       />
                     </div>
 
-                    {bioPreview ? (
-                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mt-4 flex-1">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 min-h-[108px]">
                         <div className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
                           About
                         </div>
-                        <p className="mt-1 text-sm text-slate-700 leading-6 line-clamp-3">
-                          {bioPreview}
-                        </p>
-                      </div>
-                    ) : null}
 
-                    <div className="mt-4 flex items-center justify-between gap-3">
+                        {bioPreview ? (
+                          <p className="mt-1 text-sm text-slate-700 leading-6 line-clamp-3">
+                            {bioPreview}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-sm text-slate-400 leading-6">
+                            View full profile to see doctor details.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
                       <button
                         type="button"
                         onClick={() => setActiveBioVet(vet)}
@@ -638,7 +645,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                             bookingPrice: priceValue,
                           })
                         }
-                        className="h-11 px-5 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-sm text-sm inline-flex items-center gap-3"
+                        className="h-11 px-5 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-sm text-sm inline-flex items-center gap-3 min-w-[150px] justify-center"
                       >
                         <span className="font-semibold">Consult Now</span>
                       </Button>
@@ -657,7 +664,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/90 backdrop-blur px-5 py-4 md:px-7">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-[11px] uppercase tracking-wider text-slate-400">Vet Profile</p>
                 <h3 className="truncate text-lg font-extrabold text-slate-900 md:text-xl">
                   {activeBioVet.name}
@@ -848,3 +855,4 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
 };
 
 export default VetsScreen;
+
