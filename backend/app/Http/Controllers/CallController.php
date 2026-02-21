@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Events\CallAccepted;
+use App\Events\CallStatusUpdated;
 use App\Events\PaymentDone;
 use App\Helpers\RtcTokenBuilder;
+use App\Models\Call;
 use App\Models\CallSession;
 use App\Models\Payment;
 use App\Services\CallRecordingManager;
@@ -280,8 +282,31 @@ class CallController extends Controller
         $session->save();
 
         $this->attemptAutoStopRecording($session);
+        $this->broadcastCallStatusEnded($session);
 
         return response()->json($this->sessionPayload($session));
+    }
+
+    private function broadcastCallStatusEnded(CallSession $session): void
+    {
+        if (!$session->doctor_id || !$session->patient_id) {
+            return;
+        }
+
+        $callId = $session->call_identifier ?: (string) $session->id;
+
+        $call = new Call([
+            'doctor_id' => $session->doctor_id,
+            'patient_id' => $session->patient_id,
+            'status' => Call::STATUS_ENDED,
+            'channel' => $session->channel_name,
+            'ended_at' => $session->ended_at,
+        ]);
+        $call->setAttribute('id', $callId);
+        $call->setAttribute('call_identifier', $session->call_identifier);
+        $call->setAttribute('call_session_id', (string) $session->id);
+
+        event(new CallStatusUpdated($call));
     }
 
     public function generateToken(Request $request): JsonResponse

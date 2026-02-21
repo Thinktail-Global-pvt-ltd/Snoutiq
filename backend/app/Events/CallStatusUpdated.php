@@ -32,8 +32,16 @@ class CallStatusUpdated implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
+        $callIdentifier = $this->call->call_identifier ?? null;
+        $callSessionId = $this->call->call_session_id ?? null;
+
         return [
             'call_id' => $this->call->id,
+            'callId' => (string) $this->call->id,
+            'call_identifier' => $callIdentifier,
+            'callIdentifier' => $callIdentifier,
+            'call_session_id' => $callSessionId,
+            'callSessionId' => $callSessionId,
             'doctor_id' => $this->call->doctor_id,
             'patient_id' => $this->call->patient_id,
             'status' => $this->call->status,
