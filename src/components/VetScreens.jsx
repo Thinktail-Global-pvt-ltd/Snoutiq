@@ -2834,7 +2834,11 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       ),
     ).length;
 
-    const latest = transactions
+    const listTransactions = transactions.filter(
+      (item) => (item?.status || "").toLowerCase() !== "pending",
+    );
+
+    const latest = listTransactions
       .slice()
       .sort(
         (a, b) =>
