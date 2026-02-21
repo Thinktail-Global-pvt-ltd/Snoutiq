@@ -1,14 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
-import {
-  Header,
-  PET_FLOW_STEPS,
-  ProgressBar,
-} from "../components/Sharedcomponents";
+import { PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
 import {
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   FileText,
   Image,
   Upload,
@@ -21,12 +18,14 @@ import {
   PawPrint,
   AlertCircle,
   Camera,
+  Lightbulb,
   Dog,
   Cat,
   Rabbit,
   Shield,
   Clock,
 } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 
 const ENERGY_OPTIONS = [
   { label: "Normal", value: "normal" },
@@ -108,6 +107,10 @@ const fieldBase =
   "w-full rounded-xl border border-gray-200 bg-white p-3.5 text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 focus:border-[#3998de] focus:bg-white hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-2xl md:p-4 md:text-base";
 const selectBase = `${fieldBase} appearance-none pr-12`;
 const textareaBase = `${fieldBase} resize-none min-h-[120px]`;
+const cardBase = "rounded-xl border border-gray-200 bg-white overflow-hidden";
+const cardHeaderBase =
+  "flex items-center gap-3 border-b border-gray-100 px-5 py-4";
+const cardBodyBase = "px-5 py-4 space-y-4";
 
 const pickValue = (...values) => {
   for (const value of values) {
@@ -225,6 +228,25 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
   const [loadingBreeds, setLoadingBreeds] = useState(false);
   const [breedError, setBreedError] = useState("");
   const breedDropdownRef = useRef(null);
+  const [otpToken, setOtpToken] = useState("");
+  const [otpValue, setOtpValue] = useState("");
+  const [otpStatus, setOtpStatus] = useState("idle");
+  const [otpMessage, setOtpMessage] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [otpPhone, setOtpPhone] = useState("");
+  const otpInputRef = useRef(null);
+  const [liveDoctorCount, setLiveDoctorCount] = useState(null);
+
+  const resetOtpState = () => {
+    setOtpToken("");
+    setOtpValue("");
+    setOtpStatus("idle");
+    setOtpMessage("");
+    setOtpError("");
+    setOtpCooldown(0);
+    setOtpPhone("");
+  };
 
   const applyUploadFile = async (file) => {
     if (!file) return;
@@ -349,15 +371,16 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
       setLoadingBreeds(true);
 
       try {
-        const res = await fetch("https://api.thecatapi.com/v1/breeds", {
-          method: "GET",
-        });
+        const res = await fetch(
+          "https://snoutiq.com/backend/api/cat-breeds/with-indian",
+          { method: "GET" }
+        );
         const data = await res.json();
 
-        if (Array.isArray(data) && data.length) {
-          const list = data
+        if (data?.success && Array.isArray(data?.data)) {
+          const list = data.data
             .map((breed) => ({
-              label: breed?.name || "Unknown",
+              label: breed?.name || breed?.id || "Unknown",
               value: breed?.name || breed?.id || "unknown",
             }))
             .filter((item) => item.label);
@@ -394,6 +417,61 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     if (details.type === "exotic") setDetails((p) => ({ ...p, breed: "" }));
     else setDetails((p) => ({ ...p, exoticType: "" }));
   }, [details.type]);
+
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const timer = window.setTimeout(() => {
+      setOtpCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [otpCooldown]);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchLiveStatus = async () => {
+      try {
+        const res = await fetch(
+          "https://snoutiq.com/backend/api/doctors/availability-status",
+          { method: "GET" }
+        );
+        const data = await res.json();
+        if (!active) return;
+
+        const onlineFromCounts = Number.isFinite(data?.counts?.online_doctors)
+          ? data.counts.online_doctors
+          : null;
+        const onlineFromList = Array.isArray(data?.online_doctors)
+          ? data.online_doctors.length
+          : null;
+        const onlineValue =
+          onlineFromCounts !== null ? onlineFromCounts : onlineFromList;
+
+        setLiveDoctorCount(onlineValue);
+      } catch (err) {
+        if (active) {
+          setLiveDoctorCount(null);
+        }
+      }
+    };
+
+    fetchLiveStatus();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const digits = details.ownerMobile.replace(/\D/g, "");
+    if (digits.length !== 10) {
+      if (otpStatus !== "idle") resetOtpState();
+      return;
+    }
+    if (otpPhone && digits !== otpPhone) {
+      resetOtpState();
+    }
+  }, [details.ownerMobile, otpPhone, otpStatus]);
 
   useEffect(() => {
     if (!breedDropdownOpen) return;
@@ -455,10 +533,122 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     return "File";
   }, [uploadKind]);
 
+  const ownerPhoneDigits = details.ownerMobile.replace(/\D/g, "");
+  const otpVerified = otpStatus === "verified";
+  const showOtpSection = ownerPhoneDigits.length === 10 || otpStatus !== "idle";
+
+  const fetchGeo = () =>
+    new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) =>
+          resolve({
+            lat: pos.coords.latitude,
+            lang: pos.coords.longitude,
+          }),
+        () => resolve(null),
+        { timeout: 4000 }
+      );
+    });
+
+  const sendOtp = async () => {
+    const phone = ownerPhoneDigits;
+    if (phone.length !== 10) {
+      setOtpError("Enter a valid 10-digit mobile number first.");
+      return;
+    }
+
+    setOtpError("");
+    setOtpMessage("");
+    setOtpStatus("sending");
+
+    try {
+      const res = await fetch("https://snoutiq.com/backend/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "whatsapp", value: phone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || "Failed to send OTP.");
+      }
+      if (!data?.token) {
+        throw new Error("OTP token missing. Please try again.");
+      }
+
+      setOtpToken(data.token);
+      setOtpPhone(phone);
+      setOtpStatus("sent");
+      setOtpMessage(data?.message || "OTP sent to your WhatsApp.");
+      setOtpCooldown(30);
+      setOtpValue("");
+      window.setTimeout(() => otpInputRef.current?.focus(), 100);
+    } catch (err) {
+      setOtpStatus("error");
+      setOtpError(err?.message || "Failed to send OTP.");
+    }
+  };
+
+  const verifyOtp = async () => {
+    if (!otpToken) {
+      setOtpError("Send OTP first.");
+      return;
+    }
+    if (otpValue.trim().length < 4) {
+      setOtpError("Enter the 4-digit OTP.");
+      return;
+    }
+
+    setOtpError("");
+    setOtpMessage("");
+    setOtpStatus("verifying");
+
+    try {
+      const location = await fetchGeo();
+      const payload = {
+        token: otpToken,
+        otp: otpValue.trim(),
+        phone: ownerPhoneDigits,
+      };
+      if (location) {
+        payload.lat = location.lat;
+        payload.lang = location.lang;
+      }
+      const res = await fetch("https://snoutiq.com/backend/api/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || "OTP verification failed.");
+      }
+
+      setOtpStatus("verified");
+      setOtpMessage("Mobile number verified.");
+      setOtpError("");
+    } catch (err) {
+      setOtpStatus("error");
+      setOtpError(err?.message || "OTP verification failed.");
+    }
+  };
+
+  const otpSendDisabled =
+    otpStatus === "sending" ||
+    otpStatus === "verifying" ||
+    otpCooldown > 0 ||
+    ownerPhoneDigits.length !== 10;
+  const otpVerifyDisabled =
+    otpStatus === "verifying" ||
+    otpValue.trim().length < 4 ||
+    !otpToken ||
+    ownerPhoneDigits.length !== 10;
+
   // ✅ UPDATED: gender required
   const isValid =
     details.ownerName.trim().length > 0 &&
     details.ownerMobile.replace(/\D/g, "").length === 10 &&
+    otpVerified &&
     details.name.trim().length > 0 &&
     details.type !== null &&
     details.petDob &&
@@ -476,6 +666,7 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
     if (!details.ownerName.trim()) return "Please enter owner name";
     if (details.ownerMobile.replace(/\D/g, "").length !== 10)
       return "Please enter 10-digit mobile number";
+    if (!otpVerified) return "Please verify mobile number with OTP";
     if (!details.name.trim()) return "Please enter your pet's name";
     if (!details.type) return "Please select pet type";
     if (!details.gender) return "Please select pet gender"; // ✅ NEW
@@ -622,35 +813,66 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col">
-      <Header
-        onBack={onBack}
-        title="Tell us about your pet"
-        subtitle="Help us understand your pet's needs"
-      />
+    <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
+      <div className="sticky top-0 z-40 border-b border-gray-200 bg-white">
+        <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3 md:px-6">
+          <button
+            type="button"
+            onClick={onBack}
+            className="h-8 w-8 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center transition hover:bg-gray-50"
+            aria-label="Go back"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div className="flex-1 text-center text-base font-semibold text-gray-900 md:text-lg">
+            Tell us about your pet
+          </div>
+          <div className="h-8 w-8" />
+        </div>
+      </div>
 
       <div className="w-full">
-        <div className="flex-1 px-6 py-6 pb-32 overflow-y-auto no-scrollbar md:px-12 lg:px-20 md:py-12">
-          <div className="md:max-w-none">
+        <div className="flex-1 px-4 pb-28 pt-4 overflow-y-auto no-scrollbar md:px-6 md:pb-20 md:pt-8">
+          <div className="mx-auto w-full max-w-5xl">
             <div className="md:flex md:items-center md:justify-between md:gap-6">
               <ProgressBar current={2} steps={PET_FLOW_STEPS} />
-              <div className="hidden text-sm text-gray-500 bg-white px-4 py-2 rounded-full border border-gray-100">
-                ⏱️ Takes less than 2 minutes
+              <div className="hidden text-xs font-semibold text-gray-500 bg-white px-4 py-2 rounded-full border border-gray-200">
+                Takes less than 2 minutes
               </div>
             </div>
 
-            <div className="mt-8 md:grid md:grid-cols-12 md:gap-10 lg:gap-14">
+            <div className="mt-4 rounded-xl bg-gradient-to-r from-[#1d4ed8] to-[#2563eb] px-5 py-4 text-white shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <div className="flex-1">
+                  <div className="text-sm font-semibold">
+                    {liveDoctorCount === null
+                      ? "Checking live vets..."
+                      : `${liveDoctorCount} ${
+                          liveDoctorCount === 1 ? "vet is" : "vets are"
+                        } online right now`}
+                  </div>
+                  <div className="text-xs text-white/80">
+                    Average response after payment: under 10 minutes
+                  </div>
+                </div>
+                <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold">
+                  Live
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
               {/* LEFT COLUMN - Main Form */}
-              <div className="md:col-span-7 lg:col-span-7">
-                <div className="space-y-8">
+              <div className="space-y-6">
                   {/* Owner details */}
-                  <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 md:p-8 space-y-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#3998de]/10 flex items-center justify-center">
+                  <section className={cardBase}>
+                    <div className={cardHeaderBase}>
+                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
                         <User size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">
+                        <h3 className="font-semibold text-gray-900 text-base">
                           Owner details
                         </h3>
                         <p className="text-xs text-gray-500">
@@ -659,7 +881,16 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+                    <div className={cardBodyBase}>
+                      <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+                        <Shield size={14} className="mt-0.5 text-blue-600" />
+                        <p>
+                          Your details are only shared with your assigned vet.
+                          We do not use them for marketing.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
                           Pet Owner Name <span className="text-red-500">*</span>
@@ -686,11 +917,11 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
-                          Pet Owner Mobile{" "}
+                          Pet Owner WhatsApp Mobile{" "}
                           <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
-                          <Phone
+                          <FaWhatsapp
                             size={18}
                             className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10 pointer-events-none"
                           />
@@ -720,18 +951,122 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                           <Shield size={12} className="text-[#3998de]" />
                           No spam. Only consultation updates.
                         </p>
+
+                        {showOtpSection && (
+                          <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3">
+                                <div
+                                  className={[
+                                    "w-9 h-9 rounded-full flex items-center justify-center",
+                                    otpVerified
+                                      ? "bg-emerald-100 text-emerald-600"
+                                      : "bg-blue-100 text-blue-600",
+                                  ].join(" ")}
+                                >
+                                  <Shield size={16} />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    Verify mobile number
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    OTP will be sent on WhatsApp to +91{" "}
+                                    {ownerPhoneDigits}
+                                  </p>
+                                </div>
+                              </div>
+                              {otpVerified ? (
+                                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Verified
+                                </span>
+                              ) : null}
+                            </div>
+
+                            {!otpVerified && (
+                              <div className="space-y-3">
+                                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                  <button
+                                    type="button"
+                                    onClick={sendOtp}
+                                    disabled={otpSendDisabled}
+                                    className={[
+                                      "px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
+                                      otpSendDisabled
+                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                        : "bg-[#3998de] text-white hover:bg-[#2f86c3]",
+                                    ].join(" ")}
+                                  >
+                                    {otpStatus === "sending"
+                                      ? "Sending..."
+                                      : otpCooldown > 0
+                                      ? "Resend OTP"
+                                      : "Send OTP"}
+                                  </button>
+                                  <div className="text-xs text-gray-500 flex items-center gap-1">
+                                    <Clock size={12} className="text-gray-400" />
+                                    {otpCooldown > 0
+                                      ? `Resend in ${otpCooldown}s`
+                                      : "OTP valid for 10 minutes"}
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                                  <input
+                                    ref={otpInputRef}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    value={otpValue}
+                                    onChange={(e) =>
+                                      setOtpValue(
+                                        e.target.value.replace(/\D/g, "").slice(0, 4)
+                                      )
+                                    }
+                                    placeholder="Enter OTP"
+                                    className={`${fieldBase} md:flex-1 text-center tracking-widest`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={verifyOtp}
+                                    disabled={otpVerifyDisabled}
+                                    className={[
+                                      "px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
+                                      otpVerifyDisabled
+                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                        : "bg-emerald-600 text-white hover:bg-emerald-700",
+                                    ].join(" ")}
+                                  >
+                                    {otpStatus === "verifying" ? "Verifying..." : "Verify OTP"}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {otpMessage ? (
+                              <p className="text-xs text-emerald-600">{otpMessage}</p>
+                            ) : null}
+                            {otpError ? (
+                              <p className="text-xs text-red-600 flex items-center gap-1">
+                                <AlertCircle size={12} />
+                                {otpError}
+                              </p>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </section>
+                  </div>
+                </section>
 
                   {/* Pet details */}
-                  <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 md:p-8 space-y-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#3998de]/10 flex items-center justify-center">
+                  <section className={cardBase}>
+                    <div className={cardHeaderBase}>
+                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
                         <PawPrint size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">
+                        <h3 className="font-semibold text-gray-900 text-base">
                           Pet details
                         </h3>
                         <p className="text-xs text-gray-500">
@@ -740,7 +1075,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       </div>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className={cardBodyBase}>
+                      <div className="space-y-5">
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
                           Pet&apos;s Name{" "}
@@ -1048,16 +1384,17 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         </div>
                       </div>
                     </div>
-                  </section>
+                  </div>
+                </section>
 
                   {/* Describe problem */}
-                  <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 md:p-8 space-y-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#3998de]/10 flex items-center justify-center">
+                  <section className={cardBase}>
+                    <div className={cardHeaderBase}>
+                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
                         <FileText size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">
+                        <h3 className="font-semibold text-gray-900 text-base">
                           Describe the problem
                         </h3>
                         <p className="text-xs text-gray-500">
@@ -1066,7 +1403,17 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       </div>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className={cardBodyBase}>
+                      <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+                        <Lightbulb size={14} className="mt-0.5 text-blue-600" />
+                        <p>
+                          The more detail you share, the faster the vet can help.
+                          Include when it started and any changes in eating or
+                          behavior.
+                        </p>
+                      </div>
+
+                      <div className="space-y-5">
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
                           What symptoms are you noticing?{" "}
@@ -1194,16 +1541,17 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         </div>
                       </div>
                     </div>
-                  </section>
+                  </div>
+                </section>
 
                   {/* Upload */}
-                  <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 md:p-8 space-y-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#3998de]/10 flex items-center justify-center">
+                  <section className={cardBase}>
+                    <div className={cardHeaderBase}>
+                      <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
                         <Camera size={20} className="text-[#3998de]" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">
+                        <h3 className="font-semibold text-gray-900 text-base">
                           Photo or Document
                         </h3>
                         <p className="text-xs text-gray-500">
@@ -1211,6 +1559,15 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                         </p>
                       </div>
                     </div>
+
+                    <div className={cardBodyBase}>
+                      <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+                        <CheckCircle2 size={14} className="mt-0.5 text-emerald-600" />
+                        <p>
+                          A clear photo helps the vet assess faster. For wounds,
+                          swelling, or rashes, one photo can reduce back and forth.
+                        </p>
+                      </div>
 
                     <label
                       htmlFor="petUploadGallery"
@@ -1373,254 +1730,299 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
                       </div>
                     )}
 
-                    <p className="text-sm text-gray-500 flex items-center gap-2 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
-                      <Image size={16} className="text-[#3998de]" />
-                      <span className="text-xs">
-                        💡 Tip: Clear, well-lit photos help vets assess faster
-                      </span>
+                    <p className="text-xs text-gray-500 flex items-center gap-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                      <Image size={14} className="text-[#3998de]" />
+                      Clear, well-lit photos help vets assess faster.
                     </p>
-                  </section>
+                  </div>
+                </section>
 
-                  {submitError && (
-                    <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
-                      <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
-                      <p className="text-sm">{submitError}</p>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="text-xs font-semibold text-emerald-700 flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-600" />
+                    What happens after you tap Continue
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] text-gray-600">
+                    <div className="space-y-1">
+                      <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+                        1
+                      </div>
+                      <div className="font-semibold text-gray-800">Review and Pay</div>
+                      <div>See your total before confirming</div>
                     </div>
+                    <div className="space-y-1">
+                      <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+                        2
+                      </div>
+                      <div className="font-semibold text-gray-800">Vet Notified</div>
+                      <div>Instantly sees your case</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+                        3
+                      </div>
+                      <div className="font-semibold text-gray-800">Video Call</div>
+                      <div>Usually within 8 to 15 minutes</div>
+                    </div>
+                  </div>
+                </div>
+
+                {submitError && (
+                  <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
+                    <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+                    <p className="text-sm">{submitError}</p>
+                  </div>
+                )}
+
+                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                  <Button
+                    onClick={submitObservation}
+                    disabled={!isValid || submitting}
+                    title={!isValid ? getSubmitTooltip() : undefined}
+                    className={`w-full text-base font-semibold md:py-4 md:rounded-xl ${
+                      !isValid || submitting
+                        ? "opacity-50 cursor-not-allowed bg-gray-300 hover:bg-gray-300"
+                        : "bg-[#3998de] hover:bg-[#3998de]/90 text-white shadow-lg shadow-[#3998de]/30"
+                    }`}
+                  >
+                    {submitting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Submitting...
+                      </span>
+                    ) : (
+                      "Continue to Payment"
+                    )}
+                  </Button>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-[11px] text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Shield size={12} className="text-[#3998de]" />
+                      SSL secured
+                    </div>
+                    <span className="text-gray-300">|</span>
+                    <div>Razorpay</div>
+                    <span className="text-gray-300">|</span>
+                    <div>UPI / Card / Net Banking</div>
+                  </div>
+
+                  {!isValid ? (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="text-xs text-amber-700 flex items-center gap-1.5">
+                        <AlertCircle size={14} />
+                        {getSubmitTooltip()}
+                      </p>
+                    </div>
+                  ) : submitting ? (
+                    <p className="text-sm text-gray-500 mt-4 text-center">
+                      Uploading your files...
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-4 text-center">
+                      All fields completed. Ready for payment.
+                    </p>
                   )}
                 </div>
 
                 <div className="h-24 md:hidden" />
               </div>
 
-              {/* RIGHT COLUMN - Summary & CTA */}
-              <div className="hidden md:block md:col-span-5 lg:col-span-5">
-                <div className="sticky top-24 space-y-6">
-                  <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-8">
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="w-10 h-10 rounded-full bg-[#3998de]/10 flex items-center justify-center">
-                        <FileText size={20} className="text-[#3998de]" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">
-                          Quick Summary
-                        </h3>
-                        <p className="text-xs text-gray-500">
-                          Review your information
-                        </p>
-                      </div>
+              {/* RIGHT COLUMN */}
+              <div className="space-y-6 md:sticky md:top-24 md:self-start">
+                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                  <div className="flex items-center gap-3 bg-[#2563eb] px-5 py-4 text-white">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+                      <User size={18} />
                     </div>
-
-                    <div className="space-y-4">
-                      {/* Owner Info */}
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <User size={14} className="text-gray-500" />
-                          <span className="text-xs font-medium text-gray-500 uppercase">
-                            Owner
-                          </span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">Name</span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {details.ownerName || "—"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">Mobile</span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {details.ownerMobile ? `+91 ${details.ownerMobile}` : "—"}
-                            </span>
-                          </div>
-                        </div>
+                    <div>
+                      <div className="text-sm font-semibold">Selected vet</div>
+                      <div className="text-xs text-white/80">
+                        Details shown after payment
                       </div>
-
-                      {/* Pet Info */}
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <PawPrint size={14} className="text-gray-500" />
-                          <span className="text-xs font-medium text-gray-500 uppercase">
-                            Pet
-                          </span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">Name</span>
-                            <span className="text-sm font-medium text-gray-900 capitalize">
-                              {details.name || "—"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">Type</span>
-                            <span className="text-sm font-medium text-gray-900 capitalize">
-                              {details.type || "—"}
-                            </span>
-                          </div>
-
-                          {/* ✅ NEW: Gender in summary */}
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">Gender</span>
-                            <span className="text-sm font-medium text-gray-900 capitalize">
-                              {details.gender || "—"}
-                            </span>
-                          </div>
-
-                          {showBreed && (
-                            <div className="flex justify-between">
-                              <span className="text-xs text-gray-500">Breed</span>
-                              <span className="text-sm font-medium text-gray-900 capitalize">
-                                {details.breed?.replace(/_/g, " ") || "—"}
-                              </span>
-                            </div>
-                          )}
-                          {isExotic && (
-                            <div className="flex justify-between">
-                              <span className="text-xs text-gray-500">Exotic</span>
-                              <span className="text-sm font-medium text-gray-900">
-                                {details.exoticType || "—"}
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">Age</span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {approxAge || "—"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">
-                              Neutered
-                            </span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {details.isNeutered === "1"
-                                ? "Yes"
-                                : details.isNeutered === "0"
-                                ? "No"
-                                : "—"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">
-                              Vaccinated
-                            </span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {details.vaccinatedYesNo === "1"
-                                ? "Yes"
-                                : details.vaccinatedYesNo === "0"
-                                ? "No"
-                                : "—"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Health Status */}
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Activity size={14} className="text-gray-500" />
-                          <span className="text-xs font-medium text-gray-500 uppercase">
-                            Health Status
-                          </span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">Energy</span>
-                            <span className="text-sm font-medium text-gray-900 capitalize">
-                              {details.lastDaysEnergy?.replace(/_/g, " ") || "—"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">Appetite</span>
-                            <span className="text-sm font-medium text-gray-900 capitalize">
-                              {details.lastDaysAppetite?.replace(/_/g, " ") || "—"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-500">Mood</span>
-                            <span className="text-sm font-medium text-gray-900 capitalize">
-                              {details.mood || "—"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Problem Summary */}
-                      {details.problemText && (
-                        <div className="bg-gray-50 rounded-xl p-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <FileText size={14} className="text-gray-500" />
-                            <span className="text-xs font-medium text-gray-500 uppercase">
-                              Problem
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-700 line-clamp-3">
-                            {details.problemText}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Photo Status */}
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Camera size={14} className="text-gray-500" />
-                            <span className="text-xs font-medium text-gray-500 uppercase">
-                              Photo/Document
-                            </span>
-                          </div>
-                          <span
-                            className={[
-                              "text-xs font-medium px-3 py-1.5 rounded-full border",
-                              details.hasPhoto && uploadFile
-                                ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                : "text-red-700 bg-red-50 border-red-200",
-                            ].join(" ")}
-                          >
-                            {details.hasPhoto && uploadFile ? "✓ Added" : "Required"}
-                          </span>
-                        </div>
+                      <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold">
+                        Verified
                       </div>
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-px bg-gray-100">
+                    <div className="bg-white p-3 text-center">
+                      <div className="text-base font-semibold text-[#2563eb]">--</div>
+                      <div className="text-[10px] text-gray-500">Consultations</div>
+                    </div>
+                    <div className="bg-white p-3 text-center">
+                      <div className="text-base font-semibold text-[#2563eb]">--</div>
+                      <div className="text-[10px] text-gray-500">Avg rating</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 border-t border-gray-100 px-5 py-3 text-xs font-semibold text-emerald-700">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    Responds quickly after payment
+                  </div>
+                </div>
 
-                  {/* CTA Section */}
-                  <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-8">
-                    <Button
-                      onClick={submitObservation}
-                      disabled={!isValid || submitting}
-                      title={!isValid ? getSubmitTooltip() : undefined}
-                      className={`w-full md:text-lg md:py-4 md:rounded-xl font-semibold ${
-                        !isValid || submitting
-                          ? "opacity-50 cursor-not-allowed bg-gray-300 hover:bg-gray-300"
-                          : "bg-[#3998de] hover:bg-[#3998de]/90 text-white shadow-lg shadow-[#3998de]/30"
-                      }`}
-                    >
-                      {submitting ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Submitting...
-                        </span>
-                      ) : (
-                        "Continue to Payment"
-                      )}
-                    </Button>
+                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="h-9 w-9 rounded-lg bg-[#3998de]/10 flex items-center justify-center">
+                      <FileText size={20} className="text-[#3998de]" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 text-sm">Quick Summary</h3>
+                      <p className="text-xs text-gray-500">Review your information</p>
+                    </div>
+                  </div>
 
-                    {!isValid ? (
-                      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                        <p className="text-xs text-amber-700 flex items-center gap-1.5">
-                          <AlertCircle size={14} />
-                          {getSubmitTooltip()}
-                        </p>
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <User size={14} className="text-gray-500" />
+                        <span className="text-xs font-medium text-gray-500 uppercase">Owner</span>
                       </div>
-                    ) : submitting ? (
-                      <p className="text-sm text-gray-500 mt-4 text-center">
-                        ⚡ Compressing and uploading your files...
-                      </p>
-                    ) : (
-                      <p className="text-sm text-gray-500 mt-4 text-center">
-                        ✓ All fields completed. Ready for payment.
-                      </p>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Name</span>
+                          <span className="text-sm font-medium text-gray-900">{details.ownerName || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Mobile</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {details.ownerMobile ? `+91 ${details.ownerMobile}` : "-"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <PawPrint size={14} className="text-gray-500" />
+                        <span className="text-xs font-medium text-gray-500 uppercase">Pet</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Name</span>
+                          <span className="text-sm font-medium text-gray-900 capitalize">{details.name || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Type</span>
+                          <span className="text-sm font-medium text-gray-900 capitalize">{details.type || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Gender</span>
+                          <span className="text-sm font-medium text-gray-900 capitalize">{details.gender || "-"}</span>
+                        </div>
+                        {showBreed && (
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-500">Breed</span>
+                            <span className="text-sm font-medium text-gray-900 capitalize">
+                              {details.breed?.replace(/_/g, " ") || "-"}
+                            </span>
+                          </div>
+                        )}
+                        {isExotic && (
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-500">Exotic</span>
+                            <span className="text-sm font-medium text-gray-900">{details.exoticType || "-"}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Age</span>
+                          <span className="text-sm font-medium text-gray-900">{approxAge || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Neutered</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {details.isNeutered === "1"
+                              ? "Yes"
+                              : details.isNeutered === "0"
+                              ? "No"
+                              : "-"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Vaccinated</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {details.vaccinatedYesNo === "1"
+                              ? "Yes"
+                              : details.vaccinatedYesNo === "0"
+                              ? "No"
+                              : "-"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Activity size={14} className="text-gray-500" />
+                        <span className="text-xs font-medium text-gray-500 uppercase">Health Status</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Energy</span>
+                          <span className="text-sm font-medium text-gray-900 capitalize">
+                            {details.lastDaysEnergy?.replace(/_/g, " ") || "-"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Appetite</span>
+                          <span className="text-sm font-medium text-gray-900 capitalize">
+                            {details.lastDaysAppetite?.replace(/_/g, " ") || "-"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Mood</span>
+                          <span className="text-sm font-medium text-gray-900 capitalize">{details.mood || "-"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {details.problemText && (
+                      <div className="bg-gray-50 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText size={14} className="text-gray-500" />
+                          <span className="text-xs font-medium text-gray-500 uppercase">Problem</span>
+                        </div>
+                        <p className="text-sm text-gray-700 line-clamp-3">{details.problemText}</p>
+                      </div>
                     )}
+
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Camera size={14} className="text-gray-500" />
+                          <span className="text-xs font-medium text-gray-500 uppercase">Photo/Document</span>
+                        </div>
+                        <span
+                          className={[
+                            "text-xs font-medium px-3 py-1.5 rounded-full border",
+                            details.hasPhoto && uploadFile
+                              ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                              : "text-red-700 bg-red-50 border-red-200",
+                          ].join(" ")}
+                        >
+                          {details.hasPhoto && uploadFile ? "Added" : "Required"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-lg font-semibold text-gray-900">4.8</div>
+                      <div className="text-xs text-gray-500">from 300 consultations</div>
+                    </div>
+                    <div className="text-amber-400 text-sm">*****</div>
+                  </div>
+                  <div className="mt-3 space-y-3 text-xs text-gray-600">
+                    <div className="border-t border-gray-100 pt-3">
+                      <div className="font-semibold text-gray-800">Priya M</div>
+                      <div>Fast response and clear guidance.</div>
+                    </div>
+                    <div className="border-t border-gray-100 pt-3">
+                      <div className="font-semibold text-gray-800">Aamir S</div>
+                      <div>Helpful advice for my rabbit.</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1658,4 +2060,8 @@ const PetDetailsScreen = ({ onSubmit, onBack }) => {
 };
 
 export default PetDetailsScreen;
+
+
+
+
 
