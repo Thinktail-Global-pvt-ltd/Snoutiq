@@ -288,7 +288,7 @@ Route::get('/doctors/{doctor}/blob-image', function (Doctor $doctor) {
     ]);
 })->whereNumber('doctor')->name('api.doctors.blob-image');
 
-Route::get('/exported_from_excell_doctors', function () {
+Route::get('/exported_from_excell_doctors', function (Request $request) {
     $vets = VetRegisterationTemp::query()
         ->where('exported_from_excell', 1)
         ->with(['doctors' => function ($q) {
@@ -301,6 +301,121 @@ Route::get('/exported_from_excell_doctors', function () {
             'mobile',
             'exported_from_excell',
         ]);
+
+    $timezone = (string) ($request->query('timezone') ?: config('app.timezone', 'UTC'));
+    try {
+        $now = \Carbon\Carbon::now($timezone);
+    } catch (\Throwable $e) {
+        $timezone = (string) config('app.timezone', 'UTC');
+        $now = \Carbon\Carbon::now($timezone);
+    }
+
+    $isDoctorOnlineNow = function (Doctor $doctor) use ($now): bool {
+        $rawValue = $doctor->break_do_not_disturb_time_example_2_4_pm;
+        if (is_array($rawValue)) {
+            $breakWindows = array_values(array_filter(array_map(static fn ($item) => trim((string) $item), $rawValue)));
+        } else {
+            $rawString = trim((string) $rawValue);
+            if ($rawString === '') {
+                $breakWindows = [];
+            } else {
+                $decoded = json_decode($rawString, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $breakWindows = array_values(array_filter(array_map(static fn ($item) => trim((string) $item), $decoded)));
+                } else {
+                    $breakWindows = [$rawString];
+                }
+            }
+        }
+
+        if (empty($breakWindows)) {
+            return true;
+        }
+
+        $currentMinute = ((int) $now->format('H') * 60) + (int) $now->format('i');
+        $parseTimeToMinutes = static function (string $value): ?int {
+            $normalized = strtoupper(trim($value));
+            $normalized = str_replace(['A.M.', 'P.M.'], ['AM', 'PM'], $normalized);
+            $normalized = preg_replace('/\s+/', ' ', $normalized);
+
+            foreach (['g:i A', 'g A', 'h:i A', 'h A', 'H:i', 'G:i', 'H', 'G'] as $format) {
+                try {
+                    $parsed = \Carbon\Carbon::createFromFormat($format, $normalized);
+                } catch (\Throwable $e) {
+                    $parsed = false;
+                }
+
+                if ($parsed !== false) {
+                    return ((int) $parsed->format('H') * 60) + (int) $parsed->format('i');
+                }
+            }
+
+            return null;
+        };
+
+        foreach ($breakWindows as $rawRange) {
+            if (strtolower(trim($rawRange)) === 'no') {
+                return true;
+            }
+
+            $normalizedRange = trim(str_replace(['–', '—'], '-', $rawRange));
+            $parts = preg_split('/\s*(?:-|to)\s*/i', $normalizedRange, 2);
+            if (!is_array($parts) || count($parts) !== 2) {
+                continue;
+            }
+
+            $start = trim((string) $parts[0]);
+            $end = trim((string) $parts[1]);
+            if ($start === '' || $end === '') {
+                continue;
+            }
+
+            $startHasMeridiem = (bool) preg_match('/\b(?:AM|PM)\b/i', $start);
+            $endHasMeridiem = (bool) preg_match('/\b(?:AM|PM)\b/i', $end);
+
+            if (!$startHasMeridiem && $endHasMeridiem && preg_match('/\b(AM|PM)\b/i', $end, $match)) {
+                $start .= ' '.strtoupper((string) $match[1]);
+            } elseif (!$endHasMeridiem && $startHasMeridiem && preg_match('/\b(AM|PM)\b/i', $start, $match)) {
+                $end .= ' '.strtoupper((string) $match[1]);
+            }
+
+            $startMinute = $parseTimeToMinutes($start);
+            $endMinute = $parseTimeToMinutes($end);
+            if ($startMinute === null || $endMinute === null) {
+                continue;
+            }
+
+            if ($startMinute === $endMinute) {
+                return false;
+            }
+
+            if ($startMinute < $endMinute) {
+                if ($currentMinute >= $startMinute && $currentMinute < $endMinute) {
+                    return false;
+                }
+            } else {
+                // Overnight break range e.g. 10:00 PM - 02:00 AM
+                if ($currentMinute >= $startMinute || $currentMinute < $endMinute) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    };
+
+    $vets = $vets->map(function (VetRegisterationTemp $vet) use ($isDoctorOnlineNow) {
+        $onlineDoctors = $vet->doctors
+            ->filter(function (Doctor $doctor) use ($isDoctorOnlineNow) {
+                return $isDoctorOnlineNow($doctor);
+            })
+            ->values();
+
+        $vet->setRelation('doctors', $onlineDoctors);
+        return $vet;
+    })->filter(function (VetRegisterationTemp $vet) {
+        return $vet->doctors->isNotEmpty();
+    })->values();
 
     $baseAppUrl = rtrim((string) config('app.url'), '/');
     if ($baseAppUrl === '') {
@@ -360,6 +475,8 @@ Route::get('/exported_from_excell_doctors', function () {
 
     return response()->json([
         'success' => true,
+        'timezone' => $timezone,
+        'current_time' => $now->format('h:i A'),
         'data' => $data,
     ]);
 })->name('exported_from_excell_doctors');
@@ -574,7 +691,35 @@ Route::post('/user-pet-observation', function (Request $request) {
             }
         }
         if (array_key_exists('is_neutered', $data) && Schema::hasColumn('pets', 'is_neutered')) {
-            $pet->is_neutered = (int) ((bool) $data['is_neutered']);
+            $isNeutered = (bool) $data['is_neutered'];
+            $isNeuteredColumnType = null;
+            try {
+                $isNeuteredColumnType = Schema::getColumnType('pets', 'is_neutered');
+            } catch (\Throwable $e) {
+                $isNeuteredColumnType = null;
+            }
+
+            $isNeuteredColumnTypeNormalized = strtolower(trim((string) $isNeuteredColumnType));
+            $isEnumLikeNeuteredColumn = str_contains($isNeuteredColumnTypeNormalized, 'enum')
+                || in_array($isNeuteredColumnTypeNormalized, ['string', 'char', 'varchar'], true);
+
+            // Fallback: inspect raw column type when Schema::getColumnType is unavailable or generic.
+            if (! $isEnumLikeNeuteredColumn && ($isNeuteredColumnTypeNormalized === '' || $isNeuteredColumnTypeNormalized === 'unknown')) {
+                try {
+                    $columnMeta = DB::selectOne("SHOW COLUMNS FROM `pets` LIKE 'is_neutered'");
+                    $rawType = strtolower((string) ($columnMeta->Type ?? $columnMeta->type ?? ''));
+                    $isEnumLikeNeuteredColumn = str_contains($rawType, 'enum(');
+                } catch (\Throwable $e) {
+                    // Keep default numeric mapping when metadata lookup fails.
+                }
+            }
+
+            // Some DBs use enum('Y','N') while older ones may use tinyint/boolean.
+            if ($isEnumLikeNeuteredColumn) {
+                $pet->is_neutered = $isNeutered ? 'Y' : 'N';
+            } else {
+                $pet->is_neutered = $isNeutered ? 1 : 0;
+            }
         }
         $vaccinatedYesNo = $data['vaccenated_yes_no'] ?? $data['vaccinated_yes_no'] ?? null;
         if ($vaccinatedYesNo !== null && Schema::hasColumn('pets', 'vaccenated_yes_no')) {
@@ -1984,6 +2129,7 @@ Route::post('/bookings/{id}/rate', [\App\Http\Controllers\Api\BookingsController
 Route::post('/bookings/{id}/verify-payment', [\App\Http\Controllers\Api\BookingsController::class, 'verifyPayment']);
 Route::get('/doctors', [DoctorController::class, 'index']);
 Route::get('/doctors/slots', [\App\Http\Controllers\Api\DoctorScheduleController::class, 'slots']);
+Route::get('/doctors/availability-status', [\App\Http\Controllers\Api\DoctorAvailabilityStatusController::class, 'index']);
 Route::get('/doctors/{id}', [DoctorController::class, 'show']);
 Route::put('/doctors/{id}', [DoctorController::class, 'update']);
 Route::get('/doctors/{id}/bookings', [\App\Http\Controllers\Api\BookingsController::class, 'doctorBookings']);
