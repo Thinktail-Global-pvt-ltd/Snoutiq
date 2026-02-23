@@ -512,6 +512,26 @@ public function pet_update(Request $request, $id)
 
         $petSource = $pet ?: ($legacyPetHasData ? $legacyPet : null);
 
+        $pets = collect();
+        if ($hasPetsTable) {
+            $pets = Pet::query()
+                ->where('user_id', $user->id)
+                ->orderByDesc('id')
+                ->get([
+                    'id',
+                    'name',
+                    'pet_type',
+                    'type',
+                    'breed',
+                    'pet_gender',
+                    'gender',
+                    'pet_age',
+                    'pet_age_months',
+                    'pet_dob',
+                    'dob',
+                ]);
+        }
+
         $fields = [
             // User table fields
             ['group' => 'user', 'column' => 'name',      'label' => 'Owner name'],
@@ -533,8 +553,6 @@ public function pet_update(Request $request, $id)
         ];
 
         $results = [];
-        $total = 0;
-        $filled = 0;
 
         foreach ($fields as $field) {
             // Skip if the base column is missing from the relevant table
@@ -574,6 +592,20 @@ public function pet_update(Request $request, $id)
                     }
                 }
 
+                // If web only saved DOB, derive age from DOB for completion.
+                if (!$this->profileValueFilled($value) && $field['column'] === 'pet_age' && $petSource) {
+                    $dobForAge = data_get($petSource, 'pet_dob');
+                    if (!$this->profileValueFilled($dobForAge)) {
+                        $dobForAge = data_get($petSource, 'dob');
+                    }
+
+                    $derivedAgeYears = $this->deriveAgeYearsFromDob($dobForAge);
+                    if ($derivedAgeYears !== null) {
+                        $value = $derivedAgeYears;
+                        $usedColumn = 'derived_from_pet_dob';
+                    }
+                }
+
                 // Legacy user table fallbacks
                 if (!$this->profileValueFilled($value) && isset($field['legacy'])) {
                     $legacyValue = data_get($user, $field['legacy']);
@@ -602,27 +634,62 @@ public function pet_update(Request $request, $id)
                 'value' => $value,
             ];
 
-            $total++;
-            if ($isFilled) {
-                $filled++;
-            }
         }
 
         $missingFields = array_values(array_filter($results, fn ($r) => !$r['filled']));
         $filledFields  = array_values(array_filter($results, fn ($r) => $r['filled']));
+        $fieldsFilled  = count($filledFields);
+        $fieldsMissing = count($missingFields);
+        $fieldsTotal   = $fieldsFilled + $fieldsMissing;
+        $completionPercent = $fieldsTotal ? round(($fieldsFilled / $fieldsTotal) * 100) : 0;
+
+        $petDobValue = $pet?->pet_dob ?? $pet?->dob ?? null;
+        $petDob = $this->normalizeDateString($petDobValue);
+
+        $petsPayload = $pets->map(function (Pet $item) {
+            $petDobValue = $item->pet_dob ?? $item->dob ?? null;
+            $petDob = $this->normalizeDateString($petDobValue);
+            $derivedAgeYears = $this->deriveAgeYearsFromDob($petDob);
+
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'pet_type' => $item->pet_type ?? $item->type ?? null,
+                'breed' => $item->breed,
+                'pet_gender' => $item->pet_gender ?? $item->gender ?? null,
+                'pet_age' => $item->pet_age ?? $derivedAgeYears,
+                'pet_age_months' => $item->pet_age_months,
+                'pet_dob' => $petDob,
+            ];
+        })->values();
+
+        if ($petsPayload->isEmpty() && $legacyPetHasData) {
+            $petsPayload = collect([[
+                'id' => null,
+                'name' => $user->pet_name ?? null,
+                'pet_type' => null,
+                'breed' => $user->breed ?? null,
+                'pet_gender' => $user->pet_gender ?? null,
+                'pet_age' => $user->pet_age ?? null,
+                'pet_age_months' => null,
+                'pet_dob' => null,
+            ]]);
+        }
 
         return response()->json([
             'success' => true,
             'data' => [
                 'user_id' => $user->id,
                 'pet_id' => $pet?->id,
-                'fields_total' => $total,
-                'fields_filled' => $filled,
-                'fields_missing' => max(0, $total - $filled),
-                'completion_percent' => $total ? round(($filled / $total) * 100) : 0,
+                'pet_dob' => $petDob,
+                'fields_total' => $fieldsTotal,
+                'fields_filled' => $fieldsFilled,
+                'fields_missing' => $fieldsMissing,
+                'completion_percent' => $completionPercent,
                 'missing_labels' => array_map(fn ($row) => $row['label'], $missingFields),
                 'missing_fields' => $missingFields,
                 'filled_fields' => $filledFields,
+                'pets' => $petsPayload,
             ],
         ]);
     }
@@ -640,5 +707,37 @@ public function pet_update(Request $request, $id)
         }
 
         return true; // numbers, booleans, objects
+    }
+
+    private function deriveAgeYearsFromDob($dobValue): ?int
+    {
+        if (!$this->profileValueFilled($dobValue)) {
+            return null;
+        }
+
+        try {
+            $dob = Carbon::parse($dobValue);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if ($dob->isFuture()) {
+            return null;
+        }
+
+        return $dob->diffInYears(Carbon::now());
+    }
+
+    private function normalizeDateString($value): ?string
+    {
+        if (!$this->profileValueFilled($value)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Throwable $e) {
+            return trim((string) $value) ?: null;
+        }
     }
 }
