@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
+  Star,
   FileText,
   Image,
   Upload,
@@ -58,6 +59,24 @@ const GENDER_OPTIONS = [
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "1" },
   { label: "No", value: "0" },
+];
+
+const SIDEBAR_REVIEWS = [
+  {
+    id: "r1",
+    author: "Priya M",
+    text: "Fast response and clear guidance. Consultation felt very professional.",
+  },
+  {
+    id: "r2",
+    author: "Aamir S",
+    text: "Helpful advice for my rabbit. Vet explained next steps very clearly.",
+  },
+  {
+    id: "r3",
+    author: "Neha K",
+    text: "Quick support at night and practical recommendations for home care.",
+  },
 ];
 
 const formatBreedName = (breedKey, subBreed = null) => {
@@ -839,6 +858,9 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
   const vetResponseText = vetResponse
     ? `Responds in ${vetResponse}`
     : "Responds quickly after payment";
+  const sidebarRating = vetRating === "--" ? "4.8" : vetRating;
+  const sidebarConsultations =
+    typeof vetConsultations === "number" ? vetConsultations : 300;
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
@@ -860,7 +882,7 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
       </div>
 
       <div className="w-full">
-        <div className="flex-1 px-4 pb-28 pt-4 overflow-y-auto no-scrollbar md:px-6 md:pb-20 md:pt-8">
+        <div className="flex-1 px-4 pb-28 pt-4 md:px-6 md:pb-20 md:pt-8">
           <div className="mx-auto w-full max-w-5xl">
             <div className="md:flex md:items-center md:justify-between md:gap-6">
               <ProgressBar current={2} steps={PET_FLOW_STEPS} />
@@ -2048,19 +2070,40 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                 <div className="rounded-xl border border-gray-200 bg-white p-5">
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="text-lg font-semibold text-gray-900">4.8</div>
-                      <div className="text-xs text-gray-500">from 300 consultations</div>
+                      <div className="text-lg font-semibold text-gray-900">{sidebarRating}</div>
+                      <div className="text-xs text-gray-500">
+                        from {sidebarConsultations} consultations
+                      </div>
                     </div>
-                    <div className="text-amber-400 text-sm">*****</div>
+                    <div className="flex items-center gap-0.5 text-amber-400">
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <Star key={`sidebar-star-${idx}`} size={14} className="fill-current" />
+                      ))}
+                    </div>
                   </div>
-                  <div className="mt-3 space-y-3 text-xs text-gray-600">
-                    <div className="border-t border-gray-100 pt-3">
-                      <div className="font-semibold text-gray-800">Priya M</div>
-                      <div>Fast response and clear guidance.</div>
+
+                  <div className="mt-4 border-t border-gray-100 pt-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Reviews
                     </div>
-                    <div className="border-t border-gray-100 pt-3">
-                      <div className="font-semibold text-gray-800">Aamir S</div>
-                      <div>Helpful advice for my rabbit.</div>
+                    <div className="mt-3 space-y-3">
+                      {SIDEBAR_REVIEWS.map((review) => (
+                        <div key={review.id} className="rounded-lg bg-gray-50 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-semibold text-gray-800">{review.author}</div>
+                            <div className="flex items-center gap-0.5 text-amber-400">
+                              {Array.from({ length: 5 }).map((_, idx) => (
+                                <Star
+                                  key={`${review.id}-star-${idx}`}
+                                  size={12}
+                                  className="fill-current"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="mt-1 text-xs leading-5 text-gray-600">{review.text}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

@@ -15,6 +15,7 @@ import {
 
 const API_PATH = "/backend/api/exported_from_excell_doctors";
 const DEFAULT_BACKEND_ORIGIN = "https://snoutiq.com";
+const ROTATION_INTERVAL_MS = 20000;
 
 /* ---------------- helpers ---------------- */
 
@@ -67,7 +68,7 @@ const fetchJsonStrict = async (url, { timeoutMs = 15000 } = {}) => {
   }
 };
 
-export const loadVetsWithFallback = async () => {
+const loadVetsWithFallback = async () => {
   const candidates = buildApiCandidates();
   let lastErr = null;
 
@@ -279,7 +280,7 @@ const clipText = (text, max = 160) => {
  * - HIDE DEMO/INVALID vets: if day OR night rate <= 2 => do not show
  * - Keep priceDay/priceNight numbers
  */
-export const buildVetsFromApi = (apiData = []) => {
+const buildVetsFromApi = (apiData = []) => {
   const list = [];
   apiData.forEach((clinic) => {
     const clinicName = normalizeText(clinic?.name);
@@ -390,6 +391,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
   const [errMsg, setErrMsg] = useState("");
   const [activeBioVet, setActiveBioVet] = useState(null);
   const [brokenImages, setBrokenImages] = useState(() => new Set());
+  const [rotationIndex, setRotationIndex] = useState(0);
 
   const markImageBroken = useCallback((id) => {
     if (!id) return;
@@ -447,6 +449,21 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
       return (aPrice || 0) - (bPrice || 0);
     });
   }, [vets, petDetails]);
+
+  useEffect(() => {
+    if (sortedVets.length < 2) return undefined;
+    const interval = setInterval(() => {
+      setRotationIndex((prev) => (prev + 1) % sortedVets.length);
+    }, ROTATION_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [sortedVets.length]);
+
+  const rotatedVets = useMemo(() => {
+    if (sortedVets.length <= 1) return sortedVets;
+    const shift = rotationIndex % sortedVets.length;
+    if (shift === 0) return sortedVets;
+    return [...sortedVets.slice(shift), ...sortedVets.slice(0, shift)];
+  }, [sortedVets, rotationIndex]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -511,14 +528,14 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
               </button>
             </div>
           </div>
-        ) : sortedVets.length === 0 ? (
+        ) : rotatedVets.length === 0 ? (
           <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
             <div className="text-slate-900 font-bold">No vets found.</div>
             <div className="text-slate-500 text-sm mt-2">Please try again later.</div>
           </div>
         ) : (
           <div className="mt-8 grid auto-rows-fr items-stretch gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
-            {sortedVets.map((vet) => {
+            {rotatedVets.map((vet) => {
               const showDayPrice = isDayTime();
               const priceValue = showDayPrice ? vet.priceDay : vet.priceNight;
 
@@ -637,7 +654,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         View full profile <ChevronRight size={16} />
                       </button>
 
-                      <Button
+                      {/* <Button
                         onClick={() =>
                           onSelect?.({
                             ...vet,
@@ -648,7 +665,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         className="h-11 px-5 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-sm text-sm inline-flex items-center gap-3 min-w-[150px] justify-center"
                       >
                         <span className="font-semibold">Consult Now</span>
-                      </Button>
+                      </Button> */}
                     </div>
                   </div>
                 </div>
