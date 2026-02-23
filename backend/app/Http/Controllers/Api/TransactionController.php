@@ -183,7 +183,8 @@ class TransactionController extends Controller
 
     /**
      * GET /api/transactions/by-user?user_id=123[&limit=50][&type=video_consult]
-     * Returns raw transaction rows for a given user, filtered by type (defaults to video_consult).
+     * Returns raw transaction rows for a given user, filtered by type.
+     * Defaults to excell_export_campaign and maps legacy video_consult requests to excell_export_campaign.
      */
     public function byUser(Request $request)
     {
@@ -194,7 +195,8 @@ class TransactionController extends Controller
         ]);
 
         $limit = (int) ($data['limit'] ?? 50);
-        $type = $data['type'] ?? 'video_consult';
+        $requestedType = strtolower(trim((string) ($data['type'] ?? 'excell_export_campaign')));
+        $type = $requestedType === 'video_consult' ? 'excell_export_campaign' : $requestedType;
         $hasTransactionChannelName = Schema::hasTable('transactions') && Schema::hasColumn('transactions', 'channel_name');
         $selectColumns = [
             'id',
