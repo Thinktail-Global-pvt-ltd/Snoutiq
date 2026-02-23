@@ -255,20 +255,10 @@ Route::get('/doctor/profile', function (Request $request) {
     }
 
     return response()->json([
-        'data' => [
-            'id' => $doctor->id,
-            'doctor_name' => $doctor->doctor_name,
-            'doctor_email' => $doctor->doctor_email,
-            'doctor_mobile' => $doctor->doctor_mobile,
-            'doctor_license' => $doctor->doctor_license,
-            'doctor_image' => $doctor->doctor_image,
-            'doctor_document' => $doctor->doctor_document,
-            'toggle_availability' => $doctor->toggle_availability,
-            'doctors_price' => $doctor->doctors_price,
-            'vet_registeration_id' => $doctor->vet_registeration_id,
-            'staff_role' => $doctor->staff_role,
-            'clinic' => $clinic,
-        ],
+        'data' => array_merge(
+            $doctor->toArray(),
+            ['clinic' => $clinic]
+        ),
     ]);
 });
 
