@@ -514,22 +514,24 @@ public function pet_update(Request $request, $id)
 
         $pets = collect();
         if ($hasPetsTable) {
+            $petSelectColumns = array_values(array_filter([
+                'id',
+                'name',
+                'pet_type',
+                'type',
+                'breed',
+                'pet_gender',
+                'gender',
+                'pet_age',
+                'pet_age_months',
+                'pet_dob',
+                'dob',
+            ], fn ($column) => in_array($column, $petColumns, true)));
+
             $pets = Pet::query()
                 ->where('user_id', $user->id)
                 ->orderByDesc('id')
-                ->get([
-                    'id',
-                    'name',
-                    'pet_type',
-                    'type',
-                    'breed',
-                    'pet_gender',
-                    'gender',
-                    'pet_age',
-                    'pet_age_months',
-                    'pet_dob',
-                    'dob',
-                ]);
+                ->get($petSelectColumns);
         }
 
         $fields = [
