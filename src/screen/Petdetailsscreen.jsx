@@ -183,6 +183,42 @@ const formatPhone = (value) => {
   return `91${digits}`;
 };
 
+const normalizeDisplayText = (value) => {
+  if (value === undefined || value === null) return "";
+  const text = String(value).trim();
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  if (
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "[]" ||
+    lower === "na" ||
+    lower === "n/a"
+  ) {
+    return "";
+  }
+  return text;
+};
+
+const listToDisplayText = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeDisplayText(item)).filter(Boolean).join(", ");
+  }
+  const text = normalizeDisplayText(value);
+  if (!text) return "";
+  if (text.startsWith("[") && text.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => normalizeDisplayText(item)).filter(Boolean).join(", ");
+      }
+    } catch {
+      return text.replace(/^\[|\]$/g, "").replace(/["']/g, "").trim();
+    }
+  }
+  return text;
+};
+
 /**
  * ✅ Client-side image compression (web)
  * - Only compresses images (jpeg/png/webp). PDFs are sent as-is.
@@ -848,8 +884,10 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
     }
   };
 
-  const vetName = vet?.name || "Selected vet";
-  const vetQualification = vet?.qualification || "";
+  const rawVet = vet?.raw && typeof vet.raw === "object" ? vet.raw : null;
+
+  const vetName = vet?.name || rawVet?.doctor_name || "Selected vet";
+  const vetQualification = vet?.qualification || normalizeDisplayText(rawVet?.degree);
   const vetExperience = formatExperience(vet?.experience);
   const isSnoutiqAssignedVet = Boolean(
     vet?.isSnoutiqAssigned || vet?.autoAssigned || vet?.assignedBy === "snoutiq"
@@ -860,12 +898,48 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
     vetQualification && vetExperience
       ? `${vetQualification} - ${vetExperience}`
       : vetQualification || vetExperience || "Details shown after payment";
-  const vetRating = Number.isFinite(Number(vet?.rating))
-    ? Number(vet?.rating).toFixed(1)
-    : "--";
-  const vetConsultations = Number.isFinite(Number(vet?.consultations))
-    ? Number(vet?.consultations)
-    : "--";
+
+  const backendRating = toNumber(
+    pickValue(rawVet?.average_review_points, rawVet?.average_rating)
+  );
+  const vetRating =
+    Number.isFinite(backendRating) && backendRating > 0
+      ? backendRating.toFixed(1)
+      : Number.isFinite(Number(vet?.rating))
+      ? Number(vet?.rating).toFixed(1)
+      : "--";
+
+  const backendConsultations = toNumber(
+    pickValue(
+      rawVet?.consultations_count,
+      rawVet?.total_consultations,
+      rawVet?.total_consultation_count
+    )
+  );
+  const backendReviews = toNumber(pickValue(rawVet?.reviews_count, vet?.reviews));
+  const vetConsultations =
+    Number.isFinite(backendConsultations) && backendConsultations >= 0
+      ? Math.round(backendConsultations)
+      : Number.isFinite(Number(vet?.consultations))
+      ? Math.round(Number(vet?.consultations))
+      : "--";
+  const vetReviewCount =
+    Number.isFinite(backendReviews) && backendReviews >= 0
+      ? Math.round(backendReviews)
+      : "--";
+  const vetConsultationDisplay =
+    typeof vetConsultations === "number"
+      ? vetConsultations
+      : typeof vetReviewCount === "number"
+      ? vetReviewCount
+      : "--";
+  const vetConsultationLabel =
+    typeof vetConsultations === "number"
+      ? "Consultations"
+      : typeof vetReviewCount === "number"
+      ? "Reviews"
+      : "Consultations";
+
   const vetResponse =
     (vet?.bookingRateType === "night" ? vet?.responseNight : vet?.responseDay) ||
     vet?.responseDay ||
@@ -876,9 +950,46 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
     : vetResponse
     ? `Responds in ${vetResponse}`
     : "Responds quickly after payment";
+
+  const vetDoctorMobile = normalizeDisplayText(
+    pickValue(vet?.doctor_mobile, rawVet?.doctor_mobile, rawVet?.mobile)
+  );
+  const vetSpecialization = listToDisplayText(
+    pickValue(vet?.specializationText, rawVet?.specialization_select_all_that_apply)
+  );
+  const vetDayResponse = normalizeDisplayText(
+    pickValue(vet?.responseDay, rawVet?.response_time_for_online_consults_day)
+  );
+  const vetNightResponse = normalizeDisplayText(
+    pickValue(vet?.responseNight, rawVet?.response_time_for_online_consults_night)
+  );
+  const vetFollowUp = normalizeDisplayText(
+    pickValue(
+      vet?.followUp,
+      rawVet?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta
+    )
+  );
+  const vetLanguages = listToDisplayText(
+    pickValue(vet?.languages_spoken, rawVet?.languages_spoken)
+  );
+  const vetBio = normalizeDisplayText(pickValue(vet?.bio, rawVet?.bio));
+
+  const vetProfileItems = [
+    { key: "specialization", label: "Specialization", value: vetSpecialization },
+    { key: "dayResponse", label: "Day response", value: vetDayResponse },
+    { key: "nightResponse", label: "Night response", value: vetNightResponse },
+    { key: "followUp", label: "Follow-up", value: vetFollowUp },
+    { key: "mobile", label: "Mobile", value: vetDoctorMobile },
+    { key: "languages", label: "Languages", value: vetLanguages },
+  ].filter((item) => Boolean(item.value));
+
   const sidebarRating = vetRating === "--" ? "4.8" : vetRating;
   const sidebarConsultations =
-    typeof vetConsultations === "number" ? vetConsultations : 300;
+    typeof vetConsultations === "number"
+      ? vetConsultations
+      : typeof vetReviewCount === "number"
+      ? vetReviewCount
+      : null;
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
@@ -1948,9 +2059,9 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                   <div className="grid grid-cols-2 gap-px bg-gray-100">
                     <div className="bg-white p-3 text-center">
                       <div className="text-base font-semibold text-[#2563eb]">
-                        {vetConsultations}
+                        {vetConsultationDisplay}
                       </div>
-                      <div className="text-[10px] text-gray-500">Consultations</div>
+                      <div className="text-[10px] text-gray-500">{vetConsultationLabel}</div>
                     </div>
                     <div className="bg-white p-3 text-center">
                       <div className="text-base font-semibold text-[#2563eb]">
@@ -1963,6 +2074,38 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
                     {vetResponseText}
                   </div>
+
+                  {vetProfileItems.length ? (
+                    <div className="border-t border-gray-100 px-5 py-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                        Doctor Profile
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        {vetProfileItems.map((item) => (
+                          <div
+                            key={item.key}
+                            className="flex items-start justify-between gap-3 text-[11px]"
+                          >
+                            <span className="shrink-0 text-gray-500">{item.label}</span>
+                            <span className="text-right font-medium text-gray-800">
+                              {item.value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {vetBio ? (
+                    <div className="border-t border-gray-100 px-5 py-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                        About Doctor
+                      </div>
+                      <p className="mt-2 max-h-28 overflow-y-auto whitespace-pre-line pr-1 text-xs leading-5 text-gray-700">
+                        {vetBio}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="hidden md:block rounded-xl border border-gray-200 bg-white p-5">
@@ -2116,7 +2259,9 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                     <div>
                       <div className="text-lg font-semibold text-gray-900">{sidebarRating}</div>
                       <div className="text-xs text-gray-500">
-                        from {sidebarConsultations} consultations
+                        {sidebarConsultations === null
+                          ? "Doctor profile verified"
+                          : `from ${sidebarConsultations} consultations`}
                       </div>
                     </div>
                     <div className="flex items-center gap-0.5 text-amber-400">

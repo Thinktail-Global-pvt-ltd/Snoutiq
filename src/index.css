@@ -152,3 +152,19 @@ html {
 .checkmark {
   animation: checkmark 0.3s ease-out;
 }
+
+/* Landing hero fold-fit tuning for desktop/laptop heights */
+@media (max-height: 800px) and (min-width: 1024px) {
+  .landing-hero {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  .landing-hero-stats {
+    display: none !important;
+  }
+
+  .landing-hero-image {
+    height: 11.5rem !important;
+  }
+}

@@ -1,11 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <!-- ✅ Basic Meta -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Primary Meta Tags -->
-    <title>SnoutIQ - Consult a Vet Online | Veterinary Teleconsultation India</title>
+    <title>
+      SnoutIQ - Consult a Vet Online | Veterinary Teleconsultation India
+    </title>
     <meta
       name="title"
       content="SnoutIQ - Consult a Vet Online | Veterinary Teleconsultation India"
@@ -30,6 +32,9 @@
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://www.snoutiq.com/" />
+    <meta property="og:image" content="https://www.snoutiq.com/favicon-512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
     <meta
       property="og:title"
       content="SnoutIQ - Consult a Vet Online | Veterinary Teleconsultation India"
@@ -68,27 +73,34 @@
 
     <!-- Structured Data - Organization Schema -->
     <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "MedicalBusiness",
-        "name": "SnoutIQ",
-        "description": "Professional veterinary teleconsultation and triage service in India",
-        "url": "https://www.snoutiq.com",
-        "logo": "https://www.snoutiq.com/logo.png",
-        "medicalSpecialty": "Veterinary Medicine",
-        "areaServed": {
-          "@type": "Country",
-          "name": "India"
-        },
-        "availableService": {
-          "@type": "MedicalProcedure",
-          "name": "Veterinary Teleconsultation",
-          "description": "Video consultation with licensed veterinarians for pet health assessment and guidance. No prescriptions provided - consultation and triage only."
-        },
-        "disclaimer": "SnoutIQ provides veterinary teleconsultation and triage services only. We do not prescribe medications, dispense drugs, or provide online prescriptions. All medication needs must be addressed through in-person veterinary clinics. This service is not suitable for emergencies.",
-        "acceptedPaymentMethod": ["Cash", "Credit Card", "UPI"],
-        "priceRange": "$$"
+
+            {
+      "@context": "https://schema.org",
+      "@type": "MedicalBusiness",
+      "name": "SnoutIQ",
+      "url": "https://www.snoutiq.com",
+       "logo": "https://www.snoutiq.com/favicon-512.png",
+      "description": "Professional veterinary teleconsultation and triage service in India",
+      "medicalSpecialty": "Veterinary Medicine",
+      "areaServed": {
+        "@type": "Country",
+        "name": "India"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "reviewCount": "50"
       }
+
+            "availableService": {
+              "@type": "MedicalProcedure",
+              "name": "Veterinary Teleconsultation",
+              "description": "Video consultation with licensed veterinarians for pet health assessment and guidance. No prescriptions provided - consultation and triage only."
+            },
+            "disclaimer": "SnoutIQ provides veterinary teleconsultation and triage services only. We do not prescribe medications, dispense drugs, or provide online prescriptions. All medication needs must be addressed through in-person veterinary clinics. This service is not suitable for emergencies.",
+            "acceptedPaymentMethod": ["Cash", "Credit Card", "UPI"],
+            "priceRange": "$$"
+          }
     </script>
 
     <!-- Structured Data - Service Schema -->
@@ -159,10 +171,12 @@
       }
 
       :root {
-        --font-body: "Lato", system-ui, -apple-system, BlinkMacSystemFont,
+        --font-body:
+          "Lato", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+        --font-heading:
+          "Poppins", "Lato", system-ui, -apple-system, BlinkMacSystemFont,
           "Segoe UI", Roboto, sans-serif;
-        --font-heading: "Poppins", "Lato", system-ui, -apple-system,
-          BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
 
       body {
@@ -246,12 +260,18 @@
       rel="preload"
       href="/assets/index.css"
       as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
+      onload="
+        this.onload = null;
+        this.rel = 'stylesheet';
+      "
     />
     <noscript><link rel="stylesheet" href="/assets/index.css" /></noscript>
 
     <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17874635845"></script>
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=AW-17874635845"
+    ></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag() {
@@ -276,8 +296,7 @@
               j = d.createElement(s),
               dl = l != "dataLayer" ? "&l=" + l : "";
             j.async = true;
-            j.src =
-              "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+            j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
             f.parentNode.insertBefore(j, f);
           })(window, document, "script", "dataLayer", "GTM-5D756BMW");
         }, 10000);
@@ -308,7 +327,7 @@
           window,
           document,
           "script",
-          "https://connect.facebook.net/en_US/fbevents.js"
+          "https://connect.facebook.net/en_US/fbevents.js",
         );
         fbq("init", "1909812439872823");
         fbq("track", "PageView");
@@ -346,7 +365,11 @@
     </noscript>
 
     <!-- Compliance notice for crawlers (hidden) -->
-    <div style="display: none" itemscope itemtype="https://schema.org/MedicalWebPage">
+    <div
+      style="display: none"
+      itemscope
+      itemtype="https://schema.org/MedicalWebPage"
+    >
       <meta
         itemprop="name"
         content="SnoutIQ - Veterinary Teleconsultation Service"
@@ -357,20 +380,28 @@
       />
       <meta itemprop="medicalSpecialty" content="Veterinary Medicine" />
       <div itemprop="mainContentOfPage">
-        MEDICAL DISCLAIMER: This website provides veterinary teleconsultation and
-        triage services ONLY. We do not prescribe medications. We do not sell
-        medications. We do not provide online prescriptions. All medication needs
-        require in-person veterinary examination. Service type: Consultation and
-        triage only. Not a prescription service.
+        MEDICAL DISCLAIMER: This website provides veterinary teleconsultation
+        and triage services ONLY. We do not prescribe medications. We do not
+        sell medications. We do not provide online prescriptions. All medication
+        needs require in-person veterinary examination. Service type:
+        Consultation and triage only. Not a prescription service.
       </div>
     </div>
 
     <noscript>
       <div
-        style="padding: 20px; background: #FFF5F5; border: 2px solid #E53E3E; margin: 20px;"
+        style="
+          padding: 20px;
+          background: #fff5f5;
+          border: 2px solid #e53e3e;
+          margin: 20px;
+        "
       >
         <h2>SnoutIQ - Veterinary Teleconsultation Service</h2>
-        <p><strong>IMPORTANT:</strong> SnoutIQ provides veterinary consultation and triage services ONLY.</p>
+        <p>
+          <strong>IMPORTANT:</strong> SnoutIQ provides veterinary consultation
+          and triage services ONLY.
+        </p>
         <p>We do NOT prescribe medications online.</p>
         <p>We do NOT sell or dispense any medications.</p>
         <p>All medication needs require in-person veterinary examination.</p>
