@@ -172,57 +172,82 @@ class PrescriptionShareController extends Controller
 
     private function buildHtml($prescription, $user, $pet, $doctor): string
     {
-        $title = 'Prescription';
-        $parentName = $user?->name ?? 'Pet Parent';
-        $petName = $pet?->name ?? 'Pet';
-        $petType = $pet?->pet_type ?? $pet?->type ?? $pet?->breed ?? '';
-        $doctorName = $doctor?->doctor_name ?? 'Doctor';
+        $clinic = $doctor?->clinic;
+        $clinicName = trim((string) ($clinic->name ?? 'Snoutiq Veterinary Care'));
+        $clinicAddress = trim((string) ($clinic->address ?? ''));
+        $clinicCity = trim((string) ($clinic->city ?? ''));
+        $clinicPhone = trim((string) ($clinic->mobile ?? ''));
 
-        $meds = [];
-        if (is_array($prescription->medications_json)) {
-            foreach ($prescription->medications_json as $idx => $med) {
-                $label = $med['name'] ?? ('Medicine '.($idx + 1));
-                $dose = $med['dosage'] ?? $med['dose'] ?? null;
-                $freq = $med['frequency'] ?? null;
-                $note = $med['note'] ?? null;
-                $parts = array_filter([$label, $dose, $freq]);
-                $meds[] = implode(' - ', $parts) . ($note ? (' ('.$note.')') : '');
-            }
-        }
+        $parentName = trim((string) ($user?->name ?? 'Pet Parent'));
+        $parentPhone = trim((string) ($user?->phone ?? ''));
+        $parentEmail = trim((string) ($user?->email ?? ''));
+
+        $petName = trim((string) ($pet?->name ?? 'Pet'));
+        $petType = trim((string) ($pet?->pet_type ?? $pet?->type ?? ''));
+        $petBreed = trim((string) ($pet?->breed ?? ''));
+        $petGender = trim((string) ($pet?->pet_gender ?? $pet?->gender ?? ''));
+
+        $doctorName = trim((string) ($doctor?->doctor_name ?? 'Doctor'));
+        $doctorLicense = trim((string) ($doctor?->doctor_license ?? ''));
+        $doctorEmail = trim((string) ($doctor?->doctor_email ?? ''));
+        $doctorMobile = trim((string) ($doctor?->doctor_mobile ?? ''));
+
+        $rxNumber = 'RX-' . str_pad((string) $prescription->id, 6, '0', STR_PAD_LEFT);
+        $issuedOn = $this->formatDate($prescription->created_at, 'd M Y, h:i A');
+        $followUpDate = $this->formatDate($prescription->follow_up_date, 'd M Y');
+        $nextMedicineDate = $this->formatDate($prescription->next_medicine_day, 'd M Y');
+        $nextVisitDate = $this->formatDate($prescription->next_visit_day, 'd M Y');
+
+        $temperature = $prescription->temperature !== null
+            ? trim((string) $prescription->temperature) . ' ' . trim((string) ($prescription->temperature_unit ?: ''))
+            : '—';
+        $weight = $prescription->weight !== null ? trim((string) $prescription->weight) . ' kg' : '—';
+        $heartRate = $prescription->heart_rate !== null ? trim((string) $prescription->heart_rate) . ' bpm' : '—';
+
+        $visitSummary = implode(' | ', array_values(array_filter([
+            $this->plainText($prescription->visit_category),
+            $this->plainText($prescription->case_severity),
+            $this->plainText($prescription->diagnosis_status),
+        ])));
+
+        $medicationRows = $this->buildMedicationRows($prescription->medications_json);
+        $assessmentNotes = $this->textToHtml($prescription->visit_notes ?: $prescription->content_html);
+        $examNotes = $this->textToHtml($prescription->exam_notes);
+        $diagnosis = $this->textToHtml($prescription->diagnosis);
+        $disease = $this->textToHtml($prescription->disease_name);
+        $treatment = $this->textToHtml($prescription->treatment_plan);
+        $homeCare = $this->textToHtml($prescription->home_care);
+        $followUpNotes = $this->textToHtml($prescription->follow_up_notes);
+
+        $clinicLine = trim(implode(', ', array_values(array_filter([$clinicAddress, $clinicCity]))));
 
         $style = <<<CSS
-        body { font-family: DejaVu Sans, sans-serif; color: #111; }
-        h1 { font-size: 20px; margin: 0 0 8px; }
-        h2 { font-size: 16px; margin: 16px 0 8px; }
-        .meta { font-size: 12px; margin-bottom: 8px; }
-        .card { border: 1px solid #ddd; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
-        .label { font-weight: 600; }
-        ul { margin: 6px 0 0 18px; padding: 0; }
-        CSS;
-
-        $visit = array_filter([
-            $prescription->visit_category,
-            $prescription->case_severity,
-        ]);
-
-        $vitals = array_filter([
-            $prescription->temperature ? ('Temp: '.$prescription->temperature.($prescription->temperature_unit ?: '')) : null,
-            $prescription->weight ? ('Weight: '.$prescription->weight.' kg') : null,
-            $prescription->heart_rate ? ('Heart: '.$prescription->heart_rate.' bpm') : null,
-        ]);
-
-        $follow = array_filter([
-            $prescription->follow_up_date ? ('Date: '.$prescription->follow_up_date) : null,
-            $prescription->follow_up_type ? ('Type: '.$prescription->follow_up_type) : null,
-            $prescription->follow_up_notes ? ('Notes: '.$prescription->follow_up_notes) : null,
-        ]);
-
-        $home = $prescription->home_care ?: '';
-        $notes = $prescription->visit_notes ?: $prescription->content_html ?: '';
-
-        $medList = $meds ? '<ul><li>'.implode('</li><li>', array_map('htmlspecialchars', $meds)).'</li></ul>' : '<p>—</p>';
-        $followHtml = $follow ? '<ul><li>'.implode('</li><li>', array_map('htmlspecialchars', $follow)).'</li></ul>' : '<p>—</p>';
-        $vitalsHtml = $vitals ? '<ul><li>'.implode('</li><li>', array_map('htmlspecialchars', $vitals)).'</li></ul>' : '<p>—</p>';
+@page { margin: 20px 24px; }
+body { font-family: DejaVu Sans, sans-serif; color: #1f2937; font-size: 12px; line-height: 1.45; }
+.header { border: 1px solid #dbe4f0; background: #f8fbff; padding: 14px 16px; margin-bottom: 14px; }
+.header-table { width: 100%; border-collapse: collapse; }
+.header-table td { vertical-align: top; }
+.title { margin: 0; font-size: 22px; color: #123a68; }
+.subtle { color: #64748b; font-size: 11px; }
+.doc-chip { display: inline-block; padding: 3px 10px; border: 1px solid #9db7d9; color: #123a68; font-size: 10px; border-radius: 12px; }
+.section { border: 1px solid #e2e8f0; margin-bottom: 10px; }
+.section-title { background: #f1f5f9; color: #0f172a; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+.section-body { padding: 10px; }
+.meta-table, .vitals-table, .med-table { width: 100%; border-collapse: collapse; }
+.meta-table td { padding: 4px 4px; vertical-align: top; }
+.key { color: #64748b; width: 130px; }
+.value { color: #0f172a; }
+.two-col { width: 100%; border-collapse: separate; border-spacing: 0 8px; }
+.two-col td { width: 50%; vertical-align: top; padding-right: 6px; }
+.vitals-table td { border: 1px solid #e2e8f0; padding: 8px; }
+.vitals-head { background: #f8fafc; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 10px; }
+.med-table th { background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; padding: 7px; font-size: 10px; text-transform: uppercase; }
+.med-table td { border: 1px solid #e2e8f0; padding: 8px; vertical-align: top; }
+.muted-row { color: #64748b; text-align: center; font-style: italic; }
+.footer { margin-top: 12px; font-size: 10px; color: #64748b; }
+.signature { margin-top: 24px; text-align: right; }
+.signature-line { width: 220px; border-top: 1px solid #94a3b8; margin-left: auto; margin-bottom: 4px; }
+CSS;
 
         return <<<HTML
 <!DOCTYPE html>
@@ -232,55 +257,220 @@ class PrescriptionShareController extends Controller
   <style>{$style}</style>
 </head>
 <body>
-  <h1>{$title}</h1>
-  <div class="meta">
-    <div><span class="label">Pet parent:</span> {$this->e($parentName)}</div>
-    <div><span class="label">Pet:</span> {$this->e($petName)} {$this->e($petType)}</div>
-    <div><span class="label">Doctor:</span> {$this->e($doctorName)}</div>
+  <div class="header">
+    <table class="header-table">
+      <tr>
+        <td>
+          <h1 class="title">Veterinary Prescription</h1>
+          <div><strong>{$this->e($clinicName)}</strong></div>
+          <div class="subtle">{$this->e($clinicLine !== '' ? $clinicLine : 'Address not available')}</div>
+          <div class="subtle">{$this->e($clinicPhone !== '' ? $clinicPhone : 'Contact not available')}</div>
+        </td>
+        <td style="text-align: right;">
+          <span class="doc-chip">PRESCRIPTION</span>
+          <div style="margin-top: 8px;"><strong>Prescription #</strong> {$this->e($rxNumber)}</div>
+          <div><strong>Issued On</strong> {$this->e($issuedOn)}</div>
+          <div><strong>Call Session</strong> {$this->e($this->plainText($prescription->call_session) ?: '—')}</div>
+        </td>
+      </tr>
+    </table>
   </div>
 
-  <div class="card">
-    <div class="label">Visit</div>
-    <div>{$this->e(implode(' | ', $visit) ?: '—')}</div>
+  <table class="two-col">
+    <tr>
+      <td>
+        <div class="section">
+          <div class="section-title">Pet Parent Details</div>
+          <div class="section-body">
+            <table class="meta-table">
+              <tr><td class="key">Name</td><td class="value">{$this->e($parentName)}</td></tr>
+              <tr><td class="key">Phone</td><td class="value">{$this->e($parentPhone !== '' ? $parentPhone : '—')}</td></tr>
+              <tr><td class="key">Email</td><td class="value">{$this->e($parentEmail !== '' ? $parentEmail : '—')}</td></tr>
+            </table>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div class="section">
+          <div class="section-title">Doctor Details</div>
+          <div class="section-body">
+            <table class="meta-table">
+              <tr><td class="key">Doctor</td><td class="value">{$this->e($doctorName)}</td></tr>
+              <tr><td class="key">License</td><td class="value">{$this->e($doctorLicense !== '' ? $doctorLicense : '—')}</td></tr>
+              <tr><td class="key">Phone</td><td class="value">{$this->e($doctorMobile !== '' ? $doctorMobile : '—')}</td></tr>
+              <tr><td class="key">Email</td><td class="value">{$this->e($doctorEmail !== '' ? $doctorEmail : '—')}</td></tr>
+            </table>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <div class="section">
+    <div class="section-title">Pet Details</div>
+    <div class="section-body">
+      <table class="meta-table">
+        <tr><td class="key">Pet Name</td><td class="value">{$this->e($petName)}</td><td class="key">Type</td><td class="value">{$this->e($petType !== '' ? $petType : '—')}</td></tr>
+        <tr><td class="key">Breed</td><td class="value">{$this->e($petBreed !== '' ? $petBreed : '—')}</td><td class="key">Gender</td><td class="value">{$this->e($petGender !== '' ? $petGender : '—')}</td></tr>
+        <tr><td class="key">Visit Summary</td><td class="value" colspan="3">{$this->e($visitSummary !== '' ? $visitSummary : '—')}</td></tr>
+      </table>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="label">Notes</div>
-    <div>{$this->e($notes)}</div>
+  <div class="section">
+    <div class="section-title">Vitals</div>
+    <div class="section-body">
+      <table class="vitals-table">
+        <tr>
+          <td class="vitals-head">Temperature</td>
+          <td class="vitals-head">Weight</td>
+          <td class="vitals-head">Heart Rate</td>
+        </tr>
+        <tr>
+          <td>{$this->e($temperature !== '' ? trim($temperature) : '—')}</td>
+          <td>{$this->e($weight)}</td>
+          <td>{$this->e($heartRate)}</td>
+        </tr>
+      </table>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="label">Vitals</div>
-    {$vitalsHtml}
+  <div class="section">
+    <div class="section-title">Clinical Notes</div>
+    <div class="section-body">
+      <table class="meta-table">
+        <tr><td class="key">Assessment</td><td class="value">{$assessmentNotes}</td></tr>
+        <tr><td class="key">Examination</td><td class="value">{$examNotes}</td></tr>
+        <tr><td class="key">Diagnosis</td><td class="value">{$diagnosis}</td></tr>
+        <tr><td class="key">Disease</td><td class="value">{$disease}</td></tr>
+        <tr><td class="key">Chronic Case</td><td class="value">{$this->e($prescription->is_chronic ? 'Yes' : 'No')}</td></tr>
+        <tr><td class="key">Treatment Plan</td><td class="value">{$treatment}</td></tr>
+      </table>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="label">Diagnosis</div>
-    <div>{$this->e($prescription->diagnosis ?: '—')}</div>
+  <div class="section">
+    <div class="section-title">Medication Plan</div>
+    <div class="section-body">
+      <table class="med-table">
+        <thead>
+          <tr>
+            <th style="width: 6%;">#</th>
+            <th style="width: 26%;">Medicine</th>
+            <th style="width: 16%;">Dosage</th>
+            <th style="width: 18%;">Frequency</th>
+            <th style="width: 14%;">Duration</th>
+            <th style="width: 20%;">Instructions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {$medicationRows}
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="label">Treatment plan</div>
-    <div>{$this->e($prescription->treatment_plan ?: '—')}</div>
+  <div class="section">
+    <div class="section-title">Home Care & Follow-up</div>
+    <div class="section-body">
+      <table class="meta-table">
+        <tr><td class="key">Home Care</td><td class="value">{$homeCare}</td></tr>
+        <tr><td class="key">Next Medicine Date</td><td class="value">{$this->e($nextMedicineDate)}</td></tr>
+        <tr><td class="key">Next Visit Date</td><td class="value">{$this->e($nextVisitDate)}</td></tr>
+        <tr><td class="key">Follow-up Date</td><td class="value">{$this->e($followUpDate)}</td></tr>
+        <tr><td class="key">Follow-up Type</td><td class="value">{$this->e($this->plainText($prescription->follow_up_type) ?: '—')}</td></tr>
+        <tr><td class="key">Follow-up Notes</td><td class="value">{$followUpNotes}</td></tr>
+      </table>
+      <div class="signature">
+        <div class="signature-line"></div>
+        <div><strong>{$this->e($doctorName)}</strong></div>
+        <div class="subtle">Authorized Veterinarian</div>
+      </div>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="label">Medicines</div>
-    {$medList}
-  </div>
-
-  <div class="card">
-    <div class="label">Home care</div>
-    <div>{$this->e($home ?: '—')}</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Follow-up</div>
-    {$followHtml}
+  <div class="footer">
+    This document was generated digitally by Snoutiq. Please contact your veterinarian for any urgent concerns.
   </div>
 </body>
 </html>
 HTML;
+    }
+
+    private function buildMedicationRows($medications): string
+    {
+        if (!is_array($medications) || empty($medications)) {
+            return '<tr><td colspan="6" class="muted-row">No medications prescribed.</td></tr>';
+        }
+
+        $rows = '';
+        $index = 1;
+        foreach ($medications as $medication) {
+            if (!is_array($medication)) {
+                $value = $this->plainText((string) $medication);
+                $rows .= '<tr>'
+                    . '<td>' . $index . '</td>'
+                    . '<td>' . $this->e($value !== '' ? $value : 'Medicine ' . $index) . '</td>'
+                    . '<td>—</td><td>—</td><td>—</td><td>—</td>'
+                    . '</tr>';
+                $index++;
+                continue;
+            }
+
+            $name = $this->plainText($medication['name'] ?? $medication['medicine'] ?? $medication['drug'] ?? ('Medicine ' . $index));
+            $dosage = $this->plainText($medication['dosage'] ?? $medication['dose'] ?? $medication['strength'] ?? '');
+            $frequency = $this->plainText($medication['frequency'] ?? $medication['timing'] ?? '');
+            $duration = $this->plainText($medication['duration'] ?? $medication['days'] ?? '');
+            $instructions = $this->plainText($medication['note'] ?? $medication['notes'] ?? $medication['instructions'] ?? '');
+
+            $rows .= '<tr>'
+                . '<td>' . $index . '</td>'
+                . '<td>' . $this->e($name !== '' ? $name : ('Medicine ' . $index)) . '</td>'
+                . '<td>' . $this->e($dosage !== '' ? $dosage : '—') . '</td>'
+                . '<td>' . $this->e($frequency !== '' ? $frequency : '—') . '</td>'
+                . '<td>' . $this->e($duration !== '' ? $duration : '—') . '</td>'
+                . '<td>' . $this->e($instructions !== '' ? $instructions : '—') . '</td>'
+                . '</tr>';
+            $index++;
+        }
+
+        return $rows;
+    }
+
+    private function formatDate($value, string $format): string
+    {
+        if (empty($value)) {
+            return '—';
+        }
+
+        try {
+            return \Carbon\Carbon::parse($value)->format($format);
+        } catch (\Throwable $e) {
+            return $this->plainText((string) $value) ?: '—';
+        }
+    }
+
+    private function textToHtml(?string $text): string
+    {
+        $plain = $this->plainText($text);
+        if ($plain === '') {
+            return '—';
+        }
+
+        return nl2br($this->e($plain));
+    }
+
+    private function plainText(?string $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        $decoded = html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $stripped = strip_tags($decoded);
+        $normalized = preg_replace("/\r\n|\r/u", "\n", $stripped);
+
+        return trim((string) $normalized);
     }
 
     private function e(?string $text): string
