@@ -1,12 +1,10 @@
 // VetScreens.jsx
 // Notes:
-// - Compress images before upload.
-// - Upload image to get a URL (backend upload endpoint).
-// - Send doctor_image as a URL string.
+// - Submit registration via /api/excell-export/import.
+// - Supports doctor_image_file (multipart file) or doctor_image (URL string).
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import imageCompression from "browser-image-compression";
 import { Button } from "./Button";
 import { apiBaseUrl, apiPost } from "../lib/api";
 import { clearVetAuth, loadVetAuth, saveVetAuth } from "../lib/vetAuth";
@@ -154,6 +152,7 @@ const PAYOUT_OPTIONS = [
 ];
 
 const IMAGE_URL_LIMIT = 500;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOC_ZOOM_MIN = 1;
 const DOC_ZOOM_MAX = 4;
 const DOC_ZOOM_STEP = 0.25;
@@ -247,50 +246,36 @@ const getTransactionReportedSymptoms = (transaction) => {
   return candidates.map(normalizeOptionalText).find(Boolean) || "";
 };
 
-/* -------------- Image Compression + Upload -------------- */
+/* -------------- Image + Validation Helpers -------------- */
 
-const compressToFile = async (file) => {
-  if (!file || !file.type?.startsWith("image/")) {
-    throw new Error("Please upload a valid image file.");
+const appendFormValue = (fd, key, value) => {
+  if (value === null || value === undefined || value === "") return;
+  if (Array.isArray(value)) {
+    value.forEach((item) => {
+      if (item === null || item === undefined || item === "") return;
+      fd.append(`${key}[]`, String(item));
+    });
+    return;
   }
-
-  const options = {
-    maxSizeMB: 0.2,
-    maxWidthOrHeight: 720,
-    useWebWorker: true,
-    fileType: "image/jpeg",
-    initialQuality: 0.75,
-  };
-
-  const compressedBlob = await imageCompression(file, options);
-  return new File([compressedBlob], "doctor.jpg", {
-    type: "image/jpeg",
-    lastModified: Date.now(),
-  });
+  fd.append(key, String(value));
 };
 
-const uploadDoctorImageAndGetUrl = async (file) => {
-  const fd = new FormData();
-  fd.append("file", file);
+const buildValidationMessage = (data, fallback = "Request failed.") => {
+  const primary = data?.message || data?.error || fallback;
+  const rawErrors = data?.errors;
+  if (!rawErrors || typeof rawErrors !== "object") return primary;
 
-  const res = await fetch(`${apiBaseUrl()}/api/vet-photo/upload`, {
-    method: "POST",
-    body: fd,
-  });
+  const details = Object.values(rawErrors)
+    .flat()
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
 
-  const data = await res.json().catch(() => ({}));
-  const url =
-    data?.data?.public_url ||
-    data?.data?.url ||
-    data?.public_url ||
-    data?.url ||
-    "";
-
-  if (!res.ok || !url) {
-    throw new Error(data?.message || "Image upload failed.");
-  }
-
-  return url;
+  if (details.length === 0) return primary;
+  const dedupedDetails = Array.from(
+    new Set(details.filter((item) => item !== primary)),
+  );
+  if (dedupedDetails.length === 0) return primary;
+  return [primary, ...dedupedDetails].join("\n");
 };
 
 /* ---------------- Pricing Section ---------------- */
@@ -941,15 +926,14 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const [noBreakTime, setNoBreakTime] = useState(false);
 
   // locked pricing (as you had)
-  const [dayPrice] = useState("500");
-  const [nightPrice] = useState("650");
+  const [dayPrice] = useState("499");
+  const [nightPrice] = useState("649");
 
   const [agreement1, setAgreement1] = useState(false);
   const [agreement2, setAgreement2] = useState(false);
 
   const [doctorImageFile, setDoctorImageFile] = useState(null);
   const [doctorImagePreview, setDoctorImagePreview] = useState("");
-  const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [imageError, setImageError] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -1074,26 +1058,20 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
     }
   };
 
-  const handleDoctorImageFile = async (e) => {
+  const handleDoctorImageFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImageError("");
-    setIsImageProcessing(true);
-
-    try {
-      const compressedFile = await compressToFile(file);
-      setDoctorImageFile(compressedFile);
-      // clear URL if using file
-      setForm((prev) => ({ ...prev, doctorImageUrl: "" }));
-    } catch (err) {
+    if (!file.type?.startsWith("image/")) {
       setDoctorImageFile(null);
-      setImageError(
-        err?.message || "Image compression failed. Please try another image.",
-      );
-    } finally {
-      setIsImageProcessing(false);
+      setImageError("Please upload a valid image file.");
+      return;
     }
+
+    setImageError("");
+    setDoctorImageFile(file);
+    // clear URL if using file
+    setForm((prev) => ({ ...prev, doctorImageUrl: "" }));
   };
 
   const handleDoctorImageUrlChange = (e) => {
@@ -1219,19 +1197,20 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
   const payoutReady = form.payoutDetail.trim();
   const degreeReady = degreePayload.length > 0;
   const whatsappReady = form.whatsappNumber.trim().length >= 10;
+  const emailReady = EMAIL_REGEX.test(form.email.trim());
 
   const trimmedImageUrl = form.doctorImageUrl.trim();
   const urlReady =
     trimmedImageUrl.length > 0 && trimmedImageUrl.length <= IMAGE_URL_LIMIT;
   const imageReady = Boolean(doctorImageFile) || urlReady;
-  const imageValid = !isImageProcessing && (!imageReady || !imageError);
+  const imageValid = !imageReady || !imageError;
 
   const breakReady = noBreakTime || breakTimes.length > 0;
 
   const basicComplete = Boolean(
     doctorNameReady &&
     whatsappReady &&
-    form.email.trim() &&
+    emailReady &&
     form.shortIntro.trim() &&
     form.vetCity.trim() &&
     imageValid,
@@ -1338,15 +1317,18 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
       const breakPayload = noBreakTime ? ["No"] : breakTimes;
       const clinicNameValue = form.clinicName.trim();
       const vetNamePayload = clinicNameValue ? clinicNameValue : null;
+      const emailValue = form.email.trim();
 
-      // FIX: doctor_image MUST be a string URL.
-      // If user selected a file, upload it first to get URL.
-      let finalDoctorImageUrl = trimmedImageUrl || "";
-      if (doctorImageFile) {
-        finalDoctorImageUrl = await uploadDoctorImageAndGetUrl(doctorImageFile);
+      if (!EMAIL_REGEX.test(emailValue)) {
+        throw new Error("Please enter a valid email address.");
       }
+      const finalDoctorImageUrl = trimmedImageUrl || "";
 
-      if (finalDoctorImageUrl && finalDoctorImageUrl.length > IMAGE_URL_LIMIT) {
+      if (
+        !doctorImageFile &&
+        finalDoctorImageUrl &&
+        finalDoctorImageUrl.length > IMAGE_URL_LIMIT
+      ) {
         throw new Error(
           `Image URL must be ${IMAGE_URL_LIMIT} characters or less.`,
         );
@@ -1354,14 +1336,13 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
       const payload = {
         vet_name: vetNamePayload,
-        vet_email: form.email.trim(),
+        vet_email: emailValue,
         vet_mobile: form.whatsappNumber.trim(),
         vet_city: form.vetCity.trim(),
         doctor_name: doctorNameReady,
-        doctor_email: form.email.trim(),
+        doctor_email: emailValue,
         doctor_mobile: form.whatsappNumber.trim(),
         doctor_license: form.doctorLicense.trim(),
-        doctor_image: finalDoctorImageUrl, // ✅ ALWAYS STRING
         bio: form.shortIntro.trim(),
         degree: degreePayload,
         years_of_experience: form.yearsOfExperience.trim(),
@@ -1373,14 +1354,41 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
         do_you_offer_a_free_follow_up_within_3_days_after_a_consulta:
           form.freeFollowUp === "yes" ? "Yes" : "No",
         commission_and_agreement: agreed ? "Agreed" : "Not agreed",
-        video_day_rate: 500,
-        video_night_rate: 650,
+        video_day_rate: 499,
+        video_night_rate: 649,
         short_intro: form.shortIntro.trim(),
         preferred_payout_method: form.payoutMethod,
         preferred_payout_detail: payoutReady,
       };
 
-      const data = await apiPost("/api/excell-export/import", payload);
+      const fd = new FormData();
+      Object.entries(payload).forEach(([key, value]) => {
+        appendFormValue(fd, key, value);
+      });
+      if (doctorImageFile) {
+        fd.append("doctor_image_file", doctorImageFile);
+      } else {
+        appendFormValue(fd, "doctor_image", finalDoctorImageUrl);
+      }
+
+      const res = await fetch(`${apiBaseUrl()}/api/excell-export/import`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+        },
+        body: fd,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      console.log("Vet registration import response:", data);
+      if (!res.ok) {
+        const message = buildValidationMessage(
+          data,
+          `HTTP ${res.status}`,
+        );
+        throw new Error(message);
+      }
+
       if (data?.success === false) {
         throw new Error(
           data?.message || "Registration failed. Please try again.",
@@ -1570,13 +1578,6 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                       </button>
                     )}
 
-                    {isImageProcessing && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <div className="w-4 h-4 border-2 border-[#0B4D67] border-t-transparent rounded-full animate-spin" />
-                        Optimizing image...
-                      </div>
-                    )}
-
                     {imageError && (
                       <p className="text-sm text-red-600 bg-red-50 p-3 rounded-xl">
                         {imageError}
@@ -1702,9 +1703,18 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
                       value={form.email}
                       onChange={updateForm("email")}
                       required
-                      className={`${INPUT_BASE_CLASS} pl-12 md:pl-12`}
+                      className={`${INPUT_BASE_CLASS} pl-12 md:pl-12 ${
+                        showErrors && form.email.trim() && !emailReady
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-500/20"
+                          : ""
+                      }`}
                     />
                   </div>
+                  {showErrors && form.email.trim() && !emailReady && (
+                    <p className="pl-12 text-xs text-red-600">
+                      Please enter a valid email address.
+                    </p>
+                  )}
 
                   <p className="text-xs text-gray-500 flex items-center gap-1.5 bg-gray-50 p-3 rounded-xl">
                     <Lock size={12} className="text-[#0B4D67]" />
@@ -2835,7 +2845,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     latestTransactions,
     lastUpdated,
   } = useMemo(() => {
-    const totalAmountValue = dashboardData?.total_amount_after_deduction_inr ?? 0;
+    const totalAmountValue =
+      dashboardData?.total_amount_after_deduction_inr ?? 0;
     const totalTransactionsValue =
       dashboardData?.total_transactions ?? transactions.length;
     const pendingValue = transactions.filter(
@@ -3529,6 +3540,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           className={INPUT_BASE_CLASS}
                         >
                           <option value="Follow-up">Follow-up</option>
+                          <option value="Online Consultation">
+                            Online Consultation
+                          </option>
                           <option value="New Consultation">
                             New Consultation
                           </option>
@@ -3553,7 +3567,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Diagnosis
+                          Tentative Diagnosis
                         </label>
                         <input
                           type="text"
@@ -3584,8 +3598,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         Clinical Notes
                       </label>
                       <p className="mb-2 text-[11px] text-gray-500">
-                        Patient reported symptoms are prefilled and can be edited
-                        before submission.
+                        Patient reported symptoms are prefilled and can be
+                        edited before submission.
                       </p>
                       <textarea
                         value={prescriptionForm.notes}
