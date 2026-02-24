@@ -300,11 +300,21 @@ class ReceptionistBookingController extends Controller
 
         $tz = config('app.timezone') ?? 'UTC';
         $date = $request->query('date', now($tz)->toDateString());
+        $includeRescheduledRaw = strtolower(trim((string) $request->query('include_rescheduled', '1')));
+        $includeRescheduled = !in_array($includeRescheduledRaw, ['0', 'false', 'no', 'off'], true);
 
-        $rows = DB::table('appointments as a')
+        $query = DB::table('appointments as a')
             ->leftJoin('doctors as d', 'a.doctor_id', '=', 'd.id')
             ->where('a.vet_registeration_id', $clinicId)
-            ->whereDate('a.appointment_date', $date)
+            ->where(function ($builder) use ($date, $includeRescheduled) {
+                $builder->whereDate('a.appointment_date', $date);
+                if ($includeRescheduled) {
+                    // Keep rescheduled appointments visible in the receptionist queue
+                    // even when their new date differs from the requested "today" date.
+                    $builder->orWhereRaw('LOWER(TRIM(COALESCE(a.status, ""))) = ?', ['rescheduled']);
+                }
+            })
+            ->orderBy('a.appointment_date')
             ->orderBy('a.appointment_time')
             ->select(
                 'a.id',
@@ -317,8 +327,9 @@ class ReceptionistBookingController extends Controller
                 'a.doctor_id',
                 'a.notes',
                 DB::raw('COALESCE(d.doctor_name, "") as doctor_name')
-            )
-            ->get();
+            );
+
+        $rows = $query->get();
 
         $rows = $rows->map(function ($row) {
             $row->notes_payment = $this->extractNotesPaymentStatus($row->notes ?? null);
