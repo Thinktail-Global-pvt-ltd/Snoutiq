@@ -186,11 +186,11 @@ class PrescriptionShareController extends Controller
         $petType = trim((string) ($pet?->pet_type ?? $pet?->type ?? ''));
         $petBreed = trim((string) ($pet?->breed ?? ''));
         $petGender = trim((string) ($pet?->pet_gender ?? $pet?->gender ?? ''));
+        $petIsNeutered = $this->yesNoUnknown($pet?->is_neutered ?? null);
+        $petVaccinated = $this->yesNoUnknown($pet?->vaccenated_yes_no ?? null);
 
         $doctorName = trim((string) ($doctor?->doctor_name ?? 'Doctor'));
         $doctorLicense = trim((string) ($doctor?->doctor_license ?? ''));
-        $doctorEmail = trim((string) ($doctor?->doctor_email ?? ''));
-        $doctorMobile = trim((string) ($doctor?->doctor_mobile ?? ''));
 
         $rxNumber = 'RX-' . str_pad((string) $prescription->id, 6, '0', STR_PAD_LEFT);
         $issuedOn = $this->formatDate($prescription->created_at, 'd M Y, h:i A');
@@ -211,7 +211,8 @@ class PrescriptionShareController extends Controller
         ])));
 
         $medicationRows = $this->buildMedicationRows($prescription->medications_json);
-        $assessmentNotes = $this->textToHtml($prescription->visit_notes ?: $prescription->content_html);
+        $consultNotes = $this->textToHtml($prescription->visit_notes ?: $prescription->content_html);
+        $doctorTreatment = $this->textToHtml($prescription->doctor_treatment ?? null);
         $examNotes = $this->textToHtml($prescription->exam_notes);
         $diagnosis = $this->textToHtml($prescription->diagnosis);
         $disease = $this->textToHtml($prescription->disease_name);
@@ -297,8 +298,6 @@ CSS;
             <table class="meta-table">
               <tr><td class="key">Doctor</td><td class="value">{$this->e($doctorName)}</td></tr>
               <tr><td class="key">License</td><td class="value">{$this->e($doctorLicense !== '' ? $doctorLicense : '—')}</td></tr>
-              <tr><td class="key">Phone</td><td class="value">{$this->e($doctorMobile !== '' ? $doctorMobile : '—')}</td></tr>
-              <tr><td class="key">Email</td><td class="value">{$this->e($doctorEmail !== '' ? $doctorEmail : '—')}</td></tr>
             </table>
           </div>
         </div>
@@ -312,6 +311,7 @@ CSS;
       <table class="meta-table">
         <tr><td class="key">Pet Name</td><td class="value">{$this->e($petName)}</td><td class="key">Type</td><td class="value">{$this->e($petType !== '' ? $petType : '—')}</td></tr>
         <tr><td class="key">Breed</td><td class="value">{$this->e($petBreed !== '' ? $petBreed : '—')}</td><td class="key">Gender</td><td class="value">{$this->e($petGender !== '' ? $petGender : '—')}</td></tr>
+        <tr><td class="key">Neutered</td><td class="value">{$this->e($petIsNeutered)}</td><td class="key">Vaccinated</td><td class="value">{$this->e($petVaccinated)}</td></tr>
         <tr><td class="key">Visit Summary</td><td class="value" colspan="3">{$this->e($visitSummary !== '' ? $visitSummary : '—')}</td></tr>
       </table>
     </div>
@@ -339,7 +339,8 @@ CSS;
     <div class="section-title">Clinical Notes</div>
     <div class="section-body">
       <table class="meta-table">
-        <tr><td class="key">Assessment</td><td class="value">{$assessmentNotes}</td></tr>
+        <tr><td class="key">Notes</td><td class="value">{$consultNotes}</td></tr>
+        <tr><td class="key">Doctor Treatment</td><td class="value">{$doctorTreatment}</td></tr>
         <tr><td class="key">Examination</td><td class="value">{$examNotes}</td></tr>
         <tr><td class="key">Diagnosis</td><td class="value">{$diagnosis}</td></tr>
         <tr><td class="key">Disease</td><td class="value">{$disease}</td></tr>
@@ -384,6 +385,7 @@ CSS;
       <div class="signature">
         <div class="signature-line"></div>
         <div><strong>{$this->e($doctorName)}</strong></div>
+        <div class="subtle">License: {$this->e($doctorLicense !== '' ? $doctorLicense : '—')}</div>
         <div class="subtle">Authorized Veterinarian</div>
       </div>
     </div>
@@ -471,6 +473,31 @@ HTML;
         $normalized = preg_replace("/\r\n|\r/u", "\n", $stripped);
 
         return trim((string) $normalized);
+    }
+
+    private function yesNoUnknown($value): string
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'Yes' : 'No';
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return ((int) $value) === 1 ? 'Yes' : 'No';
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        if (in_array($normalized, ['1', 'y', 'yes', 'true'], true)) {
+            return 'Yes';
+        }
+        if (in_array($normalized, ['0', 'n', 'no', 'false'], true)) {
+            return 'No';
+        }
+
+        return '—';
     }
 
     private function e(?string $text): string
