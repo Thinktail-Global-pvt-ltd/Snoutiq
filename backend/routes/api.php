@@ -1017,6 +1017,8 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 if (Schema::hasColumn('pets', 'type')) { $cols[] = 'type'; }
                 if (Schema::hasColumn('pets', 'pet_dob')) { $cols[] = 'pet_dob'; }
                 if (Schema::hasColumn('pets', 'dob')) { $cols[] = 'dob'; }
+                if (Schema::hasColumn('pets', 'vaccenated_yes_no')) { $cols[] = 'vaccenated_yes_no'; }
+                if (Schema::hasColumn('pets', 'is_neutered')) { $cols[] = 'is_neutered'; }
                 if (Schema::hasColumn('pets', 'reported_symptom')) { $cols[] = 'reported_symptom'; }
                 if (Schema::hasColumn('pets', 'pet_doc1')) { $cols[] = 'pet_doc1'; }
                 if (Schema::hasColumn('pets', 'pet_doc2')) { $cols[] = 'pet_doc2'; }
