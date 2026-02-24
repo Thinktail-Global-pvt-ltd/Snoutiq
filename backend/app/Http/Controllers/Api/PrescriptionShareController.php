@@ -198,12 +198,6 @@ class PrescriptionShareController extends Controller
         $nextMedicineDate = $this->formatDate($prescription->next_medicine_day, 'd M Y');
         $nextVisitDate = $this->formatDate($prescription->next_visit_day, 'd M Y');
 
-        $temperature = $prescription->temperature !== null
-            ? trim((string) $prescription->temperature) . ' ' . trim((string) ($prescription->temperature_unit ?: ''))
-            : '—';
-        $weight = $prescription->weight !== null ? trim((string) $prescription->weight) . ' kg' : '—';
-        $heartRate = $prescription->heart_rate !== null ? trim((string) $prescription->heart_rate) . ' bpm' : '—';
-
         $visitSummary = implode(' | ', array_values(array_filter([
             $this->plainText($prescription->visit_category),
             $this->plainText($prescription->case_severity),
@@ -234,14 +228,12 @@ body { font-family: DejaVu Sans, sans-serif; color: #1f2937; font-size: 12px; li
 .section { border: 1px solid #e2e8f0; margin-bottom: 10px; }
 .section-title { background: #f1f5f9; color: #0f172a; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
 .section-body { padding: 10px; }
-.meta-table, .vitals-table, .med-table { width: 100%; border-collapse: collapse; }
+.meta-table, .med-table { width: 100%; border-collapse: collapse; }
 .meta-table td { padding: 4px 4px; vertical-align: top; }
 .key { color: #64748b; width: 130px; }
 .value { color: #0f172a; }
 .two-col { width: 100%; border-collapse: separate; border-spacing: 0 8px; }
 .two-col td { width: 50%; vertical-align: top; padding-right: 6px; }
-.vitals-table td { border: 1px solid #e2e8f0; padding: 8px; }
-.vitals-head { background: #f8fafc; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 10px; }
 .med-table th { background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; padding: 7px; font-size: 10px; text-transform: uppercase; }
 .med-table td { border: 1px solid #e2e8f0; padding: 8px; vertical-align: top; }
 .muted-row { color: #64748b; text-align: center; font-style: italic; }
@@ -313,24 +305,6 @@ CSS;
         <tr><td class="key">Breed</td><td class="value">{$this->e($petBreed !== '' ? $petBreed : '—')}</td><td class="key">Gender</td><td class="value">{$this->e($petGender !== '' ? $petGender : '—')}</td></tr>
         <tr><td class="key">Neutered</td><td class="value">{$this->e($petIsNeutered)}</td><td class="key">Vaccinated</td><td class="value">{$this->e($petVaccinated)}</td></tr>
         <tr><td class="key">Visit Summary</td><td class="value" colspan="3">{$this->e($visitSummary !== '' ? $visitSummary : '—')}</td></tr>
-      </table>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Vitals</div>
-    <div class="section-body">
-      <table class="vitals-table">
-        <tr>
-          <td class="vitals-head">Temperature</td>
-          <td class="vitals-head">Weight</td>
-          <td class="vitals-head">Heart Rate</td>
-        </tr>
-        <tr>
-          <td>{$this->e($temperature !== '' ? trim($temperature) : '—')}</td>
-          <td>{$this->e($weight)}</td>
-          <td>{$this->e($heartRate)}</td>
-        </tr>
       </table>
     </div>
   </div>
