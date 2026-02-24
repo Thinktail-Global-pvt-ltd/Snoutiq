@@ -1,4 +1,4 @@
-// src/screen/Landingscreen.jsx
+﻿// src/screen/Landingscreen.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import logo from "../assets/images/logo.png";
 import doctorSlide1 from "../assets/doctor1.jpeg";
@@ -59,20 +59,96 @@ const HERO_SLIDES = DOCTOR_PROFILES;
 const LANDING_REVIEWS = [
   {
     id: "r1",
-    author: "Priya M",
-    text: "Fast response and clear guidance. Consultation felt very professional.",
+    author: "Megha G.",
+    petInfo: "Labrador parent, Bangalore",
+    text: "My dog suddenly stopped eating at 11 PM. I was on a video call with a vet in under 15 minutes and got clear guidance.",
   },
   {
     id: "r2",
-    author: "Aamir S",
-    text: "Helpful advice for my rabbit. Vet explained next steps very clearly.",
+    author: "Rahul K.",
+    petInfo: "Cat parent, Mumbai",
+    text: "I was worried about my cat's rash and couldn't get a clinic slot quickly. SnoutIQ connected me fast and the vet was thorough.",
   },
   {
     id: "r3",
-    author: "Neha K",
-    text: "Quick support at night and practical recommendations for home care.",
+    author: "Priya S.",
+    petInfo: "Beagle parent, Delhi",
+    text: "The fixed pricing is transparent. The consultation was professional and practical for routine concerns.",
   },
 ];
+
+const SOCIAL_PROOF_STATS = [
+  { icon: "🩺", value: "200+", label: "Verified Online Veterinarians" },
+  { icon: "⭐", value: "4.8 / 5", label: "Highly Rated by Pet Parents" },
+  { icon: "🏅", value: "7+ Yrs", label: "Specialist Vets Experience" },
+  { icon: "🕐", value: "24 / 7", label: "Day & Night Availability" },
+  { icon: "🐾", value: "10,000+", label: "Satisfied Pet Parents" },
+];
+
+const WHY_CONSULT_ONLINE = [
+  {
+    icon: "⚡",
+    title: "Instant Access",
+    desc: "No booking required. Connect with a verified vet in minutes, day or night.",
+  },
+  {
+    icon: "💰",
+    title: "Fixed Pricing",
+    desc: "₹499 day consult and ₹649 night consult with no hidden charges.",
+  },
+  {
+    icon: "🏠",
+    title: "Consult From Home",
+    desc: "Your pet stays comfortable while you get real-time veterinary guidance.",
+  },
+  {
+    icon: "🩺",
+    title: "Qualified Veterinarians",
+    desc: "Every vet is licensed, verified, and experienced in handling common concerns.",
+  },
+  {
+    icon: "📋",
+    title: "Digital Records",
+    desc: "Consultation details are saved for easy future reference.",
+  },
+  {
+    icon: "🌙",
+    title: "Night Support",
+    desc: "Consultations are available beyond regular hours when you need help most.",
+  },
+];
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    n: "1",
+    icon: "📋",
+    title: "Describe the Issue",
+    desc: "Share your pet's concern, age, and basic history in a few quick steps.",
+  },
+  {
+    n: "2",
+    icon: "🔍",
+    title: "We Assign a Verified Vet",
+    desc: "Our system matches your case with the best available veterinarian.",
+  },
+  {
+    n: "3",
+    icon: "📹",
+    title: "Video Consultation",
+    desc: "Join a secure video call and discuss symptoms with the assigned vet.",
+  },
+  {
+    n: "4",
+    icon: "📄",
+    title: "Guidance & Follow-up",
+    desc: "Get clear next steps and advice on home care or clinic visit if needed.",
+  },
+];
+
+const LANDING_SEO_TITLE =
+  "Talk to a Vet Online | Online Vet Consultation India | SnoutiQ";
+const LANDING_SEO_DESCRIPTION =
+  "Talk to a vet online in 15 minutes. ₹499 online vet consultation for dogs, cats & exotic animals. Fast, reliable online veterinarian support across India. Start your consultation now.";
 
 const normalizeNameKey = (value = "") =>
   String(value || "")
@@ -180,6 +256,20 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const [brokenImages, setBrokenImages] = useState(() => new Set());
   const [activeBioVet, setActiveBioVet] = useState(null);
   const [isStartingConsult, setIsStartingConsult] = useState(false);
+
+  useEffect(() => {
+    document.title = LANDING_SEO_TITLE;
+
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute("content", LANDING_SEO_DESCRIPTION);
+    } else {
+      const meta = document.createElement("meta");
+      meta.setAttribute("name", "description");
+      meta.setAttribute("content", LANDING_SEO_DESCRIPTION);
+      document.head.appendChild(meta);
+    }
+  }, []);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -297,69 +387,52 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const faqs = useMemo(
     () => [
       {
-        q: "What can telemedicine veterinarians help with?",
-        a: "Our veterinarians can provide guidance on behavioral issues, skin conditions, dietary questions, minor injuries, general health concerns, and help determine if an in-person clinic visit is needed. They assess symptoms and provide professional recommendations.",
+        q: "Can I talk to a vet online right now?",
+        a: "Yes. SnoutIQ connects you with a verified online veterinarian within minutes, day and night. Share your concern and we assign the best available vet.",
       },
       {
-        q: "What happens during a video consultation?",
-        a: "You'll have a live video call with a licensed veterinarian. They'll ask about your pet's symptoms, history, and may request to see your pet on camera. Based on this assessment, they'll provide guidance on care and next steps.",
+        q: "What can an online vet consultation help with?",
+        a: "Online consultations can help with behavior or appetite changes, vomiting, diarrhea, skin issues, eye and ear concerns, wellness questions, and follow-up guidance.",
       },
       {
-        q: "When should I use telemedicine vs visiting a clinic?",
-        a: "Telemedicine is ideal for initial assessment, follow-ups, behavioral questions, and determining urgency. Emergency situations like severe trauma, difficulty breathing, or suspected poisoning require immediate in-person veterinary care.",
+        q: "Can I choose a specific vet for my consultation?",
+        a: "SnoutIQ assigns the best available verified vet based on your pet's concern and the doctor's expertise to ensure faster and better matching.",
       },
       {
-        q: "Are your veterinarians licensed?",
-        a: "Yes. All veterinarians on our platform are licensed professionals registered with the Veterinary Council of India. We verify credentials and conduct background checks before onboarding.",
+        q: "How much does an online vet consultation cost?",
+        a: "Day consultation (6 AM - 10 PM) is ₹499 and night consultation (10 PM - 6 AM) is ₹649. Pricing is fixed and transparent.",
       },
       {
-        q: "How quickly can I connect with a veterinarian?",
-        a: "Our average response time is around 15 minutes. Availability may vary based on time of day and current demand. We strive to connect you as quickly as possible.",
+        q: "Will I receive guidance after consultation?",
+        a: "Yes. After consultation, the veterinarian's guidance is available in your records for reference and follow-up.",
       },
       {
-        q: "What information should I have ready?",
-        a: "Have your pet's medical history, current medications or supplements, symptom duration, and any recent changes in behavior or diet. Photos or videos of symptoms can also be helpful.",
+        q: "How long does a consultation last?",
+        a: "A standard consultation is a 15-minute video session with a verified veterinarian.",
       },
       {
-        q: "Will I receive documentation after the consultation?",
-        a: "Yes. You'll receive a consultation summary with the veterinarian's assessment, recommendations, and any suggested follow-up actions. This can be shared with your regular veterinarian if needed.",
+        q: "Are the veterinarians qualified?",
+        a: "Yes. All veterinarians are licensed professionals and their credentials are verified before onboarding.",
       },
       {
-        q: "When is the payment charged?",
-        a: "Payment is required at the time of booking to confirm your online video consultation with the selected doctor.",
+        q: "Is SnoutIQ available for emergencies?",
+        a: "For severe emergencies, visit the nearest in-person veterinary emergency clinic immediately. Online consultation is best for non-emergency and semi-urgent concerns.",
       },
       {
-        q: "Is the consultation fee refundable?",
-        a: "Consultation fees are non-refundable once the session has started or the doctor has connected. If the doctor does not return your video call within 30 minutes of the scheduled time, you may contact support to review your case for a refund.",
+        q: "What is your refund policy?",
+        a: "If a vet is not assigned within the committed time window, you are eligible for a refund as per policy terms.",
       },
       {
-        q: "What if the doctor does not call me?",
-        a: "Please wait up to 30 minutes from the scheduled consultation time. If the doctor has not connected within this period, you can reach out to SnoutIQ support for assistance.",
+        q: "What device is needed for video consultation?",
+        a: "Any smartphone, tablet, or computer with a camera and stable internet connection is sufficient.",
       },
       {
-        q: "What if I miss the doctor's call?",
-        a: "If you do not answer the doctor's call at the scheduled time, the consultation will be considered completed and the fee will not be refunded.",
-      },
-      {
-        q: "How will the consultation take place?",
-        a: "The consultation will be conducted via video call through the doctor's registered WhatsApp number. Please ensure your phone is reachable and your internet connection is stable at the scheduled time.",
-      },
-      {
-        q: "Is my payment secure?",
-        a: "Yes. All payments are processed through secure and encrypted payment gateways.",
+        q: "Is my pet's information private?",
+        a: "Yes. Consultation and health details are treated as confidential in line with privacy policy.",
       },
     ],
     []
   );
-
-  const getConsultFeeByTime = () => {
-    const now = new Date();
-    const hour = now.getHours(); // 0-23
-    const day = hour >= 6 && hour < 22;
-    return day
-      ? { label: "Day Consult", time: "6 AM - 10 PM", price: 499 }
-      : { label: "Night Consult", time: "10 PM - 6 AM", price: 649 };
-  };
 
   const blogPosts = useMemo(
     () => [
@@ -450,49 +523,41 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               </div>
 
               <h1 className="mt-2.5 text-[28px] font-extrabold leading-[1.25] text-slate-900 md:text-[34px] lg:text-[34px]">
-                Online <span className="text-[#3998de]">Vet Consultation</span> in 15
+                Talk to a{" "}
+                <span className="text-[#3998de]">Verified Vet Online</span> in 15
                 Minutes
               </h1>
 
               <p className="mt-2.5 text-sm leading-relaxed text-slate-500 md:text-[15px]">
-                Get an online video consultation with a qualified veterinarian.
-                Fast response, fixed pricing, and guidance for your pet&apos;s
-                health concerns.
+                Get an online video consultation and connect with an experienced
+                veterinarian in minutes. No appointment, no waiting room, just
+                practical guidance for your pet.
               </p>
 
-              {/* Pricing (Day/Night) */}
-              {(() => {
-                const fee = getConsultFeeByTime();
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                  Fixed Consultation Fee
+                </span>
+                <span className="inline-flex items-center rounded-full bg-[#EAF4FF] border border-[#3998de]/20 px-3 py-1 text-xs font-semibold text-[#1D4E89] shadow-sm">
+                  7+ years experienced vets
+                </span>
+              </div>
 
-                return (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-                      Fixed Consultation Fee
-                    </span>
-
-                    <span className="inline-flex items-center rounded-full bg-[#EAF4FF] border border-[#3998de]/20 px-3 py-1 text-xs font-semibold text-[#1D4E89] shadow-sm">
-                      7+ years experienced vets
-                    </span>
-
-                    <span className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          fee.label.startsWith("Day")
-                            ? "bg-amber-400"
-                            : "bg-indigo-400"
-                        }`}
-                      />
-                      {fee.label}{" "}
-                      <span className="font-medium text-slate-500">
-                        ({fee.time})
-                      </span>{" "}
-                      : {"\u20B9"}{fee.price}
-                    </span>
-
-                    <span className="text-xs text-slate-400">(No hidden charges)</span>
-                  </div>
-                );
-              })()}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isDay ? "bg-amber-400" : "bg-indigo-400"
+                    }`}
+                  />
+                  {isDay ? "Day Consult" : "Night Consult"}
+                  <span className="font-medium text-slate-500">
+                    {isDay ? "(8 AM - 8 PM)" : "(8 PM - 8 AM)"}
+                  </span>
+                  : {"\u20B9"}{isDay ? 499 : 649}
+                </span>
+                <span className="text-xs text-slate-400">(No hidden charges)</span>
+              </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {[
@@ -540,8 +605,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               </div>
 
               <p className="mt-2 text-xs text-slate-500 sm:text-sm">
-                No vet selection needed. We assign the best available verified
-                vet for your pet&apos;s issue.
+                No vet selection needed. We assign the best available vet based
+                on your pet&apos;s issue.
               </p>
 
               {/* Stats */}
@@ -624,19 +689,42 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
         </div>
       </section>
 
-      {/* Our Verified Vets */}
-      <section className="bg-gradient-to-b from-white to-[#f4faff] py-10 md:py-12">
+      {/* Social Proof */}
+      <section className="bg-slate-900 py-6">
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
-          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#1D4E89]">
-            <span className="h-[2px] w-6 bg-[#3998de]" />
-            OUR TEAM
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-0">
+            {SOCIAL_PROOF_STATS.map((item, idx) => (
+              <div
+                key={item.label}
+                className={`flex flex-col items-center justify-center rounded-xl border border-white/10 px-3 py-3 text-center md:rounded-none md:border-y-0 md:border-l-0 md:border-r md:px-4 ${
+                  idx === SOCIAL_PROOF_STATS.length - 1 ? "md:border-r-0" : ""
+                }`}
+              >
+                <div className="text-lg">{item.icon}</div>
+                <div className="mt-1 text-lg font-extrabold text-white">
+                  {item.value}
+                </div>
+                <div className="mt-0.5 text-[11px] font-medium leading-4 text-slate-300">
+                  {item.label}
+                </div>
+              </div>
+            ))}
           </div>
-          <h2 className="mt-2.5 text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
-            Meet Our Verified Veterinarians
+        </div>
+      </section>
+
+      {/* Our Verified Vets */}
+      <section className="bg-gradient-to-b from-[#edf7ff] to-white py-10 md:py-12">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#3998de] px-4 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-white">
+            🩺 100+ Verified Online Veterinarians
+          </div>
+          <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
+            Talk to a Vet Online - Real Doctors, Real Experience
           </h2>
           <p className="mt-2 max-w-3xl text-sm text-slate-500 md:text-[15px]">
-            Every vet on SnoutIQ is licensed and background-verified. Doctor list
-            below is populated from live backend data.
+            Every veterinarian on SnoutIQ is licensed and background-verified.
+            The list below is populated from live backend data.
           </p>
 
           {vetsLoading ? (
@@ -713,11 +801,6 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                         <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-[#1D4E89]">
                           {qualification}
                         </p>
-                        {hasDisplayValue(vet.clinicName) ? (
-                          <p className="mt-1 line-clamp-1 text-[11px] text-slate-500">
-                            {vet.clinicName}
-                          </p>
-                        ) : null}
                       </div>
                     </div>
 
@@ -766,10 +849,50 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               })}
             </div>
           )}
-          <p className="mt-4 text-center text-sm text-slate-600">
-            <span className="font-semibold text-slate-900">You don&apos;t choose a vet.</span>{" "}
-            We match you to the best available doctor based on your pet&apos;s issue.
-          </p>
+          <div className="mt-5 flex flex-col items-start justify-between gap-4 rounded-2xl bg-slate-900 px-5 py-5 md:flex-row md:items-center">
+            <p className="max-w-3xl text-sm text-slate-200">
+              <span className="block font-bold text-white">
+                You don&apos;t pick a vet - we assign the best available one.
+              </span>
+              Tell us your pet&apos;s concern and we instantly match you to the
+              most suitable online veterinarian from our verified network.
+            </p>
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={isStartingConsult}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3998de] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
+            >
+              {isStartingConsult
+                ? "Connecting Dr Shashank..."
+                : "Consult a Vet Online - ₹499"}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Talk to Vet Strip */}
+      <section className="bg-[#3998de] py-7">
+        <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-4 px-4 sm:px-5 md:flex-row md:items-center">
+          <div>
+            <h2 className="text-xl font-extrabold text-white md:text-2xl">
+              Want to Talk to a Vet Online Right Now?
+            </h2>
+            <p className="mt-1 text-sm text-blue-50">
+              Describe your pet&apos;s issue. We connect you with an experienced
+              online veterinarian in minutes.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={isStartingConsult}
+            className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[#1D4E89] shadow-md transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-80"
+          >
+            {isStartingConsult ? "Connecting..." : "Talk to a Vet Online"}
+            <ArrowRight className="h-4 w-4" />
+          </button>
         </div>
       </section>
 
@@ -779,11 +902,11 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
           <div className="text-center">
             <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#1D4E89]">
               <span className="h-[2px] w-6 bg-[#3998de]" />
-              PET PARENT REVIEWS
+              TESTIMONIALS
               <span className="h-[2px] w-6 bg-[#3998de]" />
             </div>
             <h2 className="mt-2.5 text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
-              Loved by Pet Parents Across India
+              Pet Parents Trust SnoutIQ
             </h2>
             <div className="mt-3 flex items-center justify-center gap-3">
               <div className="text-3xl font-extrabold text-slate-900">4.8</div>
@@ -810,8 +933,13 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EAF4FF] text-xs font-bold text-[#1D4E89]">
                     {getInitials(review.author)}
                   </div>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {review.author}
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">
+                      {review.author}
+                    </div>
+                    {review.petInfo ? (
+                      <div className="text-xs text-slate-500">{review.petInfo}</div>
+                    ) : null}
                   </div>
                 </div>
               </article>
@@ -1324,124 +1452,79 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
         </div>
       </section>
 
-      {/* Features */}
-      <section className="bg-white py-12 md:py-14">
+      {/* Why Consult Online */}
+      <section className="bg-slate-900 py-12 md:py-14">
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
-          <div className="inline-flex w-full items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#1D4E89]">
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#79BCED]">
             <span className="h-[2px] w-6 bg-[#3998de]" />
             BENEFITS
-            <span className="h-[2px] w-6 bg-[#3998de]" />
           </div>
-          <h2 className="mt-3 text-center text-2xl font-bold text-slate-900 md:text-3xl">
-            Why Pet Parents Choose SnoutIQ
+          <h2 className="mt-3 text-2xl font-extrabold text-white md:text-3xl">
+            Why Choose Online Vet Consultation?
           </h2>
+          <p className="mt-2 max-w-3xl text-sm text-slate-300 md:text-[15px]">
+            For many pet health concerns, online consultation provides fast
+            clarity without travel or waiting.
+          </p>
 
-          <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-            {[
-              {
-                icon: "\u23F1\uFE0F",
-                title: "Quick Response",
-                desc: "Average connection time of 15 minutes. No more waiting rooms or long drives to the clinic.",
-              },
-              {
-                icon: "\u{1F3E5}",
-                title: "Expert Guidance",
-                desc: "Licensed and experienced veterinarians provide professional assessment and advice for your pet's health concerns.",
-              },
-              {
-                icon: "\u{1F4F1}",
-                title: "Convenient Access",
-                desc: "Consult from home via video call. Perfect for initial assessments and follow-up guidance.",
-              },
-              {
-                icon: "\u{1F4B0}",
-                title: "Cost Effective",
-                desc: "Save on transportation and time. Get professional veterinary advice without clinic visit costs.",
-              },
-              {
-                icon: "\u{1F6E1}\uFE0F",
-                title: "Verified Professionals",
-                desc: "All veterinarians are licensed, certified, and background-verified for your peace of mind.",
-              },
-              {
-                icon: "\u{1F4CB}",
-                title: "Digital Records",
-                desc: "Consultation records saved securely. Easy to share with your regular vet or for future reference.",
-              },
-            ].map((f, i) => (
-              <div
-                key={i}
-                className="rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {WHY_CONSULT_ONLINE.map((item) => (
+              <article
+                key={item.title}
+                className="rounded-2xl border border-white/15 bg-white/5 p-5"
               >
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200 text-2xl">
-                  {f.icon}
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900 md:text-lg">
-                  {f.title}
+                <div className="text-2xl">{item.icon}</div>
+                <h3 className="mt-3 text-base font-bold text-white">
+                  {item.title}
                 </h3>
-                <p className="mt-2 text-sm text-slate-500 md:text-[15px]">
-                  {f.desc}
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {item.desc}
                 </p>
-              </div>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="bg-slate-50 py-12 md:py-14">
+      <section id="how-it-works" className="bg-white py-12 md:py-14">
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
           <div className="inline-flex w-full items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#1D4E89]">
             <span className="h-[2px] w-6 bg-[#3998de]" />
-            PROCESS
+            SIMPLE PROCESS
             <span className="h-[2px] w-6 bg-[#3998de]" />
           </div>
           <h2 className="mt-3 text-center text-2xl font-bold text-slate-900 md:text-3xl">
-            How Your Consultation Works
+            How Your Online Pet Consultation Works
           </h2>
+          <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500 md:text-[15px]">
+            Four simple steps to connect with a verified vet and get guidance.
+          </p>
 
-          <div className="relative mt-8 md:mt-12">
-            <div className="absolute left-1/2 top-0 bottom-0 hidden w-px -translate-x-1/2 bg-[#3998de]/20 md:hidden" />
-            <div className="absolute left-1/2 top-6 hidden h-px w-[70%] -translate-x-1/2 bg-[#3998de]/20 md:block" />
-
-            <div className="relative grid gap-6 md:grid-cols-3 md:gap-8">
-              {[
-                {
-                  n: "1",
-                  title: "Tell Us Your Pet Concern",
-                  desc: "Share symptoms, issue details, and basic pet history in a few steps.",
-                },
-                {
-                  n: "2",
-                  title: "We Match the Right Vet",
-                  desc: "Our system connects you with the best available veterinarian for your case.",
-                },
-                {
-                  n: "3",
-                  title: "Start Video Consultation",
-                  desc: "Join a secure video call and get clear treatment guidance in minutes.",
-                },
-              ].map((s, i) => (
-                <div key={i} className="relative flex flex-col items-center">
-                  <div className="relative z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[#3998de] text-base font-bold text-white shadow-lg">
-                    {s.n}
-                  </div>
-
-                  <div className="mt-5 w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-md md:max-w-none">
-                    <h3 className="text-lg font-semibold text-slate-900 md:text-lg">
-                      {s.title}
-                    </h3>
-                    <p className="mt-3 text-slate-500">{s.desc}</p>
-                  </div>
+          <div className="relative mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {HOW_IT_WORKS_STEPS.map((step) => (
+              <div
+                key={step.n}
+                className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-center shadow-sm"
+              >
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#3998de] text-white">
+                  {step.icon}
                 </div>
-              ))}
-            </div>
+                <div className="mt-3 text-sm font-bold text-[#1D4E89]">
+                  Step {step.n}
+                </div>
+                <h3 className="mt-1 text-base font-bold text-slate-900">
+                  {step.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">{step.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="bg-white py-9 md:py-10">
+      <section id="faq" className="bg-white py-9 md:py-10">
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
           <div className="inline-flex w-full items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#1D4E89]">
             <span className="h-[2px] w-6 bg-[#3998de]" />
@@ -1449,7 +1532,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             <span className="h-[2px] w-6 bg-[#3998de]" />
           </div>
           <h2 className="mt-3 text-center text-2xl font-bold text-slate-900 md:text-3xl">
-            Questions Pet Parents Ask
+            Online Vet Consultation - Questions Pet Parents Ask
           </h2>
 
           <div className="mx-auto mt-8 max-w-3xl">
@@ -1480,116 +1563,66 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
         </div>
       </section>
 
-      {/* Promise */}
-      <section className="bg-gradient-to-br from-blue-100 to-blue-200 py-11 md:py-13">
+      {/* Medical Disclaimer */}
+      <section className="border-t-2 border-amber-300 bg-amber-50 py-9 md:py-10">
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
-          <div className="mx-auto max-w-4xl text-center">
-            <div className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#1D4E89]">
-              <span className="h-[2px] w-6 bg-[#3998de]" />
-              OUR PROMISE
-              <span className="h-[2px] w-6 bg-[#3998de]" />
-            </div>
-            <div className="mt-2 text-3xl">{"\u2764\uFE0F"}</div>
-            <h2 className="mt-3 text-2xl font-bold text-slate-900 md:text-[28px]">
-              Our Promise to Every Pet Parent
-            </h2>
-            <p className="mt-3 text-sm leading-7 text-slate-600 md:text-[15px] md:leading-7">
-              &quot;At SnoutIQ, we understand the anxiety when your pet
-              isn&apos;t feeling well. That&apos;s why we&apos;ve built a
-              platform where expert veterinary care is just minutes away. Every
-              consultation is backed by professional expertise and genuine care
-              for your furry family members.&quot;
+          <div className="mx-auto max-w-4xl rounded-2xl border border-amber-200 bg-amber-100/50 p-5 text-sm text-amber-900">
+            <h3 className="inline-flex items-center gap-2 text-base font-bold">
+              ⚠️ Important Medical & Legal Disclaimer
+            </h3>
+            <p className="mt-3">
+              SnoutIQ connects pet owners with licensed veterinarians for remote
+              consultations. Online consultations supplement but do not replace
+              in-person veterinary care.
             </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Disclaimer */}
-      <section className="border-t border-slate-200 bg-slate-50 py-7 md:py-9">
-        <div className="mx-auto max-w-5xl px-4 sm:px-5">
-          <div className="mx-auto max-w-4xl text-center text-sm text-slate-500">
-            <strong className="mb-2 block text-slate-900">
-              Important Information
-            </strong>
-            <p>
-              SnoutIQ provides professional veterinary teletriage and
-              consultation services only. We do not dispense, sell, or
-              facilitate the purchase of any medications. We do not provide
-              online prescriptions. Our veterinarians offer guidance and
-              recommendations; any medication needs must be addressed through an
-              in-person clinic visit with a licensed veterinarian. In emergency
-              situations, please visit your nearest veterinary clinic
+            <p className="mt-2">
+              Online guidance may not be suitable for cases requiring physical
+              examination, diagnostic testing, surgery, or emergency treatment.
+              In acute emergencies, visit the nearest veterinary clinic
               immediately.
+            </p>
+            <p className="mt-2">
+              Advice is based on information shared during consultation. A
+              complete diagnosis may require physical examination and in-clinic
+              evaluation.
             </p>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 py-8 text-white">
+      <footer className="bg-slate-900 py-10 text-white">
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
-          <div className="mb-8 rounded-xl bg-white/5 p-4">
-            <h4 className="text-lg font-semibold">
-              Important Medical & Legal Disclaimer
-            </h4>
-            <p className="mt-3 text-sm text-slate-200">
-              <strong>NO ONLINE PRESCRIPTIONS:</strong> SnoutIQ does not
-              prescribe, dispense, or sell any medications. We do not provide
-              online prescriptions under any circumstances. All medication needs
-              must be addressed through in-person veterinary clinics with proper
-              physical examination.
-            </p>
-            <p className="mt-3 text-sm text-slate-200">
-              <strong>CONSULTATION ONLY:</strong> SnoutIQ provides professional
-              veterinary teletriage and consultation services only. Our service
-              is designed to help pet parents understand their pet&apos;s
-              condition and determine appropriate next steps, including when to
-              seek in-person veterinary care.
-            </p>
-            <p className="mt-3 text-sm text-slate-200">
-              <strong>NOT FOR EMERGENCIES:</strong> This service is not suitable
-              for veterinary emergencies. For emergencies, trauma, severe
-              symptoms, or life-threatening conditions, please visit your
-              nearest veterinary emergency clinic immediately.
-            </p>
-            <p className="mt-3 text-sm text-slate-200">
-              <strong>LICENSED PROFESSIONALS:</strong> All veterinarians on
-              SnoutIQ are licensed professionals registered with the Veterinary
-              Council of India. However, video consultations cannot replace
-              comprehensive physical examinations.
-            </p>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-4">
             <div>
-              <h4 className="text-lg font-semibold">SnoutIQ</h4>
-              <p className="mt-3 text-sm text-slate-300">
-                Professional veterinary teleconsultation and triage services
-                across India.
-              </p>
-              <p className="mt-4 text-sm text-slate-300">
-                <strong>Service Type:</strong> Consultation &amp; Triage Only
-              </p>
-              <p className="text-sm text-slate-300">
-                <strong>No Prescriptions:</strong> Not a pharmacy service
+              <h4 className="text-2xl font-extrabold text-[#79BCED]">SnoutIQ</h4>
+              <p className="mt-3 text-sm leading-6 text-slate-300">
+                India&apos;s online vet consultation platform. Talk to a
+                verified veterinarian from anywhere, anytime.
               </p>
             </div>
 
             <div>
-              <h4 className="text-lg font-semibold">Contact</h4>
-              <p className="mt-3 text-sm text-slate-300">
-                Email: admin@snoutiq.com
-              </p>
-              <p className="text-sm text-slate-300">Mobile: +91 85880 07466</p>
-              <p className="text-sm text-slate-300">Service Area: Pan India</p>
-              <p className="mt-4 text-sm font-semibold text-rose-200">
-                For emergencies, visit your nearest veterinary clinic
-                immediately.
-              </p>
+              <h4 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
+                Connect
+              </h4>
+              <div className="mt-3 space-y-2 text-sm text-slate-300">
+                <a className="block hover:text-white" href="#">
+                  Contact Us
+                </a>
+                <a className="block hover:text-white" href="#">
+                  Support
+                </a>
+                <a className="block hover:text-white" href="#">
+                  Feedback
+                </a>
+              </div>
             </div>
 
             <div>
-              <h4 className="text-lg font-semibold">Legal &amp; Compliance</h4>
+              <h4 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
+                Legal &amp; Compliance
+              </h4>
               <div className="mt-3 space-y-2 text-sm text-slate-300">
                 <a className="block hover:text-white" href="/terms-of-service">
                   Terms of Service
@@ -1608,17 +1641,38 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 </a>
               </div>
             </div>
+
+            <div>
+              <h4 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
+                Platform
+              </h4>
+              <div className="mt-3 space-y-2 text-sm text-slate-300">
+                <a className="block hover:text-white" href="#how-it-works">
+                  How It Works
+                </a>
+                <button
+                  type="button"
+                  onClick={() =>
+                    typeof onVetAccess === "function" ? onVetAccess() : null
+                  }
+                  className="block text-left hover:text-white"
+                >
+                  For Veterinarians
+                </button>
+                <a className="block hover:text-white" href="#faq">
+                  FAQs
+                </a>
+                <a className="block hover:text-white" href="#">
+                  App Download
+                </a>
+              </div>
+            </div>
           </div>
 
           <div className="mt-8 border-t border-white/10 pt-5 text-center text-xs text-slate-400">
-            <p>{"\u00A9"} 2026 SnoutIQ. Professional veterinary teleconsultation services.</p>
+            <p>{"\u00A9"} 2026 SnoutIQ. All rights reserved.</p>
             <p className="mt-2">
-              All veterinarians are licensed professionals registered with the
-              Veterinary Council of India or state veterinary councils.
-            </p>
-            <p className="mt-2 font-semibold">
-              We do not prescribe medications or provide online prescriptions.
-              Consultation and triage services only.
+              Platform for educational and advisory veterinary guidance only.
             </p>
           </div>
         </div>
