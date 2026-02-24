@@ -68,7 +68,7 @@ const fetchJsonStrict = async (url, { timeoutMs = 15000 } = {}) => {
   }
 };
 
-const loadVetsWithFallback = async () => {
+export const loadVetsWithFallback = async () => {
   const candidates = buildApiCandidates();
   let lastErr = null;
 
@@ -280,7 +280,7 @@ const clipText = (text, max = 160) => {
  * - HIDE DEMO/INVALID vets: if day OR night rate <= 2 => do not show
  * - Keep priceDay/priceNight numbers
  */
-const buildVetsFromApi = (apiData = []) => {
+export const buildVetsFromApi = (apiData = []) => {
   const list = [];
   apiData.forEach((clinic) => {
     const clinicName = normalizeText(clinic?.name);

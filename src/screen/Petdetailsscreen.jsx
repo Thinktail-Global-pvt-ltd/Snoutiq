@@ -165,6 +165,17 @@ const formatExperience = (value) => {
   return `${years}+ yrs experience`;
 };
 
+const normalizeNameKey = (value = "") =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
+
+const isDrShashankVet = (value) => {
+  const key = normalizeNameKey(value);
+  if (!key) return false;
+  return key.includes("shash") && key.includes("goyal");
+};
+
 const formatPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
   if (!digits) return "";
@@ -840,6 +851,11 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
   const vetName = vet?.name || "Selected vet";
   const vetQualification = vet?.qualification || "";
   const vetExperience = formatExperience(vet?.experience);
+  const isSnoutiqAssignedVet = Boolean(
+    vet?.isSnoutiqAssigned || vet?.autoAssigned || vet?.assignedBy === "snoutiq"
+  );
+  const isDrShashankSelected = isDrShashankVet(vetName) || isDrShashankVet(vet?.doctor_name);
+  const showSnoutiqHighlight = isDrShashankSelected || isSnoutiqAssignedVet;
   const vetMetaLine =
     vetQualification && vetExperience
       ? `${vetQualification} - ${vetExperience}`
@@ -855,7 +871,9 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
     vet?.responseDay ||
     vet?.responseNight ||
     "";
-  const vetResponseText = vetResponse
+  const vetResponseText = showSnoutiqHighlight
+    ? "Priority response in 7-8 minutes after payment"
+    : vetResponse
     ? `Responds in ${vetResponse}`
     : "Responds quickly after payment";
   const sidebarRating = vetRating === "--" ? "4.8" : vetRating;
@@ -902,17 +920,38 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                           liveDoctorCount === 1 ? "vet is" : "vets are"
                         } online right now`}
                   </div>
-                  <div className="text-xs text-white/80">
-                    Average response after payment: under 15 minutes
-                  </div>
+                <div className="text-xs text-white/80">
+                    {showSnoutiqHighlight
+                      ? "SnoutIQ selected your doctor for faster care. Expected response: 7-8 minutes."
+                      : "Average response after payment: under 15 minutes"}
                 </div>
-                <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold">
-                  Live
+              </div>
+              <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold">
+                Live
+              </div>
+            </div>
+          </div>
+
+          {showSnoutiqHighlight ? (
+            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div className="flex items-start gap-2">
+                <Shield size={14} className="mt-0.5 text-emerald-700" />
+                <div>
+                  <div className="text-sm font-semibold text-emerald-900">
+                    SnoutIQ Selected Best-Match Doctor
+                  </div>
+                  <p className="mt-1 text-xs text-emerald-800">
+                    For your consultation,{" "}
+                    <span className="font-semibold">{vetName}</span> is assigned by
+                    SnoutIQ as a best-fit doctor. Typical first response is within
+                    7-8 minutes.
+                  </p>
                 </div>
               </div>
             </div>
+          ) : null}
 
-            <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
               {/* LEFT COLUMN - Main Form */}
               <div className="space-y-6">
                   {/* Owner details */}
@@ -1896,9 +1935,14 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                     <div>
                       <div className="text-sm font-semibold">{vetName}</div>
                       <div className="text-xs text-white/80">{vetMetaLine}</div>
-                      <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold">
+                      <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200/50 bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-amber-100">
                         Verified
                       </div>
+                      {showSnoutiqHighlight ? (
+                        <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200/50 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-100">
+                          SnoutIQ Best Match
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-px bg-gray-100">

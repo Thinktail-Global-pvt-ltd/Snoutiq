@@ -219,6 +219,34 @@ const handleNumberWheel = (e) => {
 const clampDocZoom = (value) =>
   Math.min(DOC_ZOOM_MAX, Math.max(DOC_ZOOM_MIN, value));
 
+const normalizeOptionalText = (value) => {
+  if (value == null) return "";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim();
+};
+
+const getTransactionReportedSymptoms = (transaction) => {
+  const candidates = [
+    transaction?.pet?.reported_symptom,
+    transaction?.pet?.reportedSymptoms,
+    transaction?.reported_symptom,
+    transaction?.reportedSymptoms,
+    transaction?.metadata?.reported_symptom,
+    transaction?.metadata?.reportedSymptoms,
+    transaction?.metadata?.symptom,
+    transaction?.metadata?.symptoms,
+    transaction?.metadata?.notes?.reported_symptom,
+    transaction?.metadata?.notes?.reportedSymptoms,
+    transaction?.metadata?.notes?.symptom,
+    transaction?.metadata?.notes?.symptoms,
+  ];
+
+  return candidates.map(normalizeOptionalText).find(Boolean) || "";
+};
+
 /* -------------- Image Compression + Upload -------------- */
 
 const compressToFile = async (file) => {
@@ -2185,10 +2213,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [observationError, setObservationError] = useState("");
   const refreshTimerRef = useRef(null);
   const isFirstLoadRef = useRef(true);
-  const [prescriptionForm, setPrescriptionForm] = useState({
+  const createPrescriptionForm = (transaction = null) => ({
     visitCategory: "Follow-up",
     caseSeverity: "general",
-    notes: "",
+    notes: getTransactionReportedSymptoms(transaction),
     doctorTreatment: "",
     diagnosis: "",
     diagnosisStatus: "",
@@ -2199,6 +2227,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     medications: [{ name: "", dosage: "", frequency: "", duration: "" }],
     recordFile: null,
   });
+  const [prescriptionForm, setPrescriptionForm] = useState(() =>
+    createPrescriptionForm(),
+  );
 
   useEffect(() => {
     if (authFromProps) {
@@ -2441,21 +2472,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     return () => controller.abort();
   }, [showPatientModal, activeTransaction]);
 
-  const resetPrescriptionForm = () => {
-    setPrescriptionForm({
-      visitCategory: "Follow-up",
-      caseSeverity: "general",
-      notes: "",
-      doctorTreatment: "",
-      diagnosis: "",
-      diagnosisStatus: "",
-      treatmentPlan: "",
-      homeCare: "",
-      followUpDate: "",
-      followUpType: "",
-      medications: [{ name: "", dosage: "", frequency: "", duration: "" }],
-      recordFile: null,
-    });
+  const resetPrescriptionForm = (transaction = null) => {
+    setPrescriptionForm(createPrescriptionForm(transaction));
     setPrescriptionError("");
     setPrescriptionSuccess(false);
   };
@@ -2468,7 +2486,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
   const openPrescriptionModal = (transaction) => {
     setActiveTransaction(transaction);
-    resetPrescriptionForm();
+    resetPrescriptionForm(transaction);
     setShowPrescriptionModal(true);
   };
 
@@ -2860,6 +2878,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       lastUpdated: lastUpdatedValue,
     };
   }, [dashboardData, transactions]);
+  const reportedSymptomsForActiveTransaction =
+    getTransactionReportedSymptoms(activeTransaction);
 
   return (
     <div
@@ -2978,6 +2998,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       const petName = resolvePetName(item);
                       const { userId, clinicId } = resolveTransactionIds(item);
                       const canOpenPrescription = Boolean(userId && clinicId);
+                      const prescriptionCountForPet = Number(
+                        item?.prescription_count_for_pet ?? 0,
+                      );
+                      const hasPrescriptionForPet =
+                        prescriptionCountForPet > 0 ||
+                        Boolean(item?.latest_prescription?.id);
                       const canView = Boolean(item?.user || item?.pet);
 
                       return (
@@ -3027,13 +3053,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                 >
                                   View
                                 </button>
-                                <button
-                                  onClick={() => openPrescriptionModal(item)}
-                                  disabled={!canOpenPrescription}
-                                  className="px-4 py-2 text-sm font-medium text-white rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  Prescribe
-                                </button>
+                                {!hasPrescriptionForPet ? (
+                                  <button
+                                    onClick={() => openPrescriptionModal(item)}
+                                    disabled={!canOpenPrescription}
+                                    className="px-4 py-2 text-sm font-medium text-white rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Prescribe
+                                  </button>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -3237,13 +3265,13 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 </div>
               </div>
 
-              {activeTransaction?.pet?.reported_symptom && (
+              {reportedSymptomsForActiveTransaction && (
                 <div className="bg-gray-50 rounded-xl p-4 mb-4">
                   <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">
                     Reported Symptoms
                   </h4>
                   <p className="text-gray-700">
-                    {activeTransaction.pet.reported_symptom}
+                    {reportedSymptomsForActiveTransaction}
                   </p>
                 </div>
               )}
@@ -3555,38 +3583,19 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Clinical Notes
                       </label>
+                      <p className="mb-2 text-[11px] text-gray-500">
+                        Patient reported symptoms are prefilled and can be edited
+                        before submission.
+                      </p>
                       <textarea
                         value={prescriptionForm.notes}
                         onChange={updatePrescriptionField("notes")}
                         rows={4}
-                        placeholder="Enter diagnosis, observations, and treatment plan..."
+                        placeholder="Update reported symptoms and add your clinical findings..."
                         className={`${INPUT_BASE_CLASS} resize-none`}
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Doctor Treatment
-                      </label>
-                      <textarea
-                        value={prescriptionForm.doctorTreatment}
-                        onChange={updatePrescriptionField("doctorTreatment")}
-                        rows={3}
-                        placeholder="Doctor treatment instructions"
-                        className={`${INPUT_BASE_CLASS} resize-none`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Treatment Plan
-                      </label>
-                      <textarea
-                        value={prescriptionForm.treatmentPlan}
-                        onChange={updatePrescriptionField("treatmentPlan")}
-                        rows={3}
-                        placeholder="Treatment plan"
-                        className={`${INPUT_BASE_CLASS} resize-none`}
-                      />
-                    </div>
+
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Home Care

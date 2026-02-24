@@ -1,5 +1,5 @@
 // src/screen/Landingscreen.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import logo from "../assets/images/logo.png";
 import doctorSlide1 from "../assets/doctor1.jpeg";
 import doctorSlide2 from "../assets/doctor2.jpeg";
@@ -19,123 +19,58 @@ import {
   ShieldCheck,
   Star,
   Stethoscope,
+  X,
   Zap,
 } from "lucide-react";
 
-// ✅ IMPORTANT: file name/casing same as your actual file.
+// IMPORTANT: file name/casing same as your actual file.
 // If file is src/screens/VetsScreen.jsx then use:
-import { buildVetsFromApi, loadVetsWithFallback } from "./vetsData";
+import { buildVetsFromApi, loadVetsWithFallback } from "./Vetsscreen";
 
-const TARGET_DOCTOR_NAME = "Dr Shashannk Goyal";
-
-/** Fallback cards (used only if API not available) */
-const FALLBACK_HERO_SLIDES = [
+const DOCTOR_PROFILES = [
   {
-    id: "fallback-1",
     name: "Dr. S. K. Mishra",
-    qualification: "B.V.Sc, MBA, PGDCTM, PGCVH, CSAD",
-    experience: 17,
-    clinicName: "SnoutIQ Verified Network",
-    rating: 4.6,
-    reviews: 54,
-    consultations: 120,
-    specializationText: "Dogs, Cats, General Practice",
-    bio:
-      "Seasoned veterinarian with strong tele-triage experience. Focused on accurate assessment and next-step guidance.",
+    degree: "B.V.Sc, MBA, PGDCTM, PGCVH, CSAD",
+    experience: "17+ years of experience",
     image: doctorSlide1,
-    priceDay: 500,
-    priceNight: 650,
   },
   {
-    id: "fallback-2",
     name: "Dr. Mohd Tosif",
-    qualification: "B.V.Sc",
-    experience: 5,
-    clinicName: "SnoutIQ Verified Network",
-    rating: 4.5,
-    reviews: 38,
-    consultations: 86,
-    specializationText: "Dogs, Cats, Skin / Dermatology",
-    bio:
-      "Helps pet parents with common skin conditions, allergies, and day-to-day wellness support.",
+    degree: "B.V.Sc",
+    experience: "5+ years of experience",
     image: doctorSlide3,
-    priceDay: 500,
-    priceNight: 650,
   },
   {
-    id: "fallback-3",
     name: "Dr. Pooja Tarar",
-    qualification: "M.V.Sc",
-    experience: 18,
-    clinicName: "SnoutIQ Verified Network",
-    rating: 4.7,
-    reviews: 61,
-    consultations: 145,
-    specializationText: "General Practice, Nutrition",
-    bio:
-      "Experienced clinician focused on preventive care, nutrition, and practical home-care guidance.",
+    degree: "M.V.Sc",
+    experience: "18+ years of experience",
     image: doctorSlide2,
-    priceDay: 500,
-    priceNight: 650,
   },
   {
-    id: "fallback-4",
     name: "Dr. Shashannk Goyal",
-    qualification: "M.V.Sc (Surgery)",
-    experience: 10,
-    clinicName: "SnoutIQ Verified Network",
-    rating: 4.8,
-    reviews: 49,
-    consultations: 122,
-    specializationText: "Surgery, General Practice",
-    bio:
-      "Surgery and general practice background. Helps you understand urgency and whether clinic visit is needed.",
+    degree: "M.V.Sc (Surgery)",
+    experience: "10+ years of experience",
     image: doctorProfile4,
-    priceDay: 500,
-    priceNight: 650,
   },
 ];
 
-const HERO_REVIEWS = [
+const HERO_SLIDES = DOCTOR_PROFILES;
+
+const LANDING_REVIEWS = [
   {
-    id: "hero-review-1",
-    name: "Aditi Sharma",
-    pet: "Dog: Bruno (Labrador)",
-    rating: 5,
-    text:
-      "Bruno suddenly started vomiting late at night and I panicked. Within 10 minutes I was connected to a vet on Snoutiq. The doctor calmly guided me step by step and told me what to monitor. It saved us an unnecessary emergency visit.",
+    id: "r1",
+    author: "Priya M",
+    text: "Fast response and clear guidance. Consultation felt very professional.",
   },
   {
-    id: "hero-review-2",
-    name: "Rohan Mehta",
-    pet: "Dog: Coco (Shih Tzu)",
-    rating: 5,
-    text:
-      "I was honestly skeptical about online consultation, but the vet was extremely professional. Coco had a skin allergy issue and we got clear guidance immediately. Very convenient and worth the price.",
+    id: "r2",
+    author: "Aamir S",
+    text: "Helpful advice for my rabbit. Vet explained next steps very clearly.",
   },
   {
-    id: "hero-review-3",
-    name: "Sneha Iyer",
-    pet: "Dog: Simba (Golden Retriever)",
-    rating: 5,
-    text:
-      "Simba was not eating and I was worried. The vet explained possible causes and gave proper advice on what to do next. The response time was fast and the whole process felt smooth and trustworthy.",
-  },
-  {
-    id: "hero-review-4",
-    name: "Arjun Verma",
-    pet: "Dog: Tyson (German Shepherd)",
-    rating: 5,
-    text:
-      "Booked a night consultation around 11 PM. I did not expect someone to respond so quickly. The doctor was experienced and practical. This is genuinely helpful when clinics are closed.",
-  },
-  {
-    id: "hero-review-5",
-    name: "Neha Kapoor",
-    pet: "Dog: Bella (Indie Mix)",
-    rating: 5,
-    text:
-      "Bella had mild diarrhea and I did not want to overreact. The vet helped me understand diet changes and warning signs. It gave me peace of mind without stepping out of home.",
+    id: "r3",
+    author: "Neha K",
+    text: "Quick support at night and practical recommendations for home care.",
   },
 ];
 
@@ -144,12 +79,9 @@ const normalizeNameKey = (value = "") =>
     .toLowerCase()
     .replace(/[^a-z]/g, "");
 
-const isTargetConsultDoctor = (vet) => {
+const isDrShashankVet = (vet) => {
   const key = normalizeNameKey(vet?.name);
   if (!key) return false;
-  if (key.includes("shashannkgoyal") || key.includes("shashankgoyal")) {
-    return true;
-  }
   return key.includes("shash") && key.includes("goyal");
 };
 
@@ -178,6 +110,12 @@ const hasDisplayValue = (value) => {
   return true;
 };
 
+const formatPrice = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return "";
+  return `INR ${amount}`;
+};
+
 const clipText = (text, max = 160) => {
   const trimmed = String(text || "")
     .replace(/\s+/g, " ")
@@ -187,21 +125,6 @@ const clipText = (text, max = 160) => {
   return `${trimmed.slice(0, max).trim()}...`;
 };
 
-/** Small helper for header links */
-const HeaderLink = ({ href, children }) => (
-  <a
-    href={href}
-    className="
-      hidden md:inline-flex items-center rounded-full px-3 py-2 text-sm font-semibold
-      text-slate-600 hover:text-slate-900 hover:bg-slate-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300
-      transition
-    "
-  >
-    {children}
-  </a>
-);
-
 const InfoRow = ({ icon: Icon, label, value, subValue }) => {
   const showValue = hasDisplayValue(value);
   const showSubValue = hasDisplayValue(subValue);
@@ -209,19 +132,18 @@ const InfoRow = ({ icon: Icon, label, value, subValue }) => {
 
   return (
     <div className="flex items-start gap-3">
-      <div
-        className="mt-[2px] inline-flex h-9 w-9 items-center justify-center rounded-2xl
-                   bg-[#3998de]/10 text-[#3998de] border border-[#3998de]/15"
-      >
+      <div className="mt-[2px] inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 border border-teal-100">
         <Icon size={18} />
       </div>
-
       <div className="min-w-0">
         <div className="text-[11px] font-semibold text-slate-500">{label}</div>
         <div className="text-sm font-semibold text-slate-900 leading-5 break-words">
           {showValue ? value : null}
           {showValue && showSubValue ? (
-            <span className="text-slate-400 font-semibold"> {" - "} {subValue}</span>
+            <span className="text-slate-400 font-semibold">
+              {" "}
+              {" - "} {subValue}
+            </span>
           ) : null}
           {!showValue && showSubValue ? (
             <span className="text-slate-900 font-semibold">{subValue}</span>
@@ -232,28 +154,59 @@ const InfoRow = ({ icon: Icon, label, value, subValue }) => {
   );
 };
 
+const SkeletonCard = () => (
+  <div className="rounded-3xl border border-slate-200 bg-white shadow-sm p-5 animate-pulse">
+    <div className="flex gap-4">
+      <div className="h-16 w-16 rounded-2xl bg-slate-100" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-2/3 rounded bg-slate-100" />
+        <div className="h-3 w-1/2 rounded bg-slate-100" />
+        <div className="h-3 w-5/6 rounded bg-slate-100" />
+      </div>
+    </div>
+    <div className="mt-4 h-12 rounded-2xl bg-slate-100" />
+  </div>
+);
+
 const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const [openFaq, setOpenFaq] = useState(null);
   const [activeSlide, setActiveSlide] = useState(0);
-  const [activeReviewSlide, setActiveReviewSlide] = useState(0);
-  const [reviewCardsPerView, setReviewCardsPerView] = useState(1);
+  const activeDoctor = HERO_SLIDES[activeSlide] || HERO_SLIDES[0];
+  const vetSectionRef = useRef(null);
 
   const [vets, setVets] = useState([]);
-  const [isStartingConsult, setIsStartingConsult] = useState(false);
+  const [vetsLoading, setVetsLoading] = useState(true);
+  const [vetsError, setVetsError] = useState("");
   const [brokenImages, setBrokenImages] = useState(() => new Set());
+  const [activeBioVet, setActiveBioVet] = useState(null);
+  const [isStartingConsult, setIsStartingConsult] = useState(false);
 
-  // ✅ Mobile-safe load using loadVetsWithFallback()
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length);
+    }, 3500);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  // FIXED: Mobile-safe load using loadVetsWithFallback()
   useEffect(() => {
     let ignore = false;
 
     const loadVets = async () => {
+      setVetsLoading(true);
+      setVetsError("");
       try {
-        const vetList = await loadVetsWithFallback(); // ✅ returns array directly
+        const vetList = await loadVetsWithFallback(); // returns array directly
         if (!ignore) {
           setVets(buildVetsFromApi(vetList));
         }
       } catch (error) {
-        if (!ignore) setVets([]);
+        if (!ignore) {
+          setVets([]);
+          setVetsError(error?.message || "Network error while loading vets.");
+        }
+      } finally {
+        if (!ignore) setVetsLoading(false);
       }
     };
 
@@ -269,6 +222,43 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       return;
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleStart = async () => {
+    if (isStartingConsult) return;
+
+    if (typeof onSelectVet === "function") {
+      const currentTarget = sortedVets.find((vet) => isDrShashankVet(vet));
+      if (currentTarget) {
+        handleSelectVet(currentTarget);
+        return;
+      }
+
+      setIsStartingConsult(true);
+      try {
+        const vetList = await loadVetsWithFallback();
+        const parsedVets = buildVetsFromApi(vetList);
+        if (parsedVets.length) setVets(parsedVets);
+        const fetchedTarget = parsedVets.find((vet) => isDrShashankVet(vet));
+        if (fetchedTarget) {
+          handleSelectVet(fetchedTarget);
+          return;
+        }
+      } catch (error) {
+        console.error("[LandingScreen] Failed to load Dr Shashank:", error);
+      } finally {
+        setIsStartingConsult(false);
+      }
+    }
+
+    if (typeof onStart === "function") {
+      onStart();
+      return;
+    }
+    vetSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   };
 
   const markImageBroken = (id) => {
@@ -291,85 +281,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
     });
   }, [vets, isDay]);
 
-  const heroDoctorSlides = useMemo(() => {
-    const source = sortedVets.length ? [...sortedVets] : [...FALLBACK_HERO_SLIDES];
-    const targetIndex = source.findIndex((vet) => isTargetConsultDoctor(vet));
-    if (targetIndex > 0) {
-      const [target] = source.splice(targetIndex, 1);
-      if (target) source.unshift(target);
-    }
-    return source.slice(0, 8);
-  }, [sortedVets]);
-
-  const activeSlideIndex = heroDoctorSlides.length
-    ? activeSlide % heroDoctorSlides.length
-    : 0;
-  const activeDoctor = heroDoctorSlides[activeSlideIndex] || FALLBACK_HERO_SLIDES[0];
-  const activeDoctorExperience = hasDisplayValue(activeDoctor?.experience)
-    ? `${activeDoctor.experience} years exp.`
-    : "";
-
-  const targetConsultVet = useMemo(
-    () => sortedVets.find((vet) => isTargetConsultDoctor(vet)) || null,
-    [sortedVets]
-  );
-
-  useEffect(() => {
-    if (heroDoctorSlides.length <= 1) return undefined;
-    const interval = window.setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % heroDoctorSlides.length);
-    }, 3800);
-    return () => window.clearInterval(interval);
-  }, [heroDoctorSlides.length]);
-
-  useEffect(() => {
-    setActiveSlide((prev) => {
-      if (!heroDoctorSlides.length) return 0;
-      return prev % heroDoctorSlides.length;
-    });
-  }, [heroDoctorSlides.length]);
-
-  const maxReviewSlideIndex = useMemo(
-    () => Math.max(0, HERO_REVIEWS.length - reviewCardsPerView),
-    [reviewCardsPerView]
-  );
-
-  useEffect(() => {
-    const updateCardsPerView = () => {
-      const width = window.innerWidth;
-      if (width >= 1024) {
-        setReviewCardsPerView(3);
-        return;
-      }
-      if (width >= 768) {
-        setReviewCardsPerView(2);
-        return;
-      }
-      setReviewCardsPerView(1);
-    };
-
-    updateCardsPerView();
-    window.addEventListener("resize", updateCardsPerView);
-    return () => window.removeEventListener("resize", updateCardsPerView);
-  }, []);
-
-  useEffect(() => {
-    setActiveReviewSlide((prev) => Math.min(prev, maxReviewSlideIndex));
-  }, [maxReviewSlideIndex]);
-
-  useEffect(() => {
-    if (maxReviewSlideIndex <= 0) return undefined;
-    const interval = window.setInterval(() => {
-      setActiveReviewSlide((prev) =>
-        prev >= maxReviewSlideIndex ? 0 : prev + 1
-      );
-    }, 4500);
-    return () => window.clearInterval(interval);
-  }, [maxReviewSlideIndex]);
-
   const handleSelectVet = (vet, rateType) => {
     if (typeof onSelectVet !== "function") return;
-    if (!vet) return;
     const isDaySlot = rateType ? rateType === "day" : isDayTime();
     const bookingRateType = isDaySlot ? "day" : "night";
     const bookingPrice = isDaySlot ? vet?.priceDay : vet?.priceNight;
@@ -379,38 +292,6 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       bookingRateType,
       bookingPrice,
     });
-  };
-
-  const handleStart = async () => {
-    if (isStartingConsult) return;
-    if (typeof onSelectVet === "function") {
-      if (targetConsultVet) {
-        handleSelectVet(targetConsultVet);
-        return;
-      }
-
-      setIsStartingConsult(true);
-      try {
-        const vetList = await loadVetsWithFallback();
-        const parsed = buildVetsFromApi(vetList);
-        if (parsed.length) setVets(parsed);
-        const liveTargetVet = parsed.find((vet) => isTargetConsultDoctor(vet));
-        if (liveTargetVet) {
-          handleSelectVet(liveTargetVet);
-          return;
-        }
-      } catch {
-        // fall through
-      } finally {
-        setIsStartingConsult(false);
-      }
-    }
-
-    if (typeof onStart === "function") {
-      onStart();
-      return;
-    }
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const faqs = useMemo(
@@ -456,12 +337,12 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
         a: "Please wait up to 30 minutes from the scheduled consultation time. If the doctor has not connected within this period, you can reach out to SnoutIQ support for assistance.",
       },
       {
-        q: "What if I miss the doctor’s call?",
-        a: "If you do not answer the doctor’s call at the scheduled time, the consultation will be considered completed and the fee will not be refunded.",
+        q: "What if I miss the doctor's call?",
+        a: "If you do not answer the doctor's call at the scheduled time, the consultation will be considered completed and the fee will not be refunded.",
       },
       {
         q: "How will the consultation take place?",
-        a: "The consultation will be conducted via video call through the doctor’s registered WhatsApp number. Please ensure your phone is reachable and your internet connection is stable at the scheduled time.",
+        a: "The consultation will be conducted via video call through the doctor's registered WhatsApp number. Please ensure your phone is reachable and your internet connection is stable at the scheduled time.",
       },
       {
         q: "Is my payment secure?",
@@ -474,10 +355,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const getConsultFeeByTime = () => {
     const now = new Date();
     const hour = now.getHours(); // 0-23
-    const day = hour >= 8 && hour < 20;
+    const day = hour >= 6 && hour < 22;
     return day
-      ? { label: "Day", time: "8 AM – 8 PM", price: 500 }
-      : { label: "Night", time: "8 PM – 8 AM", price: 650 };
+      ? { label: "Day Consult", time: "6 AM - 10 PM", price: 499 }
+      : { label: "Night Consult", time: "10 PM - 6 AM", price: 649 };
   };
 
   const blogPosts = useMemo(
@@ -515,14 +396,12 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
 
   const toggleFaq = (idx) => setOpenFaq((prev) => (prev === idx ? null : idx));
 
-  const fee = getConsultFeeByTime();
-
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
+    <div className="min-h-screen bg-white text-slate-800">
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-4 sm:px-5">
-          <div className="flex items-center justify-between py-3">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="flex items-center justify-between py-2 md:py-3">
             <button
               type="button"
               onClick={handleLogoClick}
@@ -532,338 +411,775 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               <img
                 src={logo}
                 alt="SnoutIQ"
-                className="h-6 w-auto object-contain"
+                className="h-6 w-auto object-contain drop-shadow-sm md:h-6 lg:h-6"
               />
             </button>
 
-            <nav className="flex items-center gap-1">
-              <HeaderLink href="#why">Why Teleconsultation</HeaderLink>
-              <HeaderLink href="#how">How It Works</HeaderLink>
-              <HeaderLink href="#commitment">Our Commitment</HeaderLink>
-
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => window.open("https://snoutiq.com/blog", "_blank")}
-                className="
-                  ml-1 rounded-full border border-[#3998de]/25 bg-white px-3 py-2
-                  text-xs font-extrabold text-[#3998de] shadow-sm
-                  hover:bg-[#3998de]/10 transition
-                  sm:px-4 sm:text-sm
-                "
+                className="rounded-full border border-[#3998de]/30 px-3 py-1 text-xs font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10 whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-sm"
               >
                 Blog
               </button>
-
               <button
                 type="button"
                 onClick={() =>
                   typeof onVetAccess === "function" ? onVetAccess() : null
                 }
-                className="
-                  rounded-full border border-[#3998de]/25 bg-white px-3 py-2
-                  text-xs font-extrabold text-[#3998de] shadow-sm
-                  hover:bg-[#3998de]/10 transition
-                  sm:px-4 sm:text-sm
-                "
+                className="rounded-full border border-[#3998de]/30 px-3 py-1 text-xs font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10 whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-sm"
               >
-                🩺 Vet Access
+                Vet Access
               </button>
-            </nav>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-10 md:py-12">
-        <div className="pointer-events-none absolute -top-24 right-[-90px] h-72 w-72 rounded-full bg-[#3998de]/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 left-[-90px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
-
-        <div className="relative mx-auto max-w-6xl px-4 sm:px-5">
-          <div className="grid grid-cols-1 items-center gap-8 md:grid-cols-2 md:gap-10">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-6 md:py-7">
+        <div className="pointer-events-none absolute -top-24 right-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 left-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
+        <div className="relative mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-2 md:gap-6 lg:gap-7">
             {/* Left */}
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs font-extrabold text-slate-700 shadow-sm ring-1 ring-slate-200">
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#3998de]/10 text-[#3998de]">
-                  ⭐
-                </span>
-                Trusted by 100+ Pet Parents in India
+              <div className="inline-block rounded-full bg-[#EAF4FF] px-3 py-1.5 text-xs font-semibold text-[#1D4E89] shadow-sm sm:text-sm">
+                Vets Available Right Now
               </div>
 
-              <h1 className="mt-5 text-3xl font-black leading-[1.15] text-slate-900 md:text-4xl lg:text-[46px]">
-                Talk to a{" "}
-                <span className="text-[#3998de]">Verified Vet</span> in{" "}
-                <span className="text-slate-900">15 minutes.</span>
+              <h1 className="mt-3 text-[28px] font-extrabold leading-[1.3] text-slate-900 md:text-[34px] lg:text-[36px]">
+                Online <span className="text-[#3998de]">Vet Consultation</span> in 15
+                Minutes
               </h1>
 
-              <p className="mt-3 text-sm font-semibold text-slate-500 md:text-base">
-                INR 500 Day | INR 650 Night | 24/7 Video Consultation Across India
+              <p className="mt-3 text-sm leading-relaxed text-slate-500 md:text-[15px]">
+                Get an online video consultation with a qualified veterinarian.
+                Fast response, fixed pricing, and guidance for your pet&apos;s
+                health concerns.
               </p>
 
-              <p className="mt-4 text-base leading-relaxed text-slate-600 md:text-lg">
-                Professional video consultations for your pet&apos;s health
-                concerns. Get expert guidance from licensed veterinarians across
-                India.
-              </p>
+              {/* Pricing (Day/Night) */}
+              {(() => {
+                const fee = getConsultFeeByTime();
 
-              {/* Chips */}
-              <div className="mt-5 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
-                  Consultation Fee
-                </span>
+                return (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                      Fixed Consultation Fee
+                    </span>
 
-                <span className="inline-flex items-center rounded-full bg-[#EAF4FF] px-3 py-1.5 text-xs font-extrabold text-[#1D4E89] ring-1 ring-[#3998de]/15">
-                  {activeDoctorExperience || "Experienced vet"}
-                </span>
+                    <span className="inline-flex items-center rounded-full bg-[#EAF4FF] border border-[#3998de]/20 px-3 py-1 text-xs font-semibold text-[#1D4E89] shadow-sm">
+                      7+ years experienced vets
+                    </span>
 
-                <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-slate-800 ring-1 ring-slate-200">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          fee.label.startsWith("Day")
+                            ? "bg-amber-400"
+                            : "bg-indigo-400"
+                        }`}
+                      />
+                      {fee.label}{" "}
+                      <span className="font-medium text-slate-500">
+                        ({fee.time})
+                      </span>{" "}
+                      : {"\u20B9"}{fee.price}
+                    </span>
+
+                    <span className="text-xs text-slate-400">(No hidden charges)</span>
+                  </div>
+                );
+              })()}
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {[
+                  { icon: BadgeCheck, text: "Verified veterinarians" },
+                  { icon: Clock, text: "15-minute video call" },
+                  { icon: ShieldCheck, text: "Trusted guidance" },
+                  { icon: Star, text: "4.8+ rated care" },
+                ].map((item) => (
                   <span
-                    className={`h-2 w-2 rounded-full ${
-                      fee.label === "Day" ? "bg-amber-400" : "bg-indigo-400"
-                    }`}
-                  />
-                  {fee.label} Fee{" "}
-                  <span className="font-semibold text-slate-500">
-                    ({fee.time})
-                  </span>{" "}
-                  : ₹{fee.price}
-                </span>
-
-                <span className="text-xs text-slate-400">(Taxes may apply)</span>
+                    key={item.text}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm"
+                  >
+                    <item.icon className="h-3.5 w-3.5 text-[#3998de]" />
+                    {item.text}
+                  </span>
+                ))}
               </div>
 
               {/* CTA */}
-              <button
-                type="button"
-                onClick={handleStart}
-                disabled={isStartingConsult}
-                className="
-                  group mt-6 inline-flex w-full items-center justify-center gap-2
-                  rounded-2xl bg-[#3998de] px-7 py-3.5 text-base font-black text-white
-                  shadow-lg shadow-[#3998de]/25 transition
-                  hover:bg-[#2F7FC0]
-                  disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-[#3998de]
-                  sm:w-auto
-                "
-              >
-                {isStartingConsult
-                  ? "Opening consult..."
-                  : `Start Consultation`}
-                <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
-              </button>
+              <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleStart}
+                  disabled={isStartingConsult}
+                  className="
+                    group inline-flex items-center justify-center gap-2
+                    rounded-xl bg-[#3998de] px-5 py-2.5 text-sm font-semibold text-white md:text-[15px]
+                    shadow-lg shadow-[#3998de]/30 transition
+                    hover:bg-[#2F7FC0]
+                    disabled:cursor-not-allowed disabled:opacity-80
+                  "
+                >
+                  {isStartingConsult
+                    ? "Connecting Dr Shashank..."
+                    : "Start Online Vet Consultation"}
+                  <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
+                </button>
+
+                <a
+                  href="#how-it-works"
+                  className="inline-flex items-center justify-center rounded-xl border border-[#3998de]/30 px-4 py-2.5 text-sm font-semibold text-[#1D4E89] transition hover:bg-[#EAF4FF]"
+                >
+                  How It Works
+                </a>
+              </div>
+
+              <p className="mt-2.5 text-xs text-slate-500 sm:text-sm">
+                No vet selection needed. We assign the best available verified
+                vet for your pet&apos;s issue.
+              </p>
 
               {/* Stats */}
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3">
                 {[
-                  { n: "15min", l: "Average response time", icon: Clock },
+                  { n: "15 min", l: "Average response time", icon: Clock },
                   {
-                    n: "100%",
-                    l: "Licensed and experienced vets",
+                    n: "7+ yrs",
+                    l: "Experienced veterinarians",
                     icon: ShieldCheck,
                   },
                 ].map((s, i) => (
                   <div
                     key={i}
-                    className="
-                      rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-slate-200
-                      hover:shadow-md transition
-                    "
+                    className="rounded-xl border border-white/70 bg-white/90 px-3 py-2 shadow-sm hover:shadow-md transition sm:px-3.5 sm:py-3"
                   >
-                    <div className="mb-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#3998de]/10">
-                        <s.icon className="h-5 w-5 text-[#3998de]" />
+                    <div className="mb-2 sm:mb-3">
+                      <div className="w-8 h-8 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-[#3998de]/10">
+                        <s.icon className="w-4 h-4 sm:w-4 sm:h-4 text-[#3998de]" />
                       </div>
                     </div>
 
-                    <div className="text-2xl font-black text-[#3998de] leading-tight">
+                    <div className="text-lg sm:text-xl font-extrabold text-[#3998de] leading-tight">
                       {s.n}
                     </div>
-                    <div className="mt-1 text-xs font-semibold text-slate-500">
+
+                    <div className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-snug">
                       {s.l}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Right: Doctor Profile Card (screenshot-style) */}
-           <div className="w-full">
- <div className="relative rounded-3xl bg-white/80 p-4 shadow-[0_30px_80px_rgba(2,6,23,0.10)] ring-1 ring-white/60 backdrop-blur">
-  {/* FIXED HEIGHT CARD */}
-  <div className="rounded-3xl bg-white ring-1 ring-slate-200 overflow-hidden h-[560px] flex flex-col">
-    
-    {/* 1) TOP IMAGE (FULL WIDTH) */}
-    <div className="relative h-56 w-full bg-slate-50 shrink-0 overflow-hidden">
-      <div className="absolute left-4 top-4 z-10 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-extrabold text-emerald-700 shadow-sm">
-        <span className="h-2 w-2 rounded-full bg-emerald-500" />
-        Online
-      </div>
-
-      <div
-        className="flex h-full transition-transform duration-700 ease-in-out"
-        style={{ transform: `translateX(-${activeSlideIndex * 100}%)` }}
-      >
-        {heroDoctorSlides.map((slide, index) => {
-          const showImage = Boolean(slide?.image) && !brokenImages.has(slide?.id);
-          return (
-            <div key={`${slide.id || slide.name}-${index}`} className="min-w-full h-full">
-              {showImage ? (
-                <img
-                  src={slide.image}
-                  alt={slide.name}
-                  className="h-full w-full object-contain bg-gradient-to-br from-slate-50 to-slate-100"
-                  loading={index === 0 ? "eager" : "lazy"}
-                  onError={() => markImageBroken(slide?.id)}
-                />
-              ) : (
-                <div className="h-full w-full bg-gradient-to-br from-[#3998de] to-[#2F7FC0] flex items-center justify-center text-4xl font-black text-white">
-                  {getInitials(slide?.name)}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-
-    {/* 2) NAME + RATING (FIXED, FULL WIDTH) */}
-    <div className="px-5 pt-4 shrink-0">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-lg font-black text-slate-900 truncate">
-            {activeDoctor?.name}
-          </div>
-          <div className="mt-0.5 text-xs font-semibold text-slate-500 truncate">
-            {activeDoctor?.clinicName || "SnoutIQ Verified Network"}
-          </div>
-        </div>
-
-        <div className="shrink-0 text-right">
-          <div className="inline-flex items-center gap-1 text-slate-800">
-            <Star size={16} className="text-amber-500" />
-            <span className="text-sm font-black">
-              {Number(activeDoctor?.rating || 4.6).toFixed(1)}
-            </span>
-          </div>
-          <div className="text-[11px] font-semibold text-slate-500">
-            ({activeDoctor?.reviews || 50} reviews)
-          </div>
-        </div>
-      </div>
-
-      {/* specialization chip (clamped) */}
-      {activeDoctor?.specializationText ? (
-        <div className="mt-3 inline-flex max-w-full rounded-2xl bg-[#3998de]/10 px-3 py-2 text-[11px] font-extrabold text-[#2F7FC0]">
-          <span className="line-clamp-2">{activeDoctor.specializationText}</span>
-        </div>
-      ) : null}
-    </div>
-
-    {/* 3) SCROLL AREA (CARD BADA NAHI HOGA) */}
-    <div className="flex-1 overflow-y-auto px-5 pb-4 pt-4">
-      <div className="space-y-3">
-        <InfoRow
-          icon={GraduationCap}
-          label="Education"
-          value={activeDoctor?.qualification}
-          subValue={activeDoctorExperience || null}
-        />
-        <InfoRow
-          icon={Stethoscope}
-          label="Specialization"
-          value={activeDoctor?.specializationText}
-        />
-        <InfoRow
-          icon={BadgeCheck}
-          label="Successful consultations"
-          value={
-            Number.isFinite(Number(activeDoctor?.consultations))
-              ? `${activeDoctor.consultations}+`
-              : null
-          }
-        />
-
-        {/* ABOUT (clamp + still inside scroll) */}
-        <div className="mt-2 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-          <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-            About
-          </div>
-          <p className="mt-1 text-sm font-semibold text-slate-700 leading-6 line-clamp-5">
-            {activeDoctor?.bio || "—"}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    {/* 4) FOOTER FIXED */}
-    <div className="shrink-0 border-t border-slate-100 px-5 py-3 flex items-center justify-between text-[11px] font-semibold text-slate-500">
-      <span>Secure consultation</span>
-      <span>Verified vets</span>
-    </div>
-  </div>
-</div>
-</div>
-          </div>
-        </div>
-            {/* Reviews Slider */}
-      <section className="bg-white py-10 md:py-12">
-        <div className="mx-auto max-w-6xl px-4 sm:px-5">
-
-          <div className="mt-7 overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-sm">
-            <div
-              className="flex transition-transform duration-700 ease-out"
-              style={{
-                transform: `translateX(-${
-                  activeReviewSlide * (100 / reviewCardsPerView)
-                }%)`,
-              }}
-            >
-              {HERO_REVIEWS.map((review) => (
-                <article
-                  key={review.id}
-                  className="p-3 md:p-4"
-                  style={{ flex: `0 0 ${100 / reviewCardsPerView}%` }}
-                >
-                  <div className="h-full rounded-2xl bg-white p-5 ring-1 ring-slate-200 md:p-6">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="text-lg font-black text-slate-900">{review.name}</div>
-                        <div className="text-sm font-semibold text-[#3998de]">{review.pet}</div>
-                      </div>
-                      <div className="inline-flex items-center gap-1 text-amber-500">
-                        {Array.from({ length: review.rating }).map((_, idx) => (
-                          <Star
-                            key={`${review.id}-star-${idx}`}
-                            className="h-4 w-4 fill-current"
+            {/* Right (Doctor Image) */}
+            <div className="w-full">
+              <div className="relative mx-auto w-full max-w-xs sm:max-w-sm md:max-w-[20rem]">
+                <div className="absolute -top-6 right-10 h-20 w-20 rounded-full bg-[#3998de]/15 blur-2xl" />
+                <div className="absolute -bottom-8 left-6 h-24 w-24 rounded-full bg-[#3998de]/10 blur-2xl" />
+                <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-3 shadow-[0_25px_60px_rgba(15,118,110,0.08)] md:p-4">
+                  <div className="relative overflow-hidden rounded-2xl">
+                    <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      Online
+                    </div>
+                    <div
+                      className="flex transition-transform duration-700 ease-in-out"
+                      style={{
+                        transform: `translateX(-${activeSlide * 100}%)`,
+                      }}
+                    >
+                      {HERO_SLIDES.map((slide, index) => (
+                        <div key={slide.name} className="min-w-full">
+                          <img
+                            src={slide.image}
+                            alt={slide.name}
+                            className="h-48 w-full object-cover object-center sm:h-56 md:h-58"
+                            loading={index === 0 ? "eager" : "lazy"}
                           />
-                        ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-3 text-center">
+                    <div className="text-sm font-semibold text-slate-900 md:text-base">
+                      {activeDoctor?.name}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-500 md:text-xs">
+                      {activeDoctor?.degree}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-[#EAF4FF] px-3 py-1 text-[11px] font-semibold text-[#1D4E89]">
+                        {activeDoctor?.experience}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Our Verified Vets */}
+      <section className="bg-white py-10 md:py-12">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-teal-700">
+            <span className="h-[2px] w-6 bg-teal-600" />
+            OUR TEAM
+          </div>
+          <h2 className="mt-2.5 text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
+            Meet Our Verified Veterinarians
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-slate-500 md:text-[15px]">
+            Every vet on SnoutIQ is licensed and background-verified. Doctor list
+            below is populated from live backend data.
+          </p>
+
+          {vetsLoading ? (
+            <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div
+                  key={`featured-vet-skel-${idx}`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm animate-pulse"
+                >
+                  <div className="h-12 w-12 rounded-full bg-slate-100" />
+                  <div className="mt-3 h-3 w-2/3 rounded bg-slate-100" />
+                  <div className="mt-2 h-3 w-1/2 rounded bg-slate-100" />
+                  <div className="mt-3 h-2 w-4/5 rounded bg-slate-100" />
+                </div>
+              ))}
+            </div>
+          ) : sortedVets.length === 0 ? (
+            <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Vets list unavailable right now. Please try again shortly.
+            </div>
+          ) : (
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {sortedVets.map((vet, idx) => {
+                const vetKey = vet.id || `${vet.name}-${idx}`;
+                const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
+                const qualification = hasDisplayValue(vet.qualification)
+                  ? vet.qualification
+                  : "BVSc & AH";
+                const specialization = hasDisplayValue(vet.specializationText)
+                  ? vet.specializationText
+                  : "General Practice";
+                const ratingValue = Number(vet.rating || 4.8).toFixed(1);
+                const reviewCount = Number(vet.reviews || 0);
+                const yearsValue = Number(vet.experience);
+                const experienceChip =
+                  Number.isFinite(yearsValue) && yearsValue > 0
+                    ? `${Math.round(yearsValue)} yrs`
+                    : "7 yrs";
+
+                return (
+                  <div
+                    key={`featured-vet-${vetKey}`}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    <div className="flex items-start gap-3">
+                      {showImage ? (
+                        <img
+                          src={vet.image}
+                          alt={vet.name}
+                          loading="lazy"
+                          crossOrigin="anonymous"
+                          onError={() => markImageBroken(vet.id)}
+                          className="h-12 w-12 rounded-full object-cover border border-slate-200 bg-slate-50"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-sm font-extrabold text-teal-700">
+                          {getInitials(vet.name)}
+                        </div>
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[20px] font-extrabold leading-none text-slate-900">
+                          {vet.name}
+                        </div>
+                        <div className="mt-1 truncate text-xs font-semibold text-teal-700">
+                          {qualification}
+                        </div>
                       </div>
                     </div>
 
-                    <p className="mt-4 text-sm font-semibold leading-7 text-slate-600 md:text-base md:leading-8">
-                      "{review.text}"
-                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="max-w-[150px] truncate rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                        {specialization}
+                      </span>
+                      <span className="rounded-full bg-teal-100 px-3 py-1 text-xs font-bold text-teal-700">
+                        {experienceChip}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                        <span className="tracking-[1px] text-amber-500">{"\u2605".repeat(5)}</span>
+                        <span>{ratingValue}</span>
+                        <span className="text-slate-500">({reviewCount})</span>
+                      </div>
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+                        \u2713 Verified
+                      </span>
+                    </div>
                   </div>
-                </article>
-              ))}
+                );
+              })}
             </div>
+          )}
+          <p className="mt-4 text-center text-sm text-slate-600">
+            <span className="font-semibold text-slate-900">You don&apos;t choose a vet.</span>{" "}
+            We match you to the best available doctor based on your pet&apos;s issue.
+          </p>
+        </div>
+      </section>
+
+      {/* Reviews */}
+      <section className="bg-slate-50 py-10 md:py-12">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-teal-700">
+              <span className="h-[2px] w-6 bg-teal-600" />
+              PET PARENT REVIEWS
+              <span className="h-[2px] w-6 bg-teal-600" />
+            </div>
+            <h2 className="mt-2.5 text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
+              Loved by Pet Parents Across India
+            </h2>
+            <div className="mt-3 flex items-center justify-center gap-3">
+              <div className="text-3xl font-extrabold text-slate-900">4.8</div>
+              <div>
+                <div className="text-base leading-none text-amber-500">{"\u2605".repeat(5)}</div>
+                <div className="text-xs text-slate-500">
+                  Based on 1,200+ reviews
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {LANDING_REVIEWS.map((review) => (
+              <article
+                key={review.id}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="text-sm text-amber-500">{"\u2605".repeat(5)}</div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  &quot;{review.text}&quot;
+                </p>
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
+                    {getInitials(review.author)}
+                  </div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {review.author}
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
-      </section>
 
-  
+      {/* Available Vets */}
+      {/* <section
+        ref={vetSectionRef}
+        id="available-vets"
+        className="bg-white py-14 md:py-16"
+      >
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="mt-2 md:mt-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-slate-900">
+                  Available Vets
+                </h2>
+                <p className="mt-2 text-sm md:text-base text-slate-500 max-w-3xl">
+                  Choose a vet based on experience, specialization, and consult
+                  price.
+                </p>
+              </div>
+
+              <div className="shrink-0 flex flex-col items-end gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-emerald-700 text-xs md:text-sm font-semibold border border-emerald-100">
+                  <Zap size={16} fill="currentColor" />
+                  <span>Fast response</span>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isDay ? "bg-amber-400" : "bg-indigo-400"
+                    }`}
+                  />
+                  {isDay ? "Day slot pricing" : "Night slot pricing"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 border border-slate-200 shadow-sm text-slate-600">
+              <Clock size={18} />
+              <span className="text-sm md:text-base">
+                Average response time:{" "}
+                <strong className="text-slate-900">8 mins</strong>
+              </span>
+            </div>
+          </div>
+
+          {vetsLoading ? (
+            <div className="mt-8 grid gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <SkeletonCard key={`vet-skel-${idx}`} />
+              ))}
+            </div>
+          ) : vetsError ? (
+            <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
+              <div className="text-red-600 font-bold">{vetsError}</div>
+              <div className="text-slate-500 text-sm mt-2">
+                Try again or check network.
+              </div>
+            </div>
+          ) : sortedVets.length === 0 ? (
+            <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
+              <div className="text-slate-900 font-bold">No vets found.</div>
+              <div className="text-slate-500 text-sm mt-2">
+                Please try again later.
+              </div>
+            </div>
+          ) : (
+            <div className="mt-8 grid gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
+              {sortedVets.map((vet, index) => {
+                const showDayPrice = isDayTime();
+                const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
+                const initials = getInitials(vet.name);
+
+                const bioPreview = clipText(vet.bio, 170);
+                const experienceLabel = hasDisplayValue(vet.experience)
+                  ? `${vet.experience} years exp.`
+                  : "";
+                const specializationValue = hasDisplayValue(vet.specializationText)
+                  ? vet.specializationText
+                  : Array.isArray(vet.specializationList) && vet.specializationList.length
+                  ? vet.specializationList.join(", ")
+                  : "";
+
+                return (
+                  <div
+                    key={`${vet.id || vet.name}-${index}`}
+                    className="rounded-3xl border border-slate-200 bg-white shadow-sm hover:shadow-lg transition-all overflow-hidden"
+                  >
+                    <div className="h-1 bg-gradient-to-r from-teal-500 to-emerald-500" />
+
+                    <div className="p-5">
+                      <div className="flex gap-4">
+                        {showImage ? (
+                          <img
+                            src={vet.image}
+                            alt={vet.name}
+                            loading="lazy"
+                            crossOrigin="anonymous"
+                            onError={() => markImageBroken(vet.id)}
+                            className="h-16 w-16 rounded-2xl object-cover border border-slate-200 bg-slate-50"
+                          />
+                        ) : (
+                          <div className="h-16 w-16 rounded-2xl bg-amber-400 text-white flex items-center justify-center text-xl font-extrabold shadow-sm">
+                            {initials}
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h3 className="truncate text-base md:text-lg font-extrabold text-slate-900">
+                                {vet.name}
+                              </h3>
+
+                              {hasDisplayValue(vet.clinicName) ? (
+                                <p className="mt-0.5 text-xs md:text-sm text-slate-500 truncate">
+                                  {vet.clinicName}
+                                </p>
+                              ) : null}
+                            </div>
+
+                            <div className="shrink-0 text-right">
+                              <div className="inline-flex items-center gap-1 text-slate-700">
+                                <Star size={16} className="text-amber-500" />
+                                <span className="text-sm font-extrabold">
+                                  {Number(vet.rating).toFixed(1)}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                ({vet.reviews} reviews)
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        <InfoRow
+                          icon={GraduationCap}
+                          label="Education"
+                          value={vet.qualification}
+                          subValue={experienceLabel}
+                        />
+
+                        <InfoRow
+                          icon={Stethoscope}
+                          label="Specialization"
+                          value={specializationValue}
+                        />
+
+                        <InfoRow
+                          icon={BadgeCheck}
+                          label="Successful consultations"
+                          value={`${vet.consultations}+`}
+                        />
+                      </div>
+
+                      {bioPreview ? (
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
+                            About
+                          </div>
+                          <p className="mt-1 text-sm text-slate-700 leading-6 line-clamp-3">
+                            {bioPreview}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActiveBioVet(vet)}
+                          className="text-sm font-semibold text-teal-700 hover:text-teal-800 inline-flex items-center gap-1"
+                        >
+                          View full profile <ChevronRight size={16} />
+                        </button>
+
+                        <Button
+                          onClick={() =>
+                            handleSelectVet(vet, showDayPrice ? "day" : "night")
+                          }
+                          className="h-11 px-5 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-sm text-sm inline-flex items-center gap-3"
+                        >
+                          <span className="font-semibold">Consult Now</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section> */}
+
+      {/* Vet Profile Modal */}
+      {activeBioVet ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/90 backdrop-blur px-5 py-4 md:px-7">
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400">
+                  Vet Profile
+                </p>
+                <h3 className="truncate text-lg font-extrabold text-slate-900 md:text-xl">
+                  {activeBioVet.name}
+                </h3>
+                {hasDisplayValue(activeBioVet.clinicName) ? (
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {activeBioVet.clinicName}
+                  </p>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveBioVet(null)}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-700 hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="max-h-[82vh] overflow-y-auto p-5 md:p-7">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 md:p-7">
+                <div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-8">
+                  <div className="shrink-0">
+                    {activeBioVet?.image && !brokenImages.has(activeBioVet.id) ? (
+                      <img
+                        src={activeBioVet.image}
+                        alt={activeBioVet.name}
+                        loading="lazy"
+                        crossOrigin="anonymous"
+                        onError={() => markImageBroken(activeBioVet.id)}
+                        className="h-36 w-36 md:h-44 md:w-44 rounded-3xl object-cover border border-slate-200 bg-white shadow-sm"
+                      />
+                    ) : (
+                      <div className="h-36 w-36 md:h-44 md:w-44 rounded-3xl bg-amber-400 text-white flex items-center justify-center text-4xl font-extrabold shadow-sm">
+                        {getInitials(activeBioVet?.name)}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {hasDisplayValue(activeBioVet.qualification) ? (
+                        <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                          {activeBioVet.qualification}
+                        </span>
+                      ) : null}
+                      {hasDisplayValue(activeBioVet.experience) ? (
+                        <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                          {activeBioVet.experience} yrs exp
+                        </span>
+                      ) : null}
+                      {hasDisplayValue(activeBioVet.raw?.doctor_license) ? (
+                        <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                          License: {activeBioVet.raw?.doctor_license}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {hasDisplayValue(activeBioVet.followUp) ||
+                    activeBioVet.breakTimes?.length ? (
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {hasDisplayValue(activeBioVet.followUp) ? (
+                          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                              Follow-up
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-slate-800">
+                              {activeBioVet.followUp}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {activeBioVet.breakTimes?.length ? (
+                          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                              Break time
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-slate-800">
+                              {activeBioVet.breakTimes.join(", ")}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                          Day consult (8 AM - 8 PM)
+                        </div>
+                        <div className="mt-1 text-lg font-extrabold text-slate-900">
+                          {formatPrice(activeBioVet.priceDay) ||
+                            "Price on request"}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                          Night consult (8 PM - 8 AM)
+                        </div>
+                        <div className="mt-1 text-lg font-extrabold text-slate-900">
+                          {formatPrice(activeBioVet.priceNight) ||
+                            "Price on request"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 md:grid-cols-5">
+                  {hasDisplayValue(activeBioVet.bio) ? (
+                    <div className="md:col-span-3 rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
+                      <div className="text-[11px] uppercase tracking-wider text-slate-400">
+                        About
+                      </div>
+                      <div className="mt-1 text-base font-extrabold text-slate-900">
+                        Doctor Bio
+                      </div>
+
+                      <div className="mt-4 text-sm leading-6 text-slate-700 whitespace-pre-line">
+                        {activeBioVet.bio.trim()}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {(Array.isArray(activeBioVet.specializationList) &&
+                    activeBioVet.specializationList.length > 0) ||
+                  hasDisplayValue(activeBioVet.specializationText) ? (
+                    <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
+                      <div className="text-[11px] uppercase tracking-wider text-slate-400">
+                        Expertise
+                      </div>
+                      <div className="mt-1 text-base font-extrabold text-slate-900">
+                        Specializations
+                      </div>
+
+                      <div className="mt-4 text-sm text-slate-700">
+                        {Array.isArray(activeBioVet.specializationList) &&
+                        activeBioVet.specializationList.length ? (
+                          <div className="flex flex-wrap gap-2">
+                            {activeBioVet.specializationList.map((s, idx) => (
+                              <span
+                                key={`${s}-${idx}`}
+                                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700"
+                              >
+                                {String(s)}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-slate-700">
+                            {activeBioVet.specializationText}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <Button onClick={() => setActiveBioVet(null)} className="px-6">
+                    Close
+                  </Button>
+
+                  <Button
+                    onClick={() => {
+                      const vet = activeBioVet;
+                      setActiveBioVet(null);
+                      handleSelectVet(vet);
+                    }}
+                    className="px-6 bg-teal-600 hover:bg-teal-700 inline-flex items-center gap-2"
+                  >
+                    Proceed to Consult <ChevronRight size={18} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* App Download */}
-      <section className="bg-gradient-to-b from-slate-50 via-white to-[#f5f9ff] py-12 md:py-16">
-        <div className="mx-auto max-w-6xl px-4 sm:px-5">
-          <div className="grid items-center gap-10 md:grid-cols-2 md:gap-12">
+      <section className="bg-gradient-to-b from-white via-white to-[#f5f9ff] py-10 md:py-12">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="grid items-center gap-8 md:grid-cols-2 md:gap-10">
             {/* Left: Phone Mock */}
             <div className="order-2 md:order-1">
-              <div className="relative mx-auto max-w-[360px]">
-                <div className="absolute -inset-8 rounded-[36px] bg-[#3998de]/12 blur-2xl" />
-                <div className="relative rounded-[32px] bg-gradient-to-b from-slate-900 to-slate-800 p-3 shadow-[0_30px_70px_rgba(15,23,42,0.18)]">
-                  <div className="rounded-[28px] bg-white p-2">
-                    <div className="overflow-hidden rounded-[24px] border border-slate-100 bg-white">
+              <div className="relative mx-auto max-w-[300px] md:max-w-[320px]">
+                <div className="absolute -inset-6 rounded-[30px] bg-[#3998de]/10 blur-2xl" />
+                <div className="relative rounded-[28px] bg-gradient-to-b from-slate-900 to-slate-800 p-2.5 shadow-[0_24px_56px_rgba(15,23,42,0.16)]">
+                  <div className="rounded-[24px] bg-white p-2">
+                    <div className="overflow-hidden rounded-[20px] border border-slate-100 bg-white">
                       <img
                         src={appPhoneMock}
                         alt="SnoutIQ App Preview"
@@ -878,27 +1194,31 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
 
             {/* Right: Copy + Buttons */}
             <div className="order-1 md:order-2">
-              <h2 className="text-3xl font-black text-slate-900 md:text-4xl">
-                Get SnoutIQ on Your Phone
+              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-teal-700">
+                <span className="h-[2px] w-6 bg-teal-600" />
+                MOBILE APP
+              </div>
+              <h2 className="mt-3 text-2xl font-extrabold text-slate-900 md:text-3xl">
+                SnoutIQ App for Faster Care
               </h2>
 
-              <p className="mt-3 text-base leading-relaxed text-slate-600 md:text-lg">
+              <p className="mt-3 text-sm leading-relaxed text-slate-500 md:text-base">
                 Access veterinary care anytime, anywhere. Download our app for
                 instant consultations with verified vets.
               </p>
 
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <a
                   href="https://play.google.com/store/apps/details?id=com.petai.snoutiq"
                   target="_blank"
                   rel="noreferrer"
                   className="
                     group inline-flex items-center justify-center gap-3 rounded-2xl
-                    bg-slate-900 px-5 py-3 text-white shadow-lg shadow-slate-900/25
+                    bg-slate-900 px-4 py-2.5 text-white shadow-lg shadow-slate-900/25
                     transition hover:-translate-y-0.5 hover:bg-black
                   "
                 >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10">
                     <svg viewBox="0 0 512 512" className="h-5 w-5" aria-hidden="true">
                       <path d="M96 64l256 192-256 192V64z" fill="#34A853" />
                       <path d="M96 64l160 120-48 48L96 64z" fill="#FBBC04" />
@@ -913,21 +1233,21 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                     </svg>
                   </span>
                   <span className="text-left leading-tight">
-                    <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-white/60">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
                       Get it on
                     </span>
-                    <span className="block text-base font-black">Google Play</span>
+                    <span className="block text-[15px] font-extrabold">Google Play</span>
                   </span>
                 </a>
 
                 <div
                   className="
                     inline-flex cursor-not-allowed items-center justify-center gap-3 rounded-2xl
-                    border border-slate-200 bg-slate-100 px-5 py-3 text-slate-400
+                    border border-slate-200 bg-slate-100 px-4 py-2.5 text-slate-400
                   "
                   title="Coming soon"
                 >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white">
                     <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" aria-hidden="true">
                       <path
                         fill="currentColor"
@@ -936,29 +1256,29 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                     </svg>
                   </span>
                   <span className="text-left leading-tight">
-                    <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-400">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       Coming soon
                     </span>
-                    <span className="block text-base font-black">App Store</span>
+                    <span className="block text-[15px] font-extrabold">App Store</span>
                   </span>
                 </div>
               </div>
 
-              <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                  { title: "Quick Nearby Clinic Access", icon: "📍" },
-                  { title: "Vet Available", icon: "👨‍⚕️" },
-                  { title: "Digital Records", icon: "📁" },
-                  { title: "Reminders", icon: "⏰" },
+                  { title: "Quick Nearby Clinic Access", icon: "\u{1F4CD}" },
+                  { title: "Vet Available", icon: "\u{1F468}\u200D\u2695\uFE0F" },
+                  { title: "Digital Records", icon: "\u{1F4C1}" },
+                  { title: "Reminders", icon: "\u23F0" },
                 ].map((item) => (
                   <div
                     key={item.title}
-                    className="rounded-2xl bg-white p-4 text-center shadow-sm ring-1 ring-slate-200"
+                    className="rounded-2xl border border-slate-100 bg-white p-3.5 text-center shadow-sm"
                   >
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#3998de]/10 text-lg">
+                    <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#3998de]/10 text-base">
                       {item.icon}
                     </div>
-                    <div className="mt-3 text-xs font-extrabold text-slate-700">
+                    <div className="mt-2.5 text-xs font-semibold text-slate-700">
                       {item.title}
                     </div>
                   </div>
@@ -970,56 +1290,61 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </section>
 
       {/* Features */}
-      <section id="why" className="scroll-mt-24 bg-white py-16 md:py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-5">
-          <h2 className="text-center text-3xl font-black text-slate-900 md:text-4xl">
-            Why Choose Telemedicine for Your Pet?
+      <section className="bg-white py-12 md:py-14">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="inline-flex w-full items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-teal-700">
+            <span className="h-[2px] w-6 bg-teal-600" />
+            BENEFITS
+            <span className="h-[2px] w-6 bg-teal-600" />
+          </div>
+          <h2 className="mt-3 text-center text-2xl font-bold text-slate-900 md:text-3xl">
+            Why Pet Parents Choose SnoutIQ
           </h2>
 
-          <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
+          <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
             {[
               {
-                icon: "⏱️",
+                icon: "\u23F1\uFE0F",
                 title: "Quick Response",
                 desc: "Average connection time of 15 minutes. No more waiting rooms or long drives to the clinic.",
               },
               {
-                icon: "🏥",
+                icon: "\u{1F3E5}",
                 title: "Expert Guidance",
                 desc: "Licensed and experienced veterinarians provide professional assessment and advice for your pet's health concerns.",
               },
               {
-                icon: "📱",
+                icon: "\u{1F4F1}",
                 title: "Convenient Access",
                 desc: "Consult from home via video call. Perfect for initial assessments and follow-up guidance.",
               },
               {
-                icon: "💰",
+                icon: "\u{1F4B0}",
                 title: "Cost Effective",
                 desc: "Save on transportation and time. Get professional veterinary advice without clinic visit costs.",
               },
               {
-                icon: "🛡️",
+                icon: "\u{1F6E1}\uFE0F",
                 title: "Verified Professionals",
                 desc: "All veterinarians are licensed, certified, and background-verified for your peace of mind.",
               },
               {
-                icon: "📋",
+                icon: "\u{1F4CB}",
                 title: "Digital Records",
                 desc: "Consultation records saved securely. Easy to share with your regular vet or for future reference.",
               },
             ].map((f, i) => (
               <div
                 key={i}
-                className="rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-1 hover:shadow-lg"
+                className="rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
               >
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#3998de]/10 text-3xl">
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200 text-2xl">
                   {f.icon}
                 </div>
-                <h3 className="text-lg font-black text-slate-900 md:text-xl">
+                <h3 className="text-lg font-semibold text-slate-900 md:text-lg">
                   {f.title}
                 </h3>
-                <p className="mt-2 text-sm text-slate-600 md:text-[15px] font-semibold leading-6">
+                <p className="mt-2 text-sm text-slate-500 md:text-[15px]">
                   {f.desc}
                 </p>
               </div>
@@ -1029,45 +1354,49 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </section>
 
       {/* How it works */}
-      <section id="how" className="scroll-mt-24 bg-slate-50 py-16 md:py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-5">
-          <h2 className="text-center text-3xl font-black text-slate-900 md:text-4xl">
-            How It Works
+      <section id="how-it-works" className="bg-slate-50 py-12 md:py-14">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="inline-flex w-full items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-teal-700">
+            <span className="h-[2px] w-6 bg-teal-600" />
+            PROCESS
+            <span className="h-[2px] w-6 bg-teal-600" />
+          </div>
+          <h2 className="mt-3 text-center text-2xl font-bold text-slate-900 md:text-3xl">
+            How Your Consultation Works
           </h2>
 
-          <div className="relative mt-12 md:mt-16">
+          <div className="relative mt-8 md:mt-12">
+            <div className="absolute left-1/2 top-0 bottom-0 hidden w-px -translate-x-1/2 bg-[#3998de]/20 md:hidden" />
             <div className="absolute left-1/2 top-6 hidden h-px w-[70%] -translate-x-1/2 bg-[#3998de]/20 md:block" />
 
-            <div className="relative grid gap-8 md:grid-cols-3 md:gap-10">
+            <div className="relative grid gap-6 md:grid-cols-3 md:gap-8">
               {[
                 {
                   n: "1",
-                  title: "Choose a Vet",
-                  desc: "Browse nearby vets and select the right specialist for your pet.",
+                  title: "Tell Us Your Pet Concern",
+                  desc: "Share symptoms, issue details, and basic pet history in a few steps.",
                 },
                 {
                   n: "2",
-                  title: "Describe the Problem",
-                  desc: "Share symptoms, duration, and any relevant history. Upload photos if needed.",
+                  title: "We Match the Right Vet",
+                  desc: "Our system connects you with the best available veterinarian for your case.",
                 },
                 {
                   n: "3",
-                  title: "Connect via Video Call",
-                  desc: "Start a secure video consultation and get guidance within minutes.",
+                  title: "Start Video Consultation",
+                  desc: "Join a secure video call and get clear treatment guidance in minutes.",
                 },
               ].map((s, i) => (
                 <div key={i} className="relative flex flex-col items-center">
-                  <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-[#3998de] text-lg font-black text-white shadow-lg">
+                  <div className="relative z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[#3998de] text-base font-bold text-white shadow-lg">
                     {s.n}
                   </div>
 
-                  <div className="mt-6 w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-md ring-1 ring-slate-200 md:max-w-none">
-                    <h3 className="text-lg font-black text-slate-900 md:text-xl">
+                  <div className="mt-5 w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-md md:max-w-none">
+                    <h3 className="text-lg font-semibold text-slate-900 md:text-lg">
                       {s.title}
                     </h3>
-                    <p className="mt-3 text-slate-600 font-semibold leading-6">
-                      {s.desc}
-                    </p>
+                    <p className="mt-3 text-slate-500">{s.desc}</p>
                   </div>
                 </div>
               ))}
@@ -1077,34 +1406,37 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </section>
 
       {/* FAQ */}
-      <section className="bg-white py-10 md:py-10">
-        <div className="mx-auto max-w-6xl px-4 sm:px-5">
-          <h2 className="text-center text-3xl font-black text-slate-900 md:text-4xl">
-            Frequently Asked Questions
+      <section className="bg-white py-9 md:py-10">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="inline-flex w-full items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-teal-700">
+            <span className="h-[2px] w-6 bg-teal-600" />
+            FAQS
+            <span className="h-[2px] w-6 bg-teal-600" />
+          </div>
+          <h2 className="mt-3 text-center text-2xl font-bold text-slate-900 md:text-3xl">
+            Questions Pet Parents Ask
           </h2>
 
-          <div className="mx-auto mt-10 max-w-3xl">
+          <div className="mx-auto mt-8 max-w-3xl">
             {faqs.map((item, idx) => {
               const isOpen = openFaq === idx;
               return (
                 <div
                   key={idx}
-                  className="mb-4 overflow-hidden rounded-2xl ring-1 ring-slate-200"
+                  className="mb-5 overflow-hidden rounded-lg border border-slate-200"
                 >
                   <button
                     type="button"
                     onClick={() => toggleFaq(idx)}
-                    className="flex w-full items-center justify-between bg-slate-50 px-4 py-4 text-left font-black text-slate-900 hover:bg-slate-100"
+                    className="flex w-full items-center justify-between bg-slate-50 px-4 py-4 text-left font-semibold text-slate-900 hover:bg-slate-100"
                   >
                     <span className="pr-4">{item.q}</span>
-                    <span className="text-xl font-black text-[#3998de]">
-                      {isOpen ? "−" : "+"}
+                    <span className="text-xl font-bold text-[#3998de]">
+                      {isOpen ? "-" : "+"}
                     </span>
                   </button>
                   {isOpen && (
-                    <div className="px-4 py-4 text-slate-600 font-semibold leading-7">
-                      {item.a}
-                    </div>
+                    <div className="px-4 py-4 text-slate-500">{item.a}</div>
                   )}
                 </div>
               );
@@ -1114,17 +1446,19 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </section>
 
       {/* Promise */}
-      <section
-        id="commitment"
-        className="scroll-mt-24 bg-gradient-to-br from-blue-100 to-blue-200 py-14 md:py-16"
-      >
-        <div className="mx-auto max-w-6xl px-4 sm:px-5">
+      <section className="bg-gradient-to-br from-blue-100 to-blue-200 py-11 md:py-13">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="text-4xl">❤️</div>
-            <h2 className="mt-4 text-2xl font-black text-slate-900 md:text-3xl">
-              Our Commitment to Pet Parents
+            <div className="inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-teal-800">
+              <span className="h-[2px] w-6 bg-teal-700" />
+              OUR PROMISE
+              <span className="h-[2px] w-6 bg-teal-700" />
+            </div>
+            <div className="mt-2 text-3xl">{"\u2764\uFE0F"}</div>
+            <h2 className="mt-3 text-2xl font-bold text-slate-900 md:text-[28px]">
+              Our Promise to Every Pet Parent
             </h2>
-            <p className="mt-4 text-sm leading-7 text-slate-700 md:text-base md:leading-8 font-semibold">
+            <p className="mt-3 text-sm leading-7 text-slate-600 md:text-[15px] md:leading-7">
               &quot;At SnoutIQ, we understand the anxiety when your pet
               isn&apos;t feeling well. That&apos;s why we&apos;ve built a
               platform where expert veterinary care is just minutes away. Every
@@ -1136,9 +1470,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </section>
 
       {/* Disclaimer */}
-      <section className="border-t border-slate-200 bg-slate-50 py-8 md:py-10">
-        <div className="mx-auto max-w-6xl px-4 sm:px-5">
-          <div className="mx-auto max-w-4xl text-center text-sm text-slate-600 font-semibold leading-7">
+      <section className="border-t border-slate-200 bg-slate-50 py-7 md:py-9">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="mx-auto max-w-4xl text-center text-sm text-slate-500">
             <strong className="mb-2 block text-slate-900">
               Important Information
             </strong>
@@ -1157,33 +1491,33 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 py-10 text-white">
-        <div className="mx-auto max-w-6xl px-4 sm:px-5">
-          <div className="mb-10 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
-            <h4 className="text-lg font-black">
-              Important Medical &amp; Legal Disclaimer
+      <footer className="bg-slate-900 py-8 text-white">
+        <div className="mx-auto max-w-5xl px-4 sm:px-5">
+          <div className="mb-8 rounded-xl bg-white/5 p-4">
+            <h4 className="text-lg font-semibold">
+              Important Medical & Legal Disclaimer
             </h4>
-            <p className="mt-3 text-sm text-slate-200 font-semibold leading-7">
+            <p className="mt-3 text-sm text-slate-200">
               <strong>NO ONLINE PRESCRIPTIONS:</strong> SnoutIQ does not
               prescribe, dispense, or sell any medications. We do not provide
               online prescriptions under any circumstances. All medication needs
               must be addressed through in-person veterinary clinics with proper
               physical examination.
             </p>
-            <p className="mt-3 text-sm text-slate-200 font-semibold leading-7">
+            <p className="mt-3 text-sm text-slate-200">
               <strong>CONSULTATION ONLY:</strong> SnoutIQ provides professional
               veterinary teletriage and consultation services only. Our service
               is designed to help pet parents understand their pet&apos;s
               condition and determine appropriate next steps, including when to
               seek in-person veterinary care.
             </p>
-            <p className="mt-3 text-sm text-slate-200 font-semibold leading-7">
+            <p className="mt-3 text-sm text-slate-200">
               <strong>NOT FOR EMERGENCIES:</strong> This service is not suitable
               for veterinary emergencies. For emergencies, trauma, severe
               symptoms, or life-threatening conditions, please visit your
               nearest veterinary emergency clinic immediately.
             </p>
-            <p className="mt-3 text-sm text-slate-200 font-semibold leading-7">
+            <p className="mt-3 text-sm text-slate-200">
               <strong>LICENSED PROFESSIONALS:</strong> All veterinarians on
               SnoutIQ are licensed professionals registered with the Veterinary
               Council of India. However, video consultations cannot replace
@@ -1191,48 +1525,47 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             </p>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-3">
             <div>
-              <h4 className="text-lg font-black">SnoutIQ</h4>
-              <p className="mt-3 text-sm text-slate-300 font-semibold leading-7">
+              <h4 className="text-lg font-semibold">SnoutIQ</h4>
+              <p className="mt-3 text-sm text-slate-300">
                 Professional veterinary teleconsultation and triage services
                 across India.
               </p>
-              <p className="mt-4 text-sm text-slate-300 font-semibold">
+              <p className="mt-4 text-sm text-slate-300">
                 <strong>Service Type:</strong> Consultation &amp; Triage Only
               </p>
-              <p className="text-sm text-slate-300 font-semibold">
+              <p className="text-sm text-slate-300">
                 <strong>No Prescriptions:</strong> Not a pharmacy service
               </p>
             </div>
 
             <div>
-              <h4 className="text-lg font-black">Contact</h4>
-              <p className="mt-3 text-sm text-slate-300 font-semibold">
+              <h4 className="text-lg font-semibold">Contact</h4>
+              <p className="mt-3 text-sm text-slate-300">
                 Email: admin@snoutiq.com
               </p>
-              <p className="text-sm text-slate-300 font-semibold">
-                Mobile: +91 85880 07466
-              </p>
-              <p className="text-sm text-slate-300 font-semibold">
-                Service Area: Pan India
-              </p>
-              <p className="mt-4 text-sm font-black text-rose-200">
+              <p className="text-sm text-slate-300">Mobile: +91 85880 07466</p>
+              <p className="text-sm text-slate-300">Service Area: Pan India</p>
+              <p className="mt-4 text-sm font-semibold text-rose-200">
                 For emergencies, visit your nearest veterinary clinic
                 immediately.
               </p>
             </div>
 
             <div>
-              <h4 className="text-lg font-black">Legal &amp; Compliance</h4>
-              <div className="mt-3 space-y-2 text-sm text-slate-300 font-semibold">
+              <h4 className="text-lg font-semibold">Legal &amp; Compliance</h4>
+              <div className="mt-3 space-y-2 text-sm text-slate-300">
                 <a className="block hover:text-white" href="/terms-of-service">
                   Terms of Service
                 </a>
                 <a className="block hover:text-white" href="/privacy-policy">
                   Privacy Policy
                 </a>
-                <a className="block hover:text-white" href="/medical-data-consent">
+                <a
+                  className="block hover:text-white"
+                  href="/medical-data-consent"
+                >
                   Medical Disclaimer
                 </a>
                 <a className="block hover:text-white" href="/cookie-policy">
@@ -1242,8 +1575,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             </div>
           </div>
 
-          <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-slate-400">
-            <p>© 2026 SnoutIQ. Professional veterinary teleconsultation services.</p>
+          <div className="mt-8 border-t border-white/10 pt-5 text-center text-xs text-slate-400">
+            <p>{"\u00A9"} 2026 SnoutIQ. Professional veterinary teleconsultation services.</p>
             <p className="mt-2">
               All veterinarians are licensed professionals registered with the
               Veterinary Council of India or state veterinary councils.
