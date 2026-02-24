@@ -44,6 +44,7 @@ use App\Models\Doctor;
 use App\Models\VetRegisterationTemp;
 use App\Models\Pet;
 use App\Models\UserObservation;
+use App\Models\Prescription;
 use App\Models\Transaction;
 use App\Models\Otp;
 use App\Support\DeviceTokenOwnerResolver;
@@ -1006,7 +1007,7 @@ Route::get('/excell-export/transactions', function (Request $request) {
     $hasDoctorPayoutColumn = Schema::hasColumn('transactions', 'payment_to_doctor_paise');
 
     // Detailed list
-    $transactions = (clone $baseQuery)
+    $transactionRows = (clone $baseQuery)
         ->with([
             'user:id,name,phone,email',
             'doctor:id,doctor_name,doctor_email,doctor_mobile',
@@ -1024,10 +1025,82 @@ Route::get('/excell-export/transactions', function (Request $request) {
         ])
         ->orderByDesc('id')
         ->limit(200)
-        ->get()
-        ->map(function (Transaction $t) use ($hasDoctorPayoutColumn) {
+        ->get();
+
+    $latestPrescriptionByPetId = collect();
+    $prescriptionCountByPetId = collect();
+
+    if (Schema::hasTable('prescriptions') && Schema::hasColumn('prescriptions', 'pet_id')) {
+        $petIds = $transactionRows->pluck('pet_id')
+            ->filter(fn ($petId) => is_numeric($petId) && (int) $petId > 0)
+            ->map(fn ($petId) => (int) $petId)
+            ->unique()
+            ->values();
+
+        if ($petIds->isNotEmpty()) {
+            $prescriptionColumns = [
+                'id',
+                'doctor_id',
+                'user_id',
+                'pet_id',
+                'content_html',
+                'image_path',
+                'next_medicine_day',
+                'next_visit_day',
+                'created_at',
+            ];
+            if (Schema::hasColumn('prescriptions', 'follow_up_date')) {
+                $prescriptionColumns[] = 'follow_up_date';
+            }
+            if (Schema::hasColumn('prescriptions', 'follow_up_type')) {
+                $prescriptionColumns[] = 'follow_up_type';
+            }
+            if (Schema::hasColumn('prescriptions', 'follow_up_notes')) {
+                $prescriptionColumns[] = 'follow_up_notes';
+            }
+
+            $prescriptionsGroupedByPet = Prescription::query()
+                ->whereIn('pet_id', $petIds->all())
+                ->orderByDesc('id')
+                ->get($prescriptionColumns)
+                ->groupBy(fn (Prescription $prescription) => (int) $prescription->pet_id);
+
+            $prescriptionCountByPetId = $prescriptionsGroupedByPet
+                ->map(fn ($items) => $items->count());
+
+            $latestPrescriptionByPetId = $prescriptionsGroupedByPet
+                ->map(function ($items) {
+                    /** @var Prescription|null $prescription */
+                    $prescription = $items->first();
+                    if (!$prescription) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => $prescription->id,
+                        'doctor_id' => $prescription->doctor_id,
+                        'user_id' => $prescription->user_id,
+                        'pet_id' => $prescription->pet_id,
+                        'content_html' => $prescription->content_html,
+                        'image_path' => $prescription->image_path,
+                        'next_medicine_day' => optional($prescription->next_medicine_day)->toDateString(),
+                        'next_visit_day' => optional($prescription->next_visit_day)->toDateString(),
+                        'follow_up_date' => isset($prescription->follow_up_date) && $prescription->follow_up_date
+                            ? \Carbon\Carbon::parse($prescription->follow_up_date)->toDateString()
+                            : null,
+                        'follow_up_type' => $prescription->follow_up_type ?? null,
+                        'follow_up_notes' => $prescription->follow_up_notes ?? null,
+                        'created_at' => optional($prescription->created_at)->toIso8601String(),
+                    ];
+                });
+        }
+    }
+
+    $transactions = $transactionRows
+        ->map(function (Transaction $t) use ($hasDoctorPayoutColumn, $latestPrescriptionByPetId, $prescriptionCountByPetId) {
             $grossPaise = (int) ($t->amount_paise ?? 0);
             $paymentToDoctorPaise = null;
+            $petId = is_numeric($t->pet_id) ? (int) $t->pet_id : null;
 
             if ($hasDoctorPayoutColumn && $t->payment_to_doctor_paise !== null) {
                 $paymentToDoctorPaise = (int) $t->payment_to_doctor_paise;
@@ -1064,7 +1137,10 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 'created_at' => optional($t->created_at)->toIso8601String(),
                 'updated_at' => optional($t->updated_at)->toIso8601String(),
                 'user' => $t->user,
+                'pet_id' => $petId,
                 'pet' => $t->pet,
+                'prescription_count_for_pet' => $petId ? (int) ($prescriptionCountByPetId->get($petId) ?? 0) : 0,
+                'latest_prescription' => $petId ? $latestPrescriptionByPetId->get($petId) : null,
                 'doctor' => $t->doctor,
             ];
         });

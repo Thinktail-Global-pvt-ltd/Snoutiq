@@ -26,6 +26,10 @@ class PrescriptionController extends Controller
         $hasFollowUpDate  = Schema::hasColumn('prescriptions', 'follow_up_date');
         $hasFollowUpType  = Schema::hasColumn('prescriptions', 'follow_up_type');
         $hasFollowUpNotes = Schema::hasColumn('prescriptions', 'follow_up_notes');
+        $hasPetsTable = Schema::hasTable('pets');
+        $hasPetDogDiseasePayload = $hasPetsTable && Schema::hasColumn('pets', 'dog_disease_payload');
+        $hasPetIsNeutered = $hasPetsTable && Schema::hasColumn('pets', 'is_neutered');
+        $hasPetVaccinated = $hasPetsTable && Schema::hasColumn('pets', 'vaccenated_yes_no');
 
         if ($request->filled('user_id')) {
             $query->where('user_id', (int) $request->query('user_id'));
@@ -35,6 +39,23 @@ class PrescriptionController extends Controller
         }
         if ($request->filled('pet_id') && Schema::hasColumn('prescriptions', 'pet_id')) {
             $query->where('pet_id', (int) $request->query('pet_id'));
+        }
+
+        if ($hasPetsTable) {
+            $petSelect = ['id'];
+            if ($hasPetDogDiseasePayload) {
+                $petSelect[] = 'dog_disease_payload';
+            }
+            if ($hasPetIsNeutered) {
+                $petSelect[] = 'is_neutered';
+            }
+            if ($hasPetVaccinated) {
+                $petSelect[] = 'vaccenated_yes_no';
+            }
+
+            $query->with(['pet' => function ($petQuery) use ($petSelect) {
+                $petQuery->select($petSelect);
+            }]);
         }
 
         $prescriptions = $query->paginate(20);
@@ -93,6 +114,33 @@ class PrescriptionController extends Controller
             } else {
                 $prescription->follow_up_notes = null;
             }
+
+            $pet = $prescription->pet;
+            $dogDisease = null;
+            $isNeutered = null;
+            $vaccinated = null;
+            if ($pet) {
+                $payload = $pet->dog_disease_payload ?? null;
+                if (is_string($payload)) {
+                    $decoded = json_decode($payload, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $payload = $decoded;
+                    }
+                }
+                $dogDisease = data_get($payload, 'dog_disease')
+                    ?? data_get($payload, 'suggested_disease')
+                    ?? data_get($payload, 'disease')
+                    ?? null;
+                $isNeutered = $pet->is_neutered ?? null;
+                $vaccinated = isset($pet->vaccenated_yes_no) ? (bool) $pet->vaccenated_yes_no : null;
+            }
+
+            // Backward-compatible shape for clients expecting pets.* on each prescription item.
+            $prescription->pets = [
+                'dog_disease' => $dogDisease,
+                'is_neutered' => $isNeutered,
+                'vaccenated_yes_no' => $vaccinated,
+            ];
 
             return $prescription;
         });
