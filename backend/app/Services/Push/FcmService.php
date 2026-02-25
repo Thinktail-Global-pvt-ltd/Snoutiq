@@ -12,6 +12,10 @@ use Throwable;
 
 class FcmService
 {
+    private const DELIVERY_MODE_HYBRID = 'hybrid';
+    private const DELIVERY_MODE_DATA_ONLY = 'data_only';
+    private const DELIVERY_MODE_NOTIFICATION_ONLY = 'notification_only';
+
     public function __construct(private readonly Messaging $messaging)
     {
     }
@@ -68,13 +72,98 @@ class FcmService
      */
     private function shouldSendDataOnly(array $data): bool
     {
-        $type = strtolower($data['type'] ?? '');
-        if ($type === 'incoming_call') {
-            return true;
+        return $this->resolveDeliveryMode($data) === self::DELIVERY_MODE_DATA_ONLY;
+    }
+
+    /**
+     * @param array<string,string> $data
+     */
+    private function resolveDeliveryMode(array $data): string
+    {
+        $rawMode = $data['delivery_mode'] ?? $data['deliveryMode'] ?? null;
+        if (is_string($rawMode)) {
+            $normalizedMode = strtolower(trim($rawMode));
+            if (in_array($normalizedMode, [
+                self::DELIVERY_MODE_HYBRID,
+                self::DELIVERY_MODE_DATA_ONLY,
+                self::DELIVERY_MODE_NOTIFICATION_ONLY,
+            ], true)) {
+                return $normalizedMode;
+            }
         }
 
         $dataOnly = strtolower($data['data_only'] ?? '');
-        return in_array($dataOnly, ['1', 'true', 'yes'], true);
+        if (in_array($dataOnly, ['1', 'true', 'yes'], true)) {
+            return self::DELIVERY_MODE_DATA_ONLY;
+        }
+
+        // Backward compatibility: incoming_call was historically forced to data-only.
+        $type = strtolower($data['type'] ?? '');
+        if ($type === 'incoming_call') {
+            return self::DELIVERY_MODE_DATA_ONLY;
+        }
+
+        return self::DELIVERY_MODE_HYBRID;
+    }
+
+    /**
+     * @param array<string,string> $data
+     */
+    private function isIncomingCallPayload(array $data): bool
+    {
+        return strtolower($data['type'] ?? '') === 'incoming_call';
+    }
+
+    /**
+     * @param array<string,string> $data
+     * @return array<string,string>
+     */
+    private function buildNotificationOnlyData(array $data): array
+    {
+        $minimalKeys = [
+            'type',
+            'call_id',
+            'callId',
+            'call_identifier',
+            'callIdentifier',
+            'call_session_id',
+            'callSessionId',
+            'doctor_id',
+            'doctorId',
+            'patient_id',
+            'patientId',
+            'channel',
+            'channel_name',
+            'channelName',
+            'expires_at',
+            'event',
+            'action',
+            'delivery_mode',
+            'deliveryMode',
+        ];
+
+        $minimal = [];
+        foreach ($minimalKeys as $key) {
+            if (!array_key_exists($key, $data)) {
+                continue;
+            }
+
+            $value = (string) $data[$key];
+            if ($value === '') {
+                continue;
+            }
+
+            $minimal[$key] = $value;
+        }
+
+        if (!isset($minimal['delivery_mode'])) {
+            $minimal['delivery_mode'] = self::DELIVERY_MODE_NOTIFICATION_ONLY;
+        }
+        if (!isset($minimal['deliveryMode'])) {
+            $minimal['deliveryMode'] = self::DELIVERY_MODE_NOTIFICATION_ONLY;
+        }
+
+        return $minimal;
     }
 
     /**
@@ -83,18 +172,37 @@ class FcmService
      */
     private function buildPayloadArray(string $token, ?string $title, ?string $body, array $data): array
     {
-        $dataOnly = $this->shouldSendDataOnly($data);
+        $deliveryMode = $this->resolveDeliveryMode($data);
+        $dataOnly = $deliveryMode === self::DELIVERY_MODE_DATA_ONLY;
+        $notificationOnly = $deliveryMode === self::DELIVERY_MODE_NOTIFICATION_ONLY;
+        $isIncomingCall = $this->isIncomingCallPayload($data);
 
         $payload = [
             'token' => $token,
-            'data' => $data,
             'android' => [
                 'priority' => 'high',
             ],
         ];
 
-        if ($dataOnly) {
+        if (!$notificationOnly) {
+            $payload['data'] = $data;
+        } else {
+            $payload['data'] = $this->buildNotificationOnlyData($data);
+        }
+
+        if ($isIncomingCall) {
+            $payload['android']['ttl'] = '30s';
+        } elseif ($dataOnly) {
             $payload['android']['ttl'] = '90s';
+        }
+
+        if ($isIncomingCall && !$dataOnly) {
+            $payload['android']['notification'] = [
+                'channel_id' => 'incoming_calls_v6',
+            ];
+        }
+
+        if ($dataOnly || $isIncomingCall) {
             $payload['apns'] = [
                 'headers' => [
                     'apns-priority' => '10',
@@ -102,7 +210,7 @@ class FcmService
             ];
         }
 
-        if (!$dataOnly && $title) {
+        if (!$dataOnly && $title !== null && trim($title) !== '') {
             $payload['notification'] = [
                 'title' => $title,
                 'body' => $body ?? '',
@@ -148,14 +256,18 @@ class FcmService
         }
 
         $normalizedData = $this->normalizeDataPayload($data);
+        $deliveryMode = $this->resolveDeliveryMode($normalizedData);
         $dataOnly = $this->shouldSendDataOnly($normalizedData);
         $payload = $this->buildPayloadArray($normalizedToken, $title, $body, $normalizedData);
+        $includesNotification = array_key_exists('notification', $payload);
 
         \Log::info('FCM send to token attempt', [
             'token' => $this->maskToken($normalizedToken),
             'title' => $title,
             'data_keys' => array_keys($normalizedData),
+            'delivery_mode' => $deliveryMode,
             'data_only' => $dataOnly,
+            'includes_notification' => $includesNotification,
             'payload' => $this->maskPayloadToken($payload),
         ]);
 

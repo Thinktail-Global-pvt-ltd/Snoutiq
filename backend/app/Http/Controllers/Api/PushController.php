@@ -307,7 +307,9 @@ class PushController extends Controller
             'title' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
             'force' => ['nullable', 'boolean'],
+            'delivery_mode' => ['nullable', 'string', Rule::in(['hybrid', 'data_only', 'notification_only'])],
             'data' => ['nullable', 'array'],
+            'data.delivery_mode' => ['nullable', 'string', Rule::in(['hybrid', 'data_only', 'notification_only'])],
             'data.call_id' => ['nullable', 'string'],
             'data.doctor_id' => ['nullable'],
             'data.patient_id' => ['nullable'],
@@ -342,6 +344,7 @@ class PushController extends Controller
         $channel = $dataBlock['channel'] ?? $validated['channel'] ?? null;
         $channelName = $dataBlock['channel_name'] ?? $validated['channel_name'] ?? null;
         $expiresAt = $dataBlock['expires_at'] ?? $validated['expires_at'] ?? null;
+        $deliveryMode = $this->resolveRingDeliveryMode($request);
 
         $validator = validator([
             'call_id' => $callId,
@@ -520,25 +523,53 @@ class PushController extends Controller
             'channel' => (string) $channel,
             'channel_name' => (string) $channelName,
             'expires_at' => (string) $expiresAtMs,
-            // Data-only keeps FCM high priority for Doze bypass; app must display UI
-            'data_only' => '1',
+            'delivery_mode' => $deliveryMode,
+            'deliveryMode' => $deliveryMode,
+            'data_only' => $deliveryMode === 'data_only' ? '1' : '0',
         ];
 
         $tokenLast8 = strlen($token) >= 8 ? substr($token, -8) : $token;
+        $includesNotification = $deliveryMode !== 'data_only';
 
         \Log::info('FCM ring push attempt', [
             'call_id' => $callId,
             'doctor_id' => $doctorId,
             'token_last8' => $tokenLast8,
+            'delivery_mode' => $deliveryMode,
+            'includes_notification' => $includesNotification,
             'payload' => [
                 'token_last8' => $tokenLast8,
                 'data' => $data,
-                'android' => ['priority' => 'high', 'ttl' => '90s'],
+                'android' => ['priority' => 'high', 'ttl' => '30s'],
                 'apns' => ['headers' => ['apns-priority' => '10']],
             ],
         ]);
 
-        $push->sendToToken($token, $title, $body, $data);
+        try {
+            $push->sendToToken($token, $title, $body, $data);
+            \Log::info('FCM ring push success', [
+                'call_id' => $callId,
+                'doctor_id' => $doctorId,
+                'token_last8' => $tokenLast8,
+                'delivery_mode' => $deliveryMode,
+                'includes_notification' => $includesNotification,
+            ]);
+        } catch (Throwable $e) {
+            \Log::error('FCM ring push failed', [
+                'call_id' => $callId,
+                'doctor_id' => $doctorId,
+                'token_last8' => $tokenLast8,
+                'delivery_mode' => $deliveryMode,
+                'includes_notification' => $includesNotification,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'FCM ring send failed',
+                'details' => $e->getMessage(),
+            ], 500);
+        }
 
         return response()->json([
             'success' => true,
@@ -972,6 +1003,27 @@ class PushController extends Controller
         return trim(trim($token), "\"'");
     }
 
+    private function resolveRingDeliveryMode(Request $request): string
+    {
+        $mode = $request->input('delivery_mode')
+            ?? $request->input('data.delivery_mode');
+
+        if (is_string($mode)) {
+            $normalizedMode = strtolower(trim($mode));
+            if (in_array($normalizedMode, ['hybrid', 'data_only', 'notification_only'], true)) {
+                return $normalizedMode;
+            }
+        }
+
+        $legacyDataOnly = $request->input('data_only')
+            ?? $request->input('data.data_only');
+        if ($this->isTruthyValue($legacyDataOnly)) {
+            return 'data_only';
+        }
+
+        return 'hybrid';
+    }
+
     private function maskToken(string $token): string
     {
         $token = trim($token);
@@ -1029,5 +1081,22 @@ class PushController extends Controller
         }
 
         return true;
+    }
+
+    private function isTruthyValue(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value === 1;
+        }
+
+        if (!is_string($value)) {
+            return false;
+        }
+
+        return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
     }
 }
