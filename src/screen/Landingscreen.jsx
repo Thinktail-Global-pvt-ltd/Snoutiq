@@ -92,10 +92,10 @@ const WHY_CONSULT_ONLINE = [
     desc: "No booking required. Connect with a verified vet in minutes, day or night.",
   },
   {
-    icon: "💰",
-    title: "Fixed Pricing",
-    desc: "₹499 day consult and ₹649 night consult with no hidden charges.",
-  },
+  icon: "💰",
+  title: "Fixed Pricing",
+  desc: "₹499 day consult & ₹649 night consult. 🔥 Get ₹100 OFF on your first consultation. No hidden charges.",
+},
   {
     icon: "🏠",
     title: "Consult From Home",
@@ -148,7 +148,7 @@ const HOW_IT_WORKS_STEPS = [
 const LANDING_SEO_TITLE =
   "Talk to a Vet Online | Online Vet Consultation India | SnoutiQ";
 const LANDING_SEO_DESCRIPTION =
-  "Talk to a vet online in 15 minutes. ₹499 online vet consultation for dogs, cats & exotic animals. Fast, reliable online veterinarian support across India. Start your consultation now.";
+  "Talk to a vet online in 15 minutes. First-time users get ₹100 OFF. ₹499 online vet consultation for dogs, cats & exotic animals. Fast, reliable online veterinarian support across India. Book your consultation now.";
 
 const normalizeNameKey = (value = "") =>
   String(value || "")
@@ -551,9 +551,24 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                     }`}
                   />
                   {isDay ? "Day Consult" : "Night Consult"}
-                  <span className="font-medium text-slate-500">
+                  {/* <span className="font-medium text-slate-500">
                     {isDay ? "(8 AM - 8 PM)" : "(8 PM - 8 AM)"}
-                  </span>
+                  </span> */}
+                  <span>
+  <span className="font-medium text-slate-500">
+    {isDay ? "(8 AM - 8 PM)" : "(8 PM - 8 AM)"}
+  </span>
+  : 
+  <span className="line-through text-gray-400 ml-1">
+    {"\u20B9"}{isDay ? 499 : 649}
+  </span>
+  <span className="text-green-600 font-semibold ml-2">
+    {"\u20B9"}{isDay ? 399 : 549}
+  </span>
+  <span className="text-xs text-red-500 ml-2">
+    (₹100 OFF First Consult)
+  </span>
+</span>
                   : {"\u20B9"}{isDay ? 499 : 649}
                 </span>
                 <span className="text-xs text-slate-400">(No hidden charges)</span>
@@ -857,17 +872,18 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               Tell us your pet&apos;s concern and we instantly match you to the
               most suitable online veterinarian from our verified network.
             </p>
-            <button
-              type="button"
-              onClick={handleStart}
-              disabled={isStartingConsult}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3998de] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
-            >
-              {isStartingConsult
-                ? "Connecting Dr Shashank..."
-                : "Consult a Vet Online - ₹499"}
-              <ArrowRight className="h-4 w-4" />
-            </button>
+           <button
+  type="button"
+  onClick={handleStart}
+  disabled={isStartingConsult}
+  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3998de] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
+>
+  {isStartingConsult
+    ? "Connecting Dr Shashank..."
+    : "Consult a Vet Online - ₹499 (₹100 OFF Today)"}
+  <ArrowRight className="h-4 w-4" />
+</button>
+
           </div>
         </div>
       </section>

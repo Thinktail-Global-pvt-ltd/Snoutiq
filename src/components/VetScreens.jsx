@@ -165,10 +165,22 @@ const PRESCRIPTION_PROGNOSIS_OPTIONS = [
   "Grave",
 ];
 const PRESCRIPTION_FREQUENCY_OPTIONS = [
-  "Once daily",
-  "Twice daily",
-  "Thrice daily",
-  "Weekly",
+  "OD (Once daily)",
+  "BD (Twice daily)",
+  "TDS (3 times)",
+  "QID (4 times)",
+];
+const PRESCRIPTION_TIMING_OPTIONS = [
+  "Morning",
+  "Afternoon",
+  "Evening",
+  "Night",
+];
+const PRESCRIPTION_FOOD_RELATION_OPTIONS = [
+  "Before food (AC)",
+  "After food (PC)",
+  "With food",
+  "Empty stomach",
 ];
 
 const normalizeId = (value) => {
@@ -2252,14 +2264,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     homeCare: "",
     followUpRequired: "yes",
     followUpDate: "",
-    followUpType: "",
-    followUpNotes: "",
+    followUpMode: "online",
     medications: [
       {
         name: "",
         dosage: "",
         frequency: "",
         duration: "",
+        timing: [],
+        foodRelation: "",
         instructions: "",
       },
     ],
@@ -2268,6 +2281,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [prescriptionForm, setPrescriptionForm] = useState(() =>
     createPrescriptionForm(),
   );
+  const [activeMedicationIndex, setActiveMedicationIndex] = useState(0);
 
   useEffect(() => {
     if (authFromProps) {
@@ -2512,6 +2526,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
   const resetPrescriptionForm = (transaction = null) => {
     setPrescriptionForm(createPrescriptionForm(transaction));
+    setActiveMedicationIndex(0);
     setPrescriptionError("");
     setPrescriptionSuccess(false);
     setPrescriptionView("edit");
@@ -2564,7 +2579,29 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     }));
   };
 
+  const setMedicationField = (index, key, value) => {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      medications: prev.medications.map((med, idx) =>
+        idx === index ? { ...med, [key]: value } : med,
+      ),
+    }));
+  };
+
+  const toggleMedicationTiming = (index, timing) => {
+    const medication = prescriptionForm.medications[index];
+    if (!medication) return;
+    const currentTiming = Array.isArray(medication.timing)
+      ? medication.timing
+      : [];
+    const nextTiming = currentTiming.includes(timing)
+      ? currentTiming.filter((value) => value !== timing)
+      : [...currentTiming, timing];
+    setMedicationField(index, "timing", nextTiming);
+  };
+
   const addMedication = () => {
+    const nextIndex = prescriptionForm.medications.length;
     setPrescriptionForm((prev) => ({
       ...prev,
       medications: [
@@ -2574,10 +2611,13 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           dosage: "",
           frequency: "",
           duration: "",
+          timing: [],
+          foodRelation: "",
           instructions: "",
         },
       ],
     }));
+    setActiveMedicationIndex(nextIndex);
   };
 
   const removeMedication = (index) => {
@@ -2588,6 +2628,20 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           ? prev.medications.filter((_, idx) => idx !== index)
           : prev.medications,
     }));
+    setActiveMedicationIndex((prevIndex) => {
+      if (index === prevIndex) {
+        return Math.max(0, index - 1);
+      }
+      if (index < prevIndex) {
+        return prevIndex - 1;
+      }
+      return prevIndex;
+    });
+  };
+
+  const closeMedicationEditor = (index) => {
+    if (index !== activeMedicationIndex) return;
+    setActiveMedicationIndex(-1);
   };
 
   const handleRecordFile = (event) => {
@@ -2616,6 +2670,44 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     return "NA";
   };
 
+  const getPetAgeLabel = (pet) => {
+    const directAge = Number(pet?.age ?? pet?.age_years);
+    if (Number.isFinite(directAge) && directAge > 0) {
+      const years = Math.floor(directAge);
+      return `${years} year${years > 1 ? "s" : ""}`;
+    }
+
+    const dobRaw = pet?.pet_dob || pet?.dob || pet?.date_of_birth;
+    if (!dobRaw) return "Age NA";
+
+    const dob = new Date(dobRaw);
+    if (Number.isNaN(dob.getTime())) return "Age NA";
+
+    const now = new Date();
+    let years = now.getFullYear() - dob.getFullYear();
+    let months = now.getMonth() - dob.getMonth();
+
+    if (now.getDate() < dob.getDate()) {
+      months -= 1;
+    }
+    if (months < 0) {
+      years -= 1;
+      months += 12;
+    }
+
+    if (years > 0) return `${years} year${years > 1 ? "s" : ""}`;
+    if (months > 0) return `${months} month${months > 1 ? "s" : ""}`;
+
+    const diffInDays = Math.max(
+      0,
+      Math.floor((now.getTime() - dob.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+    if (diffInDays > 0) {
+      return `${diffInDays} day${diffInDays > 1 ? "s" : ""}`;
+    }
+    return "Age NA";
+  };
+
   const handlePrescriptionSubmit = async (event) => {
     event.preventDefault();
     if (!activeTransaction || prescriptionSubmitting) return;
@@ -2636,14 +2728,26 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
     const medsPayload = prescriptionForm.medications
       .map((med) => ({
+        timing: Array.isArray(med.timing) ? med.timing : [],
+        food_relation: med.foodRelation || "",
         name: med.name.trim(),
         dose: med.dosage.trim(),
         frequency: med.frequency.trim(),
         duration: med.duration.trim(),
-        instructions: (med.instructions || "").trim(),
+        instructions: [
+          (med.instructions || "").trim(),
+          Array.isArray(med.timing) && med.timing.length
+            ? `Timing: ${med.timing.join(", ")}`
+            : "",
+          med.foodRelation ? `Food: ${med.foodRelation}` : "",
+        ]
+          .filter(Boolean)
+          .join(" | "),
       }))
       .filter(
         (med) =>
+          (Array.isArray(med.timing) && med.timing.length > 0) ||
+          med.food_relation ||
           med.name ||
           med.dose ||
           med.frequency ||
@@ -2680,13 +2784,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     if (prescriptionForm.followUpDate) {
       fd.append("follow_up_date", prescriptionForm.followUpDate);
     }
-    if (prescriptionForm.followUpType.trim()) {
-      fd.append("follow_up_type", prescriptionForm.followUpType.trim());
-    }
+    fd.append(
+      "follow_up_type",
+      prescriptionForm.followUpRequired === "yes"
+        ? prescriptionForm.followUpMode === "in_clinic"
+          ? "In Clinic"
+          : "Online"
+        : "Not Required",
+    );
     fd.append("follow_up_required", prescriptionForm.followUpRequired);
-    if (prescriptionForm.followUpNotes.trim()) {
-      fd.append("follow_up_notes", prescriptionForm.followUpNotes.trim());
-    }
     fd.append("medications_json", JSON.stringify(medsPayload));
     if (prescriptionForm.recordFile) {
       fd.append("record_file", prescriptionForm.recordFile);
@@ -2936,11 +3042,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       ),
     ).length;
 
-    const listTransactions = transactions.filter(
-      (item) => (item?.status || "").toLowerCase() !== "pending",
-    );
-
-    const latest = listTransactions
+    const latest = transactions
       .slice()
       .sort(
         (a, b) =>
@@ -2964,30 +3066,36 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   }, [dashboardData, transactions]);
   const reportedSymptomsForActiveTransaction =
     getTransactionReportedSymptoms(activeTransaction);
-  const petAgeLabel = activeTransaction?.pet?.age
-    ? `${activeTransaction.pet.age} years`
-    : activeTransaction?.pet?.age_years
-      ? `${activeTransaction.pet.age_years} years`
-      : "Age NA";
+  const petAgeLabel = getPetAgeLabel(activeTransaction?.pet);
   const vaccinationLabel = formatYesNoUnknown(
     activeTransaction?.pet?.is_vaccinated ??
       activeTransaction?.pet?.vaccinated ??
-      activeTransaction?.metadata?.is_vaccinated,
+      activeTransaction?.pet?.vaccenated_yes_no ??
+      activeTransaction?.pet?.vaccinated_yes_no ??
+      activeTransaction?.metadata?.is_vaccinated ??
+      activeTransaction?.metadata?.vaccenated_yes_no ??
+      activeTransaction?.metadata?.vaccinated_yes_no ??
+      activeTransaction?.metadata?.notes?.is_vaccinated ??
+      activeTransaction?.metadata?.notes?.vaccenated_yes_no ??
+      activeTransaction?.metadata?.notes?.vaccinated_yes_no,
   );
   const neuterLabel = formatYesNoUnknown(
     activeTransaction?.pet?.is_neutered ??
       activeTransaction?.pet?.neutered ??
-      activeTransaction?.metadata?.is_neutered,
+      activeTransaction?.pet?.neutered_yes_no ??
+      activeTransaction?.metadata?.is_neutered ??
+      activeTransaction?.metadata?.neutered_yes_no ??
+      activeTransaction?.metadata?.notes?.is_neutered ??
+      activeTransaction?.metadata?.notes?.neutered_yes_no,
   );
   const followUpModeLabel =
-    (prescriptionForm.consultationCategory || "")
-      .toLowerCase()
-      .includes("online")
-      ? "Online"
-      : "Offline";
-  const followUpDisplayLabel = prescriptionForm.followUpDate
-    ? formatPrescriptionDate(prescriptionForm.followUpDate)
-    : "As needed";
+    prescriptionForm.followUpMode === "in_clinic" ? "In-Clinic" : "Online";
+  const followUpDisplayLabel =
+    prescriptionForm.followUpRequired === "no"
+      ? "Not required"
+      : prescriptionForm.followUpDate
+        ? formatPrescriptionDate(prescriptionForm.followUpDate)
+        : "As needed";
   const isPrescriptionPage = Boolean(showPrescriptionModal && activeTransaction);
 
   return (
@@ -3109,13 +3217,21 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       const petName = resolvePetName(item);
                       const { userId, clinicId } = resolveTransactionIds(item);
                       const canOpenPrescription = Boolean(userId && clinicId);
-                      const prescriptionCountForPet = Number(
-                        item?.prescription_count_for_pet ?? 0,
-                      );
-                      const hasPrescriptionForPet =
-                        prescriptionCountForPet > 0 ||
-                        Boolean(item?.latest_prescription?.id);
                       const canView = Boolean(item?.user || item?.pet);
+                      const latestPrescriptionDoctorId = normalizeId(
+                        item?.latest_prescription?.doctor_id,
+                      );
+                      const hasLatestPrescription = Boolean(
+                        item?.latest_prescription?.id,
+                      );
+                      const isLatestPrescriptionByCurrentDoctor =
+                        Boolean(latestPrescriptionDoctorId) &&
+                        latestPrescriptionDoctorId === doctorId;
+                      const prescribeButtonLabel =
+                        hasLatestPrescription &&
+                        isLatestPrescriptionByCurrentDoctor
+                          ? "Update Prescription"
+                          : "Prescribe";
 
                       return (
                         <div
@@ -3164,15 +3280,13 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                 >
                                   View
                                 </button>
-                                {!hasPrescriptionForPet ? (
-                                  <button
-                                    onClick={() => openPrescriptionModal(item)}
-                                    disabled={!canOpenPrescription}
-                                    className="px-4 py-2 text-sm font-medium text-white rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                  >
-                                    Prescribe
-                                  </button>
-                                ) : null}
+                                <button
+                                  onClick={() => openPrescriptionModal(item)}
+                                  disabled={!canOpenPrescription}
+                                  className="px-4 py-2 text-sm font-medium text-white rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {prescribeButtonLabel}
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -3661,28 +3775,68 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         {statusLabel(activeTransaction?.status)}
                       </span>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">
-                          Pet Details
-                        </label>
-                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700">
-                          {resolvePetName(activeTransaction)} /{" "}
-                          {activeTransaction?.pet?.breed || "Not available"} /{" "}
-                          {activeTransaction?.pet?.weight_kg
-                            ? `${activeTransaction.pet.weight_kg} kg`
-                            : "Weight NA"}
+                    <div className="space-y-3">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-xl border border-gray-200 bg-white p-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                            Pet Information
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-800">
+                            {resolvePetName(activeTransaction)} /{" "}
+                            {activeTransaction?.pet?.breed || "Not available"} /{" "}
+                            {petAgeLabel} /{" "}
+                            {activeTransaction?.pet?.weight_kg
+                              ? `${activeTransaction.pet.weight_kg} kg`
+                              : "Weight NA"}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                              Vaccinated: {vaccinationLabel}
+                            </span>
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                              Neutered: {neuterLabel}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="rounded-xl border border-gray-200 bg-white p-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                              Owner Name
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-gray-800">
+                              {activeTransaction?.user?.name || "Pet Parent"}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                              Location
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-gray-800">
+                              {activeTransaction?.user?.location ||
+                                activeTransaction?.metadata?.location ||
+                                "Not available"}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">
-                          Owner Name & Location
-                        </label>
-                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700">
-                          {activeTransaction?.user?.name || "Pet Parent"} -{" "}
-                          {activeTransaction?.user?.location ||
-                            activeTransaction?.metadata?.location ||
-                            "Not available"}
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-xl border border-[#dce4ff] bg-[#eef2ff] p-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6366f1]">
+                            3. Category
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-[#1f2937]">
+                            {prescriptionForm.consultationCategory ||
+                              "General Consultation"}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 bg-white p-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                            4. Medical Status
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-gray-800">
+                            {prescriptionForm.medicalStatus || "Ongoing"}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -3772,7 +3926,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Clinical Notes
+                        History (as reported by pet parent)
                       </label>
                       <textarea
                         value={prescriptionForm.notes}
@@ -3849,34 +4003,47 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           type="date"
                           value={prescriptionForm.followUpDate}
                           onChange={updatePrescriptionField("followUpDate")}
-                          className={INPUT_BASE_CLASS}
+                          disabled={prescriptionForm.followUpRequired !== "yes"}
+                          className={`${INPUT_BASE_CLASS} ${
+                            prescriptionForm.followUpRequired !== "yes"
+                              ? "cursor-not-allowed bg-gray-100 text-gray-400"
+                              : ""
+                          }`}
                         />
                       </div>
                     </div>
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Follow-up Notes
-                        </label>
-                        <input
-                          type="text"
-                          value={prescriptionForm.followUpType}
-                          onChange={updatePrescriptionField("followUpType")}
-                          placeholder="Recheck hydration and appetite"
-                          className={INPUT_BASE_CLASS}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Additional Follow-up Notes
-                        </label>
-                        <input
-                          type="text"
-                          value={prescriptionForm.followUpNotes}
-                          onChange={updatePrescriptionField("followUpNotes")}
-                          placeholder="Tele-consult if symptoms persist"
-                          className={INPUT_BASE_CLASS}
-                        />
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Follow-up Mode
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: "online", label: "Online" },
+                          { value: "in_clinic", label: "In-Clinic" },
+                        ].map((mode) => (
+                          <button
+                            key={mode.value}
+                            type="button"
+                            onClick={() =>
+                              setPrescriptionForm((prev) => ({
+                                ...prev,
+                                followUpMode: mode.value,
+                              }))
+                            }
+                            disabled={prescriptionForm.followUpRequired !== "yes"}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              prescriptionForm.followUpMode === mode.value
+                                ? "border-blue-600 bg-blue-50 text-blue-700"
+                                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                            } ${
+                              prescriptionForm.followUpRequired !== "yes"
+                                ? "cursor-not-allowed opacity-60"
+                                : ""
+                            }`}
+                          >
+                            {mode.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -3885,69 +4052,219 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                   <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
                     <h4 className="font-medium text-gray-900 flex items-center gap-2">
                       <Pill size={16} className="text-[#0B4D67]" />
-                      Medications
+                      10. Medications
                     </h4>
-                    <div className="hidden sm:grid sm:grid-cols-6 gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                      <span>Medicine</span>
-                      <span>Dosage</span>
-                      <span>Frequency</span>
-                      <span>Duration</span>
-                      <span>Instructions</span>
-                      <span className="text-right">Action</span>
-                    </div>
                     <div className="space-y-3">
                       {prescriptionForm.medications.map((medication, index) => (
                         <div
                           key={index}
-                          className="grid sm:grid-cols-6 gap-2 items-start"
+                          className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
                         >
-                          <input
-                            type="text"
-                            value={medication.name}
-                            onChange={updateMedication(index, "name")}
-                            placeholder="Medicine name"
-                            className={INPUT_BASE_CLASS}
-                          />
-                          <input
-                            type="text"
-                            value={medication.dosage}
-                            onChange={updateMedication(index, "dosage")}
-                            placeholder="Dosage"
-                            className={INPUT_BASE_CLASS}
-                          />
-                          <select
-                            value={medication.frequency}
-                            onChange={updateMedication(index, "frequency")}
-                            className={INPUT_BASE_CLASS}
-                          >
-                            <option value="">Frequency</option>
-                            {PRESCRIPTION_FREQUENCY_OPTIONS.map((frequency) => (
-                              <option key={frequency} value={frequency}>
-                                {frequency}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="text"
-                            value={medication.duration}
-                            onChange={updateMedication(index, "duration")}
-                            placeholder="Duration"
-                            className={INPUT_BASE_CLASS}
-                          />
-                          <input
-                            type="text"
-                            value={medication.instructions || ""}
-                            onChange={updateMedication(index, "instructions")}
-                            placeholder="Instructions"
-                            className={INPUT_BASE_CLASS}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeMedication(index)}
-                            className="rounded-full border border-stone-200 px-3 py-2 text-xs text-stone-500 hover:bg-stone-50 sm:col-span-6 lg:col-span-1 w-full lg:w-auto lg:justify-self-end"
-                          >
-                            Remove
-                          </button>
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setActiveMedicationIndex((prev) =>
+                                  prev === index ? -1 : index,
+                                )
+                              }
+                              className="text-left"
+                            >
+                              <p className="text-sm font-semibold text-gray-800">
+                                Medication {index + 1}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {medication.name || "Add medicine details"}
+                              </p>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeMedication(index)}
+                              className="rounded-full border border-stone-200 px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-100"
+                            >
+                              Remove
+                            </button>
+                          </div>
+
+                          {activeMedicationIndex === index ? (
+                            <div className="mt-4 space-y-4 rounded-xl border border-gray-200 bg-white p-4">
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                  Medicine Name
+                                </label>
+                                <input
+                                  type="text"
+                                  value={medication.name}
+                                  onChange={updateMedication(index, "name")}
+                                  placeholder="e.g., Amoxicillin"
+                                  className={INPUT_BASE_CLASS}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                    Dosage
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={medication.dosage}
+                                    onChange={updateMedication(index, "dosage")}
+                                    placeholder="e.g., 1 tab"
+                                    className={INPUT_BASE_CLASS}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                    Duration
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={medication.duration}
+                                    onChange={updateMedication(index, "duration")}
+                                    placeholder="e.g., 7 days"
+                                    className={INPUT_BASE_CLASS}
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="mb-2 text-sm font-semibold text-gray-700">
+                                  Frequency
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {PRESCRIPTION_FREQUENCY_OPTIONS.map((frequency) => (
+                                    <button
+                                      key={frequency}
+                                      type="button"
+                                      onClick={() =>
+                                        setMedicationField(
+                                          index,
+                                          "frequency",
+                                          frequency,
+                                        )
+                                      }
+                                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                        medication.frequency === frequency
+                                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                                          : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
+                                      }`}
+                                    >
+                                      {frequency}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="mb-2 text-sm font-semibold text-gray-700">
+                                  Timing (select one or more)
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {PRESCRIPTION_TIMING_OPTIONS.map((timing) => (
+                                    <button
+                                      key={timing}
+                                      type="button"
+                                      onClick={() =>
+                                        toggleMedicationTiming(index, timing)
+                                      }
+                                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                        Array.isArray(medication.timing) &&
+                                        medication.timing.includes(timing)
+                                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                                          : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
+                                      }`}
+                                    >
+                                      {timing}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="mb-2 text-sm font-semibold text-gray-700">
+                                  Food Relation
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {PRESCRIPTION_FOOD_RELATION_OPTIONS.map(
+                                    (foodRelation) => (
+                                      <button
+                                        key={foodRelation}
+                                        type="button"
+                                        onClick={() =>
+                                          setMedicationField(
+                                            index,
+                                            "foodRelation",
+                                            foodRelation,
+                                          )
+                                        }
+                                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                          medication.foodRelation === foodRelation
+                                            ? "border-blue-600 bg-blue-50 text-blue-700"
+                                            : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
+                                        }`}
+                                      >
+                                        {foodRelation}
+                                      </button>
+                                    ),
+                                  )}
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                  Additional Instruction (optional)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={medication.instructions || ""}
+                                  onChange={updateMedication(index, "instructions")}
+                                  placeholder="e.g., Give before sleep"
+                                  className={INPUT_BASE_CLASS}
+                                />
+                              </div>
+
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => closeMedicationEditor(index)}
+                                  className="rounded-xl border border-gray-200 bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => closeMedicationEditor(index)}
+                                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
+                              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                {medication.dosage || "Dosage N/A"}
+                              </span>
+                              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                {medication.duration || "Duration N/A"}
+                              </span>
+                              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                {medication.frequency || "Frequency N/A"}
+                              </span>
+                              {Array.isArray(medication.timing) &&
+                              medication.timing.length > 0 ? (
+                                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                  {medication.timing.join(", ")}
+                                </span>
+                              ) : null}
+                              {medication.foodRelation ? (
+                                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                  {medication.foodRelation}
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -4222,6 +4539,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                   medication.dosage ||
                                   medication.frequency ||
                                   medication.duration ||
+                                  medication.foodRelation ||
+                                  (Array.isArray(medication.timing) &&
+                                    medication.timing.length > 0) ||
                                   medication.instructions,
                               )
                               .map((medication, index) => (
@@ -4248,9 +4568,24 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                       {medication.frequency || "Frequency N/A"}
                                     </span>
                                   </div>
-                                  <p className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#6b7280]">
-                                    {medication.instructions || "No instructions"}
-                                  </p>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {Array.isArray(medication.timing) &&
+                                    medication.timing.length > 0 ? (
+                                      <span className="rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold text-[#475569]">
+                                        {medication.timing.join(", ")}
+                                      </span>
+                                    ) : null}
+                                    {medication.foodRelation ? (
+                                      <span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[10px] font-semibold text-[#4f46e5]">
+                                        {medication.foodRelation}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {medication.instructions ? (
+                                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#6b7280]">
+                                      {medication.instructions}
+                                    </p>
+                                  ) : null}
                                 </div>
                               ))}
                             {prescriptionForm.medications.every(
@@ -4259,6 +4594,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                 !medication.dosage &&
                                 !medication.frequency &&
                                 !medication.duration &&
+                                !medication.foodRelation &&
+                                (!Array.isArray(medication.timing) ||
+                                  medication.timing.length === 0) &&
                                 !medication.instructions,
                             ) ? (
                               <div className="rounded-2xl border border-dashed border-[#e5e7eb] bg-white px-4 py-5 text-sm text-[#6b7280]">
@@ -4287,9 +4625,11 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             </p>
                             <p className="mt-1 text-xl font-bold text-[#111827]">
                               {followUpDisplayLabel}{" "}
-                              <span className="text-lg text-[#4f46e5]">
-                                ({followUpModeLabel})
-                              </span>
+                              {prescriptionForm.followUpRequired === "yes" ? (
+                                <span className="text-lg text-[#4f46e5]">
+                                  ({followUpModeLabel})
+                                </span>
+                              ) : null}
                             </p>
                           </div>
                           <div className="text-right opacity-70">
