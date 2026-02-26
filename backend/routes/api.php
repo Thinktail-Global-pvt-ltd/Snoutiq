@@ -510,8 +510,8 @@ Route::match(['get', 'post'], '/excell-export/doctors/update-video-rates', funct
         'dry_run' => ['nullable', 'boolean'],
     ]);
 
-    $dayRate = (float) ($payload['day_rate'] ?? 500);
-    $nightRate = (float) ($payload['night_rate'] ?? 650);
+    $dayRate = (float) ($payload['day_rate'] ?? 399);
+    $nightRate = (float) ($payload['night_rate'] ?? 549);
     $dryRun = filter_var($payload['dry_run'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
     $query = Doctor::query()
@@ -1029,6 +1029,33 @@ Route::get('/excell-export/transactions', function (Request $request) {
         ->limit(200)
         ->get();
 
+    $petBlobUrlById = collect();
+    if (
+        Schema::hasTable('pets')
+        && Schema::hasColumn('pets', 'pet_doc2_blob')
+        && Schema::hasColumn('pets', 'pet_doc2_mime')
+    ) {
+        $petIdsForBlob = $transactionRows->pluck('pet_id')
+            ->filter(fn ($petId) => is_numeric($petId) && (int) $petId > 0)
+            ->map(fn ($petId) => (int) $petId)
+            ->unique()
+            ->values();
+
+        if ($petIdsForBlob->isNotEmpty()) {
+            $petIdsWithBlob = DB::table('pets')
+                ->whereIn('id', $petIdsForBlob->all())
+                ->whereNotNull('pet_doc2_blob')
+                ->where('pet_doc2_blob', '!=', '')
+                ->pluck('id')
+                ->map(fn ($petId) => (int) $petId)
+                ->values();
+
+            $petBlobUrlById = $petIdsWithBlob->mapWithKeys(
+                fn (int $petId) => [$petId => route('api.pets.pet-doc2-blob', ['pet' => $petId])]
+            );
+        }
+    }
+
     $latestPrescriptionByPetId = collect();
     $prescriptionCountByPetId = collect();
 
@@ -1099,10 +1126,16 @@ Route::get('/excell-export/transactions', function (Request $request) {
     }
 
     $transactions = $transactionRows
-        ->map(function (Transaction $t) use ($hasDoctorPayoutColumn, $latestPrescriptionByPetId, $prescriptionCountByPetId) {
+        ->map(function (Transaction $t) use ($hasDoctorPayoutColumn, $latestPrescriptionByPetId, $prescriptionCountByPetId, $petBlobUrlById) {
             $grossPaise = (int) ($t->amount_paise ?? 0);
             $paymentToDoctorPaise = null;
             $petId = is_numeric($t->pet_id) ? (int) $t->pet_id : null;
+            $petBlobUrl = $petId ? $petBlobUrlById->get($petId) : null;
+            $pet = $t->pet;
+            if ($pet) {
+                $pet->setAttribute('pet_doc2_blob_url', $petBlobUrl);
+                $pet->setAttribute('pet_image_url', $petBlobUrl ?: ($pet->pet_doc1 ?? $pet->pet_doc2 ?? null));
+            }
 
             if ($hasDoctorPayoutColumn && $t->payment_to_doctor_paise !== null) {
                 $paymentToDoctorPaise = (int) $t->payment_to_doctor_paise;
@@ -1140,7 +1173,7 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 'updated_at' => optional($t->updated_at)->toIso8601String(),
                 'user' => $t->user,
                 'pet_id' => $petId,
-                'pet' => $t->pet,
+                'pet' => $pet,
                 'prescription_count_for_pet' => $petId ? (int) ($prescriptionCountByPetId->get($petId) ?? 0) : 0,
                 'latest_prescription' => $petId ? $latestPrescriptionByPetId->get($petId) : null,
                 'doctor' => $t->doctor,
