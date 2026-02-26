@@ -718,9 +718,16 @@ class PrescriptionController extends Controller
         $pets = Pet::query()
             ->where('user_id', $user->id)
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->map(function (Pet $pet) {
+                $blobUrl = $this->petDoc2BlobUrl($pet);
+                $pet->setAttribute('pet_doc2_blob_url', $blobUrl);
+                $pet->setAttribute('pet_image_url', $blobUrl ?: ($pet->pet_doc1 ?? $pet->pet_doc2 ?? $pet->pic_link ?? null));
+                return $pet;
+            });
 
         $primaryPet = $pets->first();
+        $userBlobUrl = $this->userPetDoc2BlobUrl($user);
 
         $prescriptions = $prescriptions->map(function ($prescription) {
             $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
@@ -739,6 +746,9 @@ class PrescriptionController extends Controller
                     ?? data_get($primaryPet, 'pet_doc2'),
                 'pet_doc1' => $user->pet_doc1 ?? data_get($primaryPet, 'pet_doc1'),
                 'pet_doc2' => $user->pet_doc2 ?? data_get($primaryPet, 'pet_doc2'),
+                'pet_doc2_blob_url' => $userBlobUrl ?: data_get($primaryPet, 'pet_doc2_blob_url'),
+                'pet_image_url' => $userBlobUrl
+                    ?: ($user->pet_doc1 ?? $user->pet_doc2 ?? data_get($primaryPet, 'pet_image_url')),
                 'pet_name' => $user->pet_name ?? data_get($primaryPet, 'name'),
                 'pet_gender' => $user->pet_gender ?? data_get($primaryPet, 'pet_gender'),
                 'pet_age' => $user->pet_age ?? data_get($primaryPet, 'pet_age'),
@@ -778,6 +788,40 @@ class PrescriptionController extends Controller
         }
 
         return null;
+    }
+
+    private function userPetDoc2BlobUrl(?User $user): ?string
+    {
+        if (! $user
+            || ! Schema::hasTable('users')
+            || ! Schema::hasColumn('users', 'pet_doc2_blob')
+            || ! Schema::hasColumn('users', 'pet_doc2_mime')) {
+            return null;
+        }
+
+        $blob = $user->getRawOriginal('pet_doc2_blob');
+        if ($blob === null || $blob === '') {
+            return null;
+        }
+
+        return route('api.users.pet-doc2-blob', ['user' => $user->id]);
+    }
+
+    private function petDoc2BlobUrl(?Pet $pet): ?string
+    {
+        if (! $pet
+            || ! Schema::hasTable('pets')
+            || ! Schema::hasColumn('pets', 'pet_doc2_blob')
+            || ! Schema::hasColumn('pets', 'pet_doc2_mime')) {
+            return null;
+        }
+
+        $blob = $pet->getRawOriginal('pet_doc2_blob');
+        if ($blob === null || $blob === '') {
+            return null;
+        }
+
+        return route('api.pets.pet-doc2-blob', ['pet' => $pet->id]);
     }
 
     private function markVideoApointmentCompleted($videoApointmentId): void
