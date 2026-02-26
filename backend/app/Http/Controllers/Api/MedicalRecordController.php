@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Doctor;
 use App\Models\MedicalRecord;
+use App\Models\Pet;
 use App\Models\Prescription;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -386,14 +387,36 @@ class MedicalRecordController extends Controller
             ->orderByDesc('id')
             ->first();
 
-        $recordsMapped = $records->map(function (MedicalRecord $record) use ($prescriptions, $latestUserPrescription) {
+        $petIds = $prescriptions
+            ->pluck('pet_id')
+            ->push($latestUserPrescription?->pet_id)
+            ->filter(fn ($id) => (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $petMap = collect();
+        if (!empty($petIds) && Schema::hasTable('pets')) {
+            $petMap = Pet::query()
+                ->whereIn('id', $petIds)
+                ->get()
+                ->keyBy('id');
+        }
+
+        $recordsMapped = $records->map(function (MedicalRecord $record) use ($prescriptions, $latestUserPrescription, $petMap) {
             $prescription = $prescriptions->get($record->id) ?? $latestUserPrescription;
+            $petId = $prescription?->pet_id ? (int) $prescription->pet_id : null;
+            $petPayload = $petId ? $petMap->get($petId)?->toArray() : null;
+
             return [
                 'id' => $record->id,
                 'user_id' => $record->user_id,
                 'doctor_id' => $record->doctor_id,
                 'clinic_id' => $record->vet_registeration_id,
-                'pet_id' => $prescription?->pet_id,
+                'pet_id' => $petId,
+                'pet' => $petPayload,
+                'pets' => $petPayload,
                 'file_name' => $record->file_name,
                 'mime_type' => $record->mime_type,
                 'notes' => $record->notes,
