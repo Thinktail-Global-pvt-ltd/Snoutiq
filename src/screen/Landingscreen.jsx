@@ -94,7 +94,7 @@ const WHY_CONSULT_ONLINE = [
   {
   icon: "💰",
   title: "Fixed Pricing",
-  desc: "₹499 day consult & ₹649 night consult. 🔥 Get ₹100 OFF on your first consultation. No hidden charges.",
+  desc: "₹399 day consult & ₹549 night consult. 🔥 Get ₹100 OFF on your first consultation. No hidden charges.",
 },
   {
     icon: "🏠",
@@ -148,7 +148,7 @@ const HOW_IT_WORKS_STEPS = [
 const LANDING_SEO_TITLE =
   "Talk to a Vet Online | Online Vet Consultation India | SnoutiQ";
 const LANDING_SEO_DESCRIPTION =
-  "Talk to a vet online in 15 minutes. First-time users get ₹100 OFF. ₹499 online vet consultation for dogs, cats & exotic animals. Fast, reliable online veterinarian support across India. Book your consultation now.";
+  "Talk to a vet online in 15 minutes. First-time users get ₹100 OFF. ₹399 online vet consultation for dogs, cats & exotic animals. Fast, reliable online veterinarian support across India. Book your consultation now.";
 
 const normalizeNameKey = (value = "") =>
   String(value || "")
@@ -400,7 +400,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       },
       {
         q: "How much does an online vet consultation cost?",
-        a: "Day consultation (6 AM - 10 PM) is ₹499 and night consultation (10 PM - 6 AM) is ₹649. Pricing is fixed and transparent.",
+        a: "Day consultation (6 AM - 10 PM) is ₹399 and night consultation (10 PM - 6 AM) is ₹549. Pricing is fixed and transparent.",
       },
       {
         q: "Will I receive guidance after consultation?",
@@ -880,7 +880,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
 >
   {isStartingConsult
     ? "Connecting Dr Shashank..."
-    : "Consult a Vet Online - ₹499 (₹100 OFF Today)"}
+    : "Consult a Vet Online - ₹399 (₹100 OFF Today)"}
   <ArrowRight className="h-4 w-4" />
 </button>
 
