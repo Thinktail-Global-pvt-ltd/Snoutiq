@@ -1124,17 +1124,56 @@ Route::get('/excell-export/transactions', function (Request $request) {
     }
     $hasDoctorPayoutColumn = Schema::hasColumn('transactions', 'payment_to_doctor_paise');
 
+    $hasUsersCityColumn = Schema::hasTable('users') && Schema::hasColumn('users', 'city');
+    $hasDoctorLicenseColumn = Schema::hasTable('doctors') && Schema::hasColumn('doctors', 'doctor_license');
+    $hasClinicLicenseColumn = Schema::hasTable('vet_registerations_temp') && Schema::hasColumn('vet_registerations_temp', 'license_no');
+    $hasClinicCityColumn = Schema::hasTable('vet_registerations_temp') && Schema::hasColumn('vet_registerations_temp', 'city');
+    $hasClinicAddressColumn = Schema::hasTable('vet_registerations_temp') && Schema::hasColumn('vet_registerations_temp', 'address');
+    $hasClinicFormattedAddressColumn = Schema::hasTable('vet_registerations_temp') && Schema::hasColumn('vet_registerations_temp', 'formatted_address');
+
     // Detailed list
     $transactionRows = (clone $baseQuery)
         ->with([
-            'user:id,name,phone,email',
-            'doctor:id,doctor_name,doctor_email,doctor_mobile',
+            'user' => function ($q) use ($hasUsersCityColumn) {
+                $cols = ['id', 'name', 'phone', 'email'];
+                if ($hasUsersCityColumn) {
+                    $cols[] = 'city';
+                }
+                $q->select($cols);
+            },
+            'doctor' => function ($q) use ($hasDoctorLicenseColumn) {
+                $cols = ['id', 'doctor_name', 'doctor_email', 'doctor_mobile'];
+                if ($hasDoctorLicenseColumn) {
+                    $cols[] = 'doctor_license';
+                }
+                $q->select($cols);
+            },
+            'clinic' => function ($q) use ($hasClinicCityColumn, $hasClinicAddressColumn, $hasClinicFormattedAddressColumn, $hasClinicLicenseColumn) {
+                $cols = ['id', 'name'];
+                if ($hasClinicCityColumn) {
+                    $cols[] = 'city';
+                }
+                if ($hasClinicAddressColumn) {
+                    $cols[] = 'address';
+                }
+                if ($hasClinicFormattedAddressColumn) {
+                    $cols[] = 'formatted_address';
+                }
+                if ($hasClinicLicenseColumn) {
+                    $cols[] = 'license_no';
+                }
+                $q->select($cols);
+            },
             'pet' => function ($q) {
                 $cols = ['id', 'user_id', 'name', 'breed'];
                 if (Schema::hasColumn('pets', 'pet_type')) { $cols[] = 'pet_type'; }
                 if (Schema::hasColumn('pets', 'type')) { $cols[] = 'type'; }
                 if (Schema::hasColumn('pets', 'pet_dob')) { $cols[] = 'pet_dob'; }
                 if (Schema::hasColumn('pets', 'dob')) { $cols[] = 'dob'; }
+                if (Schema::hasColumn('pets', 'pet_gender')) { $cols[] = 'pet_gender'; }
+                if (Schema::hasColumn('pets', 'gender')) { $cols[] = 'gender'; }
+                if (Schema::hasColumn('pets', 'weight')) { $cols[] = 'weight'; }
+                if (Schema::hasColumn('pets', 'deworming_yes_no')) { $cols[] = 'deworming_yes_no'; }
                 if (Schema::hasColumn('pets', 'vaccenated_yes_no')) { $cols[] = 'vaccenated_yes_no'; }
                 if (Schema::hasColumn('pets', 'is_neutered')) { $cols[] = 'is_neutered'; }
                 if (Schema::hasColumn('pets', 'reported_symptom')) { $cols[] = 'reported_symptom'; }
@@ -1250,6 +1289,9 @@ Route::get('/excell-export/transactions', function (Request $request) {
             $petId = is_numeric($t->pet_id) ? (int) $t->pet_id : null;
             $petBlobUrl = $petId ? $petBlobUrlById->get($petId) : null;
             $pet = $t->pet;
+            $clinic = $t->clinic;
+            $doctor = $t->doctor;
+            $user = $t->user;
             if ($pet) {
                 $pet->setAttribute('pet_doc2_blob_url', $petBlobUrl);
                 $pet->setAttribute('pet_image_url', $petBlobUrl ?: ($pet->pet_doc1 ?? $pet->pet_doc2 ?? null));
@@ -1271,6 +1313,12 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 $paymentToDoctorPaise = (int) max(round($grossPaise * 0.75), 0);
             }
 
+            $licenseNumber = $doctor?->doctor_license ?? ($clinic?->license_no ?? null);
+            $petGender = $pet ? ($pet->pet_gender ?? $pet->gender ?? null) : null;
+            $petWeight = $pet?->weight;
+            $petDeworming = $pet?->deworming_yes_no;
+            $location = $user?->city;
+
             return [
                 'id' => $t->id,
                 'reference' => $t->reference,
@@ -1289,12 +1337,20 @@ Route::get('/excell-export/transactions', function (Request $request) {
                 'metadata' => $t->metadata,
                 'created_at' => optional($t->created_at)->toIso8601String(),
                 'updated_at' => optional($t->updated_at)->toIso8601String(),
-                'user' => $t->user,
+                'user' => $user,
                 'pet_id' => $petId,
                 'pet' => $pet,
+                'licence_number' => $licenseNumber,
+                'license_number' => $licenseNumber,
+                'gender' => $petGender,
+                'weight' => $petWeight,
+                'deworming_yes_no' => $petDeworming,
+                'dewarming_yes_no' => $petDeworming,
+                'location' => $location,
                 'prescription_count_for_pet' => $petId ? (int) ($prescriptionCountByPetId->get($petId) ?? 0) : 0,
                 'latest_prescription' => $petId ? $latestPrescriptionByPetId->get($petId) : null,
-                'doctor' => $t->doctor,
+                'doctor' => $doctor,
+                'clinic' => $clinic,
             ];
         });
 
