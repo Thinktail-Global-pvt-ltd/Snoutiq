@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Prescription;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
@@ -193,58 +194,230 @@ class PrescriptionController extends Controller
             ], 404);
         }
 
-        $prescriptions = Prescription::query()
-            ->where('user_id', $user->id)
-            ->orderByDesc('id')
-            ->get(array_values(array_filter([
-                'id',
-                'doctor_id',
-                'user_id',
-                'pet_id',
-                'content_html',
-                'image_path',
-                'next_medicine_day',
-                'next_visit_day',
-                Schema::hasColumn('prescriptions', 'follow_up_date')  ? 'follow_up_date'  : null,
-                Schema::hasColumn('prescriptions', 'follow_up_type')  ? 'follow_up_type'  : null,
-                Schema::hasColumn('prescriptions', 'follow_up_notes') ? 'follow_up_notes' : null,
-                'created_at',
-            ])));
+        return response()->json([
+            'success' => true,
+            'data' => $this->medicalSummaryPayload($user),
+        ]);
+    }
 
-        $pets = Pet::query()
-            ->where('user_id', $user->id)
-            ->orderByDesc('id')
-            ->get();
+    // PUT/PATCH /api/users/medical-summary
+    public function updateUserData(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
+            'pet_id' => ['nullable', 'integer', 'min:1'],
+            'name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'summary' => ['sometimes', 'nullable', 'string'],
+            'pet_name' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'pet_gender' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'pet_age' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:255'],
+            'pet_age_months' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:255'],
+            'pet_type' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'pet_dob' => ['sometimes', 'nullable', 'date'],
+            'breed' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'weight' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'temprature' => ['sometimes', 'nullable', 'numeric'],
+            'vaccenated_yes_no' => ['sometimes', 'nullable', 'boolean'],
+            'vaccination_date' => ['sometimes', 'nullable', 'date'],
+            'last_vaccenated_date' => ['sometimes', 'nullable', 'date'],
+            'microchip_number' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'mcd_registration_number' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'is_neutered' => ['sometimes', 'nullable', 'boolean'],
+            'reported_symptom' => ['sometimes', 'nullable', 'string'],
+            'suggested_disease' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'health_state' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'ai_summary' => ['sometimes', 'nullable', 'string'],
+            'dog_disease_payload' => ['sometimes', 'nullable'],
+            'pet_card_for_ai' => ['sometimes', 'nullable', 'string'],
+            'pet_doc1' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:4096'],
+            'pet_doc2' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:4096'],
+            'user_pet_doc1' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:4096'],
+            'user_pet_doc2' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:4096'],
+        ]);
 
-        $primaryPet = $pets->first();
+        $user = User::find((int) $validated['user_id']);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found',
+            ], 404);
+        }
 
-        $prescriptions = $prescriptions->map(function ($prescription) {
-            $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
-            return $prescription;
-        });
+        $userUpdates = [];
+        foreach (['name', 'summary', 'pet_name', 'pet_gender', 'pet_age', 'breed'] as $field) {
+            if (array_key_exists($field, $validated) && Schema::hasColumn('users', $field)) {
+                $userUpdates[$field] = $validated[$field];
+            }
+        }
+
+        if ($request->hasFile('user_pet_doc1') && Schema::hasColumn('users', 'pet_doc1')) {
+            $userUpdates['pet_doc1'] = $this->storePetDocUpload($request->file('user_pet_doc1'));
+        }
+        if ($request->hasFile('user_pet_doc2')) {
+            $userPetDoc2 = $request->file('user_pet_doc2');
+            if (Schema::hasColumn('users', 'pet_doc2')) {
+                $userUpdates['pet_doc2'] = $this->storePetDocUpload($userPetDoc2);
+            }
+            if (Schema::hasColumn('users', 'pet_doc2_blob')) {
+                $userUpdates['pet_doc2_blob'] = $userPetDoc2->get();
+                if (Schema::hasColumn('users', 'pet_doc2_mime')) {
+                    $userUpdates['pet_doc2_mime'] = $userPetDoc2->getMimeType() ?: ($userPetDoc2->getClientMimeType() ?: 'application/octet-stream');
+                }
+            }
+        }
+
+        if (!empty($userUpdates)) {
+            if (Schema::hasColumn('users', 'updated_at')) {
+                $userUpdates['updated_at'] = now();
+            }
+            DB::table('users')->where('id', $user->id)->update($userUpdates);
+        }
+
+        $petFieldPresent = $request->hasFile('pet_doc1') || $request->hasFile('pet_doc2');
+        foreach ([
+            'pet_name',
+            'pet_gender',
+            'pet_age',
+            'pet_age_months',
+            'pet_type',
+            'pet_dob',
+            'breed',
+            'weight',
+            'temprature',
+            'vaccenated_yes_no',
+            'vaccination_date',
+            'last_vaccenated_date',
+            'microchip_number',
+            'mcd_registration_number',
+            'is_neutered',
+            'reported_symptom',
+            'suggested_disease',
+            'health_state',
+            'ai_summary',
+            'dog_disease_payload',
+            'pet_card_for_ai',
+        ] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $petFieldPresent = true;
+                break;
+            }
+        }
+
+        $pet = null;
+        if (Schema::hasTable('pets')) {
+            $petQuery = Pet::query()->where('user_id', $user->id);
+            if (!empty($validated['pet_id'])) {
+                $petQuery->where('id', (int) $validated['pet_id']);
+            }
+            $pet = $petQuery->orderByDesc('id')->first();
+        }
+
+        if ($petFieldPresent && !$pet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pet not found for this user',
+            ], 404);
+        }
+
+        if ($pet) {
+            $petUpdates = [];
+            if (array_key_exists('pet_name', $validated) && Schema::hasColumn('pets', 'name')) {
+                $petUpdates['name'] = $validated['pet_name'];
+            }
+            if (array_key_exists('breed', $validated) && Schema::hasColumn('pets', 'breed')) {
+                $petUpdates['breed'] = $validated['breed'];
+            }
+            if (array_key_exists('pet_age', $validated) && Schema::hasColumn('pets', 'pet_age')) {
+                $petUpdates['pet_age'] = $validated['pet_age'];
+            }
+            if (array_key_exists('pet_age_months', $validated) && Schema::hasColumn('pets', 'pet_age_months')) {
+                $petUpdates['pet_age_months'] = $validated['pet_age_months'];
+            }
+            if (array_key_exists('pet_gender', $validated)) {
+                if (Schema::hasColumn('pets', 'pet_gender')) {
+                    $petUpdates['pet_gender'] = $validated['pet_gender'];
+                }
+                if (Schema::hasColumn('pets', 'gender')) {
+                    $petUpdates['gender'] = $validated['pet_gender'];
+                }
+            }
+            if (array_key_exists('pet_type', $validated)) {
+                if (Schema::hasColumn('pets', 'pet_type')) {
+                    $petUpdates['pet_type'] = $validated['pet_type'];
+                }
+                if (Schema::hasColumn('pets', 'type')) {
+                    $petUpdates['type'] = $validated['pet_type'];
+                }
+            }
+            if (array_key_exists('pet_dob', $validated)) {
+                if (Schema::hasColumn('pets', 'pet_dob')) {
+                    $petUpdates['pet_dob'] = $validated['pet_dob'];
+                } elseif (Schema::hasColumn('pets', 'dob')) {
+                    $petUpdates['dob'] = $validated['pet_dob'];
+                }
+            }
+            foreach ([
+                'weight',
+                'temprature',
+                'vaccination_date',
+                'last_vaccenated_date',
+                'microchip_number',
+                'mcd_registration_number',
+                'reported_symptom',
+                'suggested_disease',
+                'health_state',
+                'ai_summary',
+                'pet_card_for_ai',
+            ] as $field) {
+                if (array_key_exists($field, $validated) && Schema::hasColumn('pets', $field)) {
+                    $petUpdates[$field] = $validated[$field];
+                }
+            }
+            foreach (['vaccenated_yes_no', 'is_neutered'] as $field) {
+                if (array_key_exists($field, $validated) && Schema::hasColumn('pets', $field)) {
+                    $petUpdates[$field] = $validated[$field] === null ? null : (bool) $validated[$field];
+                }
+            }
+            if (array_key_exists('dog_disease_payload', $validated) && Schema::hasColumn('pets', 'dog_disease_payload')) {
+                $petUpdates['dog_disease_payload'] = $this->normalizeJsonPayload($validated['dog_disease_payload']);
+            }
+
+            if ($request->hasFile('pet_doc1')) {
+                $petDoc1Path = $this->storePetDocUpload($request->file('pet_doc1'));
+                if (Schema::hasColumn('pets', 'pet_doc1')) {
+                    $petUpdates['pet_doc1'] = $petDoc1Path;
+                } elseif (Schema::hasColumn('pets', 'pic_link')) {
+                    $petUpdates['pic_link'] = $petDoc1Path;
+                }
+            }
+
+            if ($request->hasFile('pet_doc2')) {
+                $petDoc2 = $request->file('pet_doc2');
+                if (Schema::hasColumn('pets', 'pet_doc2')) {
+                    $petUpdates['pet_doc2'] = $this->storePetDocUpload($petDoc2);
+                }
+                if (Schema::hasColumn('pets', 'pet_doc2_blob')) {
+                    $petUpdates['pet_doc2_blob'] = $petDoc2->get();
+                    if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
+                        $petUpdates['pet_doc2_mime'] = $petDoc2->getMimeType() ?: ($petDoc2->getClientMimeType() ?: 'application/octet-stream');
+                    }
+                }
+            }
+
+            if (!empty($petUpdates)) {
+                if (Schema::hasColumn('pets', 'updated_at')) {
+                    $petUpdates['updated_at'] = now();
+                }
+                DB::table('pets')->where('id', $pet->id)->update($petUpdates);
+            }
+        }
+
+        $freshUser = User::find($user->id);
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'summary' => $user->summary,
-                    'pet_doc' => $user->pet_doc
-                        ?? $user->pet_doc1
-                        ?? $user->pet_doc2
-                        ?? data_get($primaryPet, 'pet_doc1')
-                        ?? data_get($primaryPet, 'pet_doc2'),
-                    'pet_doc1' => $user->pet_doc1 ?? data_get($primaryPet, 'pet_doc1'),
-                    'pet_doc2' => $user->pet_doc2 ?? data_get($primaryPet, 'pet_doc2'),
-                    'pet_name' => $user->pet_name ?? data_get($primaryPet, 'name'),
-                    'pet_gender' => $user->pet_gender ?? data_get($primaryPet, 'pet_gender'),
-                    'pet_age' => $user->pet_age ?? data_get($primaryPet, 'pet_age'),
-                    'breed' => $user->breed ?? data_get($primaryPet, 'breed'),
-                ],
-                'pets' => $pets,
-                'prescriptions' => $prescriptions,
-            ],
+            'message' => 'Medical summary updated successfully',
+            'data' => $this->medicalSummaryPayload($freshUser),
         ]);
     }
 
@@ -520,6 +693,91 @@ class PrescriptionController extends Controller
         }
 
         return url($path);
+    }
+
+    private function medicalSummaryPayload(User $user): array
+    {
+        $prescriptions = Prescription::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->get(array_values(array_filter([
+                'id',
+                'doctor_id',
+                'user_id',
+                'pet_id',
+                'content_html',
+                'image_path',
+                'next_medicine_day',
+                'next_visit_day',
+                Schema::hasColumn('prescriptions', 'follow_up_date')  ? 'follow_up_date'  : null,
+                Schema::hasColumn('prescriptions', 'follow_up_type')  ? 'follow_up_type'  : null,
+                Schema::hasColumn('prescriptions', 'follow_up_notes') ? 'follow_up_notes' : null,
+                'created_at',
+            ])));
+
+        $pets = Pet::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->get();
+
+        $primaryPet = $pets->first();
+
+        $prescriptions = $prescriptions->map(function ($prescription) {
+            $prescription->image_url = $this->buildPrescriptionUrl($prescription->image_path);
+            return $prescription;
+        });
+
+        return [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'summary' => $user->summary,
+                'pet_doc' => $user->pet_doc
+                    ?? $user->pet_doc1
+                    ?? $user->pet_doc2
+                    ?? data_get($primaryPet, 'pet_doc1')
+                    ?? data_get($primaryPet, 'pet_doc2'),
+                'pet_doc1' => $user->pet_doc1 ?? data_get($primaryPet, 'pet_doc1'),
+                'pet_doc2' => $user->pet_doc2 ?? data_get($primaryPet, 'pet_doc2'),
+                'pet_name' => $user->pet_name ?? data_get($primaryPet, 'name'),
+                'pet_gender' => $user->pet_gender ?? data_get($primaryPet, 'pet_gender'),
+                'pet_age' => $user->pet_age ?? data_get($primaryPet, 'pet_age'),
+                'breed' => $user->breed ?? data_get($primaryPet, 'breed'),
+            ],
+            'pets' => $pets,
+            'prescriptions' => $prescriptions,
+        ];
+    }
+
+    private function storePetDocUpload(UploadedFile $file): string
+    {
+        $uploadPath = public_path('uploads/pet_docs');
+        File::ensureDirectoryExists($uploadPath);
+        $docName = time() . '_' . Str::random(10) . '_' . $file->getClientOriginalName();
+        $file->move($uploadPath, $docName);
+
+        return 'backend/uploads/pet_docs/' . $docName;
+    }
+
+    private function normalizeJsonPayload($value): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_array($value)) {
+            return $value;
+        }
+        if (is_object($value)) {
+            return json_decode(json_encode($value), true);
+        }
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
     }
 
     private function markVideoApointmentCompleted($videoApointmentId): void
