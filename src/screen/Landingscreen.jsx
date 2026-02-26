@@ -544,33 +544,33 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      isDay ? "bg-amber-400" : "bg-indigo-400"
-                    }`}
-                  />
-                  {isDay ? "Day Consult" : "Night Consult"}
-                  {/* <span className="font-medium text-slate-500">
-                    {isDay ? "(8 AM - 8 PM)" : "(8 PM - 8 AM)"}
-                  </span> */}
-                  <span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
+  <span
+    className={`h-2 w-2 rounded-full ${isDay ? "bg-amber-400" : "bg-indigo-400"}`}
+  />
+
+  <span>{isDay ? "Day Consult" : "Night Consult"}</span>
+
   <span className="font-medium text-slate-500">
     {isDay ? "(8 AM - 8 PM)" : "(8 PM - 8 AM)"}
   </span>
-  : 
-  <span className="line-through text-gray-400 ml-1">
-    {"\u20B9"}{isDay ? 499 : 649}
-  </span>
-  <span className="text-green-600 font-semibold ml-2">
-    {"\u20B9"}{isDay ? 399 : 549}
-  </span>
-  <span className="text-xs text-red-500 ml-2">
-    (₹100 OFF First Consult)
+
+  <span className="inline-flex items-center gap-1">
+    <span className="text-slate-400">:</span>
+
+    <span className="line-through text-gray-400">
+      ₹{isDay ? 499 : 649}
+    </span>
+
+    <span className="text-green-600 font-semibold">
+      ₹{isDay ? 399 : 549}
+    </span>
+
+    <span className="text-xs text-red-500">
+      (₹100 OFF First Consult)
+    </span>
   </span>
 </span>
-                  : {"\u20B9"}{isDay ? 499 : 649}
-                </span>
                 <span className="text-xs text-slate-400">(No hidden charges)</span>
               </div>
 
