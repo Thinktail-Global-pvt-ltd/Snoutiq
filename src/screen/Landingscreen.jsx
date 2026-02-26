@@ -9,6 +9,7 @@ import blogVaccination from "../assets/images/vaccination_schedule.jpeg";
 import blogTickFever from "../assets/images/tickfever.png";
 import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
 import appPhoneMock from "../assets/mobile UI.jpeg";
+import logo1 from "../assets/images/dark bg.webp"
 import { Button } from "../components/Button";
 import {
   ArrowRight,
@@ -249,6 +250,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const [activeSlide, setActiveSlide] = useState(0);
   const activeDoctor = HERO_SLIDES[activeSlide] || HERO_SLIDES[0];
   const vetSectionRef = useRef(null);
+  const heroSectionRef = useRef(null);
 
   const [vets, setVets] = useState([]);
   const [vetsLoading, setVetsLoading] = useState(true);
@@ -256,6 +258,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const [brokenImages, setBrokenImages] = useState(() => new Set());
   const [activeBioVet, setActiveBioVet] = useState(null);
   const [isStartingConsult, setIsStartingConsult] = useState(false);
+  const [showMobileStickyCta, setShowMobileStickyCta] = useState(false);
 
   useEffect(() => {
     document.title = LANDING_SEO_TITLE;
@@ -276,6 +279,24 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length);
     }, 3500);
     return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const updateStickyCta = () => {
+      const heroEl = heroSectionRef.current;
+      if (!heroEl) return;
+      const heroBottom = heroEl.getBoundingClientRect().bottom;
+      setShowMobileStickyCta(heroBottom <= 0);
+    };
+
+    updateStickyCta();
+    window.addEventListener("scroll", updateStickyCta, { passive: true });
+    window.addEventListener("resize", updateStickyCta);
+
+    return () => {
+      window.removeEventListener("scroll", updateStickyCta);
+      window.removeEventListener("resize", updateStickyCta);
+    };
   }, []);
 
   // FIXED: Mobile-safe load using loadVetsWithFallback()
@@ -384,6 +405,162 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
     });
   };
 
+  const FeaturedVetCard = ({ vet, idx, className = "" }) => {
+    const vetKey = vet.id || `${vet.name}-${idx}`;
+    const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
+    const qualification = hasDisplayValue(vet.qualification)
+      ? vet.qualification
+      : "BVSc & AH";
+    const specialization = hasDisplayValue(vet.specializationText)
+      ? vet.specializationText
+      : "General Practice";
+    const ratingValue = Number(vet.rating || 4.8).toFixed(1);
+    const reviewCount = Number(vet.reviews || 0);
+    const yearsValue = Number(vet.experience);
+    const experienceChip =
+      Number.isFinite(yearsValue) && yearsValue > 0
+        ? `${Math.round(yearsValue)} yrs exp`
+        : "7+ yrs exp";
+    const specializationChips = String(specialization)
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 2);
+    const responseLabelRaw = isDay ? vet.responseDay : vet.responseNight;
+    const responseLabel = hasDisplayValue(responseLabelRaw)
+      ? String(responseLabelRaw).trim()
+      : "0 To 15 Mins";
+
+    return (
+      <article
+        className={`rounded-2xl border border-[#3998de]/20 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#3998de]/15 ${className}`.trim()}
+      >
+        <div className="flex items-start gap-3">
+          {showImage ? (
+            <img
+              src={vet.image}
+              alt={vet.name}
+              loading="lazy"
+              crossOrigin="anonymous"
+              onError={() => markImageBroken(vet.id)}
+              className="h-12 w-12 rounded-full object-cover border border-[#3998de]/20 bg-slate-50"
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF4FF] text-sm font-extrabold text-[#1D4E89]">
+              {getInitials(vet.name)}
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <h3 className="line-clamp-2 text-base font-extrabold leading-tight text-slate-900">
+              {vet.name}
+            </h3>
+            <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-[#1D4E89]">
+              {qualification}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {(specializationChips.length
+            ? specializationChips
+            : [specialization]
+          ).map((chip, chipIdx) => (
+            <span
+              key={`${vetKey}-${chip}-${chipIdx}`}
+              className="max-w-[150px] truncate rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-3 py-1 text-xs font-medium text-[#1D4E89]"
+            >
+              {clipText(chip, 24)}
+            </span>
+          ))}
+          <span className="rounded-full border border-[#3998de]/20 bg-[#EAF4FF] px-3 py-1 text-xs font-bold text-[#1D4E89]">
+            {experienceChip}
+          </span>
+        </div>
+
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-2.5 py-1 text-[11px] font-medium text-[#1D4E89]">
+          <Clock size={12} className="text-[#3998de]" />
+          Response: {responseLabel}
+        </div>
+
+        <div className="mt-3 flex items-center justify-between">
+          <div className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+            <span className="tracking-[1px] text-amber-500">
+              {"\u2605".repeat(5)}
+            </span>
+            <span>{ratingValue}</span>
+            <span className="text-slate-500">({reviewCount})</span>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full border border-[#3998de]/20 bg-[#EAF4FF] px-3 py-1 text-xs font-bold text-[#1D4E89]">
+            <BadgeCheck size={12} />
+            Verified
+          </span>
+        </div>
+
+        {/* <button
+          type="button"
+          onClick={() => setActiveBioVet(vet)}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-teal-700 transition hover:text-teal-800"
+        >
+          View details <ChevronRight size={14} />
+        </button> */}
+      </article>
+    );
+  };
+
+  const AppDownloadButtons = ({ className = "" }) => (
+    <div className={`mt-5 flex flex-row items-center gap-3 ${className}`.trim()}>
+      <a
+        href="https://play.google.com/store/apps/details?id=com.petai.snoutiq"
+        target="_blank"
+        rel="noreferrer"
+        className="
+          group inline-flex min-w-0 flex-1 items-center justify-center gap-3 rounded-2xl
+          bg-slate-900 px-4 py-2.5 text-white shadow-lg shadow-slate-900/25
+          transition hover:-translate-y-0.5 hover:bg-black
+        "
+      >
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10">
+          <svg viewBox="0 0 512 512" className="h-5 w-5" aria-hidden="true">
+            <path d="M96 64l256 192-256 192V64z" fill="#34A853" />
+            <path d="M96 64l160 120-48 48L96 64z" fill="#FBBC04" />
+            <path d="M256 328l-48-48 48-48 160 120L256 328z" fill="#4285F4" />
+            <path d="M208 232l48-48 48 48-48 48-48-48z" fill="#EA4335" />
+          </svg>
+        </span>
+        <span className="text-left leading-tight">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
+            Get it on
+          </span>
+          <span className="block text-[15px] font-extrabold">Google Play</span>
+        </span>
+      </a>
+
+      <div
+        className="
+          inline-flex min-w-0 flex-1 cursor-not-allowed items-center justify-center gap-3 rounded-2xl
+          border border-slate-200 bg-slate-100 px-4 py-2.5 text-slate-400
+        "
+        title="Coming soon"
+      >
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M16.365 1.43c0 1.14-.52 2.29-1.36 3.03-.83.76-2.17 1.35-3.25 1.26-.14-1.08.4-2.22 1.16-2.98.83-.82 2.24-1.42 3.45-1.31zm5.32 16.65c-.28.64-.42.93-.78 1.5-.51.84-1.23 1.88-2.12 1.9-.79.02-1-.51-2.08-.51-1.08 0-1.33.49-2.12.53-.86.03-1.52-.95-2.03-1.79-1.43-2.34-1.58-5.08-.7-6.45.62-.97 1.6-1.54 2.52-1.54.94 0 1.54.52 2.32.52.76 0 1.22-.52 2.32-.52.82 0 1.7.45 2.32 1.22-2.04 1.12-1.71 4.05.35 5.14z"
+            />
+          </svg>
+        </span>
+        <span className="text-left leading-tight">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Coming soon
+          </span>
+          <span className="block text-[15px] font-extrabold">App Store</span>
+        </span>
+      </div>
+    </div>
+  );
+
   const faqs = useMemo(
     () => [
       {
@@ -470,7 +647,11 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const toggleFaq = (idx) => setOpenFaq((prev) => (prev === idx ? null : idx));
 
   return (
-    <div className="min-h-screen bg-white text-slate-800">
+    <div
+      className={`min-h-screen bg-white text-slate-800 ${
+        showMobileStickyCta ? "pb-24" : ""
+      }`}
+    >
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
@@ -511,7 +692,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </header>
 
       {/* Hero */}
-      <section className="landing-hero relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-4 md:py-5 lg:min-h-[calc(100vh-64px)] lg:py-3">
+      <section
+        ref={heroSectionRef}
+        className="landing-hero relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-4 md:py-5 lg:min-h-[calc(100vh-64px)] lg:py-3"
+      >
         <div className="pointer-events-none absolute -top-24 right-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
         <div className="relative mx-auto max-w-5xl px-4 sm:px-5 lg:flex lg:min-h-[calc(100vh-88px)] lg:items-center">
@@ -555,23 +739,23 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
     {isDay ? "(8 AM - 8 PM)" : "(8 PM - 8 AM)"}
   </span>
 
-  <span className="inline-flex items-center gap-1">
+  <span className="inline-flex items-center gap-1.5">
     <span className="text-slate-400">:</span>
 
-    <span className="line-through text-gray-400">
+    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 line-through">
       ₹{isDay ? 499 : 649}
     </span>
 
-    <span className="text-green-600 font-semibold">
+    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-extrabold text-emerald-700 shadow-sm">
       ₹{isDay ? 399 : 549}
     </span>
 
-    <span className="text-xs text-red-500">
-      (₹100 OFF First Consult)
+    <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-600">
+      ₹100 OFF First Consult
     </span>
   </span>
 </span>
-                <span className="text-xs text-slate-400">(No hidden charges)</span>
+                {/* <span className="text-xs text-slate-400">(No hidden charges)</span> */}
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -656,7 +840,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               </div>
             </div>
             {/* Right (Doctor Image) */}
-            <div className="landing-hero-visual w-full">
+            <div className="landing-hero-visual hidden w-full md:block">
               <div className="relative mx-auto w-full max-w-xs sm:max-w-sm md:max-w-[19.5rem]">
                 <div className="absolute -top-6 right-10 h-20 w-20 rounded-full bg-[#3998de]/15 blur-2xl" />
                 <div className="absolute -bottom-8 left-6 h-24 w-24 rounded-full bg-[#3998de]/10 blur-2xl" />
@@ -761,108 +945,35 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               Vets list unavailable right now. Please try again shortly.
             </div>
           ) : (
-            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {sortedVets.map((vet, idx) => {
-                const vetKey = vet.id || `${vet.name}-${idx}`;
-                const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
-                const qualification = hasDisplayValue(vet.qualification)
-                  ? vet.qualification
-                  : "BVSc & AH";
-                const specialization = hasDisplayValue(vet.specializationText)
-                  ? vet.specializationText
-                  : "General Practice";
-                const ratingValue = Number(vet.rating || 4.8).toFixed(1);
-                const reviewCount = Number(vet.reviews || 0);
-                const yearsValue = Number(vet.experience);
-                const experienceChip =
-                  Number.isFinite(yearsValue) && yearsValue > 0
-                    ? `${Math.round(yearsValue)} yrs exp`
-                    : "7+ yrs exp";
-                const specializationChips = String(specialization)
-                  .split(",")
-                  .map((item) => item.trim())
-                  .filter(Boolean)
-                  .slice(0, 2);
-                const responseLabelRaw = isDay ? vet.responseDay : vet.responseNight;
-                const responseLabel = hasDisplayValue(responseLabelRaw)
-                  ? String(responseLabelRaw).trim()
-                  : "0 To 15 Mins";
-
-                return (
-                  <article
-                    key={`featured-vet-${vetKey}`}
-                    className="rounded-2xl border border-[#3998de]/20 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#3998de]/15"
-                  >
-                    <div className="flex items-start gap-3">
-                      {showImage ? (
-                        <img
-                          src={vet.image}
-                          alt={vet.name}
-                          loading="lazy"
-                          crossOrigin="anonymous"
-                          onError={() => markImageBroken(vet.id)}
-                          className="h-12 w-12 rounded-full object-cover border border-[#3998de]/20 bg-slate-50"
-                        />
-                      ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF4FF] text-sm font-extrabold text-[#1D4E89]">
-                          {getInitials(vet.name)}
-                        </div>
-                      )}
-
-                      <div className="min-w-0 flex-1">
-                        <h3 className="line-clamp-2 text-base font-extrabold leading-tight text-slate-900">
-                          {vet.name}
-                        </h3>
-                        <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-[#1D4E89]">
-                          {qualification}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {(specializationChips.length ? specializationChips : [specialization]).map(
-                        (chip, chipIdx) => (
-                          <span
-                            key={`${vetKey}-${chip}-${chipIdx}`}
-                            className="max-w-[150px] truncate rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-3 py-1 text-xs font-medium text-[#1D4E89]"
-                          >
-                            {clipText(chip, 24)}
-                          </span>
-                        ),
-                      )}
-                      <span className="rounded-full border border-[#3998de]/20 bg-[#EAF4FF] px-3 py-1 text-xs font-bold text-[#1D4E89]">
-                        {experienceChip}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-2.5 py-1 text-[11px] font-medium text-[#1D4E89]">
-                      <Clock size={12} className="text-[#3998de]" />
-                      Response: {responseLabel}
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-                        <span className="tracking-[1px] text-amber-500">{"\u2605".repeat(5)}</span>
-                        <span>{ratingValue}</span>
-                        <span className="text-slate-500">({reviewCount})</span>
-                      </div>
-                      <span className="inline-flex items-center gap-1 rounded-full border border-[#3998de]/20 bg-[#EAF4FF] px-3 py-1 text-xs font-bold text-[#1D4E89]">
-                        <BadgeCheck size={12} />
-                        Verified
-                      </span>
-                    </div>
-
-                    {/* <button
-                      type="button"
-                      onClick={() => setActiveBioVet(vet)}
-                      className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-teal-700 transition hover:text-teal-800"
-                    >
-                      View details <ChevronRight size={14} />
-                    </button> */}
-                  </article>
-                );
-              })}
-            </div>
+            <>
+              <div className="mt-6 -mx-4 px-4 md:hidden">
+                <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  {sortedVets.map((vet, idx) => {
+                    const vetKey = vet.id || `${vet.name}-${idx}`;
+                    return (
+                      <FeaturedVetCard
+                        key={`featured-vet-mobile-${vetKey}`}
+                        vet={vet}
+                        idx={idx}
+                        className="min-w-[86%] snap-center"
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="mt-6 hidden grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:grid">
+                {sortedVets.map((vet, idx) => {
+                  const vetKey = vet.id || `${vet.name}-${idx}`;
+                  return (
+                    <FeaturedVetCard
+                      key={`featured-vet-${vetKey}`}
+                      vet={vet}
+                      idx={idx}
+                    />
+                  );
+                })}
+              </div>
+            </>
           )}
           <div className="mt-5 flex flex-col items-start justify-between gap-4 rounded-2xl bg-slate-900 px-5 py-5 md:flex-row md:items-center">
             <p className="max-w-3xl text-sm text-slate-200">
@@ -878,9 +989,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   disabled={isStartingConsult}
   className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3998de] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
 >
-  {isStartingConsult
-    ? "Connecting Dr Shashank..."
-    : "Consult a Vet Online - ₹399 (₹100 OFF Today)"}
+{isStartingConsult
+  ? "Connecting Dr Shashank..."
+  : `Consult a Vet Online - ₹${isDay ? 399 : 549} (₹100 OFF First Consult)`}
   <ArrowRight className="h-4 w-4" />
 </button>
 
@@ -1370,6 +1481,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 </div>
               </div>
             </div>
+            <AppDownloadButtons className="order-3 md:hidden" />
 
             {/* Right: Copy + Buttons */}
             <div className="order-1 md:order-2">
@@ -1386,62 +1498,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 instant consultations with verified vets.
               </p>
 
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <a
-                  href="https://play.google.com/store/apps/details?id=com.petai.snoutiq"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="
-                    group inline-flex items-center justify-center gap-3 rounded-2xl
-                    bg-slate-900 px-4 py-2.5 text-white shadow-lg shadow-slate-900/25
-                    transition hover:-translate-y-0.5 hover:bg-black
-                  "
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10">
-                    <svg viewBox="0 0 512 512" className="h-5 w-5" aria-hidden="true">
-                      <path d="M96 64l256 192-256 192V64z" fill="#34A853" />
-                      <path d="M96 64l160 120-48 48L96 64z" fill="#FBBC04" />
-                      <path
-                        d="M256 328l-48-48 48-48 160 120L256 328z"
-                        fill="#4285F4"
-                      />
-                      <path
-                        d="M208 232l48-48 48 48-48 48-48-48z"
-                        fill="#EA4335"
-                      />
-                    </svg>
-                  </span>
-                  <span className="text-left leading-tight">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
-                      Get it on
-                    </span>
-                    <span className="block text-[15px] font-extrabold">Google Play</span>
-                  </span>
-                </a>
-
-                <div
-                  className="
-                    inline-flex cursor-not-allowed items-center justify-center gap-3 rounded-2xl
-                    border border-slate-200 bg-slate-100 px-4 py-2.5 text-slate-400
-                  "
-                  title="Coming soon"
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white">
-                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" aria-hidden="true">
-                      <path
-                        fill="currentColor"
-                        d="M16.365 1.43c0 1.14-.52 2.29-1.36 3.03-.83.76-2.17 1.35-3.25 1.26-.14-1.08.4-2.22 1.16-2.98.83-.82 2.24-1.42 3.45-1.31zm5.32 16.65c-.28.64-.42.93-.78 1.5-.51.84-1.23 1.88-2.12 1.9-.79.02-1-.51-2.08-.51-1.08 0-1.33.49-2.12.53-.86.03-1.52-.95-2.03-1.79-1.43-2.34-1.58-5.08-.7-6.45.62-.97 1.6-1.54 2.52-1.54.94 0 1.54.52 2.32.52.76 0 1.22-.52 2.32-.52.82 0 1.7.45 2.32 1.22-2.04 1.12-1.71 4.05.35 5.14z"
-                      />
-                    </svg>
-                  </span>
-                  <span className="text-left leading-tight">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      Coming soon
-                    </span>
-                    <span className="block text-[15px] font-extrabold">App Store</span>
-                  </span>
-                </div>
-              </div>
+              <AppDownloadButtons className="hidden md:flex" />
 
               <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
@@ -1611,7 +1668,11 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
           <div className="grid gap-8 md:grid-cols-4">
             <div>
-              <h4 className="text-2xl font-extrabold text-[#79BCED]">SnoutIQ</h4>
+              <img
+                src={logo1}
+                alt="SnoutIQ"
+                className="h-6 w-auto object-contain drop-shadow-sm md:h-6 lg:h-6"
+              />
               <p className="mt-3 text-sm leading-6 text-slate-300">
                 India&apos;s online vet consultation platform. Talk to a
                 verified veterinarian from anywhere, anytime.
@@ -1693,6 +1754,30 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
           </div>
         </div>
       </footer>
+
+      {showMobileStickyCta && !activeBioVet ? (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-extrabold text-slate-900">
+                Talk to a Vet Online Now
+              </p>
+              <p className="truncate text-xs text-slate-500">
+                15 min · Starting ₹{isDay ? 399 : 549} · 24/7
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={isStartingConsult}
+              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-[#3998de] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
+            >
+              {isStartingConsult ? "Starting..." : "Start Now"}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
