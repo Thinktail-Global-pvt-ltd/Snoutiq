@@ -156,6 +156,20 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOC_ZOOM_MIN = 1;
 const DOC_ZOOM_MAX = 4;
 const DOC_ZOOM_STEP = 0.25;
+const PRESCRIPTION_MEDICAL_STATUS_OPTIONS = ["Ongoing", "Resolved", "Chronic"];
+const PRESCRIPTION_PROGNOSIS_OPTIONS = [
+  "Great",
+  "Good",
+  "Fair",
+  "Poor",
+  "Grave",
+];
+const PRESCRIPTION_FREQUENCY_OPTIONS = [
+  "Once daily",
+  "Twice daily",
+  "Thrice daily",
+  "Weekly",
+];
 
 const normalizeId = (value) => {
   const num = Number(value);
@@ -2210,8 +2224,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [activeTransaction, setActiveTransaction] = useState(null);
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [prescriptionView, setPrescriptionView] = useState("edit");
   const [prescriptionSubmitting, setPrescriptionSubmitting] = useState(false);
   const [prescriptionError, setPrescriptionError] = useState("");
+  const [prescriptionNotice, setPrescriptionNotice] = useState("");
   const [prescriptionSuccess, setPrescriptionSuccess] = useState(false);
   const [showPrescriptionSuccessModal, setShowPrescriptionSuccessModal] =
     useState(false);
@@ -2224,17 +2240,30 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const refreshTimerRef = useRef(null);
   const isFirstLoadRef = useRef(true);
   const createPrescriptionForm = (transaction = null) => ({
-    visitCategory: "Follow-up",
+    visitCategory: "General Consultation",
+    consultationCategory: "General Consultation",
+    medicalStatus: "Ongoing",
     caseSeverity: "general",
+    prognosis: "Fair",
     notes: getTransactionReportedSymptoms(transaction),
     doctorTreatment: "",
     diagnosis: "",
     diagnosisStatus: "",
     treatmentPlan: "",
     homeCare: "",
+    followUpRequired: "yes",
     followUpDate: "",
     followUpType: "",
-    medications: [{ name: "", dosage: "", frequency: "", duration: "" }],
+    followUpNotes: "",
+    medications: [
+      {
+        name: "",
+        dosage: "",
+        frequency: "",
+        duration: "",
+        instructions: "",
+      },
+    ],
     recordFile: null,
   });
   const [prescriptionForm, setPrescriptionForm] = useState(() =>
@@ -2485,7 +2514,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const resetPrescriptionForm = (transaction = null) => {
     setPrescriptionForm(createPrescriptionForm(transaction));
     setPrescriptionError("");
+    setPrescriptionNotice("");
     setPrescriptionSuccess(false);
+    setPrescriptionView("edit");
   };
 
   const openPatientModal = (transaction) => {
@@ -2498,6 +2529,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     setActiveTransaction(transaction);
     resetPrescriptionForm(transaction);
     setShowPrescriptionModal(true);
+    setPrescriptionView("edit");
   };
 
   const closePatientModal = () => {
@@ -2509,8 +2541,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const closePrescriptionModal = () => {
     setShowPrescriptionModal(false);
     setActiveTransaction(null);
+    setPrescriptionView("edit");
     setPrescriptionSubmitting(false);
     setPrescriptionSuccess(false);
+    setPrescriptionNotice("");
     setShowPrescriptionSuccessModal(false);
     setDocPreviewUrl("");
     if (prescriptionSuccessTimer.current) {
@@ -2538,7 +2572,13 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       ...prev,
       medications: [
         ...prev.medications,
-        { name: "", dosage: "", frequency: "", duration: "" },
+        {
+          name: "",
+          dosage: "",
+          frequency: "",
+          duration: "",
+          instructions: "",
+        },
       ],
     }));
   };
@@ -2558,12 +2598,46 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     setPrescriptionForm((prev) => ({ ...prev, recordFile: file }));
   };
 
+  const formatPrescriptionDate = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const savePrescriptionDraft = () => {
+    if (!activeTransaction) return;
+    const draftKey = `snoutiq_prescription_draft_${
+      activeTransaction?.id || activeTransaction?.reference || Date.now()
+    }`;
+    try {
+      window.localStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          savedAt: new Date().toISOString(),
+          transactionId: activeTransaction?.id || "",
+          form: prescriptionForm,
+        }),
+      );
+      setPrescriptionNotice("Draft saved locally.");
+      setPrescriptionError("");
+    } catch {
+      setPrescriptionError("Unable to save draft on this device.");
+      setPrescriptionNotice("");
+    }
+  };
+
   const handlePrescriptionSubmit = async (event) => {
     event.preventDefault();
     if (!activeTransaction || prescriptionSubmitting) return;
 
     setPrescriptionSubmitting(true);
     setPrescriptionError("");
+    setPrescriptionNotice("");
     setPrescriptionSuccess(false);
 
     const { userId, petId, doctorId, clinicId } =
@@ -2582,8 +2656,16 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
         dose: med.dosage.trim(),
         frequency: med.frequency.trim(),
         duration: med.duration.trim(),
+        instructions: (med.instructions || "").trim(),
       }))
-      .filter((med) => med.name || med.dose || med.frequency || med.duration);
+      .filter(
+        (med) =>
+          med.name ||
+          med.dose ||
+          med.frequency ||
+          med.duration ||
+          med.instructions,
+      );
 
     const fd = new FormData();
     fd.append("user_id", String(userId));
@@ -2591,7 +2673,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     if (doctorId) fd.append("doctor_id", String(doctorId));
     if (petId) fd.append("pet_id", String(petId));
     fd.append("visit_category", prescriptionForm.visitCategory);
+    fd.append("consultation_category", prescriptionForm.consultationCategory);
+    fd.append("medical_status", prescriptionForm.medicalStatus);
     fd.append("case_severity", prescriptionForm.caseSeverity);
+    fd.append("prognosis", prescriptionForm.prognosis);
     fd.append("notes", prescriptionForm.notes);
     if (prescriptionForm.doctorTreatment.trim()) {
       fd.append("doctor_treatment", prescriptionForm.doctorTreatment.trim());
@@ -2613,6 +2698,10 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     }
     if (prescriptionForm.followUpType.trim()) {
       fd.append("follow_up_type", prescriptionForm.followUpType.trim());
+    }
+    fd.append("follow_up_required", prescriptionForm.followUpRequired);
+    if (prescriptionForm.followUpNotes.trim()) {
+      fd.append("follow_up_notes", prescriptionForm.followUpNotes.trim());
     }
     fd.append("medications_json", JSON.stringify(medsPayload));
     if (prescriptionForm.recordFile) {
@@ -3478,48 +3567,93 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       {/* Prescription Modal */}
       {showPrescriptionModal && activeTransaction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4 flex items-center justify-between">
+          <div className="w-full max-w-6xl bg-[#f3f5f8] rounded-3xl shadow-2xl overflow-hidden border border-gray-200">
+            <div className="bg-white px-5 py-3 md:px-6 md:py-4 flex items-center justify-between border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                  <FileText size={20} className="text-white" />
+                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                  <FileText size={20} className="text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-white/70 text-xs">Create Prescription</p>
-                  <h3 className="text-white font-semibold">Medical Record</h3>
+                  <p className="text-gray-500 text-[11px] font-semibold uppercase tracking-wide">
+                    Consultation Prescription
+                  </p>
+                  <h3 className="text-gray-900 font-semibold">Medical Record</h3>
                 </div>
               </div>
-              <button
-                onClick={closePrescriptionModal}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-              >
-                <X size={16} className="text-white" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPrescriptionView("edit")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    prescriptionView === "edit"
+                      ? "bg-blue-600 text-white"
+                      : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrescriptionView("preview")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    prescriptionView === "preview"
+                      ? "bg-blue-600 text-white"
+                      : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  Preview
+                </button>
+                <button
+                  onClick={closePrescriptionModal}
+                  className="w-8 h-8 rounded-full border border-gray-200 hover:bg-gray-100 flex items-center justify-center transition-colors"
+                >
+                  <X size={16} className="text-gray-600" />
+                </button>
+              </div>
             </div>
 
             <form
               onSubmit={handlePrescriptionSubmit}
-              className="p-6 max-h-[70vh] overflow-y-auto"
+              className="p-4 md:p-6 max-h-[82vh] overflow-y-auto"
             >
-              <div className="grid lg:grid-cols-3 gap-6">
+              {prescriptionView === "edit" ? (
+                <div className="grid lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                  {/* Patient Info Summary */}
-                  <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-400">Patient</p>
-                        <p className="font-semibold text-gray-900">
-                          {activeTransaction?.user?.name || "Pet Parent"}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {resolvePetName(activeTransaction)}
-                        </p>
-                      </div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Patient Snapshot
+                      </p>
                       <span
                         className={`px-3 py-1.5 rounded-full text-xs font-medium border ${statusClass(activeTransaction?.status)}`}
                       >
                         {statusLabel(activeTransaction?.status)}
                       </span>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">
+                          Pet Details
+                        </label>
+                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                          {resolvePetName(activeTransaction)} /{" "}
+                          {activeTransaction?.pet?.breed || "Not available"} /{" "}
+                          {activeTransaction?.pet?.weight_kg
+                            ? `${activeTransaction.pet.weight_kg} kg`
+                            : "Weight NA"}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">
+                          Owner Name & Location
+                        </label>
+                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                          {activeTransaction?.user?.name || "Pet Parent"} -{" "}
+                          {activeTransaction?.user?.location ||
+                            activeTransaction?.metadata?.location ||
+                            "Not available"}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -3532,23 +3666,48 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Visit Category
+                          Consultation Category
                         </label>
                         <select
-                          value={prescriptionForm.visitCategory}
-                          onChange={updatePrescriptionField("visitCategory")}
+                          value={prescriptionForm.consultationCategory}
+                          onChange={(event) => {
+                            const nextCategory = event.target.value;
+                            setPrescriptionForm((prev) => ({
+                              ...prev,
+                              consultationCategory: nextCategory,
+                              visitCategory: nextCategory,
+                            }));
+                          }}
                           className={INPUT_BASE_CLASS}
                         >
-                          <option value="Follow-up">Follow-up</option>
+                          <option value="General Consultation">
+                            General Consultation
+                          </option>
                           <option value="Online Consultation">
                             Online Consultation
                           </option>
-                          <option value="New Consultation">
-                            New Consultation
-                          </option>
+                          <option value="Follow-up">Follow-up</option>
                           <option value="Emergency">Emergency</option>
                         </select>
                       </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Medical Status
+                        </label>
+                        <select
+                          value={prescriptionForm.medicalStatus}
+                          onChange={updatePrescriptionField("medicalStatus")}
+                          className={INPUT_BASE_CLASS}
+                        >
+                          {PRESCRIPTION_MEDICAL_STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">
                           Case Severity
@@ -3563,33 +3722,20 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           <option value="critical">Critical</option>
                         </select>
                       </div>
-                    </div>
-                    <div className="grid sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Tentative Diagnosis
-                        </label>
-                        <input
-                          type="text"
-                          value={prescriptionForm.diagnosis}
-                          onChange={updatePrescriptionField("diagnosis")}
-                          placeholder="Diagnosis summary"
-                          className={INPUT_BASE_CLASS}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Diagnosis Status
+                          Prognosis
                         </label>
                         <select
-                          value={prescriptionForm.diagnosisStatus}
-                          onChange={updatePrescriptionField("diagnosisStatus")}
+                          value={prescriptionForm.prognosis}
+                          onChange={updatePrescriptionField("prognosis")}
                           className={INPUT_BASE_CLASS}
                         >
-                          <option value="">Select status</option>
-                          <option value="ongoing">Ongoing</option>
-                          <option value="resolved">Resolved</option>
-                          <option value="chronic">Chronic</option>
+                          {PRESCRIPTION_PROGNOSIS_OPTIONS.map((item) => (
+                            <option key={item} value={item}>
+                              {item}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -3597,32 +3743,67 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Clinical Notes
                       </label>
-                      <p className="mb-2 text-[11px] text-gray-500">
-                        Patient reported symptoms are prefilled and can be
-                        edited before submission.
-                      </p>
                       <textarea
                         value={prescriptionForm.notes}
                         onChange={updatePrescriptionField("notes")}
-                        rows={4}
-                        placeholder="Update reported symptoms and add your clinical findings..."
+                        rows={2}
+                        placeholder="Vomiting for 3 days, reduced appetite..."
                         className={`${INPUT_BASE_CLASS} resize-none`}
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Home Care
+                        Clinical Notes / Tentative Diagnosis by Vet
+                      </label>
+                      <textarea
+                        value={prescriptionForm.diagnosis}
+                        onChange={updatePrescriptionField("diagnosis")}
+                        rows={2}
+                        placeholder="Possible gastritis, dehydration..."
+                        className={`${INPUT_BASE_CLASS} resize-none`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Vet Advice / Home Care Tips
                       </label>
                       <textarea
                         value={prescriptionForm.homeCare}
                         onChange={updatePrescriptionField("homeCare")}
                         rows={3}
-                        placeholder="Home care guidance"
+                        placeholder="Feed small frequent meals, ensure hydration..."
                         className={`${INPUT_BASE_CLASS} resize-none`}
                       />
                     </div>
                     <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Follow-up Required
+                        </label>
+                        <div className="flex gap-2">
+                          {["yes", "no"].map((value) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() =>
+                                setPrescriptionForm((prev) => ({
+                                  ...prev,
+                                  followUpRequired: value,
+                                }))
+                              }
+                              className={`flex-1 rounded-xl border px-3 py-2 text-xs font-semibold uppercase transition ${
+                                prescriptionForm.followUpRequired === value
+                                  ? "border-blue-600 bg-blue-50 text-blue-700"
+                                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                              }`}
+                            >
+                              {value}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">
                           Follow-up Date
@@ -3634,15 +3815,29 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                           className={INPUT_BASE_CLASS}
                         />
                       </div>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">
-                          Follow-up Type
+                          Follow-up Notes
                         </label>
                         <input
                           type="text"
                           value={prescriptionForm.followUpType}
                           onChange={updatePrescriptionField("followUpType")}
-                          placeholder="clinic / video / chat"
+                          placeholder="Recheck hydration and appetite"
+                          className={INPUT_BASE_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Additional Follow-up Notes
+                        </label>
+                        <input
+                          type="text"
+                          value={prescriptionForm.followUpNotes}
+                          onChange={updatePrescriptionField("followUpNotes")}
+                          placeholder="Tele-consult if symptoms persist"
                           className={INPUT_BASE_CLASS}
                         />
                       </div>
@@ -3655,11 +3850,19 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       <Pill size={16} className="text-[#0B4D67]" />
                       Medications
                     </h4>
+                    <div className="hidden sm:grid sm:grid-cols-6 gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      <span>Medicine</span>
+                      <span>Dosage</span>
+                      <span>Frequency</span>
+                      <span>Duration</span>
+                      <span>Instructions</span>
+                      <span className="text-right">Action</span>
+                    </div>
                     <div className="space-y-3">
                       {prescriptionForm.medications.map((medication, index) => (
                         <div
                           key={index}
-                          className="grid sm:grid-cols-5 gap-2 items-start"
+                          className="grid sm:grid-cols-6 gap-2 items-start"
                         >
                           <input
                             type="text"
@@ -3675,13 +3878,18 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             placeholder="Dosage"
                             className={INPUT_BASE_CLASS}
                           />
-                          <input
-                            type="text"
+                          <select
                             value={medication.frequency}
                             onChange={updateMedication(index, "frequency")}
-                            placeholder="Frequency"
                             className={INPUT_BASE_CLASS}
-                          />
+                          >
+                            <option value="">Frequency</option>
+                            {PRESCRIPTION_FREQUENCY_OPTIONS.map((frequency) => (
+                              <option key={frequency} value={frequency}>
+                                {frequency}
+                              </option>
+                            ))}
+                          </select>
                           <input
                             type="text"
                             value={medication.duration}
@@ -3689,10 +3897,17 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             placeholder="Duration"
                             className={INPUT_BASE_CLASS}
                           />
+                          <input
+                            type="text"
+                            value={medication.instructions || ""}
+                            onChange={updateMedication(index, "instructions")}
+                            placeholder="Instructions"
+                            className={INPUT_BASE_CLASS}
+                          />
                           <button
                             type="button"
                             onClick={() => removeMedication(index)}
-                            className="rounded-full border border-stone-200 px-3 py-2 text-xs text-stone-500 hover:bg-stone-50 sm:col-span-2 lg:col-span-1 w-full lg:w-auto lg:justify-self-end"
+                            className="rounded-full border border-stone-200 px-3 py-2 text-xs text-stone-500 hover:bg-stone-50 sm:col-span-6 lg:col-span-1 w-full lg:w-auto lg:justify-self-end"
                           >
                             Remove
                           </button>
@@ -3702,9 +3917,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     <button
                       type="button"
                       onClick={addMedication}
-                      className="rounded-full border border-stone-200 px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 w-full sm:w-auto"
+                      className="rounded-full border border-stone-200 px-4 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 w-full sm:w-auto"
                     >
-                      + Add medication
+                      + Add Medicine
                     </button>
                   </div>
 
@@ -3773,6 +3988,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </p>
                   </div>
 
+                  {prescriptionNotice ? (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-700">
+                      {prescriptionNotice}
+                    </div>
+                  ) : null}
+
                   {prescriptionError ? (
                     <div className="flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
                       <AlertCircle size={16} />
@@ -3780,30 +4001,242 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </div>
                   ) : null}
 
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={closePrescriptionModal}
+                      onClick={savePrescriptionDraft}
                       className="rounded-full border border-stone-200 px-5 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
                     >
-                      Cancel
+                      Save Draft
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrescriptionView("preview")}
+                      className="rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-100"
+                    >
+                      Preview
                     </button>
                     <button
                       type="submit"
                       disabled={prescriptionSubmitting}
-                      className={`rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 px-6 py-2 text-sm font-semibold text-white ${
+                      className={`rounded-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 px-6 py-2 text-sm font-semibold text-white ${
                         prescriptionSubmitting
                           ? "opacity-60 cursor-not-allowed"
                           : ""
                       }`}
                     >
                       {prescriptionSubmitting
-                        ? "Saving..."
-                        : "Save Prescription"}
+                        ? "Sending..."
+                        : "Send Prescription"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closePrescriptionModal}
+                      className="rounded-full border border-stone-200 px-5 py-2 text-xs font-semibold text-stone-500 hover:bg-stone-50"
+                    >
+                      Cancel
                     </button>
                   </div>
                 </aside>
               </div>
+              ) : (
+                <div className="mx-auto max-w-4xl space-y-5 rounded-2xl border border-gray-200 bg-white p-5 md:p-7">
+                  <div className="border-b border-gray-200 pb-4 text-center">
+                    <h3 className="text-2xl font-bold text-gray-900">
+                      Digital Prescription
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Date: {new Date().toLocaleDateString("en-IN")}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Pet Details
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-800">
+                        {resolvePetName(activeTransaction)} /{" "}
+                        {activeTransaction?.pet?.breed || "Not available"} /{" "}
+                        {activeTransaction?.pet?.weight_kg
+                          ? `${activeTransaction.pet.weight_kg} kg`
+                          : "Weight NA"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Owner Name & Location
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-800">
+                        {activeTransaction?.user?.name || "Pet Parent"} -{" "}
+                        {activeTransaction?.user?.location ||
+                          activeTransaction?.metadata?.location ||
+                          "Not available"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Consultation Category
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-800">
+                        {prescriptionForm.consultationCategory}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Medical Status
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-800">
+                        {prescriptionForm.medicalStatus}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Severity / Prognosis
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-800">
+                        {prescriptionForm.caseSeverity} /{" "}
+                        {prescriptionForm.prognosis}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      Clinical Notes
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                      {prescriptionForm.notes || "No notes added."}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      Tentative Diagnosis
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                      {prescriptionForm.diagnosis || "No diagnosis added."}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-gray-200">
+                    <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      Medications
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {prescriptionForm.medications
+                        .filter(
+                          (medication) =>
+                            medication.name ||
+                            medication.dosage ||
+                            medication.frequency ||
+                            medication.duration ||
+                            medication.instructions,
+                        )
+                        .map((medication, index) => (
+                          <div key={index} className="p-3 text-sm text-gray-700">
+                            <p className="font-semibold text-gray-900">
+                              {medication.name || "Unnamed medicine"}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {medication.dosage || "Dose N/A"} •{" "}
+                              {medication.frequency || "Frequency N/A"} •{" "}
+                              {medication.duration || "Duration N/A"}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {medication.instructions || "No instructions"}
+                            </p>
+                          </div>
+                        ))}
+                      {prescriptionForm.medications.every(
+                        (medication) =>
+                          !medication.name &&
+                          !medication.dosage &&
+                          !medication.frequency &&
+                          !medication.duration &&
+                          !medication.instructions,
+                      ) ? (
+                        <div className="p-3 text-sm text-gray-500">
+                          No medications added.
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Vet Advice / Home Care
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                        {prescriptionForm.homeCare || "No advice added."}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Follow-Up
+                      </p>
+                      <p className="mt-1 text-sm text-gray-700">
+                        Required:{" "}
+                        <span className="font-semibold uppercase">
+                          {prescriptionForm.followUpRequired}
+                        </span>
+                      </p>
+                      <p className="text-sm text-gray-700">
+                        Date:{" "}
+                        {formatPrescriptionDate(prescriptionForm.followUpDate) ||
+                          "Not set"}
+                      </p>
+                      <p className="text-sm text-gray-700">
+                        Notes:{" "}
+                        {prescriptionForm.followUpType ||
+                          prescriptionForm.followUpNotes ||
+                          "No notes"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {prescriptionError ? (
+                    <div className="flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
+                      <AlertCircle size={16} />
+                      <span>{prescriptionError}</span>
+                    </div>
+                  ) : null}
+
+                  <div className="grid grid-cols-1 gap-3 border-t border-gray-200 pt-3 md:grid-cols-3">
+                    <button
+                      type="button"
+                      onClick={() => setPrescriptionView("edit")}
+                      className="rounded-full border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                    >
+                      Edit Details
+                    </button>
+                    <button
+                      type="button"
+                      onClick={savePrescriptionDraft}
+                      className="rounded-full border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                    >
+                      Save Draft
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={prescriptionSubmitting}
+                      className={`rounded-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 px-6 py-2 text-sm font-semibold text-white ${
+                        prescriptionSubmitting
+                          ? "opacity-60 cursor-not-allowed"
+                          : ""
+                      }`}
+                    >
+                      {prescriptionSubmitting
+                        ? "Sending..."
+                        : "Send Prescription"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </form>
           </div>
         </div>

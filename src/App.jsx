@@ -45,7 +45,7 @@ const ScrollToTopAndHash = () => {
 // ✅ Core / Call pages (were direct imports)
 const CallLab = lazy(() => import("./pages/CallLab"));
 const DoctorReceiver = lazy(() => import("./pages/DoctorReceiver"));
-
+import Uiapp from "./screen/Uiapp";
 // ✅ Public pages
 const PrivacyPolicy = lazy(() => import("./policies/PrivacyPolicy"));
 const TearmsCondition = lazy(() => import("./policies/TearmsCondition"));
@@ -185,6 +185,7 @@ function App() {
             <Route path="/doctor-receiver-test" element={<DoctorReceiverTest />} />
             <Route path="/call-lab" element={<CallLab />} />
             <Route path="/doctor-receiver" element={<DoctorReceiver />} />
+            <Route path="/UI-test" element={<Uiapp />} />
             {/* Multiple doctor routes if needed */}
             <Route
               path="/doctor-dashboard/:doctorId"
