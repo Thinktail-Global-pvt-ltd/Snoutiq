@@ -2980,12 +2980,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   }, [dashboardData, transactions]);
   const reportedSymptomsForActiveTransaction =
     getTransactionReportedSymptoms(activeTransaction);
+  const isPrescriptionPage = Boolean(showPrescriptionModal && activeTransaction);
 
   return (
     <div
       className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col animate-fade-in"
       data-vet-dashboard="true"
     >
+      {!isPrescriptionPage ? (
+        <>
       {/* Header with Gradient */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white">
         <div className="px-6 py-6 md:px-12 lg:px-20 md:py-8">
@@ -3293,6 +3296,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
           </div>
         </div>
       </PageWrap>
+        </>
+      ) : null}
 
       {/* Patient Details Modal */}
       {showPatientModal && activeTransaction && (
@@ -3564,10 +3569,28 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
         </div>
       )}
 
-      {/* Prescription Modal */}
-      {showPrescriptionModal && activeTransaction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-6xl bg-[#f3f5f8] rounded-3xl shadow-2xl overflow-hidden border border-gray-200">
+      {/* Prescription Full Page */}
+      {isPrescriptionPage && (
+        <PageWrap>
+          <div className="px-6 py-6 md:px-0 md:py-8">
+            <div className="mb-4 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={closePrescriptionModal}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              >
+                <ChevronLeft size={16} />
+                Back to Dashboard
+              </button>
+              <span className="text-xs text-gray-500">
+                Ref:{" "}
+                {activeTransaction?.reference ||
+                  activeTransaction?.metadata?.order_id ||
+                  "N/A"}
+              </span>
+            </div>
+
+            <div className="mx-auto w-full max-w-6xl bg-[#f3f5f8] rounded-3xl shadow-sm overflow-hidden border border-gray-200">
             <div className="bg-white px-5 py-3 md:px-6 md:py-4 flex items-center justify-between border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
@@ -3614,7 +3637,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
             <form
               onSubmit={handlePrescriptionSubmit}
-              className="p-4 md:p-6 max-h-[82vh] overflow-y-auto"
+              className="p-4 md:p-6"
             >
               {prescriptionView === "edit" ? (
                 <div className="grid lg:grid-cols-3 gap-6">
@@ -3635,7 +3658,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         <label className="block text-[11px] font-semibold text-gray-500 mb-1">
                           Pet Details
                         </label>
-                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700">
                           {resolvePetName(activeTransaction)} /{" "}
                           {activeTransaction?.pet?.breed || "Not available"} /{" "}
                           {activeTransaction?.pet?.weight_kg
@@ -3647,7 +3670,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         <label className="block text-[11px] font-semibold text-gray-500 mb-1">
                           Owner Name & Location
                         </label>
-                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700">
                           {activeTransaction?.user?.name || "Pet Parent"} -{" "}
                           {activeTransaction?.user?.location ||
                             activeTransaction?.metadata?.location ||
@@ -3748,7 +3771,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         onChange={updatePrescriptionField("notes")}
                         rows={2}
                         placeholder="Vomiting for 3 days, reduced appetite..."
-                        className={`${INPUT_BASE_CLASS} resize-none`}
+                        className={`${INPUT_BASE_CLASS} resize-none text-xs`}
                       />
                     </div>
 
@@ -4238,8 +4261,9 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 </div>
               )}
             </form>
+            </div>
           </div>
-        </div>
+        </PageWrap>
       )}
 
       {showPrescriptionSuccessModal ? (
