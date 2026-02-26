@@ -579,6 +579,7 @@ Route::post('/user-pet-observation', function (Request $request) {
     $data = $request->validate([
         'name' => ['required', 'string', 'max:255'],
         'phone' => ['required', 'string', 'max:20'],
+        'city' => ['nullable', 'string', 'max:120'],
         'breed' => ['required', 'string', 'max:255'],
         'dob' => ['nullable', 'date'],
         'type' => ['required', 'string', 'max:100'],
@@ -594,9 +595,12 @@ Route::post('/user-pet-observation', function (Request $request) {
         'is_neutered' => ['nullable', 'boolean'],
         'vaccenated_yes_no' => ['nullable', 'boolean'],
         'vaccinated_yes_no' => ['nullable', 'boolean'],
+        'deworming_yes_no' => ['nullable', 'boolean'],
     ]);
 
     $uploadedFile = $request->file('file');
+    $hasUserCityColumn = Schema::hasTable('users') && Schema::hasColumn('users', 'city');
+    $hasPetDewormingColumn = Schema::hasTable('pets') && Schema::hasColumn('pets', 'deworming_yes_no');
     $petDoc2BlobColumnsReady = Schema::hasTable('pets')
         && Schema::hasColumn('pets', 'pet_doc2_blob')
         && Schema::hasColumn('pets', 'pet_doc2_mime');
@@ -608,7 +612,7 @@ Route::post('/user-pet-observation', function (Request $request) {
         ], 500);
     }
 
-    $result = DB::transaction(function () use ($data, $uploadedFile, $petDoc2BlobColumnsReady) {
+    $result = DB::transaction(function () use ($data, $uploadedFile, $petDoc2BlobColumnsReady, $hasUserCityColumn, $hasPetDewormingColumn) {
         $phoneDigits = preg_replace('/\\D+/', '', $data['phone']);
 
         // Find existing user by phone (normalized) or exact match
@@ -626,6 +630,9 @@ Route::post('/user-pet-observation', function (Request $request) {
                 $user->email = 'pp_'.$phoneDigits.'@snoutiq.local';
             }
             $user->role = 'pet_parent';
+            if ($hasUserCityColumn && array_key_exists('city', $data)) {
+                $user->city = $data['city'];
+            }
             $user->save();
 
             // Replace existing pets with a fresh record
@@ -649,6 +656,7 @@ Route::post('/user-pet-observation', function (Request $request) {
                 'email' => $email,
                 'role' => 'pet_parent',
                 'password' => Hash::make('123456'),
+                ...(($hasUserCityColumn && array_key_exists('city', $data)) ? ['city' => $data['city']] : []),
             ]);
         }
 
@@ -716,6 +724,9 @@ Route::post('/user-pet-observation', function (Request $request) {
         if ($vaccinatedYesNo !== null && Schema::hasColumn('pets', 'vaccenated_yes_no')) {
             $pet->vaccenated_yes_no = (int) ((bool) $vaccinatedYesNo);
         }
+        if (array_key_exists('deworming_yes_no', $data) && $hasPetDewormingColumn) {
+            $pet->deworming_yes_no = (int) ((bool) $data['deworming_yes_no']);
+        }
 
         // Handle optional file upload and set pet_doc2
         if ($uploadedFile) {
@@ -767,6 +778,9 @@ Route::post('/user-pet-observation', function (Request $request) {
         if (Schema::hasColumn('pets', 'vaccenated_yes_no')) {
             $petPayload['vaccenated_yes_no'] = $pet->vaccenated_yes_no;
         }
+        if ($hasPetDewormingColumn) {
+            $petPayload['deworming_yes_no'] = $pet->deworming_yes_no;
+        }
 
         $observation = new UserObservation();
         $observation->user_id = $user->id;
@@ -778,7 +792,7 @@ Route::post('/user-pet-observation', function (Request $request) {
         $observation->save();
 
         return [
-            'user' => $user->only(['id', 'name', 'phone', 'email']),
+            'user' => $user->only(array_values(array_filter(['id', 'name', 'phone', 'email', $hasUserCityColumn ? 'city' : null]))),
             'pet' => $petPayload,
             'observation' => $observation->only(['id', 'user_id', 'pet_id', 'appetite', 'energy', 'mood', 'observed_at']),
         ];
