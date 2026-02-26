@@ -640,42 +640,54 @@ class PaymentController extends Controller
         }
 
         $grossPaise = max(0, (int) $grossPaise);
-        // Always reverse-cut GST from paid amount.
+        // Keep GST data informational only; payout split is based on the paid gross amount.
         $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
         $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
 
-        $snoutiqSharePaise = $this->resolveExcelSnoutiqSharePaise($amountBeforeGstPaise);
-        $doctorSharePaise = max(0, $amountBeforeGstPaise - $snoutiqSharePaise);
+        $doctorSharePaise = $this->resolveExcelDoctorSharePaise($grossPaise, $amountBeforeGstPaise);
+        $snoutiqSharePaise = max(0, $grossPaise - $doctorSharePaise);
 
         return [
             'actual_amount_paid_by_consumer_paise' => $grossPaise,
             'gst_paise' => $gstPaise,
             'amount_after_gst_paise' => $amountBeforeGstPaise,
             'amount_before_gst_paise' => $amountBeforeGstPaise,
-            'gst_deducted_from_amount' => true,
+            'gst_deducted_from_amount' => false,
             'payment_to_snoutiq_paise' => $snoutiqSharePaise,
             'payment_to_doctor_paise' => $doctorSharePaise,
         ];
     }
 
-    protected function resolveExcelSnoutiqSharePaise(int $amountBeforeGstPaise): int
+    protected function resolveExcelDoctorSharePaise(int $grossPaise, int $amountBeforeGstPaise): int
     {
+        $grossPaise = max(0, (int) $grossPaise);
         $amountBeforeGstPaise = max(0, $amountBeforeGstPaise);
 
-        // Slab logic (after GST cut):
-        // 500 => 150 to Snoutiq, 350 to doctor
-        // 650 => 200 to Snoutiq, 450 to doctor
-        // Keep small tolerance for rounding variance.
-        if (abs($amountBeforeGstPaise - 50000) <= 250) {
-            return 15000;
+        // Gross amount slabs:
+        // 471 => doctor 350, rest Snoutiq
+        // 648 => doctor 450, rest Snoutiq
+        // Legacy gross support:
+        // 590 => doctor 350
+        // 767 => doctor 450
+        if (abs($grossPaise - 47100) <= 500 || abs($grossPaise - 59000) <= 500) {
+            return min($grossPaise, 35000);
         }
 
-        if (abs($amountBeforeGstPaise - 65000) <= 250) {
-            return 20000;
+        if (abs($grossPaise - 64800) <= 500 || abs($grossPaise - 76700) <= 500) {
+            return min($grossPaise, 45000);
+        }
+
+        // Compatibility fallback for flows still sending pre-GST/base values.
+        if (abs($amountBeforeGstPaise - 39900) <= 400 || abs($amountBeforeGstPaise - 50000) <= 400) {
+            return min($grossPaise, 35000);
+        }
+
+        if (abs($amountBeforeGstPaise - 54900) <= 400 || abs($amountBeforeGstPaise - 65000) <= 400) {
+            return min($grossPaise, 45000);
         }
 
         // Fallback for unexpected values.
-        return min(20000, $amountBeforeGstPaise);
+        return min($grossPaise, 45000);
     }
 
     protected function resolveClinicId(Request $request, array $notes, array $context = []): ?int
