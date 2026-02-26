@@ -862,7 +862,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                   disabled={isStartingConsult}
                   className="
                     btn-highlight-anim group inline-flex items-center justify-center gap-2
-                    rounded-xl bg-[#3998de] px-5 py-2.5 text-sm font-semibold text-white md:text-[15px]
+                    rounded-lg bg-[#3998de] px-7 py-3.5 text-center text-base font-extrabold leading-none tracking-[0.01em] text-white md:text-lg
                     shadow-lg shadow-[#3998de]/30 transition
                     hover:bg-[#2F7FC0]
                     disabled:cursor-not-allowed disabled:opacity-80
@@ -873,13 +873,6 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                     : "Start Online Vet Consultation"}
                   <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
                 </button>
-
-                <a
-                  href="#how-it-works"
-                  className="btn-highlight-anim inline-flex items-center justify-center rounded-xl border border-[#3998de]/30 px-4 py-2.5 text-sm font-semibold text-[#1D4E89] transition hover:bg-[#EAF4FF]"
-                >
-                  How It Works
-                </a>
               </div>
             </div>
             {/* Right (Doctor Image) */}
@@ -1855,8 +1848,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 <span className="text-[11px] font-bold text-rose-700">
                   Save ₹{consultDiscountAmount}
                 </span>
-                <span className="text-slate-300">·</span>
-                <span className="font-medium">24/7</span>
+                {/* <span className="text-slate-300">·</span>
+                <span className="font-medium">24/7</span> */}
               </p>
             </div>
             <button
