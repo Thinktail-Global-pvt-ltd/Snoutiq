@@ -8,6 +8,7 @@ use App\Models\Doctor;
 use App\Models\GroomerBooking;
 use App\Models\GroomerProfile;
 use App\Models\Pet;
+use App\Models\Prescription;
 use App\Models\User;
 use App\Models\VetRegisterationTemp;
 use App\Models\Transaction;
@@ -225,13 +226,57 @@ class AdminPanelController extends Controller
 
     public function excellExportTransactions(Request $request)
     {
-        $transactions = $this->excellExportTransactionsQuery()->get();
+        $transactions = $this->attachLatestPrescriptionIds(
+            $this->excellExportTransactionsQuery()->get()
+        );
 
         if (strtolower((string) $request->query('export')) === 'csv') {
             return $this->streamExcellExportTransactionsCsv($transactions);
         }
 
         return view('admin.transactions-excell-export', compact('transactions'));
+    }
+
+    private function attachLatestPrescriptionIds(Collection $transactions): Collection
+    {
+        if ($transactions->isEmpty()) {
+            return $transactions;
+        }
+
+        $latestPrescriptionIdByPetId = collect();
+
+        if (Schema::hasTable('prescriptions') && Schema::hasColumn('prescriptions', 'pet_id')) {
+            $petIds = $transactions->pluck('pet_id')
+                ->filter(fn ($petId) => is_numeric($petId) && (int) $petId > 0)
+                ->map(fn ($petId) => (int) $petId)
+                ->unique()
+                ->values();
+
+            if ($petIds->isNotEmpty()) {
+                $latestPrescriptionIdByPetId = Prescription::query()
+                    ->whereIn('pet_id', $petIds->all())
+                    ->selectRaw('MAX(id) as id, pet_id')
+                    ->groupBy('pet_id')
+                    ->pluck('id', 'pet_id');
+            }
+        }
+
+        $transactions->each(function (Transaction $transaction) use ($latestPrescriptionIdByPetId): void {
+            $prescriptionId = data_get($transaction->metadata, 'notes.prescription_id')
+                ?? data_get($transaction->metadata, 'prescription_id');
+
+            if (!is_numeric($prescriptionId)) {
+                $petId = is_numeric($transaction->pet_id) ? (int) $transaction->pet_id : null;
+                $prescriptionId = $petId ? $latestPrescriptionIdByPetId->get($petId) : null;
+            }
+
+            $transaction->setAttribute(
+                'prescription_id',
+                is_numeric($prescriptionId) ? (int) $prescriptionId : null
+            );
+        });
+
+        return $transactions;
     }
 
     private function excellExportTransactionsQuery(): Builder

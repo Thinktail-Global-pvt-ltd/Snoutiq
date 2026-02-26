@@ -58,6 +58,7 @@
 <div class="row">
     <button id="btn-register">POST /api/push/register-token</button>
     <button id="btn-push">POST /api/push/test</button>
+    <button id="btn-ring">POST /api/push/ring</button>
     <button id="btn-delete">DELETE /api/push/register-token</button>
 </div>
 
@@ -219,6 +220,33 @@
                 ? { token, title: 'Snoutiq', body: 'Hello from web test' }
                 : { title: 'Snoutiq', body: 'Hello to all your devices' };
             const res = await callApi('/api/push/test', 'POST', payload);
+            display(res);
+        } catch (e) {
+            display({ error: String(e) });
+        }
+    };
+
+    document.getElementById('btn-ring').onclick = async () => {
+        try {
+            const token = tokenTextarea.value.trim();
+            if (!token) throw new Error('Generate or paste FCM token first');
+            const now = Date.now();
+            const payload = {
+                token,
+                title: 'Incoming consult',
+                body: 'Web ring test',
+                data: {
+                    call_id: 'web-test-' + now,
+                    doctor_id: 1,
+                    patient_id: 1,
+                    channel: 'agora-web-test',
+                    channel_name: 'agora-web-test',
+                    expires_at: (now + 90_000).toString(),
+                    data_only: '1',
+                    type: 'incoming_call'
+                }
+            };
+            const res = await callApi('/api/push/ring', 'POST', payload);
             display(res);
         } catch (e) {
             display({ error: String(e) });
