@@ -17,6 +17,33 @@ const API_PATH = "/backend/api/exported_from_excell_doctors";
 const DEFAULT_BACKEND_ORIGIN = "https://snoutiq.com";
 const ROTATION_INTERVAL_MS = 20000;
 
+const DUMMY_VETS_PAYLOAD = [
+  {
+    name: "Demo Pet Clinic",
+    doctors: [
+      {
+        id: 999001,
+        doctor_name: "Dr. Demo Vet",
+        doctor_email: "demo@snoutiq.com",
+        doctor_mobile: "9999999999",
+        doctor_license: "DEMO-12345",
+        doctor_image:
+          "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=640&q=80",
+        degree: "BVSc",
+        years_of_experience: "7",
+        specialization_select_all_that_apply: '["Dogs","Cats"]',
+        bio: "Demo profile shown when API is unavailable in debug mode.",
+        response_time_for_online_consults_day: "0 to 15 mins",
+        response_time_for_online_consults_night: "15 to 20 mins",
+        break_do_not_disturb_time_example_2_4_pm: '["No"]',
+        do_you_offer_a_free_follow_up_within_3_days_after_a_consulta: "Yes",
+        video_day_rate: 499,
+        video_night_rate: 649,
+      },
+    ],
+  },
+];
+
 /* ---------------- helpers ---------------- */
 
 const getSafeOrigin = () => {
@@ -37,6 +64,36 @@ const buildApiCandidates = () => {
       `https://www.snoutiq.com${API_PATH}`,
     ])
   );
+};
+
+const isTruthyFlag = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  return ["1", "true", "yes", "on"].includes(normalized);
+};
+
+const isDebugDummyEnabled = () => {
+  if (typeof window === "undefined") return false;
+
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    if (
+      isTruthyFlag(params.get("debbing")) ||
+      isTruthyFlag(params.get("debugging")) ||
+      isTruthyFlag(params.get("debug"))
+    ) {
+      return true;
+    }
+
+    return (
+      isTruthyFlag(window.localStorage.getItem("debbing")) ||
+      isTruthyFlag(window.localStorage.getItem("debugging")) ||
+      isTruthyFlag(window.localStorage.getItem("debug"))
+    );
+  } catch {
+    return false;
+  }
 };
 
 const fetchJsonStrict = async (url, { timeoutMs = 15000 } = {}) => {
@@ -70,16 +127,26 @@ const fetchJsonStrict = async (url, { timeoutMs = 15000 } = {}) => {
 
 export const loadVetsWithFallback = async () => {
   const candidates = buildApiCandidates();
+  const debugDummy = isDebugDummyEnabled();
   let lastErr = null;
 
   for (const url of candidates) {
     try {
       const json = await fetchJsonStrict(url);
-      if (json?.success && Array.isArray(json?.data)) return json.data;
+      if (json?.success && Array.isArray(json?.data)) {
+        if (json.data.length > 0 || !debugDummy) return json.data;
+        console.warn("[VetsScreen] Empty API data. Showing dummy doctor because debbing=1.");
+        return DUMMY_VETS_PAYLOAD;
+      }
       lastErr = new Error("Invalid API response shape");
     } catch (e) {
       lastErr = e;
     }
+  }
+
+  if (debugDummy) {
+    console.warn("[VetsScreen] API unavailable. Showing dummy doctor because debbing=1.");
+    return DUMMY_VETS_PAYLOAD;
   }
 
   throw lastErr || new Error("Network error while loading vets.");
