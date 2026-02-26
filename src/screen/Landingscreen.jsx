@@ -9,7 +9,7 @@ import blogVaccination from "../assets/images/vaccination_schedule.jpeg";
 import blogTickFever from "../assets/images/tickfever.png";
 import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
 import appPhoneMock from "../assets/mobile UI.jpeg";
-import logo1 from "../assets/images/dark bg.webp"
+import logo1 from "../assets/images/dark bg.webp";
 import { Button } from "../components/Button";
 import {
   ArrowRight,
@@ -83,7 +83,7 @@ const SOCIAL_PROOF_STATS = [
   { icon: "⭐", value: "4.8 / 5", label: "Highly Rated by Pet Parents" },
   { icon: "🏅", value: "7+ Yrs", label: "Specialist Vets Experience" },
   { icon: "🕐", value: "24 / 7", label: "Day & Night Availability" },
-  { icon: "🐾", value: "10,000+", label: "Satisfied Pet Parents" },
+  { icon: "🐾", value: "500+", label: "Satisfied Pet Parents" },
 ];
 
 const WHY_CONSULT_ONLINE = [
@@ -93,10 +93,10 @@ const WHY_CONSULT_ONLINE = [
     desc: "No booking required. Connect with a verified vet in minutes, day or night.",
   },
   {
-  icon: "💰",
-  title: "Fixed Pricing",
-  desc: "₹399 day consult & ₹549 night consult. 🔥 Get ₹100 OFF on your first consultation. No hidden charges.",
-},
+    icon: "💰",
+    title: "Fixed Pricing",
+    desc: "₹399 day consult & ₹549 night consult. 🔥 Get ₹100 OFF on your first consultation. No hidden charges.",
+  },
   {
     icon: "🏠",
     title: "Consult From Home",
@@ -382,6 +382,22 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   };
 
   const isDay = isDayTime();
+  const originalConsultPrice = isDay ? 499 : 649;
+  const discountedConsultPrice = isDay ? 399 : 549;
+  const consultDiscountAmount = originalConsultPrice - discountedConsultPrice;
+  const mobileTopTickerItems = [
+    "India's Trusted Online Vet Platform",
+    "Talk to a Vet Online in 15 Minutes",
+    "24/7 Vet Consultation",
+    `Pay ₹${discountedConsultPrice} · Save ₹${consultDiscountAmount}`,
+  ];
+  const landingRouteLinks = [
+    { label: "How It Works", href: "#how-it-works" },
+    { label: "Verified Vets", href: "#verified-vets" },
+    { label: "Benefits", href: "#benefits" },
+    { label: "FAQs", href: "#faq" },
+    { label: "App Download", href: "#app-download" },
+  ];
 
   const sortedVets = useMemo(() => {
     const list = [...vets];
@@ -509,13 +525,15 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   };
 
   const AppDownloadButtons = ({ className = "" }) => (
-    <div className={`mt-5 flex flex-row items-center gap-3 ${className}`.trim()}>
+    <div
+      className={`mt-5 flex flex-row items-center gap-3 ${className}`.trim()}
+    >
       <a
         href="https://play.google.com/store/apps/details?id=com.petai.snoutiq"
         target="_blank"
         rel="noreferrer"
         className="
-          group inline-flex min-w-0 flex-1 items-center justify-center gap-3 rounded-2xl
+          btn-highlight-anim group inline-flex min-w-0 flex-1 items-center justify-center gap-3 rounded-2xl
           bg-slate-900 px-4 py-2.5 text-white shadow-lg shadow-slate-900/25
           transition hover:-translate-y-0.5 hover:bg-black
         "
@@ -544,7 +562,11 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
         title="Coming soon"
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white">
-          <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5 text-slate-400"
+            aria-hidden="true"
+          >
             <path
               fill="currentColor"
               d="M16.365 1.43c0 1.14-.52 2.29-1.36 3.03-.83.76-2.17 1.35-3.25 1.26-.14-1.08.4-2.22 1.16-2.98.83-.82 2.24-1.42 3.45-1.31zm5.32 16.65c-.28.64-.42.93-.78 1.5-.51.84-1.23 1.88-2.12 1.9-.79.02-1-.51-2.08-.51-1.08 0-1.33.49-2.12.53-.86.03-1.52-.95-2.03-1.79-1.43-2.34-1.58-5.08-.7-6.45.62-.97 1.6-1.54 2.52-1.54.94 0 1.54.52 2.32.52.76 0 1.22-.52 2.32-.52.82 0 1.7.45 2.32 1.22-2.04 1.12-1.71 4.05.35 5.14z"
@@ -608,7 +630,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
         a: "Yes. Consultation and health details are treated as confidential in line with privacy policy.",
       },
     ],
-    []
+    [],
   );
 
   const blogPosts = useMemo(
@@ -641,7 +663,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
         readTime: "6 min read",
       },
     ],
-    []
+    [],
   );
 
   const toggleFaq = (idx) => setOpenFaq((prev) => (prev === idx ? null : idx));
@@ -654,12 +676,32 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
     >
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+        <div className="md:hidden border-b border-[#2F7FC0]/40 bg-gradient-to-r from-[#1D4E89] via-[#2F7FC0] to-[#3998de] text-white">
+          <div className="overflow-hidden py-1.5">
+            <div
+              className="flex min-w-max items-center gap-4 whitespace-nowrap px-4 will-change-transform"
+              style={{ animation: "mobileHeaderTicker 18s linear infinite" }}
+            >
+              {[...mobileTopTickerItems, ...mobileTopTickerItems].map(
+                (item, idx) => (
+                  <span
+                    key={`mobile-top-ticker-${idx}`}
+                    className="inline-flex items-center gap-3 text-[11px] font-semibold tracking-[0.02em]"
+                  >
+                    <span>{item}</span>
+                    <span className="h-1 w-1 rounded-full bg-white/75" />
+                  </span>
+                ),
+              )}
+            </div>
+          </div>
+        </div>
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
           <div className="flex items-center justify-between py-2 md:py-3">
             <button
               type="button"
               onClick={handleLogoClick}
-              className="flex items-center gap-3"
+              className="btn-highlight-anim flex items-center gap-3 rounded-lg px-1.5 py-1"
               aria-label="SnoutIQ Home"
             >
               <img
@@ -672,8 +714,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             <div className="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
-                onClick={() => window.open("https://snoutiq.com/blog", "_blank")}
-                className="rounded-full border border-[#3998de]/30 px-3 py-1 text-xs font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10 whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-sm"
+                onClick={() =>
+                  window.open("https://snoutiq.com/blog", "_blank")
+                }
+                className="btn-highlight-anim rounded-full border border-[#3998de]/30 px-3 py-1 text-xs font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10 whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-sm"
               >
                 Blog
               </button>
@@ -682,12 +726,24 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 onClick={() =>
                   typeof onVetAccess === "function" ? onVetAccess() : null
                 }
-                className="rounded-full border border-[#3998de]/30 px-3 py-1 text-xs font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10 whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-sm"
+                className="btn-highlight-anim rounded-full border border-[#3998de]/30 px-3 py-1 text-xs font-semibold text-[#3998de] shadow-sm transition hover:bg-[#3998de]/10 whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-sm"
               >
                 Vet Access
               </button>
             </div>
           </div>
+
+          <nav className="flex items-center gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:flex-wrap md:pb-3">
+            {landingRouteLinks.map((route) => (
+              <a
+                key={route.href}
+                href={route.href}
+                className="btn-highlight-anim inline-flex shrink-0 items-center rounded-full border border-[#3998de]/30 bg-white/90 px-3 py-1 text-[11px] font-semibold text-[#1D4E89] shadow-sm transition hover:bg-[#EAF4FF] sm:text-xs"
+              >
+                {route.label}
+              </a>
+            ))}
+          </nav>
         </div>
       </header>
 
@@ -703,104 +759,63 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             {/* Left */}
             <div className="landing-hero-copy">
               <div className="inline-block rounded-full bg-[#EAF4FF] px-3 py-1.5 text-xs font-semibold text-[#1D4E89] shadow-sm sm:text-sm">
-                Vets Available Right Now
+                India's Online Vet Platform
               </div>
 
               <h1 className="mt-2.5 text-[28px] font-extrabold leading-[1.25] text-slate-900 md:text-[34px] lg:text-[34px]">
                 Talk to a{" "}
-                <span className="text-[#3998de]">Verified Vet Online</span> in 15
-                Minutes
+                <span className="text-[#3998de]">Verified Vet Online</span> in
+                15 Minutes
               </h1>
 
               <p className="mt-2.5 text-sm leading-relaxed text-slate-500 md:text-[15px]">
-                Get an online video consultation and connect with an experienced
-                veterinarian in minutes. No appointment, no waiting room, just
-                practical guidance for your pet.
+                Connect with experienced, verified veterinarians from the comfort of your home. No waiting rooms, no travel — real medical guidance for your pet, anytime.
               </p>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center rounded-full bg-white/90 border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-                  Fixed Consultation Fee
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                  ⭐ 4.8/5 Rating
                 </span>
-                <span className="inline-flex items-center rounded-full bg-[#EAF4FF] border border-[#3998de]/20 px-3 py-1 text-xs font-semibold text-[#1D4E89] shadow-sm">
-                  7+ years experienced vets
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                  ✅ 100+ Verified Vets
+                </span>
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                  ⏱ 15 Min Response
+                </span>
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                  🔒 Secure & Private
                 </span>
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
-  <span
-    className={`h-2 w-2 rounded-full ${isDay ? "bg-amber-400" : "bg-indigo-400"}`}
-  />
-
-  <span>{isDay ? "Day Consult" : "Night Consult"}</span>
-
-  <span className="font-medium text-slate-500">
-    {isDay ? "(8 AM - 8 PM)" : "(8 PM - 8 AM)"}
-  </span>
-
-  <span className="inline-flex items-center gap-1.5">
-    <span className="text-slate-400">:</span>
-
-    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 line-through">
-      ₹{isDay ? 499 : 649}
-    </span>
-
-    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-extrabold text-emerald-700 shadow-sm">
-      ₹{isDay ? 399 : 549}
-    </span>
-
-    <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-600">
-      ₹100 OFF First Consult
-    </span>
-  </span>
-</span>
-                {/* <span className="text-xs text-slate-400">(No hidden charges)</span> */}
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {[
-                  { icon: BadgeCheck, text: "Verified veterinarians" },
-                  { icon: Clock, text: "15-minute video call" },
-                  { icon: ShieldCheck, text: "Trusted guidance" },
-                  { icon: Star, text: "4.8+ rated care" },
-                ].map((item) => (
+                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm">
                   <span
-                    key={item.text}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm"
-                  >
-                    <item.icon className="h-3.5 w-3.5 text-[#3998de]" />
-                    {item.text}
+                    className={`h-2 w-2 rounded-full ${isDay ? "bg-amber-400" : "bg-indigo-400"}`}
+                  />
+
+                  <span>{isDay ? "Day Consult" : "Night Consult"}</span>
+
+                  <span className="font-medium text-slate-500">
+                    {isDay ? "(8 AM - 8 PM)" : "(8 PM - 8 AM)"}
                   </span>
-                ))}
-              </div>
 
-              {/* CTA */}
-              <div className="mt-3 flex flex-wrap items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleStart}
-                  disabled={isStartingConsult}
-                  className="
-                    group inline-flex items-center justify-center gap-2
-                    rounded-xl bg-[#3998de] px-5 py-2.5 text-sm font-semibold text-white md:text-[15px]
-                    shadow-lg shadow-[#3998de]/30 transition
-                    hover:bg-[#2F7FC0]
-                    disabled:cursor-not-allowed disabled:opacity-80
-                  "
-                >
-                  {isStartingConsult
-                    ? "Connecting Dr Shashank..."
-                    : "Start Online Vet Consultation"}
-                  <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
-                </button>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-slate-400">:</span>
 
-                <a
-                  href="#how-it-works"
-                  className="inline-flex items-center justify-center rounded-xl border border-[#3998de]/30 px-4 py-2.5 text-sm font-semibold text-[#1D4E89] transition hover:bg-[#EAF4FF]"
-                >
-                  How It Works
-                </a>
+                    <span className="text-xs font-semibold text-slate-500 line-through">
+                      ₹{isDay ? 499 : 649}
+                    </span>
+
+                    <span className="text-sm font-extrabold text-emerald-700">
+                      ₹{isDay ? 399 : 549}
+                    </span>
+
+                    <span className="text-xs font-bold text-red-600">
+                      ₹100 OFF
+                    </span>
+                  </span>
+                </span>
+                {/* <span className="text-xs text-slate-400">(No hidden charges)</span> */}
               </div>
 
               <p className="mt-2 text-xs text-slate-500 sm:text-sm">
@@ -837,6 +852,34 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* CTA */}
+              <div className="mt-3 flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleStart}
+                  disabled={isStartingConsult}
+                  className="
+                    btn-highlight-anim group inline-flex items-center justify-center gap-2
+                    rounded-xl bg-[#3998de] px-5 py-2.5 text-sm font-semibold text-white md:text-[15px]
+                    shadow-lg shadow-[#3998de]/30 transition
+                    hover:bg-[#2F7FC0]
+                    disabled:cursor-not-allowed disabled:opacity-80
+                  "
+                >
+                  {isStartingConsult
+                    ? "Connecting Dr Shashank..."
+                    : "Start Online Vet Consultation"}
+                  <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
+                </button>
+
+                <a
+                  href="#how-it-works"
+                  className="btn-highlight-anim inline-flex items-center justify-center rounded-xl border border-[#3998de]/30 px-4 py-2.5 text-sm font-semibold text-[#1D4E89] transition hover:bg-[#EAF4FF]"
+                >
+                  How It Works
+                </a>
               </div>
             </div>
             {/* Right (Doctor Image) */}
@@ -913,7 +956,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </section>
 
       {/* Our Verified Vets */}
-      <section className="bg-gradient-to-b from-[#edf7ff] to-white py-10 md:py-12">
+      <section
+        id="verified-vets"
+        className="bg-gradient-to-b from-[#edf7ff] to-white py-10 md:py-12"
+      >
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
           <div className="inline-flex items-center gap-2 rounded-full bg-[#3998de] px-4 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-white">
             🩺 100+ Verified Online Veterinarians
@@ -978,23 +1024,21 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
           <div className="mt-5 flex flex-col items-start justify-between gap-4 rounded-2xl bg-slate-900 px-5 py-5 md:flex-row md:items-center">
             <p className="max-w-3xl text-sm text-slate-200">
               <span className="block font-bold text-white">
-                You don&apos;t pick a vet - we assign the best available one.
+                Want to Talk to a Vet Online Right Now?
               </span>
-              Tell us your pet&apos;s concern and we instantly match you to the
-              most suitable online veterinarian from our verified network.
+              Can't find a vet? We'll assign the best available one matching your pet's needs — usually within 2 minutes.
             </p>
-           <button
-  type="button"
-  onClick={handleStart}
-  disabled={isStartingConsult}
-  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3998de] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
->
-{isStartingConsult
-  ? "Connecting Dr Shashank..."
-  : `Consult a Vet Online - ₹${isDay ? 399 : 549} (₹100 OFF First Consult)`}
-  <ArrowRight className="h-4 w-4" />
-</button>
-
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={isStartingConsult}
+              className="btn-highlight-anim inline-flex items-center justify-center gap-2 rounded-full bg-[#3998de] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
+            >
+              {isStartingConsult
+                ? "Connecting Dr Shashank..."
+                : `Consult a Vet Online - ₹${isDay ? 399 : 549} (₹100 OFF)`}
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </section>
@@ -1015,7 +1059,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             type="button"
             onClick={handleStart}
             disabled={isStartingConsult}
-            className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[#1D4E89] shadow-md transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-80"
+            className="btn-highlight-anim inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[#1D4E89] shadow-md transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-80"
           >
             {isStartingConsult ? "Connecting..." : "Talk to a Vet Online"}
             <ArrowRight className="h-4 w-4" />
@@ -1038,7 +1082,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             <div className="mt-3 flex items-center justify-center gap-3">
               <div className="text-3xl font-extrabold text-slate-900">4.8</div>
               <div>
-                <div className="text-base leading-none text-amber-500">{"\u2605".repeat(5)}</div>
+                <div className="text-base leading-none text-amber-500">
+                  {"\u2605".repeat(5)}
+                </div>
                 <div className="text-xs text-slate-500">
                   Based on 1,200+ reviews
                 </div>
@@ -1052,7 +1098,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 key={review.id}
                 className="rounded-2xl border border-[#3998de]/20 bg-white p-4 shadow-sm"
               >
-                <div className="text-sm text-amber-500">{"\u2605".repeat(5)}</div>
+                <div className="text-sm text-amber-500">
+                  {"\u2605".repeat(5)}
+                </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   &quot;{review.text}&quot;
                 </p>
@@ -1065,7 +1113,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                       {review.author}
                     </div>
                     {review.petInfo ? (
-                      <div className="text-xs text-slate-500">{review.petInfo}</div>
+                      <div className="text-xs text-slate-500">
+                        {review.petInfo}
+                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -1290,7 +1340,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               <button
                 type="button"
                 onClick={() => setActiveBioVet(null)}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-700 hover:bg-slate-100"
+                className="btn-highlight-anim rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-700 hover:bg-slate-100"
                 aria-label="Close"
               >
                 <X size={18} />
@@ -1301,7 +1351,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 md:p-7">
                 <div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-8">
                   <div className="shrink-0">
-                    {activeBioVet?.image && !brokenImages.has(activeBioVet.id) ? (
+                    {activeBioVet?.image &&
+                    !brokenImages.has(activeBioVet.id) ? (
                       <img
                         src={activeBioVet.image}
                         alt={activeBioVet.name}
@@ -1438,7 +1489,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 </div>
 
                 <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                  <Button onClick={() => setActiveBioVet(null)} className="px-6">
+                  <Button
+                    onClick={() => setActiveBioVet(null)}
+                    className="btn-highlight-anim px-6"
+                  >
                     Close
                   </Button>
 
@@ -1448,7 +1502,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                       setActiveBioVet(null);
                       handleSelectVet(vet);
                     }}
-                    className="px-6 bg-[#3998de] hover:bg-[#2F7FC0] inline-flex items-center gap-2"
+                    className="btn-highlight-anim px-6 bg-[#3998de] hover:bg-[#2F7FC0] inline-flex items-center gap-2"
                   >
                     Proceed to Consult <ChevronRight size={18} />
                   </Button>
@@ -1460,7 +1514,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       ) : null}
 
       {/* App Download */}
-      <section className="bg-gradient-to-b from-white via-white to-[#f5f9ff] py-10 md:py-12">
+      <section
+        id="app-download"
+        className="bg-gradient-to-b from-white via-white to-[#f5f9ff] py-10 md:py-12"
+      >
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
           <div className="grid items-center gap-8 md:grid-cols-2 md:gap-10">
             {/* Left: Phone Mock */}
@@ -1503,7 +1560,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   { title: "Quick Nearby Clinic Access", icon: "\u{1F4CD}" },
-                  { title: "Vet Available", icon: "\u{1F468}\u200D\u2695\uFE0F" },
+                  {
+                    title: "Vet Available",
+                    icon: "\u{1F468}\u200D\u2695\uFE0F",
+                  },
                   { title: "Digital Records", icon: "\u{1F4C1}" },
                   { title: "Reminders", icon: "\u23F0" },
                 ].map((item) => (
@@ -1526,7 +1586,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       </section>
 
       {/* Why Consult Online */}
-      <section className="bg-slate-900 py-12 md:py-14">
+      <section id="benefits" className="bg-slate-900 py-12 md:py-14">
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
           <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#79BCED]">
             <span className="h-[2px] w-6 bg-[#3998de]" />
@@ -1541,20 +1601,36 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
           </p>
 
           <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-            {WHY_CONSULT_ONLINE.map((item) => (
-              <article
-                key={item.title}
-                className="rounded-2xl border border-white/15 bg-white/5 p-5"
-              >
-                <div className="text-2xl">{item.icon}</div>
-                <h3 className="mt-3 text-base font-bold text-white">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  {item.desc}
-                </p>
-              </article>
-            ))}
+            {WHY_CONSULT_ONLINE.map((item) => {
+              const isNightSupportCard = item.title === "Night Support";
+
+              return (
+                <article
+                  key={item.title}
+                  className="rounded-2xl border border-white/15 bg-white/5 p-5"
+                >
+                  <div className="text-2xl">{item.icon}</div>
+                  <h3 className="mt-3 text-base font-bold text-white">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    {item.desc}
+                  </p>
+
+                  {isNightSupportCard ? (
+                    <button
+                      type="button"
+                      onClick={handleStart}
+                      disabled={isStartingConsult}
+                      className="btn-highlight-anim mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#3998de] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
+                    >
+                      {isStartingConsult ? "Starting..." : "Talk to a Vet Online"}
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1589,7 +1665,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 <h3 className="mt-1 text-base font-bold text-slate-900">
                   {step.title}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-500">{step.desc}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  {step.desc}
+                </p>
               </div>
             ))}
           </div>
@@ -1619,7 +1697,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                   <button
                     type="button"
                     onClick={() => toggleFaq(idx)}
-                    className="flex w-full items-center justify-between bg-slate-50 px-4 py-4 text-left font-semibold text-slate-900 hover:bg-slate-100"
+                    className="btn-highlight-anim flex w-full items-center justify-between bg-slate-50 px-4 py-4 text-left font-semibold text-slate-900 hover:bg-slate-100"
                   >
                     <span className="pr-4">{item.q}</span>
                     <span className="text-xl font-bold text-[#3998de]">
@@ -1732,14 +1810,14 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                   onClick={() =>
                     typeof onVetAccess === "function" ? onVetAccess() : null
                   }
-                  className="block text-left hover:text-white"
+                  className="btn-highlight-anim block rounded-md px-1 py-0.5 text-left hover:text-white"
                 >
                   For Veterinarians
                 </button>
                 <a className="block hover:text-white" href="#faq">
                   FAQs
                 </a>
-                <a className="block hover:text-white" href="#">
+                <a className="block hover:text-white" href="#app-download">
                   App Download
                 </a>
               </div>
@@ -1762,22 +1840,87 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               <p className="truncate text-sm font-extrabold text-slate-900">
                 Talk to a Vet Online Now
               </p>
-              <p className="truncate text-xs text-slate-500">
-                15 min · Starting ₹{isDay ? 399 : 549} · 24/7
+              <p className="mt-1 flex items-center gap-1 overflow-hidden whitespace-nowrap text-[11px] text-slate-500">
+                <span className="font-medium">15 min</span>
+                <span className="text-slate-300">·</span>
+                <span className="text-[11px] font-semibold text-slate-500 line-through">
+                  ₹{originalConsultPrice}
+                </span>
+                <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-emerald-800 shadow-sm">
+                  <span className="text-[10px] font-semibold">Pay</span>
+                  <span className="ml-1 text-sm font-extrabold leading-none">
+                    ₹{discountedConsultPrice}
+                  </span>
+                </span>
+                <span className="text-[11px] font-bold text-rose-700">
+                  Save ₹{consultDiscountAmount}
+                </span>
+                <span className="text-slate-300">·</span>
+                <span className="font-medium">24/7</span>
               </p>
             </div>
             <button
               type="button"
               onClick={handleStart}
               disabled={isStartingConsult}
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-[#3998de] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
+              className="btn-highlight-anim inline-flex shrink-0 items-center gap-1 rounded-xl bg-[#3998de] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
             >
-              {isStartingConsult ? "Starting..." : "Start Now"}
+              {isStartingConsult ? "Starting..." : "Talk to a Vet Online"}
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       ) : null}
+
+      <style>
+        {`
+          @keyframes mobileHeaderTicker {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-50%, 0, 0); }
+          }
+
+          .btn-highlight-anim {
+            position: relative;
+            overflow: hidden;
+            transition:
+              transform 220ms ease,
+              box-shadow 260ms ease,
+              filter 260ms ease;
+          }
+
+          .btn-highlight-anim::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -140%;
+            width: 55%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(
+              110deg,
+              rgba(255, 255, 255, 0) 0%,
+              rgba(255, 255, 255, 0.42) 50%,
+              rgba(255, 255, 255, 0) 100%
+            );
+            transform: skewX(-20deg);
+            transition: left 520ms ease;
+          }
+
+          .btn-highlight-anim:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(57, 152, 222, 0.26);
+            filter: saturate(1.06);
+          }
+
+          .btn-highlight-anim:hover::after {
+            left: 140%;
+          }
+
+          .btn-highlight-anim:active {
+            transform: translateY(0) scale(0.98);
+          }
+        `}
+      </style>
     </div>
   );
 };
