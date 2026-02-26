@@ -591,6 +591,7 @@ Route::post('/user-pet-observation', function (Request $request) {
     // Some clients send multipart values wrapped in quotes (e.g. "\"1\"").
     $request->merge([
         'city' => $normalizeScalar($request->input('city')),
+        'weight' => $normalizeScalar($request->input('weight')),
         'is_neutered' => $normalizeScalar($request->input('is_neutered')),
         'vaccenated_yes_no' => $normalizeScalar($request->input('vaccenated_yes_no')),
         'vaccinated_yes_no' => $normalizeScalar($request->input('vaccinated_yes_no')),
@@ -601,6 +602,7 @@ Route::post('/user-pet-observation', function (Request $request) {
         'name' => ['required', 'string', 'max:255'],
         'phone' => ['required', 'string', 'max:20'],
         'city' => ['nullable', 'string', 'max:120'],
+        'weight' => ['nullable', 'numeric', 'min:0'],
         'breed' => ['required', 'string', 'max:255'],
         'dob' => ['nullable', 'date'],
         'type' => ['required', 'string', 'max:100'],
@@ -769,6 +771,9 @@ Route::post('/user-pet-observation', function (Request $request) {
                 $pet->dob = $data['dob'];
             }
         }
+        if (array_key_exists('weight', $data) && $data['weight'] !== null && Schema::hasColumn('pets', 'weight')) {
+            $pet->weight = $data['weight'];
+        }
         if (array_key_exists('is_neutered', $data) && Schema::hasColumn('pets', 'is_neutered')) {
             $isNeutered = (bool) $data['is_neutered'];
             $isNeuteredColumnType = null;
@@ -851,6 +856,7 @@ Route::post('/user-pet-observation', function (Request $request) {
             'gender',
             'pet_dob',
             'dob',
+            'weight',
             'reported_symptom',
             'pet_doc2',
         ]);
