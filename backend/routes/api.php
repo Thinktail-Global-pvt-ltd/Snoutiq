@@ -715,8 +715,12 @@ Route::post('/user-pet-observation', function (Request $request) {
                 'email' => $email,
                 'role' => 'pet_parent',
                 'password' => Hash::make('123456'),
-                ...(($hasUserCityColumn && array_key_exists('city', $data)) ? ['city' => $data['city']] : []),
             ]);
+
+            if ($hasUserCityColumn && array_key_exists('city', $data)) {
+                $user->city = $data['city'];
+                $user->save();
+            }
         }
 
         if ($hasUserProfileCityColumn && array_key_exists('city', $data) && $data['city'] !== null) {
