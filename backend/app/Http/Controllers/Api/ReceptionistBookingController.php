@@ -9,6 +9,7 @@ use App\Models\UserPet;
 use App\Models\Receptionist;
 use App\Models\Appointment;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
@@ -438,6 +439,7 @@ class ReceptionistBookingController extends Controller
             'pet_doc1' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
             'pet_image' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
             'pet_pic' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
+            'pet_doc2' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
             'last_vet_id' => 'nullable|integer|exists:vet_registerations_temp,id',
         ], [
             'phone.unique' => 'A patient with this phone number already exists.',
@@ -535,12 +537,34 @@ class ReceptionistBookingController extends Controller
                 $petPayload['gender'] = $data['pet_gender'] ?? 'unknown';
             }
 
-            $petDocPath = $this->storePetDocument($request);
+            $uploadedPetFile = $this->resolvePetUploadFile($request);
+            $blobColumnsReady = $this->petDoc2BlobColumnsReady();
+            if ($uploadedPetFile && ! $blobColumnsReady) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'pet_doc2 blob columns are missing. Please run migrations.',
+                ], 500);
+            }
+
+            $petDocBlob = null;
+            $petDocMime = null;
+            if ($uploadedPetFile && $blobColumnsReady) {
+                $petDocBlob = $uploadedPetFile->get();
+                $petDocMime = $uploadedPetFile->getMimeType() ?: ($uploadedPetFile->getClientMimeType() ?: 'application/octet-stream');
+            }
+
+            $petDocPath = $this->storePetDocument($uploadedPetFile);
             if ($petDocPath) {
                 if (Schema::hasColumn('pets', 'pet_doc1')) {
                     $petPayload['pet_doc1'] = $petDocPath;
                 } elseif (Schema::hasColumn('pets', 'pic_link')) {
                     $petPayload['pic_link'] = $petDocPath;
+                }
+            }
+            if ($petDocBlob !== null && Schema::hasColumn('pets', 'pet_doc2_blob')) {
+                $petPayload['pet_doc2_blob'] = $petDocBlob;
+                if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
+                    $petPayload['pet_doc2_mime'] = $petDocMime;
                 }
             }
 
@@ -568,6 +592,9 @@ class ReceptionistBookingController extends Controller
             if (isset($petPayload['pic_link'])) {
                 $pet->pic_link = url($petPayload['pic_link']);
             }
+            if ($petDocBlob !== null) {
+                $pet->pet_doc2_blob_url = route('api.pets.pet-doc2-blob', ['pet' => $petId], true);
+            }
         }
 
         return response()->json([
@@ -586,26 +613,26 @@ class ReceptionistBookingController extends Controller
                     'name' => $pet->name,
                     'type' => $pet->type,
                     'breed' => $pet->breed,
+                    'pet_doc2_blob_url' => $pet->pet_doc2_blob_url ?? null,
+                    'pet_image_url' => $pet->pet_doc2_blob_url ?? $pet->pet_doc1 ?? $pet->pic_link ?? null,
                 ] : null,
             ],
         ], 201);
     }
 
-    private function storePetDocument(Request $request): ?string
+    private function resolvePetUploadFile(Request $request): ?UploadedFile
     {
-        $field = null;
-        foreach (['pet_doc1', 'pet_image', 'pet_pic'] as $candidate) {
+        foreach (['pet_doc2', 'pet_doc1', 'pet_image', 'pet_pic'] as $candidate) {
             if ($request->hasFile($candidate)) {
-                $field = $candidate;
-                break;
+                return $request->file($candidate);
             }
         }
 
-        if (!$field) {
-            return null;
-        }
+        return null;
+    }
 
-        $file = $request->file($field);
+    private function storePetDocument(?UploadedFile $file): ?string
+    {
         if (!$file || !$file->isValid()) {
             return null;
         }
@@ -619,6 +646,13 @@ class ReceptionistBookingController extends Controller
         $file->move($uploadPath, $docName);
 
         return 'backend/uploads/pet_docs/'.$docName;
+    }
+
+    private function petDoc2BlobColumnsReady(): bool
+    {
+        return Schema::hasTable('pets')
+            && Schema::hasColumn('pets', 'pet_doc2_blob')
+            && Schema::hasColumn('pets', 'pet_doc2_mime');
     }
 
     public function storeBooking(Request $request)
