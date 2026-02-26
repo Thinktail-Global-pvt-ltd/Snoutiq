@@ -44,6 +44,18 @@ const toNumber = (value) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+const toBoolean = (value) => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "y"].includes(normalized)) return true;
+    if (["0", "false", "no", "n"].includes(normalized)) return false;
+  }
+  return undefined;
+};
+
 const stripEmpty = (payload) =>
   Object.fromEntries(
     Object.entries(payload).filter(
@@ -91,7 +103,8 @@ export const PaymentScreen = ({
   const gstRate = 0.18;
   const baseAmount = fee + service;
   const gstAmount = Math.round(baseAmount * gstRate);
-  const total = baseAmount + gstAmount;
+  const totalBeforeDiscount = baseAmount + gstAmount;
+  const firstUserDiscount = 100;
 
   const [isPaying, setIsPaying] = useState(false);
   const [gatewayReady, setGatewayReady] = useState(false);
@@ -99,6 +112,7 @@ export const PaymentScreen = ({
   const [statusMessage, setStatusMessage] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [hasUsedFirstOffer, setHasUsedFirstOffer] = useState(false);
   const [gstNumber, setGstNumber] = useState(() =>
     pickValue(
       paymentMeta?.gst_number,
@@ -129,6 +143,64 @@ export const PaymentScreen = ({
       active = false;
     };
   }, []);
+
+  const resolvedUserId = useMemo(
+    () =>
+      toNumber(
+        pickValue(
+          paymentMeta?.user_id,
+          paymentMeta?.userId,
+          petDetails?.user_id,
+          petDetails?.userId,
+          petDetails?.data?.user_id,
+          petDetails?.data?.userId,
+          petDetails?.user?.id
+        )
+      ),
+    [paymentMeta, petDetails]
+  );
+
+  const firstOfferStorageKey = useMemo(
+    () => `snoutiq:first-offer-used:${resolvedUserId ?? "guest"}`,
+    [resolvedUserId]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      setHasUsedFirstOffer(window.localStorage.getItem(firstOfferStorageKey) === "1");
+    } catch {
+      setHasUsedFirstOffer(false);
+    }
+  }, [firstOfferStorageKey]);
+
+  const firstUserFlag = useMemo(
+    () =>
+      toBoolean(
+        pickValue(
+          paymentMeta?.is_first_user,
+          paymentMeta?.isFirstUser,
+          paymentMeta?.first_user,
+          paymentMeta?.firstUser,
+          paymentMeta?.first_consultation,
+          paymentMeta?.firstConsultation,
+          petDetails?.is_first_user,
+          petDetails?.isFirstUser,
+          petDetails?.first_user,
+          petDetails?.firstUser,
+          petDetails?.first_consultation,
+          petDetails?.firstConsultation
+        )
+      ),
+    [paymentMeta, petDetails]
+  );
+
+  const isFirstUserOfferEligible =
+    firstUserFlag !== undefined ? firstUserFlag : !hasUsedFirstOffer;
+  const discountAmount = isFirstUserOfferEligible
+    ? Math.min(firstUserDiscount, totalBeforeDiscount)
+    : 0;
+  const total = Math.max(totalBeforeDiscount - discountAmount, 0);
 
   const paymentContext = useMemo(() => {
     const orderType =
@@ -258,8 +330,20 @@ export const PaymentScreen = ({
       user_id: userId,
       gst_number: hasGstNumber ? gstNumberCleaned : undefined,
       gst_number_given: hasGstNumber ? 1 : undefined,
+      first_user_offer_applied: discountAmount > 0 ? 1 : 0,
+      offer_discount_inr: discountAmount,
+      original_amount_inr: Math.round(totalBeforeDiscount),
+      final_amount_inr: Math.round(total),
     });
-  }, [paymentMeta, petDetails, vet, gstNumber]);
+  }, [
+    paymentMeta,
+    petDetails,
+    vet,
+    gstNumber,
+    discountAmount,
+    totalBeforeDiscount,
+    total,
+  ]);
 
   const statusClassName = useMemo(() => {
     if (statusType === "success") return "text-emerald-600";
@@ -333,6 +417,14 @@ export const PaymentScreen = ({
             }
 
             updateStatus("success", "Payment successful.");
+            if (discountAmount > 0 && typeof window !== "undefined") {
+              try {
+                window.localStorage.setItem(firstOfferStorageKey, "1");
+              } catch {
+                // Ignore storage failures in private mode.
+              }
+              setHasUsedFirstOffer(true);
+            }
             setShowSuccessModal(true);
             onPay?.(verify);
           } catch (error) {
@@ -504,13 +596,21 @@ export const PaymentScreen = ({
               </div>
 
               <div className="space-y-6 md:sticky md:top-24">
-                  <div className="rounded-xl border border-gray-200 bg-white p-5">
+                  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-semibold text-gray-800">Payment Summary</h4>
                       <div className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
                         Instant confirmation
                       </div>
                     </div>
+
+                    {isFirstUserOfferEligible ? (
+                      <div className="mt-4 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-2.5">
+                        <p className="text-[11px] font-semibold text-blue-800">
+                          First-time user offer: You get Rs 100 OFF on this consultation.
+                        </p>
+                      </div>
+                    ) : null}
 
                     <div className="mt-4 space-y-3 text-sm text-gray-600">
                       <div className="flex justify-between">
@@ -530,6 +630,13 @@ export const PaymentScreen = ({
                         <span>Rs {gstAmount}</span>
                       </div>
 
+                      {discountAmount > 0 ? (
+                        <div className="flex justify-between font-semibold text-emerald-700">
+                          <span>First User Discount</span>
+                          <span>- Rs {discountAmount}</span>
+                        </div>
+                      ) : null}
+
                       <div className="flex justify-between">
                         <span>Digital Prescription</span>
                         <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold">
@@ -537,9 +644,16 @@ export const PaymentScreen = ({
                         </span>
                       </div>
 
-                      <div className="border-t border-gray-100 pt-4 flex justify-between font-semibold text-gray-900">
+                      <div className="border-t border-gray-100 pt-4 flex justify-between items-end font-semibold text-gray-900">
                         <span>Total to pay</span>
-                        <span>Rs {total}</span>
+                        <div className="text-right">
+                          {discountAmount > 0 ? (
+                            <div className="text-[11px] font-medium text-gray-400 line-through">
+                              Rs {totalBeforeDiscount}
+                            </div>
+                          ) : null}
+                          <div className="text-base font-bold text-gray-900">Rs {total}</div>
+                        </div>
                       </div>
                     </div>
 
@@ -593,6 +707,12 @@ export const PaymentScreen = ({
                       Secure UPI / Card Payment
                     </p>
 
+                    {discountAmount > 0 ? (
+                      <p className="text-[11px] text-center font-medium text-emerald-700">
+                        Offer applied: Rs {discountAmount} discounted from your first consultation.
+                      </p>
+                    ) : null}
+
                     {statusMessage ? (
                       <p className={`text-xs text-center ${statusClassName}`}>
                         {statusMessage}
@@ -625,6 +745,12 @@ export const PaymentScreen = ({
         <p className="text-[10px] text-center text-gray-500 mt-2 flex items-center justify-center gap-1">
           <ShieldCheck size={10} className="text-emerald-600" /> Secure UPI / Card Payment
         </p>
+
+        {discountAmount > 0 ? (
+          <p className="text-[10px] text-center mt-1 font-medium text-emerald-700">
+            First-time offer applied: Rs {discountAmount} OFF
+          </p>
+        ) : null}
 
         {statusMessage ? (
           <p className={`text-xs text-center mt-2 ${statusClassName}`}>
