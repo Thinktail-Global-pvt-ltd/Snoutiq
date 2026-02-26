@@ -1594,36 +1594,32 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
           </p>
 
           <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-            {WHY_CONSULT_ONLINE.map((item) => {
-              const isNightSupportCard = item.title === "Night Support";
+            {WHY_CONSULT_ONLINE.map((item) => (
+              <article
+                key={item.title}
+                className="rounded-2xl border border-white/15 bg-white/5 p-5"
+              >
+                <div className="text-2xl">{item.icon}</div>
+                <h3 className="mt-3 text-base font-bold text-white">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {item.desc}
+                </p>
+              </article>
+            ))}
+          </div>
 
-              return (
-                <article
-                  key={item.title}
-                  className="rounded-2xl border border-white/15 bg-white/5 p-5"
-                >
-                  <div className="text-2xl">{item.icon}</div>
-                  <h3 className="mt-3 text-base font-bold text-white">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
-                    {item.desc}
-                  </p>
-
-                  {isNightSupportCard ? (
-                    <button
-                      type="button"
-                      onClick={handleStart}
-                      disabled={isStartingConsult}
-                      className="btn-highlight-anim mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#3998de] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
-                    >
-                      {isStartingConsult ? "Starting..." : "Talk to a Vet Online"}
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                </article>
-              );
-            })}
+          <div className="mt-5">
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={isStartingConsult}
+              className="btn-highlight-anim inline-flex items-center gap-1.5 rounded-xl bg-[#3998de] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
+            >
+              {isStartingConsult ? "Starting..." : "Talk to a Vet Online"}
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </section>
