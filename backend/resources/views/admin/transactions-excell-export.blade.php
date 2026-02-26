@@ -102,6 +102,7 @@
 @php
     $capturedTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'captured');
     $pendingTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'pending');
+    $apiPathPrefix = request()->is('backend') || request()->is('backend/*') ? '/backend' : '';
     $totalPaise = $capturedTransactions->sum('amount_paise');
     $pendingTotalPaise = $pendingTransactions->sum('amount_paise');
     $formatInr = fn ($paise) => number_format(($paise ?? 0) / 100, 2);
@@ -155,6 +156,7 @@
                                     <th>User</th>
                                     <th>Pet</th>
                                     <th>Details</th>
+                                    <th class="text-nowrap">Prescription</th>
                                     <th class="text-nowrap">Manual WhatsApp</th>
                                 </tr>
                             </thead>
@@ -191,6 +193,13 @@
                                             'pending' => 'text-bg-warning',
                                             default => 'text-bg-light',
                                         };
+                                        $prescriptionId = $txn->prescription_id
+                                            ?? data_get($txn->metadata, 'notes.prescription_id')
+                                            ?? data_get($txn->metadata, 'prescription_id');
+                                        $prescriptionId = is_numeric($prescriptionId) ? (int) $prescriptionId : null;
+                                        $prescriptionPdfUrl = $prescriptionId
+                                            ? "{$apiPathPrefix}/api/consultation/prescription/pdf?prescription_id={$prescriptionId}"
+                                            : null;
                                     @endphp
                                     <tr>
                                         <td data-label="ID">#{{ $txn->id }}</td>
@@ -245,6 +254,20 @@
                                                 >
                                                     View Details
                                                 </button>
+                                            @else
+                                                <span class="text-muted small">Unavailable</span>
+                                            @endif
+                                        </td>
+                                        <td data-label="Prescription">
+                                            @if($prescriptionPdfUrl)
+                                                <a
+                                                    href="{{ $prescriptionPdfUrl }}"
+                                                    class="btn btn-sm btn-outline-secondary text-nowrap"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    Download PDF
+                                                </a>
                                             @else
                                                 <span class="text-muted small">Unavailable</span>
                                             @endif
