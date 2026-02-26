@@ -640,54 +640,55 @@ class PaymentController extends Controller
         }
 
         $grossPaise = max(0, (int) $grossPaise);
-        // Keep GST data informational only; payout split is based on the paid gross amount.
+        // Payout split must happen on base amount (after removing GST from paid gross).
         $amountBeforeGstPaise = (int) round($grossPaise / 1.18);
         $gstPaise = max(0, $grossPaise - $amountBeforeGstPaise);
 
-        $doctorSharePaise = $this->resolveExcelDoctorSharePaise($grossPaise, $amountBeforeGstPaise);
-        $snoutiqSharePaise = max(0, $grossPaise - $doctorSharePaise);
+        $doctorSharePaise = $this->resolveExcelDoctorSharePaise($amountBeforeGstPaise, $grossPaise);
+        $snoutiqSharePaise = max(0, $amountBeforeGstPaise - $doctorSharePaise);
 
         return [
             'actual_amount_paid_by_consumer_paise' => $grossPaise,
             'gst_paise' => $gstPaise,
             'amount_after_gst_paise' => $amountBeforeGstPaise,
             'amount_before_gst_paise' => $amountBeforeGstPaise,
-            'gst_deducted_from_amount' => false,
+            'gst_deducted_from_amount' => true,
             'payment_to_snoutiq_paise' => $snoutiqSharePaise,
             'payment_to_doctor_paise' => $doctorSharePaise,
         ];
     }
 
-    protected function resolveExcelDoctorSharePaise(int $grossPaise, int $amountBeforeGstPaise): int
+    protected function resolveExcelDoctorSharePaise(int $amountBeforeGstPaise, int $grossPaise): int
     {
-        $grossPaise = max(0, (int) $grossPaise);
         $amountBeforeGstPaise = max(0, $amountBeforeGstPaise);
+        $grossPaise = max(0, (int) $grossPaise);
 
-        // Gross amount slabs:
-        // 471 => doctor 350, rest Snoutiq
-        // 648 => doctor 450, rest Snoutiq
-        // Legacy gross support:
-        // 590 => doctor 350
-        // 767 => doctor 450
-        if (abs($grossPaise - 47100) <= 500 || abs($grossPaise - 59000) <= 500) {
-            return min($grossPaise, 35000);
+        // Base split slabs:
+        // 399 => 350 doctor + 49 snoutiq
+        // 549 => 450 doctor + 99 snoutiq
+        // Gross equivalents (with 18% GST): 471, 648
+        if (
+            abs($amountBeforeGstPaise - 39900) <= 400
+            || abs($grossPaise - 47100) <= 500
+            || abs($grossPaise - 39900) <= 400
+            || abs($amountBeforeGstPaise - 50000) <= 400 // legacy base
+            || abs($grossPaise - 59000) <= 500 // legacy gross
+        ) {
+            return min($amountBeforeGstPaise, 35000);
         }
 
-        if (abs($grossPaise - 64800) <= 500 || abs($grossPaise - 76700) <= 500) {
-            return min($grossPaise, 45000);
+        if (
+            abs($amountBeforeGstPaise - 54900) <= 400
+            || abs($grossPaise - 64800) <= 500
+            || abs($grossPaise - 54900) <= 400
+            || abs($amountBeforeGstPaise - 65000) <= 400 // legacy base
+            || abs($grossPaise - 76700) <= 500 // legacy gross
+        ) {
+            return min($amountBeforeGstPaise, 45000);
         }
 
-        // Compatibility fallback for flows still sending pre-GST/base values.
-        if (abs($amountBeforeGstPaise - 39900) <= 400 || abs($amountBeforeGstPaise - 50000) <= 400) {
-            return min($grossPaise, 35000);
-        }
-
-        if (abs($amountBeforeGstPaise - 54900) <= 400 || abs($amountBeforeGstPaise - 65000) <= 400) {
-            return min($grossPaise, 45000);
-        }
-
-        // Fallback for unexpected values.
-        return min($grossPaise, 45000);
+        // Fallback for unexpected values: keep a conservative doctor share on base amount.
+        return min($amountBeforeGstPaise, 45000);
     }
 
     protected function resolveClinicId(Request $request, array $notes, array $context = []): ?int
