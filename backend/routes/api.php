@@ -576,6 +576,27 @@ Route::match(['get', 'post'], '/excell-export/doctors/update-video-rates', funct
 
 // Create user + pet + observation
 Route::post('/user-pet-observation', function (Request $request) {
+    $normalizeScalar = static function ($value) {
+        if (! is_string($value)) {
+            return $value;
+        }
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        return trim($trimmed, "\"'");
+    };
+
+    // Some clients send multipart values wrapped in quotes (e.g. "\"1\"").
+    $request->merge([
+        'city' => $normalizeScalar($request->input('city')),
+        'is_neutered' => $normalizeScalar($request->input('is_neutered')),
+        'vaccenated_yes_no' => $normalizeScalar($request->input('vaccenated_yes_no')),
+        'vaccinated_yes_no' => $normalizeScalar($request->input('vaccinated_yes_no')),
+        'deworming_yes_no' => $normalizeScalar($request->input('deworming_yes_no')),
+    ]);
+
     $data = $request->validate([
         'name' => ['required', 'string', 'max:255'],
         'phone' => ['required', 'string', 'max:20'],
@@ -600,10 +621,27 @@ Route::post('/user-pet-observation', function (Request $request) {
 
     $uploadedFile = $request->file('file');
     $hasUserCityColumn = Schema::hasTable('users') && Schema::hasColumn('users', 'city');
+    $hasUserProfileCityColumn = Schema::hasTable('user_profiles')
+        && Schema::hasColumn('user_profiles', 'user_id')
+        && Schema::hasColumn('user_profiles', 'city');
     $hasPetDewormingColumn = Schema::hasTable('pets') && Schema::hasColumn('pets', 'deworming_yes_no');
     $petDoc2BlobColumnsReady = Schema::hasTable('pets')
         && Schema::hasColumn('pets', 'pet_doc2_blob')
         && Schema::hasColumn('pets', 'pet_doc2_mime');
+
+    if (array_key_exists('city', $data) && $data['city'] !== null && ! $hasUserCityColumn && ! $hasUserProfileCityColumn) {
+        return response()->json([
+            'success' => false,
+            'message' => 'city column missing (users.city/user_profiles.city). Please run migrations.',
+        ], 500);
+    }
+
+    if (array_key_exists('deworming_yes_no', $data) && $data['deworming_yes_no'] !== null && ! $hasPetDewormingColumn) {
+        return response()->json([
+            'success' => false,
+            'message' => 'pets.deworming_yes_no column is missing. Please run migrations.',
+        ], 500);
+    }
 
     if ($uploadedFile && ! $petDoc2BlobColumnsReady) {
         return response()->json([
@@ -612,7 +650,28 @@ Route::post('/user-pet-observation', function (Request $request) {
         ], 500);
     }
 
-    $result = DB::transaction(function () use ($data, $uploadedFile, $petDoc2BlobColumnsReady, $hasUserCityColumn, $hasPetDewormingColumn) {
+    $toNullableBoolInt = static function ($value): ?int {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+        if (is_numeric($value)) {
+            return ((int) $value) === 1 ? 1 : 0;
+        }
+        $normalized = strtolower(trim((string) $value, " \t\n\r\0\x0B\"'"));
+        if (in_array($normalized, ['1', 'true', 'yes', 'y'], true)) {
+            return 1;
+        }
+        if (in_array($normalized, ['0', 'false', 'no', 'n'], true)) {
+            return 0;
+        }
+
+        return null;
+    };
+
+    $result = DB::transaction(function () use ($data, $uploadedFile, $petDoc2BlobColumnsReady, $hasUserCityColumn, $hasUserProfileCityColumn, $hasPetDewormingColumn, $toNullableBoolInt) {
         $phoneDigits = preg_replace('/\\D+/', '', $data['phone']);
 
         // Find existing user by phone (normalized) or exact match
@@ -658,6 +717,23 @@ Route::post('/user-pet-observation', function (Request $request) {
                 'password' => Hash::make('123456'),
                 ...(($hasUserCityColumn && array_key_exists('city', $data)) ? ['city' => $data['city']] : []),
             ]);
+        }
+
+        if ($hasUserProfileCityColumn && array_key_exists('city', $data) && $data['city'] !== null) {
+            $profilePayload = [
+                'city' => $data['city'],
+                'updated_at' => now(),
+            ];
+            if (Schema::hasColumn('user_profiles', 'name')) {
+                $profilePayload['name'] = $data['name'];
+            }
+            if (! DB::table('user_profiles')->where('user_id', $user->id)->exists()) {
+                $profilePayload['created_at'] = now();
+            }
+            DB::table('user_profiles')->updateOrInsert(
+                ['user_id' => $user->id],
+                $profilePayload
+            );
         }
 
         $pet = new Pet();
@@ -720,12 +796,15 @@ Route::post('/user-pet-observation', function (Request $request) {
                 $pet->is_neutered = $isNeutered ? 1 : 0;
             }
         }
-        $vaccinatedYesNo = $data['vaccenated_yes_no'] ?? $data['vaccinated_yes_no'] ?? null;
+        $vaccinatedYesNo = $toNullableBoolInt($data['vaccenated_yes_no'] ?? $data['vaccinated_yes_no'] ?? null);
         if ($vaccinatedYesNo !== null && Schema::hasColumn('pets', 'vaccenated_yes_no')) {
-            $pet->vaccenated_yes_no = (int) ((bool) $vaccinatedYesNo);
+            $pet->vaccenated_yes_no = $vaccinatedYesNo;
         }
         if (array_key_exists('deworming_yes_no', $data) && $hasPetDewormingColumn) {
-            $pet->deworming_yes_no = (int) ((bool) $data['deworming_yes_no']);
+            $dewormingYesNo = $toNullableBoolInt($data['deworming_yes_no']);
+            if ($dewormingYesNo !== null) {
+                $pet->deworming_yes_no = $dewormingYesNo;
+            }
         }
 
         // Handle optional file upload and set pet_doc2
@@ -791,8 +870,23 @@ Route::post('/user-pet-observation', function (Request $request) {
         $observation->observed_at = now();
         $observation->save();
 
+        $resolvedUserCity = null;
+        if ($hasUserCityColumn) {
+            $resolvedUserCity = $user->city;
+        }
+        if (($resolvedUserCity === null || $resolvedUserCity === '') && $hasUserProfileCityColumn) {
+            $resolvedUserCity = DB::table('user_profiles')
+                ->where('user_id', $user->id)
+                ->value('city');
+        }
+
+        $userPayload = $user->only(['id', 'name', 'phone', 'email']);
+        if ($resolvedUserCity !== null && $resolvedUserCity !== '') {
+            $userPayload['city'] = $resolvedUserCity;
+        }
+
         return [
-            'user' => $user->only(array_values(array_filter(['id', 'name', 'phone', 'email', $hasUserCityColumn ? 'city' : null]))),
+            'user' => $userPayload,
             'pet' => $petPayload,
             'observation' => $observation->only(['id', 'user_id', 'pet_id', 'appetite', 'energy', 'mood', 'observed_at']),
         ];
