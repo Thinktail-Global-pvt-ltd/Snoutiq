@@ -102,7 +102,6 @@
 @php
     $capturedTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'captured');
     $pendingTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'pending');
-    $apiPathPrefix = request()->is('backend') || request()->is('backend/*') ? '/backend' : '';
     $totalPaise = $capturedTransactions->sum('amount_paise');
     $pendingTotalPaise = $pendingTransactions->sum('amount_paise');
     $formatInr = fn ($paise) => number_format(($paise ?? 0) / 100, 2);
@@ -198,7 +197,7 @@
                                             ?? data_get($txn->metadata, 'prescription_id');
                                         $prescriptionId = is_numeric($prescriptionId) ? (int) $prescriptionId : null;
                                         $prescriptionPdfUrl = $prescriptionId
-                                            ? "{$apiPathPrefix}/api/consultation/prescription/pdf?prescription_id={$prescriptionId}"
+                                            ? "/backend/api/consultation/prescription/pdf?prescription_id={$prescriptionId}"
                                             : null;
                                     @endphp
                                     <tr>
