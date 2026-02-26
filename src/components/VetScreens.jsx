@@ -2227,7 +2227,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [prescriptionView, setPrescriptionView] = useState("edit");
   const [prescriptionSubmitting, setPrescriptionSubmitting] = useState(false);
   const [prescriptionError, setPrescriptionError] = useState("");
-  const [prescriptionNotice, setPrescriptionNotice] = useState("");
   const [prescriptionSuccess, setPrescriptionSuccess] = useState(false);
   const [showPrescriptionSuccessModal, setShowPrescriptionSuccessModal] =
     useState(false);
@@ -2514,7 +2513,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const resetPrescriptionForm = (transaction = null) => {
     setPrescriptionForm(createPrescriptionForm(transaction));
     setPrescriptionError("");
-    setPrescriptionNotice("");
     setPrescriptionSuccess(false);
     setPrescriptionView("edit");
   };
@@ -2544,7 +2542,6 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     setPrescriptionView("edit");
     setPrescriptionSubmitting(false);
     setPrescriptionSuccess(false);
-    setPrescriptionNotice("");
     setShowPrescriptionSuccessModal(false);
     setDocPreviewUrl("");
     if (prescriptionSuccessTimer.current) {
@@ -2609,35 +2606,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     });
   };
 
-  const savePrescriptionDraft = () => {
-    if (!activeTransaction) return;
-    const draftKey = `snoutiq_prescription_draft_${
-      activeTransaction?.id || activeTransaction?.reference || Date.now()
-    }`;
-    try {
-      window.localStorage.setItem(
-        draftKey,
-        JSON.stringify({
-          savedAt: new Date().toISOString(),
-          transactionId: activeTransaction?.id || "",
-          form: prescriptionForm,
-        }),
-      );
-      setPrescriptionNotice("Draft saved locally.");
-      setPrescriptionError("");
-    } catch {
-      setPrescriptionError("Unable to save draft on this device.");
-      setPrescriptionNotice("");
-    }
-  };
-
   const handlePrescriptionSubmit = async (event) => {
     event.preventDefault();
     if (!activeTransaction || prescriptionSubmitting) return;
 
     setPrescriptionSubmitting(true);
     setPrescriptionError("");
-    setPrescriptionNotice("");
     setPrescriptionSuccess(false);
 
     const { userId, petId, doctorId, clinicId } =
@@ -3775,8 +3749,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3">
+                      <label className="block text-xs font-semibold text-blue-700 mb-1">
                         Clinical Notes / Tentative Diagnosis by Vet
                       </label>
                       <textarea
@@ -3784,12 +3758,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         onChange={updatePrescriptionField("diagnosis")}
                         rows={2}
                         placeholder="Possible gastritis, dehydration..."
-                        className={`${INPUT_BASE_CLASS} resize-none`}
+                        className={`${INPUT_BASE_CLASS} resize-none border-blue-200 bg-white focus:border-blue-500 focus:ring-blue-200`}
                       />
+                      <p className="mt-1 text-[11px] text-blue-700">
+                        Highlight the likely diagnosis clearly for medical records.
+                      </p>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+                      <label className="block text-xs font-semibold text-emerald-700 mb-1">
                         Vet Advice / Home Care Tips
                       </label>
                       <textarea
@@ -3797,8 +3774,11 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         onChange={updatePrescriptionField("homeCare")}
                         rows={3}
                         placeholder="Feed small frequent meals, ensure hydration..."
-                        className={`${INPUT_BASE_CLASS} resize-none`}
+                        className={`${INPUT_BASE_CLASS} resize-none border-emerald-200 bg-white focus:border-emerald-500 focus:ring-emerald-200`}
                       />
+                      <p className="mt-1 text-[11px] text-emerald-700">
+                        Add practical, easy-to-follow advice for the pet parent.
+                      </p>
                     </div>
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
@@ -4001,21 +3981,16 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-stone-100 bg-white p-4 shadow-sm">
-                    <div className="text-xs uppercase text-stone-400">
-                      Submission
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800">
+                      <AlertCircle size={14} />
+                      Final Check Before Sending
                     </div>
-                    <p className="mt-2 text-xs text-stone-500">
-                      Please ensure all fields are complete before saving the
-                      prescription.
+                    <p className="mt-2 text-xs leading-relaxed text-amber-800/90">
+                      Please complete the highlighted diagnosis, home care, and
+                      medications section for a complete digital prescription.
                     </p>
                   </div>
-
-                  {prescriptionNotice ? (
-                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-700">
-                      {prescriptionNotice}
-                    </div>
-                  ) : null}
 
                   {prescriptionError ? (
                     <div className="flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
@@ -4027,22 +4002,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                   <div className="flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={savePrescriptionDraft}
-                      className="rounded-full border border-stone-200 px-5 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
-                    >
-                      Save Draft
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => setPrescriptionView("preview")}
-                      className="rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-100"
+                      className="rounded-full border border-blue-200 bg-blue-50 px-5 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
                     >
                       Preview
                     </button>
                     <button
                       type="submit"
                       disabled={prescriptionSubmitting}
-                      className={`rounded-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 px-6 py-2 text-sm font-semibold text-white ${
+                      className={`rounded-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm ${
                         prescriptionSubmitting
                           ? "opacity-60 cursor-not-allowed"
                           : ""
@@ -4229,25 +4197,18 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </div>
                   ) : null}
 
-                  <div className="grid grid-cols-1 gap-3 border-t border-gray-200 pt-3 md:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 border-t border-gray-200 pt-3 md:grid-cols-2">
                     <button
                       type="button"
                       onClick={() => setPrescriptionView("edit")}
-                      className="rounded-full border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                      className="rounded-full border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50"
                     >
                       Edit Details
                     </button>
                     <button
-                      type="button"
-                      onClick={savePrescriptionDraft}
-                      className="rounded-full border border-gray-200 px-5 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                    >
-                      Save Draft
-                    </button>
-                    <button
                       type="submit"
                       disabled={prescriptionSubmitting}
-                      className={`rounded-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 px-6 py-2 text-sm font-semibold text-white ${
+                      className={`rounded-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm ${
                         prescriptionSubmitting
                           ? "opacity-60 cursor-not-allowed"
                           : ""
