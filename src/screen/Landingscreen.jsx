@@ -78,7 +78,7 @@ const LANDING_REVIEWS = [
 ];
 
 const SOCIAL_PROOF_STATS = [
-  { icon: "🩺", value: "200+", label: "Verified Online Veterinarians" },
+  { icon: "🩺", value: "100+", label: "Verified Online Veterinarians" },
   { icon: "⭐", value: "4.8 / 5", label: "Highly Rated by Pet Parents" },
   { icon: "🏅", value: "7+ Yrs", label: "Specialist Vets Experience" },
   { icon: "🕐", value: "24 / 7", label: "Day & Night Availability" },

@@ -56,6 +56,15 @@ const toBoolean = (value) => {
   return undefined;
 };
 
+const formatInr = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0";
+  return n.toLocaleString("en-IN", {
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 const stripEmpty = (payload) =>
   Object.fromEntries(
     Object.entries(payload).filter(
@@ -101,9 +110,9 @@ export const PaymentScreen = ({
   // ✅ TESTING: remove service charge for now
   const service = 0;
   const gstRate = 0.18;
-  const baseAmount = fee + service;
-  const gstAmount = Math.round(baseAmount * gstRate);
-  const totalBeforeDiscount = baseAmount + gstAmount;
+  const taxableAmount = Math.max(Number((fee + service).toFixed(2)), 0);
+  const gstAmount = Math.round(taxableAmount * gstRate);
+  const totalBeforeDiscount = Math.round(taxableAmount + gstAmount);
   const firstUserDiscount = 100;
 
   const [isPaying, setIsPaying] = useState(false);
@@ -201,6 +210,8 @@ export const PaymentScreen = ({
     ? Math.min(firstUserDiscount, totalBeforeDiscount)
     : 0;
   const total = Math.max(totalBeforeDiscount - discountAmount, 0);
+  const payableTaxableAmount = Number((total / (1 + gstRate)).toFixed(2));
+  const payableGstAmount = Number((total - payableTaxableAmount).toFixed(2));
 
   const paymentContext = useMemo(() => {
     const orderType =
@@ -324,22 +335,40 @@ export const PaymentScreen = ({
       clinic_id: clinicId,
       service_id: serviceId,
       vet_slug: vetSlug,
+      booking_rate_type: rateType,
+      slot_label: slotLabel,
       call_session_id: callSessionId,
       pet_id: petId,
       doctor_id: doctorId,
       user_id: userId,
       gst_number: hasGstNumber ? gstNumberCleaned : undefined,
       gst_number_given: hasGstNumber ? 1 : undefined,
+      amount_includes_gst: 0,
+      gst_rate_percent: 18,
+      taxable_amount_inr: Number(payableTaxableAmount.toFixed(2)),
+      gst_amount_inr: Number(payableGstAmount.toFixed(2)),
+      taxable_amount_before_discount_inr: Number(taxableAmount.toFixed(2)),
+      gst_amount_before_discount_inr: Number(gstAmount.toFixed(2)),
+      consultation_amount_inr: Number(fee.toFixed(2)),
+      service_charge_inr: Number(service.toFixed(2)),
       first_user_offer_applied: discountAmount > 0 ? 1 : 0,
       offer_discount_inr: discountAmount,
-      original_amount_inr: Math.round(totalBeforeDiscount),
-      final_amount_inr: Math.round(total),
+      original_amount_inr: Number(totalBeforeDiscount.toFixed(2)),
+      final_amount_inr: Number(total.toFixed(2)),
     });
   }, [
     paymentMeta,
     petDetails,
     vet,
+    rateType,
+    slotLabel,
     gstNumber,
+    service,
+    fee,
+    payableTaxableAmount,
+    payableGstAmount,
+    taxableAmount,
+    gstAmount,
     discountAmount,
     totalBeforeDiscount,
     total,
@@ -614,26 +643,35 @@ export const PaymentScreen = ({
 
                     <div className="mt-4 space-y-3 text-sm text-gray-600">
                       <div className="flex justify-between">
-                        <span>Consultation Fee</span>
-                        <span>Rs {fee}</span>
+                        <span>
+                          {rateType === "night"
+                            ? "Night Consultation Charge"
+                            : "Day Consultation Charge"}
+                        </span>
+                        <span>Rs {formatInr(fee)}</span>
                       </div>
 
                       {service > 0 ? (
                         <div className="flex justify-between">
                           <span>Service Charge</span>
-                          <span>Rs {service}</span>
+                          <span>Rs {formatInr(service)}</span>
                         </div>
                       ) : null}
 
                       <div className="flex justify-between">
+                        <span>Taxable Amount</span>
+                        <span>Rs {formatInr(taxableAmount)}</span>
+                      </div>
+
+                      <div className="flex justify-between">
                         <span>GST (18%)</span>
-                        <span>Rs {gstAmount}</span>
+                        <span>Rs {formatInr(gstAmount)}</span>
                       </div>
 
                       {discountAmount > 0 ? (
                         <div className="flex justify-between font-semibold text-emerald-700">
                           <span>First User Discount</span>
-                          <span>- Rs {discountAmount}</span>
+                          <span>- Rs {formatInr(discountAmount)}</span>
                         </div>
                       ) : null}
 
@@ -649,10 +687,12 @@ export const PaymentScreen = ({
                         <div className="text-right">
                           {discountAmount > 0 ? (
                             <div className="text-[11px] font-medium text-gray-400 line-through">
-                              Rs {totalBeforeDiscount}
+                              Rs {formatInr(totalBeforeDiscount)}
                             </div>
                           ) : null}
-                          <div className="text-base font-bold text-gray-900">Rs {total}</div>
+                          <div className="text-base font-bold text-gray-900">
+                            Rs {formatInr(total)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -696,7 +736,9 @@ export const PaymentScreen = ({
                           : "bg-[#1d4ed8] hover:bg-[#1e40af] text-white shadow-lg shadow-blue-200"
                       }`}
                     >
-                      <span>{isPaying ? "Processing..." : `Pay Rs ${total}`}</span>
+                      <span>
+                        {isPaying ? "Processing..." : `Pay Rs ${formatInr(total)}`}
+                      </span>
                       <span className="flex items-center gap-2 text-white/80">
                         Proceed <ArrowRight size={18} />
                       </span>
@@ -709,7 +751,7 @@ export const PaymentScreen = ({
 
                     {discountAmount > 0 ? (
                       <p className="text-[11px] text-center font-medium text-emerald-700">
-                        Offer applied: Rs {discountAmount} discounted from your first consultation.
+                        Offer applied: Rs {formatInr(discountAmount)} discounted from your first consultation.
                       </p>
                     ) : null}
 
@@ -736,7 +778,7 @@ export const PaymentScreen = ({
               : "bg-[#1d4ed8] hover:bg-[#1e40af] text-white shadow-md"
           }`}
         >
-          <span>{isPaying ? "Processing..." : `Pay Rs ${total}`}</span>
+          <span>{isPaying ? "Processing..." : `Pay Rs ${formatInr(total)}`}</span>
           <span className="flex items-center gap-2 text-white/80">
             Proceed <ArrowRight size={16} />
           </span>
@@ -748,7 +790,7 @@ export const PaymentScreen = ({
 
         {discountAmount > 0 ? (
           <p className="text-[10px] text-center mt-1 font-medium text-emerald-700">
-            First-time offer applied: Rs {discountAmount} OFF
+            First-time offer applied: Rs {formatInr(discountAmount)} OFF
           </p>
         ) : null}
 

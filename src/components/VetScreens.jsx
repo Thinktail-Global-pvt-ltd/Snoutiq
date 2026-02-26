@@ -96,7 +96,7 @@ const PageWrap = ({ children }) => (
 );
 
 const INPUT_BASE_CLASS =
-  "w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 md:text-base md:px-5 md:py-4 md:rounded-2xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400 hover:border-gray-300";
+  "w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700 md:text-sm md:px-4 md:py-2.5 md:rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#0B4D67]/20 focus:border-[#0B4D67] focus:bg-white placeholder:text-gray-400 hover:border-gray-300";
 
 const CARD_CLASS =
   "bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(11,77,103,0.08)] transition-all duration-300";
@@ -2248,6 +2248,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
   const [observationImages, setObservationImages] = useState([]);
   const [observationLoading, setObservationLoading] = useState(false);
   const [observationError, setObservationError] = useState("");
+  const [petDocUrl, setPetDocUrl] = useState("");
+  const [petDocMime, setPetDocMime] = useState("");
+  const [petDocSource, setPetDocSource] = useState("");
+  const [petDocLoading, setPetDocLoading] = useState(false);
+  const [petDocError, setPetDocError] = useState("");
+  const petDocBlobUrlRef = useRef("");
   const refreshTimerRef = useRef(null);
   const isFirstLoadRef = useRef(true);
   const createPrescriptionForm = (transaction = null) => ({
@@ -2470,6 +2476,15 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     };
   };
 
+  const clearPetDocBlobUrl = () => {
+    const objectUrl = petDocBlobUrlRef.current;
+    if (!objectUrl) return;
+    if (objectUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    petDocBlobUrlRef.current = "";
+  };
+
   useEffect(() => {
     if (!showPatientModal || !activeTransaction) {
       setObservationImages([]);
@@ -2524,6 +2539,120 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     return () => controller.abort();
   }, [showPatientModal, activeTransaction]);
 
+  useEffect(() => {
+    if (!showPatientModal || !activeTransaction) {
+      clearPetDocBlobUrl();
+      setPetDocUrl("");
+      setPetDocMime("");
+      setPetDocSource("");
+      setPetDocLoading(false);
+      setPetDocError("");
+      return;
+    }
+
+    const { petId } = resolveTransactionIds(activeTransaction);
+    const fallbackUrl = toDocUrl(
+      activeTransaction?.pet?.pet_doc2_blob_url ||
+        activeTransaction?.pet?.pet_doc2_url ||
+        activeTransaction?.pet?.pet_doc2,
+    );
+
+    if (!petId && !fallbackUrl) {
+      clearPetDocBlobUrl();
+      setPetDocUrl("");
+      setPetDocMime("");
+      setPetDocSource("");
+      setPetDocLoading(false);
+      setPetDocError("No document uploaded.");
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+
+    const setFallbackDoc = (message = "") => {
+      if (!active) return;
+      clearPetDocBlobUrl();
+      if (fallbackUrl) {
+        setPetDocUrl(fallbackUrl);
+        setPetDocMime("");
+        setPetDocSource("uploaded_url");
+        setPetDocError("");
+      } else {
+        setPetDocUrl("");
+        setPetDocMime("");
+        setPetDocSource("");
+        setPetDocError(message || "No document uploaded.");
+      }
+    };
+
+    const fetchPetDocBlob = async () => {
+      setPetDocLoading(true);
+      setPetDocError("");
+
+      if (!petId) {
+        setFallbackDoc();
+        setPetDocLoading(false);
+        return;
+      }
+
+      const endpoint = `${apiBaseUrl()}/api/auth/pets/${encodeURIComponent(
+        petId,
+      )}/pet-doc2-blob`;
+      const headers = authToken
+        ? { Authorization: `Bearer ${authToken}`, Accept: "*/*" }
+        : { Accept: "*/*" };
+
+      try {
+        const res = await fetch(endpoint, {
+          signal: controller.signal,
+          headers,
+          credentials: "include",
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const blob = await res.blob();
+        if (!blob || blob.size <= 0) {
+          throw new Error("Empty response");
+        }
+
+        const objectUrl = URL.createObjectURL(blob);
+        const mime = res.headers.get("content-type") || blob.type || "";
+
+        if (!active) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+
+        clearPetDocBlobUrl();
+        petDocBlobUrlRef.current = objectUrl;
+        setPetDocUrl(objectUrl);
+        setPetDocMime(mime);
+        setPetDocSource("secure_blob");
+        setPetDocError("");
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        setFallbackDoc("No pet document found for this case.");
+      } finally {
+        if (active) {
+          setPetDocLoading(false);
+        }
+      }
+    };
+
+    fetchPetDocBlob();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [showPatientModal, activeTransaction, authToken]);
+
+  useEffect(() => () => clearPetDocBlobUrl(), []);
+
   const resetPrescriptionForm = (transaction = null) => {
     setPrescriptionForm(createPrescriptionForm(transaction));
     setActiveMedicationIndex(0);
@@ -2549,6 +2678,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     setShowPatientModal(false);
     setActiveTransaction(null);
     setDocPreviewUrl("");
+    clearPetDocBlobUrl();
+    setPetDocUrl("");
+    setPetDocMime("");
+    setPetDocSource("");
+    setPetDocLoading(false);
+    setPetDocError("");
   };
 
   const closePrescriptionModal = () => {
@@ -2559,6 +2694,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
     setPrescriptionSuccess(false);
     setShowPrescriptionSuccessModal(false);
     setDocPreviewUrl("");
+    clearPetDocBlobUrl();
+    setPetDocUrl("");
+    setPetDocMime("");
+    setPetDocSource("");
+    setPetDocLoading(false);
+    setPetDocError("");
     if (prescriptionSuccessTimer.current) {
       window.clearTimeout(prescriptionSuccessTimer.current);
       prescriptionSuccessTimer.current = null;
@@ -3552,51 +3693,89 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 </div>
               )}
 
-              <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">
-                  Pet Document
-                </h4>
-                {(() => {
-                  const docUrl = toDocUrl(activeTransaction?.pet?.pet_doc2);
-                  const hasImage = docUrl && isImageUrl(docUrl);
-                  return docUrl ? (
-                    <button
-                      type="button"
-                      onClick={() => handleDocPreview(docUrl)}
-                      className="w-full text-left rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-[#0B4D67]/40 hover:shadow-sm"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0B4D67]/10">
-                          <FileText size={20} className="text-[#0B4D67]" />
+              <div className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Pet Document
+                  </h4>
+                  {petDocSource === "secure_blob" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                      <Lock size={12} />
+                      Secure file
+                    </span>
+                  ) : petDocSource === "uploaded_url" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                      <ExternalLink size={12} />
+                      Uploaded link
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="p-4">
+                  {petDocLoading ? (
+                    <div className="space-y-3">
+                      <div className="h-4 w-40 animate-pulse rounded bg-gray-200" />
+                      <div className="h-28 w-full animate-pulse rounded-xl bg-gray-100" />
+                    </div>
+                  ) : petDocUrl ? (
+                    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0B4D67]/10">
+                            <FileText size={18} className="text-[#0B4D67]" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              Patient report available
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Preview, zoom, and download from one place.
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-gray-900">
-                            Document available
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Tap to preview, zoom, or download.
-                          </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDocPreview(petDocUrl, petDocMime)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#0B4D67]/30 bg-white px-3 py-1.5 text-xs font-semibold text-[#0B4D67] transition hover:bg-[#0B4D67]/5"
+                          >
+                            <ZoomIn size={13} />
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              window.open(petDocUrl, "_blank", "noopener,noreferrer")
+                            }
+                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                          >
+                            <ExternalLink size={13} />
+                            Open
+                          </button>
                         </div>
-                        <span className="text-xs font-semibold text-[#0B4D67]">
-                          Open
-                        </span>
                       </div>
-                      {hasImage ? (
-                        <div className="mt-3 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+
+                      {(isImageMime(petDocMime) || isImageUrl(petDocUrl)) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDocPreview(petDocUrl, petDocMime)}
+                          className="mt-3 w-full overflow-hidden rounded-xl border border-gray-200 bg-white"
+                        >
                           <img
-                            src={docUrl}
+                            src={petDocUrl}
                             alt="Pet document preview"
-                            className="h-40 w-full object-cover"
+                            className="h-44 w-full object-cover"
+                            loading="lazy"
                           />
-                        </div>
-                      ) : null}
-                    </button>
+                        </button>
+                      )}
+                    </div>
                   ) : (
                     <p className="text-sm text-gray-500">
-                      No document uploaded
+                      {petDocError || "No document uploaded."}
                     </p>
-                  );
-                })()}
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-end">
@@ -3694,7 +3873,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
       {/* Prescription Full Page */}
       {isPrescriptionPage && (
         <PageWrap>
-          <div className="px-6 py-6 md:px-0 md:py-8">
+          <div className="px-4 py-4 md:px-0 md:py-5">
             <div className="mb-4 flex items-center justify-between">
               <button
                 type="button"
@@ -3712,8 +3891,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
               </span>
             </div>
 
-            <div className="mx-auto w-full max-w-6xl bg-[#f3f5f8] rounded-3xl shadow-sm overflow-hidden border border-gray-200">
-            <div className="bg-white px-5 py-3 md:px-6 md:py-4 flex items-center justify-between border-b border-gray-200">
+            <div className="mx-auto w-full max-w-5xl bg-[#f8fafc] rounded-2xl shadow-sm overflow-hidden border border-gray-200">
+            <div className="bg-white px-4 py-2.5 md:px-5 md:py-3 flex items-center justify-between border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
                   <FileText size={20} className="text-blue-600" />
@@ -3759,12 +3938,12 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
 
             <form
               onSubmit={handlePrescriptionSubmit}
-              className="p-4 md:p-6"
+              className="p-3.5 md:p-4"
             >
               {prescriptionView === "edit" ? (
-                <div className="grid lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
+                <div className="grid lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                         Patient Snapshot
@@ -3820,7 +3999,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         </div>
                       </div>
 
-                      <div className="grid gap-3 md:grid-cols-2">
+                      {/* <div className="grid gap-3 md:grid-cols-2">
                         <div className="rounded-xl border border-[#dce4ff] bg-[#eef2ff] p-3">
                           <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6366f1]">
                             3. Category
@@ -3838,17 +4017,17 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                             {prescriptionForm.medicalStatus || "Ongoing"}
                           </p>
                         </div>
-                      </div>
+                      </div> */}
                     </div>
                   </div>
 
                   {/* Consultation Basics */}
-                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+                  <div className="bg-white border border-gray-200 rounded-xl p-3.5 space-y-3">
                     <h4 className="font-medium text-gray-900 flex items-center gap-2">
                       <FileText size={16} className="text-[#0B4D67]" />
                       Consultation Details
                     </h4>
-                    <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="grid sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">
                           Consultation Category
@@ -3892,7 +4071,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         </select>
                       </div>
                     </div>
-                    <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="grid sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">
                           Case Severity
@@ -3968,7 +4147,243 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                         Add practical, easy-to-follow advice for the pet parent.
                       </p>
                     </div>
-                    <div className="grid sm:grid-cols-2 gap-4">
+                  </div>
+
+                  {/* Medications */}
+                  <div className="bg-white border border-gray-200 rounded-xl p-3.5 space-y-3">
+                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                      <Pill size={16} className="text-[#0B4D67]" />
+                      10. Medications
+                    </h4>
+                    <div className="space-y-2.5">
+                      {prescriptionForm.medications.map((medication, index) => (
+                        <div
+                          key={index}
+                          className="rounded-xl border border-gray-200 bg-gray-50 p-3"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setActiveMedicationIndex((prev) =>
+                                  prev === index ? -1 : index,
+                                )
+                              }
+                              className="text-left"
+                            >
+                              <p className="text-sm font-semibold text-gray-800">
+                                Medication {index + 1}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {medication.name || "Add medicine details"}
+                              </p>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeMedication(index)}
+                              className="rounded-full border border-stone-200 px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-100"
+                            >
+                              Remove
+                            </button>
+                          </div>
+
+                          {activeMedicationIndex === index ? (
+                            <div className="mt-3 space-y-3 rounded-xl border border-gray-200 bg-white p-3">
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                                  Medicine Name
+                                </label>
+                                <input
+                                  type="text"
+                                  value={medication.name}
+                                  onChange={updateMedication(index, "name")}
+                                  placeholder="e.g., Amoxicillin"
+                                  className={INPUT_BASE_CLASS}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2.5">
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                                    Dosage
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={medication.dosage}
+                                    onChange={updateMedication(index, "dosage")}
+                                    placeholder="e.g., 1 tab"
+                                    className={INPUT_BASE_CLASS}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                                    Duration
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={medication.duration}
+                                    onChange={updateMedication(index, "duration")}
+                                    placeholder="e.g., 7 days"
+                                    className={INPUT_BASE_CLASS}
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="mb-2 text-xs font-semibold text-gray-700">
+                                  Frequency
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {PRESCRIPTION_FREQUENCY_OPTIONS.map((frequency) => (
+                                    <button
+                                      key={frequency}
+                                      type="button"
+                                      onClick={() =>
+                                        setMedicationField(
+                                          index,
+                                          "frequency",
+                                          frequency,
+                                        )
+                                      }
+                                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                        medication.frequency === frequency
+                                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                                          : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
+                                      }`}
+                                    >
+                                      {frequency}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="mb-2 text-xs font-semibold text-gray-700">
+                                  Timing (select one or more)
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {PRESCRIPTION_TIMING_OPTIONS.map((timing) => (
+                                    <button
+                                      key={timing}
+                                      type="button"
+                                      onClick={() =>
+                                        toggleMedicationTiming(index, timing)
+                                      }
+                                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                        Array.isArray(medication.timing) &&
+                                        medication.timing.includes(timing)
+                                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                                          : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
+                                      }`}
+                                    >
+                                      {timing}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="mb-2 text-xs font-semibold text-gray-700">
+                                  Food Relation
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {PRESCRIPTION_FOOD_RELATION_OPTIONS.map(
+                                    (foodRelation) => (
+                                      <button
+                                        key={foodRelation}
+                                        type="button"
+                                        onClick={() =>
+                                          setMedicationField(
+                                            index,
+                                            "foodRelation",
+                                            foodRelation,
+                                          )
+                                        }
+                                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                          medication.foodRelation === foodRelation
+                                            ? "border-blue-600 bg-blue-50 text-blue-700"
+                                            : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
+                                        }`}
+                                      >
+                                        {foodRelation}
+                                      </button>
+                                    ),
+                                  )}
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                                  Additional Instruction (optional)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={medication.instructions || ""}
+                                  onChange={updateMedication(index, "instructions")}
+                                  placeholder="e.g., Give before sleep"
+                                  className={INPUT_BASE_CLASS}
+                                />
+                              </div>
+
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => closeMedicationEditor(index)}
+                                  className="inline-flex h-[42px] items-center justify-center rounded-xl border border-gray-200 bg-gray-100 px-4 text-xs font-semibold text-gray-600 hover:bg-gray-200"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => closeMedicationEditor(index)}
+                                  className="inline-flex h-[42px] items-center justify-center rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
+                              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                {medication.dosage || "Dosage N/A"}
+                              </span>
+                              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                {medication.duration || "Duration N/A"}
+                              </span>
+                              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                {medication.frequency || "Frequency N/A"}
+                              </span>
+                              {Array.isArray(medication.timing) &&
+                              medication.timing.length > 0 ? (
+                                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                  {medication.timing.join(", ")}
+                                </span>
+                              ) : null}
+                              {medication.foodRelation ? (
+                                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
+                                  {medication.foodRelation}
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addMedication}
+                      className="inline-flex h-[42px] w-full items-center justify-center rounded-full border border-stone-200 px-4 text-xs font-semibold text-blue-600 hover:bg-blue-50 sm:w-auto"
+                    >
+                      + Add Medicine
+                    </button>
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-xl p-3.5 space-y-3">
+                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                      <Calendar size={16} className="text-[#0B4D67]" />
+                      Follow-up
+                    </h4>
+                    <div className="grid sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">
                           Follow-up Required
@@ -3984,7 +4399,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                   followUpRequired: value,
                                 }))
                               }
-                              className={`flex-1 rounded-xl border px-3 py-2 text-xs font-semibold uppercase transition ${
+                              className={`inline-flex h-[42px] flex-1 items-center justify-center rounded-xl border px-3 text-xs font-semibold uppercase transition ${
                                 prescriptionForm.followUpRequired === value
                                   ? "border-blue-600 bg-blue-50 text-blue-700"
                                   : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
@@ -4031,7 +4446,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                               }))
                             }
                             disabled={prescriptionForm.followUpRequired !== "yes"}
-                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                            className={`inline-flex h-[42px] items-center justify-center rounded-xl border px-3 text-xs font-semibold transition ${
                               prescriptionForm.followUpMode === mode.value
                                 ? "border-blue-600 bg-blue-50 text-blue-700"
                                 : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
@@ -4048,240 +4463,11 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </div>
                   </div>
 
-                  {/* Medications */}
-                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
-                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                      <Pill size={16} className="text-[#0B4D67]" />
-                      10. Medications
-                    </h4>
-                    <div className="space-y-3">
-                      {prescriptionForm.medications.map((medication, index) => (
-                        <div
-                          key={index}
-                          className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setActiveMedicationIndex((prev) =>
-                                  prev === index ? -1 : index,
-                                )
-                              }
-                              className="text-left"
-                            >
-                              <p className="text-sm font-semibold text-gray-800">
-                                Medication {index + 1}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {medication.name || "Add medicine details"}
-                              </p>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeMedication(index)}
-                              className="rounded-full border border-stone-200 px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-100"
-                            >
-                              Remove
-                            </button>
-                          </div>
-
-                          {activeMedicationIndex === index ? (
-                            <div className="mt-4 space-y-4 rounded-xl border border-gray-200 bg-white p-4">
-                              <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                  Medicine Name
-                                </label>
-                                <input
-                                  type="text"
-                                  value={medication.name}
-                                  onChange={updateMedication(index, "name")}
-                                  placeholder="e.g., Amoxicillin"
-                                  className={INPUT_BASE_CLASS}
-                                />
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                    Dosage
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={medication.dosage}
-                                    onChange={updateMedication(index, "dosage")}
-                                    placeholder="e.g., 1 tab"
-                                    className={INPUT_BASE_CLASS}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                    Duration
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={medication.duration}
-                                    onChange={updateMedication(index, "duration")}
-                                    placeholder="e.g., 7 days"
-                                    className={INPUT_BASE_CLASS}
-                                  />
-                                </div>
-                              </div>
-
-                              <div>
-                                <p className="mb-2 text-sm font-semibold text-gray-700">
-                                  Frequency
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {PRESCRIPTION_FREQUENCY_OPTIONS.map((frequency) => (
-                                    <button
-                                      key={frequency}
-                                      type="button"
-                                      onClick={() =>
-                                        setMedicationField(
-                                          index,
-                                          "frequency",
-                                          frequency,
-                                        )
-                                      }
-                                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                                        medication.frequency === frequency
-                                          ? "border-blue-600 bg-blue-50 text-blue-700"
-                                          : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
-                                      }`}
-                                    >
-                                      {frequency}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div>
-                                <p className="mb-2 text-sm font-semibold text-gray-700">
-                                  Timing (select one or more)
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {PRESCRIPTION_TIMING_OPTIONS.map((timing) => (
-                                    <button
-                                      key={timing}
-                                      type="button"
-                                      onClick={() =>
-                                        toggleMedicationTiming(index, timing)
-                                      }
-                                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                                        Array.isArray(medication.timing) &&
-                                        medication.timing.includes(timing)
-                                          ? "border-blue-600 bg-blue-50 text-blue-700"
-                                          : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
-                                      }`}
-                                    >
-                                      {timing}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div>
-                                <p className="mb-2 text-sm font-semibold text-gray-700">
-                                  Food Relation
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {PRESCRIPTION_FOOD_RELATION_OPTIONS.map(
-                                    (foodRelation) => (
-                                      <button
-                                        key={foodRelation}
-                                        type="button"
-                                        onClick={() =>
-                                          setMedicationField(
-                                            index,
-                                            "foodRelation",
-                                            foodRelation,
-                                          )
-                                        }
-                                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                                          medication.foodRelation === foodRelation
-                                            ? "border-blue-600 bg-blue-50 text-blue-700"
-                                            : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
-                                        }`}
-                                      >
-                                        {foodRelation}
-                                      </button>
-                                    ),
-                                  )}
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                  Additional Instruction (optional)
-                                </label>
-                                <input
-                                  type="text"
-                                  value={medication.instructions || ""}
-                                  onChange={updateMedication(index, "instructions")}
-                                  placeholder="e.g., Give before sleep"
-                                  className={INPUT_BASE_CLASS}
-                                />
-                              </div>
-
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => closeMedicationEditor(index)}
-                                  className="rounded-xl border border-gray-200 bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => closeMedicationEditor(index)}
-                                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
-                              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
-                                {medication.dosage || "Dosage N/A"}
-                              </span>
-                              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
-                                {medication.duration || "Duration N/A"}
-                              </span>
-                              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
-                                {medication.frequency || "Frequency N/A"}
-                              </span>
-                              {Array.isArray(medication.timing) &&
-                              medication.timing.length > 0 ? (
-                                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
-                                  {medication.timing.join(", ")}
-                                </span>
-                              ) : null}
-                              {medication.foodRelation ? (
-                                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1">
-                                  {medication.foodRelation}
-                                </span>
-                              ) : null}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addMedication}
-                      className="rounded-full border border-stone-200 px-4 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 w-full sm:w-auto"
-                    >
-                      + Add Medicine
-                    </button>
-                  </div>
-
-                  <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3 shadow-sm">
+                  <div className="rounded-xl border border-stone-100 bg-white p-3.5 space-y-3 shadow-sm">
                     <div className="flex items-center gap-2 text-sm font-semibold text-stone-700">
                       <Upload size={16} /> Attach Record (optional)
                     </div>
-                    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-6 text-center text-xs text-stone-500 hover:border-[#3998de] hover:text-[#3998de]">
+                    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-stone-200 bg-stone-50 px-4 py-5 text-center text-xs text-stone-500 hover:border-[#3998de] hover:text-[#3998de]">
                       <input
                         type="file"
                         accept=".pdf,.png,.jpg,.jpeg"
@@ -4297,8 +4483,8 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                   </div>
                 </div>
 
-                <aside className="space-y-4 lg:sticky lg:top-4 self-start">
-                  <div className="rounded-2xl border border-stone-100 bg-white p-4 shadow-sm">
+                <aside className="space-y-3 lg:sticky lg:top-4 self-start">
+                  <div className="rounded-xl border border-stone-100 bg-white p-3.5 shadow-sm">
                     <div className="text-xs uppercase text-stone-400">
                       Consult Summary
                     </div>
@@ -4332,7 +4518,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 shadow-sm">
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800">
                       <AlertCircle size={14} />
                       Final Check Before Sending
@@ -4354,14 +4540,14 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     <button
                       type="button"
                       onClick={() => setPrescriptionView("preview")}
-                      className="rounded-full border border-blue-200 bg-blue-50 px-5 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                      className="inline-flex h-[42px] items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
                     >
                       Preview
                     </button>
                     <button
                       type="submit"
                       disabled={prescriptionSubmitting}
-                      className={`rounded-full bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm ${
+                      className={`inline-flex h-[42px] items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-orange-400 px-6 text-sm font-semibold text-white shadow-sm hover:from-orange-600 hover:to-orange-500 ${
                         prescriptionSubmitting
                           ? "opacity-60 cursor-not-allowed"
                           : ""
@@ -4374,7 +4560,7 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                     <button
                       type="button"
                       onClick={closePrescriptionModal}
-                      className="rounded-full border border-stone-200 px-5 py-2 text-xs font-semibold text-stone-500 hover:bg-stone-50"
+                      className="inline-flex h-[42px] items-center justify-center rounded-full border border-stone-200 px-5 text-xs font-semibold text-stone-500 hover:bg-stone-50"
                     >
                       Cancel
                     </button>
@@ -4382,264 +4568,271 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                 </aside>
               </div>
               ) : (
-                <div className="mx-auto max-w-4xl space-y-5">
-                  <div className="rounded-[28px] border border-[#e6e9f2] bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.10)] md:p-6">
-                    <div className="mb-4 flex items-center justify-between border-b border-[#edf1f7] pb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#4f46e5] text-white">
-                          <Stethoscope size={18} />
+                <div className="mx-auto max-w-5xl space-y-5">
+                  <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_22px_55px_rgba(15,23,42,0.12)]">
+                    <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-slate-50 px-5 py-5 md:px-7">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0B4D67] text-white shadow-sm">
+                            <Stethoscope size={18} />
+                          </div>
+                          <div>
+                            <p className="text-lg font-bold text-slate-900">
+                              Digital Prescription
+                            </p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Prepared by {doctorName || "Assigned Veterinarian"}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-base font-bold text-[#0f172a]">
-                            VetPrescribe
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-right">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            Date
                           </p>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6b7280]">
-                            Digital Prescription
+                          <p className="text-sm font-bold text-slate-900">
+                            {new Date().toLocaleDateString("en-US")}
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-slate-500">
+                            Ref:{" "}
+                            {activeTransaction?.reference ||
+                              activeTransaction?.metadata?.order_id ||
+                              "N/A"}
                           </p>
                         </div>
                       </div>
-                      <div className="rounded-xl border border-[#e4e7f0] bg-[#f7f8fd] px-3 py-2 text-right">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b93a7]">
-                          Date
-                        </p>
-                        <p className="text-sm font-bold text-[#111827]">
-                          {new Date().toLocaleDateString("en-IN")}
-                        </p>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700">
+                          {statusLabel(activeTransaction?.status)}
+                        </span>
+                        <span className="rounded-full border border-[#b7d3df] bg-[#e9f5fa] px-3 py-1 text-[11px] font-semibold text-[#0B4D67]">
+                          {prescriptionForm.consultationCategory ||
+                            "General Consultation"}
+                        </span>
+                        <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                          Powered by SnoutIQ
+                        </span>
                       </div>
                     </div>
 
-                    <div className="rounded-[24px] border border-[#e9edf5] bg-[#fbfcff] p-4 md:p-6">
-                      <div className="mb-5 flex items-start justify-between gap-4 border-b border-[#eceff6] pb-4">
-                        <div>
-                          <h3 className="text-3xl font-bold tracking-tight text-[#0f172a]">
-                            Prescription
-                          </h3>
-                          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
-                            VetPrescribe Digital
+                    <div className="space-y-6 p-5 md:p-7">
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                            Patient Profile
                           </p>
-                        </div>
-                        <div className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-right">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b93a7]">
-                            Status
-                          </p>
-                          <p className="text-sm font-bold text-[#0f172a]">
-                            {statusLabel(activeTransaction?.status)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-6 border-b border-[#eceff6] pb-6 md:grid-cols-2">
-                        <div className="space-y-4">
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                              Pet Details
-                            </p>
-                            <p className="mt-1 text-lg font-bold text-[#111827]">
+                          <div className="mt-3 space-y-2 text-sm text-slate-700">
+                            <p>
+                              <span className="font-semibold text-slate-900">
+                                Pet:
+                              </span>{" "}
                               {resolvePetName(activeTransaction)} /{" "}
-                              {activeTransaction?.pet?.breed || "Not available"} /{" "}
-                              {petAgeLabel} /{" "}
+                              {activeTransaction?.pet?.breed ||
+                                "Not available"} / {petAgeLabel} /{" "}
                               {activeTransaction?.pet?.weight_kg
                                 ? `${activeTransaction.pet.weight_kg} kg`
                                 : "Weight NA"}
                             </p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-                                Vaccinated: {vaccinationLabel}
-                              </span>
-                              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-                                Neutered: {neuterLabel}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                              Owner
-                            </p>
-                            <p className="mt-1 text-lg font-bold text-[#111827]">
+                            <p>
+                              <span className="font-semibold text-slate-900">
+                                Owner:
+                              </span>{" "}
                               {activeTransaction?.user?.name || "Pet Parent"}
                             </p>
-                            <p className="text-sm text-[#6b7280]">
+                            <p>
+                              <span className="font-semibold text-slate-900">
+                                Location:
+                              </span>{" "}
                               {activeTransaction?.user?.location ||
                                 activeTransaction?.metadata?.location ||
                                 "Not available"}
                             </p>
                           </div>
-
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                              Consultation
-                            </p>
-                            <p className="mt-1 text-lg font-bold text-[#4f46e5]">
-                              {prescriptionForm.consultationCategory ||
-                                "General Consultation"}
-                            </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                              Vaccinated: {vaccinationLabel}
+                            </span>
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                              Neutered: {neuterLabel}
+                            </span>
                           </div>
                         </div>
 
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                            Clinical Summary
+                          </p>
+                          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                                Status
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                Medical Status
                               </p>
-                              <p className="mt-1 text-base font-bold text-[#111827]">
+                              <p className="mt-1 font-semibold text-slate-900">
                                 {prescriptionForm.medicalStatus || "Ongoing"}
                               </p>
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                                Severity
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                Case Severity
                               </p>
-                              <p className="mt-1 text-base font-bold text-[#111827]">
-                                {prescriptionForm.caseSeverity || "General"}
+                              <p className="mt-1 font-semibold text-slate-900">
+                                {formatPetText(
+                                  prescriptionForm.caseSeverity || "General",
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                Prognosis
+                              </p>
+                              <p className="mt-1 font-semibold text-slate-900">
+                                {prescriptionForm.prognosis || "Good"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                Follow-Up
+                              </p>
+                              <p className="mt-1 font-semibold text-slate-900">
+                                {followUpDisplayLabel}
                               </p>
                             </div>
                           </div>
-
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                              Prognosis
+                          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                              Primary Diagnosis
                             </p>
-                            <p className="mt-1 text-base font-bold text-[#111827]">
-                              {prescriptionForm.prognosis || "Good"}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                              Diagnosis
-                            </p>
-                            <p className="mt-1 text-base font-bold italic text-[#111827]">
-                              "{prescriptionForm.diagnosis || "No diagnosis provided"}"
+                            <p className="mt-1 text-sm font-medium text-slate-800">
+                              {prescriptionForm.diagnosis ||
+                                "No diagnosis provided"}
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="mt-6 space-y-6">
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                            Medical History
-                          </p>
-                          <div className="mt-2 rounded-2xl bg-[#f2f5fb] px-4 py-3 text-sm leading-relaxed text-[#334155]">
-                            {prescriptionForm.notes || "No notes added."}
-                          </div>
-                        </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                          Medical History
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                          {prescriptionForm.notes || "No notes added."}
+                        </p>
+                      </div>
 
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                            Medications & Treatment
-                          </p>
-                          <div className="mt-2 space-y-3">
-                            {prescriptionForm.medications
-                              .filter(
-                                (medication) =>
-                                  medication.name ||
-                                  medication.dosage ||
-                                  medication.frequency ||
-                                  medication.duration ||
-                                  medication.foodRelation ||
-                                  (Array.isArray(medication.timing) &&
-                                    medication.timing.length > 0) ||
-                                  medication.instructions,
-                              )
-                              .map((medication, index) => (
-                                <div
-                                  key={index}
-                                  className="rounded-2xl border border-[#e8ecf4] bg-white p-4"
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="flex items-start gap-3">
-                                      <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-[#eef2ff] text-[#4f46e5]">
-                                        <Pill size={16} />
-                                      </div>
-                                      <div>
-                                        <p className="text-lg font-bold text-[#111827]">
-                                          {medication.name || "Unnamed Medicine"}
-                                        </p>
-                                        <p className="text-sm text-[#64748b]">
-                                          {medication.dosage || "-"} |{" "}
-                                          {medication.duration || "-"}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <span className="rounded-full bg-[#eef2ff] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#4f46e5]">
-                                      {medication.frequency || "Frequency N/A"}
-                                    </span>
-                                  </div>
-                                  <div className="mt-2 flex flex-wrap gap-2">
-                                    {Array.isArray(medication.timing) &&
-                                    medication.timing.length > 0 ? (
-                                      <span className="rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold text-[#475569]">
-                                        {medication.timing.join(", ")}
-                                      </span>
-                                    ) : null}
-                                    {medication.foodRelation ? (
-                                      <span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[10px] font-semibold text-[#4f46e5]">
-                                        {medication.foodRelation}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  {medication.instructions ? (
-                                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#6b7280]">
-                                      {medication.instructions}
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                          Medications & Treatment
+                        </p>
+                        <div className="mt-3 space-y-3">
+                          {prescriptionForm.medications
+                            .filter(
+                              (medication) =>
+                                medication.name ||
+                                medication.dosage ||
+                                medication.frequency ||
+                                medication.duration ||
+                                medication.foodRelation ||
+                                (Array.isArray(medication.timing) &&
+                                  medication.timing.length > 0) ||
+                                medication.instructions,
+                            )
+                            .map((medication, index) => (
+                              <div
+                                key={index}
+                                className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-semibold text-slate-900">
+                                      {medication.name || "Unnamed Medicine"}
                                     </p>
+                                    <p className="text-xs text-slate-600">
+                                      {medication.dosage || "-"} |{" "}
+                                      {medication.duration || "-"}
+                                    </p>
+                                  </div>
+                                  <span className="rounded-full bg-[#e9f5fa] px-2.5 py-1 text-[10px] font-semibold text-[#0B4D67]">
+                                    {medication.frequency || "Frequency N/A"}
+                                  </span>
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {Array.isArray(medication.timing) &&
+                                  medication.timing.length > 0 ? (
+                                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600">
+                                      {medication.timing.join(", ")}
+                                    </span>
+                                  ) : null}
+                                  {medication.foodRelation ? (
+                                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600">
+                                      {medication.foodRelation}
+                                    </span>
                                   ) : null}
                                 </div>
-                              ))}
-                            {prescriptionForm.medications.every(
-                              (medication) =>
-                                !medication.name &&
-                                !medication.dosage &&
-                                !medication.frequency &&
-                                !medication.duration &&
-                                !medication.foodRelation &&
-                                (!Array.isArray(medication.timing) ||
-                                  medication.timing.length === 0) &&
-                                !medication.instructions,
-                            ) ? (
-                              <div className="rounded-2xl border border-dashed border-[#e5e7eb] bg-white px-4 py-5 text-sm text-[#6b7280]">
-                                No medications added.
+                                {medication.instructions ? (
+                                  <p className="mt-2 text-xs text-slate-600">
+                                    {medication.instructions}
+                                  </p>
+                                ) : null}
                               </div>
-                            ) : null}
-                          </div>
+                            ))}
+                          {prescriptionForm.medications.every(
+                            (medication) =>
+                              !medication.name &&
+                              !medication.dosage &&
+                              !medication.frequency &&
+                              !medication.duration &&
+                              !medication.foodRelation &&
+                              (!Array.isArray(medication.timing) ||
+                                medication.timing.length === 0) &&
+                              !medication.instructions,
+                          ) ? (
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                              No medications added.
+                            </div>
+                          ) : null}
                         </div>
+                      </div>
 
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                            Vet Advice
+                      <div className="rounded-2xl border border-[#b7d3df] bg-[#f0f9fc] p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0B4D67]">
+                          Vet Advice
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                          {prescriptionForm.homeCare ||
+                            "Standard care recommended."}
+                        </p>
+                      </div>
+
+                      <div className="grid gap-4 border-t border-slate-200 pt-5 md:grid-cols-2">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            Follow-Up Plan
                           </p>
-                          <div className="mt-2 rounded-2xl border border-[#dde3ff] bg-[#eef2ff] px-4 py-3 text-sm text-[#1e3a8a]">
-                            <p className="font-semibold">Advice Section:</p>
-                            <p className="mt-1 whitespace-pre-wrap text-[#334155]">
-                              {prescriptionForm.homeCare || "Standard care recommended."}
-                            </p>
-                          </div>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">
+                            {followUpDisplayLabel}
+                            {prescriptionForm.followUpRequired === "yes" ? (
+                              <span className="text-[#0B4D67]">
+                                {" "}
+                                ({followUpModeLabel})
+                              </span>
+                            ) : null}
+                          </p>
                         </div>
-
-                        <div className="flex items-end justify-between border-t border-[#eceff6] pt-4">
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                              Follow-Up
+                        <div className="rounded-xl border border-slate-200 bg-white p-3 text-right">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            Attending Veterinarian
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">
+                            {doctorName || "Assigned Veterinarian"}
+                          </p>
+                          {doctorEmail ? (
+                            <p className="text-xs text-slate-500">
+                              {doctorEmail}
                             </p>
-                            <p className="mt-1 text-xl font-bold text-[#111827]">
-                              {followUpDisplayLabel}{" "}
-                              {prescriptionForm.followUpRequired === "yes" ? (
-                                <span className="text-lg text-[#4f46e5]">
-                                  ({followUpModeLabel})
-                                </span>
-                              ) : null}
-                            </p>
-                          </div>
-                          <div className="text-right opacity-70">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9aa3b2]">
-                              Digital Signature
-                            </p>
-                            <p className="font-serif text-3xl italic text-[#6b7280]">
-                              Dr. VetPrescribe
-                            </p>
-                          </div>
+                          ) : null}
+                          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                            Powered by SnoutIQ
+                          </p>
                         </div>
                       </div>
                     </div>

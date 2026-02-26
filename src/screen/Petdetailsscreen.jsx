@@ -26,6 +26,8 @@ import {
   Rabbit,
   Shield,
   Clock,
+  MapPin,
+  Scale,
 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 
@@ -124,13 +126,13 @@ const calcAgeFromDob = (dob) => {
 
 // Enhanced input styling with professional placeholders
 const fieldBase =
-  "w-full rounded-xl border border-gray-200 bg-white p-3.5 text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 focus:border-[#3998de] focus:bg-white hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-2xl md:p-4 md:text-base";
+  "w-full rounded-xl border border-gray-200 bg-white p-3 text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#3998de]/30 focus:border-[#3998de] focus:bg-white hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-2xl md:p-3.5 md:text-[15px]";
 const selectBase = `${fieldBase} appearance-none pr-12`;
 const textareaBase = `${fieldBase} resize-none min-h-[120px]`;
 const cardBase = "rounded-xl border border-gray-200 bg-white overflow-hidden";
 const cardHeaderBase =
-  "flex items-center gap-3 border-b border-gray-100 px-5 py-4";
-const cardBodyBase = "px-5 py-4 space-y-4";
+  "flex items-center gap-3 border-b border-gray-100 px-4 py-3.5";
+const cardBodyBase = "px-4 py-4 space-y-3.5";
 
 const pickValue = (...values) => {
   for (const value of values) {
@@ -278,6 +280,7 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
   const [details, setDetails] = useState({
     ownerName: "",
     ownerMobile: "",
+    city: "",
     name: "",
     type: null,
     breed: "",
@@ -293,6 +296,8 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
     hasPhoto: false,
     isNeutered: "",
     vaccinatedYesNo: "",
+    dewormingYesNo: "",
+    weightKg: "",
   });
 
   const [uploadFile, setUploadFile] = useState(null);
@@ -719,6 +724,7 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
   const isValid =
     details.ownerName.trim().length > 0 &&
     details.ownerMobile.replace(/\D/g, "").length === 10 &&
+    details.city.trim().length > 1 &&
     otpVerified &&
     details.name.trim().length > 0 &&
     details.type !== null &&
@@ -737,6 +743,7 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
     if (!details.ownerName.trim()) return "Please enter owner name";
     if (details.ownerMobile.replace(/\D/g, "").length !== 10)
       return "Please enter 10-digit mobile number";
+    if (!details.city.trim()) return "Please enter city name";
     if (!otpVerified) return "Please verify mobile number with OTP";
     if (!details.name.trim()) return "Please enter your pet's name";
     if (!details.type) return "Please select pet type";
@@ -779,9 +786,13 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
       const fd = new FormData();
       fd.append("name", details.ownerName);
       fd.append("phone", formatPhone(details.ownerMobile));
+      fd.append("city", details.city.trim());
       fd.append("type", details.type || "");
       fd.append("dob", details.petDob || "");
       fd.append("pet_name", details.name || "");
+      if (details.weightKg !== "") {
+        fd.append("weight", details.weightKg);
+      }
 
       // ✅ NEW: send to backend with key "gender"
       fd.append("gender", details.gender || "");
@@ -801,6 +812,9 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
       }
       if (details.vaccinatedYesNo !== "") {
         fd.append("vaccenated_yes_no", details.vaccinatedYesNo);
+      }
+      if (details.dewormingYesNo !== "") {
+        fd.append("deworming_yes_no", details.dewormingYesNo);
       }
 
       if (details.petDoc2?.trim()) fd.append("pet_doc2", details.petDoc2.trim());
@@ -1255,6 +1269,33 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                           </div>
                         )}
                       </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          City <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <MapPin
+                            size={18}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                          />
+                          <input
+                            type="text"
+                            value={details.city}
+                            onChange={(e) =>
+                              setDetails((p) => ({
+                                ...p,
+                                city: e.target.value,
+                              }))
+                            }
+                            placeholder="Enter city (e.g. Gurugram)"
+                            className={`${fieldBase} pl-12 md:pl-12`}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Helps us route your case faster to nearby vets
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </section>
@@ -1484,35 +1525,70 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                           <span className="text-red-500">*</span>
                         </label>
 
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
-                          <div className="relative">
-                            <Calendar
-                              size={18}
-                              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                            />
-                            <input
-                              type="date"
-                              value={details.petDob}
-                              max={todayISO()}
-                              onChange={(e) =>
-                                setDetails((p) => ({ ...p, petDob: e.target.value }))
-                              }
-                              className={`${fieldBase} pl-12 md:pl-12`}
-                            />
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:items-start md:gap-4">
+                          <div className="space-y-1.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                              DOB
+                            </p>
+                            <div className="relative">
+                              <Calendar
+                                size={18}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                              />
+                              <input
+                                type="date"
+                                value={details.petDob}
+                                max={todayISO()}
+                                onChange={(e) =>
+                                  setDetails((p) => ({ ...p, petDob: e.target.value }))
+                                }
+                                className={`${fieldBase} pl-12 md:pl-12`}
+                              />
+                            </div>
                           </div>
 
-                          <div className="hidden md:flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-5 py-3">
-                            <div>
-                              <div className="text-sm font-medium text-gray-700">
-                                Approximate age
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Auto-calculated from DOB
-                              </div>
+                          <div className="hidden md:block space-y-1.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                              Approximate age
+                            </p>
+                            <div className="flex h-[46px] items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3.5">
+                              <p className="text-xs text-gray-500">
+                                Auto-calculated
+                              </p>
+                              <p className="text-sm font-bold text-[#3998de]">
+                                {calcAgeFromDob(details.petDob) || "--"}
+                              </p>
                             </div>
-                            <div className="text-lg font-bold text-[#3998de]">
-                              {calcAgeFromDob(details.petDob) || "—"}
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                              Current Weight (kg)
+                            </p>
+                            <div className="relative">
+                              <Scale
+                                size={17}
+                                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                inputMode="decimal"
+                                value={details.weightKg}
+                                onChange={(e) =>
+                                  setDetails((p) => ({
+                                    ...p,
+                                    weightKg: e.target.value,
+                                  }))
+                                }
+                                placeholder="e.g. 12.5"
+                                className={`${fieldBase} pl-11 md:pl-11`}
+                              />
                             </div>
+                            <p className="text-[11px] text-gray-500">
+                              Optional
+                            </p>
                           </div>
                         </div>
 
@@ -1522,7 +1598,7 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
                             Is your pet neutered?
@@ -1568,6 +1644,36 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
                                 setDetails((p) => ({
                                   ...p,
                                   vaccinatedYesNo: e.target.value,
+                                }))
+                              }
+                              className={`${selectBase} pl-12 md:pl-12`}
+                            >
+                              <option value="">Select</option>
+                              {YES_NO_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Deworming done recently?
+                          </label>
+                          <div className="relative">
+                            <Activity
+                              size={18}
+                              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                            />
+                            <select
+                              value={details.dewormingYesNo}
+                              onChange={(e) =>
+                                setDetails((p) => ({
+                                  ...p,
+                                  dewormingYesNo: e.target.value,
                                 }))
                               }
                               className={`${selectBase} pl-12 md:pl-12`}
