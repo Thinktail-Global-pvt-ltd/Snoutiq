@@ -339,6 +339,35 @@ class ReceptionistBookingController extends Controller
             return $row;
         });
 
+        $userBlobUrlById = collect();
+        if ($this->userPetDoc2BlobColumnsReady()) {
+            $patientIds = $rows->pluck('patient_id')
+                ->filter(fn ($patientId) => is_numeric($patientId) && (int) $patientId > 0)
+                ->map(fn ($patientId) => (int) $patientId)
+                ->unique()
+                ->values();
+
+            if ($patientIds->isNotEmpty()) {
+                $userIdsWithBlob = DB::table('users')
+                    ->whereIn('id', $patientIds->all())
+                    ->whereNotNull('pet_doc2_blob')
+                    ->where('pet_doc2_blob', '!=', '')
+                    ->pluck('id')
+                    ->map(fn ($userId) => (int) $userId);
+
+                $userBlobUrlById = $userIdsWithBlob->mapWithKeys(
+                    fn (int $userId) => [$userId => route('api.users.pet-doc2-blob', ['user' => $userId], true)]
+                );
+            }
+        }
+
+        $rows = $rows->map(function ($row) use ($userBlobUrlById) {
+            $patientId = is_numeric($row->patient_id ?? null) ? (int) $row->patient_id : null;
+            $row->user_pet_doc2_blob_url = $patientId ? $userBlobUrlById->get($patientId) : null;
+            $row->user_image_url = $row->user_pet_doc2_blob_url;
+            return $row;
+        });
+
         return response()->json([
             'success' => true,
             'date' => $date,
@@ -653,6 +682,13 @@ class ReceptionistBookingController extends Controller
         return Schema::hasTable('pets')
             && Schema::hasColumn('pets', 'pet_doc2_blob')
             && Schema::hasColumn('pets', 'pet_doc2_mime');
+    }
+
+    private function userPetDoc2BlobColumnsReady(): bool
+    {
+        return Schema::hasTable('users')
+            && Schema::hasColumn('users', 'pet_doc2_blob')
+            && Schema::hasColumn('users', 'pet_doc2_mime');
     }
 
     public function storeBooking(Request $request)
