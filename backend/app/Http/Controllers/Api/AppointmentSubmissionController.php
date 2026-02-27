@@ -177,7 +177,7 @@ class AppointmentSubmissionController extends Controller
                 ->all();
         }
 
-        return response()->json([
+        $payload = [
             'success' => true,
             'data' => [
                 'appointment' => [
@@ -206,7 +206,9 @@ class AppointmentSubmissionController extends Controller
                 'pets' => $petsPayload['pets'],
                 'prescriptions' => $prescriptions,
             ],
-        ]);
+        ];
+
+        return response()->json($this->sanitizeForJson($payload));
     }
 
     public function update(Request $request, Appointment $appointment): JsonResponse
@@ -716,10 +718,29 @@ class AppointmentSubmissionController extends Controller
                 : (Schema::hasColumn('pets', 'owner_id') ? 'owner_id' : null);
 
             if ($userColumn) {
+                $petColumns = Schema::getColumnListing('pets');
+                $petColumns = array_values(array_filter(
+                    $petColumns,
+                    static fn (string $column) => $column !== 'pet_doc2_blob'
+                ));
+
                 $pets = DB::table('pets')
                     ->where($userColumn, $userId)
+                    ->when(!empty($petColumns), fn ($query) => $query->select($petColumns))
                     ->orderByDesc('id')
                     ->get()
+                    ->map(function ($pet) {
+                        foreach (['vaccine_reminder_status', 'dog_disease_payload'] as $jsonField) {
+                            if (property_exists($pet, $jsonField)) {
+                                $pet->{$jsonField} = $this->decodeJsonField($pet->{$jsonField});
+                            }
+                        }
+
+                        $petId = property_exists($pet, 'id') && is_numeric($pet->id) ? (int) $pet->id : null;
+                        $pet->pet_doc2_blob_url = $petId ? route('api.pets.pet-doc2-blob', ['pet' => $petId]) : null;
+
+                        return $pet;
+                    })
                     ->all();
 
                 if (!empty($pets)) {
@@ -759,8 +780,15 @@ class AppointmentSubmissionController extends Controller
             return null;
         }
 
+        $petColumns = Schema::getColumnListing('pets');
+        $petColumns = array_values(array_filter(
+            $petColumns,
+            static fn (string $column) => $column !== 'pet_doc2_blob'
+        ));
+
         $pet = DB::table('pets')
             ->where('id', $appointment->pet_id)
+            ->when(!empty($petColumns), fn ($query) => $query->select($petColumns))
             ->first();
 
         if (!$pet) {
@@ -774,6 +802,10 @@ class AppointmentSubmissionController extends Controller
             }
         }
 
+        if (property_exists($pet, 'id') && is_numeric($pet->id)) {
+            $pet->pet_doc2_blob_url = route('api.pets.pet-doc2-blob', ['pet' => (int) $pet->id]);
+        }
+
         return (array) $pet;
     }
 
@@ -785,6 +817,40 @@ class AppointmentSubmissionController extends Controller
 
         $decoded = json_decode($value, true);
         return json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
+    }
+
+    private function sanitizeForJson($value)
+    {
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $value[$key] = $this->sanitizeForJson($item);
+            }
+
+            return $value;
+        }
+
+        if ($value instanceof \JsonSerializable) {
+            return $this->sanitizeForJson($value->jsonSerialize());
+        }
+
+        if ($value instanceof \Traversable) {
+            return $this->sanitizeForJson(iterator_to_array($value));
+        }
+
+        if (is_object($value)) {
+            return $this->sanitizeForJson((array) $value);
+        }
+
+        if (is_string($value)) {
+            if (function_exists('mb_check_encoding') && mb_check_encoding($value, 'UTF-8')) {
+                return $value;
+            }
+
+            $normalized = function_exists('iconv') ? @iconv('UTF-8', 'UTF-8//IGNORE', $value) : false;
+            return $normalized !== false ? $normalized : '';
+        }
+
+        return $value;
     }
 
     private function fetchPrescriptionsForPetAppointments(array $petIds, array $userIds, array $appointmentIds): array
