@@ -166,8 +166,28 @@ const normalizeImageUrl = (value) => {
     );
   }
 
-  if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("data:")) {
-    return trimmed;
+  const optimizeImageUrl = (rawUrl) => {
+    try {
+      const parsed = new URL(rawUrl);
+      const host = parsed.hostname.toLowerCase();
+      if (host.includes("unsplash.com")) {
+        parsed.searchParams.set("auto", "format");
+        parsed.searchParams.set("fit", "crop");
+        parsed.searchParams.set("w", "640");
+        parsed.searchParams.set("q", "80");
+      }
+      return parsed.toString();
+    } catch {
+      return rawUrl;
+    }
+  };
+
+  if (
+    lower.startsWith("http://") ||
+    lower.startsWith("https://") ||
+    lower.startsWith("data:")
+  ) {
+    return optimizeImageUrl(trimmed);
   }
 
   let cleaned = trimmed.replace(/^\/+/, "");
@@ -175,7 +195,7 @@ const normalizeImageUrl = (value) => {
     cleaned = cleaned.slice("backend/".length);
   }
 
-  return `${BACKEND_BASE}/${cleaned}`;
+  return optimizeImageUrl(`${BACKEND_BASE}/${cleaned}`);
 };
 
 const getDoctorImageSource = (doc) =>

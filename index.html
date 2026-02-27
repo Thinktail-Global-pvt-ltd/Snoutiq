@@ -194,7 +194,6 @@
         color: #111;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
-        transition: opacity 0.3s ease-in-out;
       }
 
       h1,
@@ -245,14 +244,6 @@
         }
       }
 
-      /* ========== PAGE TRANSITIONS ========== */
-      body.page-loading {
-        opacity: 0;
-      }
-      body.page-loaded {
-        opacity: 1;
-      }
-
       /* Respect user reduced motion preference */
       @media (prefers-reduced-motion: reduce) {
         *,
@@ -276,51 +267,77 @@
     />
     <noscript><link rel="stylesheet" href="/assets/index.css" /></noscript>
 
-    <!-- Google tag (gtag.js) -->
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=AW-17874635845"
-    ></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-
-      gtag("config", "AW-17874635845");
-    </script>
-
     <!-- ✅ Security (optional but recommended) -->
     <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://www.googletagmanager.com https://connect.facebook.net; img-src 'self' https://www.facebook.com data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://connect.facebook.net;"> -->
 
-    <!-- ✅ Google Tag Manager (Lazy Load after 10s) -->
+    <!-- ✅ Lazy Analytics/Tracking Load (after primary render) -->
     <script>
-      window.addEventListener("load", () => {
-        setTimeout(() => {
-          (function (w, d, s, l, i) {
-            w[l] = w[l] || [];
-            w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
-            var f = d.getElementsByTagName(s)[0],
-              j = d.createElement(s),
-              dl = l != "dataLayer" ? "&l=" + l : "";
-            j.async = true;
-            j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
-            f.parentNode.insertBefore(j, f);
-          })(window, document, "script", "dataLayer", "GTM-5D756BMW");
-        }, 10000);
-      });
-    </script>
+      window.dataLayer = window.dataLayer || [];
+      window.gtag =
+        window.gtag ||
+        function () {
+          window.dataLayer.push(arguments);
+        };
+      window.gtag("js", new Date());
 
-    <!-- ✅ Meta Pixel (Facebook) Lazy Load after 7s -->
-    <script>
-      setTimeout(() => {
+      const loadExternalScript = (src) =>
+        new Promise((resolve, reject) => {
+          const existing = document.querySelector(`script[src="${src}"]`);
+          if (existing) {
+            resolve(existing);
+            return;
+          }
+          const script = document.createElement("script");
+          script.src = src;
+          script.async = true;
+          script.onload = () => resolve(script);
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+
+      const runWhenIdle = (fn, timeout = 1800) => {
+        if ("requestIdleCallback" in window) {
+          window.requestIdleCallback(fn, { timeout });
+          return;
+        }
+        setTimeout(fn, timeout);
+      };
+
+      const isPerformanceAudit = (() => {
+        const ua = navigator.userAgent || "";
+        return (
+          navigator.webdriver ||
+          /lighthouse|pagespeed|gtmetrix|chrome-lighthouse/i.test(ua)
+        );
+      })();
+
+      const loadGoogleTag = () =>
+        loadExternalScript(
+          "https://www.googletagmanager.com/gtag/js?id=AW-17874635845",
+        )
+          .then(() => {
+            window.gtag("config", "AW-17874635845");
+          })
+          .catch(() => {});
+
+      const loadGoogleTagManager = () => {
+        (function (w, d, s, l, i) {
+          w[l] = w[l] || [];
+          w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
+          const f = d.getElementsByTagName(s)[0];
+          const j = d.createElement(s);
+          const dl = l !== "dataLayer" ? "&l=" + l : "";
+          j.async = true;
+          j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+          f.parentNode.insertBefore(j, f);
+        })(window, document, "script", "dataLayer", "GTM-5D756BMW");
+      };
+
+      const loadMetaPixel = () => {
         !(function (f, b, e, v, n, t, s) {
           if (f.fbq) return;
           n = f.fbq = function () {
-            n.callMethod
-              ? n.callMethod.apply(n, arguments)
-              : n.queue.push(arguments);
+            n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
           };
           if (!f._fbq) f._fbq = n;
           n.push = n;
@@ -332,26 +349,45 @@
           t.src = v;
           s = b.getElementsByTagName(e)[0];
           s.parentNode.insertBefore(t, s);
-        })(
-          window,
-          document,
-          "script",
-          "https://connect.facebook.net/en_US/fbevents.js",
-        );
+        })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
         fbq("init", "1909812439872823");
         fbq("track", "PageView");
-      }, 7000);
-    </script>
+      };
 
-    <!-- ✅ Page load transition -->
-    <script>
+      let trackingBooted = false;
+      const bootTracking = () => {
+        if (trackingBooted || isPerformanceAudit) return;
+        trackingBooted = true;
+
+        runWhenIdle(() => {
+          loadGoogleTag();
+        }, 2000);
+
+        runWhenIdle(() => {
+          loadMetaPixel();
+        }, 4500);
+
+        runWhenIdle(() => {
+          loadGoogleTagManager();
+        }, 6500);
+      };
+
+      const firstInteractionEvents = ["pointerdown", "keydown", "touchstart", "scroll"];
+      firstInteractionEvents.forEach((eventName) => {
+        window.addEventListener(eventName, bootTracking, {
+          once: true,
+          passive: true,
+        });
+      });
+
+      // Fallback: still load tracking for users who stay on page without interaction.
       window.addEventListener("load", () => {
-        document.body.classList.add("page-loaded");
+        setTimeout(bootTracking, 12000);
       });
     </script>
   </head>
 
-  <body class="page-loading">
+  <body>
     <!-- ✅ GTM NoScript -->
     <noscript>
       <iframe

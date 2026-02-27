@@ -65,6 +65,28 @@ const formatInr = (value) => {
   });
 };
 
+const round2 = (n) => Number((Number(n) || 0).toFixed(2));
+
+const optimizeAvatarUrl = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase();
+    if (host.includes("unsplash.com")) {
+      parsed.searchParams.set("auto", "format");
+      parsed.searchParams.set("fit", "crop");
+      parsed.searchParams.set("w", "160");
+      parsed.searchParams.set("h", "160");
+      parsed.searchParams.set("q", "70");
+      return parsed.toString();
+    }
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
+};
+
 const stripEmpty = (payload) =>
   Object.fromEntries(
     Object.entries(payload).filter(
@@ -110,9 +132,9 @@ export const PaymentScreen = ({
   // ✅ TESTING: remove service charge for now
   const service = 0;
   const gstRate = 0.18;
-  const taxableAmount = Math.max(Number((fee + service).toFixed(2)), 0);
-  const gstAmount = Math.round(taxableAmount * gstRate);
-  const totalBeforeDiscount = Math.round(taxableAmount + gstAmount);
+  const taxableAmount = round2(Math.max(fee + service, 0));
+  const gstAmount = round2(taxableAmount * gstRate);
+  const totalBeforeDiscount = round2(taxableAmount + gstAmount);
   const firstUserDiscount = 100;
 
   const [isPaying, setIsPaying] = useState(false);
@@ -207,11 +229,11 @@ export const PaymentScreen = ({
   const isFirstUserOfferEligible =
     firstUserFlag !== undefined ? firstUserFlag : !hasUsedFirstOffer;
   const discountAmount = isFirstUserOfferEligible
-    ? Math.min(firstUserDiscount, totalBeforeDiscount)
+    ? round2(Math.min(firstUserDiscount, totalBeforeDiscount))
     : 0;
-  const total = Math.max(totalBeforeDiscount - discountAmount, 0);
-  const payableTaxableAmount = Number((total / (1 + gstRate)).toFixed(2));
-  const payableGstAmount = Number((total - payableTaxableAmount).toFixed(2));
+  const total = round2(Math.max(totalBeforeDiscount - discountAmount, 0));
+  const payableTaxableAmount = round2(total / (1 + gstRate));
+  const payableGstAmount = round2(total - payableTaxableAmount);
 
   const paymentContext = useMemo(() => {
     const orderType =
@@ -345,16 +367,16 @@ export const PaymentScreen = ({
       gst_number_given: hasGstNumber ? 1 : undefined,
       amount_includes_gst: 0,
       gst_rate_percent: 18,
-      taxable_amount_inr: Number(payableTaxableAmount.toFixed(2)),
-      gst_amount_inr: Number(payableGstAmount.toFixed(2)),
-      taxable_amount_before_discount_inr: Number(taxableAmount.toFixed(2)),
-      gst_amount_before_discount_inr: Number(gstAmount.toFixed(2)),
-      consultation_amount_inr: Number(fee.toFixed(2)),
-      service_charge_inr: Number(service.toFixed(2)),
+      taxable_amount_inr: payableTaxableAmount,
+      gst_amount_inr: payableGstAmount,
+      taxable_amount_before_discount_inr: taxableAmount,
+      gst_amount_before_discount_inr: gstAmount,
+      consultation_amount_inr: round2(fee),
+      service_charge_inr: round2(service),
       first_user_offer_applied: discountAmount > 0 ? 1 : 0,
       offer_discount_inr: discountAmount,
-      original_amount_inr: Number(totalBeforeDiscount.toFixed(2)),
-      final_amount_inr: Number(total.toFixed(2)),
+      original_amount_inr: totalBeforeDiscount,
+      final_amount_inr: total,
     });
   }, [
     paymentMeta,
@@ -413,7 +435,7 @@ export const PaymentScreen = ({
     try {
       // ✅ amount = total (keep same as your current backend expectation)
       const order = await apiPost("/api/create-order", {
-        amount: Math.round(total),
+        amount: total,
         ...paymentContext,
       });
 
@@ -483,7 +505,7 @@ export const PaymentScreen = ({
   };
 
   const doctorDisplayName = vet?.name?.split(" ")[1] || vet?.name || "Vet";
-  const imageSrc = vet?.image || "";
+  const imageSrc = useMemo(() => optimizeAvatarUrl(vet?.image), [vet?.image]);
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
@@ -516,8 +538,12 @@ export const PaymentScreen = ({
                     <img
                       src={imageSrc}
                       alt={vet?.name || "Vet"}
+                      width={64}
+                      height={64}
                       className="w-12 h-12 rounded-full object-cover md:w-16 md:h-16"
-                      loading="lazy"
+                      loading="eager"
+                      fetchPriority="high"
+                      decoding="async"
                     />
                   ) : (
                     <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-stone-200" />

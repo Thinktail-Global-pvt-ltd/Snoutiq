@@ -5,6 +5,13 @@
 
     RewriteEngine On
 
+    # Cache static assets served by backend (photos, docs, css/js).
+    <IfModule mod_headers.c>
+        <FilesMatch "\.(?:css|js|mjs|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|eot|mp3)$">
+            Header set Cache-Control "public, max-age=604800"
+        </FilesMatch>
+    </IfModule>
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

@@ -261,6 +261,25 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   }, [isDesktopViewport]);
 
   useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const firstHeroImage = HERO_SLIDES[0]?.image;
+    if (!firstHeroImage) return undefined;
+
+    const preloadLink = document.createElement("link");
+    preloadLink.rel = "preload";
+    preloadLink.as = "image";
+    preloadLink.href = firstHeroImage;
+    preloadLink.media = DESKTOP_MEDIA_QUERY;
+    preloadLink.setAttribute("fetchpriority", "high");
+    preloadLink.setAttribute("data-landing-preload", "hero-image");
+    document.head.appendChild(preloadLink);
+
+    return () => {
+      preloadLink.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     if (isDesktopViewport) {
       setShowMobileStickyCta(false);
       return undefined;
@@ -491,6 +510,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             <img
               src={vet.image}
               alt={vet.name}
+              width={64}
+              height={64}
               loading="lazy"
               decoding="async"
               crossOrigin="anonymous"
@@ -718,6 +739,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 src={logo}
                 alt="SnoutIQ"
                 className="h-6 w-auto object-contain drop-shadow-sm md:h-6 lg:h-6"
+                width={124}
+                height={24}
+                loading="eager"
+                fetchPriority="high"
                 decoding="async"
               />
             </button>
@@ -910,6 +935,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                               src={slide.image}
                               alt={slide.name}
                               className="landing-hero-image h-44 w-full object-cover object-center sm:h-52 md:h-52"
+                              width={640}
+                              height={480}
                               loading={index === 0 ? "eager" : "lazy"}
                               fetchPriority={index === 0 ? "high" : "low"}
                               decoding="async"
@@ -1373,6 +1400,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                       <img
                         src={activeBioVet.image}
                         alt={activeBioVet.name}
+                        width={176}
+                        height={176}
                         loading="lazy"
                         decoding="async"
                         crossOrigin="anonymous"
@@ -1550,6 +1579,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                           src={appPhoneMock}
                           alt="SnoutIQ App Preview"
                           className="h-auto w-full object-contain"
+                          width={320}
+                          height={640}
                           loading="lazy"
                           decoding="async"
                         />
@@ -1769,6 +1800,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 src={logo1}
                 alt="SnoutIQ"
                 className="h-6 w-auto object-contain drop-shadow-sm md:h-6 lg:h-6"
+                width={124}
+                height={24}
                 loading="lazy"
                 decoding="async"
               />
