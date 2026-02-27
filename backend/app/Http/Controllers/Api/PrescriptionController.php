@@ -257,12 +257,18 @@ class PrescriptionController extends Controller
         }
 
         if ($request->hasFile('user_pet_doc1') && Schema::hasColumn('users', 'pet_doc1')) {
-            $userUpdates['pet_doc1'] = $this->storePetDocUpload($request->file('user_pet_doc1'));
+            $storedPath = $this->storePetDocUploadSafely($request->file('user_pet_doc1'));
+            if ($storedPath !== null) {
+                $userUpdates['pet_doc1'] = $storedPath;
+            }
         }
         if ($request->hasFile('user_pet_doc2')) {
             $userPetDoc2 = $request->file('user_pet_doc2');
             if (Schema::hasColumn('users', 'pet_doc2')) {
-                $userUpdates['pet_doc2'] = $this->storePetDocUpload($userPetDoc2);
+                $storedPath = $this->storePetDocUploadSafely($userPetDoc2);
+                if ($storedPath !== null) {
+                    $userUpdates['pet_doc2'] = $storedPath;
+                }
             }
             if (Schema::hasColumn('users', 'pet_doc2_blob')) {
                 $userUpdates['pet_doc2_blob'] = $userPetDoc2->get();
@@ -389,10 +395,10 @@ class PrescriptionController extends Controller
             }
 
             if ($request->hasFile('pet_doc1')) {
-                $petDoc1Path = $this->storePetDocUpload($request->file('pet_doc1'));
-                if (Schema::hasColumn('pets', 'pet_doc1')) {
+                $petDoc1Path = $this->storePetDocUploadSafely($request->file('pet_doc1'));
+                if ($petDoc1Path !== null && Schema::hasColumn('pets', 'pet_doc1')) {
                     $petUpdates['pet_doc1'] = $petDoc1Path;
-                } elseif (Schema::hasColumn('pets', 'pic_link')) {
+                } elseif ($petDoc1Path !== null && Schema::hasColumn('pets', 'pic_link')) {
                     $petUpdates['pic_link'] = $petDoc1Path;
                 }
             }
@@ -400,7 +406,10 @@ class PrescriptionController extends Controller
             if ($request->hasFile('pet_doc2')) {
                 $petDoc2 = $request->file('pet_doc2');
                 if (Schema::hasColumn('pets', 'pet_doc2')) {
-                    $petUpdates['pet_doc2'] = $this->storePetDocUpload($petDoc2);
+                    $storedPath = $this->storePetDocUploadSafely($petDoc2);
+                    if ($storedPath !== null) {
+                        $petUpdates['pet_doc2'] = $storedPath;
+                    }
                 }
                 if (Schema::hasColumn('pets', 'pet_doc2_blob')) {
                     $petUpdates['pet_doc2_blob'] = $petDoc2->get();
@@ -777,6 +786,20 @@ class PrescriptionController extends Controller
         $file->move($uploadPath, $docName);
 
         return 'backend/uploads/pet_docs/' . $docName;
+    }
+
+    private function storePetDocUploadSafely(?UploadedFile $file): ?string
+    {
+        if (! $file || ! $file->isValid()) {
+            return null;
+        }
+
+        try {
+            return $this->storePetDocUpload($file);
+        } catch (\Throwable $e) {
+            report($e);
+            return null;
+        }
     }
 
     private function normalizeJsonPayload($value): ?array
