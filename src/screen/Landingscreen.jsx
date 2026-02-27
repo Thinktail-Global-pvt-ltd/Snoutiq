@@ -891,14 +891,14 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               </div>
 
               {/* CTA */}
-              <div className="mt-3 flex flex-wrap items-center gap-2.5">
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2.5 md:justify-start">
                 <button
                   type="button"
                   onClick={handleStart}
                   disabled={isStartingConsult}
                   className="
                     btn-highlight-anim group inline-flex items-center justify-center gap-2
-                    rounded-lg bg-[#3998de] px-7 py-3.5 text-center text-base font-extrabold leading-none tracking-[0.01em] text-white md:text-lg
+                    rounded-lg bg-[#3998de] px-8 py-4 text-center text-[17px] font-extrabold leading-none tracking-[0.01em] text-white md:text-xl
                     shadow-lg shadow-[#3998de]/30 transition
                     hover:bg-[#2F7FC0]
                     disabled:cursor-not-allowed disabled:opacity-80
@@ -1076,7 +1076,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               type="button"
               onClick={handleStart}
               disabled={isStartingConsult}
-              className="btn-highlight-anim inline-flex items-center justify-center gap-2 rounded-full bg-[#3998de] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
+              className="btn-highlight-anim inline-flex items-center justify-center gap-2 rounded-xl bg-[#3998de] px-6 py-3 text-[15px] font-extrabold text-white shadow-lg shadow-[#3998de]/30 transition hover:bg-[#2F7FC0] sm:text-base disabled:cursor-not-allowed disabled:opacity-80"
             >
               {isStartingConsult
                 ? "Connecting Dr Shashank..."
@@ -1103,10 +1103,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             type="button"
             onClick={handleStart}
             disabled={isStartingConsult}
-            className="btn-highlight-anim inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[#1D4E89] shadow-md transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-80"
+            className="btn-highlight-anim inline-flex self-center items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-[17px] font-extrabold text-[#1D4E89] shadow-md transition hover:-translate-y-0.5 md:self-auto md:text-lg disabled:cursor-not-allowed disabled:opacity-80"
           >
             {isStartingConsult ? "Connecting..." : "Talk to a Vet Online"}
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-5 w-5" />
           </button>
         </div>
       </section>
@@ -1671,15 +1671,15 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             ))}
           </div>
 
-          <div className="mt-5">
+          <div className="mt-5 flex justify-center">
             <button
               type="button"
               onClick={handleStart}
               disabled={isStartingConsult}
-              className="btn-highlight-anim inline-flex items-center gap-1.5 rounded-xl bg-[#3998de] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2F7FC0] disabled:cursor-not-allowed disabled:opacity-80"
+              className="btn-highlight-anim inline-flex items-center gap-2 rounded-xl bg-[#3998de] px-7 py-3.5 text-[17px] font-extrabold text-white transition hover:bg-[#2F7FC0] md:text-lg disabled:cursor-not-allowed disabled:opacity-80"
             >
               {isStartingConsult ? "Starting..." : "Talk to a Vet Online"}
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -1894,19 +1894,19 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               <p className="truncate text-sm font-extrabold text-slate-900">
                 Talk to a Vet Online Now
               </p>
-              <p className="mt-1 flex items-center gap-1 overflow-hidden whitespace-nowrap text-[11px] text-slate-500">
-                <span className="font-medium">15 min</span>
-                <span className="text-slate-300">·</span>
-                <span className="text-[11px] font-semibold text-slate-500 line-through">
+              <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-slate-500 sm:text-[11px]">
+                <span className="shrink-0 font-medium">15 min</span>
+                <span className="shrink-0 text-slate-300">·</span>
+                <span className="shrink-0 text-[11px] font-semibold text-slate-500 line-through">
                   ₹{originalConsultPrice}
                 </span>
-                <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-emerald-800 shadow-sm">
+                <span className="inline-flex shrink-0 items-center rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-emerald-800 shadow-sm">
                   <span className="text-[10px] font-semibold">Pay</span>
                   <span className="ml-1 text-sm font-extrabold leading-none">
                     ₹{discountedConsultPrice}
                   </span>
                 </span>
-                <span className="text-[11px] font-bold text-rose-700">
+                <span className="shrink-0 whitespace-nowrap rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-bold text-rose-700">
                   Save ₹{consultDiscountAmount}
                 </span>
               </p>
