@@ -9,7 +9,6 @@ import {
   GraduationCap,
   Stethoscope,
   BadgeCheck,
-  Star,
   X,
 } from "lucide-react";
 
@@ -251,6 +250,45 @@ const buildSpecializationData = (value) => {
   return { list, text };
 };
 
+const normalizeSpecializationKey = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const isPetTypeSpecialization = (value) => {
+  const key = normalizeSpecializationKey(value);
+  if (!key) return false;
+  return (
+    key.includes("dog") ||
+    key.includes("cat") ||
+    key.includes("exotic") ||
+    key.includes("livestock") ||
+    key.includes("avian") ||
+    key.includes("bird") ||
+    key.includes("rabbit") ||
+    key.includes("turtle")
+  );
+};
+
+const buildDisplaySpecializationList = (list = []) => {
+  const unique = [];
+  const seen = new Set();
+  list.forEach((item) => {
+    const label = String(item || "").trim();
+    if (!label) return;
+    const key = normalizeSpecializationKey(label);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    unique.push(label);
+  });
+
+  if (!unique.length) return [];
+  const focused = unique.filter((item) => !isPetTypeSpecialization(item));
+  const petTypes = unique.filter((item) => isPetTypeSpecialization(item));
+  return [...focused, ...petTypes];
+};
+
 const buildDegreeData = (value) => {
   const list = parseListField(value);
   let text = list.length ? list.join(", ") : "";
@@ -304,35 +342,9 @@ const toNumber = (v, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-const seedFromValue = (value) => {
-  const str = String(value ?? "");
-  let hash = 0;
-  for (let i = 0; i < str.length; i += 1) {
-    hash = (hash * 31 + str.charCodeAt(i)) % 1000000007;
-  }
-  return hash;
-};
-
-const seededRandom = (seed) => {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-};
-
-const getSeededNumber = (seed, min, max, decimals = 0) => {
-  const raw = min + seededRandom(seed) * (max - min);
-  const factor = 10 ** decimals;
-  return Math.round(raw * factor) / factor;
-};
-
 const isDayTime = (date = new Date()) => {
   const hour = date.getHours();
   return hour >= 8 && hour < 20;
-};
-
-const formatPrice = (value) => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) return "";
-  return `₹${amount}`;
 };
 
 const clipText = (text, max = 160) => {
@@ -356,19 +368,19 @@ export const buildVetsFromApi = (apiData = []) => {
       const specializationData = buildSpecializationData(
         doc?.specialization_select_all_that_apply
       );
+      const specializationList = buildDisplaySpecializationList(specializationData.list);
+      const specializationText = normalizeText(
+        specializationList.length
+          ? specializationList.join(", ")
+          : specializationData.text
+      );
       const degreeData = buildDegreeData(doc?.degree);
       const breakTimes = normalizeBreakTimes(doc?.break_do_not_disturb_time_example_2_4_pm);
 
-      const seedBase = seedFromValue(
-        doc?.id ||
-          doc?.doctor_email ||
-          doc?.doctor_mobile ||
-          doc?.doctor_name ||
-          `${clinicName}-${list.length}`
-      );
-
       const priceDay = toNumber(doc?.video_day_rate, 0);
       const priceNight = toNumber(doc?.video_night_rate, 0);
+      const apiReviews = Math.max(0, Math.round(toNumber(doc?.reviews_count, 0)));
+      const apiRating = toOptionalNumber(doc?.average_review_points);
 
       if (priceDay <= 2 || priceNight <= 2) return;
 
@@ -386,13 +398,16 @@ export const buildVetsFromApi = (apiData = []) => {
         priceDay,
         priceNight,
 
-        rating: getSeededNumber(seedBase + 11, 4.0, 4.9, 1),
-        reviews: Math.round(getSeededNumber(seedBase + 23, 30, 220)),
-        consultations: Math.round(getSeededNumber(seedBase + 37, 20, 180)),
+        rating:
+          Number.isFinite(apiRating) && apiRating > 0
+            ? Math.round(apiRating * 10) / 10
+            : null,
+        reviews: apiReviews,
+        consultations: null,
 
-        specialties: normalizeSpecialties(specializationData.list),
-        specializationList: specializationData.list,
-        specializationText: normalizeText(specializationData.text),
+        specialties: normalizeSpecialties(specializationList),
+        specializationList,
+        specializationText,
 
         responseDay: normalizeText(doc?.response_time_for_online_consults_day),
         responseNight: normalizeText(doc?.response_time_for_online_consults_night),
@@ -546,7 +561,7 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                 {petDetails?.name ? `Vets for ${petDetails.name}` : "Available Vets"}
               </h2>
               <p className="mt-2 text-sm md:text-base text-slate-500 max-w-3xl">
-                Choose a vet based on your pet and consult price.
+                Choose a vet based on experience, specialization, and response time.
               </p>
             </div>
 
@@ -603,16 +618,20 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
         ) : (
           <div className="mt-8 grid auto-rows-fr items-stretch gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
             {rotatedVets.map((vet) => {
-              const showDayPrice = isDayTime();
-              const priceValue = showDayPrice ? vet.priceDay : vet.priceNight;
-
               const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
               const initials = getInitials(vet.name);
-
-              const bioPreview = clipText(vet.bio, 170);
+              const responseLabelRaw = isDayTime() ? vet.responseDay : vet.responseNight;
+              const responseLabel = hasDisplayValue(responseLabelRaw)
+                ? String(responseLabelRaw).trim()
+                : "0 to 15 mins";
+              const followUpLabel = hasDisplayValue(vet.followUp)
+                ? clipText(vet.followUp, 44)
+                : "Follow-up available";
               const experienceLabel = hasDisplayValue(vet.experience)
                 ? `${vet.experience} years exp.`
                 : "";
+              const ratingValue = Number(vet.rating);
+              const hasRating = Number.isFinite(ratingValue) && ratingValue > 0;
 
               const specializationValue = hasDisplayValue(vet.specializationText)
                 ? vet.specializationText
@@ -659,14 +678,11 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                           </div>
 
                           <div className="shrink-0 text-right">
-                            <div className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 border border-amber-100">
-                              <Star size={14} className="text-amber-500" />
-                              <span className="text-sm font-extrabold text-slate-900">
-                                {Number(vet.rating).toFixed(1)}
+                            <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 border border-emerald-100">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                              <span className="text-xs font-extrabold text-emerald-800">
+                                Available
                               </span>
-                            </div>
-                            <div className="mt-1 text-[11px] text-slate-500">
-                              ({vet.reviews} reviews)
                             </div>
                           </div>
                         </div>
@@ -687,28 +703,30 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                         value={specializationValue}
                       />
 
-                      <InfoRow
-                        icon={BadgeCheck}
-                        label="Successful consultations"
-                        value={`${vet.consultations}+`}
-                      />
+                      <InfoRow icon={Clock} label="Response Time" value={responseLabel} />
                     </div>
 
-                    <div className="mt-4 flex-1">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 min-h-[108px]">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
-                          About
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                          Follow-up
                         </div>
+                        <div className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-emerald-800">
+                          <BadgeCheck size={13} />
+                          {followUpLabel}
+                        </div>
+                      </div>
 
-                        {bioPreview ? (
-                          <p className="mt-1 text-sm text-slate-700 leading-6 line-clamp-3">
-                            {bioPreview}
-                          </p>
-                        ) : (
-                          <p className="mt-1 text-sm text-slate-400 leading-6">
-                            View full profile to see doctor details.
-                          </p>
-                        )}
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-right">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                          Rating
+                        </div>
+                        <div className="mt-0.5 text-sm font-extrabold text-amber-900">
+                          {hasRating ? `${ratingValue.toFixed(1)} / 5` : "New"}
+                        </div>
+                        <div className="text-[11px] font-medium text-amber-700">
+                          {vet.reviews || 0} review{(vet.reviews || 0) === 1 ? "" : "s"}
+                        </div>
                       </div>
                     </div>
 
@@ -720,19 +738,6 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                       >
                         View full profile <ChevronRight size={16} />
                       </button>
-
-                      {/* <Button
-                        onClick={() =>
-                          onSelect?.({
-                            ...vet,
-                            bookingRateType: showDayPrice ? "day" : "night",
-                            bookingPrice: priceValue,
-                          })
-                        }
-                        className="h-11 px-5 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-sm text-sm inline-flex items-center gap-3 min-w-[150px] justify-center"
-                      >
-                        <span className="font-semibold">Consult Now</span>
-                      </Button> */}
                     </div>
                   </div>
                 </div>
@@ -838,19 +843,25 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-slate-200 bg-white p-4">
                         <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                          Day consult (8 AM - 8 PM)
+                          Response time
                         </div>
-                        <div className="mt-1 text-lg font-extrabold text-slate-900">
-                          {formatPrice(activeBioVet.priceDay) || "Price on request"}
+                        <div className="mt-1 text-sm font-semibold text-slate-800">
+                          Day: {hasDisplayValue(activeBioVet.responseDay) ? activeBioVet.responseDay : "0 to 15 mins"}
+                        </div>
+                        <div className="mt-0.5 text-sm font-semibold text-slate-800">
+                          Night: {hasDisplayValue(activeBioVet.responseNight) ? activeBioVet.responseNight : "15 to 20 mins"}
                         </div>
                       </div>
 
                       <div className="rounded-2xl border border-slate-200 bg-white p-4">
                         <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                          Night consult (8 PM - 8 AM)
+                          Languages
                         </div>
-                        <div className="mt-1 text-lg font-extrabold text-slate-900">
-                          {formatPrice(activeBioVet.priceNight) || "Price on request"}
+                        <div className="mt-1 text-sm font-semibold text-slate-800">
+                          {(() => {
+                            const langs = parseListField(activeBioVet.raw?.languages_spoken);
+                            return langs.length ? langs.join(", ") : "English / Hindi";
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -939,4 +950,5 @@ const VetsScreen = ({ petDetails, onSelect, onBack }) => {
 };
 
 export default VetsScreen;
+
 

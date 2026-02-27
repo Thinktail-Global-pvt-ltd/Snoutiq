@@ -441,34 +441,52 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const FeaturedVetCard = ({ vet, idx, className = "" }) => {
     const vetKey = vet.id || `${vet.name}-${idx}`;
     const showImage = Boolean(vet.image) && !brokenImages.has(vet.id);
+    const clinicLabel = hasDisplayValue(vet.clinicName)
+      ? String(vet.clinicName).trim()
+      : "Verified Clinic";
     const qualification = hasDisplayValue(vet.qualification)
       ? vet.qualification
       : "BVSc & AH";
     const specialization = hasDisplayValue(vet.specializationText)
       ? vet.specializationText
       : "General Practice";
-    const ratingValue = Number(vet.rating || 4.8).toFixed(1);
+    const ratingRaw = Number(vet.rating);
+    const hasRating = Number.isFinite(ratingRaw) && ratingRaw > 0;
+    const ratingValue = hasRating ? ratingRaw.toFixed(1) : "New";
     const reviewCount = Number(vet.reviews || 0);
+    const reviewLabel = `${reviewCount} review${reviewCount === 1 ? "" : "s"}`;
     const yearsValue = Number(vet.experience);
     const experienceChip =
       Number.isFinite(yearsValue) && yearsValue > 0
         ? `${Math.round(yearsValue)} yrs exp`
         : "7+ yrs exp";
-    const specializationChips = String(specialization)
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .slice(0, 2);
+    const specializationChips = (
+      Array.isArray(vet.specializationList) && vet.specializationList.length
+        ? vet.specializationList
+        : String(specialization)
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+    ).slice(0, 2);
     const responseLabelRaw = isDay ? vet.responseDay : vet.responseNight;
     const responseLabel = hasDisplayValue(responseLabelRaw)
       ? String(responseLabelRaw).trim()
       : "0 To 15 Mins";
+    const followUpLabel = hasDisplayValue(vet.followUp)
+      ? clipText(vet.followUp, 26)
+      : "Follow-up available";
+    const cardStats = [
+      { label: "Response", value: clipText(responseLabel, 16) },
+      { label: "Experience", value: experienceChip },
+      { label: "Follow-up", value: followUpLabel },
+      { label: "Rating", value: hasRating ? `${ratingValue}/5` : ratingValue },
+    ];
 
     return (
       <article
-        className={`rounded-2xl border border-[#3998de]/20 bg-white p-5 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#3998de]/15 ${className}`.trim()}
+        className={`rounded-3xl border border-[#3998de]/25 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#3998de]/15 md:p-4 ${className}`.trim()}
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3.5">
           {showImage ? (
             <img
               src={vet.image}
@@ -477,19 +495,28 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               decoding="async"
               crossOrigin="anonymous"
               onError={() => markImageBroken(vet.id)}
-              className="h-14 w-14 rounded-full object-cover border border-[#3998de]/20 bg-slate-50 md:h-12 md:w-12"
+              className="h-16 w-16 rounded-2xl object-cover border border-[#3998de]/20 bg-slate-50 md:h-14 md:w-14"
             />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#EAF4FF] text-base font-extrabold text-[#1D4E89] md:h-12 md:w-12 md:text-sm">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#EAF4FF] text-lg font-extrabold text-[#1D4E89] md:h-14 md:w-14 md:text-base">
               {getInitials(vet.name)}
             </div>
           )}
 
           <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-[17px] font-extrabold leading-tight text-slate-900 md:text-base">
-              {vet.name}
-            </h3>
-            <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#1D4E89] md:text-[11px]">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="line-clamp-2 text-[17px] font-extrabold leading-tight text-slate-900 md:text-base">
+                {vet.name}
+              </h3>
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#3998de]/20 bg-[#EAF4FF] px-2.5 py-1 text-[10px] font-bold text-[#1D4E89]">
+                <BadgeCheck size={11} />
+                Verified
+              </span>
+            </div>
+            <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-500">
+              {clipText(clinicLabel, 34)}
+            </p>
+            <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-[#1D4E89] md:text-[11px]">
               {qualification}
             </p>
           </div>
@@ -502,42 +529,40 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
           ).map((chip, chipIdx) => (
             <span
               key={`${vetKey}-${chip}-${chipIdx}`}
-              className="max-w-[170px] truncate rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-3.5 py-1.5 text-xs font-semibold text-[#1D4E89] md:max-w-[150px] md:px-3 md:py-1 md:font-medium"
+              className="max-w-[180px] truncate rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-3.5 py-1.5 text-xs font-semibold text-[#1D4E89] md:max-w-[150px] md:px-3 md:py-1 md:font-medium"
             >
               {clipText(chip, 24)}
             </span>
           ))}
-          <span className="rounded-full border border-[#3998de]/20 bg-[#EAF4FF] px-3.5 py-1.5 text-xs font-bold text-[#1D4E89] md:px-3 md:py-1">
-            {experienceChip}
-          </span>
         </div>
 
-        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-3 py-1.5 text-xs font-semibold text-[#1D4E89] md:px-2.5 md:py-1 md:text-[11px] md:font-medium">
-          <Clock size={12} className="text-[#3998de]" />
-          Response: {responseLabel}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {cardStats.map((item) => (
+            <div
+              key={`${vetKey}-${item.label}`}
+              className="rounded-xl border border-[#3998de]/20 bg-[#f8fbff] px-2.5 py-2"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {item.label}
+              </div>
+              <div className="mt-0.5 text-xs font-extrabold text-[#1D4E89]">
+                {item.value}
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-            <span className="tracking-[1px] text-amber-500">
-              {"\u2605".repeat(5)}
+        {/* <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Available
             </span>
-            <span>{ratingValue}</span>
-            <span className="text-slate-500">({reviewCount})</span>
+            <span className="text-xs font-semibold text-emerald-800">
+              {reviewLabel}
+            </span>
           </div>
-          <span className="inline-flex items-center gap-1 rounded-full border border-[#3998de]/20 bg-[#EAF4FF] px-3 py-1 text-xs font-bold text-[#1D4E89]">
-            <BadgeCheck size={12} />
-            Verified
-          </span>
-        </div>
-
-        {/* <button
-          type="button"
-          onClick={() => setActiveBioVet(vet)}
-          className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-teal-700 transition hover:text-teal-800"
-        >
-          View details <ChevronRight size={14} />
-        </button> */}
+        </div> */}
       </article>
     );
   };
@@ -993,7 +1018,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                         key={`featured-vet-mobile-${vetKey}`}
                         vet={vet}
                         idx={idx}
-                        className="min-w-[92%] snap-center"
+                        className="min-w-[94%] snap-center"
                       />
                     );
                   })}
