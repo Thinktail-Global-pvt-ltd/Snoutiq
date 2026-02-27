@@ -769,7 +769,11 @@ class PrescriptionController extends Controller
     {
         $uploadPath = public_path('uploads/pet_docs');
         File::ensureDirectoryExists($uploadPath);
-        $docName = time() . '_' . Str::random(10) . '_' . $file->getClientOriginalName();
+
+        // Keep path short/safe to avoid DB column overflow with long original filenames.
+        $ext = strtolower((string) ($file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'bin'));
+        $ext = preg_replace('/[^a-z0-9]+/', '', $ext) ?: 'bin';
+        $docName = now()->format('YmdHis') . '_' . Str::random(16) . '.' . $ext;
         $file->move($uploadPath, $docName);
 
         return 'backend/uploads/pet_docs/' . $docName;
