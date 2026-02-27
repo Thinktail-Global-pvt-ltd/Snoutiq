@@ -5,9 +5,6 @@ import doctorSlide1 from "../assets/doctor1.jpeg";
 import doctorSlide2 from "../assets/doctor2.jpeg";
 import doctorSlide3 from "../assets/doctor3.jpeg";
 import doctorProfile4 from "../assets/doctor4.jpeg";
-import blogVaccination from "../assets/images/vaccination_schedule.jpeg";
-import blogTickFever from "../assets/images/tickfever.png";
-import blogFirstAid from "../assets/images/first_aid_tips.jpeg";
 import appPhoneMock from "../assets/mobile UI.jpeg";
 import logo1 from "../assets/images/dark bg.webp";
 import { Button } from "../components/Button";
@@ -16,12 +13,8 @@ import {
   BadgeCheck,
   ChevronRight,
   Clock,
-  GraduationCap,
   ShieldCheck,
-  Star,
-  Stethoscope,
   X,
-  Zap,
 } from "lucide-react";
 
 // IMPORTANT: file name/casing same as your actual file.
@@ -202,48 +195,12 @@ const clipText = (text, max = 160) => {
   return `${trimmed.slice(0, max).trim()}...`;
 };
 
-const InfoRow = ({ icon: Icon, label, value, subValue }) => {
-  const showValue = hasDisplayValue(value);
-  const showSubValue = hasDisplayValue(subValue);
-  if (!showValue && !showSubValue) return null;
+const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
 
-  return (
-    <div className="flex items-start gap-3">
-      <div className="mt-[2px] inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 border border-teal-100">
-        <Icon size={18} />
-      </div>
-      <div className="min-w-0">
-        <div className="text-[11px] font-semibold text-slate-500">{label}</div>
-        <div className="text-sm font-semibold text-slate-900 leading-5 break-words">
-          {showValue ? value : null}
-          {showValue && showSubValue ? (
-            <span className="text-slate-400 font-semibold">
-              {" "}
-              {" - "} {subValue}
-            </span>
-          ) : null}
-          {!showValue && showSubValue ? (
-            <span className="text-slate-900 font-semibold">{subValue}</span>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const SkeletonCard = () => (
-  <div className="rounded-3xl border border-slate-200 bg-white shadow-sm p-5 animate-pulse">
-    <div className="flex gap-4">
-      <div className="h-16 w-16 rounded-2xl bg-slate-100" />
-      <div className="flex-1 space-y-2">
-        <div className="h-4 w-2/3 rounded bg-slate-100" />
-        <div className="h-3 w-1/2 rounded bg-slate-100" />
-        <div className="h-3 w-5/6 rounded bg-slate-100" />
-      </div>
-    </div>
-    <div className="mt-4 h-12 rounded-2xl bg-slate-100" />
-  </div>
-);
+const isDesktopViewportNow = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
 
 const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const [openFaq, setOpenFaq] = useState(null);
@@ -253,11 +210,15 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const heroSectionRef = useRef(null);
 
   const [vets, setVets] = useState([]);
-  const [vetsLoading, setVetsLoading] = useState(true);
+  const [vetsLoading, setVetsLoading] = useState(false);
   const [vetsError, setVetsError] = useState("");
   const [brokenImages, setBrokenImages] = useState(() => new Set());
   const [activeBioVet, setActiveBioVet] = useState(null);
   const [isStartingConsult, setIsStartingConsult] = useState(false);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(
+    isDesktopViewportNow,
+  );
+  const [shouldLoadVets, setShouldLoadVets] = useState(false);
   const [showMobileStickyCta, setShowMobileStickyCta] = useState(false);
 
   useEffect(() => {
@@ -275,13 +236,36 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+      return undefined;
+
+    const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
+    const updateViewport = () => setIsDesktopViewport(mediaQuery.matches);
+    updateViewport();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateViewport);
+      return () => mediaQuery.removeEventListener("change", updateViewport);
+    }
+
+    mediaQuery.addListener(updateViewport);
+    return () => mediaQuery.removeListener(updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktopViewport) return undefined;
     const interval = window.setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length);
     }, 3500);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [isDesktopViewport]);
 
   useEffect(() => {
+    if (isDesktopViewport) {
+      setShowMobileStickyCta(false);
+      return undefined;
+    }
+
     const updateStickyCta = () => {
       const heroEl = heroSectionRef.current;
       if (!heroEl) return;
@@ -297,10 +281,42 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       window.removeEventListener("scroll", updateStickyCta);
       window.removeEventListener("resize", updateStickyCta);
     };
-  }, []);
+  }, [isDesktopViewport]);
 
-  // FIXED: Mobile-safe load using loadVetsWithFallback()
   useEffect(() => {
+    if (shouldLoadVets) return;
+
+    if (
+      typeof window === "undefined" ||
+      typeof window.IntersectionObserver === "undefined"
+    ) {
+      setShouldLoadVets(true);
+      return;
+    }
+
+    const sectionEl = vetSectionRef.current;
+    if (!sectionEl) return;
+
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoadVets(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: "320px 0px",
+        threshold: 0.01,
+      },
+    );
+
+    observer.observe(sectionEl);
+    return () => observer.disconnect();
+  }, [shouldLoadVets]);
+
+  useEffect(() => {
+    if (!shouldLoadVets) return;
+
     let ignore = false;
 
     const loadVets = async () => {
@@ -325,7 +341,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [shouldLoadVets]);
 
   const handleLogoClick = () => {
     if (typeof onStart === "function") {
@@ -337,6 +353,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
 
   const handleStart = async () => {
     if (isStartingConsult) return;
+    setShouldLoadVets(true);
 
     if (typeof onSelectVet === "function") {
       const currentTarget = sortedVets.find((vet) => isDrShashankVet(vet));
@@ -457,6 +474,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               src={vet.image}
               alt={vet.name}
               loading="lazy"
+              decoding="async"
               crossOrigin="anonymous"
               onError={() => markImageBroken(vet.id)}
               className="h-12 w-12 rounded-full object-cover border border-[#3998de]/20 bg-slate-50"
@@ -633,39 +651,6 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
     [],
   );
 
-  const blogPosts = useMemo(
-    () => [
-      {
-        title: "Vaccination Schedule for Pets in India",
-        excerpt:
-          "Complete, vet-approved vaccine timeline with essential boosters for dogs and cats.",
-        link: "/blog/vaccination-schedule-for-pets-in-india",
-        image: blogVaccination,
-        category: "Pet Health",
-        readTime: "15 min read",
-      },
-      {
-        title: "Symptoms of Tick Fever in Dogs",
-        excerpt:
-          "Learn the early warning signs, prevention tips, and when to seek care.",
-        link: "/blog/symptoms-of-tick-fever-in-dogs",
-        image: blogTickFever,
-        category: "Dog Care",
-        readTime: "7 min read",
-      },
-      {
-        title: "First Aid Tips Every Pet Parent Should Know",
-        excerpt:
-          "Practical first-aid steps for common pet emergencies before you reach a vet.",
-        link: "/blog/first-aid-tips-every-pet-parent-should-know",
-        image: blogFirstAid,
-        category: "Emergency",
-        readTime: "6 min read",
-      },
-    ],
-    [],
-  );
-
   const toggleFaq = (idx) => setOpenFaq((prev) => (prev === idx ? null : idx));
 
   return (
@@ -708,6 +693,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 src={logo}
                 alt="SnoutIQ"
                 className="h-6 w-auto object-contain drop-shadow-sm md:h-6 lg:h-6"
+                decoding="async"
               />
             </button>
 
@@ -876,50 +862,54 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               </div>
             </div>
             {/* Right (Doctor Image) */}
-            <div className="landing-hero-visual hidden w-full md:block">
-              <div className="relative mx-auto w-full max-w-xs sm:max-w-sm md:max-w-[19.5rem]">
-                <div className="absolute -top-6 right-10 h-20 w-20 rounded-full bg-[#3998de]/15 blur-2xl" />
-                <div className="absolute -bottom-8 left-6 h-24 w-24 rounded-full bg-[#3998de]/10 blur-2xl" />
-                <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-3 shadow-[0_25px_60px_rgba(15,118,110,0.08)] md:p-3.5">
-                  <div className="relative overflow-hidden rounded-2xl">
-                    <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                      Online
+            {isDesktopViewport ? (
+              <div className="landing-hero-visual w-full">
+                <div className="relative mx-auto w-full max-w-xs sm:max-w-sm md:max-w-[19.5rem]">
+                  <div className="absolute -top-6 right-10 h-20 w-20 rounded-full bg-[#3998de]/15 blur-2xl" />
+                  <div className="absolute -bottom-8 left-6 h-24 w-24 rounded-full bg-[#3998de]/10 blur-2xl" />
+                  <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-3 shadow-[0_25px_60px_rgba(15,118,110,0.08)] md:p-3.5">
+                    <div className="relative overflow-hidden rounded-2xl">
+                      <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        Online
+                      </div>
+                      <div
+                        className="flex transition-transform duration-700 ease-in-out"
+                        style={{
+                          transform: `translateX(-${activeSlide * 100}%)`,
+                        }}
+                      >
+                        {HERO_SLIDES.map((slide, index) => (
+                          <div key={slide.name} className="min-w-full">
+                            <img
+                              src={slide.image}
+                              alt={slide.name}
+                              className="landing-hero-image h-44 w-full object-cover object-center sm:h-52 md:h-52"
+                              loading={index === 0 ? "eager" : "lazy"}
+                              fetchPriority={index === 0 ? "high" : "low"}
+                              decoding="async"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div
-                      className="flex transition-transform duration-700 ease-in-out"
-                      style={{
-                        transform: `translateX(-${activeSlide * 100}%)`,
-                      }}
-                    >
-                      {HERO_SLIDES.map((slide, index) => (
-                        <div key={slide.name} className="min-w-full">
-                          <img
-                            src={slide.image}
-                            alt={slide.name}
-                            className="landing-hero-image h-44 w-full object-cover object-center sm:h-52 md:h-52"
-                            loading={index === 0 ? "eager" : "lazy"}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mt-3 text-center">
-                    <div className="text-sm font-semibold text-slate-900 md:text-base">
-                      {activeDoctor?.name}
-                    </div>
-                    <div className="mt-1 text-[11px] text-slate-500 md:text-xs">
-                      {activeDoctor?.degree}
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                      <span className="inline-flex items-center rounded-full bg-[#EAF4FF] px-3 py-1 text-[11px] font-semibold text-[#1D4E89]">
-                        {activeDoctor?.experience}
-                      </span>
+                    <div className="mt-3 text-center">
+                      <div className="text-sm font-semibold text-slate-900 md:text-base">
+                        {activeDoctor?.name}
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-500 md:text-xs">
+                        {activeDoctor?.degree}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                        <span className="inline-flex items-center rounded-full bg-[#EAF4FF] px-3 py-1 text-[11px] font-semibold text-[#1D4E89]">
+                          {activeDoctor?.experience}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -950,6 +940,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
 
       {/* Our Verified Vets */}
       <section
+        ref={vetSectionRef}
         id="verified-vets"
         className="bg-gradient-to-b from-[#edf7ff] to-white py-10 md:py-12"
       >
@@ -965,7 +956,11 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             The list below is populated from live backend data.
           </p>
 
-          {vetsLoading ? (
+          {!shouldLoadVets ? (
+            <div className="mt-8 rounded-2xl border border-[#3998de]/20 bg-[#f8fbff] p-4 text-sm text-slate-600">
+              Vet profiles will load as soon as this section is in view.
+            </div>
+          ) : vetsLoading ? (
             <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {Array.from({ length: 8 }).map((_, idx) => (
                 <div
@@ -978,6 +973,10 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                   <div className="mt-3 h-2 w-4/5 rounded bg-slate-100" />
                 </div>
               ))}
+            </div>
+          ) : vetsError ? (
+            <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {vetsError}
             </div>
           ) : sortedVets.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-[#3998de]/20 bg-[#f8fbff] p-4 text-sm text-slate-600">
@@ -1350,6 +1349,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                         src={activeBioVet.image}
                         alt={activeBioVet.name}
                         loading="lazy"
+                        decoding="async"
                         crossOrigin="anonymous"
                         onError={() => markImageBroken(activeBioVet.id)}
                         className="h-36 w-36 md:h-44 md:w-44 rounded-3xl object-cover border border-slate-200 bg-white shadow-sm"
@@ -1514,23 +1514,26 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
         <div className="mx-auto max-w-5xl px-4 sm:px-5">
           <div className="grid items-center gap-8 md:grid-cols-2 md:gap-10">
             {/* Left: Phone Mock */}
-            <div className="order-2 md:order-1">
-              <div className="relative mx-auto max-w-[300px] md:max-w-[320px]">
-                <div className="absolute -inset-6 rounded-[30px] bg-[#3998de]/10 blur-2xl" />
-                <div className="relative rounded-[28px] bg-gradient-to-b from-slate-900 to-slate-800 p-2.5 shadow-[0_24px_56px_rgba(15,23,42,0.16)]">
-                  <div className="rounded-[24px] bg-white p-2">
-                    <div className="overflow-hidden rounded-[20px] border border-slate-100 bg-white">
-                      <img
-                        src={appPhoneMock}
-                        alt="SnoutIQ App Preview"
-                        className="h-auto w-full object-contain"
-                        loading="lazy"
-                      />
+            {isDesktopViewport ? (
+              <div className="order-2 md:order-1">
+                <div className="relative mx-auto max-w-[300px] md:max-w-[320px]">
+                  <div className="absolute -inset-6 rounded-[30px] bg-[#3998de]/10 blur-2xl" />
+                  <div className="relative rounded-[28px] bg-gradient-to-b from-slate-900 to-slate-800 p-2.5 shadow-[0_24px_56px_rgba(15,23,42,0.16)]">
+                    <div className="rounded-[24px] bg-white p-2">
+                      <div className="overflow-hidden rounded-[20px] border border-slate-100 bg-white">
+                        <img
+                          src={appPhoneMock}
+                          alt="SnoutIQ App Preview"
+                          className="h-auto w-full object-contain"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
             <AppDownloadButtons className="order-3 md:hidden" />
 
             {/* Right: Copy + Buttons */}
@@ -1739,6 +1742,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 src={logo1}
                 alt="SnoutIQ"
                 className="h-6 w-auto object-contain drop-shadow-sm md:h-6 lg:h-6"
+                loading="lazy"
+                decoding="async"
               />
               <p className="mt-3 text-sm leading-6 text-slate-300">
                 India&apos;s online vet consultation platform. Talk to a
@@ -1844,8 +1849,6 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 <span className="text-[11px] font-bold text-rose-700">
                   Save ₹{consultDiscountAmount}
                 </span>
-                {/* <span className="text-slate-300">·</span>
-                <span className="font-medium">24/7</span> */}
               </p>
             </div>
             <button
