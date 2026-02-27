@@ -466,7 +466,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
 
     return (
       <article
-        className={`rounded-2xl border border-[#3998de]/20 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#3998de]/15 ${className}`.trim()}
+        className={`rounded-2xl border border-[#3998de]/20 bg-white p-5 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#3998de]/15 ${className}`.trim()}
       >
         <div className="flex items-start gap-3">
           {showImage ? (
@@ -477,19 +477,19 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               decoding="async"
               crossOrigin="anonymous"
               onError={() => markImageBroken(vet.id)}
-              className="h-12 w-12 rounded-full object-cover border border-[#3998de]/20 bg-slate-50"
+              className="h-14 w-14 rounded-full object-cover border border-[#3998de]/20 bg-slate-50 md:h-12 md:w-12"
             />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF4FF] text-sm font-extrabold text-[#1D4E89]">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#EAF4FF] text-base font-extrabold text-[#1D4E89] md:h-12 md:w-12 md:text-sm">
               {getInitials(vet.name)}
             </div>
           )}
 
           <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-base font-extrabold leading-tight text-slate-900">
+            <h3 className="line-clamp-2 text-[17px] font-extrabold leading-tight text-slate-900 md:text-base">
               {vet.name}
             </h3>
-            <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-[#1D4E89]">
+            <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#1D4E89] md:text-[11px]">
               {qualification}
             </p>
           </div>
@@ -502,17 +502,17 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
           ).map((chip, chipIdx) => (
             <span
               key={`${vetKey}-${chip}-${chipIdx}`}
-              className="max-w-[150px] truncate rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-3 py-1 text-xs font-medium text-[#1D4E89]"
+              className="max-w-[170px] truncate rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-3.5 py-1.5 text-xs font-semibold text-[#1D4E89] md:max-w-[150px] md:px-3 md:py-1 md:font-medium"
             >
               {clipText(chip, 24)}
             </span>
           ))}
-          <span className="rounded-full border border-[#3998de]/20 bg-[#EAF4FF] px-3 py-1 text-xs font-bold text-[#1D4E89]">
+          <span className="rounded-full border border-[#3998de]/20 bg-[#EAF4FF] px-3.5 py-1.5 text-xs font-bold text-[#1D4E89] md:px-3 md:py-1">
             {experienceChip}
           </span>
         </div>
 
-        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-2.5 py-1 text-[11px] font-medium text-[#1D4E89]">
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#3998de]/20 bg-[#f8fbff] px-3 py-1.5 text-xs font-semibold text-[#1D4E89] md:px-2.5 md:py-1 md:text-[11px] md:font-medium">
           <Clock size={12} className="text-[#3998de]" />
           Response: {responseLabel}
         </div>
@@ -993,7 +993,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                         key={`featured-vet-mobile-${vetKey}`}
                         vet={vet}
                         idx={idx}
-                        className="min-w-[86%] snap-center"
+                        className="min-w-[92%] snap-center"
                       />
                     );
                   })}
@@ -1515,7 +1515,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
           <div className="grid items-center gap-8 md:grid-cols-2 md:gap-10">
             {/* Left: Phone Mock */}
             {isDesktopViewport ? (
-              <div className="order-2 md:order-1">
+              <div className="order-2 hidden md:order-1 md:block">
                 <div className="relative mx-auto max-w-[300px] md:max-w-[320px]">
                   <div className="absolute -inset-6 rounded-[30px] bg-[#3998de]/10 blur-2xl" />
                   <div className="relative rounded-[28px] bg-gradient-to-b from-slate-900 to-slate-800 p-2.5 shadow-[0_24px_56px_rgba(15,23,42,0.16)]">
@@ -1602,7 +1602,9 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 key={item.title}
                 className="rounded-2xl border border-white/15 bg-white/5 p-5"
               >
-                <div className="text-2xl">{item.icon}</div>
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3998de]/20 text-3xl leading-none">
+                  {item.icon}
+                </div>
                 <h3 className="mt-3 text-base font-bold text-white">
                   {item.title}
                 </h3>

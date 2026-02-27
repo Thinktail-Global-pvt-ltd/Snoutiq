@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // THEME
@@ -1288,6 +1288,23 @@ export default function Uiapp() {
   const [activePetId, setActivePetId] = useState(1);
   const [isDark,      setIsDark]      = useState(true);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (document.getElementById("uiapp-google-fonts")) return;
+
+    const stylesheet = document.createElement("link");
+    stylesheet.id = "uiapp-google-fonts";
+    stylesheet.rel = "stylesheet";
+    stylesheet.href =
+      "https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap";
+    stylesheet.media = "print";
+    stylesheet.onload = () => {
+      stylesheet.media = "all";
+    };
+
+    document.head.appendChild(stylesheet);
+  }, []);
+
   const th         = isDark ? THEMES.dark : THEMES.light;
   const activePet  = PETS.find(p => p.id === activePetId);
   const toggleTheme = () => setIsDark(d => !d);
@@ -1301,8 +1318,6 @@ export default function Uiapp() {
 
   return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: th.wallpaper, fontFamily: "'DM Sans', sans-serif", padding: 20, transition: "background 0.4s" }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-
       {/* Theme toggle floating pill — quick access outside phone */}
       <div onClick={toggleTheme} style={{ position: "fixed", top: 24, right: 24, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)", backdropFilter: "blur(12px)", border: isDark ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(0,0,0,0.12)", borderRadius: "20px", padding: "8px 16px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", zIndex: 10 }}>
         <span style={{ fontSize: "16px" }}>{isDark ? "☀️" : "🌙"}</span>

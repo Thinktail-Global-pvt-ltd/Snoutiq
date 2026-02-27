@@ -21,7 +21,7 @@
     <meta name="robots" content="index, follow" />
     <meta name="language" content="English" />
     <meta name="author" content="SnoutIQ" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#EEF5FF" />
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Canonical URL -->
@@ -144,12 +144,21 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
 
     <!-- ✅ Fonts (preconnect + preload + fallback) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
     <link
-      rel="stylesheet"
+      rel="preload"
       href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap"
+      as="style"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap"
+      />
+    </noscript>
 
     <!-- ✅ Base Style -->
     <style>
