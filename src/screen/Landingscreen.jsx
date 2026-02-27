@@ -477,6 +477,29 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
     )
       .slice(0, 3)
       .join(" • ");
+    const specializationValues =
+      Array.isArray(vet.specializationList) && vet.specializationList.length
+        ? vet.specializationList
+        : hasDisplayValue(vet.specializationText)
+          ? String(vet.specializationText)
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean)
+          : [];
+    const specializationKey = specializationValues.join(" ").toLowerCase();
+    const petTypeBadges = [
+      /(dog|canine)/i.test(specializationKey)
+        ? { key: "dog", label: "Dog", icon: "🐶" }
+        : null,
+      /(cat|feline)/i.test(specializationKey)
+        ? { key: "cat", label: "Cat", icon: "🐱" }
+        : null,
+      /(exotic|avian|bird|rabbit|reptile|small mammal|ferret|hamster|guinea)/i.test(
+        specializationKey,
+      )
+        ? { key: "exotic", label: "Exotic", icon: "🦜" }
+        : null,
+    ].filter(Boolean);
     const ratingRaw = Number(vet.rating);
     const hasRating = Number.isFinite(ratingRaw) && ratingRaw > 0;
     const ratingValue = hasRating ? ratingRaw.toFixed(1) : "New profile";
@@ -556,6 +579,19 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
               <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-500">
                 {clipText(clinicLabel, 52)}
               </p>
+              {petTypeBadges.length ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {petTypeBadges.map((petType) => (
+                    <span
+                      key={`${vet.id || idx}-${petType.key}`}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#1D4E89]/15 bg-[#EAF4FF] px-2 py-0.5 text-[10px] font-semibold text-[#1D4E89]"
+                    >
+                      <span aria-hidden="true">{petType.icon}</span>
+                      <span>{petType.label}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 
