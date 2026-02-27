@@ -203,6 +203,12 @@ class PrescriptionController extends Controller
     // PUT/PATCH /api/users/medical-summary
     public function updateUserData(Request $request)
     {
+        // Backward compatibility: allow nested payload like { "pets": { "pet_dob": "2026-02-10" } }.
+        $nestedPetDob = data_get($request->input('pets'), 'pet_dob');
+        if (! $request->has('pet_dob') && $nestedPetDob !== null && $nestedPetDob !== '') {
+            $request->merge(['pet_dob' => $nestedPetDob]);
+        }
+
         $validated = $request->validate([
             'user_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
             'pet_id' => ['nullable', 'integer', 'min:1'],
