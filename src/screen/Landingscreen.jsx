@@ -690,7 +690,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       },
       {
         q: "How much does an online vet consultation cost?",
-        a: "Day consultation (6 AM - 8 PM) is ₹399 and night consultation (8 PM - 6 AM) is ₹549. Pricing is fixed and transparent.",
+        a: "Day consultation (8 AM - 8 PM) is ₹399 and night consultation (8 PM - 8 AM) is ₹549. Pricing is fixed and transparent.",
       },
       {
         q: "Will I receive guidance after consultation?",
