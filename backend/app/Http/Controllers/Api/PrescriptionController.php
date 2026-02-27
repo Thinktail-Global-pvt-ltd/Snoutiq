@@ -264,16 +264,18 @@ class PrescriptionController extends Controller
         }
         if ($request->hasFile('user_pet_doc2')) {
             $userPetDoc2 = $request->file('user_pet_doc2');
+            $userPetDoc2BlobPayload = $this->extractUploadedFileBlobPayload($userPetDoc2);
+
             if (Schema::hasColumn('users', 'pet_doc2')) {
                 $storedPath = $this->storePetDocUploadSafely($userPetDoc2);
                 if ($storedPath !== null) {
                     $userUpdates['pet_doc2'] = $storedPath;
                 }
             }
-            if (Schema::hasColumn('users', 'pet_doc2_blob')) {
-                $userUpdates['pet_doc2_blob'] = $userPetDoc2->get();
+            if (Schema::hasColumn('users', 'pet_doc2_blob') && $userPetDoc2BlobPayload !== null) {
+                $userUpdates['pet_doc2_blob'] = $userPetDoc2BlobPayload['blob'];
                 if (Schema::hasColumn('users', 'pet_doc2_mime')) {
-                    $userUpdates['pet_doc2_mime'] = $userPetDoc2->getMimeType() ?: ($userPetDoc2->getClientMimeType() ?: 'application/octet-stream');
+                    $userUpdates['pet_doc2_mime'] = $userPetDoc2BlobPayload['mime'];
                 }
             }
         }
@@ -405,16 +407,18 @@ class PrescriptionController extends Controller
 
             if ($request->hasFile('pet_doc2')) {
                 $petDoc2 = $request->file('pet_doc2');
+                $petDoc2BlobPayload = $this->extractUploadedFileBlobPayload($petDoc2);
+
                 if (Schema::hasColumn('pets', 'pet_doc2')) {
                     $storedPath = $this->storePetDocUploadSafely($petDoc2);
                     if ($storedPath !== null) {
                         $petUpdates['pet_doc2'] = $storedPath;
                     }
                 }
-                if (Schema::hasColumn('pets', 'pet_doc2_blob')) {
-                    $petUpdates['pet_doc2_blob'] = $petDoc2->get();
+                if (Schema::hasColumn('pets', 'pet_doc2_blob') && $petDoc2BlobPayload !== null) {
+                    $petUpdates['pet_doc2_blob'] = $petDoc2BlobPayload['blob'];
                     if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
-                        $petUpdates['pet_doc2_mime'] = $petDoc2->getMimeType() ?: ($petDoc2->getClientMimeType() ?: 'application/octet-stream');
+                        $petUpdates['pet_doc2_mime'] = $petDoc2BlobPayload['mime'];
                     }
                 }
             }
@@ -796,6 +800,23 @@ class PrescriptionController extends Controller
 
         try {
             return $this->storePetDocUpload($file);
+        } catch (\Throwable $e) {
+            report($e);
+            return null;
+        }
+    }
+
+    private function extractUploadedFileBlobPayload(?UploadedFile $file): ?array
+    {
+        if (! $file || ! $file->isValid()) {
+            return null;
+        }
+
+        try {
+            return [
+                'blob' => $file->get(),
+                'mime' => $file->getMimeType() ?: ($file->getClientMimeType() ?: 'application/octet-stream'),
+            ];
         } catch (\Throwable $e) {
             report($e);
             return null;
