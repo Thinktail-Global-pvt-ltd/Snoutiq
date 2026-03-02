@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -21,8 +22,8 @@ class DoctorServiceCategoryController extends Controller
         'dog_vaccine' => 'Dog Vaccine',
     ];
 
-    // GET /api/doctors/by-service-category?service_category_code=dog_vaccine
-    // OR  /api/doctors/by-service-category?service_type=Dog%20Vaccine
+    // GET /api/doctors/by-service-category?service_category_code=boarding
+    // OR  /api/doctors/by-service-category?service_type=Boarding
     public function index(Request $request)
     {
         $payload = $request->validate([
@@ -30,30 +31,209 @@ class DoctorServiceCategoryController extends Controller
             'service_category_code' => ['nullable', 'string', 'max:120', 'required_without:service_type'],
         ]);
 
-        $serviceCategoryCode = isset($payload['service_category_code'])
-            ? $this->normalizeServiceType((string) $payload['service_category_code'])
+        $requestedCode = isset($payload['service_category_code'])
+            ? $this->normalizeCode((string) $payload['service_category_code'])
             : null;
         $serviceType = trim((string) ($payload['service_type'] ?? ''));
 
-        if ($serviceCategoryCode) {
-            if (! array_key_exists($serviceCategoryCode, self::SERVICE_CATEGORY_CODE_MAP)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid service_category_code.',
-                    'supported_codes' => array_keys(self::SERVICE_CATEGORY_CODE_MAP),
-                ], 422);
-            }
-            $serviceType = self::SERVICE_CATEGORY_CODE_MAP[$serviceCategoryCode];
+        if ($requestedCode !== null && $requestedCode !== '') {
+            $serviceType = self::SERVICE_CATEGORY_CODE_MAP[$requestedCode] ?? $serviceType;
         }
 
-        if ($serviceType === '') {
+        if ($serviceType === '' && ($requestedCode === null || $requestedCode === '')) {
             return response()->json([
                 'success' => false,
                 'message' => 'service_type or service_category_code is required.',
             ], 422);
         }
 
-        $normalizedServiceType = $this->normalizeServiceType($serviceType);
+        $normalizedServiceType = $this->normalizeText($serviceType);
+        $resolvedCode = $requestedCode ?: ($this->serviceCategoryCodeFromType($serviceType) ?? '');
+
+        // Primary source: doctor_service_master (contains service_category_code + clinic_rate rows)
+        $masterRows = $this->fetchDoctorServiceMasterRows($resolvedCode, $normalizedServiceType);
+        if ($masterRows->isNotEmpty()) {
+            return response()->json($this->formatDoctorServiceMasterResponse($masterRows, $serviceType, $resolvedCode));
+        }
+
+        // Fallback source: legacy clinic/groomer services mapping
+        return response()->json($this->buildLegacyServiceResponse($serviceType, $resolvedCode, $normalizedServiceType));
+    }
+
+    private function fetchDoctorServiceMasterRows(string $resolvedCode, string $normalizedServiceType): Collection
+    {
+        if (!Schema::hasTable('doctor_service_master')) {
+            return collect();
+        }
+
+        $query = DB::table('doctor_service_master');
+        $hasCategoryCode = Schema::hasColumn('doctor_service_master', 'service_category_code');
+        $hasCategoryName = Schema::hasColumn('doctor_service_master', 'service_category_name');
+        $hasServiceTypeName = Schema::hasColumn('doctor_service_master', 'service_type_name');
+
+        if (! $hasCategoryCode && ! $hasCategoryName && ! $hasServiceTypeName) {
+            return collect();
+        }
+
+        $query->where(function ($where) use ($resolvedCode, $normalizedServiceType, $hasCategoryCode, $hasCategoryName, $hasServiceTypeName) {
+            if ($hasCategoryCode && $resolvedCode !== '') {
+                $where->orWhereRaw('LOWER(TRIM(service_category_code)) = ?', [$resolvedCode]);
+            }
+            if ($hasCategoryName && $normalizedServiceType !== '') {
+                $where->orWhereRaw('LOWER(TRIM(service_category_name)) = ?', [$normalizedServiceType]);
+            }
+            if ($hasServiceTypeName && $normalizedServiceType !== '') {
+                $where->orWhereRaw('LOWER(TRIM(service_type_name)) = ?', [$normalizedServiceType]);
+            }
+        });
+
+        $select = ['id'];
+        foreach ([
+            'doctor_id', 'clinic_id', 'doctor_name', 'clinic_name',
+            'service_category_code', 'service_type_code',
+            'service_category_name', 'service_type_name',
+            'clinic_rate', 'snoutiq_commission', 'currency',
+            'created_at', 'updated_at',
+        ] as $column) {
+            if (Schema::hasColumn('doctor_service_master', $column)) {
+                $select[] = $column;
+            }
+        }
+
+        return $query
+            ->select($select)
+            ->orderBy('doctor_id')
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function formatDoctorServiceMasterResponse(Collection $rows, string $serviceType, string $resolvedCode): array
+    {
+        $doctorIds = $rows->pluck('doctor_id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $clinicIds = $rows->pluck('clinic_id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $doctorsById = collect();
+        if (Schema::hasTable('doctors') && $doctorIds->isNotEmpty()) {
+            $doctorsById = DB::table('doctors')
+                ->whereIn('id', $doctorIds->all())
+                ->select([
+                    'id',
+                    'vet_registeration_id',
+                    'doctor_name',
+                    'doctor_email',
+                    'doctor_mobile',
+                    'doctor_license',
+                    'doctor_status',
+                    'toggle_availability',
+                    'doctors_price',
+                    'video_day_rate',
+                    'video_night_rate',
+                ])
+                ->get()
+                ->keyBy('id');
+        }
+
+        $clinicsById = collect();
+        if (Schema::hasTable('vet_registerations_temp') && $clinicIds->isNotEmpty()) {
+            $clinicsById = DB::table('vet_registerations_temp')
+                ->whereIn('id', $clinicIds->all())
+                ->select([
+                    'id',
+                    DB::raw('COALESCE(name, slug, CONCAT("Clinic #", id)) as clinic_name_resolved'),
+                    'slug',
+                    'city',
+                    'mobile',
+                    'address',
+                ])
+                ->get()
+                ->keyBy('id');
+        }
+
+        $doctorGroups = $rows->groupBy(function ($row) {
+            return ((string) ($row->doctor_id ?? '0')) . '|' . ((string) ($row->clinic_id ?? '0'));
+        });
+
+        $data = $doctorGroups->map(function (Collection $doctorRows) use ($doctorsById, $clinicsById, $serviceType, $resolvedCode) {
+            $first = $doctorRows->first();
+            $doctorId = (int) ($first->doctor_id ?? 0);
+            $clinicId = (int) ($first->clinic_id ?? 0);
+            $doctorMeta = $doctorsById->get($doctorId);
+            $clinicMeta = $clinicsById->get($clinicId);
+
+            $services = $doctorRows->map(function ($row) {
+                return [
+                    'service_master_id' => (int) ($row->id ?? 0),
+                    'service_category_code' => $row->service_category_code ?? null,
+                    'service_type_code' => $row->service_type_code ?? null,
+                    'service_category_name' => $row->service_category_name ?? null,
+                    'service_type_name' => $row->service_type_name ?? null,
+                    'price' => isset($row->clinic_rate) ? (float) $row->clinic_rate : null,
+                    'clinic_rate' => isset($row->clinic_rate) ? (float) $row->clinic_rate : null,
+                    'snoutiq_commission' => isset($row->snoutiq_commission) ? (float) $row->snoutiq_commission : null,
+                    'currency' => $row->currency ?? null,
+                    'created_at' => $row->created_at ?? null,
+                    'updated_at' => $row->updated_at ?? null,
+                ];
+            })->values();
+
+            return [
+                'doctor_id' => $doctorId,
+                'doctor_name' => $doctorMeta->doctor_name ?? $first->doctor_name ?? null,
+                'doctor_email' => $doctorMeta->doctor_email ?? null,
+                'doctor_mobile' => $doctorMeta->doctor_mobile ?? null,
+                'doctor_license' => $doctorMeta->doctor_license ?? null,
+                'doctor_status' => $doctorMeta->doctor_status ?? null,
+                'toggle_availability' => $doctorMeta->toggle_availability ?? null,
+                'consultation_price' => isset($doctorMeta->doctors_price) ? (float) $doctorMeta->doctors_price : null,
+                'video_day_rate' => isset($doctorMeta->video_day_rate) ? (float) $doctorMeta->video_day_rate : null,
+                'video_night_rate' => isset($doctorMeta->video_night_rate) ? (float) $doctorMeta->video_night_rate : null,
+                'service_category_code' => $resolvedCode !== '' ? $resolvedCode : ($first->service_category_code ?? null),
+                'service_type' => $serviceType,
+                'clinic' => [
+                    'id' => $clinicId,
+                    'name' => $clinicMeta->clinic_name_resolved ?? $first->clinic_name ?? null,
+                    'slug' => $clinicMeta->slug ?? null,
+                    'city' => $clinicMeta->city ?? null,
+                    'mobile' => $clinicMeta->mobile ?? null,
+                    'address' => $clinicMeta->address ?? null,
+                ],
+                'services' => $services,
+            ];
+        })->values();
+
+        return [
+            'success' => true,
+            'source' => 'doctor_service_master',
+            'service_category_code' => $resolvedCode !== '' ? $resolvedCode : null,
+            'service_type' => $serviceType,
+            'clinic_count' => $clinicIds->count(),
+            'doctor_count' => $data->count(),
+            'data' => $data,
+        ];
+    }
+
+    private function buildLegacyServiceResponse(string $serviceType, string $resolvedCode, string $normalizedServiceType): array
+    {
+        if (!Schema::hasTable('groomer_services')) {
+            return [
+                'success' => true,
+                'source' => 'legacy_fallback',
+                'service_category_code' => $resolvedCode !== '' ? $resolvedCode : $this->serviceCategoryCodeFromType($serviceType),
+                'service_type' => $serviceType,
+                'doctor_count' => 0,
+                'clinic_count' => 0,
+                'data' => [],
+            ];
+        }
 
         $serviceQuery = DB::table('groomer_services as gs')
             ->select([
@@ -112,14 +292,15 @@ class DoctorServiceCategoryController extends Controller
             ->values();
 
         if ($clinicIds->isEmpty()) {
-            return response()->json([
+            return [
                 'success' => true,
-                'service_category_code' => $this->serviceCategoryCodeFromType($serviceType),
+                'source' => 'legacy_fallback',
+                'service_category_code' => $resolvedCode !== '' ? $resolvedCode : $this->serviceCategoryCodeFromType($serviceType),
                 'service_type' => $serviceType,
                 'doctor_count' => 0,
                 'clinic_count' => 0,
                 'data' => [],
-            ]);
+            ];
         }
 
         $clinicRows = DB::table('vet_registerations_temp')
@@ -172,7 +353,7 @@ class DoctorServiceCategoryController extends Controller
                 })->values();
             });
 
-        $data = $doctorRows->map(function ($doctor) use ($clinicRows, $servicesByClinic, $serviceType) {
+        $data = $doctorRows->map(function ($doctor) use ($clinicRows, $servicesByClinic, $serviceType, $resolvedCode) {
             $clinicId = (int) $doctor->vet_registeration_id;
             $clinic = $clinicRows->get($clinicId);
             $services = $servicesByClinic->get($clinicId, collect())->values();
@@ -188,6 +369,7 @@ class DoctorServiceCategoryController extends Controller
                 'consultation_price' => $doctor->doctors_price !== null ? (float) $doctor->doctors_price : null,
                 'video_day_rate' => $doctor->video_day_rate !== null ? (float) $doctor->video_day_rate : null,
                 'video_night_rate' => $doctor->video_night_rate !== null ? (float) $doctor->video_night_rate : null,
+                'service_category_code' => $resolvedCode !== '' ? $resolvedCode : null,
                 'service_type' => $serviceType,
                 'clinic' => [
                     'id' => $clinicId,
@@ -201,17 +383,18 @@ class DoctorServiceCategoryController extends Controller
             ];
         })->values();
 
-        return response()->json([
+        return [
             'success' => true,
-            'service_category_code' => $this->serviceCategoryCodeFromType($serviceType),
+            'source' => 'legacy_fallback',
+            'service_category_code' => $resolvedCode !== '' ? $resolvedCode : $this->serviceCategoryCodeFromType($serviceType),
             'service_type' => $serviceType,
             'clinic_count' => $clinicIds->count(),
             'doctor_count' => $data->count(),
             'data' => $data,
-        ]);
+        ];
     }
 
-    private function normalizeServiceType(string $value): string
+    private function normalizeText(string $value): string
     {
         $value = trim($value);
         $value = preg_replace('/\s+/', ' ', $value) ?? $value;
@@ -219,11 +402,19 @@ class DoctorServiceCategoryController extends Controller
         return strtolower($value);
     }
 
+    private function normalizeCode(string $value): string
+    {
+        $value = strtolower(trim($value));
+        $value = preg_replace('/\s+/', '_', $value) ?? $value;
+
+        return $value;
+    }
+
     private function serviceCategoryCodeFromType(string $serviceType): ?string
     {
-        $normalized = $this->normalizeServiceType($serviceType);
+        $normalized = $this->normalizeText($serviceType);
         foreach (self::SERVICE_CATEGORY_CODE_MAP as $code => $label) {
-            if ($this->normalizeServiceType($label) === $normalized) {
+            if ($this->normalizeText($label) === $normalized) {
                 return $code;
             }
         }
