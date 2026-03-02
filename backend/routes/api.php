@@ -1940,6 +1940,7 @@ Route::get('/users/medical-summary', [PrescriptionController::class, 'userData']
 Route::match(['put', 'patch'], '/users/medical-summary', [PrescriptionController::class, 'updateUserData']);
 Route::get('/users/pets-prescriptions', [PrescriptionController::class, 'userPetsAndPrescriptions']); // ?user_id=
 Route::get('/doctors/{doctor_id}/prescriptions', [PrescriptionController::class, 'forDoctor'])->whereNumber('doctor_id');
+Route::get('/pets/{pet_id}/prescriptions/medications-json', [PrescriptionController::class, 'medicationsByPet'])->whereNumber('pet_id');
 Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show']);
 Route::post('/prescriptions', [PrescriptionController::class, 'store']);
 Route::get('/chat-rooms/{chat_room_token}/chats', [GeminiChatController::class, 'getRoomChats']);

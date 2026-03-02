@@ -180,6 +180,54 @@ class PrescriptionController extends Controller
         return response()->json($prescriptions);
     }
 
+    // GET /api/pets/{pet_id}/prescriptions/medications-json
+    public function medicationsByPet(Request $request, int $petId)
+    {
+        if (!Schema::hasTable('prescriptions') || !Schema::hasColumn('prescriptions', 'pet_id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'prescriptions.pet_id column is missing.',
+            ], 500);
+        }
+
+        $limit = (int) $request->query('limit', 100);
+        $limit = max(1, min($limit, 500));
+
+        $rows = Prescription::query()
+            ->select(['id', 'pet_id', 'medications_json', 'created_at', 'updated_at'])
+            ->where('pet_id', $petId)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(function (Prescription $row) {
+                $medications = $row->medications_json;
+                if (is_string($medications)) {
+                    $decoded = json_decode($medications, true);
+                    $medications = json_last_error() === JSON_ERROR_NONE ? $decoded : [];
+                }
+                if (!is_array($medications)) {
+                    $medications = [];
+                }
+
+                return [
+                    'prescription_id' => $row->id,
+                    'pet_id' => (int) $row->pet_id,
+                    'medications_json' => $medications,
+                    'medications_count' => count($medications),
+                    'created_at' => optional($row->created_at)->toDateTimeString(),
+                    'updated_at' => optional($row->updated_at)->toDateTimeString(),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'pet_id' => $petId,
+            'count' => $rows->count(),
+            'data' => $rows,
+        ]);
+    }
+
     // GET /api/users/medical-summary?user_id=
     public function userData(Request $request)
     {
