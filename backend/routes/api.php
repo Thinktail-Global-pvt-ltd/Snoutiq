@@ -1928,6 +1928,8 @@ Route::get('/weather/cities', [WeatherController::class, 'cities']);            
 Route::get('/weather/detail', [WeatherController::class, 'detail']);            // ?city=Delhi
 Route::get('/weather/hourly-schedule', [WeatherController::class, 'hourlySchedule']); // ?city=Delhi
 
+Route::get('/doctors/by-service-category', [\App\Http\Controllers\Api\DoctorServiceCategoryController::class, 'index']);
+
 // routes/api.php
 Route::get('/nearby-vets', [VideoCallingController::class, 'nearbyVets']);
 Route::get('/nearby-doctors', [VideoCallingController::class, 'nearbyDoctors']);
