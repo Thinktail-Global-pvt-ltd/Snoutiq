@@ -195,6 +195,133 @@ class AuthController extends Controller
         return [$fetch($latKeys), $fetch($lngKeys)];
     }
 
+    private function normalizeNullableBoolInt($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+
+        if (is_numeric($value)) {
+            return ((int) $value) === 1 ? 1 : 0;
+        }
+
+        $normalized = strtolower(trim((string) $value, " \t\n\r\0\x0B\"'"));
+        if (in_array($normalized, ['1', 'true', 'yes', 'y'], true)) {
+            return 1;
+        }
+        if (in_array($normalized, ['0', 'false', 'no', 'n'], true)) {
+            return 0;
+        }
+
+        return null;
+    }
+
+    private function normalizeDateInput($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function petColumnUsesEnumStyle(string $column): bool
+    {
+        if (! Schema::hasTable('pets') || ! Schema::hasColumn('pets', $column)) {
+            return false;
+        }
+
+        $columnType = null;
+        try {
+            $columnType = Schema::getColumnType('pets', $column);
+        } catch (\Throwable $e) {
+            $columnType = null;
+        }
+
+        $columnTypeNormalized = strtolower(trim((string) $columnType));
+        if (str_contains($columnTypeNormalized, 'enum')
+            || in_array($columnTypeNormalized, ['string', 'char', 'varchar'], true)) {
+            return true;
+        }
+
+        if ($columnTypeNormalized === '' || $columnTypeNormalized === 'unknown') {
+            try {
+                $columnMeta = DB::selectOne("SHOW COLUMNS FROM `pets` LIKE ?", [$column]);
+                $rawType = strtolower((string) ($columnMeta->Type ?? $columnMeta->type ?? ''));
+                if (str_contains($rawType, 'enum(')) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // Use non-enum fallback when metadata lookup fails.
+            }
+        }
+
+        return false;
+    }
+
+    private function neuteredValueForPetColumn(string $column, int $value)
+    {
+        if ($this->petColumnUsesEnumStyle($column)) {
+            return $value === 1 ? 'Y' : 'N';
+        }
+
+        return $value === 1 ? 1 : 0;
+    }
+
+    private function resolveDewormingSchedule(?string $petDob, ?string $lastDewormingDate): array
+    {
+        $normalizedDob = $this->normalizeDateInput($petDob);
+        if ($normalizedDob === null) {
+            return [
+                'deworming_status' => null,
+                'next_deworming_date' => null,
+            ];
+        }
+
+        try {
+            $dob = Carbon::parse($normalizedDob)->startOfDay();
+        } catch (\Throwable $e) {
+            return [
+                'deworming_status' => null,
+                'next_deworming_date' => null,
+            ];
+        }
+
+        $today = Carbon::today();
+        $ageInMonths = max(0, $dob->diffInMonths($today, false));
+        $isUnderSixMonths = $ageInMonths < 6;
+        $status = $isUnderSixMonths ? 'every_15_days' : 'every_3_months';
+
+        $normalizedLastDewormingDate = $this->normalizeDateInput($lastDewormingDate);
+        $baseDate = $normalizedLastDewormingDate
+            ? Carbon::parse($normalizedLastDewormingDate)->startOfDay()
+            : $dob->copy();
+
+        $nextDate = $baseDate->copy();
+        if ($isUnderSixMonths) {
+            do {
+                $nextDate->addDays(15);
+            } while ($nextDate->lte($today));
+        } else {
+            do {
+                $nextDate->addMonthsNoOverflow(3);
+            } while ($nextDate->lte($today));
+        }
+
+        return [
+            'deworming_status' => $status,
+            'next_deworming_date' => $nextDate->toDateString(),
+        ];
+    }
+
     private function loadRelatedPets(?User $user): array
     {
         if (! $user) {
@@ -876,15 +1003,18 @@ public function register(Request $request)
     $tokenExpiresAt = now()->addDays(30);
     [$latitude, $longitude] = $this->extractGeo($request);
     $petType = $request->filled('pet_type') ? $request->input('pet_type') : null;
-    $petDob = $request->filled('pet_dob') ? $request->input('pet_dob') : null;
+    $petDob = $request->filled('pet_dob') ? $this->normalizeDateInput($request->input('pet_dob')) : null;
     $weightRaw = $request->filled('pet_weight') ? $request->input('pet_weight') : $request->input('weight');
     $petWeight = null;
     if ($weightRaw !== null && $weightRaw !== '' && is_numeric($weightRaw)) {
         $petWeight = (float) $weightRaw;
     }
+    $dewormingYesNo = $this->normalizeNullableBoolInt($request->input('deworming_yes_no', $request->input('deworming')));
+    $isNuetered = $this->normalizeNullableBoolInt($request->input('is_nuetered', $request->input('is_neutered')));
+    $lastDewormingDate = $this->normalizeDateInput($request->input('last_deworming_date'));
 
     try {
-        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petWeight, $ownerName, $userBlobColumnsReady, $petBlobColumnsReady, $hasNewDoc2Upload, $doc2Blob, $doc2Mime) {
+        $pet = DB::transaction(function () use ($user, $request, $doc1Path, $doc2Path, $summaryText, $tokenHash, $tokenExpiresAt, $latitude, $longitude, $petType, $petDob, $petWeight, $ownerName, $userBlobColumnsReady, $petBlobColumnsReady, $hasNewDoc2Upload, $doc2Blob, $doc2Mime, $dewormingYesNo, $isNuetered, $lastDewormingDate) {
             // ✅ Update user with final details
             $user->fill([
                 'name'        => $ownerName,
@@ -914,6 +1044,20 @@ public function register(Request $request)
                 return null;
             }
 
+            $existingPet = Pet::where('user_id', $user->id)->first();
+
+            $effectivePetDob = $petDob;
+            if ($effectivePetDob === null && $existingPet) {
+                $effectivePetDob = $this->normalizeDateInput($existingPet->pet_dob ?? $existingPet->dob ?? null);
+            }
+
+            $effectiveLastDewormingDate = $lastDewormingDate;
+            if ($effectiveLastDewormingDate === null && $existingPet && Schema::hasColumn('pets', 'last_deworming_date')) {
+                $effectiveLastDewormingDate = $this->normalizeDateInput($existingPet->last_deworming_date);
+            }
+
+            $dewormingSchedule = $this->resolveDewormingSchedule($effectivePetDob, $effectiveLastDewormingDate);
+
             $petAttributes = [
                 'name'       => $request->pet_name,
                 'breed'      => $request->breed,
@@ -935,8 +1079,26 @@ public function register(Request $request)
                 $petAttributes['pet_doc2_blob'] = $doc2Blob;
                 $petAttributes['pet_doc2_mime'] = $doc2Mime;
             }
-
-            $existingPet = Pet::where('user_id', $user->id)->first();
+            if ($dewormingYesNo !== null && Schema::hasColumn('pets', 'deworming_yes_no')) {
+                $petAttributes['deworming_yes_no'] = $dewormingYesNo;
+            }
+            if ($isNuetered !== null) {
+                if (Schema::hasColumn('pets', 'is_nuetered')) {
+                    $petAttributes['is_nuetered'] = $this->neuteredValueForPetColumn('is_nuetered', $isNuetered);
+                }
+                if (Schema::hasColumn('pets', 'is_neutered')) {
+                    $petAttributes['is_neutered'] = $this->neuteredValueForPetColumn('is_neutered', $isNuetered);
+                }
+            }
+            if ($effectiveLastDewormingDate !== null && Schema::hasColumn('pets', 'last_deworming_date')) {
+                $petAttributes['last_deworming_date'] = $effectiveLastDewormingDate;
+            }
+            if (!empty($dewormingSchedule['deworming_status']) && Schema::hasColumn('pets', 'deworming_status')) {
+                $petAttributes['deworming_status'] = $dewormingSchedule['deworming_status'];
+            }
+            if (!empty($dewormingSchedule['next_deworming_date']) && Schema::hasColumn('pets', 'next_deworming_date')) {
+                $petAttributes['next_deworming_date'] = $dewormingSchedule['next_deworming_date'];
+            }
 
             if ($existingPet) {
                 $existingPet->fill($petAttributes);
