@@ -155,7 +155,8 @@ class PetOverviewController extends Controller
             return null;
         }
 
-        $date = Carbon::today()->toDateString();
+        $todayDate = Carbon::today()->toDateString();
+        $date = $todayDate;
         if ($careDate !== null && trim($careDate) !== '') {
             try {
                 $date = Carbon::parse($careDate)->toDateString();
@@ -164,12 +165,18 @@ class PetOverviewController extends Controller
             }
         }
 
-        $rows = DB::table('pet_daily_cares')
+        $query = DB::table('pet_daily_cares')
             ->where('pet_id', $petId)
             ->whereDate('care_date', $date)
             ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
+
+        // For today's care, only show tasks created today.
+        if ($date === $todayDate) {
+            $query->whereDate('created_at', $todayDate);
+        }
+
+        $rows = $query->get();
 
         $doneCount = (int) $rows->where('is_completed', 1)->count();
         $totalCount = (int) $rows->count();
