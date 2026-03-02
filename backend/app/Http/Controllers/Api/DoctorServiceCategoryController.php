@@ -9,18 +9,47 @@ use Illuminate\Support\Facades\Schema;
 
 class DoctorServiceCategoryController extends Controller
 {
-    // GET /api/doctors/by-service-category?service_type=Dog%20Vaccine
+    private const SERVICE_CATEGORY_CODE_MAP = [
+        'boarding' => 'Boarding',
+        'cat_neutering' => 'Cat Neutering',
+        'cat_package' => 'Cat Package',
+        'cat_service' => 'Cat Service',
+        'cat_vaccine' => 'Cat Vaccine',
+        'dog_neutering' => 'Dog Neutering',
+        'dog_package' => 'Dog Package',
+        'dog_service' => 'Dog Service',
+        'dog_vaccine' => 'Dog Vaccine',
+    ];
+
+    // GET /api/doctors/by-service-category?service_category_code=dog_vaccine
+    // OR  /api/doctors/by-service-category?service_type=Dog%20Vaccine
     public function index(Request $request)
     {
         $payload = $request->validate([
-            'service_type' => ['required', 'string', 'max:120'],
+            'service_type' => ['nullable', 'string', 'max:120', 'required_without:service_category_code'],
+            'service_category_code' => ['nullable', 'string', 'max:120', 'required_without:service_type'],
         ]);
 
-        $serviceType = trim((string) $payload['service_type']);
+        $serviceCategoryCode = isset($payload['service_category_code'])
+            ? $this->normalizeServiceType((string) $payload['service_category_code'])
+            : null;
+        $serviceType = trim((string) ($payload['service_type'] ?? ''));
+
+        if ($serviceCategoryCode) {
+            if (! array_key_exists($serviceCategoryCode, self::SERVICE_CATEGORY_CODE_MAP)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid service_category_code.',
+                    'supported_codes' => array_keys(self::SERVICE_CATEGORY_CODE_MAP),
+                ], 422);
+            }
+            $serviceType = self::SERVICE_CATEGORY_CODE_MAP[$serviceCategoryCode];
+        }
+
         if ($serviceType === '') {
             return response()->json([
                 'success' => false,
-                'message' => 'service_type is required.',
+                'message' => 'service_type or service_category_code is required.',
             ], 422);
         }
 
@@ -85,6 +114,7 @@ class DoctorServiceCategoryController extends Controller
         if ($clinicIds->isEmpty()) {
             return response()->json([
                 'success' => true,
+                'service_category_code' => $this->serviceCategoryCodeFromType($serviceType),
                 'service_type' => $serviceType,
                 'doctor_count' => 0,
                 'clinic_count' => 0,
@@ -173,6 +203,7 @@ class DoctorServiceCategoryController extends Controller
 
         return response()->json([
             'success' => true,
+            'service_category_code' => $this->serviceCategoryCodeFromType($serviceType),
             'service_type' => $serviceType,
             'clinic_count' => $clinicIds->count(),
             'doctor_count' => $data->count(),
@@ -186,5 +217,17 @@ class DoctorServiceCategoryController extends Controller
         $value = preg_replace('/\s+/', ' ', $value) ?? $value;
 
         return strtolower($value);
+    }
+
+    private function serviceCategoryCodeFromType(string $serviceType): ?string
+    {
+        $normalized = $this->normalizeServiceType($serviceType);
+        foreach (self::SERVICE_CATEGORY_CODE_MAP as $code => $label) {
+            if ($this->normalizeServiceType($label) === $normalized) {
+                return $code;
+            }
+        }
+
+        return null;
     }
 }
