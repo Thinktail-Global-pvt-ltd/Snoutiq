@@ -57,6 +57,17 @@ class PetOverviewController extends Controller
 
         $careRoadmap = $vaccinations['care_roadmap'] ?? [];
         $medications = $this->buildMedications($prescriptions);
+        $dailyCare = $this->fetchDailyCare($petId, $request->query('care_date'));
+        $isNueteredRaw = property_exists($pet, 'is_nuetered')
+            ? $pet->is_nuetered
+            : (property_exists($pet, 'is_neutered') ? $pet->is_neutered : null);
+        $isNuetered = $this->normalizeYesNoFlag($isNueteredRaw);
+        $dewormingYesNo = property_exists($pet, 'deworming_yes_no')
+            ? $this->normalizeYesNoFlag($pet->deworming_yes_no)
+            : null;
+        $lastDewormingDate = property_exists($pet, 'last_deworming_date') ? $pet->last_deworming_date : null;
+        $dewormingStatus = property_exists($pet, 'deworming_status') ? $pet->deworming_status : null;
+        $nextDewormingDate = property_exists($pet, 'next_deworming_date') ? $pet->next_deworming_date : null;
 
         return response()->json([
             'success' => true,
@@ -73,6 +84,12 @@ class PetOverviewController extends Controller
                     'reported_symptom' => $pet->reported_symptom,
                     'suggested_disease' => $pet->suggested_disease,
                     'image' => $pet->pet_doc1 ?? $pet->pet_doc2 ?? null,
+                    'is_nuetered' => $isNuetered,
+                    'is_neutered' => $isNuetered,
+                    'deworming_yes_no' => $dewormingYesNo,
+                    'last_deworming_date' => $lastDewormingDate,
+                    'deworming_status' => $dewormingStatus,
+                    'next_deworming_date' => $nextDewormingDate,
                 ],
                 'owner' => $owner ? [
                     'id' => $owner->id,
@@ -96,8 +113,86 @@ class PetOverviewController extends Controller
                 'vaccination_ai_summary' => $vaccinationAiSummary,
                 'observation_note' => $observation['notes'] ?? null,
                 'knowledge_hub' => $this->knowledgeHubSuggestions($pet),
+                'today_care' => $dailyCare,
+                'deworming' => [
+                    'deworming_yes_no' => $dewormingYesNo,
+                    'last_deworming_date' => $lastDewormingDate,
+                    'deworming_status' => $dewormingStatus,
+                    'next_deworming_date' => $nextDewormingDate,
+                ],
             ],
         ]);
+    }
+
+    private function normalizeYesNoFlag($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+
+        if (is_numeric($value)) {
+            return ((int) $value) === 1 ? 1 : 0;
+        }
+
+        $normalized = strtolower(trim((string) $value, " \t\n\r\0\x0B\"'"));
+        if (in_array($normalized, ['1', 'true', 'yes', 'y'], true)) {
+            return 1;
+        }
+        if (in_array($normalized, ['0', 'false', 'no', 'n'], true)) {
+            return 0;
+        }
+
+        return null;
+    }
+
+    private function fetchDailyCare(int $petId, ?string $careDate = null): ?array
+    {
+        if (!Schema::hasTable('pet_daily_cares')) {
+            return null;
+        }
+
+        $date = Carbon::today()->toDateString();
+        if ($careDate !== null && trim($careDate) !== '') {
+            try {
+                $date = Carbon::parse($careDate)->toDateString();
+            } catch (\Throwable $e) {
+                // Keep today's date when incoming care_date is invalid.
+            }
+        }
+
+        $rows = DB::table('pet_daily_cares')
+            ->where('pet_id', $petId)
+            ->whereDate('care_date', $date)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        $doneCount = (int) $rows->where('is_completed', 1)->count();
+        $totalCount = (int) $rows->count();
+
+        return [
+            'care_date' => $date,
+            'done_count' => $doneCount,
+            'total_count' => $totalCount,
+            'progress_text' => "{$doneCount}/{$totalCount} done",
+            'items' => $rows->map(function ($row) {
+                return [
+                    'id' => $row->id,
+                    'task_key' => $row->task_key ?? null,
+                    'title' => $row->title,
+                    'scheduled_time' => $row->scheduled_time,
+                    'icon' => $row->icon,
+                    'is_completed' => (bool) ($row->is_completed ?? false),
+                    'completed_at' => $row->completed_at,
+                    'sort_order' => (int) ($row->sort_order ?? 0),
+                    'notes' => $row->notes,
+                ];
+            })->values(),
+        ];
     }
 
     private function fetchPrescriptions(int $petId): array
