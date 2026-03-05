@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\DashboardProfileController;
 use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\ClinicServicePresetController;
 use App\Http\Controllers\Api\VetRegistrationReportController;
+use App\Http\Controllers\Api\DoctorCsvExportController;
 use App\Http\Controllers\Api\VaccinationBookingController;
 use App\Models\User;
 use App\Models\DeviceToken;
@@ -165,6 +166,8 @@ Route::get('/admin/vet-registrations/report', [VetRegistrationReportController::
 // Public alias for the same report (no admin guard)
 Route::get('/vet-registrations/report', [VetRegistrationReportController::class, 'summary'])
     ->name('api.vet-registrations.report.public');
+Route::get('/admin/doctors/export/csv', [DoctorCsvExportController::class, 'export'])
+    ->name('api.admin.doctors.export.csv');
 
 // Financials (clinic dashboard KPIs + charts + transactions)
 Route::get('/financials', [ClinicFinancialsController::class, 'show'])->name('api.clinic.financials');
