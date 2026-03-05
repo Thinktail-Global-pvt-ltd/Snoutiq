@@ -419,7 +419,8 @@ export default function VideoConsultLP() {
   useEffect(() => {
     let active = true;
     const abortController = new AbortController();
-    let idleHandle = null;
+    const firstInteractionEvents = ["pointerdown", "keydown", "touchstart"];
+    let hasStarted = false;
 
     const fetchLiveStatus = async () => {
       try {
@@ -442,25 +443,24 @@ export default function VideoConsultLP() {
     };
 
     const runDeferredFetch = () => {
+      if (hasStarted || !active) return;
+      hasStarted = true;
       void fetchLiveStatus();
     };
 
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleHandle = window.requestIdleCallback(runDeferredFetch, { timeout: 1200 });
-    } else {
-      idleHandle = window.setTimeout(runDeferredFetch, 350);
-    }
+    firstInteractionEvents.forEach((eventName) => {
+      window.addEventListener(eventName, runDeferredFetch, {
+        once: true,
+        passive: true,
+      });
+    });
 
     return () => {
       active = false;
       abortController.abort();
-      if (typeof window !== "undefined") {
-        if ("cancelIdleCallback" in window && idleHandle !== null) {
-          window.cancelIdleCallback(idleHandle);
-        } else if (idleHandle !== null) {
-          window.clearTimeout(idleHandle);
-        }
-      }
+      firstInteractionEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, runDeferredFetch);
+      });
     };
   }, []);
 
@@ -961,12 +961,12 @@ export default function VideoConsultLP() {
       {/* ── LIVE STATUS BAR ─────────────────────────────────────────────── */}
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200 py-2 px-4">
         <p className="text-xs font-bold text-green-700 flex items-center justify-center gap-2 flex-wrap">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            {liveDoctorCount === null
-              ? "Checking vets online…"
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              {liveDoctorCount === null
+              ? "Verified vets online right now"
               : `${liveDoctorCount} ${liveDoctorCount === 1 ? "vet is" : "vets are"} online right now`}
-          </span>
+            </span>
           <span className="text-green-400">·</span>
           <span>Average wait: 15 minutes</span>
           <span className="text-green-400">·</span>

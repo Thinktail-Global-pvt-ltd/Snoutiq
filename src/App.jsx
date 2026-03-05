@@ -115,7 +115,7 @@ const ClinicsSolutionPage = lazy(() => import("./pages/ClinicsSolutionPage"));
 const AITriagePage = lazy(() => import("./pages/AITriagePage"));
 
 const HomePage = lazy(() => import("./components/Home"));
-// const DoctorRegistration = lazy(() => import("./components/DoctorRegistration"));
+const DoctorRegistration = lazy(() => import("./components/DoctorRegistration"));
 const ConsultationBooked = lazy(() => import("./pages/ConsultationBooked"));
 const HomePage1 = lazy(() => import("./newflow/HomePage"));
 const NewAbout = lazy(()=> import("./newflow/NewAbout"));
@@ -125,6 +125,16 @@ const NewVets = lazy(() => import("./newflow/NewVets"));
 const NewVideoConsultation = lazy(() => import("./newflow/NewVideoConsultationLP"));
 const VideoConsultLP = lazy(() => import("./newflow/VideoConsultLP"));
 const SymptomsHub = lazy(() => import("./newflow/SymptomsHub"));
+const PuppyVaccinationDelhi = lazy(() => import("./newflow/PuppyVaccinationDelhi"));
+const KittenVaccinationDelhi = lazy(() => import("./newflow/KittenVaccinationDelhi"));
+const DogNeuteringDelhi = lazy(() => import("./newflow/DogNeuteringDelhi"));
+const CatNeuteringDelhi = lazy(() => import("./newflow/CatNeuteringDelhi"));
+const VaccinationLP = lazy(() => import("./newflow/VaccinationLP"));
+const NeuteringLP = lazy(() => import("./newflow/NeuteringLP"));
+const VetInsightsHub = lazy(() => import("./newflow/VetInsightsHub"));
+const DrSharmaInterview = lazy(() => import("./newflow/DrSharmaInterview"));
+const DogVomitingPage = lazy(() => import("./newflow/DogVomitingPage"));
+
 function App() {
   return (
     <Router>
@@ -161,6 +171,15 @@ function App() {
                 <Route path="/veterinary-doctor-online-india" element={<NewVideoConsultation />} />
                 <Route path="/online-vet-consultation-india" element={<VideoConsultLP />} />
                 <Route path="/symptoms" element={<SymptomsHub />} />
+                <Route path="/puppy-vaccination-delhi" element={<PuppyVaccinationDelhi />} />
+                <Route path="/kitten-vaccination-delhi" element={<KittenVaccinationDelhi />} />
+                <Route path="/dog-neutering-delhi" element={<DogNeuteringDelhi />} />
+                <Route path="/cat-neutering-delhi" element={<CatNeuteringDelhi />} />
+                <Route path="/lp/vaccination" element={<VaccinationLP />} />
+                <Route path="/lp/neutering" element={<NeuteringLP />} />
+                <Route path="/vet-insights" element={<VetInsightsHub />} />
+                <Route path="/vet-insights/interview-dr-sharma-emergency-care" element={<DrSharmaInterview />} />
+                <Route path="/dog-vomiting-treatment-india" element={<DogVomitingPage />} />
 
             <Route path="/20+vetsonline" element={<HomePage />} />
             <Route path="/consult" element={<HomePage />} />
@@ -181,7 +200,7 @@ function App() {
             <Route path="/terms-of-service" element={<TearmsCondition />} />
             <Route path="/cancellation-policy" element={<Cancelation />} />
             <Route path="/cookie-policy" element={<CookiePolicy />} />
-            {/* <Route path="/vet-register" element={<DoctorRegistration />} /> */}
+            <Route path="/vetclinic-register" element={<DoctorRegistration />} />
             <Route
               path="/medical-data-consent"
               element={<MedicalDataConsent />}

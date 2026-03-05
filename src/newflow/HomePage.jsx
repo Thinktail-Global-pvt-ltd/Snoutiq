@@ -344,21 +344,49 @@ function S({ icon: a, title: t, desc: s, tag: r }) {
 function me({ vet: a, idx: t }) {
   const [s, r] = L[t % L.length],
     [n, o] = k.useState(!1),
-    x = !!a.image && !n,
-    d =
+    [x, d] = k.useState(!1),
+    c = k.useRef(null),
+    j = !!a.image && !n && x,
+    y =
       Array.isArray(a.specializationList) && a.specializationList.length
         ? a.specializationList
         : I(a.specialty),
-    c = F(a.specialty),
-    j = c.icon,
-    y = a.name
+    i = F(a.specialty),
+    l = i.icon,
+    m = a.name
       .replace(/^Dr\.?\s*/i, "")
       .split(" ")
       .slice(0, 2)
-      .map((i) => i[0])
+      .map((p) => p[0])
       .join("")
       .toUpperCase();
+  k.useEffect(() => {
+    if (!a.image || x) return;
+    if (typeof window > "u") return;
+
+    const p = c.current;
+    if (!p) return;
+
+    if (!("IntersectionObserver" in window)) {
+      d(!0);
+      return;
+    }
+
+    const h = new IntersectionObserver(
+      (u, g) => {
+        if (u.some((v) => v.isIntersecting)) {
+          d(!0);
+          g.disconnect();
+        }
+      },
+      { rootMargin: "160px 0px" },
+    );
+    h.observe(p);
+
+    return () => h.disconnect();
+  }, [a.image, x]);
   return e.jsxs("div", {
+    ref: c,
     className:
       "snap-start shrink-0 w-[220px] sm:w-56 rounded-3xl overflow-hidden border border-slate-100 bg-white shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer",
     children: [
@@ -368,7 +396,7 @@ function me({ vet: a, idx: t }) {
           e.jsx("div", {
             className:
               "h-24 w-24 rounded-full bg-white/70 backdrop-blur border-4 border-white shadow-lg flex items-center justify-center mb-2",
-            children: x
+            children: j
               ? e.jsx("img", {
                   src: a.image,
                   alt: a.name,
@@ -382,7 +410,7 @@ function me({ vet: a, idx: t }) {
                 })
               : e.jsx("span", {
                   className: `text-3xl font-black ${r}`,
-                  children: y || "V",
+                  children: m || "V",
                 }),
           }),
           e.jsxs("div", {
@@ -410,22 +438,22 @@ function me({ vet: a, idx: t }) {
           e.jsxs("p", {
             className: `inline-flex items-center gap-1 text-xs font-semibold mt-0.5 ${r}`,
             children: [
-              e.jsx(j, { className: `h-3.5 w-3.5 ${c.color}` }),
+              e.jsx(l, { className: `h-3.5 w-3.5 ${i.color}` }),
               a.specialty,
             ],
           }),
           e.jsx("div", {
             className: "mt-2 flex flex-wrap gap-1.5",
-            children: d.map((i, l) => {
-              const { icon: m, color: p, bg: h } = F(i);
+            children: y.map((p, h) => {
+              const { icon: u, color: g, bg: v } = F(p);
               return e.jsx(
                 "span",
                 {
-                  title: i,
-                  className: `inline-flex h-6 w-6 items-center justify-center rounded-full border ${h}`,
-                  children: e.jsx(m, { className: `h-3.5 w-3.5 ${p}` }),
+                  title: p,
+                  className: `inline-flex h-6 w-6 items-center justify-center rounded-full border ${v}`,
+                  children: e.jsx(u, { className: `h-3.5 w-3.5 ${g}` }),
                 },
-                `${i}-${l}`,
+                `${p}-${h}`,
               );
             }),
           }),

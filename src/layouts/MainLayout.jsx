@@ -56,17 +56,43 @@ export default function MainLayout({ children }) {
     );
     if (hasGtmScript) return;
 
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-      "gtm.start": new Date().getTime(),
-      event: "gtm.js",
+    const firstInteractionEvents = ["pointerdown", "keydown", "touchstart"];
+    let loaded = false;
+
+    const loadGtm = () => {
+      if (loaded) return;
+      loaded = true;
+
+      const alreadyLoaded = document.querySelector(
+        `script[src*="googletagmanager.com/gtm.js?id=${gtmId}"]`
+      );
+      if (alreadyLoaded) return;
+
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        "gtm.start": new Date().getTime(),
+        event: "gtm.js",
+      });
+
+      const script = document.createElement("script");
+      script.async = true;
+      script.src = `https://www.googletagmanager.com/gtm.js?id=${gtmId}`;
+      script.setAttribute("data-gtm-id", gtmId);
+      document.head.appendChild(script);
+    };
+
+    firstInteractionEvents.forEach((eventName) => {
+      window.addEventListener(eventName, loadGtm, {
+        once: true,
+        passive: true,
+      });
     });
 
-    const script = document.createElement("script");
-    script.async = true;
-    script.src = `https://www.googletagmanager.com/gtm.js?id=${gtmId}`;
-    script.setAttribute("data-gtm-id", gtmId);
-    document.head.appendChild(script);
+    return () => {
+      firstInteractionEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, loadGtm);
+      });
+    };
   }, []);
 
   return (

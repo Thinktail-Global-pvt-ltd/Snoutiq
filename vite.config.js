@@ -35,17 +35,23 @@ export default defineConfig({
     modulePreload: { polyfill: false },
     rollupOptions: {
       output: {
-        entryFileNames: "assets/index.js",
-        chunkFileNames: "assets/[name].js",
-        assetFileNames: (assetInfo) => {
-          if (assetInfo.name && assetInfo.name.endsWith(".css")) {
-            return "assets/index.css";
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
+        manualChunks: (id) => {
+          if (id.includes("node_modules/agora-rtc-sdk-ng")) {
+            return "agora";
           }
-          return "assets/[name].[ext]";
-        },
-        manualChunks: {
-          react: ["react", "react-dom"],
-          vendor: ["react-router-dom"],
+          if (id.includes("node_modules/lucide-react")) {
+            return "icons";
+          }
+          if (id.includes("node_modules/react-router-dom") || id.includes("node_modules/react-router")) {
+            return "router-vendor";
+          }
+          if (id.includes("node_modules/react-dom") || id.includes("node_modules/react")) {
+            return "react-vendor";
+          }
+          return undefined;
         },
       },
     },

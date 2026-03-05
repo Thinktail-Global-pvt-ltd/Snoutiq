@@ -85,7 +85,7 @@ export function NewFooter() {
               </li>
               <li>
                 <Link
-                  to="/services/puppy-vaccination-delhi"
+                  to="/puppy-vaccination-delhi"
                   className="hover:text-brand transition-colors"
                 >
                   Puppy Vaccination
@@ -93,7 +93,7 @@ export function NewFooter() {
               </li>
               <li>
                 <Link
-                  to="/services/kitten-vaccination-delhi"
+                  to="/kitten-vaccination-delhi"
                   className="hover:text-brand transition-colors"
                 >
                   Kitten Vaccination
@@ -101,7 +101,7 @@ export function NewFooter() {
               </li>
               <li>
                 <Link
-                  to="/services/dog-neutering-delhi"
+                  to="/dog-neutering-delhi"
                   className="hover:text-brand transition-colors"
                 >
                   Dog Neutering
@@ -109,7 +109,7 @@ export function NewFooter() {
               </li>
               <li>
                 <Link
-                  to="/services/cat-neutering-delhi"
+                  to="/cat-neutering-delhi"
                   className="hover:text-brand transition-colors"
                 >
                   Cat Neutering
@@ -146,7 +146,7 @@ export function NewFooter() {
               </li>
               <li>
                 <Link
-                  to="/symptoms/dog-vomiting-treatment-india"
+                  to="/dog-vomiting-treatment-india"
                   className="hover:text-brand transition-colors"
                 >
                   Dog Vomiting Guide
