@@ -50,6 +50,9 @@ export default function NewVets() {
                     src={vetHeroImage}
                     alt="Veterinarian using SnoutiQ telemedicine platform"
                     className="h-[280px] w-full object-cover object-center sm:h-[360px] lg:h-[430px]"
+                    width={1600}
+                    height={1326}
+                    sizes="(min-width: 1024px) 45vw, 100vw"
                     loading="eager"
                     decoding="async"
                     fetchPriority="high"

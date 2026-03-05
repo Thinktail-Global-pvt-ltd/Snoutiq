@@ -1,454 +1,633 @@
-import React, { useState } from "react";
-import { LPNavbar } from "../newflow/LPNavbar";
-import { NewButton as Button } from "../newflow/NewButton";
+// VeterinaryDoctorOnlineIndia.jsx
+import React from "react";
+import { Helmet } from "react-helmet-async";
+import { Link } from "react-router-dom";
+
+import { Navbar } from "./Navbar";
+import { Footer } from "./NewFooter";
+import { Button } from "./NewButton";
+import img from "../assets/images/vet_online.jpeg";
 
 import {
   ShieldCheck,
-  Star,
-  Clock,
-  Users,
   Video,
-  Phone,
+  Clock,
+  Star,
+  MapPin,
+  Stethoscope,
+  HeartPulse,
+  BadgeCheck,
+  PhoneCall,
 } from "lucide-react";
 
-export default function NewVideoConsultationLP() {
-  const [isSubmitted, setIsSubmitted] = useState(false);
+export default function VeterinaryDoctorOnlineIndia() {
+  const canonical = "https://snoutiq.com/veterinary-doctor-online-india";
+  const ogImage = "https://snoutiq.com/images/veterinary-doctor-online-india.jpg";
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setIsSubmitted(true);
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "MedicalOrganization",
+        name: "SnoutiQ",
+        url: "https://snoutiq.com",
+        logo: "https://snoutiq.com/logo.png",
+        medicalSpecialty: "Veterinary",
+        areaServed: "India",
+        hasOfferCatalog: {
+          "@type": "OfferCatalog",
+          name: "Online Vet Consultation Services",
+          itemListElement: [
+            {
+              "@type": "Offer",
+              itemOffered: {
+                "@type": "Service",
+                name: "Day Video Consultation",
+                description: "Online vet consultation during daytime hours",
+              },
+              price: "399",
+              priceCurrency: "INR",
+            },
+            {
+              "@type": "Offer",
+              itemOffered: {
+                "@type": "Service",
+                name: "Night Video Consultation",
+                description: "Emergency online vet consultation at night",
+              },
+              price: "549",
+              priceCurrency: "INR",
+            },
+          ],
+        },
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "How do I consult a veterinary doctor online in India?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "You can consult a veterinary doctor online in India through SnoutiQ. Simply click 'Start Instant Vet Consultation', choose your pet type, pay the consultation fee (₹399 day / ₹549 night), and connect via secure HD video call within minutes.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Is online vet consultation available 24/7 in India?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Yes. SnoutiQ offers 24/7 online vet consultation in India including nights, weekends, and public holidays. Emergency online vet India support is always available.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "What is the cost of online vet consultation in India?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Online vet consultation on SnoutiQ costs ₹399 during the day and ₹549 at night. No hidden charges. Covers dogs and cats.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Can an online vet prescribe medicine in India?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Online vets on SnoutiQ can provide clinical advice, triage guidance, and written recommendations. For prescription medicines, a follow-up clinic visit may be needed depending on regulations.",
+            },
+          },
+        ],
+      },
+    ],
   };
 
-  const vets = [
+  const cities = [
+    "Mumbai",
+    "Delhi",
+    "Bangalore",
+    "Hyderabad",
+    "Chennai",
+    "Pune",
+    "Kolkata",
+    "Ahmedabad",
+    "Jaipur",
+    "Lucknow",
+    "Surat",
+    "Kochi",
+    "Chandigarh",
+    "Indore",
+    "Nagpur",
+  ];
+
+  const testimonials = [
     {
-      name: "Dr. Sharma",
-      spec: "Small Animals, Dogs",
-      exp: "12 Years",
-      city: "Delhi",
-      img: "https://picsum.photos/seed/vet1/400/400",
+      name: "Priya M.",
+      location: "Bangalore",
+      pet: "Golden Retriever",
+      text: "My dog started vomiting at midnight. SnoutiQ connected me to a vet in under 15 minutes. The doctor was calm, thorough and gave clear advice. Saved us a stressful emergency clinic run.",
+      rating: 5,
     },
     {
-      name: "Dr. Priya",
-      spec: "Cats, Exotic Pets",
-      exp: "8 Years",
-      city: "Mumbai",
-      img: "https://picsum.photos/seed/vet2/400/400",
+      name: "Rahul S.",
+      location: "Mumbai",
+      pet: "Persian Cat",
+      text: "My cat had watery eyes and I panicked. The online vet India consultation on SnoutiQ was super easy. The vet explained everything clearly and even followed up the next day.",
+      rating: 5,
     },
     {
-      name: "Dr. Reddy",
-      spec: "Dogs, Cats",
-      exp: "14 Years",
-      city: "Bangalore",
-      img: "https://picsum.photos/seed/vet3/400/400",
+      name: "Ananya K.",
+      location: "Delhi",
+      pet: "Labrador Puppy",
+      text: "Used SnoutiQ for my puppy who wasn't eating. The vet was very experienced and the video quality was great. ₹399 is so worth it compared to clinic fees.",
+      rating: 5,
+    },
+  ];
+
+  const steps = [
+    {
+      step: "01",
+      title: "Book Instantly",
+      desc: "Click 'Start Consultation', select your pet type (dog or cat), and pay securely online.",
     },
     {
-      name: "Dr. Patel",
-      spec: "Small Animals",
-      exp: "9 Years",
-      city: "Ahmedabad",
-      img: "https://picsum.photos/seed/vet4/400/400",
+      step: "02",
+      title: "Connect via Video",
+      desc: "Join a secure HD video call with a verified veterinary doctor online India within minutes.",
     },
     {
-      name: "Dr. Singh",
-      spec: "Dogs, Behavior",
-      exp: "11 Years",
-      city: "Chandigarh",
-      img: "https://picsum.photos/seed/vet5/400/400",
-    },
-    {
-      name: "Dr. Iyer",
-      spec: "Cats, Nutrition",
-      exp: "7 Years",
-      city: "Chennai",
-      img: "https://picsum.photos/seed/vet6/400/400",
-    },
-    {
-      name: "Dr. Gupta",
-      spec: "Small Animals",
-      exp: "10 Years",
-      city: "Pune",
-      img: "https://picsum.photos/seed/vet7/400/400",
-    },
-    {
-      name: "Dr. Verma",
-      spec: "Dogs, Cats",
-      exp: "15 Years",
-      city: "Lucknow",
-      img: "https://picsum.photos/seed/vet8/400/400",
+      step: "03",
+      title: "Get Expert Advice",
+      desc: "Receive diagnosis guidance, treatment recommendations, and a written summary after the call.",
     },
   ];
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">
-      <LPNavbar />
+      <Helmet>
+        <title>Veterinary Doctor Online India | 24/7 Pet Doctor Online | SnoutiQ</title>
+        <meta
+          name="description"
+          content="Connect with a verified veterinary doctor online in India. 24/7 instant vet consultation for dogs & cats. Talk to vet online India via secure video consultation."
+        />
+        <link rel="canonical" href={canonical} />
 
-      <main className="flex-1 pb-20 md:pb-0">
-        {/* Hero Section */}
-        <section className="relative overflow-hidden py-16 lg:py-24">
-          <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/dogvet/1920/1080?blur=4')] bg-cover bg-center opacity-10" />
+        {/* Open Graph */}
+        <meta property="og:title" content="Veterinary Doctor Online India | SnoutiQ" />
+        <meta
+          property="og:description"
+          content="Talk to a veterinary doctor online in India. Instant video consultation with vet India for dogs and cats."
+        />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:site_name" content="SnoutiQ" />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta
+          property="og:image:alt"
+          content="Veterinary doctor examining dog during online consultation in India"
+        />
 
-          <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <span className="inline-block rounded-full bg-brand/20 px-4 py-1.5 text-sm font-medium text-brand mb-6">
-                  Online Vet Consultation India
-                </span>
+        {/* JSON-LD */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        />
+      </Helmet>
 
-                <h1 className="font-display text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl mb-6">
-                  Talk to a Vet Online — 200+ Verified Online Veterinarians
-                </h1>
+      <Navbar />
 
-                <p className="text-xl text-slate-700 mb-8">
-                  Get instant expert advice for your pet. 15-minute video call with
-                  vets having 7+ years of experience.
-                </p>
+      <main className="flex-1">
+        {/* ── HERO ── */}
+        <section className="py-20 bg-slate-50 border-b border-slate-200">
+          <div className="mx-auto max-w-6xl px-4 grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+                Veterinary Doctor Online India – 24/7 Instant Pet Consultation
+              </h1>
+              <p className="text-lg text-slate-700 mb-8">
+                Connect with a <strong>veterinary doctor online in India</strong> instantly.
+                Talk to vet online India through secure video consultation with vet India.
+                Get expert advice from an <strong>online dog doctor India</strong> or{" "}
+                <strong>online cat doctor India</strong> anytime.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <a href="/lp-video-consultation-india.html">
+                  <Button size="lg">Start Instant Vet Consultation</Button>
+                </a>
 
-                <div className="flex flex-col sm:flex-row gap-6 mb-8">
-                  <div className="rounded-xl border border-brand/30 bg-brand/10 p-4">
-                    <p className="text-sm text-slate-600 mb-1">Day Consultation</p>
-                    <p className="font-display text-3xl font-bold text-brand">₹499</p>
-                    <p className="text-xs text-slate-600 mt-1">8 AM - 10 PM</p>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-sm text-slate-600 mb-1">Night Consultation</p>
-                    <p className="font-display text-3xl font-bold text-slate-900">
-                      ₹549
-                    </p>
-                    <p className="text-xs text-slate-600 mt-1">8 PM - 8 AM</p>
-                  </div>
-                </div>
-
-                <ul className="space-y-3 text-slate-700 mb-8">
-                  <li className="flex items-center gap-3">
-                    <ShieldCheck className="h-5 w-5 text-brand" />
-                    <span>Verified vets with 7+ years experience</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Video className="h-5 w-5 text-brand" />
-                    <span>15-minute secure video call</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Clock className="h-5 w-5 text-brand" />
-                    <span>Available 24/7 across India</span>
-                  </li>
-                </ul>
+                {/* External = <a>, internal = <Link> */}
+                <a href="https://snoutiq.com" target="_blank" rel="noreferrer">
+                  <Button variant="outline" size="lg">
+                    Visit Homepage
+                  </Button>
+                </a>
               </div>
-
-              <div
-                id="booking-form"
-                className="rounded-3xl border border-slate-200 bg-slate-50 p-8 shadow-2xl"
-              >
-                <div className="text-center mb-6">
-                  <h3 className="font-display text-2xl font-bold text-slate-900 mb-2">
-                    Consult Vet Online
-                  </h3>
-                  <p className="text-slate-600">
-                    Enter your number to connect instantly
-                  </p>
-                </div>
-
-                {isSubmitted ? (
-                  <div className="text-center py-8">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand/20 text-brand mb-6">
-                      <span className="text-2xl">✓</span>
-                    </div>
-                    <h4 className="text-xl font-bold text-slate-900 mb-2">
-                      Connecting...
-                    </h4>
-                    <p className="text-slate-600">
-                      We are assigning the best available vet for you. Please keep
-                      your phone handy.
-                    </p>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-5">
-                    {/* <!-- GA CONVERSION TAG HERE --> */}
-                    <div>
-                      <label
-                        htmlFor="mobile"
-                        className="block text-sm font-medium text-slate-700 mb-2"
-                      >
-                        Mobile Number
-                      </label>
-
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                          <Phone className="h-5 w-5 text-gray-500" />
-                        </div>
-
-                        <input
-                          type="tel"
-                          id="mobile"
-                          required
-                          className="w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 py-4 text-slate-900 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand text-lg"
-                          placeholder="+91 98765 43210"
-                        />
-                      </div>
-                    </div>
-
-                    <Button type="submit" size="lg" className="w-full mt-4 h-14 text-lg">
-                      Connect with a Vet Now
-                    </Button>
-
-                    <p className="text-xs text-center text-gray-500 mt-4">
-                      By proceeding, you agree to our terms of service.
-                    </p>
-                  </form>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Trust Bar */}
-        <section className="border-y border-slate-200 bg-slate-50 py-8">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
-              <div className="flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold text-slate-900">200+</span>
-                <span className="text-xs text-slate-600 uppercase tracking-wider mt-1">
-                  Verified Vets
-                </span>
-              </div>
-
-              <div className="flex flex-col items-center justify-center">
-                <div className="flex text-brand mb-1">
-                  {Array(5)
-                    .fill(0)
-                    .map((_, i) => (
-                      <Star key={i} className="h-4 w-4" />
-                    ))}
-                </div>
-                <span className="text-2xl font-bold text-slate-900">4.8</span>
-                <span className="text-xs text-slate-600 uppercase tracking-wider mt-1">
-                  Average Rating
-                </span>
-              </div>
-
-              <div className="flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold text-slate-900">7+ Yrs</span>
-                <span className="text-xs text-slate-600 uppercase tracking-wider mt-1">
-                  Min. Experience
-                </span>
-              </div>
-
-              <div className="flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold text-slate-900">24/7</span>
-                <span className="text-xs text-slate-600 uppercase tracking-wider mt-1">
-                  Availability
-                </span>
-              </div>
-
-              <div className="flex flex-col items-center justify-center col-span-2 md:col-span-1">
-                <span className="text-2xl font-bold text-slate-900">10,000+</span>
-                <span className="text-xs text-slate-600 uppercase tracking-wider mt-1">
-                  Pet Parents
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* How it works */}
-        <section className="py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="font-display text-3xl font-bold text-slate-900 sm:text-4xl mb-4">
-                How Online Vet Consultation Works
-              </h2>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-10">
-              <div className="text-center">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-slate-50 border border-brand/30 text-brand mb-6">
-                  <Phone className="h-8 w-8" />
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                  1. Enter Details
-                </h3>
-                <p className="text-slate-600">
-                  Provide your mobile number and pay the fixed consultation fee
-                  securely.
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-slate-50 border border-brand/30 text-brand mb-6">
-                  <Users className="h-8 w-8" />
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                  2. Instant Match
-                </h3>
-                <p className="text-slate-600">
-                  We automatically assign the best available verified vet for your
-                  pet&apos;s needs.
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-slate-50 border border-brand/30 text-brand mb-6">
-                  <Video className="h-8 w-8" />
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                  3. Video Call
-                </h3>
-                <p className="text-slate-600">
-                  Connect on a 15-minute secure video call and get expert advice
-                  and triage.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Vets Grid */}
-        <section className="py-20 bg-slate-50">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="font-display text-3xl font-bold text-slate-900 sm:text-4xl mb-4">
-                Meet Our Verified Vets
-              </h2>
-              <p className="text-slate-600">
-                Over 200+ experienced veterinarians ready to help your pet.
+              <p className="mt-4 text-sm text-slate-600">
+                ₹399 Day | ₹549 Night • Trusted Online Vet Doctor Across India
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {vets.map((vet, i) => (
-                <div
-                  key={i}
-                  className="rounded-2xl border border-slate-200 bg-white overflow-hidden"
-                >
-                  <div className="relative h-48 w-full bg-gray-800">
-                    <img
-                      src={vet.img}
-                      alt={vet.name}
-                      className="absolute inset-0 h-full w-full object-cover"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-
-                  <div className="p-5">
-                    <h4 className="font-bold text-lg text-slate-900 mb-1">
-                      {vet.name}
-                    </h4>
-                    <p className="text-brand text-sm mb-3">{vet.spec}</p>
-
-                    <div className="flex justify-between text-xs text-slate-600">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> {vet.exp}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <ShieldCheck className="h-3 w-3" /> {vet.city}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="relative w-full h-[400px] rounded-2xl overflow-hidden shadow-lg">
+              <img
+                src={img}
+                alt="Veterinary doctor online India examining dog during consultation"
+                className="absolute inset-0 w-full h-full object-cover"
+                loading="eager"
+              />
             </div>
           </div>
         </section>
 
-        {/* Reviews */}
-        <section className="py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="font-display text-3xl font-bold text-slate-900 sm:text-4xl mb-4">
-                What Pet Parents Say
-              </h2>
+        {/* ── TRUST STRIP ── */}
+        <section className="py-6 bg-brand text-white">
+          <div className="mx-auto max-w-6xl px-4 flex flex-wrap justify-center gap-8 text-sm font-medium">
+            <span className="flex items-center gap-2">
+              <BadgeCheck className="w-4 h-4" /> BVSc & AH Verified Vets
+            </span>
+            <span className="flex items-center gap-2">
+              <Clock className="w-4 h-4" /> Available 24/7 Including Nights
+            </span>
+            <span className="flex items-center gap-2">
+              <Video className="w-4 h-4" /> Secure HD Video Call
+            </span>
+            <span className="flex items-center gap-2">
+              <Star className="w-4 h-4" /> 4.8★ Rated by Pet Parents
+            </span>
+            <span className="flex items-center gap-2">
+              <PhoneCall className="w-4 h-4" /> Connect in Under 15 Minutes
+            </span>
+          </div>
+        </section>
+
+        {/* ── WHY CHOOSE ── */}
+        <section className="py-16">
+          <div className="mx-auto max-w-4xl px-4">
+            <h2 className="text-3xl font-bold mb-6">
+              Why Choose Veterinary Doctor Online Consultation in India?
+            </h2>
+            <p className="text-slate-700 mb-8">
+              With our <strong>online veterinary consultation</strong> platform, pet parents
+              can connect with vet online India without clinic visits. Whether you need an
+              emergency online vet India or general pet advice, our verified online vet
+              doctors provide expert guidance.
+            </p>
+
+            <div className="grid md:grid-cols-3 gap-8 mb-12">
+              <div className="bg-slate-50 p-6 rounded-2xl border">
+                <Video className="w-10 h-10 mb-4 text-brand" />
+                <h3 className="text-xl font-bold mb-2">Video Consultation with Vet India</h3>
+                <p className="text-slate-600">
+                  Secure HD video consultation for dogs and cats across India.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-6 rounded-2xl border">
+                <Clock className="w-10 h-10 mb-4 text-brand" />
+                <h3 className="text-xl font-bold mb-2">Instant Vet Consultation India</h3>
+                <p className="text-slate-600">
+                  Connect to a pet doctor online India within minutes.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-6 rounded-2xl border">
+                <ShieldCheck className="w-10 h-10 mb-4 text-brand" />
+                <h3 className="text-xl font-bold mb-2">Verified Online Vet Doctor</h3>
+                <p className="text-slate-600">
+                  Experienced dog vet and cat specialists available 24/7.
+                </p>
+              </div>
             </div>
+          </div>
+        </section>
+
+        {/* ── HOW IT WORKS ── */}
+        <section className="py-16 bg-slate-50 border-y border-slate-200">
+          <div className="mx-auto max-w-4xl px-4">
+            <h2 className="text-3xl font-bold mb-4">
+              How to Consult a Vet Online India – 3 Simple Steps
+            </h2>
+            <p className="text-slate-700 mb-10">
+              Getting an <strong>online vet consultation India</strong> on SnoutiQ takes less
+              than 15 minutes. Works on any phone or laptop.
+            </p>
 
             <div className="grid md:grid-cols-3 gap-8">
+              {steps.map(({ step, title, desc }) => (
+                <div key={step} className="bg-white p-6 rounded-2xl border shadow-sm">
+                  <div className="text-4xl font-black text-brand/20 mb-3">{step}</div>
+                  <h3 className="text-xl font-bold mb-2">{title}</h3>
+                  <p className="text-slate-600">{desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-10 text-center">
+              <a href="/lp-video-consultation-india.html">
+                <Button size="lg">Start Your Consultation Now</Button>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        {/* ── SYMPTOMS ── */}
+        <section className="py-16">
+          <div className="mx-auto max-w-4xl px-4">
+            <h2 className="text-3xl font-bold mb-6">Common Symptoms We Treat Online</h2>
+            <p className="text-slate-700 mb-6">
+              Not sure if you need a clinic visit? A video consultation vet can help
+              diagnose and triage many common issues. Explore our symptom guides to learn more:
+            </p>
+
+            <ul className="space-y-3 mb-12">
+              <li>
+                <Link
+                  to="/symptoms/dog-vomiting-treatment-india"
+                  className="text-brand hover:underline"
+                >
+                  Dog Vomiting Treatment &amp; Triage
+                </Link>
+              </li>
+              <li>
+                <Link to="/symptoms/dog-diarrhea-what-to-do" className="text-brand hover:underline">
+                  What to do if your dog has diarrhea
+                </Link>
+              </li>
+              <li>
+                <Link to="/symptoms/puppy-not-eating" className="text-brand hover:underline">
+                  Why is my puppy lethargic and not eating?
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/symptoms/cat-watery-eyes-treatment"
+                  className="text-brand hover:underline"
+                >
+                  Cat watery eyes and infection care
+                </Link>
+              </li>
+              <li>
+                <Link to="/symptoms/dog-fever-symptoms" className="text-brand hover:underline">
+                  Identifying dog fever symptoms at home
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        {/* ── WHAT VET CAN HELP WITH ── */}
+        <section className="py-16 bg-slate-50 border-y border-slate-200">
+          <div className="mx-auto max-w-4xl px-4">
+            <h2 className="text-3xl font-bold mb-4">
+              What Can an Online Vet Doctor in India Help With?
+            </h2>
+            <p className="text-slate-700 mb-8">
+              Our <strong>online vet consultation India</strong> covers a wide range of pet
+              health needs. From emergency triage to routine guidance, our online vet
+              doctors are equipped to assist with:
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
               {[
                 {
-                  text:
-                    'Talk to a vet online was so easy. Dr. Sharma was very patient and guided me on what to do when my dog ate chocolate late at night.',
-                  name: "Rohan K.",
+                  icon: <Stethoscope className="w-5 h-5 text-brand" />,
+                  title: "Symptom Assessment & Triage",
+                  desc: "Understand if your pet's condition needs immediate clinic attention or can be managed at home.",
                 },
                 {
-                  text:
-                    "The online vet consultation India service is a lifesaver. Fixed price of ₹399 is very reasonable for the quality of advice received.",
-                  name: "Sneha M.",
+                  icon: <HeartPulse className="w-5 h-5 text-brand" />,
+                  title: "Diet & Nutrition Advice",
+                  desc: "Get personalised feeding and nutrition guidance for your dog or cat's age and health status.",
                 },
                 {
-                  text:
-                    "I always consult vet online here before panicking. The 15-minute call is enough to understand if a clinic visit is actually needed.",
-                  name: "Vikram S.",
+                  icon: <ShieldCheck className="w-5 h-5 text-brand" />,
+                  title: "Skin & Coat Conditions",
+                  desc: "Identify and manage allergies, rashes, fur loss, and skin infections with expert online vet advice.",
                 },
-              ].map((r, i) => (
-                <div key={i} className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-                  <div className="flex text-brand mb-4">
-                    {Array(5)
-                      .fill(0)
-                      .map((_, j) => (
-                        <Star key={j} className="h-4 w-4" />
-                      ))}
+                {
+                  icon: <Video className="w-5 h-5 text-brand" />,
+                  title: "Post-Surgery Follow-Ups",
+                  desc: "Check recovery progress and get wound care guidance via secure video consultation vet.",
+                },
+                {
+                  icon: <BadgeCheck className="w-5 h-5 text-brand" />,
+                  title: "Vaccination Scheduling",
+                  desc: "Know exactly which vaccines your pet needs and when, from a certified online vet doctor India.",
+                },
+                {
+                  icon: <Clock className="w-5 h-5 text-brand" />,
+                  title: "Behaviour & Training Concerns",
+                  desc: "Address aggression, anxiety, and training challenges with experienced pet behaviour vets.",
+                },
+              ].map(({ icon, title, desc }) => (
+                <div key={title} className="flex gap-4 bg-white p-5 rounded-2xl border shadow-sm">
+                  <div className="mt-1 shrink-0">{icon}</div>
+                  <div>
+                    <h3 className="font-bold mb-1">{title}</h3>
+                    <p className="text-slate-600 text-sm">{desc}</p>
                   </div>
-                  <p className="text-slate-700 italic mb-6">
-                    &quot;{r.text}&quot;
-                  </p>
-                  <p className="font-semibold text-slate-900">{r.name}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* FAQ */}
-        <section className="py-20 bg-slate-50">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="font-display text-3xl font-bold text-slate-900 sm:text-4xl mb-4">
-                Frequently Asked Questions
-              </h2>
-            </div>
+        {/* ── TESTIMONIALS ── */}
+        <section className="py-16">
+          <div className="mx-auto max-w-4xl px-4">
+            <h2 className="text-3xl font-bold mb-4">
+              What Pet Parents Say About Online Vet Consultation India
+            </h2>
+            <p className="text-slate-700 mb-10">
+              Thousands of pet parents across India trust SnoutiQ for instant, expert veterinary care online.
+            </p>
 
-            <div className="space-y-4">
-              {[
-                {
-                  q: "Can I talk to a vet online right now?",
-                  a: "Yes, our service is available 24/7. Once you enter your details and complete the payment, you will be connected to a vet almost instantly.",
-                },
-                {
-                  q: "Is ₹399 the fixed price?",
-                  a: "Yes, ₹399 is the fixed price for a 15-minute daytime consultation (8 AM - 10 PM). There are no hidden charges.",
-                },
-                {
-                  q: "What happens at night?",
-                  a: "Night consultations (8 PM - 8 AM) are priced at ₹549. Availability depends on the vets online at that hour, but we strive to maintain 24/7 coverage.",
-                },
-                {
-                  q: "Can a video call replace a clinic visit?",
-                  a: "Online consultations are for triage, minor issues, and advice. They cannot replace a physical examination for serious emergencies or when diagnostic tests are needed.",
-                },
-              ].map((f, i) => (
-                <div key={i} className="border border-slate-200 rounded-xl p-6 bg-white">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                    {f.q}
-                  </h3>
-                  <p className="text-slate-600">{f.a}</p>
+            <div className="grid md:grid-cols-3 gap-6 mb-8">
+              {testimonials.map(({ name, location, pet, text, rating }) => (
+                <div key={name} className="bg-slate-50 p-6 rounded-2xl border flex flex-col gap-3">
+                  <div className="flex gap-1">
+                    {Array.from({ length: rating }).map((_, i) => (
+                      <Star key={`${name}-star-${i}`} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                  <p className="text-slate-700 text-sm italic">"{text}"</p>
+                  <div className="mt-auto">
+                    <p className="font-bold text-sm">{name}</p>
+                    <p className="text-slate-500 text-xs flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {location} • {pet}
+                    </p>
+                  </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── PRICING ── */}
+        <section className="py-16 bg-slate-50 border-y border-slate-200">
+          <div className="mx-auto max-w-4xl px-4">
+            <h2 className="text-3xl font-bold mb-4">
+              Online Vet Consultation Cost India – Transparent Pricing
+            </h2>
+            <p className="text-slate-700 mb-8">
+              SnoutiQ offers affordable <strong>online vet consultation India</strong> with no hidden fees.
+              Get access to qualified vets at a fraction of clinic costs.
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white border-2 border-brand/30 rounded-2xl p-8 text-center shadow-sm">
+                <div className="text-brand font-bold text-sm uppercase tracking-wider mb-2">
+                  Day Consultation
+                </div>
+                <div className="text-5xl font-black mb-1">₹399</div>
+                <div className="text-slate-500 text-sm mb-6">6 AM – 10 PM IST</div>
+
+                <ul className="text-slate-700 text-sm space-y-2 mb-8 text-left">
+                  <li>✔ HD Video Call with Verified Vet</li>
+                  <li>✔ Dogs &amp; Cats</li>
+                  <li>✔ Written Consultation Summary</li>
+                  <li>✔ Connect in Under 15 Minutes</li>
+                </ul>
+
+                <a href="/lp-video-consultation-india.html">
+                  <Button size="lg" className="w-full">
+                    Book Day Consultation
+                  </Button>
+                </a>
+              </div>
+
+              <div className="bg-white border-2 border-slate-200 rounded-2xl p-8 text-center shadow-sm">
+                <div className="text-slate-600 font-bold text-sm uppercase tracking-wider mb-2">
+                  Night Consultation
+                </div>
+                <div className="text-5xl font-black mb-1">₹549</div>
+                <div className="text-slate-500 text-sm mb-6">10 PM – 6 AM IST</div>
+
+                <ul className="text-slate-700 text-sm space-y-2 mb-8 text-left">
+                  <li>✔ Emergency Online Vet India</li>
+                  <li>✔ Available All Night, Every Night</li>
+                  <li>✔ Written Consultation Summary</li>
+                  <li>✔ Immediate Triage Guidance</li>
+                </ul>
+
+                <a href="/lp-video-consultation-india.html">
+                  <Button size="lg" variant="outline" className="w-full">
+                    Book Night Consultation
+                  </Button>
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── CITIES ── */}
+        <section className="py-16">
+          <div className="mx-auto max-w-4xl px-4">
+            <h2 className="text-3xl font-bold mb-4">Online Vet Consultation Available Across India</h2>
+            <p className="text-slate-700 mb-8">
+              SnoutiQ's <strong>veterinary doctor online</strong> service is available to pet parents in every city across India —
+              no matter where you are, a verified vet is just a click away.
+            </p>
+
+            <div className="flex flex-wrap gap-3 mb-8">
+              {cities.map((city) => (
+                <span
+                  key={city}
+                  className="bg-slate-100 border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2 rounded-full"
+                >
+                  Online Vet {city}
+                </span>
+              ))}
+            </div>
+
+            <p className="text-slate-600 text-sm">
+              And everywhere else in India. If you have internet, you can access an{" "}
+              <strong>online vet doctor India</strong> within minutes.
+            </p>
+          </div>
+        </section>
+
+        {/* ── ABOUT ONLINE VET (SEO CONTENT) ── */}
+        <section className="py-16 bg-slate-50 border-y border-slate-200">
+          <div className="mx-auto max-w-4xl px-4">
+            <h2 className="text-3xl font-bold mb-6">About Veterinary Doctor Online India – SnoutiQ</h2>
+            <p className="text-slate-700 mb-4">
+              SnoutiQ is India's trusted <strong>online vet consultation</strong> platform, connecting dog and cat owners with
+              licensed veterinarians through secure video calls. Every <strong>online vet doctor</strong> on SnoutiQ holds a
+              BVSc &amp; AH degree and has verified clinical experience, ensuring your pet receives expert care at any hour.
+            </p>
+            <p className="text-slate-700 mb-4">
+              Unlike generic teleconsultation platforms, SnoutiQ is built exclusively for pets. Our{" "}
+              <strong>video consultation vet</strong> sessions are tailored to small animal medicine — covering dogs, cats, and more.
+              The platform supports real-time visual examination, enabling vets to assess symptoms accurately over video.
+            </p>
+            <p className="text-slate-700 mb-4">
+              Whether your pet shows signs of fever, vomiting, lethargy, or skin problems, our{" "}
+              <strong>online dog doctor India</strong> and <strong>online cat doctor India</strong> specialists are available around
+              the clock. With consultation fees starting at just ₹399, quality pet healthcare has never been more accessible across India.
+            </p>
+            <p className="text-slate-700">
+              SnoutiQ also provides supplementary resources such as an AI symptom checker, vaccination reminders, and vet insights — all
+              designed to help Indian pet parents make informed decisions about their pet's health without unnecessary clinic visits.
+            </p>
+          </div>
+        </section>
+
+        {/* ── FAQ ── */}
+        <section className="py-16">
+          <div className="mx-auto max-w-4xl px-4">
+            <h2 className="text-3xl font-bold mb-10">Frequently Asked Questions – Vet Online India</h2>
+
+            <div className="space-y-6">
+              {[
+                {
+                  q: "How do I consult a veterinary doctor online in India?",
+                  a: "Simply click 'Start Instant Vet Consultation' on SnoutiQ, select your pet type, pay the consultation fee (₹399 day / ₹549 night), and join a secure HD video call with a verified vet within minutes. No app download required.",
+                },
+                {
+                  q: "Is online vet consultation available 24/7 in India?",
+                  a: "Yes. SnoutiQ offers 24/7 online vet consultation in India including nights, weekends, and public holidays. Emergency online vet India support is always available — even at 3 AM.",
+                },
+                {
+                  q: "What is the cost of online vet consultation in India?",
+                  a: "Online vet consultation on SnoutiQ costs ₹399 during the day (6 AM–10 PM) and ₹549 at night (10 PM–6 AM). No hidden charges. Covers dogs and cats across all of India.",
+                },
+                {
+                  q: "Can an online vet prescribe medicine in India?",
+                  a: "Online vets on SnoutiQ can provide clinical advice, triage guidance, and written recommendations. For certain prescription medicines, a follow-up clinic visit may be required as per Indian veterinary regulations.",
+                },
+                {
+                  q: "Is SnoutiQ's online vet consultation safe and private?",
+                  a: "Yes. All video consultations on SnoutiQ are conducted over encrypted, secure connections. Your pet's health data is kept confidential and never shared without consent.",
+                },
+              ].map(({ q, a }) => (
+                <div key={q} className="bg-slate-50 rounded-2xl border p-6">
+                  <h3 className="font-bold text-lg mb-2">{q}</h3>
+                  <p className="text-slate-700">{a}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── FINAL CTA ── */}
+        <section className="py-16 bg-slate-50 border-t border-slate-200">
+          <div className="mx-auto max-w-4xl px-4">
+            <div className="bg-brand/10 p-8 rounded-2xl text-center border border-brand/30">
+              <h3 className="text-2xl font-bold mb-4">Talk to Veterinary Doctor Online India Now</h3>
+              <p className="text-slate-700 mb-6">
+                Your pet's health can't wait. Get expert online vet advice in minutes — day or night.
+              </p>
+              <a href="/lp-video-consultation-india.html">
+                <Button size="lg">Consult Online Vet Doctor</Button>
+              </a>
             </div>
           </div>
         </section>
       </main>
 
-      {/* Sticky Mobile CTA */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-slate-200 z-50">
-        <a href="#booking-form">
-          <Button size="lg" className="w-full text-lg h-14 shadow-lg shadow-brand/20" type="button">
-            Connect with a Vet Now
-          </Button>
-        </a>
-      </div>
-
-      {/* LP Footer (same as your original) */}
-      <footer className="bg-white border-t border-slate-200 py-8 text-center text-sm text-gray-500 pb-24 md:pb-8">
-        <p>&copy; {new Date().getFullYear()} SnoutiQ. All rights reserved.</p>
-      </footer>
+      <Footer />
     </div>
   );
 }

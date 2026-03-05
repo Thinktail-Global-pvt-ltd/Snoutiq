@@ -196,6 +196,7 @@ const clipText = (text, max = 160) => {
 };
 
 const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
+const MOBILE_STICKY_HEADER_OFFSET_PX = 88;
 
 const isDesktopViewportNow = () =>
   typeof window !== "undefined" &&
@@ -207,7 +208,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   const [activeSlide, setActiveSlide] = useState(0);
   const activeDoctor = HERO_SLIDES[activeSlide] || HERO_SLIDES[0];
   const vetSectionRef = useRef(null);
-  const heroSectionRef = useRef(null);
+  const mobileStickySentinelRef = useRef(null);
 
   const [vets, setVets] = useState([]);
   const [vetsLoading, setVetsLoading] = useState(false);
@@ -285,21 +286,33 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       return undefined;
     }
 
-    const updateStickyCta = () => {
-      const heroEl = heroSectionRef.current;
-      if (!heroEl) return;
-      const heroBottom = heroEl.getBoundingClientRect().bottom;
-      setShowMobileStickyCta(heroBottom <= 0);
-    };
+    if (
+      typeof window === "undefined" ||
+      typeof window.IntersectionObserver === "undefined"
+    ) {
+      setShowMobileStickyCta(false);
+      return undefined;
+    }
 
-    updateStickyCta();
-    window.addEventListener("scroll", updateStickyCta, { passive: true });
-    window.addEventListener("resize", updateStickyCta);
+    const sentinel = mobileStickySentinelRef.current;
+    if (!sentinel) return undefined;
 
-    return () => {
-      window.removeEventListener("scroll", updateStickyCta);
-      window.removeEventListener("resize", updateStickyCta);
-    };
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        const shouldShow = !entry?.isIntersecting;
+        setShowMobileStickyCta((prev) =>
+          prev === shouldShow ? prev : shouldShow,
+        );
+      },
+      {
+        threshold: 0,
+        rootMargin: `-${MOBILE_STICKY_HEADER_OFFSET_PX}px 0px 0px 0px`,
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
   }, [isDesktopViewport]);
 
   useEffect(() => {
@@ -812,7 +825,6 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
 
       {/* Hero */}
       <section
-        ref={heroSectionRef}
         className="landing-hero relative overflow-hidden bg-gradient-to-br from-[#f4faff] via-white to-[#e8f2ff] py-4 md:py-5 lg:min-h-[calc(100vh-64px)] lg:py-3"
       >
         <div className="pointer-events-none absolute -top-24 right-[-80px] h-72 w-72 rounded-full bg-[#3998de]/10 blur-3xl" />
@@ -991,6 +1003,11 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
             ) : null}
           </div>
         </div>
+        <div
+          ref={mobileStickySentinelRef}
+          aria-hidden="true"
+          className="pointer-events-none h-px w-full"
+        />
       </section>
 
       {/* Social Proof */}

@@ -26,7 +26,12 @@ export default function NewCounsult() {
             src={contactImage}
             alt="Pet consultation support"
             className="absolute inset-0 h-full w-full object-cover object-center"
+            width={1600}
+            height={988}
+            sizes="100vw"
             loading="eager"
+            decoding="async"
+            fetchPriority="high"
           />
           <div className="absolute inset-0 bg-slate-900/55" />
 

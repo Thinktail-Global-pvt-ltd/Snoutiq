@@ -18,6 +18,9 @@ export default function NewAbout() {
             src={aboutImage}
             alt="About SnoutiQ"
             className="absolute inset-0 h-full w-full object-cover object-[center_22%] sm:object-[center_28%]"
+            width={1600}
+            height={1067}
+            sizes="100vw"
             loading="eager"
             decoding="async"
             fetchPriority="high"

@@ -142,23 +142,19 @@
     <link rel="icon" sizes="512x512" href="/favicon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
 
-    <!-- ✅ Fonts (preconnect + preload + fallback) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <!-- ✅ Fonts (lighter, non-blocking) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
     <link
-      rel="preload"
-      href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap"
-      as="style"
-      onload="
-        this.onload = null;
-        this.rel = 'stylesheet';
-      "
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
     <noscript>
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@500;600;700&display=swap"
       />
     </noscript>
 
@@ -254,18 +250,6 @@
         }
       }
     </style>
-
-    <!-- ✅ Main CSS (deferred load) -->
-    <link
-      rel="preload"
-      href="/assets/index.css"
-      as="style"
-      onload="
-        this.onload = null;
-        this.rel = 'stylesheet';
-      "
-    />
-    <noscript><link rel="stylesheet" href="/assets/index.css" /></noscript>
 
     <!-- ✅ Security (optional but recommended) -->
     <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://www.googletagmanager.com https://connect.facebook.net; img-src 'self' https://www.facebook.com data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://connect.facebook.net;"> -->

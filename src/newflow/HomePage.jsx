@@ -554,19 +554,6 @@ function Ie() {
         tag.setAttribute(SEO_OWNER_ATTR, "true");
       };
 
-      const upsertLinkTag = (rel, href, crossOrigin = null) => {
-        let tag = head.querySelector(`link[rel="${rel}"][href="${href}"]`);
-        if (!tag) {
-          tag = document.createElement("link");
-          tag.setAttribute("rel", rel);
-          tag.setAttribute("href", href);
-          head.appendChild(tag);
-        }
-        if (crossOrigin !== null) tag.setAttribute("crossorigin", crossOrigin);
-        else tag.removeAttribute("crossorigin");
-        tag.setAttribute(SEO_OWNER_ATTR, "true");
-      };
-
       const upsertJsonLdTag = (id, payload) => {
         let tag = head.querySelector(`script#${id}`);
         if (!tag) {
@@ -585,12 +572,6 @@ function Ie() {
       upsertMetaTag("name", "googlebot", "index, follow");
 
       upsertCanonicalTag(SEO_CANONICAL);
-      upsertLinkTag("preconnect", "https://snoutiq.com");
-      upsertLinkTag("preconnect", "https://www.snoutiq.com");
-      upsertLinkTag("preconnect", "https://play.google.com");
-      upsertLinkTag("dns-prefetch", "//snoutiq.com");
-      upsertLinkTag("dns-prefetch", "//www.snoutiq.com");
-      upsertLinkTag("dns-prefetch", "//play.google.com");
 
       upsertMetaTag("property", "og:title", SEO_TITLE_DEFAULT);
       upsertMetaTag("property", "og:description", SEO_DESCRIPTION);
