@@ -1080,12 +1080,23 @@ Route::post('/doctor/otp/verify', function (Request $request) {
     }
 
     $otpEntry->update(['is_verified' => 1]);
+    $doctorData = $doctor->toArray();
+
+    $vetData = null;
+    if (!empty($doctor->vet_registeration_id)) {
+        $vet = VetRegisterationTemp::query()->find((int) $doctor->vet_registeration_id);
+        if ($vet) {
+            $vetData = $vet->toArray();
+            unset($vetData['password'], $vetData['claim_token']);
+        }
+    }
 
     return response()->json([
         'success' => true,
         'message' => 'OTP verified',
         'doctor_id' => $doctor->id,
-        'doctor' => $doctor->only(['id', 'doctor_name', 'doctor_email', 'doctor_mobile']),
+        'doctor' => $doctorData,
+        'vet_registeration' => $vetData,
     ]);
 })->name('doctor.otp.verify');
 
