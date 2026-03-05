@@ -22,8 +22,12 @@ import {
 export default function VeterinaryDoctorOnlineIndia() {
   const canonical = "https://snoutiq.com/veterinary-doctor-online-india";
   const ogImage = "https://snoutiq.com/images/veterinary-doctor-online-india.jpg";
-  const consultPath = "/20+vetsonline?start=details";
+  const consultPath = "/online-vet-consultation-india";
   const homePath = "/";
+  const belowFoldSectionStyle = {
+    contentVisibility: "auto",
+    containIntrinsicSize: "1px 900px",
+  };
 
   // ── CHANGE 1: Expanded schema ──────────────────────────────────────────────
   // Added a third entry to "@graph": a new "LocalBusiness" node with
@@ -391,7 +395,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         </section>
 
         {/* ── WHY CHOOSE ── */}
-        <section className="py-16">
+        <section className="py-16" style={belowFoldSectionStyle}>
           <div className="mx-auto max-w-4xl px-4">
             <h2 className="text-3xl font-bold mb-6">
               Why Choose Veterinary Doctor Online Consultation in India?
@@ -432,7 +436,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         </section>
 
         {/* ── HOW IT WORKS ── */}
-        <section className="py-16 bg-slate-50 border-y border-slate-200">
+        <section className="py-16 bg-slate-50 border-y border-slate-200" style={belowFoldSectionStyle}>
           <div className="mx-auto max-w-4xl px-4">
             <h2 className="text-3xl font-bold mb-4">
               How to Consult a Vet Online India – 3 Simple Steps
@@ -461,7 +465,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         </section>
 
         {/* ── SYMPTOMS ── */}
-        <section className="py-16">
+        <section className="py-16" style={belowFoldSectionStyle}>
           <div className="mx-auto max-w-4xl px-4">
             <h2 className="text-3xl font-bold mb-6">Common Symptoms We Treat Online</h2>
             <p className="text-slate-700 mb-6">
@@ -506,7 +510,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         </section>
 
         {/* ── WHAT VET CAN HELP WITH ── */}
-        <section className="py-16 bg-slate-50 border-y border-slate-200">
+        <section className="py-16 bg-slate-50 border-y border-slate-200" style={belowFoldSectionStyle}>
           <div className="mx-auto max-w-4xl px-4">
             <h2 className="text-3xl font-bold mb-4">
               What Can an Online Vet Doctor in India Help With?
@@ -563,7 +567,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         </section>
 
         {/* ── TESTIMONIALS ── */}
-        <section className="py-16">
+        <section className="py-16" style={belowFoldSectionStyle}>
           <div className="mx-auto max-w-4xl px-4">
             <h2 className="text-3xl font-bold mb-4">
               What Pet Parents Say About Online Vet Consultation India
@@ -595,7 +599,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         </section>
 
         {/* ── CITIES ── */}
-        <section className="py-6">
+        <section className="py-6" style={belowFoldSectionStyle}>
           <div className="mx-auto max-w-4xl px-4">
             <h2 className="text-3xl font-bold mb-4">Online Vet Consultation Available Across India</h2>
             <p className="text-slate-700 mb-8">
@@ -622,7 +626,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         </section>
 
         {/* ── ABOUT ONLINE VET (SEO CONTENT) ── */}
-        <section className="py-16 bg-slate-50 border-y border-slate-200">
+        <section className="py-16 bg-slate-50 border-y border-slate-200" style={belowFoldSectionStyle}>
           <div className="mx-auto max-w-4xl px-4">
             <h2 className="text-3xl font-bold mb-6">About Veterinary Doctor Online India – SnoutIQ</h2>
             <p className="text-slate-700 mb-4">
@@ -648,7 +652,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         </section>
 
         {/* ── FAQ ── */}
-        <section className="py-16">
+        <section className="py-16" style={belowFoldSectionStyle}>
           <div className="mx-auto max-w-4xl px-4">
             <h2 className="text-3xl font-bold mb-10">Frequently Asked Questions – Vet Online India</h2>
 
@@ -685,7 +689,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         </section>
 
         {/* ── FINAL CTA ── */}
-        <section className="py-16 bg-slate-50 border-t border-slate-200">
+        <section className="py-16 bg-slate-50 border-t border-slate-200" style={belowFoldSectionStyle}>
           <div className="mx-auto max-w-4xl px-4">
             <div className="bg-brand/10 p-8 rounded-2xl text-center border border-brand/30">
               <h3 className="text-2xl font-bold mb-4">Talk to Veterinary Doctor Online India Now</h3>

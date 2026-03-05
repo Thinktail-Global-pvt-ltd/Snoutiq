@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { toast } from "react-hot-toast";
+import { Toaster, toast } from "react-hot-toast";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import {
@@ -901,6 +901,14 @@ const DoctorRegistration = () => {
   return (
     <>
       <Header />
+      <Toaster
+        position="top-center"
+        containerStyle={{ top: 80, bottom: 32 }}
+        toastOptions={{
+          duration: 4000,
+          style: { fontSize: "14px", borderRadius: "8px" },
+        }}
+      />
       <div className="w-full min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4 flex justify-center items-start overflow-auto mt-16">
         <div className="w-full max-w-6xl mx-auto">
           <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 mx-auto my-4 border border-gray-100">

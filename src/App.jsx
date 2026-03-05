@@ -6,8 +6,6 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
-import { FaPaw } from "react-icons/fa";
 import MainLayout from "./layouts/MainLayout";
 
 const ScrollToTopAndHash = () => {
@@ -139,24 +137,11 @@ function App() {
   return (
     <Router>
       <ScrollToTopAndHash />
-      <Toaster
-        position="top-center"
-        containerStyle={{
-          top: 80,
-          bottom: 80,
-        }}
-        toastOptions={{
-          duration: 4000,
-          style: { fontSize: "14px", borderRadius: "8px" },
-        }}
-      />
 
       <Suspense
           fallback={
             <div className="flex items-center justify-center h-screen">
-              <div className="animate-spin">
-                <FaPaw className="w-16 h-16 text-blue-500" />
-              </div>
+              <div className="h-14 w-14 rounded-full border-4 border-slate-200 border-t-brand animate-spin" />
             </div>
           }
         >
