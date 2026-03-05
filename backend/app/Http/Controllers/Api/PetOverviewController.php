@@ -58,6 +58,8 @@ class PetOverviewController extends Controller
         $careRoadmap = $vaccinations['care_roadmap'] ?? [];
         $medications = $this->buildMedications($prescriptions);
         $dailyCare = $this->fetchDailyCare($petId, $request->query('care_date'));
+        $latestInClinicAppointment = $this->fetchLatestInClinicAppointment($petId);
+        $latestVideoCallingAppointment = $this->fetchLatestVideoCallingAppointment($petId);
         $isNueteredRaw = property_exists($pet, 'is_nuetered')
             ? $pet->is_nuetered
             : (property_exists($pet, 'is_neutered') ? $pet->is_neutered : null);
@@ -114,6 +116,12 @@ class PetOverviewController extends Controller
                 'observation_note' => $observation['notes'] ?? null,
                 'knowledge_hub' => $this->knowledgeHubSuggestions($pet),
                 'today_care' => $dailyCare,
+                'in_clinic_appointment' => $latestInClinicAppointment,
+                'video_call_appointment' => $latestVideoCallingAppointment,
+                'latest_appointments' => [
+                    'in_clinic' => $latestInClinicAppointment,
+                    'video_call' => $latestVideoCallingAppointment,
+                ],
                 'deworming' => [
                     'deworming_yes_no' => $dewormingYesNo,
                     'last_deworming_date' => $lastDewormingDate,
@@ -200,6 +208,185 @@ class PetOverviewController extends Controller
                 ];
             })->values(),
         ];
+    }
+
+    private function fetchLatestInClinicAppointment(int $petId): ?array
+    {
+        if (!Schema::hasTable('appointments') || !Schema::hasColumn('appointments', 'pet_id')) {
+            return null;
+        }
+
+        $query = DB::table('appointments as a')->where('a.pet_id', $petId);
+
+        $select = [
+            'a.id',
+            'a.pet_id',
+            'a.vet_registeration_id',
+            'a.doctor_id',
+            'a.name as patient_name',
+            'a.mobile as patient_mobile',
+            'a.pet_name',
+            'a.appointment_date',
+            'a.appointment_time',
+            'a.status',
+            'a.notes',
+            'a.created_at',
+            'a.updated_at',
+        ];
+
+        if (Schema::hasTable('doctors')) {
+            $query->leftJoin('doctors as d', 'd.id', '=', 'a.doctor_id');
+            $select[] = DB::raw('COALESCE(d.doctor_name, d.name) as doctor_name');
+        }
+
+        if (Schema::hasTable('vet_registerations_temp')) {
+            $query->leftJoin('vet_registerations_temp as v', 'v.id', '=', 'a.vet_registeration_id');
+            $select[] = 'v.name as clinic_name';
+        }
+
+        $row = $query
+            ->select($select)
+            ->orderByDesc('a.appointment_date')
+            ->orderByDesc('a.appointment_time')
+            ->orderByDesc('a.id')
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        return [
+            'id' => $row->id,
+            'pet_id' => $row->pet_id,
+            'vet_registeration_id' => $row->vet_registeration_id,
+            'doctor_id' => $row->doctor_id,
+            'doctor_name' => $row->doctor_name ?? null,
+            'clinic_name' => $row->clinic_name ?? null,
+            'patient_name' => $row->patient_name,
+            'patient_mobile' => $row->patient_mobile,
+            'pet_name' => $row->pet_name,
+            'appointment_date' => $row->appointment_date,
+            'appointment_time' => $row->appointment_time,
+            'status' => $row->status,
+            'notes' => $this->decodeJsonMaybe($row->notes),
+            'created_at' => $this->toIso8601String($row->created_at ?? null),
+            'updated_at' => $this->toIso8601String($row->updated_at ?? null),
+            'source' => 'appointments',
+            'appointment_mode' => 'in_clinic',
+        ];
+    }
+
+    private function fetchLatestVideoCallingAppointment(int $petId): ?array
+    {
+        if (!Schema::hasTable('transactions') || !Schema::hasColumn('transactions', 'pet_id')) {
+            return null;
+        }
+
+        $query = DB::table('transactions as t')
+            ->where('t.pet_id', $petId)
+            ->whereIn('t.type', ['excell_export_campaign', 'video_consult']);
+
+        $select = [
+            't.id',
+            't.pet_id',
+            't.user_id',
+            't.doctor_id',
+            't.clinic_id',
+            't.amount_paise',
+            't.status',
+            't.type',
+            't.payment_method',
+            't.reference',
+            't.metadata',
+            't.created_at',
+            't.updated_at',
+        ];
+
+        if (Schema::hasColumn('transactions', 'channel_name')) {
+            $select[] = 't.channel_name';
+        }
+
+        if (Schema::hasTable('users')) {
+            $query->leftJoin('users as u', 'u.id', '=', 't.user_id');
+            $select[] = 'u.name as user_name';
+        }
+
+        if (Schema::hasTable('doctors')) {
+            $query->leftJoin('doctors as d', 'd.id', '=', 't.doctor_id');
+            $select[] = DB::raw('COALESCE(d.doctor_name, d.name) as doctor_name');
+        }
+
+        if (Schema::hasTable('vet_registerations_temp')) {
+            $query->leftJoin('vet_registerations_temp as v', 'v.id', '=', 't.clinic_id');
+            $select[] = 'v.name as clinic_name';
+        }
+
+        $row = $query
+            ->select($select)
+            ->orderByDesc('t.created_at')
+            ->orderByDesc('t.id')
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        return [
+            'id' => $row->id,
+            'pet_id' => $row->pet_id,
+            'user_id' => $row->user_id,
+            'user_name' => $row->user_name ?? null,
+            'doctor_id' => $row->doctor_id,
+            'doctor_name' => $row->doctor_name ?? null,
+            'clinic_id' => $row->clinic_id,
+            'clinic_name' => $row->clinic_name ?? null,
+            'amount_paise' => $row->amount_paise !== null ? (int) $row->amount_paise : null,
+            'status' => $row->status,
+            'type' => $row->type,
+            'payment_method' => $row->payment_method,
+            'reference' => $row->reference,
+            'channel_name' => $row->channel_name ?? null,
+            'metadata' => $this->decodeJsonMaybe($row->metadata),
+            'created_at' => $this->toIso8601String($row->created_at ?? null),
+            'updated_at' => $this->toIso8601String($row->updated_at ?? null),
+            'source' => 'transactions',
+            'appointment_mode' => 'video_call',
+        ];
+    }
+
+    private function decodeJsonMaybe($value)
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        $decoded = json_decode($value, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            return $decoded;
+        }
+
+        return $value;
+    }
+
+    private function toIso8601String($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof Carbon) {
+            return $value->toIso8601String();
+        }
+
+        try {
+            return Carbon::parse((string) $value)->toIso8601String();
+        } catch (\Throwable $e) {
+            return is_string($value) ? $value : null;
+        }
     }
 
     private function fetchPrescriptions(int $petId): array
