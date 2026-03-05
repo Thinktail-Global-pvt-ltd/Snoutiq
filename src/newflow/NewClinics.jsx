@@ -143,8 +143,11 @@ export default function NewClinics() {
                 <div className="relative overflow-hidden rounded-[2rem] border-4 border-sky-300/80 bg-white ring-1 ring-blue-200/80 shadow-[0_24px_60px_-26px_rgba(30,64,175,0.5)]">
                   <img
                     src={clinicImage}
-                    alt="Veterinary clinic using SnoutiQ platform"
+                    alt="Veterinary clinic using SnoutIQ platform"
                     className="h-[280px] w-full object-cover object-center sm:h-[360px] lg:h-[430px]"
+                    width={1024}
+                    height={1024}
+                    sizes="(min-width: 1024px) 45vw, 100vw"
                     loading="eager"
                     decoding="async"
                     fetchPriority="high"
@@ -401,4 +404,3 @@ export default function NewClinics() {
     </div>
   );
 }
-

@@ -18,7 +18,7 @@ export default function SymptomsHub() {
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <span className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-4 py-1.5 text-sm font-medium text-brand mb-6">
-              <Bot className="w-4 h-4" /> Powered by Snoutiq AI
+              <Bot className="w-4 h-4" /> Powered by SnoutIQ AI
             </span>
 
             <h1 className="font-display text-4xl md:text-5xl font-bold mb-6">
@@ -54,12 +54,12 @@ export default function SymptomsHub() {
             </div>
 
             <h3 className="text-2xl font-bold text-slate-900 mb-4">
-              Get the SnoutiQ App
+              Get the SnoutIQ App
             </h3>
 
             <p className="text-slate-600 mb-6 max-w-2xl mx-auto">
               For personalized recommendations, health insights, and to instantly
-              consult with verified veterinarians, download the SnoutiQ app today.
+              consult with verified veterinarians, download the SnoutIQ app today.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

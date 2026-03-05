@@ -307,7 +307,7 @@ export default function VideoConsultLP() {
           name: "Is online vet consultation available across India?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes, SnoutiQ provides 24/7 online vet consultation across India.",
+            text: "Yes, SnoutIQ provides 24/7 online vet consultation across India.",
           },
         },
       ],
@@ -2260,7 +2260,7 @@ export default function VideoConsultLP() {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-100 py-4 px-4 pb-28 md:pb-4">
         <p className="text-xs text-slate-400 text-center">
-          © {new Date().getFullYear()} SnoutiQ ·{" "}
+          © {new Date().getFullYear()} SnoutIQ ·{" "}
           <a href="/" className="hover:text-brand font-semibold">
             Home
           </a>{" "}

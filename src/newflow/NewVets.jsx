@@ -48,7 +48,7 @@ export default function NewVets() {
                 <div className="relative overflow-hidden rounded-[2rem] border-4 border-brand/30 bg-white ring-1 ring-brand/20 shadow-[0_24px_60px_-26px_rgba(2,132,199,0.55)]">
                   <img
                     src={vetHeroImage}
-                    alt="Veterinarian using SnoutiQ telemedicine platform"
+                    alt="Veterinarian using SnoutIQ telemedicine platform"
                     className="h-[280px] w-full object-cover object-center sm:h-[360px] lg:h-[430px]"
                     width={1600}
                     height={1326}

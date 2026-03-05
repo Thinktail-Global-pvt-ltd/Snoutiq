@@ -15,7 +15,6 @@ export default {
       },
       fontFamily: {
         sans: [
-          "Lato",
           "system-ui",
           "-apple-system",
           "BlinkMacSystemFont",
@@ -24,8 +23,6 @@ export default {
           "sans-serif",
         ],
         display: [
-          "Poppins",
-          "Lato",
           "system-ui",
           "-apple-system",
           "BlinkMacSystemFont",
@@ -34,8 +31,6 @@ export default {
           "sans-serif",
         ],
         heading: [
-          "Poppins",
-          "Lato",
           "system-ui",
           "-apple-system",
           "BlinkMacSystemFont",

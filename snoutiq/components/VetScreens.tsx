@@ -109,7 +109,7 @@ export const VetLoginScreen: React.FC<{
         </div>
 
         <div className="mt-8 text-center">
-          <p className="text-stone-500 text-sm">New to Snoutiq?</p>
+          <p className="text-stone-500 text-sm">New to SnoutIQ?</p>
           <button onClick={onRegisterClick} className="text-brand-600 font-bold text-sm hover:underline mt-1">
             Register as a Partner
           </button>
@@ -281,7 +281,7 @@ export const VetRegisterScreen: React.FC<{
                 {dayMath && (
                   <div className="mt-1 text-[10px] flex justify-between bg-green-50 text-green-800 px-2 py-1 rounded">
                     <span>You earn: <strong>₹{dayMath.earning}</strong></span>
-                    <span className="text-green-600/70">Snoutiq Fee: ₹{dayMath.commission}</span>
+                    <span className="text-green-600/70">SnoutIQ Fee: ₹{dayMath.commission}</span>
                   </div>
                 )}
               </div>
@@ -298,7 +298,7 @@ export const VetRegisterScreen: React.FC<{
                 {nightMath && (
                   <div className="mt-1 text-[10px] flex justify-between bg-green-50 text-green-800 px-2 py-1 rounded">
                     <span>You earn: <strong>₹{nightMath.earning}</strong></span>
-                    <span className="text-green-600/70">Snoutiq Fee: ₹{nightMath.commission}</span>
+                    <span className="text-green-600/70">SnoutIQ Fee: ₹{nightMath.commission}</span>
                   </div>
                 )}
               </div>

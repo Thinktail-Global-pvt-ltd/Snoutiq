@@ -68,18 +68,22 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2"
-              aria-label="Open SnoutiQ website"
+              aria-label="Open SnoutIQ website"
             >
               <img
                 src={logo}
-                alt="SnoutiQ"
+                alt="SnoutIQ"
                 className="h-5 w-auto max-w-[130px] object-contain sm:h-6"
+                width={130}
+                height={24}
                 loading="eager"
+                decoding="async"
+                fetchPriority="high"
                 draggable={false}
                 onDragStart={(event) => event.preventDefault()}
                 onContextMenu={(event) => event.preventDefault()}
               />
-              <span className="sr-only">SnoutiQ</span>
+              <span className="sr-only">SnoutIQ</span>
             </a>
           </div>
 

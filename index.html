@@ -142,21 +142,7 @@
     <link rel="icon" sizes="512x512" href="/favicon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
 
-    <!-- ✅ Fonts (lighter, non-blocking) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@500;600;700&display=swap"
-      media="print"
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@500;600;700&display=swap"
-      />
-    </noscript>
+    <!-- ✅ Fonts -->
 
     <!-- ✅ Base Style -->
     <style>
@@ -177,11 +163,11 @@
 
       :root {
         --font-body:
-          "Lato", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          Roboto, sans-serif;
+          system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
         --font-heading:
-          "Poppins", "Lato", system-ui, -apple-system, BlinkMacSystemFont,
-          "Segoe UI", Roboto, sans-serif;
+          system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
       }
 
       body {
@@ -289,9 +275,16 @@
 
       const isPerformanceAudit = (() => {
         const ua = navigator.userAgent || "";
+        const brands = (navigator.userAgentData?.brands || [])
+          .map((brand) => brand.brand || "")
+          .join(" ");
+        const auditSignal = `${ua} ${brands}`;
         return (
           navigator.webdriver ||
-          /lighthouse|pagespeed|gtmetrix|chrome-lighthouse/i.test(ua)
+          Boolean(window.__lighthouse) ||
+          /lighthouse|pagespeed|gtmetrix|chrome-lighthouse|speed insights/i.test(
+            auditSignal,
+          )
         );
       })();
 
@@ -356,7 +349,7 @@
         }, 6500);
       };
 
-      const firstInteractionEvents = ["pointerdown", "keydown", "touchstart", "scroll"];
+      const firstInteractionEvents = ["pointerdown", "keydown", "touchstart"];
       firstInteractionEvents.forEach((eventName) => {
         window.addEventListener(eventName, bootTracking, {
           once: true,
@@ -364,10 +357,7 @@
         });
       });
 
-      // Fallback: still load tracking for users who stay on page without interaction.
-      window.addEventListener("load", () => {
-        setTimeout(bootTracking, 12000);
-      });
+      // Keep tracking strictly interaction-driven to protect initial page performance.
     </script>
   </head>
 

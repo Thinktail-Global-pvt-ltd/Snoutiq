@@ -18,12 +18,15 @@ export function NewFooter() {
                 src={logo}
                 alt="SnoutiQ"
                 className="h-5 w-auto max-w-[130px] object-contain sm:h-6"
+                width={130}
+                height={24}
                 loading="lazy"
+                decoding="async"
                 draggable={false}
                 onDragStart={(e) => e.preventDefault()}
                 onContextMenu={(e) => e.preventDefault()}
               />
-              <span className="sr-only">SnoutiQ</span>
+              <span className="sr-only">SnoutIQ</span>
             </a>
 
             <p className="text-sm mb-4">
@@ -74,7 +77,7 @@ export function NewFooter() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
-                  to="/video-consultation-india"
+                  to="/veterinary-doctor-online-india"
                   className="hover:text-brand transition-colors"
                 >
                   Video Consultation
@@ -167,7 +170,7 @@ export function NewFooter() {
               </li>
               <li>
                 <Link
-                   to="/lp/video-consultation"
+                   to="/online-vet-consultation-india"
                   className="hover:text-brand transition-colors"
                 >
                   Online Vet Consultation
@@ -231,7 +234,7 @@ export function NewFooter() {
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-slate-200 pt-6 text-center text-sm md:flex-row">
-          <p>&copy; {new Date().getFullYear()} SnoutiQ. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} SnoutIQ. All rights reserved.</p>
           <p>Made with ❤️ for pet parents across India</p>
         </div>
       </div>

@@ -11,7 +11,11 @@ export function BlogLayout({ post }) {
         src={src}
         alt={alt}
         className="absolute inset-0 w-full h-full object-cover"
+        width={1600}
+        height={900}
+        sizes="100vw"
         loading="lazy"
+        decoding="async"
       />
     </div>
   );
@@ -34,7 +38,11 @@ export function BlogLayout({ post }) {
             src={post.heroImage}
             alt={post.title}
             className="absolute inset-0 w-full h-full object-cover"
+            width={1600}
+            height={900}
+            sizes="100vw"
             loading="lazy"
+            decoding="async"
           />
         </div>
 
@@ -85,7 +93,11 @@ export function BlogLayout({ post }) {
             src={post.heroImage}
             alt={post.title}
             className="absolute inset-0 w-full h-full object-cover"
+            width={1600}
+            height={900}
+            sizes="100vw"
             loading="lazy"
+            decoding="async"
           />
         </div>
 
@@ -139,7 +151,11 @@ export function BlogLayout({ post }) {
           src={post.heroImage}
           alt={post.title}
           className="absolute inset-0 w-full h-full object-cover"
+          width={1600}
+          height={900}
+          sizes="100vw"
           loading="lazy"
+          decoding="async"
         />
 
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent flex flex-col justify-end p-8 md:p-12">

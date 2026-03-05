@@ -244,7 +244,7 @@ const N =
     },
     {
       q: "Are the vets qualified?",
-      a: "Every vet on SnoutiQ has a minimum of 7 years clinical experience and goes through a verification process before joining. You'll see their credentials and ratings before you book.",
+      a: "Every vet on SnoutIQ has a minimum of 7 years clinical experience and goes through a verification process before joining. You'll see their credentials and ratings before you book.",
     },
     {
       q: "How fast can I connect with a vet?",
@@ -286,10 +286,10 @@ const N =
   };
 const SEO_TITLE_BASE =
   "Online Vet Consultation India | Connect with Vet Within 15 Minutes";
-const SEO_TITLE_DEFAULT = `${SEO_TITLE_BASE} | SnoutiQ`;
-const SEO_TITLE_TEMPLATE = "%s | SnoutiQ";
+const SEO_TITLE_DEFAULT = `${SEO_TITLE_BASE} | SnoutIQ`;
+const SEO_TITLE_TEMPLATE = "%s | SnoutIQ";
 const SEO_DESCRIPTION =
-  "SnoutiQ is a trusted pet healthcare platform in India. Start an online vet consultation for ₹399 and connect with a certified veterinary doctor within 15 minutes. 24/7 availability with digital prescriptions.";
+  "SnoutIQ is a trusted pet healthcare platform in India. Start an online vet consultation for ₹399 and connect with a certified veterinary doctor within 15 minutes. 24/7 availability with digital prescriptions.";
 const SEO_KEYWORDS = [
   "online vet consultation india",
   "pet healthcare platform india",
@@ -303,7 +303,7 @@ const SEO_KEYWORDS = [
 ].join(", ");
 const SEO_CANONICAL = "https://www.snoutiq.com/";
 const SEO_OG_IMAGE = "https://www.snoutiq.com/og-image.jpg";
-const SEO_OG_IMAGE_ALT = "SnoutiQ Online Vet Consultation India";
+const SEO_OG_IMAGE_ALT = "SnoutIQ Online Vet Consultation India";
 const SEO_OWNER_ATTR = "data-homepage-seo";
 function S({ icon: a, title: t, desc: s, tag: r }) {
   return e.jsxs("div", {
@@ -373,6 +373,10 @@ function me({ vet: a, idx: t }) {
                   src: a.image,
                   alt: a.name,
                   loading: "lazy",
+                  decoding: "async",
+                  fetchPriority: "low",
+                  width: 96,
+                  height: 96,
                   onError: () => o(!0),
                   className: "h-full w-full rounded-full object-cover",
                 })
@@ -576,7 +580,7 @@ function Ie() {
       upsertMetaTag("property", "og:title", SEO_TITLE_DEFAULT);
       upsertMetaTag("property", "og:description", SEO_DESCRIPTION);
       upsertMetaTag("property", "og:url", SEO_CANONICAL);
-      upsertMetaTag("property", "og:site_name", "SnoutiQ");
+      upsertMetaTag("property", "og:site_name", "SnoutIQ");
       upsertMetaTag("property", "og:type", "website");
       upsertMetaTag("property", "og:locale", "en_IN");
       upsertMetaTag("property", "og:image", SEO_OG_IMAGE);
@@ -770,7 +774,7 @@ function Ie() {
                           className:
                             "text-slate-600 text-base leading-relaxed mb-8 max-w-lg",
                           children: [
-                            "SnoutiQ is a trusted ",
+                            "SnoutIQ is a trusted ",
                             e.jsx("strong", {
                               children: "pet healthcare platform India",
                             }),
@@ -869,7 +873,7 @@ function Ie() {
                                     e.jsx("p", {
                                       className:
                                         "font-bold text-slate-900 text-sm",
-                                      children: "SnoutiQ Pet App",
+                                      children: "SnoutIQ Pet App",
                                     }),
                                     e.jsx("p", {
                                       className: "text-xs text-slate-400",
@@ -965,7 +969,7 @@ function Ie() {
                           n: "01",
                           icon: P,
                           title: "Open the App",
-                          desc: "Download SnoutiQ. Tell us about your pet in 30 seconds.",
+                          desc: "Download SnoutIQ. Tell us about your pet in 30 seconds.",
                         },
                         {
                           n: "02",
@@ -1036,7 +1040,7 @@ function Ie() {
                           e.jsx("h2", {
                             className:
                               "text-3xl sm:text-4xl font-extrabold text-slate-900",
-                            children: "The doctors behind SnoutiQ",
+                            children: "The doctors behind SnoutIQ",
                           }),
                           e.jsx("p", {
                             className: "text-slate-500 mt-2 max-w-md",
@@ -1343,7 +1347,7 @@ function Ie() {
                         e.jsx("h2", {
                           className:
                             "text-3xl sm:text-4xl font-extrabold text-white",
-                          children: "Pet parents love SnoutiQ",
+                          children: "Pet parents love SnoutIQ",
                         }),
                         e.jsx("p", {
                           className: "text-slate-400 mt-3",
@@ -1364,7 +1368,7 @@ function Ie() {
                           name: "Rahul Verma",
                           role: "Cat Parent · Delhi NCR",
                           stars: 5,
-                          text: "Got the kitten vaccination package through SnoutiQ. Clinic was verified, vet was experienced, and the reminders in the app made sure we never missed a dose.",
+                          text: "Got the kitten vaccination package through SnoutIQ. Clinic was verified, vet was experienced, and the reminders in the app made sure we never missed a dose.",
                         },
                         {
                           name: "Ananya Desai",
@@ -1452,7 +1456,7 @@ function Ie() {
                   e.jsx("p", {
                     className: "mx-auto mb-6 max-w-lg text-slate-500",
                     children:
-                      "Download the SnoutiQ app for instant vet consultation, booking help, and complete pet care support in one place.",
+                      "Download the SnoutIQ app for instant vet consultation, booking help, and complete pet care support in one place.",
                   }),
                   e.jsxs("a", {
                     href: N,
@@ -1560,7 +1564,7 @@ function Ie() {
                     e.jsx("p", {
                       className: "mx-auto mb-6 max-w-xl text-lg text-blue-200",
                       children:
-                        "Download the SnoutiQ app or start a video consult right now. No appointment needed.",
+                        "Download the SnoutIQ app or start a video consult right now. No appointment needed.",
                     }),
                     e.jsxs("div", {
                       className:

@@ -158,8 +158,8 @@ function App() {
                 <Route path="/parents" element={<NewCounsult />} />
                 <Route path="/clinics" element={<NewClinics />} />
                 <Route path="/vets" element={<NewVets />} />
-                <Route path="/video-consultation-india" element={<NewVideoConsultation />} />
-                <Route path="/lp/video-consultation" element={<VideoConsultLP />} />
+                <Route path="/veterinary-doctor-online-india" element={<NewVideoConsultation />} />
+                <Route path="/online-vet-consultation-india" element={<VideoConsultLP />} />
                 <Route path="/symptoms" element={<SymptomsHub />} />
 
             <Route path="/20+vetsonline" element={<HomePage />} />

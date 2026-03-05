@@ -1,4 +1,4 @@
-// VeterinaryDoctorOnlineIndia.jsx
+
 import React from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
@@ -124,21 +124,21 @@ export default function VeterinaryDoctorOnlineIndia() {
       name: "Priya M.",
       location: "Bangalore",
       pet: "Golden Retriever",
-      text: "My dog started vomiting at midnight. SnoutiQ connected me to a vet in under 15 minutes. The doctor was calm, thorough and gave clear advice. Saved us a stressful emergency clinic run.",
+      text: "My dog started vomiting at midnight. SnoutIQ connected me to a vet in under 15 minutes. The doctor was calm, thorough and gave clear advice. Saved us a stressful emergency clinic run.",
       rating: 5,
     },
     {
       name: "Rahul S.",
       location: "Mumbai",
       pet: "Persian Cat",
-      text: "My cat had watery eyes and I panicked. The online vet India consultation on SnoutiQ was super easy. The vet explained everything clearly and even followed up the next day.",
+      text: "My cat had watery eyes and I panicked. The online vet India consultation on SnoutIQ was super easy. The vet explained everything clearly and even followed up the next day.",
       rating: 5,
     },
     {
       name: "Ananya K.",
       location: "Delhi",
       pet: "Labrador Puppy",
-      text: "Used SnoutiQ for my puppy who wasn't eating. The vet was very experienced and the video quality was great. ₹399 is so worth it compared to clinic fees.",
+      text: "Used SnoutIQ for my puppy who wasn't eating. The vet was very experienced and the video quality was great. ₹399 is so worth it compared to clinic fees.",
       rating: 5,
     },
   ];
@@ -164,7 +164,7 @@ export default function VeterinaryDoctorOnlineIndia() {
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">
       <Helmet>
-        <title>Veterinary Doctor Online India | 24/7 Pet Doctor Online | SnoutiQ</title>
+        <title>Veterinary Doctor Online India | 24/7 Pet Doctor Online | SnoutIQ</title>
         <meta
           name="description"
           content="Connect with a verified veterinary doctor online in India. 24/7 instant vet consultation for dogs & cats. Talk to vet online India via secure video consultation."
@@ -172,7 +172,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         <link rel="canonical" href={canonical} />
 
         {/* Open Graph */}
-        <meta property="og:title" content="Veterinary Doctor Online India | SnoutiQ" />
+        <meta property="og:title" content="Veterinary Doctor Online India | SnoutIQ" />
         <meta
           property="og:description"
           content="Talk to a veterinary doctor online in India. Instant video consultation with vet India for dogs and cats."
@@ -233,7 +233,12 @@ export default function VeterinaryDoctorOnlineIndia() {
                 src={img}
                 alt="Veterinary doctor online India examining dog during consultation"
                 className="absolute inset-0 w-full h-full object-cover"
+                width={1600}
+                height={1045}
+                sizes="(min-width: 1024px) 50vw, 100vw"
                 loading="eager"
+                decoding="async"
+                fetchPriority="high"
               />
             </div>
           </div>
@@ -308,7 +313,7 @@ export default function VeterinaryDoctorOnlineIndia() {
               How to Consult a Vet Online India – 3 Simple Steps
             </h2>
             <p className="text-slate-700 mb-10">
-              Getting an <strong>online vet consultation India</strong> on SnoutiQ takes less
+              Getting an <strong>online vet consultation India</strong> on SnoutIQ takes less
               than 15 minutes. Works on any phone or laptop.
             </p>
 
@@ -439,7 +444,7 @@ export default function VeterinaryDoctorOnlineIndia() {
               What Pet Parents Say About Online Vet Consultation India
             </h2>
             <p className="text-slate-700 mb-10">
-              Thousands of pet parents across India trust SnoutiQ for instant, expert veterinary care online.
+              Thousands of pet parents across India trust SnoutIQ for instant, expert veterinary care online.
             </p>
 
             <div className="grid md:grid-cols-3 gap-6 mb-8">
@@ -471,7 +476,7 @@ export default function VeterinaryDoctorOnlineIndia() {
               Online Vet Consultation Cost India – Transparent Pricing
             </h2>
             <p className="text-slate-700 mb-8">
-              SnoutiQ offers affordable <strong>online vet consultation India</strong> with no hidden fees.
+              SnoutIQ offers affordable <strong>online vet consultation India</strong> with no hidden fees.
               Get access to qualified vets at a fraction of clinic costs.
             </p>
 
@@ -526,7 +531,7 @@ export default function VeterinaryDoctorOnlineIndia() {
           <div className="mx-auto max-w-4xl px-4">
             <h2 className="text-3xl font-bold mb-4">Online Vet Consultation Available Across India</h2>
             <p className="text-slate-700 mb-8">
-              SnoutiQ's <strong>veterinary doctor online</strong> service is available to pet parents in every city across India —
+              SnoutIQ's <strong>veterinary doctor online</strong> service is available to pet parents in every city across India —
               no matter where you are, a verified vet is just a click away.
             </p>
 
@@ -551,14 +556,14 @@ export default function VeterinaryDoctorOnlineIndia() {
         {/* ── ABOUT ONLINE VET (SEO CONTENT) ── */}
         <section className="py-16 bg-slate-50 border-y border-slate-200">
           <div className="mx-auto max-w-4xl px-4">
-            <h2 className="text-3xl font-bold mb-6">About Veterinary Doctor Online India – SnoutiQ</h2>
+            <h2 className="text-3xl font-bold mb-6">About Veterinary Doctor Online India – SnoutIQ</h2>
             <p className="text-slate-700 mb-4">
-              SnoutiQ is India's trusted <strong>online vet consultation</strong> platform, connecting dog and cat owners with
+              SnoutIQ is India's trusted <strong>online vet consultation</strong> platform, connecting dog and cat owners with
               licensed veterinarians through secure video calls. Every <strong>online vet doctor</strong> on SnoutiQ holds a
               BVSc &amp; AH degree and has verified clinical experience, ensuring your pet receives expert care at any hour.
             </p>
             <p className="text-slate-700 mb-4">
-              Unlike generic teleconsultation platforms, SnoutiQ is built exclusively for pets. Our{" "}
+              Unlike generic teleconsultation platforms, SnoutIQ is built exclusively for pets. Our{" "}
               <strong>video consultation vet</strong> sessions are tailored to small animal medicine — covering dogs, cats, and more.
               The platform supports real-time visual examination, enabling vets to assess symptoms accurately over video.
             </p>
@@ -568,7 +573,7 @@ export default function VeterinaryDoctorOnlineIndia() {
               the clock. With consultation fees starting at just ₹399, quality pet healthcare has never been more accessible across India.
             </p>
             <p className="text-slate-700">
-              SnoutiQ also provides supplementary resources such as an AI symptom checker, vaccination reminders, and vet insights — all
+              SnoutIQ also provides supplementary resources such as an AI symptom checker, vaccination reminders, and vet insights — all
               designed to help Indian pet parents make informed decisions about their pet's health without unnecessary clinic visits.
             </p>
           </div>
@@ -583,23 +588,23 @@ export default function VeterinaryDoctorOnlineIndia() {
               {[
                 {
                   q: "How do I consult a veterinary doctor online in India?",
-                  a: "Simply click 'Start Instant Vet Consultation' on SnoutiQ, select your pet type, pay the consultation fee (₹399 day / ₹549 night), and join a secure HD video call with a verified vet within minutes. No app download required.",
+                  a: "Simply click 'Start Instant Vet Consultation' on SnoutIQ, select your pet type, pay the consultation fee (₹399 day / ₹549 night), and join a secure HD video call with a verified vet within minutes. No app download required.",
                 },
                 {
                   q: "Is online vet consultation available 24/7 in India?",
-                  a: "Yes. SnoutiQ offers 24/7 online vet consultation in India including nights, weekends, and public holidays. Emergency online vet India support is always available — even at 3 AM.",
+                  a: "Yes. SnoutIQ offers 24/7 online vet consultation in India including nights, weekends, and public holidays. Emergency online vet India support is always available — even at 3 AM.",
                 },
                 {
                   q: "What is the cost of online vet consultation in India?",
-                  a: "Online vet consultation on SnoutiQ costs ₹399 during the day (6 AM–10 PM) and ₹549 at night (10 PM–6 AM). No hidden charges. Covers dogs and cats across all of India.",
+                  a: "Online vet consultation on SnoutIQ costs ₹399 during the day (6 AM–10 PM) and ₹549 at night (10 PM–6 AM). No hidden charges. Covers dogs and cats across all of India.",
                 },
                 {
                   q: "Can an online vet prescribe medicine in India?",
-                  a: "Online vets on SnoutiQ can provide clinical advice, triage guidance, and written recommendations. For certain prescription medicines, a follow-up clinic visit may be required as per Indian veterinary regulations.",
+                  a: "Online vets on SnoutIQ can provide clinical advice, triage guidance, and written recommendations. For certain prescription medicines, a follow-up clinic visit may be required as per Indian veterinary regulations.",
                 },
                 {
-                  q: "Is SnoutiQ's online vet consultation safe and private?",
-                  a: "Yes. All video consultations on SnoutiQ are conducted over encrypted, secure connections. Your pet's health data is kept confidential and never shared without consent.",
+                  q: "Is SnoutIQ's online vet consultation safe and private?",
+                  a: "Yes. All video consultations on SnoutIQ are conducted over encrypted, secure connections. Your pet's health data is kept confidential and never shared without consent.",
                 },
               ].map(({ q, a }) => (
                 <div key={q} className="bg-slate-50 rounded-2xl border p-6">

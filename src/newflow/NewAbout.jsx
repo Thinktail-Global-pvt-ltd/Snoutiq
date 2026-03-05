@@ -16,7 +16,7 @@ export default function NewAbout() {
         <section className="relative flex min-h-[320px] items-center overflow-hidden border-b border-slate-200 sm:min-h-[380px]">
           <img
             src={aboutImage}
-            alt="About SnoutiQ"
+            alt="About SnoutIQ"
             className="absolute inset-0 h-full w-full object-cover object-[center_22%] sm:object-[center_28%]"
             width={1600}
             height={1067}
@@ -44,7 +44,7 @@ export default function NewAbout() {
           <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
             <div className="prose prose-invert prose-lg mx-auto">
               <p className="mb-6 text-xl leading-relaxed text-slate-700">
-                SnoutiQ was founded with a simple mission: to ensure every pet in
+                SnoutIQ was founded with a simple mission: to ensure every pet in
                 India has access to high-quality, affordable, and timely healthcare.
                 We understand that pets are family, and their health is a top priority.
               </p>
