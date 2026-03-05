@@ -198,11 +198,6 @@ export function NewFooter() {
                 </Link>
               </li>
               <li>
-                <Link to="/about" className="hover:text-brand transition-colors">
-                  Contact
-                </Link>
-              </li>
-              <li>
                 <Link to="/privacy-policy" className="hover:text-brand transition-colors">
                   Privacy Policy
                 </Link>
