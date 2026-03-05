@@ -170,7 +170,7 @@ export function NewFooter() {
               </li>
               <li>
                 <Link
-                   to="/online-vet-consultation-india"
+                   to="/online-vet-consultation"
                   className="hover:text-brand transition-colors"
                 >
                   Online Vet Consultation

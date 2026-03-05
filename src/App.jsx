@@ -18,22 +18,10 @@ const ScrollToTopAndHash = () => {
     }
 
     const elementId = hash.replace("#", "");
-    const headerOffset =
-      document.querySelector("header")?.getBoundingClientRect().height ?? 0;
-
     const scrollIntoView = () => {
       const target = document.getElementById(elementId);
       if (!target) return;
-
-      const top =
-        window.scrollY +
-        target.getBoundingClientRect().top -
-        (headerOffset + 16);
-
-      window.scrollTo({
-        top: Math.max(0, top),
-        behavior: "smooth",
-      });
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
     };
 
     requestAnimationFrame(scrollIntoView);
@@ -154,7 +142,7 @@ function App() {
                 <Route path="/clinics" element={<NewClinics />} />
                 <Route path="/vets" element={<NewVets />} />
                 <Route path="/veterinary-doctor-online-india" element={<NewVideoConsultation />} />
-                <Route path="/online-vet-consultation-india" element={<VideoConsultLP />} />
+                <Route path="/online-vet-consultation" element={<VideoConsultLP />} />
                 <Route path="/symptoms" element={<SymptomsHub />} />
                 <Route path="/puppy-vaccination-delhi" element={<PuppyVaccinationDelhi />} />
                 <Route path="/kitten-vaccination-delhi" element={<KittenVaccinationDelhi />} />

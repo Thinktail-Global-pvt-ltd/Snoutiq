@@ -350,9 +350,11 @@
           loadMetaPixel();
         }, 4500);
 
-        runWhenIdle(() => {
-          loadGoogleTagManager();
-        }, 6500);
+        // runWhenIdle(() => {
+        //   loadGoogleTagManager();
+        // }, 6500);
+        
+        loadGoogleTagManager();
       };
 
       const firstInteractionEvents = ["pointerdown", "keydown", "touchstart"];
