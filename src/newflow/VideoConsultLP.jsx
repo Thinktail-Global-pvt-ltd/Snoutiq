@@ -1,8 +1,9 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LPNavbar } from "../newflow/LPNavbar";
 import { apiBaseUrl } from "../lib/api";
+import { PaymentScreen, ConfirmationScreen } from "../screen/Paymentscreen";
 import {
   ArrowRight,
   CheckCircle2,
@@ -33,7 +34,6 @@ import {
   Stethoscope,
   Pill,
   Globe,
-  ChevronRight,
 } from "lucide-react";
 
 // ─── SEO constants ───────────────────────────────────────────────────────────
@@ -53,8 +53,22 @@ const KEYWORDS = [
   "talk to vet",
 ].join(", ");
 
+const BASE_ROUTE = "/online-vet-consultation";
 const DOCTOR_LIST_ENDPOINT = "/api/exported_from_excell_doctors";
-const PET_DETAILS_ROUTE = "/consult?start=details";
+const CONSULT_OWNER_ROUTE = `${BASE_ROUTE}/owner`;
+const STEP_ROUTES = {
+  1: "owner",
+  2: "pet",
+  3: "problem",
+};
+const SECTION_ROUTES = new Set([
+  "how-it-works",
+  "pricing",
+  "common-problems",
+  "across-india",
+  "our-vets",
+  "faq",
+]);
 
 const getAssetRoot = () => {
   const base = apiBaseUrl().replace(/\/+$/, "");
@@ -92,18 +106,6 @@ const getInitials = (value) => {
   return letters.join("").toUpperCase();
 };
 
-const getStepFromUrl = () => {
-  if (typeof window === "undefined") return 1;
-  const params = new URLSearchParams(window.location.search || "");
-  const stepParam = String(params.get("step") || "").toLowerCase();
-  if (stepParam === "pet") return 2;
-  if (stepParam === "payment") return 3;
-  if (stepParam === "owner") return 1;
-  const numeric = Number(stepParam);
-  if (Number.isFinite(numeric) && numeric >= 1 && numeric <= 3) return numeric;
-  return 1;
-};
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const cn = (...v) => v.filter(Boolean).join(" ");
 
@@ -119,19 +121,6 @@ const PAYMENT_AMOUNTS = {
   day: 399,
   night: 549,
 };
-
-const loadRazorpayScript = () =>
-  new Promise((resolve) => {
-    if (typeof window !== "undefined" && window.Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
 
 const formatInr = (value) => {
   const n = Number(value);
@@ -328,66 +317,82 @@ export default function VideoConsultLP() {
   const navigate = useNavigate();
   const { price, label: priceLabel, rateType } = getCurrentPrice();
   const consultAmount = PAYMENT_AMOUNTS[rateType] || PAYMENT_AMOUNTS.day;
+  const location = useLocation();
+  const { view } = useParams();
   const consultAmountLabel = `₹${formatInr(consultAmount)}`;
-  const [step, setStep] = useState(() => getStepFromUrl());
+  const slotLabel =
+    rateType === "day" ? "Day (8 AM - 10 PM)" : "Night (10 PM - 8 AM)";
+  const stepFromView =
+    view === "pet" ? 2 : view === "problem" ? 3 : view === "owner" ? 1 : null;
+  const [step, setStep] = useState(() => stepFromView ?? 1);
 
-  const scrollToConsultForm = useCallback(() => {
-    const formNode = document.getElementById("consult-form");
-    if (!formNode) return;
+  const scrollToIdWithRetry = useCallback(
+    (id, { offset = 0, retries = 10, delay = 120 } = {}) => {
+      if (typeof window === "undefined") return;
+      let attempts = 0;
 
-    const topOffset = 96;
-    const targetTop = formNode.getBoundingClientRect().top + window.scrollY - topOffset;
-    window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      const attemptScroll = () => {
+        const target = document.getElementById(id);
+        if (target) {
+          const targetTop = target.getBoundingClientRect().top + window.scrollY - offset;
+          window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+          return;
+        }
 
-    if (window.location.hash !== "#consult-form") {
-      const nextUrl = `${window.location.pathname}${window.location.search}#consult-form`;
-      window.history.replaceState(window.history.state, "", nextUrl);
-    }
-  }, []);
+        attempts += 1;
+        if (attempts <= retries) {
+          window.setTimeout(attemptScroll, delay);
+        }
+      };
 
-  const updateStepRoute = useCallback((nextStep) => {
-    if (typeof window === "undefined") return;
-    const stepKey = nextStep === 2 ? "pet" : nextStep === 3 ? "payment" : "owner";
-    const url = new URL(window.location.href);
-    url.searchParams.set("step", stepKey);
-    window.history.replaceState(window.history.state, "", url);
-  }, []);
+      attemptScroll();
+    },
+    []
+  );
 
   const goToStep = useCallback(
     (nextStep) => {
+      const stepSlug = STEP_ROUTES[nextStep] || STEP_ROUTES[1];
+      const targetPath = `${BASE_ROUTE}/${stepSlug}`;
+
+      if (location.pathname === targetPath) {
+        setStep(nextStep);
+        scrollToIdWithRetry("consult-form", { offset: 96 });
+        return;
+      }
+
       setStep(nextStep);
-      updateStepRoute(nextStep);
+      navigate(targetPath);
     },
-    [updateStepRoute]
+    [location.pathname, navigate, scrollToIdWithRetry]
   );
 
+  const scrollToConsultForm = useCallback(() => {
+    goToStep(1);
+  }, [goToStep]);
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search || "");
-    if (!params.get("step")) {
-      updateStepRoute(step);
+    if (!view) {
+      navigate(`${BASE_ROUTE}/owner`, { replace: true });
+      return;
     }
-  }, [step, updateStepRoute]);
 
-  const scrollToSection = useCallback((sectionId) => {
-    const target = document.getElementById(sectionId);
-    if (!target) return;
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    const nextStep =
+      view === "pet" ? 2 : view === "problem" ? 3 : view === "owner" ? 1 : null;
 
-    const nextUrl = `${window.location.pathname}${window.location.search}#${sectionId}`;
-    if (window.location.hash !== `#${sectionId}`) {
-      window.history.replaceState(window.history.state, "", nextUrl);
+    if (nextStep) {
+      setStep(nextStep);
+      scrollToIdWithRetry("consult-form", { offset: 96 });
+      return;
     }
-  }, []);
 
-  const quickLinks = [
-    { id: "how-it-works", label: "How it works", icon: Clock },
-    { id: "pricing", label: "Pricing", icon: Zap },
-    { id: "common-problems", label: "Common problems", icon: AlertCircle },
-    { id: "across-india", label: "Across India", icon: MapPin },
-    { id: "our-vets", label: "Our vets", icon: Star },
-    { id: "faq", label: "FAQ", icon: MessageCircle },
-  ];
+    if (SECTION_ROUTES.has(view)) {
+      scrollToIdWithRetry(view, { offset: 96 });
+      return;
+    }
+
+    navigate(`${BASE_ROUTE}/owner`, { replace: true });
+  }, [view, navigate, scrollToIdWithRetry]);
 
   // ─── JSON-LD Schemas ──────────────────────────────────────────────────────
   const serviceSchema = useMemo(
@@ -563,7 +568,6 @@ export default function VideoConsultLP() {
   );
 
   // ─── State ────────────────────────────────────────────────────────────────
-  const [submitPayload, setSubmitPayload] = useState(null);
   const [selectedIssue, setSelectedIssue] = useState(null);
 
   const [details, setDetails] = useState({
@@ -602,25 +606,11 @@ export default function VideoConsultLP() {
   const breedDropdownRef = useRef(null);
 
   const [liveDoctorCount, setLiveDoctorCount] = useState(null);
-  const [gatewayReady, setGatewayReady] = useState(false);
-  const [isPaying, setIsPaying] = useState(false);
-  const [paymentStatusType, setPaymentStatusType] = useState("");
-  const [paymentStatusMessage, setPaymentStatusMessage] = useState("");
-  const [paymentComplete, setPaymentComplete] = useState(false);
-  const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
   const [featuredVets, setFeaturedVets] = useState([]);
   const [vetsLoading, setVetsLoading] = useState(true);
   const [vetsError, setVetsError] = useState("");
 
   const ownerPhoneDigits = details.ownerMobile.replace(/\D/g, "");
-
-  useEffect(() => {
-    let active = true;
-    loadRazorpayScript().then((ready) => {
-      if (active) setGatewayReady(ready);
-    });
-    return () => { active = false; };
-  }, []);
 
   useEffect(() => {
     if (!breedDropdownOpen) return;
@@ -961,11 +951,6 @@ export default function VideoConsultLP() {
     !!uploadFile;
 
   const isValidAll = step1Valid && step2Valid && step3Valid;
-  const paymentStatusClass =
-    paymentStatusType === "success" ? "text-emerald-600"
-    : paymentStatusType === "error" ? "text-red-600"
-    : paymentStatusType === "info" ? "text-blue-600"
-    : "text-slate-400";
 
   const getSubmitTooltip = () => {
     if (!details.ownerName.trim()) return "Please enter owner name";
@@ -990,10 +975,6 @@ export default function VideoConsultLP() {
 
   const submitObservation = async () => {
     setSubmitError("");
-    setPaymentComplete(false);
-    setPaymentStatusType("");
-    setPaymentStatusMessage("");
-    setShowPaymentSuccessModal(false);
 
     if (!isValidAll) {
       setSubmitError(getSubmitTooltip() || "Please complete all fields.");
@@ -1044,112 +1025,48 @@ export default function VideoConsultLP() {
       const petId = toNumber(pickValue(observation?.pet_id, observation?.petId, observation?.pet?.id, data?.pet_id, data?.petId, data?.pet?.id, data?.data?.pet_id, data?.data?.petId, data?.data?.pet?.id));
 
       const nextPayload = { ...details, observation, observationResponse: data, user_id: userId, pet_id: petId };
-      setSubmitPayload(nextPayload);
-      await handleInlinePayment(nextPayload);
+
+      const isFirstUser = pickValue(
+        data?.is_first_user,
+        data?.data?.is_first_user,
+        observation?.is_first_user,
+        observation?.data?.is_first_user,
+        data?.isFirstUser,
+        data?.data?.isFirstUser,
+        observation?.isFirstUser,
+        observation?.data?.isFirstUser
+      );
+
+      const paymentMeta = {
+        order_type: "excell_export_campaign",
+        service_id: "consult_basic",
+        booking_rate_type: rateType,
+        slot_label: slotLabel,
+        user_id: userId,
+        pet_id: petId,
+        ...(isFirstUser !== undefined ? { is_first_user: isFirstUser } : {}),
+      };
+
+      const fallbackVet = featuredVets?.[0];
+      const paymentVet = {
+        id: fallbackVet?.id,
+        name: fallbackVet?.name || "SnoutIQ Vet",
+        bookingRateType: rateType,
+        bookingPrice: consultAmount,
+        priceDay: PAYMENT_AMOUNTS.day,
+        priceNight: PAYMENT_AMOUNTS.night,
+        image: fallbackVet?.image || "",
+      };
+
+      navigate(`${BASE_ROUTE}/payment`, {
+        state: { petDetails: nextPayload, paymentMeta, vet: paymentVet },
+      });
     } catch (e) {
       setSubmitError(e?.message || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
-
-  const buildPaymentContext = useCallback((payload) => {
-    const userId = toNumber(pickValue(payload?.user_id, payload?.userId, payload?.observation?.user_id, payload?.observation?.userId, payload?.observationResponse?.user_id, payload?.observationResponse?.userId));
-    const petId = toNumber(pickValue(payload?.pet_id, payload?.petId, payload?.observation?.pet_id, payload?.observation?.petId, payload?.observationResponse?.pet_id, payload?.observationResponse?.petId));
-    return { order_type: "excell_export_campaign", service_id: "consult_basic", booking_rate_type: rateType, slot_label: priceLabel, user_id: userId, pet_id: petId };
-  }, [rateType, priceLabel]);
-
-  const updatePaymentStatus = useCallback((type, message) => {
-    setPaymentStatusType(type);
-    setPaymentStatusMessage(message);
-  }, []);
-
-  const handleInlinePayment = useCallback(async (payloadArg) => {
-    const activePayload = payloadArg || submitPayload;
-    if (!activePayload || isPaying) return;
-    const paymentContext = buildPaymentContext(activePayload);
-
-    let paymentGatewayAvailable = typeof window !== "undefined" && Boolean(window.Razorpay) && gatewayReady;
-
-    if (!paymentGatewayAvailable && typeof window !== "undefined") {
-      updatePaymentStatus("info", "Preparing secure payment...");
-      const loaded = await loadRazorpayScript();
-      if (loaded && window.Razorpay) {
-        paymentGatewayAvailable = true;
-        setGatewayReady(true);
-      }
-    }
-
-    if (!paymentGatewayAvailable) {
-      updatePaymentStatus("error", "Payment gateway failed to load. Please refresh and try again.");
-      return;
-    }
-
-    setIsPaying(true);
-    updatePaymentStatus("info", "Creating secure payment order...");
-
-    try {
-      const baseUrl = apiBaseUrl();
-      const orderRes = await fetch(`${baseUrl}/api/create-order`, {
-        method: "POST",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: consultAmount, ...paymentContext }),
-      });
-
-      const orderData = await orderRes.json().catch(() => ({}));
-      if (!orderRes.ok) throw new Error(orderData?.message || orderData?.error || "Could not create payment order.");
-
-      const orderId = orderData?.order_id || orderData?.order?.id;
-      const key = orderData?.key;
-      if (!orderId || !key) throw new Error("Invalid payment order response.");
-
-      const rzp = new window.Razorpay({
-        key,
-        order_id: orderId,
-        name: "SnoutiQ Veterinary Consultation",
-        description: `Online ${rateType === "day" ? "Day" : "Night"} Consultation`,
-        handler: async (response) => {
-          updatePaymentStatus("info", "Verifying payment...");
-          try {
-            const verifyRes = await fetch(`${baseUrl}/api/rzp/verify`, {
-              method: "POST",
-              headers: { Accept: "application/json", "Content-Type": "application/json" },
-              body: JSON.stringify({ ...paymentContext, razorpay_order_id: response?.razorpay_order_id, razorpay_payment_id: response?.razorpay_payment_id, razorpay_signature: response?.razorpay_signature }),
-            });
-            const verifyData = await verifyRes.json().catch(() => ({}));
-            if (!verifyRes.ok || verifyData?.success === false) throw new Error(verifyData?.message || verifyData?.error || "Payment verification failed.");
-            setPaymentComplete(true);
-            setShowPaymentSuccessModal(true);
-            updatePaymentStatus("success", "Payment successful. Vet will connect shortly.");
-            window.setTimeout(() => { setShowPaymentSuccessModal(false); }, 1800);
-          } catch (error) {
-            updatePaymentStatus("error", error?.message || "Payment verification failed.");
-          } finally {
-            setIsPaying(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            updatePaymentStatus("error", "Payment cancelled.");
-            setIsPaying(false);
-          },
-        },
-        prefill: { name: details.ownerName || "", contact: formatPhone(details.ownerMobile) },
-      });
-
-      rzp.open();
-      updatePaymentStatus("info", "Opening secure payment...");
-    } catch (error) {
-      updatePaymentStatus("error", error?.message || "Payment could not be initiated.");
-      setIsPaying(false);
-    }
-  }, [submitPayload, isPaying, gatewayReady, updatePaymentStatus, buildPaymentContext, consultAmount, rateType, details.ownerName, details.ownerMobile]);
-
-  const handlePrimaryAction = useCallback(async () => {
-    if (submitting || isPaying || paymentComplete) return;
-    if (submitPayload) { await handleInlinePayment(submitPayload); return; }
-    await submitObservation();
-  }, [submitting, isPaying, paymentComplete, submitPayload, handleInlinePayment, submitObservation]);
 
   const getPetTypeIcon = (type) => {
     switch (type) {
@@ -1182,7 +1099,7 @@ export default function VideoConsultLP() {
         <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
       </Helmet>
 
-      <LPNavbar consultPath="#consult-form" onConsultClick={scrollToConsultForm} />
+      <LPNavbar consultPath={CONSULT_OWNER_ROUTE} onConsultClick={scrollToConsultForm} />
 
       {/* ── LIVE STATUS BAR ─────────────────────────────────────────────── */}
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200 py-2 px-4">
@@ -1228,7 +1145,7 @@ export default function VideoConsultLP() {
 
             {/* ── "WHAT'S WRONG WITH YOUR PET?" SECTION ──────────────────── */}
             <div className="max-w-4xl mx-auto mb-6">
-            <h2 className="text-3xl font-extrabold text-slate-900 text-center mb-8">Online vet consultation for dogs, cats and pets across India</h2>
+            <h2 className="text-4xl font-extrabold text-slate-900 text-center mb-8">Online vet consultation for dogs, cats and pets across India</h2>
               <div className="bg-white rounded-2xl shadow-md shadow-slate-200/60 border border-slate-100 overflow-hidden">
                 <div className="px-4 py-4 border-b border-slate-100">
                   <h2 className="text-base font-extrabold text-slate-900 text-center">What&apos;s wrong with your pet?</h2>
@@ -1742,28 +1659,18 @@ export default function VideoConsultLP() {
                         <button type="button" onClick={() => goToStep(2)} className="px-4 py-3.5 rounded-2xl border border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 shrink-0">← Back</button>
                         <button
                           type="button"
-                          disabled={!isValidAll || submitting || isPaying || paymentComplete}
+                          disabled={!isValidAll || submitting}
                           title={!isValidAll ? getSubmitTooltip() : undefined}
-                          onClick={handlePrimaryAction}
+                          onClick={submitObservation}
                           className={cn("flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-base py-3.5 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]")}
                         >
                           {submitting ? (
                             <><span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />Saving details...</>
-                          ) : isPaying ? (
-                            <><span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />Opening payment...</>
-                          ) : paymentComplete ? (
-                            <>Payment completed <CheckCircle2 className="h-4 w-4" /></>
-                          ) : submitPayload ? (
-                            <>Pay Now — {consultAmountLabel} <ArrowRight className="h-4 w-4" /></>
                           ) : (
-                            <>Save & Pay Now — {consultAmountLabel} <ArrowRight className="h-4 w-4" /></>
+                            <>Continue to Payment — {consultAmountLabel} <ArrowRight className="h-4 w-4" /></>
                           )}
                         </button>
                       </div>
-
-                      {paymentStatusMessage ? (
-                        <p className={cn("text-center text-xs font-semibold", paymentStatusClass)}>{paymentStatusMessage}</p>
-                      ) : null}
 
                       {!isValidAll ? (
                         <p className="text-center text-xs text-amber-600"><span className="inline-flex items-center gap-1"><AlertCircle className="h-4 w-4" />{getSubmitTooltip()}</span></p>
@@ -1923,7 +1830,7 @@ export default function VideoConsultLP() {
             <div className="mt-6 flex justify-center">
               <button
                 type="button"
-                onClick={() => navigate(PET_DETAILS_ROUTE)}
+                onClick={scrollToConsultForm}
                 className="w-full max-w-3xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
               >
                 <span className="inline-flex items-center justify-center gap-2">
@@ -2130,18 +2037,6 @@ export default function VideoConsultLP() {
         </section>
       </main>
 
-      {showPaymentSuccessModal ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-emerald-200 bg-white p-6 text-center shadow-2xl">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-              <CheckCircle2 className="h-8 w-8" />
-            </div>
-            <h4 className="text-lg font-extrabold text-slate-900">Payment confirmed</h4>
-            <p className="mt-2 text-sm text-slate-600">Success! Your vet will connect shortly on WhatsApp.</p>
-          </div>
-        </div>
-      ) : null}
-
       {/* Footer */}
       <footer className="bg-white border-t border-slate-100 py-4 px-4 pb-28 md:pb-4">
         <p className="text-xs text-slate-400 text-center">
@@ -2176,3 +2071,84 @@ function FaqItem({ q, a }) {
     </div>
   );
 }
+
+export const VideoConsultPaymentPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state || {};
+  const petDetails = state?.petDetails;
+  const paymentMeta = state?.paymentMeta;
+  const vet = state?.vet;
+
+  if (!petDetails || !paymentMeta || !vet) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md text-center rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+          <h2 className="text-lg font-extrabold text-slate-900">Payment link not ready</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Please start the consultation form again so we can generate your payment.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate(`${BASE_ROUTE}/owner`, { replace: true })}
+            className="mt-5 w-full rounded-2xl bg-accent hover:bg-accent-hover text-white font-extrabold py-3 text-sm shadow-md shadow-orange-200/60 transition-all"
+          >
+            Start Consultation
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <PaymentScreen
+      vet={vet}
+      petDetails={petDetails}
+      paymentMeta={paymentMeta}
+      onBack={() => navigate(`${BASE_ROUTE}/problem`)}
+      onPay={(verify) =>
+        navigate("/consultation-booked", {
+          replace: true,
+          state: { vet, verify },
+        })
+      }
+    />
+  );
+};
+
+export const VideoConsultThankYou = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const vet = location.state?.vet;
+
+  if (!vet) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md text-center rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+          <h2 className="text-lg font-extrabold text-slate-900">Booking details missing</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Please return to the consultation form to continue.
+          </p>
+          <div className="mt-5 flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(`${BASE_ROUTE}/owner`, { replace: true })}
+              className="w-full rounded-2xl bg-accent hover:bg-accent-hover text-white font-extrabold py-3 text-sm shadow-md shadow-orange-200/60 transition-all"
+            >
+              Start Consultation
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/", { replace: true })}
+              className="w-full rounded-2xl border border-slate-200 bg-white text-slate-600 font-semibold py-3 text-sm hover:bg-slate-50 transition-all"
+            >
+              Go to Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <ConfirmationScreen vet={vet} />;
+};

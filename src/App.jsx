@@ -110,6 +110,11 @@ const NewClinics = lazy(() => import("./newflow/NewClinics"));
 const NewVets = lazy(() => import("./newflow/NewVets"));
 const NewVideoConsultation = lazy(() => import("./newflow/NewVideoConsultationLP"));
 const VideoConsultLP = lazy(() => import("./newflow/VideoConsultLP"));
+const VideoConsultPaymentPage = lazy(() =>
+  import("./newflow/VideoConsultLP").then((m) => ({
+    default: m.VideoConsultPaymentPage,
+  }))
+);
 const SymptomsHub = lazy(() => import("./newflow/SymptomsHub"));
 const PuppyVaccinationDelhi = lazy(() => import("./newflow/PuppyVaccinationDelhi"));
 const KittenVaccinationDelhi = lazy(() => import("./newflow/KittenVaccinationDelhi"));
@@ -142,6 +147,12 @@ function App() {
                 <Route path="/clinics" element={<NewClinics />} />
                 <Route path="/vets" element={<NewVets />} />
                 <Route path="/veterinary-doctor-online-india" element={<NewVideoConsultation />} />
+                <Route path="/online-vet-consultation/payment" element={<VideoConsultPaymentPage />} />
+                <Route
+                  path="/online-vet-consultation/thank-you"
+                  element={<Navigate to="/consultation-booked" replace />}
+                />
+                <Route path="/online-vet-consultation/:view" element={<VideoConsultLP />} />
                 <Route path="/online-vet-consultation" element={<VideoConsultLP />} />
                 <Route path="/symptoms" element={<SymptomsHub />} />
                 <Route path="/puppy-vaccination-delhi" element={<PuppyVaccinationDelhi />} />

@@ -96,7 +96,7 @@ const stripEmpty = (payload) =>
 
 const isDayTime = (date = new Date()) => {
   const hour = date.getHours();
-  return hour >= 8 && hour < 20;
+  return hour >= 8 && hour < 22;
 };
 
 export const PaymentScreen = ({
@@ -127,7 +127,7 @@ export const PaymentScreen = ({
   }, [vet?.bookingPrice, vet?.priceDay, vet?.priceNight, rateType]);
 
   const slotLabel =
-    rateType === "night" ? "Night (8 PM - 8 AM)" : "Day (8 AM - 8 PM)";
+    rateType === "night" ? "Night (10 PM - 8 AM)" : "Day (8 AM - 10 PM)";
 
   // ✅ TESTING: remove service charge for now
   const service = 0;
