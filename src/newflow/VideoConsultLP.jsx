@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
+import { useNavigate } from "react-router-dom";
 import { LPNavbar } from "../newflow/LPNavbar";
 import { apiBaseUrl } from "../lib/api";
 import {
@@ -29,13 +30,17 @@ import {
   MapPin,
   Scale,
   Lightbulb,
+  Stethoscope,
+  Pill,
+  Globe,
+  ChevronRight,
 } from "lucide-react";
 
 // ─── SEO constants ───────────────────────────────────────────────────────────
-const TITLE = "Online Vet Consultation in India | Talk to Vet Online 24/7";
+const TITLE = "Talk to Vet Online India | Online Vet Consultation 24/7";
 const DESCRIPTION =
-  "Get instant online vet consultation in India. Talk to vet online via WhatsApp video within 15 minutes. Consult vet online India with licensed veterinarians. 24/7 online pet consultation.";
-const CANONICAL = "https://www.snoutiq.com/online-vet-consultation";
+  "Talk to vet online in India via WhatsApp video within 15 minutes. Licensed veterinarians available 24/7. Day consult ₹399, Night ₹549. Online vet consultation for dogs, cats & exotic pets across India.";
+const CANONICAL = "https://www.snoutiq.com/talk-to-vet-online";
 const KEYWORDS = [
   "online vet consultation",
   "talk to vet online",
@@ -48,15 +53,66 @@ const KEYWORDS = [
   "talk to vet",
 ].join(", ");
 
+const DOCTOR_LIST_ENDPOINT = "/api/exported_from_excell_doctors";
+const PET_DETAILS_ROUTE = "/consult?start=details";
+
+const getAssetRoot = () => {
+  const base = apiBaseUrl().replace(/\/+$/, "");
+  if (base.endsWith("/backend")) return base.slice(0, -"/backend".length);
+  return "https://snoutiq.com";
+};
+
+const normalizeDoctorImageUrl = (rawUrl, assetRoot) => {
+  if (!rawUrl) return "";
+  let url = String(rawUrl).trim();
+  if (!url) return "";
+
+  if (url.startsWith("http")) {
+    return url.replace(
+      "https://snoutiq.com/https://snoutiq.com",
+      "https://snoutiq.com"
+    );
+  }
+
+  if (url.startsWith("/")) url = url.slice(1);
+  return `${assetRoot}/${url}`;
+};
+
+const resolveDoctorImage = (doctor, assetRoot) => {
+  const blob = doctor?.doctor_image_blob_url;
+  const preferred = doctor?.doctor_image_url || doctor?.doctor_image;
+  return normalizeDoctorImageUrl(blob, assetRoot) || normalizeDoctorImageUrl(preferred, assetRoot);
+};
+
+const getInitials = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return "DR";
+  const parts = text.split(/\s+/).filter(Boolean);
+  const letters = parts.slice(0, 2).map((p) => p[0]);
+  return letters.join("").toUpperCase();
+};
+
+const getStepFromUrl = () => {
+  if (typeof window === "undefined") return 1;
+  const params = new URLSearchParams(window.location.search || "");
+  const stepParam = String(params.get("step") || "").toLowerCase();
+  if (stepParam === "pet") return 2;
+  if (stepParam === "payment") return 3;
+  if (stepParam === "owner") return 1;
+  const numeric = Number(stepParam);
+  if (Number.isFinite(numeric) && numeric >= 1 && numeric <= 3) return numeric;
+  return 1;
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const cn = (...v) => v.filter(Boolean).join(" ");
 
 function getCurrentPrice() {
   const h = new Date().getHours();
-  const isDay = h >= 8 && h < 20; // Day rate 8AM–8PM
+  const isDay = h >= 8 && h < 22;
   return isDay
-    ? { price: "₹399", label: "Day rate · 8AM–8PM", rateType: "day" }
-    : { price: "₹549", label: "Night rate · 8PM–8AM", rateType: "night" };
+    ? { price: "₹399", label: "Day rate · 8AM–10PM", rateType: "day" }
+    : { price: "₹549", label: "Night rate · 10PM–8AM", rateType: "night" };
 }
 
 const PAYMENT_AMOUNTS = {
@@ -175,87 +231,6 @@ const formatBreedName = (breedKey, subBreed = null) => {
   return `${cap(subBreed)} ${base}`;
 };
 
-const OTP_JSON_HEADERS = {
-  Accept: "application/json",
-  "Content-Type": "application/json",
-};
-
-const buildOtpApiBases = () => {
-  const bases = [];
-  const push = (value) => {
-    if (!value) return;
-    const normalized = String(value).replace(/\/+$/, "");
-    if (!normalized || bases.includes(normalized)) return;
-    bases.push(normalized);
-  };
-
-  if (typeof window !== "undefined") {
-    push(`${window.location.origin}/backend`);
-  }
-  push("https://snoutiq.com/backend");
-  push("https://www.snoutiq.com/backend");
-
-  return bases;
-};
-
-const parseOtpResponse = async (res) => {
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
-};
-
-const isOtpRetryableStatus = (status) =>
-  status === 404 || status === 502 || status === 503 || status === 504;
-
-const postOtpJson = async (path, payload) => {
-  const bases = buildOtpApiBases();
-  let lastError = null;
-
-  for (let i = 0; i < bases.length; i += 1) {
-    const base = bases[i];
-    const canRetry = i < bases.length - 1;
-
-    try {
-      const res = await fetch(`${base}${path}`, {
-        method: "POST",
-        headers: OTP_JSON_HEADERS,
-        body: JSON.stringify(payload),
-      });
-      const data = await parseOtpResponse(res);
-
-      if (!res.ok) {
-        const message = data?.message || data?.error || `HTTP ${res.status}`;
-        const error = new Error(message);
-        error.status = res.status;
-        if (canRetry && isOtpRetryableStatus(res.status)) {
-          lastError = error;
-          continue;
-        }
-        throw error;
-      }
-
-      return data || {};
-    } catch (error) {
-      lastError = error;
-      const status = Number(error?.status);
-      const isNetworkError = !Number.isFinite(status);
-      if (canRetry && (isNetworkError || isOtpRetryableStatus(status))) {
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  throw lastError || new Error("Failed to reach OTP service.");
-};
-
-/**
- * ✅ Client-side image compression (web)
- * - Only compresses images (jpeg/png/webp). PDFs are sent as-is.
- * - Returns a NEW File (compressed) to append in FormData.
- */
 const compressImageFile = async (
   file,
   { maxWidth = 1280, maxHeight = 1280, quality = 0.72, outputMime = "image/jpeg" } = {}
@@ -330,6 +305,16 @@ const YES_NO_OPTIONS = [
   { label: "No", value: "0" },
 ];
 
+// ─── Pet issue quick-select options (for "What's wrong with your pet?" section) ──
+const PET_ISSUE_OPTIONS = [
+  { label: "Vomiting", emoji: "🤢" },
+  { label: "Not eating", emoji: "🍽️" },
+  { label: "Skin itching", emoji: "🐾" },
+  { label: "Injury", emoji: "🩹" },
+  { label: "Diarrhea", emoji: "💧" },
+  { label: "Other", emoji: "❓" },
+];
+
 const fieldBase =
   "w-full rounded-lg border border-gray-200 bg-white p-2.5 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-xl md:p-3 md:text-sm";
 const selectBase = `${fieldBase} appearance-none pr-12`;
@@ -340,9 +325,11 @@ const cardBodyBase = "px-3 py-3 space-y-3";
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default function VideoConsultLP() {
+  const navigate = useNavigate();
   const { price, label: priceLabel, rateType } = getCurrentPrice();
   const consultAmount = PAYMENT_AMOUNTS[rateType] || PAYMENT_AMOUNTS.day;
   const consultAmountLabel = `₹${formatInr(consultAmount)}`;
+  const [step, setStep] = useState(() => getStepFromUrl());
 
   const scrollToConsultForm = useCallback(() => {
     const formNode = document.getElementById("consult-form");
@@ -357,6 +344,50 @@ export default function VideoConsultLP() {
       window.history.replaceState(window.history.state, "", nextUrl);
     }
   }, []);
+
+  const updateStepRoute = useCallback((nextStep) => {
+    if (typeof window === "undefined") return;
+    const stepKey = nextStep === 2 ? "pet" : nextStep === 3 ? "payment" : "owner";
+    const url = new URL(window.location.href);
+    url.searchParams.set("step", stepKey);
+    window.history.replaceState(window.history.state, "", url);
+  }, []);
+
+  const goToStep = useCallback(
+    (nextStep) => {
+      setStep(nextStep);
+      updateStepRoute(nextStep);
+    },
+    [updateStepRoute]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search || "");
+    if (!params.get("step")) {
+      updateStepRoute(step);
+    }
+  }, [step, updateStepRoute]);
+
+  const scrollToSection = useCallback((sectionId) => {
+    const target = document.getElementById(sectionId);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    const nextUrl = `${window.location.pathname}${window.location.search}#${sectionId}`;
+    if (window.location.hash !== `#${sectionId}`) {
+      window.history.replaceState(window.history.state, "", nextUrl);
+    }
+  }, []);
+
+  const quickLinks = [
+    { id: "how-it-works", label: "How it works", icon: Clock },
+    { id: "pricing", label: "Pricing", icon: Zap },
+    { id: "common-problems", label: "Common problems", icon: AlertCircle },
+    { id: "across-india", label: "Across India", icon: MapPin },
+    { id: "our-vets", label: "Our vets", icon: Star },
+    { id: "faq", label: "FAQ", icon: MessageCircle },
+  ];
 
   // ─── JSON-LD Schemas ──────────────────────────────────────────────────────
   const serviceSchema = useMemo(
@@ -383,9 +414,8 @@ export default function VideoConsultLP() {
         priceCurrency: "INR",
         price: "399",
         availability: "https://schema.org/InStock",
-        description: "Day ₹399 (8AM–8PM), Night ₹549 (8PM–8AM)",
+      description: "Day ₹399 (8AM–10PM), Night ₹549 (10PM–8AM)",
       },
-      // ── AggregateRating added to MedicalService ──────────────────────────
       aggregateRating: {
         "@type": "AggregateRating",
         ratingValue: "4.8",
@@ -424,7 +454,6 @@ export default function VideoConsultLP() {
     []
   );
 
-  // ── NEW: Review schema (individual reviews for rich snippets) ─────────────
   const reviewSchema = useMemo(
     () => ({
       "@context": "https://schema.org",
@@ -448,82 +477,42 @@ export default function VideoConsultLP() {
       review: [
         {
           "@type": "Review",
-          author: {
-            "@type": "Person",
-            name: "Priya M.",
-          },
+          author: { "@type": "Person", name: "Priya M." },
           datePublished: "2025-12-10",
-          reviewRating: {
-            "@type": "Rating",
-            ratingValue: "5",
-            bestRating: "5",
-          },
-          reviewBody:
-            "My dog started vomiting at midnight. SnoutiQ connected me to a vet in under 5 minutes. The doctor was calm, thorough and gave very clear advice. Saved us a stressful emergency clinic visit.",
+          reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
+          reviewBody: "My dog started vomiting at midnight. SnoutiQ connected me to a vet in under 5 minutes. The doctor was calm, thorough and gave very clear advice. Saved us a stressful emergency clinic visit.",
           name: "Excellent midnight emergency support",
         },
         {
           "@type": "Review",
-          author: {
-            "@type": "Person",
-            name: "Rahul S.",
-          },
+          author: { "@type": "Person", name: "Rahul S." },
           datePublished: "2025-11-22",
-          reviewRating: {
-            "@type": "Rating",
-            ratingValue: "5",
-            bestRating: "5",
-          },
-          reviewBody:
-            "My cat had watery eyes and I panicked at night. The online vet consultation on SnoutiQ was super easy to book. The vet explained everything clearly and even followed up the next day.",
+          reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
+          reviewBody: "My cat had watery eyes and I panicked at night. The online vet consultation on SnoutiQ was super easy to book. The vet explained everything clearly and even followed up the next day.",
           name: "Quick and professional online vet consultation",
         },
         {
           "@type": "Review",
-          author: {
-            "@type": "Person",
-            name: "Ananya K.",
-          },
+          author: { "@type": "Person", name: "Ananya K." },
           datePublished: "2026-01-05",
-          reviewRating: {
-            "@type": "Rating",
-            ratingValue: "5",
-            bestRating: "5",
-          },
-          reviewBody:
-            "Used SnoutiQ for my Labrador puppy who wasn't eating. The vet was very experienced and the video quality was excellent. ₹399 is so worth it compared to clinic charges.",
+          reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
+          reviewBody: "Used SnoutiQ for my Labrador puppy who wasn't eating. The vet was very experienced and the video quality was excellent. ₹399 is so worth it compared to clinic charges.",
           name: "Best online vet in India – highly recommend",
         },
         {
           "@type": "Review",
-          author: {
-            "@type": "Person",
-            name: "Deepa R.",
-          },
+          author: { "@type": "Person", name: "Deepa R." },
           datePublished: "2025-10-18",
-          reviewRating: {
-            "@type": "Rating",
-            ratingValue: "5",
-            bestRating: "5",
-          },
-          reviewBody:
-            "Really impressed by how prepared the vet was before the call. They had already reviewed my dog's photo and symptoms. The prescription came on WhatsApp within minutes. Brilliant service.",
+          reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
+          reviewBody: "Really impressed by how prepared the vet was before the call. They had already reviewed my dog's photo and symptoms. The prescription came on WhatsApp within minutes. Brilliant service.",
           name: "Vet was fully prepared before the video call",
         },
         {
           "@type": "Review",
-          author: {
-            "@type": "Person",
-            name: "Vikram T.",
-          },
+          author: { "@type": "Person", name: "Vikram T." },
           datePublished: "2026-02-01",
-          reviewRating: {
-            "@type": "Rating",
-            ratingValue: "4",
-            bestRating: "5",
-          },
-          reviewBody:
-            "Good experience overall. The vet was knowledgeable and the wait time was around 10 minutes which is great for a Sunday night. Would definitely use again for non-emergency advice.",
+          reviewRating: { "@type": "Rating", ratingValue: "4", bestRating: "5" },
+          reviewBody: "Good experience overall. The vet was knowledgeable and the wait time was around 10 minutes which is great for a Sunday night. Would definitely use again for non-emergency advice.",
           name: "Reliable 24/7 vet service across India",
         },
       ],
@@ -531,19 +520,14 @@ export default function VideoConsultLP() {
     []
   );
 
-  // ── NEW: Product schema for Google Ads quality score boost ────────────────
   const productSchema = useMemo(
     () => ({
       "@context": "https://schema.org",
       "@type": "Product",
       name: "Online Vet Consultation – SnoutiQ",
-      description:
-        "Talk to a licensed veterinarian online in India via WhatsApp video call within 15 minutes. Available 24/7 for dogs, cats and exotic pets.",
+      description: "Talk to a licensed veterinarian online in India via WhatsApp video call within 15 minutes. Available 24/7 for dogs, cats and exotic pets.",
       url: CANONICAL,
-      brand: {
-        "@type": "Brand",
-        name: "SnoutiQ",
-      },
+      brand: { "@type": "Brand", name: "SnoutiQ" },
       offers: [
         {
           "@type": "Offer",
@@ -553,7 +537,7 @@ export default function VideoConsultLP() {
           priceValidUntil: "2026-12-31",
           availability: "https://schema.org/InStock",
           url: CANONICAL,
-          description: "Online vet consultation during 8AM–8PM IST",
+          description: "Online vet consultation during 8AM–10PM IST",
         },
         {
           "@type": "Offer",
@@ -563,7 +547,7 @@ export default function VideoConsultLP() {
           priceValidUntil: "2026-12-31",
           availability: "https://schema.org/InStock",
           url: CANONICAL,
-          description: "Emergency online vet consultation during 8PM–8AM IST",
+          description: "Emergency online vet consultation during 10PM–8AM IST",
         },
       ],
       aggregateRating: {
@@ -578,9 +562,9 @@ export default function VideoConsultLP() {
     []
   );
 
-  // ✅ Form state (unchanged)
-  const [step, setStep] = useState(1);
+  // ─── State ────────────────────────────────────────────────────────────────
   const [submitPayload, setSubmitPayload] = useState(null);
+  const [selectedIssue, setSelectedIssue] = useState(null);
 
   const [details, setDetails] = useState({
     ownerName: "",
@@ -617,15 +601,6 @@ export default function VideoConsultLP() {
   const [breedError, setBreedError] = useState("");
   const breedDropdownRef = useRef(null);
 
-  const [otpToken, setOtpToken] = useState("");
-  const [otpValue, setOtpValue] = useState("");
-  const [otpStatus, setOtpStatus] = useState("idle");
-  const [otpMessage, setOtpMessage] = useState("");
-  const [otpError, setOtpError] = useState("");
-  const [otpCooldown, setOtpCooldown] = useState(0);
-  const [otpPhone, setOtpPhone] = useState("");
-  const otpInputRef = useRef(null);
-
   const [liveDoctorCount, setLiveDoctorCount] = useState(null);
   const [gatewayReady, setGatewayReady] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
@@ -633,47 +608,19 @@ export default function VideoConsultLP() {
   const [paymentStatusMessage, setPaymentStatusMessage] = useState("");
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
-
-  const resetOtpState = useCallback(() => {
-    setOtpToken("");
-    setOtpValue("");
-    setOtpStatus("idle");
-    setOtpMessage("");
-    setOtpError("");
-    setOtpCooldown(0);
-    setOtpPhone("");
-  }, []);
+  const [featuredVets, setFeaturedVets] = useState([]);
+  const [vetsLoading, setVetsLoading] = useState(true);
+  const [vetsError, setVetsError] = useState("");
 
   const ownerPhoneDigits = details.ownerMobile.replace(/\D/g, "");
-  const otpVerified = otpStatus === "verified";
-  const showOtpSection = ownerPhoneDigits.length === 10 || otpStatus !== "idle";
 
   useEffect(() => {
     let active = true;
     loadRazorpayScript().then((ready) => {
       if (active) setGatewayReady(ready);
     });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
-
-  useEffect(() => {
-    if (otpCooldown <= 0) return;
-    const timer = window.setTimeout(() => {
-      setOtpCooldown((prev) => Math.max(0, prev - 1));
-    }, 1000);
-    return () => window.clearTimeout(timer);
-  }, [otpCooldown]);
-
-  useEffect(() => {
-    const digits = ownerPhoneDigits;
-    if (digits.length !== 10) {
-      if (otpStatus !== "idle") resetOtpState();
-      return;
-    }
-    if (otpPhone && digits !== otpPhone) resetOtpState();
-  }, [ownerPhoneDigits, otpPhone, otpStatus, resetOtpState]);
 
   useEffect(() => {
     if (!breedDropdownOpen) return;
@@ -711,9 +658,7 @@ export default function VideoConsultLP() {
       }
     };
 
-    const runDeferredFetch = () => {
-      void fetchLiveStatus();
-    };
+    const runDeferredFetch = () => { void fetchLiveStatus(); };
 
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
       idleHandle = window.requestIdleCallback(runDeferredFetch, { timeout: 1200 });
@@ -735,18 +680,82 @@ export default function VideoConsultLP() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    const loadFeaturedVets = async () => {
+      setVetsLoading(true);
+      setVetsError("");
+
+      try {
+        const base = apiBaseUrl().replace(/\/+$/, "");
+        const res = await fetch(`${base}${DOCTOR_LIST_ENDPOINT}`, {
+          method: "GET",
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!active) return;
+
+        const assetRoot = getAssetRoot();
+        const flattened = [];
+
+        (data?.data || []).forEach((entry) => {
+          (entry?.doctors || []).forEach((doctor) => {
+            if (!doctor) return;
+            flattened.push({
+              ...doctor,
+              clinic_name: entry?.name || "",
+            });
+          });
+        });
+
+        const cleaned = flattened.filter(
+          (doc) => doc?.doctor_name || doc?.doctor_email || doc?.doctor_mobile
+        );
+
+        const topFour = cleaned.slice(0, 4).map((doc) => ({
+          id: doc?.id,
+          name: doc?.doctor_name || "Veterinarian",
+          degree: doc?.degree || "",
+          experience: doc?.years_of_experience || "",
+          specialization: doc?.specialization_select_all_that_apply || "",
+          dayRate: doc?.video_day_rate || doc?.doctors_price || "",
+          nightRate: doc?.video_night_rate || "",
+          responseDay: doc?.response_time_for_online_consults_day || "",
+          responseNight: doc?.response_time_for_online_consults_night || "",
+          reviewsCount: doc?.reviews_count || 0,
+          rating: doc?.average_review_points || "",
+          clinic: doc?.clinic_name || "",
+          image: resolveDoctorImage(doc, assetRoot),
+        }));
+
+        setFeaturedVets(topFour);
+      } catch (error) {
+        if (error?.name !== "AbortError") {
+          setVetsError("Could not load doctors right now.");
+        }
+      } finally {
+        if (active) setVetsLoading(false);
+      }
+    };
+
+    loadFeaturedVets();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     const abortController = new AbortController();
 
     const fetchDogBreeds = async () => {
       setBreedError("");
       setLoadingBreeds(true);
-
       try {
         const baseUrl = apiBaseUrl();
-        const res = await fetch(`${baseUrl}/api/dog-breeds/all`, {
-          method: "GET",
-          signal: abortController.signal,
-        });
+        const res = await fetch(`${baseUrl}/api/dog-breeds/all`, { method: "GET", signal: abortController.signal });
         const data = await res.json();
 
         if (data?.status === "success" && data?.breeds) {
@@ -762,7 +771,6 @@ export default function VideoConsultLP() {
               });
             }
           });
-
           list.sort((a, b) => a.label.localeCompare(b.label));
           list.push({ label: "Mixed Breed", value: "mixed_breed" }, { label: "Other", value: "other" });
           setDogBreeds(list);
@@ -782,23 +790,15 @@ export default function VideoConsultLP() {
     const fetchCatBreeds = async () => {
       setBreedError("");
       setLoadingBreeds(true);
-
       try {
         const baseUrl = apiBaseUrl();
-        const res = await fetch(`${baseUrl}/api/cat-breeds/with-indian`, {
-          method: "GET",
-          signal: abortController.signal,
-        });
+        const res = await fetch(`${baseUrl}/api/cat-breeds/with-indian`, { method: "GET", signal: abortController.signal });
         const data = await res.json();
 
         if (data?.success && Array.isArray(data?.data)) {
           const list = data.data
-            .map((breed) => ({
-              label: breed?.name || breed?.id || "Unknown",
-              value: breed?.name || breed?.id || "unknown",
-            }))
+            .map((breed) => ({ label: breed?.name || breed?.id || "Unknown", value: breed?.name || breed?.id || "unknown" }))
             .filter((item) => item.label);
-
           list.sort((a, b) => a.label.localeCompare(b.label));
           list.push({ label: "Mixed / Other", value: "other" });
           setCatBreeds(list);
@@ -831,18 +831,14 @@ export default function VideoConsultLP() {
     if (details.type === "exotic") setDetails((p) => ({ ...p, breed: "" }));
     else setDetails((p) => ({ ...p, exoticType: "" }));
 
-    return () => {
-      abortController.abort();
-    };
+    return () => { abortController.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [details.type]);
 
   useEffect(() => {
     return () => {
       if (uploadPreviewUrl) {
-        try {
-          URL.revokeObjectURL(uploadPreviewUrl);
-        } catch {}
+        try { URL.revokeObjectURL(uploadPreviewUrl); } catch {}
       }
     };
   }, [uploadPreviewUrl]);
@@ -891,43 +887,38 @@ export default function VideoConsultLP() {
     return "File";
   }, [uploadKind]);
 
-  const applyUploadFile = useCallback(
-    async (file) => {
-      if (!file) return;
+  const applyUploadFile = useCallback(async (file) => {
+    if (!file) return;
 
-      if (uploadPreviewUrl) {
-        try {
-          URL.revokeObjectURL(uploadPreviewUrl);
-        } catch {}
-      }
+    if (uploadPreviewUrl) {
+      try { URL.revokeObjectURL(uploadPreviewUrl); } catch {}
+    }
 
-      const lowerName = file.name?.toLowerCase() || "";
-      const isVideo = file.type?.startsWith("video/") || /\.(mp4|mov|avi|mkv|webm)$/i.test(lowerName);
-      if (isVideo) {
-        alert("Video uploads are not supported. Please upload a photo or PDF.");
-        return;
-      }
+    const lowerName = file.name?.toLowerCase() || "";
+    const isVideo = file.type?.startsWith("video/") || /\.(mp4|mov|avi|mkv|webm)$/i.test(lowerName);
+    if (isVideo) {
+      alert("Video uploads are not supported. Please upload a photo or PDF.");
+      return;
+    }
 
-      const isImage = file.type?.startsWith("image/");
-      const isPdf = file.type === "application/pdf" || lowerName.endsWith(".pdf");
-      if (!isImage && !isPdf) {
-        alert("Please upload a JPG, PNG, or PDF file.");
-        return;
-      }
+    const isImage = file.type?.startsWith("image/");
+    const isPdf = file.type === "application/pdf" || lowerName.endsWith(".pdf");
+    if (!isImage && !isPdf) {
+      alert("Please upload a JPG, PNG, or PDF file.");
+      return;
+    }
 
-      if (isImage) {
-        const url = URL.createObjectURL(file);
-        setUploadPreviewUrl(url);
-      } else {
-        setUploadPreviewUrl("");
-      }
+    if (isImage) {
+      const url = URL.createObjectURL(file);
+      setUploadPreviewUrl(url);
+    } else {
+      setUploadPreviewUrl("");
+    }
 
-      setUploadFile(file);
-      setDetails((prev) => ({ ...prev, hasPhoto: true }));
-      setUploadMeta({ name: file.name, size: file.size, type: file.type, compressedSize: null });
-    },
-    [uploadPreviewUrl]
-  );
+    setUploadFile(file);
+    setDetails((prev) => ({ ...prev, hasPhoto: true }));
+    setUploadMeta({ name: file.name, size: file.size, type: file.type, compressedSize: null });
+  }, [uploadPreviewUrl]);
 
   const handlePhotoUpload = async (e) => {
     const f = e.target.files?.[0];
@@ -945,105 +936,13 @@ export default function VideoConsultLP() {
   };
 
   const handleDragOver = (e) => e.preventDefault();
-  const handleDragEnter = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+  const handleDragEnter = (e) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);
-
-  const fetchGeo = () =>
-    new Promise((resolve) => {
-      if (!navigator.geolocation) return resolve(null);
-      navigator.geolocation.getCurrentPosition(
-        (pos) =>
-          resolve({
-            lat: pos.coords.latitude,
-            lang: pos.coords.longitude,
-          }),
-        () => resolve(null),
-        { timeout: 4000 }
-      );
-    });
-
-  const sendOtp = async () => {
-    const phone = ownerPhoneDigits;
-    if (phone.length !== 10) {
-      setOtpError("Enter a valid 10-digit mobile number first.");
-      return;
-    }
-
-    setOtpError("");
-    setOtpMessage("");
-    setOtpStatus("sending");
-
-    try {
-      const data = await postOtpJson("/api/send-otp", { type: "whatsapp", value: phone });
-      if (!data?.token) throw new Error("OTP token missing. Please try again.");
-
-      setOtpToken(data.token);
-      setOtpPhone(phone);
-      setOtpStatus("sent");
-      setOtpMessage(data?.message || "OTP sent to your WhatsApp.");
-      setOtpCooldown(30);
-      setOtpValue("");
-      window.setTimeout(() => otpInputRef.current?.focus(), 100);
-    } catch (err) {
-      setOtpStatus("error");
-      setOtpError(err?.message || "Failed to send OTP.");
-    }
-  };
-
-  const verifyOtp = async () => {
-    if (!otpToken) {
-      setOtpError("Send OTP first.");
-      return;
-    }
-    if (otpValue.trim().length < 4) {
-      setOtpError("Enter the 4-digit OTP.");
-      return;
-    }
-
-    setOtpError("");
-    setOtpMessage("");
-    setOtpStatus("verifying");
-
-    try {
-      const location = await fetchGeo();
-      const payload = { token: otpToken, otp: otpValue.trim(), phone: ownerPhoneDigits };
-      if (location) {
-        payload.lat = location.lat;
-        payload.lang = location.lang;
-      }
-
-      const data = await postOtpJson("/api/verify-otp", payload);
-      if (data?.success === false) throw new Error(data?.error || data?.message || "OTP verification failed.");
-
-      setOtpStatus("verified");
-      setOtpMessage("Mobile number verified.");
-      setOtpError("");
-    } catch (err) {
-      setOtpStatus("error");
-      setOtpError(err?.message || "OTP verification failed.");
-    }
-  };
-
-  const otpSendDisabled =
-    otpStatus === "sending" ||
-    otpStatus === "verifying" ||
-    otpCooldown > 0 ||
-    ownerPhoneDigits.length !== 10;
-
-  const otpVerifyDisabled =
-    otpStatus === "verifying" ||
-    otpValue.trim().length < 4 ||
-    !otpToken ||
-    ownerPhoneDigits.length !== 10;
 
   const step1Valid =
     details.ownerName.trim().length > 0 &&
     ownerPhoneDigits.length === 10 &&
-    details.city.trim().length > 1 &&
-    otpVerified;
+    details.city.trim().length > 1;
 
   const step2Valid =
     details.name.trim().length > 0 &&
@@ -1063,19 +962,15 @@ export default function VideoConsultLP() {
 
   const isValidAll = step1Valid && step2Valid && step3Valid;
   const paymentStatusClass =
-    paymentStatusType === "success"
-      ? "text-emerald-600"
-      : paymentStatusType === "error"
-      ? "text-red-600"
-      : paymentStatusType === "info"
-      ? "text-blue-600"
-      : "text-slate-400";
+    paymentStatusType === "success" ? "text-emerald-600"
+    : paymentStatusType === "error" ? "text-red-600"
+    : paymentStatusType === "info" ? "text-blue-600"
+    : "text-slate-400";
 
   const getSubmitTooltip = () => {
     if (!details.ownerName.trim()) return "Please enter owner name";
     if (ownerPhoneDigits.length !== 10) return "Please enter 10-digit mobile number";
     if (!details.city.trim()) return "Please enter city name";
-    if (!otpVerified) return "Please verify mobile number with OTP";
     if (!details.name.trim()) return "Please enter your pet's name";
     if (!details.type) return "Please select pet type";
     if (!details.gender) return "Please select pet gender";
@@ -1111,13 +1006,7 @@ export default function VideoConsultLP() {
       let fileToSend = uploadFile;
 
       if (uploadFile?.type?.startsWith("image/")) {
-        const compressed = await compressImageFile(uploadFile, {
-          maxWidth: 1280,
-          maxHeight: 1280,
-          quality: 0.72,
-          outputMime: "image/jpeg",
-        });
-
+        const compressed = await compressImageFile(uploadFile, { maxWidth: 1280, maxHeight: 1280, quality: 0.72, outputMime: "image/jpeg" });
         fileToSend = compressed;
         setUploadMeta((prev) => (prev ? { ...prev, compressedSize: compressed?.size ?? null } : prev));
       }
@@ -1130,12 +1019,10 @@ export default function VideoConsultLP() {
       fd.append("dob", details.petDob || "");
       fd.append("pet_name", details.name || "");
       if (details.weightKg !== "") fd.append("weight", details.weightKg);
-
       fd.append("gender", details.gender || "");
 
       const breedValue = details.type === "exotic" ? details.exoticType.trim() : details.breed || "";
       fd.append("breed", breedValue);
-
       fd.append("reported_symptom", details.problemText || "");
       fd.append("appetite", details.lastDaysAppetite || "");
       fd.append("energy", details.lastDaysEnergy || "");
@@ -1149,25 +1036,12 @@ export default function VideoConsultLP() {
 
       const baseUrl = apiBaseUrl();
       const res = await fetch(`${baseUrl}/api/user-pet-observation`, { method: "POST", body: fd });
-
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Failed to submit observation");
 
       const observation = data?.data ?? data ?? {};
-      const userId = toNumber(
-        pickValue(
-          observation?.user_id, observation?.userId, observation?.user?.id,
-          data?.user_id, data?.userId, data?.user?.id,
-          data?.data?.user_id, data?.data?.userId, data?.data?.user?.id
-        )
-      );
-      const petId = toNumber(
-        pickValue(
-          observation?.pet_id, observation?.petId, observation?.pet?.id,
-          data?.pet_id, data?.petId, data?.pet?.id,
-          data?.data?.pet_id, data?.data?.petId, data?.data?.pet?.id
-        )
-      );
+      const userId = toNumber(pickValue(observation?.user_id, observation?.userId, observation?.user?.id, data?.user_id, data?.userId, data?.user?.id, data?.data?.user_id, data?.data?.userId, data?.data?.user?.id));
+      const petId = toNumber(pickValue(observation?.pet_id, observation?.petId, observation?.pet?.id, data?.pet_id, data?.petId, data?.pet?.id, data?.data?.pet_id, data?.data?.petId, data?.data?.pet?.id));
 
       const nextPayload = { ...details, observation, observationResponse: data, user_id: userId, pet_id: petId };
       setSubmitPayload(nextPayload);
@@ -1180,36 +1054,9 @@ export default function VideoConsultLP() {
   };
 
   const buildPaymentContext = useCallback((payload) => {
-    const userId = toNumber(
-      pickValue(
-        payload?.user_id,
-        payload?.userId,
-        payload?.observation?.user_id,
-        payload?.observation?.userId,
-        payload?.observationResponse?.user_id,
-        payload?.observationResponse?.userId
-      )
-    );
-
-    const petId = toNumber(
-      pickValue(
-        payload?.pet_id,
-        payload?.petId,
-        payload?.observation?.pet_id,
-        payload?.observation?.petId,
-        payload?.observationResponse?.pet_id,
-        payload?.observationResponse?.petId
-      )
-    );
-
-    return {
-      order_type: "excell_export_campaign",
-      service_id: "consult_basic",
-      booking_rate_type: rateType,
-      slot_label: priceLabel,
-      user_id: userId,
-      pet_id: petId,
-    };
+    const userId = toNumber(pickValue(payload?.user_id, payload?.userId, payload?.observation?.user_id, payload?.observation?.userId, payload?.observationResponse?.user_id, payload?.observationResponse?.userId));
+    const petId = toNumber(pickValue(payload?.pet_id, payload?.petId, payload?.observation?.pet_id, payload?.observation?.petId, payload?.observationResponse?.pet_id, payload?.observationResponse?.petId));
+    return { order_type: "excell_export_campaign", service_id: "consult_basic", booking_rate_type: rateType, slot_label: priceLabel, user_id: userId, pet_id: petId };
   }, [rateType, priceLabel]);
 
   const updatePaymentStatus = useCallback((type, message) => {
@@ -1222,10 +1069,7 @@ export default function VideoConsultLP() {
     if (!activePayload || isPaying) return;
     const paymentContext = buildPaymentContext(activePayload);
 
-    let paymentGatewayAvailable =
-      typeof window !== "undefined" &&
-      Boolean(window.Razorpay) &&
-      gatewayReady;
+    let paymentGatewayAvailable = typeof window !== "undefined" && Boolean(window.Razorpay) && gatewayReady;
 
     if (!paymentGatewayAvailable && typeof window !== "undefined") {
       updatePaymentStatus("info", "Preparing secure payment...");
@@ -1248,26 +1092,16 @@ export default function VideoConsultLP() {
       const baseUrl = apiBaseUrl();
       const orderRes = await fetch(`${baseUrl}/api/create-order`, {
         method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: consultAmount,
-          ...paymentContext,
-        }),
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: consultAmount, ...paymentContext }),
       });
 
       const orderData = await orderRes.json().catch(() => ({}));
-      if (!orderRes.ok) {
-        throw new Error(orderData?.message || orderData?.error || "Could not create payment order.");
-      }
+      if (!orderRes.ok) throw new Error(orderData?.message || orderData?.error || "Could not create payment order.");
 
       const orderId = orderData?.order_id || orderData?.order?.id;
       const key = orderData?.key;
-      if (!orderId || !key) {
-        throw new Error("Invalid payment order response.");
-      }
+      if (!orderId || !key) throw new Error("Invalid payment order response.");
 
       const rzp = new window.Razorpay({
         key,
@@ -1279,30 +1113,15 @@ export default function VideoConsultLP() {
           try {
             const verifyRes = await fetch(`${baseUrl}/api/rzp/verify`, {
               method: "POST",
-              headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                ...paymentContext,
-                razorpay_order_id: response?.razorpay_order_id,
-                razorpay_payment_id: response?.razorpay_payment_id,
-                razorpay_signature: response?.razorpay_signature,
-              }),
+              headers: { Accept: "application/json", "Content-Type": "application/json" },
+              body: JSON.stringify({ ...paymentContext, razorpay_order_id: response?.razorpay_order_id, razorpay_payment_id: response?.razorpay_payment_id, razorpay_signature: response?.razorpay_signature }),
             });
-
             const verifyData = await verifyRes.json().catch(() => ({}));
-            if (!verifyRes.ok || verifyData?.success === false) {
-              throw new Error(verifyData?.message || verifyData?.error || "Payment verification failed.");
-            }
-
+            if (!verifyRes.ok || verifyData?.success === false) throw new Error(verifyData?.message || verifyData?.error || "Payment verification failed.");
             setPaymentComplete(true);
             setShowPaymentSuccessModal(true);
             updatePaymentStatus("success", "Payment successful. Vet will connect shortly.");
-
-            window.setTimeout(() => {
-              setShowPaymentSuccessModal(false);
-            }, 1800);
+            window.setTimeout(() => { setShowPaymentSuccessModal(false); }, 1800);
           } catch (error) {
             updatePaymentStatus("error", error?.message || "Payment verification failed.");
           } finally {
@@ -1315,10 +1134,7 @@ export default function VideoConsultLP() {
             setIsPaying(false);
           },
         },
-        prefill: {
-          name: details.ownerName || "",
-          contact: formatPhone(details.ownerMobile),
-        },
+        prefill: { name: details.ownerName || "", contact: formatPhone(details.ownerMobile) },
       });
 
       rzp.open();
@@ -1327,24 +1143,11 @@ export default function VideoConsultLP() {
       updatePaymentStatus("error", error?.message || "Payment could not be initiated.");
       setIsPaying(false);
     }
-  }, [
-    submitPayload,
-    isPaying,
-    gatewayReady,
-    updatePaymentStatus,
-    buildPaymentContext,
-    consultAmount,
-    rateType,
-    details.ownerName,
-    details.ownerMobile,
-  ]);
+  }, [submitPayload, isPaying, gatewayReady, updatePaymentStatus, buildPaymentContext, consultAmount, rateType, details.ownerName, details.ownerMobile]);
 
   const handlePrimaryAction = useCallback(async () => {
     if (submitting || isPaying || paymentComplete) return;
-    if (submitPayload) {
-      await handleInlinePayment(submitPayload);
-      return;
-    }
+    if (submitPayload) { await handleInlinePayment(submitPayload); return; }
     await submitObservation();
   }, [submitting, isPaying, paymentComplete, submitPayload, handleInlinePayment, submitObservation]);
 
@@ -1365,29 +1168,17 @@ export default function VideoConsultLP() {
         <meta name="keywords" content={KEYWORDS} />
         <meta name="robots" content="noindex, follow" />
         <link rel="canonical" href={CANONICAL} />
-
-        {/* OpenGraph */}
         <meta property="og:type" content="website" />
         <meta property="og:title" content={TITLE} />
         <meta property="og:description" content={DESCRIPTION} />
         <meta property="og:url" content={CANONICAL} />
         <meta property="og:site_name" content="SnoutiQ" />
-
-        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={TITLE} />
         <meta name="twitter:description" content={DESCRIPTION} />
-
-        {/* JSON-LD: MedicalService (now includes aggregateRating) */}
         <script type="application/ld+json">{JSON.stringify(serviceSchema)}</script>
-
-        {/* JSON-LD: FAQ */}
         <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
-
-        {/* JSON-LD: LocalBusiness with individual Reviews + AggregateRating ── NEW */}
         <script type="application/ld+json">{JSON.stringify(reviewSchema)}</script>
-
-        {/* JSON-LD: Product with AggregateRating (boosts Google Ads quality) ── NEW */}
         <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
       </Helmet>
 
@@ -1426,16 +1217,52 @@ export default function VideoConsultLP() {
             </div>
 
             <h1 className="text-[2.1rem] sm:text-[2.8rem] lg:text-[3.4rem] font-extrabold text-slate-900 leading-[1.1] text-center mb-3">
-              Online Vet Consultation – Talk to a Verified Veterinarian in 15 Minutes
+              Talk to a Vet Online in 15 Minutes – Video Consultation 
             </h1>
 
             <p className="text-slate-500 text-center text-base mb-7 max-w-3xl mx-auto leading-relaxed">
-              Get instant <strong>online vet consultation</strong> anywhere in India. Talk to vet online via secure WhatsApp
-              video call and connect with a licensed <strong>online veterinarian</strong> within 15 minutes. Ideal for
-              emergency advice, second opinions and routine <strong>online pet consultation</strong>.
+              Speak to a licensed veterinarian online anywhere in India.
+              Instant video consultation for dogs & cats. Day consult ₹399.
+              Night emergency consult ₹549.
             </p>
 
-            {/* ── FORM CARD (unchanged) ───────────────────────────────────── */}
+            {/* ── "WHAT'S WRONG WITH YOUR PET?" SECTION ──────────────────── */}
+            <div className="max-w-4xl mx-auto mb-6">
+            <h2 className="text-3xl font-extrabold text-slate-900 text-center mb-8">Online vet consultation for dogs, cats and pets across India</h2>
+              <div className="bg-white rounded-2xl shadow-md shadow-slate-200/60 border border-slate-100 overflow-hidden">
+                <div className="px-4 py-4 border-b border-slate-100">
+                  <h2 className="text-base font-extrabold text-slate-900 text-center">What&apos;s wrong with your pet?</h2>
+                  <p className="text-xs text-slate-500 text-center mt-0.5 flex items-center justify-center gap-1">
+                    <span>🔍</span> Select the main issue – helps us match you with the right vet
+                  </p>
+                </div>
+                <div className="px-4 py-4">
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {PET_ISSUE_OPTIONS.map((issue) => (
+                      <button
+                        key={issue.label}
+                        type="button"
+                        onClick={() => {
+                          setSelectedIssue(issue.label);
+                          scrollToConsultForm();
+                        }}
+                        className={cn(
+                          "inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold transition-all duration-200",
+                          selectedIssue === issue.label
+                            ? "border-brand bg-brand/10 text-brand"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-brand/40 hover:bg-brand/5 hover:text-brand"
+                        )}
+                      >
+                        <span>{issue.emoji}</span>
+                        {issue.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── FORM CARD ───────────────────────────────────────────────── */}
             <div id="consult-form" className="scroll-mt-28">
               <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden mt-6 max-w-4xl mx-auto">
                 {/* Step progress strip */}
@@ -1448,16 +1275,13 @@ export default function VideoConsultLP() {
                       <div
                         key={s}
                         className={cn(
-                            "flex-1 py-2.5 text-center text-xs font-extrabold transition-colors border-b-2",
-                          isActive
-                            ? "text-brand border-brand bg-brand-light/30"
-                            : isDone
-                            ? "text-green-600 border-green-400 bg-green-50/30"
+                          "flex-1 py-2.5 text-center text-xs font-extrabold transition-colors border-b-2",
+                          isActive ? "text-brand border-brand bg-brand-light/30"
+                            : isDone ? "text-green-600 border-green-400 bg-green-50/30"
                             : "text-slate-300 border-transparent"
                         )}
                       >
-                        {isDone ? "✓ " : `${n}. `}
-                        {s}
+                        {isDone ? "✓ " : `${n}. `}{s}
                       </div>
                     );
                   })}
@@ -1523,75 +1347,8 @@ export default function VideoConsultLP() {
 
                               <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                                 <Shield size={12} className="text-brand" />
-                                No spam. Only consultation updates.
+                                Please enter a WhatsApp number so the vet can contact you.
                               </p>
-
-                              {showOtpSection && (
-                                <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="flex items-start gap-3">
-                                      <div className={cn("w-9 h-9 rounded-full flex items-center justify-center", otpVerified ? "bg-emerald-100 text-emerald-600" : "bg-blue-100 text-blue-600")}>
-                                        <Shield size={16} />
-                                      </div>
-                                      <div>
-                                        <p className="text-sm font-semibold text-gray-900">Verify mobile number</p>
-                                        <p className="text-xs text-gray-500">OTP will be sent on WhatsApp to +91 {ownerPhoneDigits}</p>
-                                      </div>
-                                    </div>
-                                    {otpVerified ? (
-                                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Verified</span>
-                                    ) : null}
-                                  </div>
-
-                                  {!otpVerified && (
-                                    <div className="space-y-3">
-                                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                        <button
-                                          type="button"
-                                          onClick={sendOtp}
-                                          disabled={otpSendDisabled}
-                                          className={cn("px-4 py-2 rounded-xl text-sm font-semibold transition-colors", otpSendDisabled ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-brand text-white hover:bg-brand/90")}
-                                        >
-                                          {otpStatus === "sending" ? "Sending..." : otpCooldown > 0 ? "Resend OTP" : "Send OTP"}
-                                        </button>
-                                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                                          <Clock size={12} className="text-gray-400" />
-                                          {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : "OTP valid for 10 minutes"}
-                                        </div>
-                                      </div>
-
-                                      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                                        <input
-                                          ref={otpInputRef}
-                                          type="text"
-                                          inputMode="numeric"
-                                          pattern="[0-9]*"
-                                          value={otpValue}
-                                          onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                                          placeholder="Enter OTP"
-                                          className={cn(fieldBase, "md:flex-1 text-center tracking-widest")}
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={verifyOtp}
-                                          disabled={otpVerifyDisabled}
-                                          className={cn("px-4 py-2 rounded-xl text-sm font-semibold transition-colors", otpVerifyDisabled ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700")}
-                                        >
-                                          {otpStatus === "verifying" ? "Verifying..." : "Verify OTP"}
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {otpMessage ? <p className="text-xs text-emerald-600">{otpMessage}</p> : null}
-                                  {otpError ? (
-                                    <p className="text-xs text-red-600 flex items-center gap-1">
-                                      <AlertCircle size={12} />
-                                      {otpError}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              )}
                             </div>
 
                             <div className="space-y-2 md:col-span-2">
@@ -1619,7 +1376,7 @@ export default function VideoConsultLP() {
                         <button
                           type="button"
                           disabled={!step1Valid}
-                          onClick={() => setStep(2)}
+                          onClick={() => goToStep(2)}
                           className={cn("flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-base py-4 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]")}
                         >
                           Continue <ArrowRight className="h-4 w-4" />
@@ -1631,7 +1388,7 @@ export default function VideoConsultLP() {
                           <span className="inline-flex items-center gap-1"><AlertCircle className="h-4 w-4" />{getSubmitTooltip()}</span>
                         </p>
                       ) : (
-                        <p className="text-center text-xs text-slate-400">Takes 60 seconds · No spam · OTP verification required</p>
+                        <p className="text-center text-xs text-slate-400">Takes 60 seconds · No spam · WhatsApp number required</p>
                       )}
                     </div>
                   )}
@@ -1795,9 +1552,9 @@ export default function VideoConsultLP() {
                       </div>
 
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => setStep(1)} className="px-4 py-3.5 rounded-2xl border border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 shrink-0">← Back</button>
-                        <button type="button" disabled={!step2Valid} onClick={() => setStep(3)} className={cn("flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-base py-4 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]")}>
-                          Continue <ArrowRight className="h-4 w-4" />
+                        <button type="button" onClick={() => goToStep(1)} className="px-4 py-3.5 rounded-2xl border border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 shrink-0">← Back</button>
+                        <button type="button" disabled={!step2Valid} onClick={() => goToStep(3)} className={cn("flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-base py-4 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]")}>
+                          Submit Pet Details <ArrowRight className="h-4 w-4" />
                         </button>
                       </div>
 
@@ -1982,7 +1739,7 @@ export default function VideoConsultLP() {
                       </div>
 
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => setStep(2)} className="px-4 py-3.5 rounded-2xl border border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 shrink-0">← Back</button>
+                        <button type="button" onClick={() => goToStep(2)} className="px-4 py-3.5 rounded-2xl border border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 shrink-0">← Back</button>
                         <button
                           type="button"
                           disabled={!isValidAll || submitting || isPaying || paymentComplete}
@@ -1991,35 +1748,21 @@ export default function VideoConsultLP() {
                           className={cn("flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-base py-3.5 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]")}
                         >
                           {submitting ? (
-                            <>
-                              <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                              Saving details...
-                            </>
+                            <><span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />Saving details...</>
                           ) : isPaying ? (
-                            <>
-                              <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                              Opening payment...
-                            </>
+                            <><span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />Opening payment...</>
                           ) : paymentComplete ? (
-                            <>
-                              Payment completed <CheckCircle2 className="h-4 w-4" />
-                            </>
+                            <>Payment completed <CheckCircle2 className="h-4 w-4" /></>
                           ) : submitPayload ? (
-                            <>
-                              Pay Now — {consultAmountLabel} <ArrowRight className="h-4 w-4" />
-                            </>
+                            <>Pay Now — {consultAmountLabel} <ArrowRight className="h-4 w-4" /></>
                           ) : (
-                            <>
-                              Save & Pay Now — {consultAmountLabel} <ArrowRight className="h-4 w-4" />
-                            </>
+                            <>Save & Pay Now — {consultAmountLabel} <ArrowRight className="h-4 w-4" /></>
                           )}
                         </button>
                       </div>
 
                       {paymentStatusMessage ? (
-                        <p className={cn("text-center text-xs font-semibold", paymentStatusClass)}>
-                          {paymentStatusMessage}
-                        </p>
+                        <p className={cn("text-center text-xs font-semibold", paymentStatusClass)}>{paymentStatusMessage}</p>
                       ) : null}
 
                       {!isValidAll ? (
@@ -2058,7 +1801,7 @@ export default function VideoConsultLP() {
         </section>
 
         {/* HOW IT WORKS */}
-        <section className="py-14 px-4 bg-white">
+        <section id="how-it-works" className="py-14 px-4 bg-white scroll-mt-24">
           <div className="max-w-4xl mx-auto">
             <p className="text-xs font-extrabold text-brand text-center tracking-widest mb-2">HOW IT WORKS</p>
             <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">From worried to sorted in 15 minutes</h2>
@@ -2086,20 +1829,207 @@ export default function VideoConsultLP() {
         <section className="px-4 py-6 bg-white">
           <div className="max-w-3xl mx-auto">
             <button type="button" onClick={scrollToConsultForm} className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white font-extrabold text-base py-4 rounded-2xl shadow-lg shadow-orange-200/50 transition-all">
-              <Zap className="h-4 w-4" /> Talk to a Vet Now — {price}
+              <Zap className="h-4 w-4" /> Consult Now — {price}
             </button>
           </div>
         </section>
 
+        {/* ══ OUR LICENSED VETERINARIANS ══════════════════════════════════════ */}
+        <section id="our-vets" className="py-14 px-4 bg-white scroll-mt-24">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-end justify-between gap-4 flex-wrap mb-8">
+              <div>
+                <h2 className="text-2xl font-extrabold text-slate-900 mb-2 flex items-center gap-2">
+                  <PawPrint className="h-6 w-6 text-brand" />
+                  Our Licensed Veterinarians
+                </h2>
+                <p className="text-slate-500 text-sm">
+                  Verified doctors with experience across dogs, cats, and exotic pets.
+                </p>
+              </div>
+            </div>
+
+            {vetsLoading ? (
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-2xl border border-slate-200 overflow-hidden">
+                    <div className="h-40 bg-slate-100 animate-pulse" />
+                    <div className="p-4 space-y-2">
+                      <div className="h-4 bg-slate-100 rounded animate-pulse" />
+                      <div className="h-3 bg-slate-100 rounded w-4/5 animate-pulse" />
+                      <div className="h-3 bg-slate-100 rounded w-2/3 animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : vetsError ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                {vetsError}
+              </div>
+            ) : featuredVets.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                No vets available right now. Please check back soon.
+              </div>
+            ) : (
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                {featuredVets.map((vet) => (
+                  <div key={vet.id} className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                    <div className="h-40 bg-slate-100 relative">
+                      {vet.image ? (
+                        <img
+                          src={vet.image}
+                          alt={vet.name}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-slate-200 text-slate-600 text-xl font-bold">
+                          {getInitials(vet.name)}
+                        </div>
+                      )}
+                      {vet.rating ? (
+                        <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-slate-700 shadow">
+                          <Star className="h-3.5 w-3.5 text-amber-400" />
+                          {vet.rating}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="p-4 space-y-2">
+                      <div>
+                        <p className="text-sm font-extrabold text-slate-900">{vet.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {vet.degree || "Veterinary Doctor"}
+                          {vet.experience ? ` · ${vet.experience} yrs` : ""}
+                        </p>
+                      </div>
+                      {vet.specialization ? (
+                        <p className="text-xs text-slate-600 line-clamp-2">
+                          {listToDisplayText(vet.specialization)}
+                        </p>
+                      ) : null}
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span>{vet.responseDay || "0-15 mins"}</span>
+                        <span>
+                          ₹{vet.dayRate || "399"} day · ₹{vet.nightRate || "549"} night
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => navigate(PET_DETAILS_ROUTE)}
+                className="w-full max-w-3xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
+              >
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  Consult Now — {price}
+                </span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ══ TALK TO A VET FOR COMMON PET PROBLEMS ═══════════════════════════ */}
+        <section id="common-problems" className="py-14 px-4 bg-slate-50 scroll-mt-24">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-2xl font-extrabold text-slate-900 mb-2">Talk to a Vet Online for Common Pet Problems</h2>
+            <p className="text-slate-500 text-sm mb-8">Pet parents contact us for issues like:</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { emoji: "🐶", label: "Dog vomiting or diarrhea" },
+                { emoji: "🐱", label: "Cat not eating" },
+                { emoji: "🐾", label: "Dog skin itching / infection" },
+                { emoji: "🩹", label: "Pet injury or sudden illness" },
+                { emoji: "💉", label: "Puppy vaccination questions" },
+                { emoji: "🐱", label: "Cat urinary problems" },
+                { emoji: "🦷", label: "Dental & mouth issues" },
+                { emoji: "🔍", label: "Second opinion on treatment" },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={scrollToConsultForm}
+                  className="flex items-center justify-center gap-2.5 bg-white border border-slate-200 rounded-full py-3 px-4 text-sm text-slate-700 font-medium hover:border-brand/40 hover:bg-brand/5 hover:text-brand transition-all duration-200"
+                >
+                  <span>{item.emoji}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ══ ONLINE VET CONSULTATION ACROSS INDIA ════════════════════════════ */}
+        <section id="across-india" className="py-8 px-4 bg-slate-50 scroll-mt-24">
+          <div className="max-w-6xl mx-auto">
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 p-6">
+              <h2 className="text-xl font-extrabold text-slate-900 mb-1 flex items-center gap-2">
+                <Globe size={20} className="text-brand" />
+                Online Vet Consultation Across India
+              </h2>
+              <p className="text-sm text-slate-700 mb-1">
+                <strong>Snoutiq provides online vet consultations across India including Delhi NCR, Mumbai, Bangalore, Hyderabad, Chennai, Pune, Kolkata, Ahmedabad and other cities.</strong>{" "}
+                Wherever you are, a licensed vet is 15 min away.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-4">
+                {["Delhi NCR", "Mumbai", "Bangalore", "Hyderabad", "Chennai", "Pune", "Kolkata", "Jaipur", "Lucknow"].map((city) => (
+                  <span key={city} className="inline-block border border-slate-300 rounded-full px-3 py-1 text-xs font-semibold text-slate-700 bg-white">
+                    {city}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ══ WHY ONLINE VET CONSULTATION WORKS ══════════════════════════════ */}
+        <section className="py-14 px-4 bg-white">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-2xl font-extrabold text-slate-900 mb-8">Why online vet consultation works</h2>
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                <h3 className="font-extrabold text-slate-900 text-base mb-2 flex items-center gap-2">
+                  <span className="text-xl">✅</span> Benefits
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  Instant access from home, avoid travel stress for your pet, affordable follow-ups, and quick emergency triage. Perfect for minor illnesses, behaviour concerns, and post-op checks.
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                <h3 className="font-extrabold text-slate-900 text-base mb-2 flex items-center gap-2">
+                  <span className="text-xl">📡</span> When to use teleconsult
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  Vomiting, loose stools, skin issues, dietary advice, vaccination reminders, lethargy — if your pet is stable, a video call works. For severe breathing issues or trauma, visit a clinic.
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                <h3 className="font-extrabold text-slate-900 text-base mb-2 flex items-center gap-2">
+                  <span className="text-xl">📋</span> How prescription works
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  After video exam, vets send e-prescriptions (Rx) via WhatsApp. You can buy medicines locally or online. Follow-up included if needed within 48 hrs.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* PRICING */}
-        <section className="py-14 px-4 bg-slate-50">
+        <section id="pricing" className="py-14 px-4 bg-slate-50 scroll-mt-24">
           <div className="max-w-6xl mx-auto">
             <p className="text-xs font-extrabold text-brand text-center tracking-widest mb-2">PRICING</p>
             <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-2">One flat fee. Everything included.</h2>
             <p className="text-slate-500 text-sm text-center mb-8">No subscription. No extra charges for prescription or follow-up.</p>
             <div className="grid sm:grid-cols-2 gap-4 mb-5">
               <div className="bg-white rounded-2xl border-2 border-brand p-5 relative shadow-lg shadow-brand/10">
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white text-[10px] font-extrabold px-3 py-1 rounded-full whitespace-nowrap">8 AM – 8 PM</span>
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white text-[10px] font-extrabold px-3 py-1 rounded-full whitespace-nowrap">8 AM – 10 PM</span>
                 <p className="text-sm text-slate-500 font-semibold mt-1 mb-1">Day consult</p>
                 <p className="text-4xl font-extrabold text-brand mb-4">₹399</p>
                 <ul className="space-y-2 text-xs text-slate-600">
@@ -2109,7 +2039,7 @@ export default function VideoConsultLP() {
                 </ul>
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-5 relative">
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-extrabold px-3 py-1 rounded-full whitespace-nowrap">8 PM – 8 AM</span>
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-extrabold px-3 py-1 rounded-full whitespace-nowrap">10 PM – 8 AM</span>
                 <p className="text-sm text-slate-500 font-semibold mt-1 mb-1">Night consult</p>
                 <p className="text-4xl font-extrabold text-slate-900 mb-4">₹549</p>
                 <ul className="space-y-2 text-xs text-slate-600">
@@ -2120,22 +2050,62 @@ export default function VideoConsultLP() {
               </div>
             </div>
             <p className="text-xs text-slate-400 text-center">Same quality vets. Same service. Night rate reflects 24/7 availability.</p>
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={scrollToConsultForm}
+                className="w-full max-w-3xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
+              >
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  Consult Now — {price}
+                </span>
+              </button>
+            </div>
           </div>
         </section>
 
-        {/* FAQ */}
-        <section className="py-14 px-4 bg-white">
+        {/* ══ FAQ ════════════════════════════════════════════════════════════ */}
+        <section id="faq" className="py-14 px-4 bg-white scroll-mt-24">
           <div className="max-w-4xl mx-auto">
-            <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">Questions before you book</h2>
-            <div className="space-y-3">
+            <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">Frequently Asked Questions</h2>
+            <div className="space-y-0 divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
               {[
+                { q: "Can I talk to a vet online in India?", a: "Absolutely. Snoutiq connects you with licensed Indian vets within 15 minutes over WhatsApp video call. Available 24/7." },
+                { q: "How much does online vet consultation cost?", a: "Day consultation starts at ₹399, and night emergency (10pm–8am) is ₹549. No hidden fees." },
+                { q: "Can a vet prescribe medicine online?", a: "Yes, registered veterinarians can issue electronic prescriptions after video examination, valid at pharmacy stores." },
+                { q: "Is online vet consultation safe for dogs and cats?", a: "For non-emergency issues it's completely safe and reduces stress. For critical conditions we'll guide you to a clinic." },
+                { q: "What problems can be treated through online vet consultation?", a: "Vomiting, diarrhea, skin allergies, loss of appetite, minor injuries, vaccination advice, and general health queries." },
                 { q: "How does online vet consultation work?", a: "You'll receive a WhatsApp video call on the number you provide. No app download required — the call comes to you." },
                 { q: "Does the vet see my photos before the call?", a: "Yes. The vet reviews your pet details, symptoms, and uploaded photo/PDF before calling — so they come prepared." },
-                { q: "Can I really get a prescription online?", a: "Yes. VCI-registered vets can issue digital prescriptions for non-restricted medications. Sent on WhatsApp and valid at pharmacies in India." },
-                { q: "What if my pet won't sit still for the video?", a: "Normal. The vet will guide you; your description + photos are usually enough. They may request follow-up photos after the call." },
-                { q: "What if I'm not happy with the consultation?", a: "Message support within 24 hours. If the call dropped or there's a genuine issue, we can reschedule or refund based on review." },
                 { q: "Is this available outside Delhi NCR?", a: "Online consultations are pan-India 24/7. Clinic services (vaccination/neuter) are currently Delhi NCR only." },
               ].map((f, i) => <FaqItem key={i} q={f.q} a={f.a} />)}
+            </div>
+          </div>
+        </section>
+
+        {/* ══ EXPLORE MORE PET CARE ════════════════════════════════════════════ */}
+        <section className="py-10 px-4 bg-white border-t border-slate-100">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-lg font-extrabold text-slate-900 mb-5">Explore more pet care</h2>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { emoji: "🐶", label: "Dog neutering", href: "/dog-neutering" },
+                { emoji: "🐱", label: "Cat neutering", href: "/cat-neutering" },
+                { emoji: "💉", label: "Puppy vaccination", href: "/puppy-vaccination" },
+                { emoji: "🐱", label: "Kitten vaccination", href: "/kitten-vaccination" },
+                { emoji: "📖", label: "Pet care blog", href: "/blog" },
+                { emoji: "🏥", label: "In-clinic near me", href: "/clinic" },
+              ].map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className="inline-flex items-center gap-2 border border-slate-200 rounded-full px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:border-brand/40 hover:bg-brand/5 hover:text-brand transition-all duration-200"
+                >
+                  <span>{link.emoji}</span>
+                  {link.label}
+                </a>
+              ))}
             </div>
           </div>
         </section>
@@ -2154,9 +2124,8 @@ export default function VideoConsultLP() {
             </h2>
             <p className="text-slate-400 text-sm mb-7">Fill in your pet&apos;s details, describe the issue, upload photo/PDF and a vet calls you on WhatsApp within 15 minutes after payment.</p>
             <button type="button" onClick={scrollToConsultForm} className="w-full bg-accent hover:bg-accent-hover text-white font-extrabold text-lg py-4 rounded-2xl shadow-xl shadow-orange-900/30 transition-all mb-3">
-              Talk to a Vet — {price}
+              Consult Now — {price}
             </button>
-            {/* <p className="text-slate-500 text-xs">{priceLabel} · No appointment · No app · Secure payment</p> */}
           </div>
         </section>
       </main>
@@ -2168,9 +2137,7 @@ export default function VideoConsultLP() {
               <CheckCircle2 className="h-8 w-8" />
             </div>
             <h4 className="text-lg font-extrabold text-slate-900">Payment confirmed</h4>
-            <p className="mt-2 text-sm text-slate-600">
-              Success! Your vet will connect shortly on WhatsApp.
-            </p>
+            <p className="mt-2 text-sm text-slate-600">Success! Your vet will connect shortly on WhatsApp.</p>
           </div>
         </div>
       ) : null}
@@ -2188,7 +2155,7 @@ export default function VideoConsultLP() {
       <div className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-white/98 backdrop-blur-sm border-t border-slate-200 p-3 shadow-2xl">
         <div className="flex gap-2.5 items-center max-w-lg mx-auto">
           <button type="button" onClick={scrollToConsultForm} className="flex-1 bg-accent hover:bg-accent-hover text-white font-extrabold py-3.5 rounded-xl text-sm transition-colors">
-            Talk to a Vet — {price}
+            Consult Now — {price}
           </button>
         </div>
       </div>
@@ -2200,12 +2167,12 @@ export default function VideoConsultLP() {
 function FaqItem({ q, a }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={cn("border rounded-2xl overflow-hidden transition-all", open ? "border-brand/30 bg-brand-light/10" : "border-slate-200 bg-white")}>
+    <div className={cn("bg-white transition-all", open ? "bg-brand-light/10" : "")}>
       <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left">
         <span className="font-semibold text-slate-900 text-sm leading-snug">{q}</span>
         <ChevronDown className={cn("h-4 w-4 text-brand shrink-0 transition-transform", open ? "rotate-180" : "")} />
       </button>
-      {open && <p className="px-5 pb-4 text-sm text-slate-500 leading-relaxed border-t border-brand/10 pt-3">{a}</p>}
+      {open && <p className="px-5 pb-4 text-sm text-slate-500 leading-relaxed border-t border-slate-100 pt-3">{a}</p>}
     </div>
   );
 }
