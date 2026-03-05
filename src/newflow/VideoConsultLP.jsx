@@ -59,6 +59,33 @@ function getCurrentPrice() {
     : { price: "₹549", label: "Night rate · 8PM–8AM", rateType: "night" };
 }
 
+const PAYMENT_AMOUNTS = {
+  day: 399,
+  night: 549,
+};
+
+const loadRazorpayScript = () =>
+  new Promise((resolve) => {
+    if (typeof window !== "undefined" && window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
+const formatInr = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0";
+  return n.toLocaleString("en-IN", {
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const calcAgeFromDob = (dob) => {
@@ -304,16 +331,19 @@ const YES_NO_OPTIONS = [
 ];
 
 const fieldBase =
-  "w-full rounded-xl border border-gray-200 bg-white p-3 text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-2xl md:p-3.5 md:text-[15px]";
+  "w-full rounded-lg border border-gray-200 bg-white p-2.5 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-xl md:p-3 md:text-sm";
 const selectBase = `${fieldBase} appearance-none pr-12`;
 const textareaBase = `${fieldBase} resize-none min-h-[120px]`;
-const cardBase = "rounded-2xl border border-gray-200 bg-white overflow-hidden";
-const cardHeaderBase = "flex items-center gap-3 border-b border-gray-100 px-4 py-3.5";
-const cardBodyBase = "px-4 py-4 space-y-3.5";
+const cardBase = "rounded-xl border border-gray-200 bg-white overflow-hidden";
+const cardHeaderBase = "flex items-center gap-3 border-b border-gray-100 px-3 py-2.5";
+const cardBodyBase = "px-3 py-3 space-y-3";
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default function VideoConsultLP() {
   const { price, label: priceLabel, rateType } = getCurrentPrice();
+  const consultAmount = PAYMENT_AMOUNTS[rateType] || PAYMENT_AMOUNTS.day;
+  const consultAmountLabel = `₹${formatInr(consultAmount)}`;
+
   const scrollToConsultForm = useCallback(() => {
     const formNode = document.getElementById("consult-form");
     if (!formNode) return;
@@ -326,10 +356,6 @@ export default function VideoConsultLP() {
       const nextUrl = `${window.location.pathname}${window.location.search}#consult-form`;
       window.history.replaceState(window.history.state, "", nextUrl);
     }
-  }, []);
-
-  const goToPetDetails = useCallback(() => {
-    window.location.assign("/20+vetsonline?start=details");
   }, []);
 
   // ─── JSON-LD Schemas ──────────────────────────────────────────────────────
@@ -554,7 +580,6 @@ export default function VideoConsultLP() {
 
   // ✅ Form state (unchanged)
   const [step, setStep] = useState(1);
-  const [submitted, setSubmitted] = useState(false);
   const [submitPayload, setSubmitPayload] = useState(null);
 
   const [details, setDetails] = useState({
@@ -602,6 +627,12 @@ export default function VideoConsultLP() {
   const otpInputRef = useRef(null);
 
   const [liveDoctorCount, setLiveDoctorCount] = useState(null);
+  const [gatewayReady, setGatewayReady] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentStatusType, setPaymentStatusType] = useState("");
+  const [paymentStatusMessage, setPaymentStatusMessage] = useState("");
+  const [paymentComplete, setPaymentComplete] = useState(false);
+  const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
 
   const resetOtpState = useCallback(() => {
     setOtpToken("");
@@ -616,6 +647,16 @@ export default function VideoConsultLP() {
   const ownerPhoneDigits = details.ownerMobile.replace(/\D/g, "");
   const otpVerified = otpStatus === "verified";
   const showOtpSection = ownerPhoneDigits.length === 10 || otpStatus !== "idle";
+
+  useEffect(() => {
+    let active = true;
+    loadRazorpayScript().then((ready) => {
+      if (active) setGatewayReady(ready);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (otpCooldown <= 0) return;
@@ -1021,6 +1062,14 @@ export default function VideoConsultLP() {
     !!uploadFile;
 
   const isValidAll = step1Valid && step2Valid && step3Valid;
+  const paymentStatusClass =
+    paymentStatusType === "success"
+      ? "text-emerald-600"
+      : paymentStatusType === "error"
+      ? "text-red-600"
+      : paymentStatusType === "info"
+      ? "text-blue-600"
+      : "text-slate-400";
 
   const getSubmitTooltip = () => {
     if (!details.ownerName.trim()) return "Please enter owner name";
@@ -1046,6 +1095,10 @@ export default function VideoConsultLP() {
 
   const submitObservation = async () => {
     setSubmitError("");
+    setPaymentComplete(false);
+    setPaymentStatusType("");
+    setPaymentStatusMessage("");
+    setShowPaymentSuccessModal(false);
 
     if (!isValidAll) {
       setSubmitError(getSubmitTooltip() || "Please complete all fields.");
@@ -1118,15 +1171,182 @@ export default function VideoConsultLP() {
 
       const nextPayload = { ...details, observation, observationResponse: data, user_id: userId, pet_id: petId };
       setSubmitPayload(nextPayload);
-      setSubmitted(true);
-
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      await handleInlinePayment(nextPayload);
     } catch (e) {
       setSubmitError(e?.message || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const buildPaymentContext = useCallback((payload) => {
+    const userId = toNumber(
+      pickValue(
+        payload?.user_id,
+        payload?.userId,
+        payload?.observation?.user_id,
+        payload?.observation?.userId,
+        payload?.observationResponse?.user_id,
+        payload?.observationResponse?.userId
+      )
+    );
+
+    const petId = toNumber(
+      pickValue(
+        payload?.pet_id,
+        payload?.petId,
+        payload?.observation?.pet_id,
+        payload?.observation?.petId,
+        payload?.observationResponse?.pet_id,
+        payload?.observationResponse?.petId
+      )
+    );
+
+    return {
+      order_type: "excell_export_campaign",
+      service_id: "consult_basic",
+      booking_rate_type: rateType,
+      slot_label: priceLabel,
+      user_id: userId,
+      pet_id: petId,
+    };
+  }, [rateType, priceLabel]);
+
+  const updatePaymentStatus = useCallback((type, message) => {
+    setPaymentStatusType(type);
+    setPaymentStatusMessage(message);
+  }, []);
+
+  const handleInlinePayment = useCallback(async (payloadArg) => {
+    const activePayload = payloadArg || submitPayload;
+    if (!activePayload || isPaying) return;
+    const paymentContext = buildPaymentContext(activePayload);
+
+    let paymentGatewayAvailable =
+      typeof window !== "undefined" &&
+      Boolean(window.Razorpay) &&
+      gatewayReady;
+
+    if (!paymentGatewayAvailable && typeof window !== "undefined") {
+      updatePaymentStatus("info", "Preparing secure payment...");
+      const loaded = await loadRazorpayScript();
+      if (loaded && window.Razorpay) {
+        paymentGatewayAvailable = true;
+        setGatewayReady(true);
+      }
+    }
+
+    if (!paymentGatewayAvailable) {
+      updatePaymentStatus("error", "Payment gateway failed to load. Please refresh and try again.");
+      return;
+    }
+
+    setIsPaying(true);
+    updatePaymentStatus("info", "Creating secure payment order...");
+
+    try {
+      const baseUrl = apiBaseUrl();
+      const orderRes = await fetch(`${baseUrl}/api/create-order`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: consultAmount,
+          ...paymentContext,
+        }),
+      });
+
+      const orderData = await orderRes.json().catch(() => ({}));
+      if (!orderRes.ok) {
+        throw new Error(orderData?.message || orderData?.error || "Could not create payment order.");
+      }
+
+      const orderId = orderData?.order_id || orderData?.order?.id;
+      const key = orderData?.key;
+      if (!orderId || !key) {
+        throw new Error("Invalid payment order response.");
+      }
+
+      const rzp = new window.Razorpay({
+        key,
+        order_id: orderId,
+        name: "SnoutiQ Veterinary Consultation",
+        description: `Online ${rateType === "day" ? "Day" : "Night"} Consultation`,
+        handler: async (response) => {
+          updatePaymentStatus("info", "Verifying payment...");
+          try {
+            const verifyRes = await fetch(`${baseUrl}/api/rzp/verify`, {
+              method: "POST",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                ...paymentContext,
+                razorpay_order_id: response?.razorpay_order_id,
+                razorpay_payment_id: response?.razorpay_payment_id,
+                razorpay_signature: response?.razorpay_signature,
+              }),
+            });
+
+            const verifyData = await verifyRes.json().catch(() => ({}));
+            if (!verifyRes.ok || verifyData?.success === false) {
+              throw new Error(verifyData?.message || verifyData?.error || "Payment verification failed.");
+            }
+
+            setPaymentComplete(true);
+            setShowPaymentSuccessModal(true);
+            updatePaymentStatus("success", "Payment successful. Vet will connect shortly.");
+
+            window.setTimeout(() => {
+              setShowPaymentSuccessModal(false);
+            }, 1800);
+          } catch (error) {
+            updatePaymentStatus("error", error?.message || "Payment verification failed.");
+          } finally {
+            setIsPaying(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            updatePaymentStatus("error", "Payment cancelled.");
+            setIsPaying(false);
+          },
+        },
+        prefill: {
+          name: details.ownerName || "",
+          contact: formatPhone(details.ownerMobile),
+        },
+      });
+
+      rzp.open();
+      updatePaymentStatus("info", "Opening secure payment...");
+    } catch (error) {
+      updatePaymentStatus("error", error?.message || "Payment could not be initiated.");
+      setIsPaying(false);
+    }
+  }, [
+    submitPayload,
+    isPaying,
+    gatewayReady,
+    updatePaymentStatus,
+    buildPaymentContext,
+    consultAmount,
+    rateType,
+    details.ownerName,
+    details.ownerMobile,
+  ]);
+
+  const handlePrimaryAction = useCallback(async () => {
+    if (submitting || isPaying || paymentComplete) return;
+    if (submitPayload) {
+      await handleInlinePayment(submitPayload);
+      return;
+    }
+    await submitObservation();
+  }, [submitting, isPaying, paymentComplete, submitPayload, handleInlinePayment, submitObservation]);
 
   const getPetTypeIcon = (type) => {
     switch (type) {
@@ -1226,8 +1446,7 @@ export default function VideoConsultLP() {
 
             {/* ── FORM CARD (unchanged) ───────────────────────────────────── */}
             <div id="consult-form" className="scroll-mt-28">
-              {!submitted ? (
-                <div className="bg-white rounded-3xl shadow-2xl shadow-slate-200/60 border border-slate-100 overflow-hidden mt-6 max-w-5xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden mt-6 max-w-4xl mx-auto">
                 {/* Step progress strip */}
                 <div className="flex border-b border-slate-100">
                   {["Owner", "Pet", "Problem"].map((s, i) => {
@@ -1238,7 +1457,7 @@ export default function VideoConsultLP() {
                       <div
                         key={s}
                         className={cn(
-                          "flex-1 py-3 text-center text-xs font-extrabold transition-colors border-b-2",
+                            "flex-1 py-2.5 text-center text-xs font-extrabold transition-colors border-b-2",
                           isActive
                             ? "text-brand border-brand bg-brand-light/30"
                             : isDone
@@ -1253,10 +1472,10 @@ export default function VideoConsultLP() {
                   })}
                 </div>
 
-                <div className="p-5 sm:p-6">
+                <div className="p-4 sm:p-5">
                   {/* STEP 1: OWNER */}
                   {step === 1 && (
-                    <div className="space-y-5">
+                    <div className="space-y-4">
                       <div className={cardBase}>
                         <div className={cardHeaderBase}>
                           <div className="h-9 w-9 rounded-lg bg-brand/10 flex items-center justify-center">
@@ -1428,7 +1647,7 @@ export default function VideoConsultLP() {
 
                   {/* STEP 2: PET */}
                   {step === 2 && (
-                    <div className="space-y-5">
+                    <div className="space-y-4">
                       <div className={cardBase}>
                         <div className={cardHeaderBase}>
                           <div className="h-9 w-9 rounded-lg bg-brand/10 flex items-center justify-center">
@@ -1601,7 +1820,7 @@ export default function VideoConsultLP() {
 
                   {/* STEP 3: PROBLEM + UPLOAD + SUBMIT */}
                   {step === 3 && (
-                    <div className="space-y-5">
+                    <div className="space-y-4">
                       <div className={cardBase}>
                         <div className={cardHeaderBase}>
                           <div className="h-9 w-9 rounded-lg bg-brand/10 flex items-center justify-center">
@@ -1686,7 +1905,7 @@ export default function VideoConsultLP() {
                             <p>A clear photo helps the vet assess faster. For wounds/rashes/swelling, one photo saves time.</p>
                           </div>
 
-                          <label htmlFor="petUploadGallery" className={cn("flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 md:h-48 md:rounded-2xl", isDragging ? "border-brand bg-brand/5 ring-4 ring-brand/10" : "border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400", details.hasPhoto && uploadFile ? "bg-emerald-50/30 border-emerald-300" : "")} onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+                          <label htmlFor="petUploadGallery" className={cn("flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 md:h-40 md:rounded-2xl", isDragging ? "border-brand bg-brand/5 ring-4 ring-brand/10" : "border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400", details.hasPhoto && uploadFile ? "bg-emerald-50/30 border-emerald-300" : "")} onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
                             <div className="flex flex-col items-center justify-center pt-5 pb-6">
                               {details.hasPhoto ? (
                                 <>
@@ -1773,10 +1992,44 @@ export default function VideoConsultLP() {
 
                       <div className="flex gap-2">
                         <button type="button" onClick={() => setStep(2)} className="px-4 py-3.5 rounded-2xl border border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 shrink-0">← Back</button>
-                        <button type="button" disabled={!isValidAll || submitting} title={!isValidAll ? getSubmitTooltip() : undefined} onClick={submitObservation} className={cn("flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-base py-4 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]")}>
-                          {submitting ? (<><span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />Submitting...</>) : (<>Continue to Payment <ArrowRight className="h-4 w-4" /></>)}
+                        <button
+                          type="button"
+                          disabled={!isValidAll || submitting || isPaying || paymentComplete}
+                          title={!isValidAll ? getSubmitTooltip() : undefined}
+                          onClick={handlePrimaryAction}
+                          className={cn("flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-base py-3.5 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]")}
+                        >
+                          {submitting ? (
+                            <>
+                              <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                              Saving details...
+                            </>
+                          ) : isPaying ? (
+                            <>
+                              <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                              Opening payment...
+                            </>
+                          ) : paymentComplete ? (
+                            <>
+                              Payment completed <CheckCircle2 className="h-4 w-4" />
+                            </>
+                          ) : submitPayload ? (
+                            <>
+                              Pay Now — {consultAmountLabel} <ArrowRight className="h-4 w-4" />
+                            </>
+                          ) : (
+                            <>
+                              Save & Pay Now — {consultAmountLabel} <ArrowRight className="h-4 w-4" />
+                            </>
+                          )}
                         </button>
                       </div>
+
+                      {paymentStatusMessage ? (
+                        <p className={cn("text-center text-xs font-semibold", paymentStatusClass)}>
+                          {paymentStatusMessage}
+                        </p>
+                      ) : null}
 
                       {!isValidAll ? (
                         <p className="text-center text-xs text-amber-600"><span className="inline-flex items-center gap-1"><AlertCircle className="h-4 w-4" />{getSubmitTooltip()}</span></p>
@@ -1790,29 +2043,7 @@ export default function VideoConsultLP() {
                     </div>
                   )}
                 </div>
-                </div>
-              ) : (
-                <div className="bg-white rounded-3xl shadow-2xl shadow-slate-200/60 border border-slate-100 p-8 text-center mt-6 max-w-2xl mx-auto">
-                <div className="text-5xl mb-4">✅</div>
-                <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Details submitted!</h3>
-                <p className="text-slate-500 text-sm mb-5">Your pet details + symptoms + upload are received. Next step is payment, then you&apos;ll get a WhatsApp call from the vet.</p>
-                <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-left mb-5 space-y-2">
-                  {["We notified our vet team with your case details", "After payment, you'll get a WhatsApp call within ~15 minutes", "Prescription shared on WhatsApp after call (if needed)", "Follow-up support via WhatsApp for 24 hours"].map((s, i) => (
-                    <p key={i} className="text-xs text-slate-700 flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" /> {s}</p>
-                  ))}
-                </div>
-                <button type="button" onClick={goToPetDetails} className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white font-extrabold text-base py-4 rounded-2xl transition-all shadow-lg shadow-orange-200/50">
-                  Proceed to Payment — {price} <ArrowRight className="h-4 w-4" />
-                </button>
-                <p className="text-xs text-slate-400 mt-4">Need help? <a href="https://wa.me/919999999999" className="text-brand font-semibold">WhatsApp us</a></p>
-                {submitPayload ? (
-                  <details className="mt-6 text-left text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                    <summary className="cursor-pointer font-semibold">Submitted payload (debug)</summary>
-                    <pre className="mt-2 whitespace-pre-wrap break-words">{JSON.stringify(submitPayload, null, 2)}</pre>
-                  </details>
-                ) : null}
-                </div>
-              )}
+              </div>
             </div>
 
             <div className="flex items-center justify-center gap-5 mt-5 text-xs text-slate-400 flex-wrap">
@@ -1938,6 +2169,20 @@ export default function VideoConsultLP() {
           </div>
         </section>
       </main>
+
+      {showPaymentSuccessModal ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-emerald-200 bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <CheckCircle2 className="h-8 w-8" />
+            </div>
+            <h4 className="text-lg font-extrabold text-slate-900">Payment confirmed</h4>
+            <p className="mt-2 text-sm text-slate-600">
+              Success! Your vet will connect shortly on WhatsApp.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-100 py-4 px-4 pb-28 md:pb-4">

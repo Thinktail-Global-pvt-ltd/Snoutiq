@@ -22,6 +22,8 @@ import {
 export default function VeterinaryDoctorOnlineIndia() {
   const canonical = "https://snoutiq.com/veterinary-doctor-online-india";
   const ogImage = "https://snoutiq.com/images/veterinary-doctor-online-india.jpg";
+  const consultPath = "/20+vetsonline?start=details";
+  const homePath = "/";
 
   // ── CHANGE 1: Expanded schema ──────────────────────────────────────────────
   // Added a third entry to "@graph": a new "LocalBusiness" node with
@@ -270,7 +272,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         {/* CHANGE 4: Added <meta name="keywords"> — was completely missing in original */}
         <meta
           name="keywords"
-          content="veterinary doctor online India, online vet consultation India, talk to vet online India, pet doctor online India, online dog doctor India, online cat doctor India, vet online India 24/7, emergency online vet India"
+          content="veterinary doctor online India, online vet consultation India, talk to vet online India, pet doctor online India, online dog doctor India, online cat doctor India, vet online India 24/7, emergency online vet India, pet doctor online in India, veterinary telemedicine India, online vet India for dogs, online vet India for cats, secure video consultation vet India, instant vet consultation India, best online vet India, veterinary doctor online consultation India, talk to vet online"
         />
 
         {/* CHANGE 5: Added <meta name="robots"> — was completely missing in original.
@@ -332,14 +334,14 @@ export default function VeterinaryDoctorOnlineIndia() {
                 <strong>online cat doctor India</strong> anytime.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/lp-video-consultation-india.html">
+                <Link to={consultPath}>
                   <Button size="lg">Start Instant Vet Consultation</Button>
-                </a>
-                <a href="https://snoutiq.com" target="_blank" rel="noreferrer">
+                </Link>
+                <Link to={homePath}>
                   <Button variant="outline" size="lg">
                     Visit Homepage
                   </Button>
-                </a>
+                </Link>
               </div>
               <p className="mt-4 text-sm text-slate-600">
                 ₹399 Day | ₹549 Night • Trusted Online Vet Doctor Across India
@@ -451,9 +453,9 @@ export default function VeterinaryDoctorOnlineIndia() {
             </div>
 
             <div className="mt-10 text-center">
-              <a href="/lp-video-consultation-india.html">
+              <Link to={consultPath}>
                 <Button size="lg">Start Your Consultation Now</Button>
-              </a>
+              </Link>
             </div>
           </div>
         </section>
@@ -690,9 +692,9 @@ export default function VeterinaryDoctorOnlineIndia() {
               <p className="text-slate-700 mb-6">
                 Your pet's health can't wait. Get expert online vet advice in minutes — day or night.
               </p>
-              <a href="/lp-video-consultation-india.html">
+              <Link to={consultPath}>
                 <Button size="lg">Consult Online Vet Doctor</Button>
-              </a>
+              </Link>
             </div>
           </div>
         </section>

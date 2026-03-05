@@ -107,7 +107,7 @@ export default function NewCounsult() {
                 icon={Video}
                 badge="All India"
                 price="₹399 (Day) / ₹549 (Night)"
-                href="/20+vetsonline?start=details"
+                href="/online-vet-consultation-india"
                 ctaText="Consult Now"
                 features={[
                   "Available 24/7 across India",
