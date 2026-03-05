@@ -6,8 +6,25 @@ export default {
   ],
   theme: {
     extend: {
+      colors: {
+        brand: "#2a8cfb",
+        "brand-dark": "#1a6fd6",
+        "brand-light": "#e8f3ff",
+        accent: "#f97316",
+        "accent-hover": "#ea6c0a",
+      },
       fontFamily: {
         sans: [
+          "Lato",
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          '"Segoe UI"',
+          "Roboto",
+          "sans-serif",
+        ],
+        display: [
+          "Poppins",
           "Lato",
           "system-ui",
           "-apple-system",

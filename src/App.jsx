@@ -3,10 +3,12 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
+  Navigate,
   useLocation,
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { FaPaw } from "react-icons/fa";
+import MainLayout from "./layouts/MainLayout";
 
 const ScrollToTopAndHash = () => {
   const { pathname, hash } = useLocation();
@@ -115,8 +117,14 @@ const AITriagePage = lazy(() => import("./pages/AITriagePage"));
 const HomePage = lazy(() => import("./components/Home"));
 // const DoctorRegistration = lazy(() => import("./components/DoctorRegistration"));
 const ConsultationBooked = lazy(() => import("./pages/ConsultationBooked"));
-
-
+const HomePage1 = lazy(() => import("./newflow/HomePage"));
+const NewAbout = lazy(()=> import("./newflow/NewAbout"));
+const NewCounsult = lazy(() => import("./newflow/NewCounsult"));
+const NewClinics = lazy(() => import("./newflow/NewClinics"));
+const NewVets = lazy(() => import("./newflow/NewVets"));
+const NewVideoConsultation = lazy(() => import("./newflow/NewVideoConsultationLP"));
+const VideoConsultLP = lazy(() => import("./newflow/VideoConsultLP"));
+const SymptomsHub = lazy(() => import("./newflow/SymptomsHub"));
 function App() {
   return (
     <Router>
@@ -133,8 +141,7 @@ function App() {
         }}
       />
 
-      <div className="bg-white text-black">
-        <Suspense
+      <Suspense
           fallback={
             <div className="flex items-center justify-center h-screen">
               <div className="animate-spin">
@@ -144,9 +151,19 @@ function App() {
           }
         >
           <Routes>
+            <Route element={<MainLayout />}>
             {/* Home page - will redirect authenticated users to dashboard */}
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<HomePage1 />} />
+              <Route path="/about" element={<NewAbout />} />
+                <Route path="/parents" element={<NewCounsult />} />
+                <Route path="/clinics" element={<NewClinics />} />
+                <Route path="/vets" element={<NewVets />} />
+                <Route path="/video-consultation-india" element={<NewVideoConsultation />} />
+                <Route path="/lp/video-consultation" element={<VideoConsultLP />} />
+                <Route path="/symptoms" element={<SymptomsHub />} />
+
             <Route path="/20+vetsonline" element={<HomePage />} />
+            <Route path="/consult" element={<HomePage />} />
             <Route path="/whychooseteleconsult" element={<HomePage />} />
             <Route path="/howwework" element={<HomePage />} />
             <Route path="/commitment" element={<HomePage />} />
@@ -253,12 +270,12 @@ function App() {
             {/* <Route path="/video-consult" element={<VideoConsultPage />} /> */}
             {/* <Route path="/ai-triage" element={<AITriagePage />} /> */}
             <Route path="*" element={<NotFoundPage />} />
-
+            </Route>
           </Routes>
         </Suspense>
-      </div>
     </Router>
   );
 }
 
 export default App;
+

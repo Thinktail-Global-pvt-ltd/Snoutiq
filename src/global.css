@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --color-brand: #2a8cfb;
+  --color-brand-dark: #1a6fd6;
+  --color-brand-light: #e8f3ff;
+  --color-accent: #F97316;
+  --color-accent-hover: #ea6c0a;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-slate-900 font-sans antialiased;
+  }
+}

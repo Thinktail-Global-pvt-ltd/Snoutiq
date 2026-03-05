@@ -1,8 +1,8 @@
 import React from "react";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import Footer from "../components/Footer";
-import Header from "../components/Header";
+import {Footer} from "../newflow/NewFooter";
+import {Header} from "../newflow/Navbar";
 
 const seo = {
   title: "Top Friendly Dog Breeds in India for Home and Family",

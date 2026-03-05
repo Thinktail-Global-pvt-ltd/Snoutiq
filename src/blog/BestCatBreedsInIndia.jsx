@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import Footer from "../components/Footer";
-import Header from "../components/Header";
+import {Footer} from "../newflow/NewFooter";
+import {Header} from "../newflow/Navbar";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import { Link } from "react-router-dom";
 
@@ -8,7 +8,6 @@ const BestCatBreedsInIndia = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
-    // Back to top functionality
     const handleScroll = () => {
       setShowBackToTop(window.pageYOffset > 300);
     };

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import img6 from "../assets/images/how_vets_can.jpeg";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+import {Header} from "../newflow/Navbar";
+import {Footer} from "../newflow/NewFooter";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 
 const HowVetsGrow = () => {

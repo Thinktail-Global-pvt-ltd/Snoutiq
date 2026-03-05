@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import Footer from "../components/Footer";
-import Header from "../components/Header";
+import {Footer} from "../newflow/NewFooter";
+import {Header} from "../newflow/Navbar";
 import img8 from "../assets/images/what_should_your.jpeg";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 

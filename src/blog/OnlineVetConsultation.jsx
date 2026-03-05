@@ -1,6 +1,6 @@
 import React from "react";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+import {Header} from "../newflow/Navbar";
+import {Footer} from "../newflow/NewFooter";
 import img9 from "../assets/images/OnlineVetConsultation.png";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 const OnlineVetConsultation = () => {

@@ -1,7 +1,7 @@
 import React from "react";
 import { Helmet, HelmetProvider } from "react-helmet-async";
-import Footer from "../components/Footer";
-import Header from "../components/Header";
+import {Footer} from "../newflow/NewFooter";
+import {Header} from "../newflow/Navbar";
 import img5 from "../assets/images/how_to_boost.jpeg";
 
 const seo = {

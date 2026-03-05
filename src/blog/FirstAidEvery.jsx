@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
+import {Header} from '../newflow/Navbar';
+import {Footer} from '../newflow/NewFooter';
 import img4 from '../assets/images/first_aid_tips.jpeg';
 
 const PetFirstAidGuide = () => {

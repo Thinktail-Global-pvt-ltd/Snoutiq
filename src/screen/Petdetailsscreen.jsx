@@ -6,7 +6,6 @@ import { apiPost, apiBaseUrl } from "../lib/api";
 import {
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
   Star,
   FileText,
   Image,
@@ -276,7 +275,7 @@ const compressImageFile = async (
   return new File([blob], safeName, { type: outputMime });
 };
 
-const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
+const PetDetailsScreen = ({ onSubmit, vet }) => {
   const [details, setDetails] = useState({
     ownerName: "",
     ownerMobile: "",
@@ -1008,19 +1007,10 @@ const PetDetailsScreen = ({ onSubmit, onBack, vet }) => {
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
       <div className="sticky top-0 z-40 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3 md:px-6">
-          <button
-            type="button"
-            onClick={onBack}
-            className="h-8 w-8 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center transition hover:bg-gray-50"
-            aria-label="Go back"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <div className="flex-1 text-center text-base font-semibold text-gray-900 md:text-lg">
+        <div className="mx-auto max-w-5xl px-4 py-3 text-center md:px-6">
+          <div className="text-base font-semibold text-gray-900 md:text-lg">
             Tell us about your pet
           </div>
-          <div className="h-8 w-8" />
         </div>
       </div>
 

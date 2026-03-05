@@ -1,6 +1,6 @@
 import React from "react";
-import Footer from "../components/Footer";
-import Header from "../components/Header";
+import {Footer} from "../newflow/NewFooter";
+import {Header} from "../newflow/Navbar";
 import img11 from "../assets/images/OnlineVetConsultation.png";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 

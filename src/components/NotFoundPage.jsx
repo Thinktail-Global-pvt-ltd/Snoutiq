@@ -75,10 +75,6 @@ const NotFoundPage = () => {
     }
     canonicalLink.setAttribute('href', canonicalUrl);
 
-    if (window.location.pathname !== '/404') {
-      window.history.replaceState(null, '', '/404');
-    }
-
     return () => {
       document.title = previousTitle;
       if (robotsMeta) {
@@ -242,7 +238,7 @@ const NotFoundPage = () => {
       </div>
 
       {/* Custom animations */}
-      <style jsx global>{`
+      <style>{`
         @keyframes float {
           0%, 100% { 
             transform: translate(0, 0) rotate(0deg); 

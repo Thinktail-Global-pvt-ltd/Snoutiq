@@ -9,8 +9,8 @@ import {
   BookOpen,
   TrendingUp,
 } from "lucide-react";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+import {Header} from "../newflow/Navbar";
+import {Footer} from "../newflow/NewFooter";
 import img1 from '../assets/images/dog winter.png';
 import img2 from '../assets/images/pawproduction.png';
 import img3 from '../assets/images/tickfever.png';
