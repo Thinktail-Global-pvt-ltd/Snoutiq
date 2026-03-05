@@ -845,17 +845,18 @@ export const PaymentScreen = ({
   );
 };
 
-export const ConfirmationScreen = ({ vet }) => {
+export const ConfirmationScreen = ({ vet, skipConversion = false }) => {
   const navigate = useNavigate();
   const conversionFiredRef = useRef(false);
 
   useEffect(() => {
+    if (skipConversion) return;
     if (conversionFiredRef.current) return;
     conversionFiredRef.current = true;
     if (typeof window !== "undefined" && typeof window.gtag === "function") {
       window.gtag("event", "ads_conversion_PURCHASE_1");
     }
-  }, []);
+  }, [skipConversion]);
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center animate-fade-in md:bg-gradient-to-b md:from-white md:to-calm-bg">

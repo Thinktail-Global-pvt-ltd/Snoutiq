@@ -1757,9 +1757,9 @@ export default function VideoConsultLP() {
             </div>
 
             {vetsLoading ? (
-              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:overflow-visible md:mx-0 md:px-0">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="rounded-2xl border border-slate-200 overflow-hidden">
+                  <div key={i} className="min-w-[240px] snap-start rounded-2xl border border-slate-200 overflow-hidden md:min-w-0">
                     <div className="h-40 bg-slate-100 animate-pulse" />
                     <div className="p-4 space-y-2">
                       <div className="h-4 bg-slate-100 rounded animate-pulse" />
@@ -1778,9 +1778,9 @@ export default function VideoConsultLP() {
                 No vets available right now. Please check back soon.
               </div>
             ) : (
-              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:overflow-visible md:mx-0 md:px-0">
                 {featuredVets.map((vet) => (
-                  <div key={vet.id} className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                  <div key={vet.id} className="min-w-[240px] snap-start rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm md:min-w-0">
                     <div className="h-40 bg-slate-100 relative">
                       {vet.image ? (
                         <img
@@ -2075,10 +2075,19 @@ function FaqItem({ q, a }) {
 export const VideoConsultPaymentPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const conversionFiredRef = useRef(false);
   const state = location.state || {};
   const petDetails = state?.petDetails;
   const paymentMeta = state?.paymentMeta;
   const vet = state?.vet;
+
+  const fireConversion = useCallback(() => {
+    if (conversionFiredRef.current) return;
+    conversionFiredRef.current = true;
+    if (typeof window !== "undefined" && typeof window.gtag === "function") {
+      window.gtag("event", "ads_conversion_PURCHASE_1");
+    }
+  }, []);
 
   if (!petDetails || !paymentMeta || !vet) {
     return (
@@ -2107,10 +2116,13 @@ export const VideoConsultPaymentPage = () => {
       paymentMeta={paymentMeta}
       onBack={() => navigate(`${BASE_ROUTE}/problem`)}
       onPay={(verify) =>
-        navigate("/consultation-booked", {
-          replace: true,
-          state: { vet, verify },
-        })
+        {
+          fireConversion();
+          navigate("/consultation-booked", {
+            replace: true,
+            state: { vet, verify, skipConversion: true },
+          });
+        }
       }
     />
   );
