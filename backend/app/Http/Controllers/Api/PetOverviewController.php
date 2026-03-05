@@ -236,7 +236,13 @@ class PetOverviewController extends Controller
 
         if (Schema::hasTable('doctors')) {
             $query->leftJoin('doctors as d', 'd.id', '=', 'a.doctor_id');
-            $select[] = DB::raw('COALESCE(d.doctor_name, d.name) as doctor_name');
+            if (Schema::hasColumn('doctors', 'doctor_name')) {
+                $select[] = 'd.doctor_name as doctor_name';
+            } elseif (Schema::hasColumn('doctors', 'name')) {
+                $select[] = 'd.name as doctor_name';
+            } elseif (Schema::hasColumn('doctors', 'full_name')) {
+                $select[] = 'd.full_name as doctor_name';
+            }
         }
 
         if (Schema::hasTable('vet_registerations_temp')) {
@@ -313,7 +319,13 @@ class PetOverviewController extends Controller
 
         if (Schema::hasTable('doctors')) {
             $query->leftJoin('doctors as d', 'd.id', '=', 't.doctor_id');
-            $select[] = DB::raw('COALESCE(d.doctor_name, d.name) as doctor_name');
+            if (Schema::hasColumn('doctors', 'doctor_name')) {
+                $select[] = 'd.doctor_name as doctor_name';
+            } elseif (Schema::hasColumn('doctors', 'name')) {
+                $select[] = 'd.name as doctor_name';
+            } elseif (Schema::hasColumn('doctors', 'full_name')) {
+                $select[] = 'd.full_name as doctor_name';
+            }
         }
 
         if (Schema::hasTable('vet_registerations_temp')) {
