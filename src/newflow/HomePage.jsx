@@ -250,10 +250,10 @@ const N =
       q: "How fast can I connect with a vet?",
       a: "Average wait is under 15 minutes. Vets are available 24/7 across India.",
     },
-    {
-      q: "Can I get a prescription online?",
-      a: "Yes - our vets issue valid digital prescriptions for non-restricted medications, usable at any local pharmacy.",
-    },
+    // {
+    //   q: "Can I get a  online?",
+    //   a: "Yes - our vets issue valid digital prescriptions for non-restricted medications, usable at any local pharmacy.",
+    // },
     {
       q: "Does the app work outside Delhi NCR?",
       a: "Online video consultations are available pan-India. Clinic bookings, vaccination packages, and neuter/spay services are currently Delhi NCR only - more cities coming soon.",
@@ -266,7 +266,7 @@ const N =
     url: "https://www.snoutiq.com",
     logo: "https://www.snoutiq.com/logo.png",
     description:
-      "Online vet consultation platform in India offering 24/7 video consultations, digital prescriptions, and clinic bookings.",
+      "Online vet consultation platform in India offering 24/7 video consultations, follow up, and clinic bookings.",
     areaServed: "India",
     availableService: {
       "@type": "MedicalService",
@@ -289,7 +289,7 @@ const SEO_TITLE_BASE =
 const SEO_TITLE_DEFAULT = `${SEO_TITLE_BASE} | SnoutIQ`;
 const SEO_TITLE_TEMPLATE = "%s | SnoutIQ";
 const SEO_DESCRIPTION =
-  "SnoutIQ is a trusted pet healthcare platform in India. Start an online vet consultation for ₹399 and connect with a certified veterinary doctor within 15 minutes. 24/7 availability with digital prescriptions.";
+  "SnoutIQ is a trusted pet healthcare platform in India. Start an online vet consultation for ₹399 and connect with a certified veterinary doctor within 15 minutes. 24/7 availability with follow up.";
 const SEO_KEYWORDS = [
   "online vet consultation india",
   "pet healthcare platform india",
@@ -817,7 +817,7 @@ function Ie() {
                             }),
                             " for just",
                             e.jsx("strong", { children: " ₹399" }),
-                            " and receive expert diagnosis, guidance, and digital prescription.",
+                            " and receive expert diagnosis, guidance, and ffollow up.",
                           ],
                         }),
                         e.jsxs("div", {
@@ -862,7 +862,7 @@ function Ie() {
                             e.jsx("span", {
                               className:
                                 "bg-slate-100 px-3 py-1.5 rounded-full",
-                              children: "✓ Digital Prescription",
+                              children: "✓ Follow up",
                             }),
                             e.jsx("span", {
                               className:
@@ -949,7 +949,7 @@ function Ie() {
                             e.jsx(S, {
                               icon: R,
                               title: "Digital Health Records",
-                              desc: "Vaccination history, prescriptions, and reports - always accessible.",
+                              desc: "Vaccination history, reminders, and reports - always accessible.",
                             }),
                           ],
                         }),
@@ -1009,7 +1009,7 @@ function Ie() {
                           n: "03",
                           icon: H,
                           title: "Get Expert Care",
-                          desc: "Diagnosis, prescription, records - all done. Follow-up reminders included.",
+                          desc: "Diagnosis, consultation, records - all done. Follow-up reminders included.",
                         },
                       ].map((s) =>
                         e.jsxs(
@@ -1159,7 +1159,7 @@ function Ie() {
                           "Available 24/7",
                           "15-min video call",
                           "7+ yrs exp vets",
-                          "Digital prescription",
+                          "Folloe up",
                         ],
                       }),
                       e.jsx(A, {

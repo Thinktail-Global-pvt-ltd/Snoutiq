@@ -88,11 +88,11 @@ const faqItems = [
   },
   {
     q: "What is the cost of online vet consultation in India?",
-    a: "Online vet consultation on SnoutIQ costs Rs 399 during the day (8 AM to 8 PM) and Rs 549 at night (8 PM to 8 AM). No hidden charges. Covers dogs and cats across all of India.",
+    a: "Online vet consultation on SnoutIQ costs Rs 399 during the day (8 AM to 10 PM) and Rs 549 at night (10 PM to 8 AM). No hidden charges. Covers dogs and cats across all of India.",
   },
   {
-    q: "Can an online vet prescribe medicine in India?",
-    a: "Online vets on SnoutIQ can provide clinical advice, triage guidance, and written recommendations. For certain prescription medicines, a follow-up clinic visit may be required as per Indian veterinary regulations.",
+    q: "Can an online vet advice medicine in India?",
+    a: "Online vets on SnoutIQ can provide clinical advice, triage guidance, and written recommendations. For certain advice medicines, a follow-up clinic visit may be required as per Indian veterinary regulations.",
   },
   {
     q: "Is SnoutIQ's online vet consultation safe and private?",

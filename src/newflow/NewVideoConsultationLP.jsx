@@ -128,10 +128,10 @@ export default function VeterinaryDoctorOnlineIndia() {
           },
           {
             "@type": "Question",
-            name: "Can an online vet prescribe medicine in India?",
+            name: "Can an online vet advice medicine in India?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Online vets on SnoutIQ can provide clinical advice, triage guidance, and written recommendations. For prescription medicines, a follow-up clinic visit may be needed depending on regulations.",
+              text: "Online vets on SnoutIQ can provide clinical advice, triage guidance, and written recommendations. For advice medicines, a follow-up clinic visit may be needed depending on regulations.",
             },
           },
           // CHANGE 1b: Added a 5th FAQ entry (was missing from schema, present in UI)
@@ -198,7 +198,7 @@ export default function VeterinaryDoctorOnlineIndia() {
             reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
             name: "Vet was fully prepared before the video call",
             reviewBody:
-              "Really impressed by how prepared the vet was before the call. They had already reviewed my dog's photo and symptoms. The prescription came on WhatsApp within minutes.",
+              "Really impressed by how prepared the vet was before the call. They had already reviewed my dog's photo and symptoms. The advice came on WhatsApp within minutes.",
           },
           {
             "@type": "Review",

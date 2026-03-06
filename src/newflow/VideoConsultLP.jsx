@@ -509,7 +509,7 @@ export default function VideoConsultLP() {
           author: { "@type": "Person", name: "Deepa R." },
           datePublished: "2025-10-18",
           reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-          reviewBody: "Really impressed by how prepared the vet was before the call. They had already reviewed my dog's photo and symptoms. The prescription came on WhatsApp within minutes. Brilliant service.",
+          reviewBody: "Really impressed by how prepared the vet was before the call. They had already reviewed my dog's photo and symptoms. The follow up came on WhatsApp within minutes. Brilliant service.",
           name: "Vet was fully prepared before the video call",
         },
         {
@@ -1718,7 +1718,7 @@ export default function VideoConsultLP() {
                 { n: "01", title: "Tell us about your pet & issue", desc: "Fill in your pet's details and describe what's wrong. Attach a photo or report — it helps the vet prepare before the call." },
                 { n: "02", title: "Pay securely (₹399 / ₹549)", desc: "One-time fee. UPI, cards, or netbanking. No subscription, no hidden charges." },
                 { n: "03", title: "Vet calls you within 15 minutes", desc: "A verified vet calls on WhatsApp video or your number. They review your case before calling." },
-                { n: "04", title: "Get diagnosis, advice & prescription", desc: "The vet assesses, advises, and sends a digital prescription to WhatsApp if medication is needed." },
+                { n: "04", title: "Get diagnosis, advice & follow up", desc: "The vet assesses, advises, and sends a recommended advice to WhatsApp if medication is needed." },
               ].map((s, i) => (
                 <div key={i} className="flex gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-100 relative">
                   <div className="h-11 w-11 rounded-2xl bg-brand text-white flex items-center justify-center font-extrabold text-xs shrink-0 relative z-10">{s.n}</div>
@@ -1918,10 +1918,10 @@ export default function VideoConsultLP() {
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-5">
                 <h3 className="font-extrabold text-slate-900 text-base mb-2 flex items-center gap-2">
-                  <span className="text-xl">📋</span> How prescription works
+                  <span className="text-xl">📋</span> How consultation works
                 </h3>
                 <p className="text-slate-600 text-sm leading-relaxed">
-                  After video exam, vets send e-prescriptions (Rx) via WhatsApp. You can buy medicines locally or online. Follow-up included if needed within 48 hrs.
+                  After video exam, vets send recommended advice via WhatsApp. You can buy medicines locally or online. Follow-up included if needed within 48 hrs.
                 </p>
               </div>
             </div>
@@ -1933,14 +1933,14 @@ export default function VideoConsultLP() {
           <div className="max-w-6xl mx-auto">
             <p className="text-xs font-extrabold text-brand text-center tracking-widest mb-2">PRICING</p>
             <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-2">One flat fee. Everything included.</h2>
-            <p className="text-slate-500 text-sm text-center mb-8">No subscription. No extra charges for prescription or follow-up.</p>
+            <p className="text-slate-500 text-sm text-center mb-8">No subscription. No extra charges for follow-up.</p>
             <div className="grid sm:grid-cols-2 gap-4 mb-5">
               <div className="bg-white rounded-2xl border-2 border-brand p-5 relative shadow-lg shadow-brand/10">
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white text-[10px] font-extrabold px-3 py-1 rounded-full whitespace-nowrap">8 AM – 10 PM</span>
                 <p className="text-sm text-slate-500 font-semibold mt-1 mb-1">Day consult</p>
                 <p className="text-4xl font-extrabold text-brand mb-4">₹399</p>
                 <ul className="space-y-2 text-xs text-slate-600">
-                  {["Video / WhatsApp call with vet", "Vet reviews your case before calling", "Digital prescription if needed", "WhatsApp follow-up for 24 hours"].map((f) => (
+                  {["Video / WhatsApp call with vet", "Vet reviews your case before calling", "WhatsApp follow-up for 24 hours"].map((f) => (
                     <li key={f} className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-brand shrink-0" />{f}</li>
                   ))}
                 </ul>
@@ -1950,7 +1950,7 @@ export default function VideoConsultLP() {
                 <p className="text-sm text-slate-500 font-semibold mt-1 mb-1">Night consult</p>
                 <p className="text-4xl font-extrabold text-slate-900 mb-4">₹549</p>
                 <ul className="space-y-2 text-xs text-slate-600">
-                  {["Video / WhatsApp call with vet", "Vet reviews your case before calling", "Digital prescription if needed", "WhatsApp follow-up for 24 hours"].map((f) => (
+                  {["Video / WhatsApp call with vet", "Vet reviews your case before calling", "WhatsApp follow-up for 24 hours"].map((f) => (
                     <li key={f} className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />{f}</li>
                   ))}
                 </ul>
@@ -1980,7 +1980,7 @@ export default function VideoConsultLP() {
               {[
                 { q: "Can I talk to a vet online in India?", a: "Absolutely. Snoutiq connects you with licensed Indian vets within 15 minutes over WhatsApp video call. Available 24/7." },
                 { q: "How much does online vet consultation cost?", a: "Day consultation starts at ₹399, and night emergency (10pm–8am) is ₹549. No hidden fees." },
-                { q: "Can a vet prescribe medicine online?", a: "Yes, registered veterinarians can issue electronic prescriptions after video examination, valid at pharmacy stores." },
+                { q: "Can a vet advice medicine online?", a: "Yes, registered veterinarians can advice after video examination, valid at pharmacy stores." },
                 { q: "Is online vet consultation safe for dogs and cats?", a: "For non-emergency issues it's completely safe and reduces stress. For critical conditions we'll guide you to a clinic." },
                 { q: "What problems can be treated through online vet consultation?", a: "Vomiting, diarrhea, skin allergies, loss of appetite, minor injuries, vaccination advice, and general health queries." },
                 { q: "How does online vet consultation work?", a: "You'll receive a WhatsApp video call on the number you provide. No app download required — the call comes to you." },
