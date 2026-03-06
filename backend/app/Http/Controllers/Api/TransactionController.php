@@ -54,9 +54,13 @@ class TransactionController extends Controller
 
         $prescriptionChannelSet = $this->prescriptionChannelSetForTransactions($transactions);
 
-        $latestSessions = $this->latestCallSessionsForUsers(
+        $latestSessions = $this->latestCallSessionsForTransactionChannels(
             doctorId: (int) $data['doctor_id'],
-            userIds: $transactions->pluck('user_id')->filter()->unique()
+            channels: $transactions
+                ->pluck('channel_name')
+                ->filter(fn ($channel) => is_string($channel) && trim($channel) !== '')
+                ->map(fn (string $channel) => trim($channel))
+                ->unique()
         );
         $latestVideoApointments = $this->latestVideoApointmentsForUsers(
             doctorId: (int) $data['doctor_id'],
@@ -68,7 +72,8 @@ class TransactionController extends Controller
         $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser, $prescriptionChannelSet) {
             $user = $tx->user;
             $pet = $tx->pet;
-            $callSession = $latestSessions->get($tx->user_id);
+            $transactionChannel = is_string($tx->channel_name ?? null) ? trim((string) $tx->channel_name) : '';
+            $callSession = $transactionChannel !== '' ? $latestSessions->get($transactionChannel) : null;
             $videoApointment = $latestVideoApointments->get((int) $tx->user_id);
             $deviceTokens = $deviceTokensByUser->get((int) $tx->user_id)
                 ?: ($callSession ? $deviceTokensByUser->get((int) $callSession->patient_id, []) : []);
@@ -284,22 +289,22 @@ class TransactionController extends Controller
     }
 
     /**
-     * Fetch the latest call session for each user for a given doctor.
+     * Fetch the latest call session for each channel for a given doctor.
      */
-    protected function latestCallSessionsForUsers(int $doctorId, $userIds)
+    protected function latestCallSessionsForTransactionChannels(int $doctorId, Collection $channels): Collection
     {
-        if ($userIds->isEmpty()) {
+        if ($channels->isEmpty()) {
             return collect();
         }
 
         $sessions = CallSession::query()
             ->where('doctor_id', $doctorId)
-            ->whereIn('patient_id', $userIds)
+            ->whereIn('channel_name', $channels)
             ->orderByDesc('id')
             ->get();
 
         return $sessions
-            ->groupBy('patient_id')
+            ->groupBy(fn (CallSession $session) => trim((string) ($session->channel_name ?? '')))
             ->map(fn ($group) => $group->first());
     }
 
