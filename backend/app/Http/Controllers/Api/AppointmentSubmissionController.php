@@ -113,6 +113,20 @@ class AppointmentSubmissionController extends Controller
             $notesPayload['text'] = $validated['notes'];
         }
 
+        // Keep the pet's reported symptom aligned with the latest walk-in notes.
+        if (
+            !empty($validated['notes'])
+            && !empty($validated['pet_id'])
+            && Schema::hasTable('pets')
+            && Schema::hasColumn('pets', 'reported_symptom')
+        ) {
+            $pet = Pet::find((int) $validated['pet_id']);
+            if ($pet) {
+                $pet->reported_symptom = $validated['notes'];
+                $pet->save();
+            }
+        }
+
         $appointment = Appointment::create([
             'vet_registeration_id' => $clinic->id,
             'doctor_id' => $doctor->id,
