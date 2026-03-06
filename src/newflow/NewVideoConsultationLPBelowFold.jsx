@@ -92,7 +92,7 @@ const faqItems = [
   },
   {
     q: "What do I receive after an online vet consultation in India?",
-    a: "Online vets on SnoutIQ provide clinical guidance, personalized treatment recommendations, a consultation summary, and clear follow-up care instructions based on your pet's needs.",
+    a: "Online vets on SnoutIQ provide clinical guidance, personalized care guidance, a consultation summary, and clear follow-up care instructions based on your pet's needs.",
   },
   {
     q: "Is SnoutIQ's online vet consultation safe and private?",

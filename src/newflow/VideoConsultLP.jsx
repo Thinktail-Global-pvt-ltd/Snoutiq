@@ -39,7 +39,7 @@ import {
 // ─── SEO constants ───────────────────────────────────────────────────────────
 const TITLE = "Trusted Online Vet Consultation India | Expert Vet Guidance 24/7";
 const DESCRIPTION =
-  "Consult licensed veterinarians in India via WhatsApp video within 15 minutes. Trusted online vet consultation for dogs, cats, and exotic pets with personalized treatment recommendations and follow-up care guidance.";
+  "Consult licensed veterinarians in India via WhatsApp video within 15 minutes. Trusted online vet consultation for dogs, cats, and exotic pets with personalized care guidance and follow-up care guidance.";
 const CANONICAL = "https://www.snoutiq.com/online-vet-consultation";
 const KEYWORDS = [
   "online vet consultation",
@@ -459,7 +459,7 @@ export default function VideoConsultLP() {
           name: "What do I receive after an online vet consultation?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "You receive expert veterinary guidance, personalized treatment recommendations, a consultation summary, and follow-up care instructions based on your pet's needs.",
+            text: "You receive expert veterinary guidance, personalized care guidance, a consultation summary, and follow-up care instructions based on your pet's needs.",
           },
         },
       ],
@@ -538,7 +538,7 @@ export default function VideoConsultLP() {
       "@context": "https://schema.org",
       "@type": "Product",
       name: "Online Vet Consultation – SnoutiQ",
-      description: "Talk to a licensed veterinarian online in India via WhatsApp video call within 15 minutes and receive personalized treatment recommendations with clear follow-up care guidance.",
+      description: "Talk to a licensed veterinarian online in India via WhatsApp video call within 15 minutes and receive personalized care guidance with clear follow-up care guidance.",
       url: CANONICAL,
       brand: { "@type": "Brand", name: "SnoutiQ" },
       offers: [
@@ -1726,7 +1726,7 @@ export default function VideoConsultLP() {
                 { n: "01", title: "Tell us about your pet & issue", desc: "Fill in your pet's details and describe what's wrong. Attach a photo or report — it helps the vet prepare before the call." },
                 { n: "02", title: "Pay securely (₹399 / ₹549)", desc: "One-time fee. UPI, cards, or netbanking. No subscription, no hidden charges." },
                 { n: "03", title: "Vet calls you within 15 minutes", desc: "A verified vet calls on WhatsApp video or your number. They review your case before calling." },
-                { n: "04", title: "Get your care plan & follow-up", desc: "The vet assesses your pet, shares personalized treatment recommendations, and sends follow-up care instructions on WhatsApp." },
+                { n: "04", title: "Get your care plan & follow-up", desc: "The vet assesses your pet, shares personalized care guidance, and sends follow-up care instructions on WhatsApp." },
               ].map((s, i) => (
                 <div key={i} className="flex gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-100 relative">
                   <div className="h-11 w-11 rounded-2xl bg-brand text-white flex items-center justify-center font-extrabold text-xs shrink-0 relative z-10">{s.n}</div>
@@ -1929,7 +1929,7 @@ export default function VideoConsultLP() {
                   <span className="text-xl">📋</span> How consultation works
                 </h3>
                 <p className="text-slate-600 text-sm leading-relaxed">
-                  After the video exam, vets send a consultation summary, personalized treatment recommendations, and follow-up care instructions via WhatsApp. Follow-up support is included if needed within 48 hrs.
+                  After the video exam, vets send a consultation summary, personalized care guidance, and follow-up care instructions via WhatsApp. Follow-up support is included if needed within 48 hrs.
                 </p>
               </div>
             </div>
@@ -1988,7 +1988,7 @@ export default function VideoConsultLP() {
               {[
                 { q: "Can I talk to a vet online in India?", a: "Absolutely. Snoutiq connects you with licensed Indian vets within 15 minutes over WhatsApp video call. Available 24/7." },
                 { q: "How much does online vet consultation cost?", a: "Day consultation starts at ₹399, and night emergency (10pm–8am) is ₹549. No hidden fees." },
-                { q: "What do I receive after an online vet consultation?", a: "You receive expert veterinary guidance, personalized treatment recommendations, a consultation summary, and follow-up care instructions for your pet." },
+                { q: "What do I receive after an online vet consultation?", a: "You receive expert veterinary guidance, personalized care guidance, a consultation summary, and follow-up care instructions for your pet." },
                 { q: "Is online vet consultation safe for dogs and cats?", a: "For non-emergency issues it's completely safe and reduces stress. For critical conditions we'll guide you to a clinic." },
                 { q: "What problems can be treated through online vet consultation?", a: "Vomiting, diarrhea, skin allergies, loss of appetite, minor injuries, vaccination advice, and general health queries." },
                 { q: "How does online vet consultation work?", a: "You'll receive a WhatsApp video call on the number you provide. No app download required — the call comes to you." },

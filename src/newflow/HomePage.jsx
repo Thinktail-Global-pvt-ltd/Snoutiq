@@ -285,7 +285,7 @@ const SEO_TITLE_BASE =
 const SEO_TITLE_DEFAULT = `${SEO_TITLE_BASE} | SnoutIQ`;
 const SEO_TITLE_TEMPLATE = "%s | SnoutIQ";
 const SEO_DESCRIPTION =
-  "SnoutIQ is a trusted pet healthcare platform in India. Start an online vet consultation and connect with a certified veterinary doctor within 15 minutes for personalized treatment recommendations and follow-up care guidance.";
+  "SnoutIQ is a trusted pet healthcare platform in India. Start an online vet consultation and connect with a certified veterinary doctor within 15 minutes for personalized care guidance and follow-up care guidance.";
 const SEO_KEYWORDS = [
   "online vet consultation india",
   "pet healthcare platform india",

@@ -131,7 +131,7 @@ export default function VeterinaryDoctorOnlineIndia() {
             name: "What do I receive after an online vet consultation in India?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Online vets on SnoutIQ provide clinical guidance, personalized treatment recommendations, a consultation summary, and clear follow-up care instructions based on your pet's needs.",
+              text: "Online vets on SnoutIQ provide clinical guidance, personalized care guidance, a consultation summary, and clear follow-up care instructions based on your pet's needs.",
             },
           },
           // CHANGE 1b: Added a 5th FAQ entry (was missing from schema, present in UI)
@@ -228,7 +228,7 @@ export default function VeterinaryDoctorOnlineIndia() {
             New: Added "from ₹399" and "dogs & cats" kept, added "No app needed." */}
         <meta
           name="description"
-          content="Connect with a verified veterinary doctor online in India from Rs 399. 24/7 instant vet consultation for dogs and cats with personalized treatment recommendations and follow-up care instructions. No app needed."
+          content="Connect with a verified veterinary doctor online in India from Rs 399. 24/7 instant vet consultation for dogs and cats with personalized care guidance and follow-up care instructions. No app needed."
         />
 
         {/* CHANGE 4: Added <meta name="keywords"> — was completely missing in original */}
@@ -250,7 +250,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         <meta property="og:title" content="Veterinary Doctor Online India | SnoutIQ" />
         <meta
           property="og:description"
-          content="Talk to a veterinary doctor online in India and receive expert vet guidance, personalized treatment recommendations, and follow-up care instructions."
+          content="Talk to a veterinary doctor online in India and receive expert vet guidance, personalized care guidance, and follow-up care instructions."
         />
         <meta property="og:url" content={canonical} />
         <meta property="og:site_name" content="SnoutIQ" />
