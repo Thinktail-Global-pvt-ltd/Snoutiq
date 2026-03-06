@@ -149,7 +149,7 @@ class PrescriptionController extends Controller
     }
 
     // GET /api/prescriptions/{id}
-    public function show($id)
+    public function show(int $id)
     {
         $prescription = Prescription::find($id);
         if (!$prescription) {
