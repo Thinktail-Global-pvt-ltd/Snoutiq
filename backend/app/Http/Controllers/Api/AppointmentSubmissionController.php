@@ -199,6 +199,7 @@ class AppointmentSubmissionController extends Controller
                     'date' => $appointment->appointment_date,
                     'time_slot' => $appointment->appointment_time,
                     'status' => $appointment->status,
+                    'appointment_table' => $this->appointmentTablePayload($appointment, $notes),
                 ],
                 'patient_user_id' => (int) $user->id,
                 'user' => $user->toArray(),
@@ -497,8 +498,8 @@ class AppointmentSubmissionController extends Controller
                 $resolvedUser = $user->toArray();
             }
 
-            $appointmentPayload = $appointment->toArray();
-            $appointmentPayload['notes_decoded'] = $this->decodeNotes($appointment->notes);
+            $notes = $this->decodeNotes($appointment->notes);
+            $appointmentPayload = $this->appointmentTablePayload($appointment, $notes);
 
             return [
                 'appointment' => $appointmentPayload,
@@ -584,6 +585,7 @@ class AppointmentSubmissionController extends Controller
             'status' => $appointment->status,
             'amount' => $notes['amount_paise'] ?? null,
             'currency' => $notes['currency'] ?? 'INR',
+            'appointment_table' => $this->appointmentTablePayload($appointment, $notes),
         ];
     }
 
@@ -604,6 +606,25 @@ class AppointmentSubmissionController extends Controller
         $decoded = json_decode($notes ?? '{}', true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function appointmentTablePayload(Appointment $appointment, array $notes = []): array
+    {
+        static $columns = null;
+        if ($columns === null) {
+            $columns = Schema::hasTable('appointments')
+                ? Schema::getColumnListing('appointments')
+                : [];
+        }
+
+        $payload = [];
+        foreach ($columns as $column) {
+            $payload[$column] = $appointment->{$column} ?? null;
+        }
+
+        $payload['notes_decoded'] = !empty($notes) ? $notes : $this->decodeNotes($appointment->notes);
+
+        return $payload;
     }
 
     private function resolvePatientUserId(Appointment $appointment, array $notes = [], array $userLookup = []): ?int
