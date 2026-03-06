@@ -91,8 +91,8 @@ const faqItems = [
     a: "Online vet consultation on SnoutIQ costs Rs 399 during the day (8 AM to 10 PM) and Rs 549 at night (10 PM to 8 AM). No hidden charges. Covers dogs and cats across all of India.",
   },
   {
-    q: "Can an online vet advice medicine in India?",
-    a: "Online vets on SnoutIQ can provide clinical advice, triage guidance, and written recommendations. For certain advice medicines, a follow-up clinic visit may be required as per Indian veterinary regulations.",
+    q: "What do I receive after an online vet consultation in India?",
+    a: "Online vets on SnoutIQ provide clinical guidance, personalized treatment recommendations, a consultation summary, and clear follow-up care instructions based on your pet's needs.",
   },
   {
     q: "Is SnoutIQ's online vet consultation safe and private?",
@@ -321,7 +321,7 @@ export default function NewVideoConsultationLPBelowFold({ consultPath }) {
           </p>
           <p className="text-slate-700 mb-4">
             Unlike generic teleconsultation platforms, SnoutIQ is built exclusively for pets. Our{" "}
-            <strong>video consultation vet</strong> sessions are tailored to small animal medicine, covering dogs,
+            <strong>video consultation vet</strong> sessions are tailored to small animal care, covering dogs,
             cats, and more. The platform supports real-time visual examination, enabling vets to assess symptoms
             accurately over video.
           </p>
@@ -359,7 +359,7 @@ export default function NewVideoConsultationLPBelowFold({ consultPath }) {
           <div className="bg-brand/10 p-8 rounded-2xl text-center border border-brand/30">
             <h3 className="text-2xl font-bold mb-4">Talk to Veterinary Doctor Online India Now</h3>
             <p className="text-slate-700 mb-6">
-              Your pet&apos;s health can&apos;t wait. Get expert online vet advice in minutes, day or night.
+              Your pet&apos;s health can&apos;t wait. Get expert online vet guidance in minutes, day or night.
             </p>
             <Link to={consultPath}>
               <Button size="lg">Consult Online Vet Doctor</Button>

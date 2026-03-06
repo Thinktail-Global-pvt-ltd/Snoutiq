@@ -3,14 +3,12 @@ Allow: /
 Disallow: /admin/
 Disallow: /private/
 
-# Important: This website provides veterinary teleconsultation services ONLY
-# We DO NOT prescribe medications online
-# We DO NOT operate as an online pharmacy
-# Consultation and triage services only
+# Important: This website provides online veterinary consultation services
+# Focused on pet care guidance, triage, and follow-up support
+# Designed for pet parents seeking expert veterinary advice from home
 
 Sitemap: https://www.snoutiq.com/sitemap.xml
 
 # Healthcare Compliance Notice:
-# This service complies with Google Healthcare and Medicines policies
-# Service Type: Teleconsultation and Triage Only
-# No Prescription Services Offered
+# Service Type: Online veterinary consultation and triage
+# Includes consultation summaries and next-step care guidance

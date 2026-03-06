@@ -30,7 +30,7 @@ const N =
   te = [
     {
       name: "Dr. Priya Menon",
-      specialty: "Small Animal Medicine",
+      specialty: "Small Animal Care",
       exp: "9 Yrs",
       location: "Delhi",
       rating: "4.9",
@@ -70,7 +70,7 @@ const N =
     },
     {
       name: "Dr. Amit Bose",
-      specialty: "Internal Medicine",
+      specialty: "Internal Care",
       exp: "14 Yrs",
       location: "Kolkata",
       rating: "4.9",
@@ -250,10 +250,6 @@ const N =
       q: "How fast can I connect with a vet?",
       a: "Average wait is under 15 minutes. Vets are available 24/7 across India.",
     },
-    // {
-    //   q: "Can I get a  online?",
-    //   a: "Yes - our vets issue valid digital prescriptions for non-restricted medications, usable at any local pharmacy.",
-    // },
     {
       q: "Does the app work outside Delhi NCR?",
       a: "Online video consultations are available pan-India. Clinic bookings, vaccination packages, and neuter/spay services are currently Delhi NCR only - more cities coming soon.",
@@ -271,7 +267,7 @@ const N =
     availableService: {
       "@type": "MedicalService",
       name: "Online Veterinary Consultation",
-      serviceType: "Telemedicine",
+      serviceType: "Online Veterinary Consultation",
       areaServed: "India",
     },
   },
@@ -285,11 +281,11 @@ const N =
     })),
   };
 const SEO_TITLE_BASE =
-  "Online Vet Consultation India | Connect with Vet Within 15 Minutes";
+  "Trusted Online Vet Consultation India | Connect Within 15 Minutes";
 const SEO_TITLE_DEFAULT = `${SEO_TITLE_BASE} | SnoutIQ`;
 const SEO_TITLE_TEMPLATE = "%s | SnoutIQ";
 const SEO_DESCRIPTION =
-  "SnoutIQ is a trusted pet healthcare platform in India. Start an online vet consultation for ₹399 and connect with a certified veterinary doctor within 15 minutes. 24/7 availability with follow up.";
+  "SnoutIQ is a trusted pet healthcare platform in India. Start an online vet consultation and connect with a certified veterinary doctor within 15 minutes for personalized treatment recommendations and follow-up care guidance.";
 const SEO_KEYWORDS = [
   "online vet consultation india",
   "pet healthcare platform india",
@@ -1239,7 +1235,7 @@ function Ie() {
                           e.jsx("p", {
                             className: "text-slate-600 mb-6 leading-relaxed",
                             children:
-                              "Join India's growing pet telemedicine network. A dedicated app connects you 1-on-1 with pet parents - consult from anywhere, grow your practice.",
+                              "Join India's growing pet consultation network. A dedicated app connects you 1-on-1 with pet parents - consult from anywhere, grow your practice.",
                           }),
                           e.jsx("ul", {
                             className:

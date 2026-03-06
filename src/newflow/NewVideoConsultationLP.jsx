@@ -128,10 +128,10 @@ export default function VeterinaryDoctorOnlineIndia() {
           },
           {
             "@type": "Question",
-            name: "Can an online vet advice medicine in India?",
+            name: "What do I receive after an online vet consultation in India?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "Online vets on SnoutIQ can provide clinical advice, triage guidance, and written recommendations. For advice medicines, a follow-up clinic visit may be needed depending on regulations.",
+              text: "Online vets on SnoutIQ provide clinical guidance, personalized treatment recommendations, a consultation summary, and clear follow-up care instructions based on your pet's needs.",
             },
           },
           // CHANGE 1b: Added a 5th FAQ entry (was missing from schema, present in UI)
@@ -220,7 +220,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         {/* CHANGE 2: Title — added "| SnoutiQ" brand suffix for CTR and brand recall.
             Old: "Veterinary Doctor Online India | 24/7 Pet Doctor Online | SnoutiQ"
             New: "Veterinary Doctor Online India | 24/7 Pet Doctor Online | SnoutiQ" — unchanged, already good */}
-        <title>Veterinary Doctor Online India | 24/7 Pet Doctor Online | SnoutIQ</title>
+        <title>Trusted Veterinary Doctor Online India | Expert Vet Guidance 24/7 | SnoutIQ</title>
 
         {/* CHANGE 3: Meta description — made more action-oriented and added "₹399" price signal.
             Old: "Connect with a verified veterinary doctor online in India. 24/7 instant vet consultation
@@ -228,13 +228,13 @@ export default function VeterinaryDoctorOnlineIndia() {
             New: Added "from ₹399" and "dogs & cats" kept, added "No app needed." */}
         <meta
           name="description"
-          content="Connect with a verified veterinary doctor online in India from ₹399. 24/7 instant vet consultation for dogs & cats. Talk to vet online India via secure HD video call. No app needed."
+          content="Connect with a verified veterinary doctor online in India from Rs 399. 24/7 instant vet consultation for dogs and cats with personalized treatment recommendations and follow-up care instructions. No app needed."
         />
 
         {/* CHANGE 4: Added <meta name="keywords"> — was completely missing in original */}
         <meta
           name="keywords"
-          content="veterinary doctor online India, online vet consultation India, talk to vet online India, pet doctor online India, online dog doctor India, online cat doctor India, vet online India 24/7, emergency online vet India, pet doctor online in India, veterinary telemedicine India, online vet India for dogs, online vet India for cats, secure video consultation vet India, instant vet consultation India, best online vet India, veterinary doctor online consultation India, talk to vet online"
+          content="veterinary doctor online India, online vet consultation India, talk to vet online India, pet doctor online India, online dog doctor India, online cat doctor India, vet online India 24/7, emergency online vet India, pet doctor online in India, veterinary consultation India, online vet India for dogs, online vet India for cats, secure video consultation vet India, instant vet consultation India, best online vet India, veterinary doctor online consultation India, talk to vet online"
         />
 
         {/* CHANGE 5: Added <meta name="robots"> — was completely missing in original.
@@ -250,7 +250,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         <meta property="og:title" content="Veterinary Doctor Online India | SnoutIQ" />
         <meta
           property="og:description"
-          content="Talk to a veterinary doctor online in India. Instant video consultation with vet India for dogs and cats."
+          content="Talk to a veterinary doctor online in India and receive expert vet guidance, personalized treatment recommendations, and follow-up care instructions."
         />
         <meta property="og:url" content={canonical} />
         <meta property="og:site_name" content="SnoutIQ" />
@@ -268,7 +268,7 @@ export default function VeterinaryDoctorOnlineIndia() {
         <meta name="twitter:title" content="Veterinary Doctor Online India | 24/7 Pet Doctor Online | SnoutIQ" />
         <meta
           name="twitter:description"
-          content="Connect with a verified veterinary doctor online in India from ₹399. 24/7 vet consultation for dogs & cats via secure HD video call."
+          content="Connect with a verified veterinary doctor online in India from Rs 399. 24/7 vet consultation for dogs and cats via secure HD video call with clear follow-up care guidance."
         />
         <meta name="twitter:image" content={ogImage} />
         <meta name="twitter:site" content="@SnoutIQ" />
@@ -306,7 +306,7 @@ export default function VeterinaryDoctorOnlineIndia() {
                 </Link>
               </div>
               <p className="mt-4 text-sm text-slate-600">
-                ₹399 Day | ₹549 Night • Trusted Online Vet Doctor Across India
+                Rs 399 Day | Rs 549 Night • Trusted online vet consultation across India
               </p>
             </div>
 
