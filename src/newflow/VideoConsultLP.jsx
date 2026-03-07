@@ -1766,7 +1766,6 @@ export default function VideoConsultLP() {
                         <p className="text-[10px] font-extrabold text-slate-400 tracking-widest uppercase mb-2.5">Consultation fee</p>
                         <div className="flex items-center justify-between">
                           <div className="text-xs text-slate-500">{rateType === "day" ? "Day consult" : "Night consult"} · {priceLabel}</div>
-                          <div className="text-right"><span className="text-2xl font-extrabold text-brand">{price}</span></div>
                         </div>
                       </div>
 
