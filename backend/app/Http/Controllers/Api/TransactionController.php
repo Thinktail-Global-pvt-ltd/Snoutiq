@@ -34,6 +34,21 @@ class TransactionController extends Controller
             if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
                 $petColumns[] = 'pet_doc2_mime';
             }
+            if (Schema::hasColumn('pets', 'breed')) {
+                $petColumns[] = 'breed';
+            }
+            if (Schema::hasColumn('pets', 'pet_age')) {
+                $petColumns[] = 'pet_age';
+            }
+            if (Schema::hasColumn('pets', 'pet_gender')) {
+                $petColumns[] = 'pet_gender';
+            }
+            if (Schema::hasColumn('pets', 'gender')) {
+                $petColumns[] = 'gender';
+            }
+            if (Schema::hasColumn('pets', 'weight')) {
+                $petColumns[] = 'weight';
+            }
         }
 
         $supportsCallsJoin = Schema::hasTable('transactions')
@@ -154,6 +169,10 @@ class TransactionController extends Controller
                 'pet' => $pet ? [
                     'id' => $pet->id,
                     'name' => $pet->name,
+                    'gender' => $pet->pet_gender ?? $pet->gender ?? null,
+                    'breed' => $pet->breed ?? null,
+                    'age' => $pet->pet_age ?? null,
+                    'weight' => $pet->weight ?? null,
                     'pet_doc2' => $pet->pet_doc2 ?? null,
                     'pet_doc2_blob_url' => $petBlobUrl,
                     'pet_doc2_url' => $petDoc2Url,
