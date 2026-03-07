@@ -10,6 +10,7 @@ use App\Models\Transaction;
 use App\Models\VideoApointment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
 class TransactionController extends Controller
@@ -35,20 +36,54 @@ class TransactionController extends Controller
             }
         }
 
-        $transactions = Transaction::query()
-            ->whereIn('type', ['video_consult', 'video_call', 'video call', 'appointment'])
-            ->where('doctor_id', $data['doctor_id'])
+        $supportsCallsJoin = Schema::hasTable('transactions')
+            && Schema::hasColumn('transactions', 'channel_name')
+            && Schema::hasTable('calls')
+            && Schema::hasColumn('calls', 'channel_name');
+
+        $transactionsQuery = Transaction::query()
+            ->select('transactions.*')
+            ->whereIn('transactions.type', ['video_consult', 'video_call', 'video call', 'appointment'])
+            ->where('transactions.doctor_id', $data['doctor_id'])
             ->where(function ($query) {
-                $query->whereNull('status')
-                    ->orWhere('status', '!=', 'pending');
+                $query->whereNull('transactions.status')
+                    ->orWhere('transactions.status', '!=', 'pending');
             })
             ->with([
                 'user' => fn ($q) => $q->select('id', 'name'),
                 'user.deviceTokens:id,user_id,token',
                 'pet' => fn ($q) => $q->select($petColumns),
                 'doctor:id,doctor_name',
-            ])
-            ->orderByDesc('id')
+            ]);
+
+        if ($supportsCallsJoin) {
+            $latestCallsByChannel = DB::table('calls as c')
+                ->selectRaw('MAX(c.id) as latest_call_id, c.channel_name, c.doctor_id')
+                ->whereNotNull('c.channel_name')
+                ->where('c.channel_name', '!=', '')
+                ->groupBy('c.channel_name', 'c.doctor_id');
+
+            $transactionsQuery
+                ->leftJoinSub($latestCallsByChannel, 'latest_call_by_channel', function ($join) {
+                    $join->on('latest_call_by_channel.channel_name', '=', 'transactions.channel_name')
+                        ->on('latest_call_by_channel.doctor_id', '=', 'transactions.doctor_id');
+                })
+                ->leftJoin('calls as joined_call', 'joined_call.id', '=', 'latest_call_by_channel.latest_call_id')
+                ->addSelect([
+                    'joined_call.id as joined_call_id',
+                    'joined_call.status as joined_call_status',
+                    'joined_call.channel_name as joined_call_channel_name',
+                    'joined_call.channel as joined_call_channel',
+                    'joined_call.accepted_at as joined_call_accepted_at',
+                    'joined_call.rejected_at as joined_call_rejected_at',
+                    'joined_call.ended_at as joined_call_ended_at',
+                    'joined_call.cancelled_at as joined_call_cancelled_at',
+                    'joined_call.missed_at as joined_call_missed_at',
+                ]);
+        }
+
+        $transactions = $transactionsQuery
+            ->orderByDesc('transactions.id')
             ->limit($limit)
             ->get();
 
@@ -124,6 +159,7 @@ class TransactionController extends Controller
                     'pet_doc2_url' => $petDoc2Url,
                     'pet_image_url' => $petBlobUrl ?: $petDoc2Url,
                 ] : null,
+                'call' => $this->formatJoinedCall($tx),
                 'call_session' => $callSession ? $this->formatCallSession($callSession) : null,
                 'call_session_is_completed' => $callSession ? (bool) ($callSession->is_completed ?? false) : null,
                 'video_appointment' => $videoApointment ? $this->formatVideoApointment($videoApointment) : null,
@@ -383,6 +419,26 @@ class TransactionController extends Controller
             'is_completed' => (bool) ($videoApointment->is_completed ?? false),
             'created_at' => optional($videoApointment->created_at)->toIso8601String(),
             'updated_at' => optional($videoApointment->updated_at)->toIso8601String(),
+        ];
+    }
+
+    protected function formatJoinedCall(Transaction $transaction): ?array
+    {
+        $callId = $transaction->getAttribute('joined_call_id');
+        if ($callId === null) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $callId,
+            'status' => $transaction->getAttribute('joined_call_status'),
+            'channel_name' => $transaction->getAttribute('joined_call_channel_name'),
+            'channel' => $transaction->getAttribute('joined_call_channel'),
+            'accepted_at' => $transaction->getAttribute('joined_call_accepted_at'),
+            'rejected_at' => $transaction->getAttribute('joined_call_rejected_at'),
+            'ended_at' => $transaction->getAttribute('joined_call_ended_at'),
+            'cancelled_at' => $transaction->getAttribute('joined_call_cancelled_at'),
+            'missed_at' => $transaction->getAttribute('joined_call_missed_at'),
         ];
     }
 
