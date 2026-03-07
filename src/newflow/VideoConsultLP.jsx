@@ -140,13 +140,13 @@ function getCurrentPrice() {
   const h = new Date().getHours();
   const isDay = h >= 8 && h < 22;
   return isDay
-    ? { price: "₹399", label: "Day rate · 8AM–10PM", rateType: "day" }
-    : { price: "₹549", label: "Night rate · 10PM–8AM", rateType: "night" };
+    ? { price: "₹499", label: "Day rate · 8AM–10PM", rateType: "day" }
+    : { price: "₹649", label: "Night rate · 10PM–8AM", rateType: "night" };
 }
 
 const PAYMENT_AMOUNTS = {
-  day: 399,
-  night: 549,
+  day: 499,
+  night: 649,
 };
 
 const formatInr = (value) => {
