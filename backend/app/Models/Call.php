@@ -22,6 +22,7 @@ class Call extends Model
         'patient_id',
         'status',
         'channel',
+        'channel_name',
         'rtc',
         'accepted_at',
         'rejected_at',

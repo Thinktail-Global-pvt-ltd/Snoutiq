@@ -16,6 +16,7 @@ class CallController extends Controller
         $data = $request->validate([
             'patient_id' => 'required|integer',
             'channel' => 'nullable|string',
+            'channel_name' => 'nullable|string|max:255',
             'rtc' => 'nullable|array',
         ]);
 
@@ -29,7 +30,13 @@ class CallController extends Controller
             ], 409);
         }
 
-        $call = $service->createCall($doctorId, $patientId, $data['channel'] ?? null, $data['rtc'] ?? null);
+        $call = $service->createCall(
+            $doctorId,
+            $patientId,
+            $data['channel'] ?? null,
+            $data['channel_name'] ?? null,
+            $data['rtc'] ?? null
+        );
 
         return response()->json([
             'ok' => true,
