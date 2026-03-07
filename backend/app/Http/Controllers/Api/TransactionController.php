@@ -10,6 +10,7 @@ use App\Models\Transaction;
 use App\Models\VideoApointment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
 class TransactionController extends Controller
@@ -33,30 +34,83 @@ class TransactionController extends Controller
             if (Schema::hasColumn('pets', 'pet_doc2_mime')) {
                 $petColumns[] = 'pet_doc2_mime';
             }
+            if (Schema::hasColumn('pets', 'breed')) {
+                $petColumns[] = 'breed';
+            }
+            if (Schema::hasColumn('pets', 'pet_age')) {
+                $petColumns[] = 'pet_age';
+            }
+            if (Schema::hasColumn('pets', 'pet_gender')) {
+                $petColumns[] = 'pet_gender';
+            }
+            if (Schema::hasColumn('pets', 'gender')) {
+                $petColumns[] = 'gender';
+            }
+            if (Schema::hasColumn('pets', 'weight')) {
+                $petColumns[] = 'weight';
+            }
         }
 
-        $transactions = Transaction::query()
-            ->whereIn('type', ['video_consult', 'video_call', 'video call', 'appointment'])
-            ->where('doctor_id', $data['doctor_id'])
+        $supportsCallsJoin = Schema::hasTable('transactions')
+            && Schema::hasColumn('transactions', 'channel_name')
+            && Schema::hasTable('calls')
+            && Schema::hasColumn('calls', 'channel_name');
+
+        $transactionsQuery = Transaction::query()
+            ->select('transactions.*')
+            ->whereIn('transactions.type', ['video_consult', 'video_call', 'video call', 'appointment'])
+            ->where('transactions.doctor_id', $data['doctor_id'])
             ->where(function ($query) {
-                $query->whereNull('status')
-                    ->orWhere('status', '!=', 'pending');
+                $query->whereNull('transactions.status')
+                    ->orWhere('transactions.status', '!=', 'pending');
             })
             ->with([
                 'user' => fn ($q) => $q->select('id', 'name'),
                 'user.deviceTokens:id,user_id,token',
                 'pet' => fn ($q) => $q->select($petColumns),
                 'doctor:id,doctor_name',
-            ])
-            ->orderByDesc('id')
+            ]);
+
+        if ($supportsCallsJoin) {
+            $latestCallsByChannel = DB::table('calls as c')
+                ->selectRaw('MAX(c.id) as latest_call_id, c.channel_name, c.doctor_id')
+                ->whereNotNull('c.channel_name')
+                ->where('c.channel_name', '!=', '')
+                ->groupBy('c.channel_name', 'c.doctor_id');
+
+            $transactionsQuery
+                ->leftJoinSub($latestCallsByChannel, 'latest_call_by_channel', function ($join) {
+                    $join->on('latest_call_by_channel.channel_name', '=', 'transactions.channel_name')
+                        ->on('latest_call_by_channel.doctor_id', '=', 'transactions.doctor_id');
+                })
+                ->leftJoin('calls as joined_call', 'joined_call.id', '=', 'latest_call_by_channel.latest_call_id')
+                ->addSelect([
+                    'joined_call.id as joined_call_id',
+                    'joined_call.status as joined_call_status',
+                    'joined_call.channel_name as joined_call_channel_name',
+                    'joined_call.channel as joined_call_channel',
+                    'joined_call.accepted_at as joined_call_accepted_at',
+                    'joined_call.rejected_at as joined_call_rejected_at',
+                    'joined_call.ended_at as joined_call_ended_at',
+                    'joined_call.cancelled_at as joined_call_cancelled_at',
+                    'joined_call.missed_at as joined_call_missed_at',
+                ]);
+        }
+
+        $transactions = $transactionsQuery
+            ->orderByDesc('transactions.id')
             ->limit($limit)
             ->get();
 
         $prescriptionChannelSet = $this->prescriptionChannelSetForTransactions($transactions);
 
-        $latestSessions = $this->latestCallSessionsForUsers(
+        $latestSessions = $this->latestCallSessionsForTransactionChannels(
             doctorId: (int) $data['doctor_id'],
-            userIds: $transactions->pluck('user_id')->filter()->unique()
+            channels: $transactions
+                ->pluck('channel_name')
+                ->filter(fn ($channel) => is_string($channel) && trim($channel) !== '')
+                ->map(fn (string $channel) => trim($channel))
+                ->unique()
         );
         $latestVideoApointments = $this->latestVideoApointmentsForUsers(
             doctorId: (int) $data['doctor_id'],
@@ -68,7 +122,8 @@ class TransactionController extends Controller
         $payload = $transactions->map(function (Transaction $tx) use ($latestSessions, $latestVideoApointments, $deviceTokensByUser, $prescriptionChannelSet) {
             $user = $tx->user;
             $pet = $tx->pet;
-            $callSession = $latestSessions->get($tx->user_id);
+            $transactionChannel = is_string($tx->channel_name ?? null) ? trim((string) $tx->channel_name) : '';
+            $callSession = $transactionChannel !== '' ? $latestSessions->get($transactionChannel) : null;
             $videoApointment = $latestVideoApointments->get((int) $tx->user_id);
             $deviceTokens = $deviceTokensByUser->get((int) $tx->user_id)
                 ?: ($callSession ? $deviceTokensByUser->get((int) $callSession->patient_id, []) : []);
@@ -114,11 +169,16 @@ class TransactionController extends Controller
                 'pet' => $pet ? [
                     'id' => $pet->id,
                     'name' => $pet->name,
+                    'gender' => $pet->pet_gender ?? $pet->gender ?? null,
+                    'breed' => $pet->breed ?? null,
+                    'age' => $pet->pet_age ?? null,
+                    'weight' => $pet->weight ?? null,
                     'pet_doc2' => $pet->pet_doc2 ?? null,
                     'pet_doc2_blob_url' => $petBlobUrl,
                     'pet_doc2_url' => $petDoc2Url,
                     'pet_image_url' => $petBlobUrl ?: $petDoc2Url,
                 ] : null,
+                'call' => $this->formatJoinedCall($tx),
                 'call_session' => $callSession ? $this->formatCallSession($callSession) : null,
                 'call_session_is_completed' => $callSession ? (bool) ($callSession->is_completed ?? false) : null,
                 'video_appointment' => $videoApointment ? $this->formatVideoApointment($videoApointment) : null,
@@ -284,22 +344,22 @@ class TransactionController extends Controller
     }
 
     /**
-     * Fetch the latest call session for each user for a given doctor.
+     * Fetch the latest call session for each channel for a given doctor.
      */
-    protected function latestCallSessionsForUsers(int $doctorId, $userIds)
+    protected function latestCallSessionsForTransactionChannels(int $doctorId, Collection $channels): Collection
     {
-        if ($userIds->isEmpty()) {
+        if ($channels->isEmpty()) {
             return collect();
         }
 
         $sessions = CallSession::query()
             ->where('doctor_id', $doctorId)
-            ->whereIn('patient_id', $userIds)
+            ->whereIn('channel_name', $channels)
             ->orderByDesc('id')
             ->get();
 
         return $sessions
-            ->groupBy('patient_id')
+            ->groupBy(fn (CallSession $session) => trim((string) ($session->channel_name ?? '')))
             ->map(fn ($group) => $group->first());
     }
 
@@ -378,6 +438,26 @@ class TransactionController extends Controller
             'is_completed' => (bool) ($videoApointment->is_completed ?? false),
             'created_at' => optional($videoApointment->created_at)->toIso8601String(),
             'updated_at' => optional($videoApointment->updated_at)->toIso8601String(),
+        ];
+    }
+
+    protected function formatJoinedCall(Transaction $transaction): ?array
+    {
+        $callId = $transaction->getAttribute('joined_call_id');
+        if ($callId === null) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $callId,
+            'status' => $transaction->getAttribute('joined_call_status'),
+            'channel_name' => $transaction->getAttribute('joined_call_channel_name'),
+            'channel' => $transaction->getAttribute('joined_call_channel'),
+            'accepted_at' => $transaction->getAttribute('joined_call_accepted_at'),
+            'rejected_at' => $transaction->getAttribute('joined_call_rejected_at'),
+            'ended_at' => $transaction->getAttribute('joined_call_ended_at'),
+            'cancelled_at' => $transaction->getAttribute('joined_call_cancelled_at'),
+            'missed_at' => $transaction->getAttribute('joined_call_missed_at'),
         ];
     }
 

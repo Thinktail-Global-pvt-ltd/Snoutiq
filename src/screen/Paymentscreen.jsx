@@ -234,6 +234,7 @@ export const PaymentScreen = ({
   const total = round2(Math.max(totalBeforeDiscount - discountAmount, 0));
   const payableTaxableAmount = round2(total / (1 + gstRate));
   const payableGstAmount = round2(total - payableTaxableAmount);
+  const createOrderAmountInr = useMemo(() => Math.round(total), [total]);
 
   const paymentContext = useMemo(() => {
     const orderType =
@@ -424,7 +425,7 @@ export const PaymentScreen = ({
       return;
     }
 
-    if (!total || total <= 0) {
+    if (!createOrderAmountInr || createOrderAmountInr <= 0) {
       updateStatus("error", "Invalid consultation amount.");
       return;
     }
@@ -433,9 +434,9 @@ export const PaymentScreen = ({
     updateStatus("info", "Creating order...");
 
     try {
-      // ✅ amount = total (keep same as your current backend expectation)
+      // Backend expects integer INR and converts it to paise.
       const order = await apiPost("/api/create-order", {
-        amount: total,
+        amount: createOrderAmountInr,
         ...paymentContext,
       });
 
@@ -933,4 +934,3 @@ export const ConfirmationScreen = ({ vet, skipConversion = false }) => {
     </div>
   );
 };
-

@@ -74,13 +74,20 @@ class CallRoutingService
         return null;
     }
 
-    public function createCall(int $doctorId, int $patientId, ?string $channel, ?array $rtc = null): Call
+    public function createCall(
+        int $doctorId,
+        int $patientId,
+        ?string $channel,
+        ?string $channelName = null,
+        ?array $rtc = null
+    ): Call
     {
         $call = Call::create([
             'doctor_id' => $doctorId,
             'patient_id' => $patientId,
             'status' => Call::STATUS_RINGING,
             'channel' => $channel,
+            'channel_name' => $channelName ?? $channel,
             'rtc' => $rtc,
         ]);
 
