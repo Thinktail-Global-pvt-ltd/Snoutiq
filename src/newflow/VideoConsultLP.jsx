@@ -158,6 +158,8 @@ const formatInr = (value) => {
   });
 };
 
+const round2 = (n) => Number((Number(n) || 0).toFixed(2));
+
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const calcAgeFromDob = (dob) => {
@@ -208,6 +210,18 @@ const toNumber = (value) => {
   if (value === undefined || value === null || value === "") return undefined;
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
+};
+
+const toBoolean = (value) => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "y"].includes(normalized)) return true;
+    if (["0", "false", "no", "n"].includes(normalized)) return false;
+  }
+  return undefined;
 };
 
 const normalizeDisplayText = (value) => {
@@ -1077,6 +1091,36 @@ export default function VideoConsultLP() {
         observation?.data?.isFirstUser
       );
 
+      const firstUserFlag = toBoolean(isFirstUser);
+      const firstOfferStorageKey = `snoutiq:first-offer-used:${userId ?? "guest"}`;
+      let hasUsedFirstOffer = false;
+      if (typeof window !== "undefined") {
+        try {
+          hasUsedFirstOffer =
+            window.localStorage.getItem(firstOfferStorageKey) === "1";
+        } catch {
+          hasUsedFirstOffer = false;
+        }
+      }
+
+      const isFirstUserOfferEligible =
+        firstUserFlag !== undefined ? firstUserFlag : !hasUsedFirstOffer;
+      const firstUserDiscount = 100;
+      const gstRate = 0.18;
+      const taxableAmount = round2(Math.max(consultAmount, 0));
+      const discountAmount = isFirstUserOfferEligible
+        ? round2(Math.min(firstUserDiscount, taxableAmount))
+        : 0;
+      const discountedTaxableAmount = round2(
+        Math.max(taxableAmount - discountAmount, 0)
+      );
+      const gstAmountBeforeDiscount = round2(taxableAmount * gstRate);
+      const gstAmount = round2(discountedTaxableAmount * gstRate);
+      const totalBeforeDiscount = round2(
+        taxableAmount + round2(taxableAmount * gstRate)
+      );
+      const total = round2(discountedTaxableAmount + gstAmount);
+
       const shashankVet =
         featuredVets.find((vet) => isDrShashankVet(vet?.name || vet?.doctor_name)) ||
         DEFAULT_PRIMARY_PAYMENT_VET;
@@ -1100,6 +1144,16 @@ export default function VideoConsultLP() {
         slot_label: slotLabel,
         user_id: userId,
         pet_id: petId,
+        taxable_amount_inr: discountedTaxableAmount,
+        gst_amount_inr: gstAmount,
+        taxable_amount_before_discount_inr: taxableAmount,
+        gst_amount_before_discount_inr: gstAmountBeforeDiscount,
+        consultation_amount_inr: taxableAmount,
+        service_charge_inr: 0,
+        first_user_offer_applied: discountAmount > 0 ? 1 : 0,
+        offer_discount_inr: discountAmount,
+        original_amount_inr: totalBeforeDiscount,
+        final_amount_inr: total,
         ...(isFirstUser !== undefined ? { is_first_user: isFirstUser } : {}),
       };
 

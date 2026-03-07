@@ -133,8 +133,10 @@ export const PaymentScreen = ({
   const service = 0;
   const gstRate = 0.18;
   const taxableAmount = round2(Math.max(fee + service, 0));
-  const gstAmount = round2(taxableAmount * gstRate);
-  const totalBeforeDiscount = round2(taxableAmount + gstAmount);
+  const gstAmountBeforeDiscount = round2(taxableAmount * gstRate);
+  const totalBeforeDiscount = round2(
+    taxableAmount + round2(taxableAmount * gstRate)
+  );
   const firstUserDiscount = 100;
 
   const [isPaying, setIsPaying] = useState(false);
@@ -229,11 +231,13 @@ export const PaymentScreen = ({
   const isFirstUserOfferEligible =
     firstUserFlag !== undefined ? firstUserFlag : !hasUsedFirstOffer;
   const discountAmount = isFirstUserOfferEligible
-    ? round2(Math.min(firstUserDiscount, totalBeforeDiscount))
+    ? round2(Math.min(firstUserDiscount, taxableAmount))
     : 0;
-  const total = round2(Math.max(totalBeforeDiscount - discountAmount, 0));
-  const payableTaxableAmount = round2(total / (1 + gstRate));
-  const payableGstAmount = round2(total - payableTaxableAmount);
+  const discountedTaxableAmount = round2(
+    Math.max(taxableAmount - discountAmount, 0)
+  );
+  const gstAmount = round2(discountedTaxableAmount * gstRate);
+  const total = round2(discountedTaxableAmount + gstAmount);
   const createOrderAmountInr = useMemo(() => Math.round(total), [total]);
 
   const paymentContext = useMemo(() => {
@@ -368,10 +372,10 @@ export const PaymentScreen = ({
       gst_number_given: hasGstNumber ? 1 : undefined,
       amount_includes_gst: 0,
       gst_rate_percent: 18,
-      taxable_amount_inr: payableTaxableAmount,
-      gst_amount_inr: payableGstAmount,
+      taxable_amount_inr: discountedTaxableAmount,
+      gst_amount_inr: gstAmount,
       taxable_amount_before_discount_inr: taxableAmount,
-      gst_amount_before_discount_inr: gstAmount,
+      gst_amount_before_discount_inr: gstAmountBeforeDiscount,
       consultation_amount_inr: round2(fee),
       service_charge_inr: round2(service),
       first_user_offer_applied: discountAmount > 0 ? 1 : 0,
@@ -388,10 +392,10 @@ export const PaymentScreen = ({
     gstNumber,
     service,
     fee,
-    payableTaxableAmount,
-    payableGstAmount,
+    discountedTaxableAmount,
     taxableAmount,
     gstAmount,
+    gstAmountBeforeDiscount,
     discountAmount,
     totalBeforeDiscount,
     total,
