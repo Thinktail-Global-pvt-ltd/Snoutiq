@@ -126,17 +126,55 @@ export const PaymentScreen = ({
     return 0;
   }, [vet?.bookingPrice, vet?.priceDay, vet?.priceNight, rateType]);
 
+  const consultationAmount = useMemo(() => {
+    const metaAmount = toNumber(
+      pickValue(
+        paymentMeta?.consultation_amount_inr,
+        paymentMeta?.consultationAmountInr
+      )
+    );
+    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
+    return round2(Math.max(fee, 0));
+  }, [fee, paymentMeta]);
+
   const slotLabel =
     rateType === "night" ? "Night (10 PM - 8 AM)" : "Day (8 AM - 10 PM)";
 
   // ✅ TESTING: remove service charge for now
-  const service = 0;
+  const service = useMemo(() => {
+    const metaAmount = toNumber(
+      pickValue(paymentMeta?.service_charge_inr, paymentMeta?.serviceChargeInr, 0)
+    );
+    return round2(Math.max(metaAmount ?? 0, 0));
+  }, [paymentMeta]);
   const gstRate = 0.18;
-  const taxableAmount = round2(Math.max(fee + service, 0));
-  const gstAmountBeforeDiscount = round2(taxableAmount * gstRate);
-  const totalBeforeDiscount = round2(
-    taxableAmount + round2(taxableAmount * gstRate)
-  );
+  const taxableAmountBeforeDiscount = useMemo(() => {
+    const metaAmount = toNumber(
+      pickValue(
+        paymentMeta?.taxable_amount_before_discount_inr,
+        paymentMeta?.taxableAmountBeforeDiscountInr
+      )
+    );
+    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
+    return round2(Math.max(consultationAmount + service, 0));
+  }, [consultationAmount, paymentMeta, service]);
+  const gstAmountBeforeDiscount = useMemo(() => {
+    const metaAmount = toNumber(
+      pickValue(
+        paymentMeta?.gst_amount_before_discount_inr,
+        paymentMeta?.gstAmountBeforeDiscountInr
+      )
+    );
+    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
+    return round2(taxableAmountBeforeDiscount * gstRate);
+  }, [paymentMeta, taxableAmountBeforeDiscount]);
+  const totalBeforeDiscount = useMemo(() => {
+    const metaAmount = toNumber(
+      pickValue(paymentMeta?.original_amount_inr, paymentMeta?.originalAmountInr)
+    );
+    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
+    return round2(taxableAmountBeforeDiscount + gstAmountBeforeDiscount);
+  }, [gstAmountBeforeDiscount, paymentMeta, taxableAmountBeforeDiscount]);
   const firstUserDiscount = 100;
 
   const [isPaying, setIsPaying] = useState(false);
@@ -228,16 +266,55 @@ export const PaymentScreen = ({
     [paymentMeta, petDetails]
   );
 
-  const isFirstUserOfferEligible =
-    firstUserFlag !== undefined ? firstUserFlag : !hasUsedFirstOffer;
-  const discountAmount = isFirstUserOfferEligible
-    ? round2(Math.min(firstUserDiscount, taxableAmount))
-    : 0;
-  const discountedTaxableAmount = round2(
-    Math.max(taxableAmount - discountAmount, 0)
+  const paymentMetaDiscountAmount = toNumber(
+    pickValue(paymentMeta?.offer_discount_inr, paymentMeta?.offerDiscountInr)
   );
-  const gstAmount = round2(discountedTaxableAmount * gstRate);
-  const total = round2(discountedTaxableAmount + gstAmount);
+  const paymentMetaOfferApplied = toBoolean(
+    pickValue(
+      paymentMeta?.first_user_offer_applied,
+      paymentMeta?.firstUserOfferApplied
+    )
+  );
+
+  const isFirstUserOfferEligible =
+    paymentMetaDiscountAmount !== undefined
+      ? paymentMetaDiscountAmount > 0
+      : paymentMetaOfferApplied !== undefined
+        ? paymentMetaOfferApplied
+        : firstUserFlag !== undefined
+          ? firstUserFlag
+          : !hasUsedFirstOffer;
+
+  const discountAmount =
+    paymentMetaDiscountAmount !== undefined
+      ? round2(Math.max(paymentMetaDiscountAmount, 0))
+      : isFirstUserOfferEligible
+        ? round2(Math.min(firstUserDiscount, taxableAmountBeforeDiscount))
+        : 0;
+
+  const taxableAmount = useMemo(() => {
+    const metaAmount = toNumber(
+      pickValue(paymentMeta?.taxable_amount_inr, paymentMeta?.taxableAmountInr)
+    );
+    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
+    return round2(Math.max(taxableAmountBeforeDiscount - discountAmount, 0));
+  }, [discountAmount, paymentMeta, taxableAmountBeforeDiscount]);
+
+  const gstAmount = useMemo(() => {
+    const metaAmount = toNumber(
+      pickValue(paymentMeta?.gst_amount_inr, paymentMeta?.gstAmountInr)
+    );
+    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
+    return round2(taxableAmount * gstRate);
+  }, [paymentMeta, taxableAmount]);
+
+  const total = useMemo(() => {
+    const metaAmount = toNumber(
+      pickValue(paymentMeta?.final_amount_inr, paymentMeta?.finalAmountInr)
+    );
+    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
+    return round2(taxableAmount + gstAmount);
+  }, [gstAmount, paymentMeta, taxableAmount]);
   const createOrderAmountInr = useMemo(() => Math.round(total), [total]);
 
   const paymentContext = useMemo(() => {
@@ -372,11 +449,11 @@ export const PaymentScreen = ({
       gst_number_given: hasGstNumber ? 1 : undefined,
       amount_includes_gst: 0,
       gst_rate_percent: 18,
-      taxable_amount_inr: discountedTaxableAmount,
+      consultation_amount_inr: consultationAmount,
+      taxable_amount_inr: taxableAmount,
       gst_amount_inr: gstAmount,
-      taxable_amount_before_discount_inr: taxableAmount,
+      taxable_amount_before_discount_inr: taxableAmountBeforeDiscount,
       gst_amount_before_discount_inr: gstAmountBeforeDiscount,
-      consultation_amount_inr: round2(fee),
       service_charge_inr: round2(service),
       first_user_offer_applied: discountAmount > 0 ? 1 : 0,
       offer_discount_inr: discountAmount,
@@ -391,9 +468,9 @@ export const PaymentScreen = ({
     slotLabel,
     gstNumber,
     service,
-    fee,
-    discountedTaxableAmount,
+    consultationAmount,
     taxableAmount,
+    taxableAmountBeforeDiscount,
     gstAmount,
     gstAmountBeforeDiscount,
     discountAmount,
@@ -679,13 +756,20 @@ export const PaymentScreen = ({
                             ? "Night Consultation Charge"
                             : "Day Consultation Charge"}
                         </span>
-                        <span>Rs {formatInr(fee)}</span>
+                        <span>Rs {formatInr(consultationAmount)}</span>
                       </div>
 
                       {service > 0 ? (
                         <div className="flex justify-between">
                           <span>Service Charge</span>
                           <span>Rs {formatInr(service)}</span>
+                        </div>
+                      ) : null}
+
+                      {discountAmount > 0 ? (
+                        <div className="flex justify-between font-semibold text-emerald-700">
+                          <span>First User Discount</span>
+                          <span>- Rs {formatInr(discountAmount)}</span>
                         </div>
                       ) : null}
 
@@ -698,13 +782,6 @@ export const PaymentScreen = ({
                         <span>GST (18%)</span>
                         <span>Rs {formatInr(gstAmount)}</span>
                       </div>
-
-                      {discountAmount > 0 ? (
-                        <div className="flex justify-between font-semibold text-emerald-700">
-                          <span>First User Discount</span>
-                          <span>- Rs {formatInr(discountAmount)}</span>
-                        </div>
-                      ) : null}
 
                       <div className="flex justify-between">
                         <span>Digital Prescription</span>

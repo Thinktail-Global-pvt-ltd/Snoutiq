@@ -1107,19 +1107,15 @@ export default function VideoConsultLP() {
         firstUserFlag !== undefined ? firstUserFlag : !hasUsedFirstOffer;
       const firstUserDiscount = 100;
       const gstRate = 0.18;
-      const taxableAmount = round2(Math.max(consultAmount, 0));
+      const baseAmount = round2(Math.max(consultAmount, 0));
       const discountAmount = isFirstUserOfferEligible
-        ? round2(Math.min(firstUserDiscount, taxableAmount))
+        ? round2(Math.min(firstUserDiscount, baseAmount))
         : 0;
-      const discountedTaxableAmount = round2(
-        Math.max(taxableAmount - discountAmount, 0)
-      );
-      const gstAmountBeforeDiscount = round2(taxableAmount * gstRate);
-      const gstAmount = round2(discountedTaxableAmount * gstRate);
-      const totalBeforeDiscount = round2(
-        taxableAmount + round2(taxableAmount * gstRate)
-      );
-      const total = round2(discountedTaxableAmount + gstAmount);
+      const taxableAmount = round2(Math.max(baseAmount - discountAmount, 0));
+      const gstAmountBeforeDiscount = round2(baseAmount * gstRate);
+      const gstAmount = round2(taxableAmount * gstRate);
+      const totalBeforeDiscount = round2(baseAmount + gstAmountBeforeDiscount);
+      const total = round2(taxableAmount + gstAmount);
 
       const shashankVet =
         featuredVets.find((vet) => isDrShashankVet(vet?.name || vet?.doctor_name)) ||
@@ -1144,11 +1140,11 @@ export default function VideoConsultLP() {
         slot_label: slotLabel,
         user_id: userId,
         pet_id: petId,
-        taxable_amount_inr: discountedTaxableAmount,
+        consultation_amount_inr: baseAmount,
+        taxable_amount_inr: taxableAmount,
         gst_amount_inr: gstAmount,
-        taxable_amount_before_discount_inr: taxableAmount,
+        taxable_amount_before_discount_inr: baseAmount,
         gst_amount_before_discount_inr: gstAmountBeforeDiscount,
-        consultation_amount_inr: taxableAmount,
         service_charge_inr: 0,
         first_user_offer_applied: discountAmount > 0 ? 1 : 0,
         offer_discount_inr: discountAmount,
@@ -1786,7 +1782,7 @@ export default function VideoConsultLP() {
                           {submitting ? (
                             <><span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />Saving details...</>
                           ) : (
-                            <>Continue to Payment — {consultAmountLabel} <ArrowRight className="h-4 w-4" /></>
+                            <>Continue to Payment <ArrowRight className="h-4 w-4" /></>
                           )}
                         </button>
                       </div>
@@ -1855,7 +1851,19 @@ export default function VideoConsultLP() {
         <section className="px-4 py-6 bg-white">
           <div className="max-w-3xl mx-auto">
             <button type="button" onClick={scrollToConsultForm} className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white font-extrabold text-base py-4 rounded-2xl shadow-lg shadow-orange-200/50 transition-all">
-              <Zap className="h-4 w-4" /> Consult Now — {price}
+             <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
+  <Zap className="h-4 w-4 shrink-0" />
+  <span className="whitespace-nowrap">Consult Now —</span>
+  <span className="whitespace-nowrap line-through text-white/75">
+    ₹{formatInr(consultAmount)}
+  </span>
+  <span className="whitespace-nowrap text-white/90">
+    - ₹100 =
+  </span>
+  <span className="whitespace-nowrap font-extrabold text-white">
+    ₹{formatInr(Math.max(consultAmount - 100, 0))}
+  </span>
+</span>
             </button>
           </div>
         </section>
@@ -1952,10 +1960,23 @@ export default function VideoConsultLP() {
                 onClick={scrollToConsultForm}
                 className="w-full max-w-3xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
               >
-                <span className="inline-flex items-center justify-center gap-2">
+                {/* <span className="inline-flex items-center justify-center gap-2">
                   <Zap className="h-4 w-4" />
                   Consult Now — {price}
-                </span>
+                </span> */}
+ <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
+  <Zap className="h-4 w-4 shrink-0" />
+  <span className="whitespace-nowrap">Consult Now —</span>
+  <span className="whitespace-nowrap line-through text-white/75">
+    ₹{formatInr(consultAmount)}
+  </span>
+  <span className="whitespace-nowrap text-white/90">
+    - ₹100 =
+  </span>
+  <span className="whitespace-nowrap font-extrabold text-white">
+    ₹{formatInr(Math.max(consultAmount - 100, 0))}
+  </span>
+</span>
               </button>
             </div>
           </div>
@@ -2082,10 +2103,19 @@ export default function VideoConsultLP() {
                 onClick={scrollToConsultForm}
                 className="w-full max-w-3xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
               >
-                <span className="inline-flex items-center justify-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  Consult Now — {price}
-                </span>
+             <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
+  <Zap className="h-4 w-4 shrink-0" />
+  <span className="whitespace-nowrap">Consult Now —</span>
+  <span className="whitespace-nowrap line-through text-white/75">
+    ₹{formatInr(consultAmount)}
+  </span>
+  <span className="whitespace-nowrap text-white/90">
+    - ₹100 =
+  </span>
+  <span className="whitespace-nowrap font-extrabold text-white">
+    ₹{formatInr(Math.max(consultAmount - 100, 0))}
+  </span>
+</span>
               </button>
             </div>
           </div>
@@ -2150,7 +2180,19 @@ export default function VideoConsultLP() {
             </h2>
             <p className="text-slate-400 text-sm mb-7">Fill in your pet&apos;s details, describe the issue, upload photo/PDF, and a vet calls you on WhatsApp within 15 minutes after payment with clear next-step care guidance.</p>
             <button type="button" onClick={scrollToConsultForm} className="w-full bg-accent hover:bg-accent-hover text-white font-extrabold text-lg py-4 rounded-2xl shadow-xl shadow-orange-900/30 transition-all mb-3">
-              Consult Now — {price}
+              <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
+  <Zap className="h-4 w-4 shrink-0" />
+  <span className="whitespace-nowrap">Consult Now —</span>
+  <span className="whitespace-nowrap line-through text-white/75">
+    ₹{formatInr(consultAmount)}
+  </span>
+  <span className="whitespace-nowrap text-white/90">
+    - ₹100 =
+  </span>
+  <span className="whitespace-nowrap font-extrabold text-white">
+    ₹{formatInr(Math.max(consultAmount - 100, 0))}
+  </span>
+</span>
             </button>
           </div>
         </section>
@@ -2169,7 +2211,19 @@ export default function VideoConsultLP() {
       <div className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-white/98 backdrop-blur-sm border-t border-slate-200 p-3 shadow-2xl">
         <div className="flex gap-2.5 items-center max-w-lg mx-auto">
           <button type="button" onClick={scrollToConsultForm} className="flex-1 bg-accent hover:bg-accent-hover text-white font-extrabold py-3.5 rounded-xl text-sm transition-colors">
-            Consult Now — {price}
+           <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
+  <Zap className="h-4 w-4 shrink-0" />
+  <span className="whitespace-nowrap">Consult Now —</span>
+  <span className="whitespace-nowrap line-through text-white/75">
+    ₹{formatInr(consultAmount)}
+  </span>
+  <span className="whitespace-nowrap text-white/90">
+    - ₹100 =
+  </span>
+  <span className="whitespace-nowrap font-extrabold text-white">
+    ₹{formatInr(Math.max(consultAmount - 100, 0))}
+  </span>
+</span>
           </button>
         </div>
       </div>
