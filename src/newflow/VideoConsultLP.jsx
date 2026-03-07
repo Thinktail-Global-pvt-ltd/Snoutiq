@@ -106,6 +106,33 @@ const getInitials = (value) => {
   return letters.join("").toUpperCase();
 };
 
+const normalizeNameKey = (value = "") =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
+
+const isDrShashankVet = (value) => {
+  const key = normalizeNameKey(value);
+  if (!key) return false;
+  return key.includes("shash") && key.includes("goyal");
+};
+
+const DEFAULT_PRIMARY_PAYMENT_VET = {
+  id: 116,
+  doctor_id: 116,
+  name: "Dr. Shashannk Goyal",
+  doctor_name: "Dr Shashannk Goyal",
+  image: "",
+  isSnoutiqAssigned: true,
+  autoAssigned: true,
+  assignedBy: "snoutiq",
+  raw: {
+    id: 116,
+    doctor_id: 116,
+    doctor_name: "Dr Shashannk Goyal",
+  },
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const cn = (...v) => v.filter(Boolean).join(" ");
 
@@ -713,6 +740,10 @@ export default function VideoConsultLP() {
 
         const topFour = cleaned.slice(0, 4).map((doc) => ({
           id: doc?.id,
+          doctor_id: doc?.doctor_id || doc?.id,
+          clinic_id: doc?.clinic_id || doc?.vet_registeration_id || undefined,
+          service_id: doc?.service_id || "consult_basic",
+          vet_slug: doc?.vet_slug || doc?.slug || "",
           name: doc?.doctor_name || "Veterinarian",
           degree: doc?.degree || "",
           experience: doc?.years_of_experience || "",
@@ -725,6 +756,7 @@ export default function VideoConsultLP() {
           rating: doc?.average_review_points || "",
           clinic: doc?.clinic_name || "",
           image: resolveDoctorImage(doc, assetRoot),
+          raw: doc,
         }));
 
         setFeaturedVets(topFour);
@@ -1045,9 +1077,25 @@ export default function VideoConsultLP() {
         observation?.data?.isFirstUser
       );
 
+      const shashankVet =
+        featuredVets.find((vet) => isDrShashankVet(vet?.name || vet?.doctor_name)) ||
+        DEFAULT_PRIMARY_PAYMENT_VET;
+
+      const paymentDoctorId =
+        toNumber(
+          pickValue(
+            shashankVet?.doctor_id,
+            shashankVet?.id,
+            shashankVet?.raw?.doctor_id,
+            shashankVet?.raw?.id,
+            DEFAULT_PRIMARY_PAYMENT_VET.doctor_id
+          )
+        ) || DEFAULT_PRIMARY_PAYMENT_VET.doctor_id;
+
       const paymentMeta = {
         order_type: "excell_export_campaign",
         service_id: "consult_basic",
+        doctor_id: paymentDoctorId,
         booking_rate_type: rateType,
         slot_label: slotLabel,
         user_id: userId,
@@ -1055,15 +1103,24 @@ export default function VideoConsultLP() {
         ...(isFirstUser !== undefined ? { is_first_user: isFirstUser } : {}),
       };
 
-      const fallbackVet = featuredVets?.[0];
       const paymentVet = {
-        id: fallbackVet?.id,
-        name: fallbackVet?.name || "SnoutIQ Vet",
+        ...DEFAULT_PRIMARY_PAYMENT_VET,
+        ...shashankVet,
+        id: paymentDoctorId,
+        doctor_id: paymentDoctorId,
+        name: shashankVet?.name || DEFAULT_PRIMARY_PAYMENT_VET.name,
         bookingRateType: rateType,
         bookingPrice: consultAmount,
         priceDay: PAYMENT_AMOUNTS.day,
         priceNight: PAYMENT_AMOUNTS.night,
-        image: fallbackVet?.image || "",
+        image: shashankVet?.image || DEFAULT_PRIMARY_PAYMENT_VET.image || "",
+        raw: {
+          ...(DEFAULT_PRIMARY_PAYMENT_VET.raw || {}),
+          ...(shashankVet?.raw || {}),
+          id: paymentDoctorId,
+          doctor_id: paymentDoctorId,
+          doctor_name: shashankVet?.name || DEFAULT_PRIMARY_PAYMENT_VET.name,
+        },
       };
 
       navigate(`${BASE_ROUTE}/payment`, {
