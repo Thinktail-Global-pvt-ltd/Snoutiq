@@ -37,6 +37,7 @@ class Prescription extends Model
         'video_inclinic',
         'call_session',
         'follow_up_date',
+        'follow_up_notification_sent_at',
         'follow_up_type',
         'follow_up_notes',
         'pet_id',
@@ -50,6 +51,7 @@ class Prescription extends Model
         'weight' => 'float',
         'heart_rate' => 'float',
         'follow_up_date' => 'date',
+        'follow_up_notification_sent_at' => 'datetime',
         'is_chronic' => 'boolean',
         'medications_json' => 'array',
     ];
