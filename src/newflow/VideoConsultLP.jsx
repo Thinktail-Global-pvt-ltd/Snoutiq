@@ -353,6 +353,27 @@ const cardBase = "rounded-xl border border-gray-200 bg-white overflow-hidden";
 const cardHeaderBase = "flex items-center gap-3 border-b border-gray-100 px-3 py-2.5";
 const cardBodyBase = "px-3 py-3 space-y-3";
 
+function ConsultCtaLabel({ amount, prefixText = "Consult Now" }) {
+  const originalAmount = Number(amount) || 0;
+  const discounted = Math.max(originalAmount - 100, 0);
+
+  return (
+    <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-center align-middle leading-tight sm:flex-nowrap">
+      <Zap className="h-4 w-4 shrink-0 text-current" />
+      <span className="font-extrabold text-white group-disabled:text-slate-400">{prefixText}</span>
+      <span className="whitespace-nowrap line-through text-sm font-bold text-white/70 group-disabled:text-slate-400">
+        ₹{formatInr(originalAmount)}
+      </span>
+      <span className="whitespace-nowrap rounded-full bg-yellow-300 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-900 group-disabled:bg-slate-300 group-disabled:text-slate-500">
+        ₹100 OFF
+      </span>
+      <span className="whitespace-nowrap rounded-full bg-white px-3 py-1 text-sm font-black text-orange-600 shadow-sm group-disabled:bg-slate-100 group-disabled:text-slate-500">
+        Now ₹{formatInr(discounted)}
+      </span>
+    </span>
+  );
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default function VideoConsultLP() {
   const navigate = useNavigate();
@@ -1776,12 +1797,15 @@ export default function VideoConsultLP() {
                           disabled={!isValidAll || submitting}
                           title={!isValidAll ? getSubmitTooltip() : undefined}
                           onClick={submitObservation}
-                          className={cn("flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-base py-3.5 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]")}
+                          className={cn("group flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold text-base py-3.5 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]")}
                         >
                           {submitting ? (
                             <><span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />Saving details...</>
                           ) : (
-                            <>Continue to Payment <ArrowRight className="h-4 w-4" /></>
+                            <>
+                              <ConsultCtaLabel amount={consultAmount} prefixText="Continue to Payment" />
+                              <ArrowRight className="h-4 w-4 shrink-0" />
+                            </>
                           )}
                         </button>
                       </div>
@@ -1850,19 +1874,7 @@ export default function VideoConsultLP() {
         <section className="px-4 py-6 bg-white">
           <div className="max-w-3xl mx-auto">
             <button type="button" onClick={scrollToConsultForm} className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white font-extrabold text-base py-4 rounded-2xl shadow-lg shadow-orange-200/50 transition-all">
-             <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
-  <Zap className="h-4 w-4 shrink-0" />
-  <span className="whitespace-nowrap">Consult Now —</span>
-  <span className="whitespace-nowrap line-through text-white/75">
-    ₹{formatInr(consultAmount)}
-  </span>
-  <span className="whitespace-nowrap text-white/90">
-    - ₹100 =
-  </span>
-  <span className="whitespace-nowrap font-extrabold text-white">
-    ₹{formatInr(Math.max(consultAmount - 100, 0))}
-  </span>
-</span>
+              <ConsultCtaLabel amount={consultAmount} />
             </button>
           </div>
         </section>
@@ -1959,23 +1971,7 @@ export default function VideoConsultLP() {
                 onClick={scrollToConsultForm}
                 className="w-full max-w-3xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
               >
-                {/* <span className="inline-flex items-center justify-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  Consult Now — {price}
-                </span> */}
- <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
-  <Zap className="h-4 w-4 shrink-0" />
-  <span className="whitespace-nowrap">Consult Now —</span>
-  <span className="whitespace-nowrap line-through text-white/75">
-    ₹{formatInr(consultAmount)}
-  </span>
-  <span className="whitespace-nowrap text-white/90">
-    - ₹100 =
-  </span>
-  <span className="whitespace-nowrap font-extrabold text-white">
-    ₹{formatInr(Math.max(consultAmount - 100, 0))}
-  </span>
-</span>
+                <ConsultCtaLabel amount={consultAmount} />
               </button>
             </div>
           </div>
@@ -2077,7 +2073,11 @@ export default function VideoConsultLP() {
               <div className="bg-white rounded-2xl border-2 border-brand p-5 relative shadow-lg shadow-brand/10">
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white text-[10px] font-extrabold px-3 py-1 rounded-full whitespace-nowrap">8 AM – 10 PM</span>
                 <p className="text-sm text-slate-500 font-semibold mt-1 mb-1">Day consult</p>
-                <p className="text-4xl font-extrabold text-brand mb-4">₹399</p>
+                <p className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-4xl font-extrabold tracking-tight">
+                  <span className="text-slate-400 line-through">₹499</span>
+                  <span className="text-slate-500 text-2xl font-bold">- ₹100 =</span>
+                  <span className="text-orange-600">₹399</span>
+                </p>
                 <ul className="space-y-2 text-xs text-slate-600">
                   {["Video / WhatsApp call with vet", "Vet reviews your case before calling", "WhatsApp follow-up care for 24 hours"].map((f) => (
                     <li key={f} className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-brand shrink-0" />{f}</li>
@@ -2087,7 +2087,11 @@ export default function VideoConsultLP() {
               <div className="bg-white rounded-2xl border border-slate-200 p-5 relative">
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-extrabold px-3 py-1 rounded-full whitespace-nowrap">10 PM – 8 AM</span>
                 <p className="text-sm text-slate-500 font-semibold mt-1 mb-1">Night consult</p>
-                <p className="text-4xl font-extrabold text-slate-900 mb-4">₹549</p>
+                <p className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-4xl font-extrabold tracking-tight">
+                  <span className="text-slate-400 line-through">₹649</span>
+                  <span className="text-slate-500 text-2xl font-bold">- ₹100 =</span>
+                  <span className="text-orange-600">₹549</span>
+                </p>
                 <ul className="space-y-2 text-xs text-slate-600">
                   {["Video / WhatsApp call with vet", "Vet reviews your case before calling", "WhatsApp follow-up care for 24 hours"].map((f) => (
                     <li key={f} className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />{f}</li>
@@ -2102,19 +2106,7 @@ export default function VideoConsultLP() {
                 onClick={scrollToConsultForm}
                 className="w-full max-w-3xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
               >
-             <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
-  <Zap className="h-4 w-4 shrink-0" />
-  <span className="whitespace-nowrap">Consult Now —</span>
-  <span className="whitespace-nowrap line-through text-white/75">
-    ₹{formatInr(consultAmount)}
-  </span>
-  <span className="whitespace-nowrap text-white/90">
-    - ₹100 =
-  </span>
-  <span className="whitespace-nowrap font-extrabold text-white">
-    ₹{formatInr(Math.max(consultAmount - 100, 0))}
-  </span>
-</span>
+                <ConsultCtaLabel amount={consultAmount} />
               </button>
             </div>
           </div>
@@ -2179,19 +2171,7 @@ export default function VideoConsultLP() {
             </h2>
             <p className="text-slate-400 text-sm mb-7">Fill in your pet&apos;s details, describe the issue, upload photo/PDF, and a vet calls you on WhatsApp within 15 minutes after payment with clear next-step care guidance.</p>
             <button type="button" onClick={scrollToConsultForm} className="w-full bg-accent hover:bg-accent-hover text-white font-extrabold text-lg py-4 rounded-2xl shadow-xl shadow-orange-900/30 transition-all mb-3">
-              <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
-  <Zap className="h-4 w-4 shrink-0" />
-  <span className="whitespace-nowrap">Consult Now —</span>
-  <span className="whitespace-nowrap line-through text-white/75">
-    ₹{formatInr(consultAmount)}
-  </span>
-  <span className="whitespace-nowrap text-white/90">
-    - ₹100 =
-  </span>
-  <span className="whitespace-nowrap font-extrabold text-white">
-    ₹{formatInr(Math.max(consultAmount - 100, 0))}
-  </span>
-</span>
+              <ConsultCtaLabel amount={consultAmount} />
             </button>
           </div>
         </section>
@@ -2210,19 +2190,7 @@ export default function VideoConsultLP() {
       <div className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-white/98 backdrop-blur-sm border-t border-slate-200 p-3 shadow-2xl">
         <div className="flex gap-2.5 items-center max-w-lg mx-auto">
           <button type="button" onClick={scrollToConsultForm} className="flex-1 bg-accent hover:bg-accent-hover text-white font-extrabold py-3.5 rounded-xl text-sm transition-colors">
-           <span className="inline-flex items-center justify-center gap-2.5 flex-wrap sm:flex-nowrap">
-  <Zap className="h-4 w-4 shrink-0" />
-  <span className="whitespace-nowrap">Consult Now —</span>
-  <span className="whitespace-nowrap line-through text-white/75">
-    ₹{formatInr(consultAmount)}
-  </span>
-  <span className="whitespace-nowrap text-white/90">
-    - ₹100 =
-  </span>
-  <span className="whitespace-nowrap font-extrabold text-white">
-    ₹{formatInr(Math.max(consultAmount - 100, 0))}
-  </span>
-</span>
+            <ConsultCtaLabel amount={consultAmount} />
           </button>
         </div>
       </div>

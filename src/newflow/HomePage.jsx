@@ -232,6 +232,35 @@ const N =
                     color: "text-slate-600",
                     bg: "bg-slate-50 border-slate-200",
                   };
+  };
+function getCurrentPrice() {
+  const h = new Date().getHours();
+  const isDay = h >= 8 && h < 22;
+  return isDay
+    ? {
+        amount: 499,
+        finalAmount: 399,
+        label: "Day consult · 8 AM–10 PM",
+        rateType: "day",
+      }
+    : {
+        amount: 649,
+        finalAmount: 549,
+        label: "Night consult · 10 PM–8 AM",
+        rateType: "night",
+      };
+}
+const PAYMENT_AMOUNTS = {
+    day: 499,
+    night: 649,
+  },
+  formatInr = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "0";
+    return n.toLocaleString("en-IN", {
+      minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+      maximumFractionDigits: 2,
+    });
   },
   B = [
     {
@@ -240,7 +269,7 @@ const N =
     },
     {
       q: "How do I pay for the consultation?",
-      a: "Securely via UPI, Credit/Debit Cards, or Netbanking before the consultation. Day consults are ₹399 and night consults are ₹549.",
+      a: "Securely via UPI, Credit/Debit Cards, or Netbanking before the consultation. Day consult base ₹499 becomes ₹399 after ₹100 off, and night consult base ₹649 becomes ₹549 after ₹100 off.",
     },
     {
       q: "Are the vets qualified?",
@@ -301,6 +330,37 @@ const SEO_CANONICAL = "https://www.snoutiq.com/";
 const SEO_OG_IMAGE = "https://www.snoutiq.com/og-image.jpg";
 const SEO_OG_IMAGE_ALT = "SnoutIQ Online Vet Consultation India";
 const SEO_OWNER_ATTR = "data-homepage-seo";
+function DynamicConsultLabel({
+  amount: a,
+  finalAmount: t,
+  rateType: s,
+  prefixText: r = "Consult a Vet Now",
+}) {
+  return e.jsxs("span", {
+    className:
+      "inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-center align-middle leading-tight sm:flex-nowrap",
+    title: s === "day" ? "Day consult pricing active" : "Night consult pricing active",
+    children: [
+      e.jsx("span", { className: "text-base leading-none", children: "⚡" }),
+      e.jsx("span", { className: "font-extrabold text-white", children: r }),
+      e.jsxs("span", {
+        className:
+          "whitespace-nowrap line-through text-sm font-bold text-white/70",
+        children: ["₹", formatInr(a)],
+      }),
+      e.jsx("span", {
+        className:
+          "whitespace-nowrap rounded-full bg-yellow-300 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-900",
+        children: "₹100 OFF",
+      }),
+      e.jsxs("span", {
+        className:
+          "whitespace-nowrap rounded-full bg-white px-3 py-1 text-sm font-black text-orange-600 shadow-sm",
+        children: ["Now ₹", formatInr(t)],
+      }),
+    ],
+  });
+}
 function S({ icon: a, title: t, desc: s, tag: r }) {
   return e.jsxs("div", {
     className:
@@ -552,7 +612,12 @@ function pe() {
   });
 }
 function Ie() {
-  const [a, t] = k.useState(te);
+  const [a, t] = k.useState(te),
+    { amount, finalAmount, label, rateType } = getCurrentPrice(),
+    consultPriceText = `₹${formatInr(finalAmount)}`,
+    originalPriceText = `₹${formatInr(amount)}`,
+    dayConsultPriceText = `₹${formatInr(PAYMENT_AMOUNTS.day - 100)}`,
+    nightConsultPriceText = `₹${formatInr(PAYMENT_AMOUNTS.night - 100)}`;
   return (
     k.useEffect(() => {
       const head = document.head;
@@ -811,9 +876,15 @@ function Ie() {
                             e.jsx("strong", {
                               children: "online vet consultation",
                             }),
-                            " for just",
-                            e.jsx("strong", { children: " ₹399" }),
-                            " and receive expert diagnosis, guidance, and ffollow up.",
+                            " for ",
+                            e.jsx("strong", { children: consultPriceText }),
+                            " after ₹100 off on the current ",
+                            e.jsx("strong", {
+                              children: rateType === "day" ? "day" : "night",
+                            }),
+                            " slot (",
+                            originalPriceText,
+                            " base) and receive expert diagnosis, guidance, and follow-up.",
                           ],
                         }),
                         e.jsxs("div", {
@@ -824,8 +895,13 @@ function Ie() {
                               title: "Online Vet Consultation India",
                               children: e.jsx("button", {
                                 className:
-                                  "bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-4 rounded-full transition shadow-lg",
-                                children: "⚡ Consult a Vet Now - ₹399",
+                                  "bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-4 rounded-full transition shadow-lg shadow-orange-200/80",
+                                children: e.jsx(DynamicConsultLabel, {
+                                  amount: amount,
+                                  finalAmount: finalAmount,
+                                  rateType: rateType,
+                                  prefixText: "Consult a Vet Now",
+                                }),
                               }),
                             }),
                             e.jsx(b, {
@@ -838,6 +914,37 @@ function Ie() {
                                   "border border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold px-8 py-4 rounded-full transition",
                                 children: "Download App",
                               }),
+                            }),
+                          ],
+                        }),
+                        e.jsxs("div", {
+                          className:
+                            "mb-8 flex flex-wrap items-center gap-2 rounded-2xl border border-orange-100 bg-white/90 p-3 text-sm text-slate-700 shadow-sm shadow-orange-100/60",
+                          children: [
+                            e.jsxs("span", {
+                              className:
+                                "rounded-full bg-slate-900 px-3 py-1 font-semibold text-white",
+                              children: ["Currently: ", label],
+                            }),
+                            e.jsxs("span", {
+                              className:
+                                "rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700",
+                              children: [originalPriceText, " original"],
+                            }),
+                            e.jsx("span", {
+                              className:
+                                "rounded-full bg-yellow-300 px-3 py-1 font-black text-slate-900",
+                              children: "₹100 OFF",
+                            }),
+                            e.jsxs("span", {
+                              className:
+                                "rounded-full bg-orange-500 px-3 py-1 font-black text-white",
+                              children: ["Pay ", consultPriceText],
+                            }),
+                            e.jsx("span", {
+                              className:
+                                "rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700",
+                              children: "24/7 available",
                             }),
                           ],
                         }),
@@ -1146,16 +1253,16 @@ function Ie() {
                       e.jsx(A, {
                         title: "Online Video Consultation",
                         description:
-                          "Connect with a verified vet in under 15 minutes from wherever you are.",
+                          `Connect with a verified vet in under 15 minutes from wherever you are. ${label} is active right now.`,
                         icon: _,
                         badge: "All India",
-                        price: "₹399",
+                        price: consultPriceText,
                         href: C,
                         features: [
                           "Available 24/7",
                           "15-min video call",
-                          "7+ yrs exp vets",
-                          "Folloe up",
+                          `Day: ${dayConsultPriceText} after ₹100 off`,
+                          `Night: ${nightConsultPriceText} after ₹100 off`,
                         ],
                       }),
                       e.jsx(A, {
@@ -1600,8 +1707,13 @@ function Ie() {
                             variant: "primary",
                             size: "lg",
                             className:
-                              "w-full sm:w-auto shadow-xl shadow-orange-900/30",
-                            children: "Consult a Vet - ₹399",
+                              "w-full sm:w-auto bg-orange-500 text-white hover:bg-orange-600 shadow-xl shadow-orange-900/30 px-4 sm:px-6",
+                            children: e.jsx(DynamicConsultLabel, {
+                              amount: amount,
+                              finalAmount: finalAmount,
+                              rateType: rateType,
+                              prefixText: "Consult a Vet Now",
+                            }),
                           }),
                         }),
                         e.jsx(b, {
