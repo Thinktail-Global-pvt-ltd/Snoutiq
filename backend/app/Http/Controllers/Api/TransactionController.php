@@ -311,6 +311,79 @@ class TransactionController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/transactions/video-consult/by-pet-user?pet_id=1&user_id=2[&limit=50]
+     * Returns video_consult transaction rows joined with users, pets and doctors.
+     */
+    public function videoConsultByPetUser(Request $request)
+    {
+        $data = $request->validate([
+            'pet_id' => 'required|integer',
+            'user_id' => 'required|integer',
+            'limit' => 'nullable|integer|min:1|max:200',
+        ]);
+
+        if (
+            ! Schema::hasTable('transactions')
+            || ! Schema::hasTable('users')
+            || ! Schema::hasTable('pets')
+            || ! Schema::hasTable('doctors')
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Required tables are missing.',
+            ], 500);
+        }
+
+        $requiredTransactionColumns = ['id', 'type', 'user_id', 'pet_id', 'doctor_id'];
+        foreach ($requiredTransactionColumns as $column) {
+            if (! Schema::hasColumn('transactions', $column)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "transactions.{$column} column is missing.",
+                ], 500);
+            }
+        }
+
+        $limit = (int) ($data['limit'] ?? 50);
+
+        $rows = DB::table('transactions as t')
+            ->leftJoin('users as u', 'u.id', '=', 't.user_id')
+            ->leftJoin('pets as p', 'p.id', '=', 't.pet_id')
+            ->leftJoin('doctors as d', 'd.id', '=', 't.doctor_id')
+            ->where('t.type', 'video_consult')
+            ->where('t.user_id', (int) $data['user_id'])
+            ->where('t.pet_id', (int) $data['pet_id'])
+            ->orderByDesc('t.id')
+            ->limit($limit)
+            ->select([
+                't.*',
+                'u.name as user_name',
+                'u.phone as user_phone',
+                'u.email as user_email',
+                'p.name as pet_name',
+                'p.pet_type as pet_type',
+                'p.breed as pet_breed',
+                'p.pet_age as pet_age',
+                'p.pet_gender as pet_gender',
+                'd.doctor_name as doctor_name',
+                'd.doctor_mobile as doctor_mobile',
+                'd.doctor_email as doctor_email',
+            ])
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'count' => $rows->count(),
+            'filters' => [
+                'pet_id' => (int) $data['pet_id'],
+                'user_id' => (int) $data['user_id'],
+                'type' => 'video_consult',
+            ],
+            'data' => $rows,
+        ]);
+    }
+
     protected function prescriptionsByTransactionChannels(Collection $transactions): array
     {
         if (
