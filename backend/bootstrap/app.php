@@ -9,6 +9,7 @@ use App\Console\Commands\SendVetResponseReminders;
 use App\Console\Commands\SendMedicalRecordCreatedReminders;
 use App\Console\Commands\SendUserCreatedReminders;
 use App\Console\Commands\SendUserContinuityReminders;
+use App\Console\Commands\LogTodayPrescriptionFollowUps;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SendMedicalRecordCreatedReminders::class,
         SendUserCreatedReminders::class,
         SendUserContinuityReminders::class,
+        LogTodayPrescriptionFollowUps::class,
     ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
@@ -53,6 +55,10 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         $schedule->command('notifications:consult-reminders')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command('notifications:prescription-followups-today')
             ->everyMinute()
             ->withoutOverlapping();
 
