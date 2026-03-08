@@ -117,9 +117,11 @@ const isDrShashankVet = (value) => {
   return key.includes("shash") && key.includes("goyal");
 };
 
-const DEFAULT_PRIMARY_PAYMENT_VET = {
+const PRIMARY_FIXED_VET = {
   id: 116,
   doctor_id: 116,
+  clinic_id: 115,
+  vet_registeration_id: 115,
   name: "Dr. Shashannk Goyal",
   doctor_name: "Dr Shashannk Goyal",
   image: "",
@@ -129,6 +131,7 @@ const DEFAULT_PRIMARY_PAYMENT_VET = {
   raw: {
     id: 116,
     doctor_id: 116,
+    vet_registeration_id: 115,
     doctor_name: "Dr Shashannk Goyal",
   },
 };
@@ -773,7 +776,16 @@ export default function VideoConsultLP() {
           (doc) => doc?.doctor_name || doc?.doctor_email || doc?.doctor_mobile
         );
 
-        const topFour = cleaned.slice(0, 4).map((doc) => ({
+        const prioritized = [...cleaned].sort((a, b) => {
+          const aIsShashank = isDrShashankVet(a?.doctor_name);
+          const bIsShashank = isDrShashankVet(b?.doctor_name);
+
+          if (aIsShashank && !bIsShashank) return -1;
+          if (!aIsShashank && bIsShashank) return 1;
+          return 0;
+        });
+
+        const topFour = prioritized.slice(0, 4).map((doc) => ({
           id: doc?.id,
           doctor_id: doc?.doctor_id || doc?.id,
           clinic_id: doc?.clinic_id || doc?.vet_registeration_id || undefined,
@@ -1083,6 +1095,13 @@ export default function VideoConsultLP() {
       fd.append("appetite", details.lastDaysAppetite || "");
       fd.append("energy", details.lastDaysEnergy || "");
       fd.append("mood", details.mood || "calm");
+      const fixedVet = PRIMARY_FIXED_VET;
+      const fixedDoctorId = fixedVet.doctor_id;
+      const fixedClinicId = fixedVet.clinic_id || fixedVet.vet_registeration_id;
+      fd.append("doctor_id", String(fixedDoctorId));
+      fd.append("assigned_doctor_id", String(fixedDoctorId));
+      fd.append("vet_registeration_id", String(fixedClinicId));
+      fd.append("clinic_id", String(fixedClinicId));
 
       if (details.isNeutered !== "") fd.append("is_neutered", details.isNeutered);
       if (details.vaccinatedYesNo !== "") fd.append("vaccenated_yes_no", details.vaccinatedYesNo);
@@ -1140,23 +1159,17 @@ export default function VideoConsultLP() {
 
       const shashankVet =
         featuredVets.find((vet) => isDrShashankVet(vet?.name || vet?.doctor_name)) ||
-        DEFAULT_PRIMARY_PAYMENT_VET;
+        PRIMARY_FIXED_VET;
 
-      const paymentDoctorId =
-        toNumber(
-          pickValue(
-            shashankVet?.doctor_id,
-            shashankVet?.id,
-            shashankVet?.raw?.doctor_id,
-            shashankVet?.raw?.id,
-            DEFAULT_PRIMARY_PAYMENT_VET.doctor_id
-          )
-        ) || DEFAULT_PRIMARY_PAYMENT_VET.doctor_id;
+      const paymentDoctorId = PRIMARY_FIXED_VET.doctor_id;
+      const paymentClinicId = PRIMARY_FIXED_VET.clinic_id || PRIMARY_FIXED_VET.vet_registeration_id;
 
       const paymentMeta = {
         order_type: "excell_export_campaign",
         service_id: "consult_basic",
         doctor_id: paymentDoctorId,
+        clinic_id: paymentClinicId,
+        vet_registeration_id: paymentClinicId,
         booking_rate_type: rateType,
         slot_label: slotLabel,
         user_id: userId,
@@ -1175,22 +1188,26 @@ export default function VideoConsultLP() {
       };
 
       const paymentVet = {
-        ...DEFAULT_PRIMARY_PAYMENT_VET,
+        ...PRIMARY_FIXED_VET,
         ...shashankVet,
-        id: paymentDoctorId,
-        doctor_id: paymentDoctorId,
-        name: shashankVet?.name || DEFAULT_PRIMARY_PAYMENT_VET.name,
+        id: PRIMARY_FIXED_VET.doctor_id,
+        doctor_id: PRIMARY_FIXED_VET.doctor_id,
+        clinic_id: paymentClinicId,
+        vet_registeration_id: paymentClinicId,
+        name: "Dr. Shashannk Goyal",
+        doctor_name: "Dr Shashannk Goyal",
         bookingRateType: rateType,
         bookingPrice: consultAmount,
         priceDay: PAYMENT_AMOUNTS.day,
         priceNight: PAYMENT_AMOUNTS.night,
-        image: shashankVet?.image || DEFAULT_PRIMARY_PAYMENT_VET.image || "",
+        image: shashankVet?.image || PRIMARY_FIXED_VET.image || "",
         raw: {
-          ...(DEFAULT_PRIMARY_PAYMENT_VET.raw || {}),
+          ...(PRIMARY_FIXED_VET.raw || {}),
           ...(shashankVet?.raw || {}),
-          id: paymentDoctorId,
-          doctor_id: paymentDoctorId,
-          doctor_name: shashankVet?.name || DEFAULT_PRIMARY_PAYMENT_VET.name,
+          id: PRIMARY_FIXED_VET.doctor_id,
+          doctor_id: PRIMARY_FIXED_VET.doctor_id,
+          vet_registeration_id: paymentClinicId,
+          doctor_name: "Dr Shashannk Goyal",
         },
       };
 
