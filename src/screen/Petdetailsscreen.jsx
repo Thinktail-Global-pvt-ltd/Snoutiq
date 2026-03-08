@@ -177,6 +177,170 @@ const isDrShashankVet = (value) => {
   return key.includes("shash") && key.includes("goyal");
 };
 
+const isDayTime = (date = new Date()) => {
+  const hour = date.getHours();
+  return hour >= 8 && hour < 22;
+};
+
+const DEFAULT_PRIMARY_PAYMENT_VET = {
+  id: 116,
+  doctor_id: 116,
+  name: "Dr. Shashannk Goyal",
+  doctor_name: "Dr Shashannk Goyal",
+  qualification: "MVSc",
+  experience: 10,
+  specializationText:
+    "Dogs, Cats, Exotic Pet, Surgery, Skin / Dermatology, General Practice, Endocrinology",
+  specializationList: [
+    "Dogs",
+    "Cats",
+    "Exotic Pet",
+    "Surgery",
+    "Skin / Dermatology",
+    "General Practice",
+    "Endocrinology",
+  ],
+  responseDay: "15 To 20 Mins",
+  responseNight: "0 To 15 Mins",
+  followUp: "Yes - free follow-up chat/call within 3 days",
+  rating: 5,
+  reviews: 0,
+  priceDay: 499,
+  priceNight: 649,
+  bookingRateType: "day",
+  bookingPrice: 499,
+  isSnoutiqAssigned: true,
+  autoAssigned: true,
+  assignedBy: "snoutiq",
+  image: "",
+  raw: {
+    id: 116,
+    doctor_id: 116,
+    doctor_name: "Dr Shashannk Goyal",
+    degree: "MVSc",
+    years_of_experience: "10",
+    video_day_rate: "499.00",
+    video_night_rate: "649.00",
+    specialization_select_all_that_apply:
+      "Dogs, Cats, Exotic Pet, Surgery, Skin / Dermatology, General Practice, Endocrinology",
+    response_time_for_online_consults_day: "15 To 20 Mins",
+    response_time_for_online_consults_night: "0 To 15 Mins",
+    do_you_offer_a_free_follow_up_within_3_days_after_a_consulta:
+      "Yes - free follow-up chat/call within 3 days",
+    average_review_points: 5,
+    reviews_count: 0,
+  },
+};
+
+const DOCTOR_LIST_ENDPOINT = "/api/exported_from_excell_doctors";
+
+const getAssetRoot = () => {
+  const base = apiBaseUrl().replace(/\/+$/, "");
+  if (base.endsWith("/backend")) return base.slice(0, -"/backend".length);
+  return "https://snoutiq.com";
+};
+
+const normalizeDoctorImageUrl = (rawUrl, assetRoot) => {
+  if (!rawUrl) return "";
+  let url = String(rawUrl).trim();
+  if (!url) return "";
+
+  if (url.startsWith("http")) {
+    return url.replace(
+      "https://snoutiq.com/https://snoutiq.com",
+      "https://snoutiq.com"
+    );
+  }
+
+  if (url.startsWith("/")) url = url.slice(1);
+  return `${assetRoot}/${url}`;
+};
+
+const resolveDoctorImage = (doctor, assetRoot) => {
+  const blob = doctor?.doctor_image_blob_url;
+  const preferred = doctor?.doctor_image_url || doctor?.doctor_image;
+  return (
+    normalizeDoctorImageUrl(blob, assetRoot) ||
+    normalizeDoctorImageUrl(preferred, assetRoot)
+  );
+};
+
+const resolvePrimaryPaymentVet = (inputVet) => {
+  const providedDoctorName = pickValue(
+    inputVet?.name,
+    inputVet?.doctor_name,
+    inputVet?.raw?.doctor_name
+  );
+  const isProvidedShashank = isDrShashankVet(providedDoctorName);
+  const sourceVet = isProvidedShashank ? inputVet : DEFAULT_PRIMARY_PAYMENT_VET;
+  const bookingRateType =
+    inputVet?.bookingRateType === "day" || inputVet?.bookingRateType === "night"
+      ? inputVet.bookingRateType
+      : isDayTime()
+      ? "day"
+      : "night";
+  const priceDay =
+    toNumber(pickValue(sourceVet?.priceDay, sourceVet?.raw?.video_day_rate)) ||
+    DEFAULT_PRIMARY_PAYMENT_VET.priceDay;
+  const priceNight =
+    toNumber(pickValue(sourceVet?.priceNight, sourceVet?.raw?.video_night_rate)) ||
+    DEFAULT_PRIMARY_PAYMENT_VET.priceNight;
+  const bookingPrice =
+    toNumber(
+      pickValue(
+        sourceVet?.bookingPrice,
+        bookingRateType === "day" ? priceDay : priceNight
+      )
+    ) || (bookingRateType === "day" ? priceDay : priceNight);
+  const doctorId =
+    toNumber(
+      pickValue(
+        sourceVet?.doctor_id,
+        sourceVet?.id,
+        sourceVet?.raw?.doctor_id,
+        sourceVet?.raw?.id,
+        DEFAULT_PRIMARY_PAYMENT_VET.doctor_id
+      )
+    ) || DEFAULT_PRIMARY_PAYMENT_VET.doctor_id;
+  const displayName =
+    pickValue(
+      sourceVet?.name,
+      sourceVet?.doctor_name,
+      sourceVet?.raw?.doctor_name,
+      DEFAULT_PRIMARY_PAYMENT_VET.name
+    ) || DEFAULT_PRIMARY_PAYMENT_VET.name;
+  const doctorName =
+    pickValue(
+      sourceVet?.doctor_name,
+      sourceVet?.raw?.doctor_name,
+      sourceVet?.name,
+      DEFAULT_PRIMARY_PAYMENT_VET.doctor_name
+    ) || DEFAULT_PRIMARY_PAYMENT_VET.doctor_name;
+
+  return {
+    ...DEFAULT_PRIMARY_PAYMENT_VET,
+    ...(isProvidedShashank ? sourceVet : {}),
+    id: doctorId,
+    doctor_id: doctorId,
+    name: displayName,
+    doctor_name: doctorName,
+    priceDay,
+    priceNight,
+    bookingRateType,
+    bookingPrice,
+    isSnoutiqAssigned: true,
+    autoAssigned: true,
+    assignedBy: "snoutiq",
+    raw: {
+      ...(DEFAULT_PRIMARY_PAYMENT_VET.raw || {}),
+      ...(isProvidedShashank && sourceVet?.raw ? sourceVet.raw : {}),
+      id: doctorId,
+      doctor_id: doctorId,
+      doctor_name: doctorName,
+    },
+  };
+};
+
 const formatPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
   if (!digits) return "";
@@ -322,6 +486,17 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
   const [otpPhone, setOtpPhone] = useState("");
   const otpInputRef = useRef(null);
   const [liveDoctorCount, setLiveDoctorCount] = useState(null);
+  const paymentVet = useMemo(() => resolvePrimaryPaymentVet(vet), [vet]);
+  const [resolvedDoctorImage, setResolvedDoctorImage] = useState(
+    () => paymentVet?.image || ""
+  );
+  const displayVet = useMemo(
+    () => ({
+      ...paymentVet,
+      image: resolvedDoctorImage || paymentVet?.image || "",
+    }),
+    [paymentVet, resolvedDoctorImage]
+  );
 
   const resetOtpState = () => {
     setOtpToken("");
@@ -332,6 +507,56 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     setOtpCooldown(0);
     setOtpPhone("");
   };
+
+  useEffect(() => {
+    setResolvedDoctorImage(paymentVet?.image || "");
+  }, [paymentVet?.image]);
+
+  useEffect(() => {
+    const shouldFetchShashankImage =
+      isDrShashankVet(paymentVet?.name || paymentVet?.doctor_name) &&
+      !(resolvedDoctorImage || paymentVet?.image);
+
+    if (!shouldFetchShashankImage) return;
+
+    let active = true;
+
+    const loadDoctorImage = async () => {
+      try {
+        const base = apiBaseUrl().replace(/\/+$/, "");
+        const res = await fetch(`${base}${DOCTOR_LIST_ENDPOINT}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !active) return;
+
+        const assetRoot = getAssetRoot();
+        const doctors = [];
+        (data?.data || []).forEach((entry) => {
+          (entry?.doctors || []).forEach((doctor) => {
+            if (doctor) doctors.push(doctor);
+          });
+        });
+
+        const shashankDoctor = doctors.find((doctor) =>
+          isDrShashankVet(doctor?.doctor_name)
+        );
+        const image = resolveDoctorImage(shashankDoctor, assetRoot);
+        if (active && image) {
+          setResolvedDoctorImage(image);
+        }
+      } catch {
+        // Keep initials fallback if image cannot be resolved.
+      }
+    };
+
+    loadDoctorImage();
+
+    return () => {
+      active = false;
+    };
+  }, [paymentVet?.doctor_name, paymentVet?.image, paymentVet?.name, resolvedDoctorImage]);
 
   const applyUploadFile = async (file) => {
     if (!file) return;
@@ -870,6 +1095,11 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
         pet_id: petId,
       };
 
+      if (vet && typeof vet === "object") {
+        Object.assign(vet, displayVet);
+        vet.raw = { ...(displayVet.raw || {}) };
+      }
+
       onSubmit?.(nextPayload);
     } catch (e) {
       setSubmitError(e?.message || "Something went wrong. Please try again.");
@@ -897,15 +1127,20 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     }
   };
 
-  const rawVet = vet?.raw && typeof vet.raw === "object" ? vet.raw : null;
+  const rawVet =
+    paymentVet?.raw && typeof paymentVet.raw === "object" ? paymentVet.raw : null;
 
-  const vetName = vet?.name || rawVet?.doctor_name || "Selected vet";
-  const vetQualification = vet?.qualification || normalizeDisplayText(rawVet?.degree);
-  const vetExperience = formatExperience(vet?.experience);
+  const vetName = paymentVet?.name || rawVet?.doctor_name || "Selected vet";
+  const vetQualification =
+    paymentVet?.qualification || normalizeDisplayText(rawVet?.degree);
+  const vetExperience = formatExperience(paymentVet?.experience);
   const isSnoutiqAssignedVet = Boolean(
-    vet?.isSnoutiqAssigned || vet?.autoAssigned || vet?.assignedBy === "snoutiq"
+    paymentVet?.isSnoutiqAssigned ||
+      paymentVet?.autoAssigned ||
+      paymentVet?.assignedBy === "snoutiq"
   );
-  const isDrShashankSelected = isDrShashankVet(vetName) || isDrShashankVet(vet?.doctor_name);
+  const isDrShashankSelected =
+    isDrShashankVet(vetName) || isDrShashankVet(paymentVet?.doctor_name);
   const showSnoutiqHighlight = isDrShashankSelected || isSnoutiqAssignedVet;
   const vetMetaLine =
     vetQualification && vetExperience
@@ -918,8 +1153,8 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
   const vetRating =
     Number.isFinite(backendRating) && backendRating > 0
       ? backendRating.toFixed(1)
-      : Number.isFinite(Number(vet?.rating))
-      ? Number(vet?.rating).toFixed(1)
+      : Number.isFinite(Number(paymentVet?.rating))
+      ? Number(paymentVet?.rating).toFixed(1)
       : "--";
 
   const backendConsultations = toNumber(
@@ -929,12 +1164,14 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
       rawVet?.total_consultation_count
     )
   );
-  const backendReviews = toNumber(pickValue(rawVet?.reviews_count, vet?.reviews));
+  const backendReviews = toNumber(
+    pickValue(rawVet?.reviews_count, paymentVet?.reviews)
+  );
   const vetConsultations =
     Number.isFinite(backendConsultations) && backendConsultations >= 0
       ? Math.round(backendConsultations)
-      : Number.isFinite(Number(vet?.consultations))
-      ? Math.round(Number(vet?.consultations))
+      : Number.isFinite(Number(paymentVet?.consultations))
+      ? Math.round(Number(paymentVet?.consultations))
       : "--";
   const vetReviewCount =
     Number.isFinite(backendReviews) && backendReviews >= 0
@@ -954,9 +1191,11 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
       : "Consultations";
 
   const vetResponse =
-    (vet?.bookingRateType === "night" ? vet?.responseNight : vet?.responseDay) ||
-    vet?.responseDay ||
-    vet?.responseNight ||
+    (paymentVet?.bookingRateType === "night"
+      ? paymentVet?.responseNight
+      : paymentVet?.responseDay) ||
+    paymentVet?.responseDay ||
+    paymentVet?.responseNight ||
     "";
   const vetResponseText = showSnoutiqHighlight
     ? "Priority response in 7-8 minutes after payment"
@@ -965,27 +1204,36 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     : "Responds quickly after payment";
 
   const vetDoctorMobile = normalizeDisplayText(
-    pickValue(vet?.doctor_mobile, rawVet?.doctor_mobile, rawVet?.mobile)
+    pickValue(paymentVet?.doctor_mobile, rawVet?.doctor_mobile, rawVet?.mobile)
   );
   const vetSpecialization = listToDisplayText(
-    pickValue(vet?.specializationText, rawVet?.specialization_select_all_that_apply)
+    pickValue(
+      paymentVet?.specializationText,
+      rawVet?.specialization_select_all_that_apply
+    )
   );
   const vetDayResponse = normalizeDisplayText(
-    pickValue(vet?.responseDay, rawVet?.response_time_for_online_consults_day)
+    pickValue(
+      paymentVet?.responseDay,
+      rawVet?.response_time_for_online_consults_day
+    )
   );
   const vetNightResponse = normalizeDisplayText(
-    pickValue(vet?.responseNight, rawVet?.response_time_for_online_consults_night)
+    pickValue(
+      paymentVet?.responseNight,
+      rawVet?.response_time_for_online_consults_night
+    )
   );
   const vetFollowUp = normalizeDisplayText(
     pickValue(
-      vet?.followUp,
+      paymentVet?.followUp,
       rawVet?.do_you_offer_a_free_follow_up_within_3_days_after_a_consulta
     )
   );
   const vetLanguages = listToDisplayText(
-    pickValue(vet?.languages_spoken, rawVet?.languages_spoken)
+    pickValue(paymentVet?.languages_spoken, rawVet?.languages_spoken)
   );
-  const vetBio = normalizeDisplayText(pickValue(vet?.bio, rawVet?.bio));
+  const vetBio = normalizeDisplayText(pickValue(paymentVet?.bio, rawVet?.bio));
 
   const vetProfileItems = [
     { key: "specialization", label: "Specialization", value: vetSpecialization },
@@ -2127,9 +2375,9 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
               <div className="space-y-6 md:sticky md:top-24 md:self-start">
                 <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
                   <div className="flex items-center gap-3 bg-[#2563eb] px-5 py-4 text-white">
-                    {vet?.image ? (
+                    {displayVet?.image ? (
                       <img
-                        src={vet.image}
+                        src={displayVet.image}
                         alt={vetName}
                         className="h-10 w-10 rounded-full object-cover border border-white/30"
                         loading="lazy"
