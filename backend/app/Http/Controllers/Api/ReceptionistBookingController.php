@@ -304,8 +304,17 @@ class ReceptionistBookingController extends Controller
         $includeRescheduledRaw = strtolower(trim((string) $request->query('include_rescheduled', '1')));
         $includeRescheduled = !in_array($includeRescheduledRaw, ['0', 'false', 'no', 'off'], true);
 
+        $latestPrescriptionByAppointment = DB::table('prescriptions')
+            ->select('in_clinic_appointment_id', DB::raw('MAX(id) as latest_prescription_id'))
+            ->whereNotNull('in_clinic_appointment_id')
+            ->groupBy('in_clinic_appointment_id');
+
         $query = DB::table('appointments as a')
             ->leftJoin('doctors as d', 'a.doctor_id', '=', 'd.id')
+            ->leftJoinSub($latestPrescriptionByAppointment, 'lp', function ($join) {
+                $join->on('lp.in_clinic_appointment_id', '=', 'a.id');
+            })
+            ->leftJoin('prescriptions as p', 'p.id', '=', 'lp.latest_prescription_id')
             ->where('a.vet_registeration_id', $clinicId)
             ->where(function ($builder) use ($date, $includeRescheduled) {
                 $builder->whereDate('a.appointment_date', $date);
@@ -327,7 +336,13 @@ class ReceptionistBookingController extends Controller
                 'a.status',
                 'a.doctor_id',
                 'a.notes',
-                DB::raw('COALESCE(d.doctor_name, "") as doctor_name')
+                DB::raw('COALESCE(d.doctor_name, "") as doctor_name'),
+                'p.id as prescription_id',
+                'p.in_clinic_appointment_id',
+                'p.diagnosis as prescription_diagnosis',
+                'p.follow_up_date as prescription_follow_up_date',
+                'p.follow_up_type as prescription_follow_up_type',
+                'p.follow_up_notes as prescription_follow_up_notes'
             );
 
         $rows = $query->get();
