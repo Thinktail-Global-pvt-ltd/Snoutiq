@@ -237,6 +237,22 @@ class AdminPanelController extends Controller
         return view('admin.transactions-excell-export', compact('transactions'));
     }
 
+    public function deleteExcellExportTransaction(Transaction $transaction): RedirectResponse
+    {
+        if (! $this->isExcellExportTransaction($transaction)) {
+            return redirect()
+                ->route('admin.transactions.excell-export')
+                ->withErrors(['transaction' => 'Only Excel export campaign transactions can be deleted from this page.']);
+        }
+
+        $transactionId = (int) $transaction->id;
+        $transaction->delete();
+
+        return redirect()
+            ->route('admin.transactions.excell-export')
+            ->with('status', "Transaction #{$transactionId} deleted.");
+    }
+
     private function attachLatestPrescriptionIds(Collection $transactions): Collection
     {
         if ($transactions->isEmpty()) {
@@ -281,8 +297,6 @@ class AdminPanelController extends Controller
 
     private function excellExportTransactionsQuery(): Builder
     {
-        $petColumns = $this->excellExportPetColumns();
-
         return Transaction::query()
             ->where(function ($query) {
                 $query->whereIn('status', ['captured', 'pending', 'CAPTURED', 'PENDING']);
@@ -295,34 +309,16 @@ class AdminPanelController extends Controller
             ->with([
                 'clinic:id,name',
                 'doctor:id,doctor_name,doctor_email,doctor_mobile',
-                'user' => function ($query) use ($petColumns) {
-                    $query->select('id', 'name', 'email', 'phone', 'city')
-                        ->with([
-                            'pets' => function ($petQuery) use ($petColumns) {
-                                $petQuery->select($petColumns)
-                                    ->orderByDesc('id');
-                            },
-                        ]);
+                'user' => function ($query) {
+                    $query->with([
+                        'pets' => function ($petQuery) {
+                            $petQuery->orderByDesc('id');
+                        },
+                    ]);
                 },
-                'pet' => function ($query) use ($petColumns) {
-                    $query->select($petColumns);
-                },
+                'pet',
             ])
             ->orderByDesc('created_at');
-    }
-
-    private function excellExportPetColumns(): array
-    {
-        $petColumns = ['id', 'user_id', 'name', 'breed', 'pet_type', 'reported_symptom'];
-
-        if (Schema::hasColumn('pets', 'pet_dob')) {
-            $petColumns[] = 'pet_dob';
-        }
-        if (Schema::hasColumn('pets', 'dob')) {
-            $petColumns[] = 'dob';
-        }
-
-        return $petColumns;
     }
 
     private function resolveExcellExportPetRecord(Transaction $transaction): ?Pet
@@ -584,6 +580,14 @@ class AdminPanelController extends Controller
                     ->orWhere('metadata->order_type', 'video_consult')
                     ->orWhere('metadata->order_type', 'excell_export_campaign');
             });
+    }
+
+    private function isExcellExportTransaction(Transaction $transaction): bool
+    {
+        $type = strtolower((string) ($transaction->type ?? ''));
+        $orderType = strtolower((string) data_get($transaction->metadata, 'order_type', ''));
+
+        return $type === 'excell_export_campaign' || $orderType === 'excell_export_campaign';
     }
 
     private function isAppointmentTransaction(Transaction $transaction): bool

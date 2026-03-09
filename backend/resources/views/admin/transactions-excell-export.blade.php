@@ -82,6 +82,9 @@
         .excel-export-table td[data-label="Details"] .btn {
             width: 100%;
         }
+        .excel-export-table td[data-label="Delete"] .btn {
+            width: 100%;
+        }
     }
     @media (max-width: 575.98px) {
         .excel-export-table td {
@@ -115,6 +118,44 @@
             return (string) $value;
         }
     };
+    $formatNonNullAttributes = static function ($model, array $exclude = []) {
+        if (!$model) {
+            return [];
+        }
+
+        $excluded = array_flip($exclude);
+        $result = [];
+
+        foreach ($model->getAttributes() as $key => $value) {
+            if (isset($excluded[$key])) {
+                continue;
+            }
+            if ($value === null) {
+                continue;
+            }
+            if (is_string($value) && trim($value) === '') {
+                continue;
+            }
+            if (is_array($value) && empty($value)) {
+                continue;
+            }
+
+            if (is_bool($value)) {
+                $result[$key] = $value ? 'Yes' : 'No';
+                continue;
+            }
+
+            if (is_array($value) || is_object($value)) {
+                $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $result[$key] = $json !== false ? $json : (string) $value;
+                continue;
+            }
+
+            $result[$key] = (string) $value;
+        }
+
+        return $result;
+    };
 @endphp
 <div class="row g-4">
     <div class="col-12">
@@ -136,6 +177,20 @@
                     </div>
                 </div>
 
+                @if(session('status'))
+                    <div class="alert alert-success">{{ session('status') }}</div>
+                @endif
+
+                @if($errors->any())
+                    <div class="alert alert-danger">
+                        <ul class="mb-0">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 @if($transactions->isEmpty())
                     <div class="text-center text-muted py-5">
                         <i class="bi bi-receipt-cutoff display-6 d-block mb-2"></i>
@@ -156,6 +211,7 @@
                                     <th>Pet</th>
                                     <th>Details</th>
                                     <th class="text-nowrap">Prescription</th>
+                                    <th class="text-nowrap">Delete</th>
                                     <th class="text-nowrap">Manual WhatsApp</th>
                                 </tr>
                             </thead>
@@ -199,6 +255,17 @@
                                         $prescriptionPdfUrl = $prescriptionId
                                             ? "/backend/api/consultation/prescription/pdf?prescription_id={$prescriptionId}"
                                             : null;
+                                        $userDetails = $formatNonNullAttributes($txn->user, [
+                                            'password',
+                                            'remember_token',
+                                            'api_token_hash',
+                                            'google_token',
+                                            'pet_doc2_blob',
+                                            'pet_doc2_mime',
+                                        ]);
+                                        $petDetails = $formatNonNullAttributes($petRecord, [
+                                            'pet_doc2_blob',
+                                        ]);
                                     @endphp
                                     <tr>
                                         <td data-label="ID">#{{ $txn->id }}</td>
@@ -251,6 +318,8 @@
                                                     data-doctor-mobile="{{ $doctorMobile }}"
                                                     data-user-phone="{{ $txn->user->phone ?? 'N/A' }}"
                                                     data-user-city="{{ $txn->user->city ?? 'N/A' }}"
+                                                    data-user-fields='@json($userDetails, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)'
+                                                    data-pet-fields='@json($petDetails, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)'
                                                 >
                                                     View Details
                                                 </button>
@@ -271,6 +340,15 @@
                                             @else
                                                 <span class="text-muted small">Unavailable</span>
                                             @endif
+                                        </td>
+                                        <td data-label="Delete">
+                                            <form action="{{ route('admin.transactions.excell-export.delete', $txn) }}" method="POST" onsubmit="return confirm('Delete transaction #{{ $txn->id }}? This cannot be undone.');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">
+                                                    Delete
+                                                </button>
+                                            </form>
                                         </td>
                                         <td class="text-nowrap" data-label="Manual WhatsApp">
                                             <div class="mb-2">
@@ -310,6 +388,8 @@
                 <div id="petTimelineMeta" class="small text-muted mb-3"></div>
                 <div id="petTimelineDetails" class="small mb-3"></div>
                 <div id="petTimelineSymptom" class="small mb-3"></div>
+                <div id="petTimelineUserFields" class="small"></div>
+                <div id="petTimelinePetFields" class="small"></div>
                 <div id="petTimelineContent" class="small text-muted">Click "View Details" to load timeline.</div>
             </div>
         </div>
@@ -331,6 +411,8 @@
     const timelineMetaEl = document.getElementById('petTimelineMeta');
     const timelineDetailsEl = document.getElementById('petTimelineDetails');
     const timelineSymptomEl = document.getElementById('petTimelineSymptom');
+    const timelineUserFieldsEl = document.getElementById('petTimelineUserFields');
+    const timelinePetFieldsEl = document.getElementById('petTimelinePetFields');
     const timelineContentEl = document.getElementById('petTimelineContent');
     const timelineModal = timelineModalEl ? new bootstrap.Modal(timelineModalEl) : null;
 
@@ -356,6 +438,58 @@
             hour: '2-digit',
             minute: '2-digit'
         });
+    }
+
+    function normalizeFieldValue(value) {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+        if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+            try {
+                return JSON.stringify(value);
+            } catch (error) {
+                return String(value);
+            }
+        }
+        return String(value).trim();
+    }
+
+    function parseJsonObject(raw) {
+        if (!raw) return {};
+        try {
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function formatFieldLabel(key) {
+        return String(key || '')
+            .replace(/_/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, (ch) => ch.toUpperCase());
+    }
+
+    function renderFieldGroup(container, title, fields) {
+        if (!container) return;
+
+        const entries = Object.entries(fields || {}).filter(([, rawValue]) => normalizeFieldValue(rawValue) !== '');
+        if (entries.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="border rounded p-2 bg-light mb-3">
+                <div class="text-muted mb-1">${escapeHtml(title)}</div>
+                <div class="d-flex flex-column gap-1">
+                    ${entries.map(([key, rawValue]) => `
+                        <div><span class="text-muted">${escapeHtml(formatFieldLabel(key))}:</span> <strong>${escapeHtml(normalizeFieldValue(rawValue))}</strong></div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
     }
 
     function sourceBadgeClass(source) {
@@ -475,6 +609,8 @@
         const doctorMobile = btn.getAttribute('data-doctor-mobile') || '';
         const userPhone = btn.getAttribute('data-user-phone') || '';
         const userCity = btn.getAttribute('data-user-city') || '';
+        const userFields = parseJsonObject(btn.getAttribute('data-user-fields'));
+        const petFields = parseJsonObject(btn.getAttribute('data-pet-fields'));
 
         if (!petId || !userId || !timelineModal) {
             alert('Pet details unavailable for this row.');
@@ -485,6 +621,8 @@
         timelineMetaEl.textContent = `Transaction #${transactionId} | Pet ID: ${petId} | User ID: ${userId}`;
         renderPetDetails(petDob, doctorMobile, userPhone, userCity);
         renderReportedSymptom(reportedSymptom);
+        renderFieldGroup(timelineUserFieldsEl, 'User Table (Non-null Fields)', userFields);
+        renderFieldGroup(timelinePetFieldsEl, 'Pet Table (Non-null Fields)', petFields);
         timelineContentEl.innerHTML = '<div class="text-muted">Loading timeline...</div>';
         timelineModal.show();
 
