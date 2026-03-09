@@ -44,18 +44,6 @@ const toNumber = (value) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const toBoolean = (value) => {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value === 1;
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (["1", "true", "yes", "y"].includes(normalized)) return true;
-    if (["0", "false", "no", "n"].includes(normalized)) return false;
-  }
-  return undefined;
-};
-
 const formatInr = (value) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return "0";
@@ -120,10 +108,12 @@ export const PaymentScreen = ({
     const booking = Number(vet?.bookingPrice);
     if (Number.isFinite(booking) && booking > 0) return booking;
 
-    const fallback = Number(rateType === "night" ? vet?.priceNight : vet?.priceDay);
+    const fallback = Number(
+      rateType === "night" ? (vet?.priceNight ?? 599) : (vet?.priceDay ?? 499)
+    );
     if (Number.isFinite(fallback) && fallback > 0) return fallback;
 
-    return 0;
+    return rateType === "night" ? 599 : 499;
   }, [vet?.bookingPrice, vet?.priceDay, vet?.priceNight, rateType]);
 
   const consultationAmount = useMemo(() => {
@@ -175,15 +165,12 @@ export const PaymentScreen = ({
     if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
     return round2(taxableAmountBeforeDiscount + gstAmountBeforeDiscount);
   }, [gstAmountBeforeDiscount, paymentMeta, taxableAmountBeforeDiscount]);
-  const firstUserDiscount = 100;
-
   const [isPaying, setIsPaying] = useState(false);
   const [gatewayReady, setGatewayReady] = useState(false);
   const [statusType, setStatusType] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
-  const [hasUsedFirstOffer, setHasUsedFirstOffer] = useState(false);
   const [gstNumber, setGstNumber] = useState(() =>
     pickValue(
       paymentMeta?.gst_number,
@@ -215,82 +202,16 @@ export const PaymentScreen = ({
     };
   }, []);
 
-  const resolvedUserId = useMemo(
-    () =>
-      toNumber(
-        pickValue(
-          paymentMeta?.user_id,
-          paymentMeta?.userId,
-          petDetails?.user_id,
-          petDetails?.userId,
-          petDetails?.data?.user_id,
-          petDetails?.data?.userId,
-          petDetails?.user?.id
-        )
-      ),
-    [paymentMeta, petDetails]
-  );
-
-  const firstOfferStorageKey = useMemo(
-    () => `snoutiq:first-offer-used:${resolvedUserId ?? "guest"}`,
-    [resolvedUserId]
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      setHasUsedFirstOffer(window.localStorage.getItem(firstOfferStorageKey) === "1");
-    } catch {
-      setHasUsedFirstOffer(false);
-    }
-  }, [firstOfferStorageKey]);
-
-  const firstUserFlag = useMemo(
-    () =>
-      toBoolean(
-        pickValue(
-          paymentMeta?.is_first_user,
-          paymentMeta?.isFirstUser,
-          paymentMeta?.first_user,
-          paymentMeta?.firstUser,
-          paymentMeta?.first_consultation,
-          paymentMeta?.firstConsultation,
-          petDetails?.is_first_user,
-          petDetails?.isFirstUser,
-          petDetails?.first_user,
-          petDetails?.firstUser,
-          petDetails?.first_consultation,
-          petDetails?.firstConsultation
-        )
-      ),
-    [paymentMeta, petDetails]
-  );
-
   const paymentMetaDiscountAmount = toNumber(
     pickValue(paymentMeta?.offer_discount_inr, paymentMeta?.offerDiscountInr)
   );
-  const paymentMetaOfferApplied = toBoolean(
-    pickValue(
-      paymentMeta?.first_user_offer_applied,
-      paymentMeta?.firstUserOfferApplied
-    )
-  );
-
-  const isFirstUserOfferEligible =
-    paymentMetaDiscountAmount !== undefined
-      ? paymentMetaDiscountAmount > 0
-      : paymentMetaOfferApplied !== undefined
-        ? paymentMetaOfferApplied
-        : firstUserFlag !== undefined
-          ? firstUserFlag
-          : !hasUsedFirstOffer;
-
-  const discountAmount =
-    paymentMetaDiscountAmount !== undefined
-      ? round2(Math.max(paymentMetaDiscountAmount, 0))
-      : isFirstUserOfferEligible
-        ? round2(Math.min(firstUserDiscount, taxableAmountBeforeDiscount))
-        : 0;
+  const discountAmount = useMemo(() => {
+    if (paymentMetaDiscountAmount !== undefined) {
+      return round2(Math.max(paymentMetaDiscountAmount, 0));
+    }
+    return round2(Math.min(100, taxableAmountBeforeDiscount));
+  }, [paymentMetaDiscountAmount, taxableAmountBeforeDiscount]);
+  const isOfferApplied = discountAmount > 0;
 
   const taxableAmount = useMemo(() => {
     const metaAmount = toNumber(
@@ -315,7 +236,11 @@ export const PaymentScreen = ({
     if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
     return round2(taxableAmount + gstAmount);
   }, [gstAmount, paymentMeta, taxableAmount]);
-  const createOrderAmountInr = useMemo(() => Math.round(total), [total]);
+  const createOrderAmountInr = useMemo(() => round2(total), [total]);
+  const createOrderAmountPaise = useMemo(
+    () => Math.round(createOrderAmountInr * 100),
+    [createOrderAmountInr]
+  );
 
   const paymentContext = useMemo(() => {
     const orderType =
@@ -506,7 +431,7 @@ export const PaymentScreen = ({
       return;
     }
 
-    if (!createOrderAmountInr || createOrderAmountInr <= 0) {
+    if (!createOrderAmountPaise || createOrderAmountPaise <= 0) {
       updateStatus("error", "Invalid consultation amount.");
       return;
     }
@@ -515,9 +440,9 @@ export const PaymentScreen = ({
     updateStatus("info", "Creating order...");
 
     try {
-      // Backend expects integer INR and converts it to paise.
       const order = await apiPost("/api/create-order", {
         amount: createOrderAmountInr,
+        amount_paise: createOrderAmountPaise,
         ...paymentContext,
       });
 
@@ -550,14 +475,6 @@ export const PaymentScreen = ({
             }
 
             updateStatus("success", "Payment successful.");
-            if (discountAmount > 0 && typeof window !== "undefined") {
-              try {
-                window.localStorage.setItem(firstOfferStorageKey, "1");
-              } catch {
-                // Ignore storage failures in private mode.
-              }
-              setHasUsedFirstOffer(true);
-            }
             setShowSuccessModal(true);
             onPay?.(verify);
           } catch (error) {
@@ -741,10 +658,10 @@ export const PaymentScreen = ({
                       </div>
                     </div>
 
-                    {isFirstUserOfferEligible ? (
+                    {isOfferApplied ? (
                       <div className="mt-4 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-2.5">
                         <p className="text-[11px] font-semibold text-blue-800">
-                          First-time user offer: You get Rs 100 OFF on this consultation.
+                          Special offer applied: You get Rs 100 OFF on this consultation.
                         </p>
                       </div>
                     ) : null}
@@ -768,7 +685,7 @@ export const PaymentScreen = ({
 
                       {discountAmount > 0 ? (
                         <div className="flex justify-between font-semibold text-emerald-700">
-                          <span>First User Discount</span>
+                          <span>Special Discount</span>
                           <span>- Rs {formatInr(discountAmount)}</span>
                         </div>
                       ) : null}
@@ -859,7 +776,7 @@ export const PaymentScreen = ({
 
                     {discountAmount > 0 ? (
                       <p className="text-[11px] text-center font-medium text-emerald-700">
-                        Offer applied: Rs {formatInr(discountAmount)} discounted from your first consultation.
+                        Special discount applied: Rs {formatInr(discountAmount)} OFF
                       </p>
                     ) : null}
 
@@ -898,7 +815,7 @@ export const PaymentScreen = ({
 
         {discountAmount > 0 ? (
           <p className="text-[10px] text-center mt-1 font-medium text-emerald-700">
-            First-time offer applied: Rs {formatInr(discountAmount)} OFF
+            Special discount applied: Rs {formatInr(discountAmount)} OFF
           </p>
         ) : null}
 

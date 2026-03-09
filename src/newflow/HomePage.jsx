@@ -244,15 +244,15 @@ function getCurrentPrice() {
         rateType: "day",
       }
     : {
-        amount: 649,
-        finalAmount: 549,
+        amount: 599,
+        finalAmount: 499,
         label: "Night consult · 10 PM–8 AM",
         rateType: "night",
       };
 }
 const PAYMENT_AMOUNTS = {
     day: 499,
-    night: 649,
+    night: 599,
   },
   formatInr = (value) => {
     const n = Number(value);
@@ -269,7 +269,7 @@ const PAYMENT_AMOUNTS = {
     },
     {
       q: "How do I pay for the consultation?",
-      a: "Securely via UPI, Credit/Debit Cards, or Netbanking before the consultation. Day consult base ₹499 becomes ₹399 after ₹100 off, and night consult base ₹649 becomes ₹549 after ₹100 off.",
+      a: "Securely via UPI, Credit/Debit Cards, or Netbanking before the consultation. Day consult base ₹499 becomes ₹399 after ₹100 off, and night consult base ₹599 becomes ₹499 after ₹100 off.",
     },
     {
       q: "Are the vets qualified?",
@@ -814,7 +814,7 @@ function Ie() {
       );
     }, []),
     e.jsxs("div", {
-      className: "flex min-h-screen flex-col bg-white",
+      className: "flex min-h-screen flex-col bg-white", 
       children: [
         e.jsx(Q, { consultPath: "/20+vetsonline?start=details" }),
         e.jsxs("main", {

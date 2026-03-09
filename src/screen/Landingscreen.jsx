@@ -88,7 +88,7 @@ const WHY_CONSULT_ONLINE = [
   {
     icon: "💰",
     title: "Fixed Pricing",
-    desc: "₹399 day consult & ₹549 night consult. 🔥 Get ₹100 OFF on your first consultation. No hidden charges.",
+    desc: "₹399 day consult & ₹499 night consult. 🔥 Get ₹100 OFF on your first consultation. No hidden charges.",
   },
   {
     icon: "🏠",
@@ -431,8 +431,8 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
   };
 
   const isDay = isDayTime();
-  const originalConsultPrice = isDay ? 499 : 649;
-  const discountedConsultPrice = isDay ? 399 : 549;
+  const originalConsultPrice = isDay ? 499 : 599;
+  const discountedConsultPrice = isDay ? 399 : 499;
   const consultDiscountAmount = originalConsultPrice - discountedConsultPrice;
   const mobileTopTickerItems = [
     "India's Trusted Online Vet Platform",
@@ -703,7 +703,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
       },
       {
         q: "How much does an online vet consultation cost?",
-        a: "Day consultation (8 AM - 8 PM) is ₹399 and night consultation (8 PM - 8 AM) is ₹549. Pricing is fixed and transparent.",
+        a: "Day consultation (8 AM - 8 PM) is ₹399 and night consultation (8 PM - 8 AM) is ₹499. Pricing is fixed and transparent.",
       },
       {
         q: "Will I receive guidance after consultation?",
@@ -878,11 +878,11 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                     <span className="text-slate-400">:</span>
 
                     <span className="text-xs font-semibold text-slate-500 line-through">
-                      ₹{isDay ? 499 : 649}
+                      ₹{isDay ? 499 : 599}
                     </span>
 
                     <span className="text-sm font-extrabold text-emerald-700">
-                      ₹{isDay ? 399 : 549}
+                      ₹{isDay ? 399 : 499}
                     </span>
 
                     <span className="text-xs font-bold text-red-600">
@@ -1124,7 +1124,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                         Consult a Vet Online
                       </span>
                       <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-white/16 px-3 py-1 text-[12px] font-semibold md:text-[13px]">
-                        <span className="font-extrabold">₹{isDay ? 399 : 549}</span>
+                        <span className="font-extrabold">₹{isDay ? 399 : 499}</span>
                         <span className="text-white/90">₹100 OFF</span>
                       </span>
                     </span>

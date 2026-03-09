@@ -953,7 +953,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
 
   // locked pricing (as you had)
   const [dayPrice] = useState("499");
-  const [nightPrice] = useState("649");
+  const [nightPrice] = useState("599");
 
   const [agreement1, setAgreement1] = useState(false);
   const [agreement2, setAgreement2] = useState(false);
@@ -1381,7 +1381,7 @@ export const VetRegisterScreen = ({ onSubmit, onBack }) => {
           form.freeFollowUp === "yes" ? "Yes" : "No",
         commission_and_agreement: agreed ? "Agreed" : "Not agreed",
         video_day_rate: 499,
-        video_night_rate: 649,
+        video_night_rate: 599,
         short_intro: form.shortIntro.trim(),
         preferred_payout_method: form.payoutMethod,
         preferred_payout_detail: payoutReady,

@@ -80,7 +80,7 @@ const cities = [
 const faqItems = [
   {
     q: "How do I consult a veterinary doctor online in India?",
-    a: "Simply click 'Start Instant Vet Consultation' on SnoutIQ, select your pet type, pay the consultation fee (Rs 399 day / Rs 549 night), and join a secure HD video call with a verified vet within minutes. No app download required.",
+    a: "Simply click 'Start Instant Vet Consultation' on SnoutIQ, select your pet type, pay the consultation fee (Rs 399 day / Rs 499 night), and join a secure HD video call with a verified vet within minutes. No app download required.",
   },
   {
     q: "Is online vet consultation available 24/7 in India?",
@@ -88,7 +88,7 @@ const faqItems = [
   },
   {
     q: "What is the cost of online vet consultation in India?",
-    a: "Online vet consultation on SnoutIQ costs Rs 399 during the day (8 AM to 10 PM) and Rs 549 at night (10 PM to 8 AM). No hidden charges. Covers dogs and cats across all of India.",
+    a: "Online vet consultation on SnoutIQ costs Rs 399 during the day (8 AM to 10 PM) and Rs 499 at night (10 PM to 8 AM). No hidden charges. Covers dogs and cats across all of India.",
   },
   {
     q: "What do I receive after an online vet consultation in India?",

@@ -70,7 +70,7 @@ const DEFAULT_AUTO_ASSIGNED_VET = {
   rating: 5,
   reviews: 0,
   priceDay: 499,
-  priceNight: 649,
+  priceNight: 599,
   bookingRateType: "day",
   bookingPrice: 499,
   isSnoutiqAssigned: true,
@@ -82,7 +82,7 @@ const DEFAULT_AUTO_ASSIGNED_VET = {
     degree: "MVSc",
     years_of_experience: "10",
     video_day_rate: "499.00",
-    video_night_rate: "649.00",
+    video_night_rate: "599.00",
     specialization_select_all_that_apply:
       "Dogs, Cats, Exotic Pet, Surgery, Skin / Dermatology, General Practice, Endocrinology",
     response_time_for_online_consults_day: "15 To 20 Mins",

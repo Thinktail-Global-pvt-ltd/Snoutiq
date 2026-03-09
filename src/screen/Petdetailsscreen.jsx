@@ -3,6 +3,7 @@ import { SPECIALTY_ICONS } from "../../constants";
 import { Button } from "../components/Button";
 import { PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
 import { apiPost, apiBaseUrl } from "../lib/api";
+import { useLocation } from "react-router-dom";
 import {
   CheckCircle2,
   ChevronDown,
@@ -206,7 +207,7 @@ const DEFAULT_PRIMARY_PAYMENT_VET = {
   rating: 5,
   reviews: 0,
   priceDay: 499,
-  priceNight: 649,
+  priceNight: 599,
   bookingRateType: "day",
   bookingPrice: 499,
   isSnoutiqAssigned: true,
@@ -220,7 +221,7 @@ const DEFAULT_PRIMARY_PAYMENT_VET = {
     degree: "MVSc",
     years_of_experience: "10",
     video_day_rate: "499.00",
-    video_night_rate: "649.00",
+    video_night_rate: "599.00",
     specialization_select_all_that_apply:
       "Dogs, Cats, Exotic Pet, Surgery, Skin / Dermatology, General Practice, Endocrinology",
     response_time_for_online_consults_day: "15 To 20 Mins",
@@ -440,20 +441,23 @@ const compressImageFile = async (
 };
 
 const PetDetailsScreen = ({ onSubmit, vet }) => {
-  const [details, setDetails] = useState({
-    ownerName: "",
+  const location = useLocation();
+  const routePrefill = location.state?.prefill || null;
+
+  const [details, setDetails] = useState(() => ({
+    ownerName: routePrefill?.ownerName || "",
     ownerMobile: "",
     city: "",
-    name: "",
-    type: null,
-    breed: "",
-    petDob: "",
+    name: routePrefill?.name || "",
+    type: routePrefill?.type || null,
+    breed: routePrefill?.breed || "",
+    petDob: routePrefill?.petDob || "",
     // ✅ NEW: gender (required)
     gender: "",
-    problemText: "",
+    problemText: routePrefill?.problemText || "",
     mood: "calm",
     petDoc2: "",
-    exoticType: "",
+    exoticType: routePrefill?.exoticType || "",
     lastDaysEnergy: "",
     lastDaysAppetite: "",
     hasPhoto: false,
@@ -461,7 +465,47 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     vaccinatedYesNo: "",
     dewormingYesNo: "",
     weightKg: "",
-  });
+  }));
+
+  const routePrefillFlags = useMemo(
+    () => ({
+      ownerName: Boolean(routePrefill?.ownerName?.trim()),
+      name: Boolean(routePrefill?.name?.trim()),
+      type: Boolean(routePrefill?.type),
+      breed: Boolean(routePrefill?.breed),
+      exoticType: Boolean(routePrefill?.exoticType?.trim()),
+      petDob: Boolean(routePrefill?.petDob),
+      problemText: Boolean(routePrefill?.problemText?.trim()),
+    }),
+    [routePrefill]
+  );
+
+  const [prefillEdited, setPrefillEdited] = useState({});
+
+  const markPrefillEdited = (field) => {
+    setPrefillEdited((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  };
+
+  const prefillFieldClass = (field) =>
+    routePrefillFlags[field] && !prefillEdited[field]
+      ? "!border-sky-200 !bg-sky-50/80 focus:!border-sky-400 focus:!ring-sky-200"
+      : "";
+
+  useEffect(() => {
+    const prefill = location.state?.prefill;
+    if (!prefill) return;
+
+    setDetails((prev) => ({
+      ...prev,
+      ownerName: prev.ownerName || prefill.ownerName || "",
+      name: prev.name || prefill.name || "",
+      type: prev.type || prefill.type || null,
+      breed: prev.breed || prefill.breed || "",
+      petDob: prev.petDob || prefill.petDob || "",
+      problemText: prev.problemText || prefill.problemText || "",
+      exoticType: prev.exoticType || prefill.exoticType || "",
+    }));
+  }, [location.state]);
 
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState("");
@@ -1355,16 +1399,20 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                           <input
                             type="text"
                             value={details.ownerName}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              markPrefillEdited("ownerName");
                               setDetails((p) => ({
                                 ...p,
                                 ownerName: e.target.value,
-                              }))
-                            }
+                              }));
+                            }}
                             placeholder="Enter your full name"
-                            className={`${fieldBase} pl-12 md:pl-12`}
+                            className={`${fieldBase} pl-12 md:pl-12 ${prefillFieldClass("ownerName")}`}
                           />
                         </div>
+                        {routePrefillFlags.ownerName && !prefillEdited.ownerName ? (
+                          <p className="text-xs text-sky-700">Prefilled from previous step</p>
+                        ) : null}
                       </div>
 
                       <div className="space-y-2">
@@ -1569,11 +1617,12 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                           <input
                             type="text"
                             value={details.name}
-                            onChange={(e) =>
-                              setDetails((p) => ({ ...p, name: e.target.value }))
-                            }
+                            onChange={(e) => {
+                              markPrefillEdited("name");
+                              setDetails((p) => ({ ...p, name: e.target.value }));
+                            }}
                             placeholder="Enter your pet's name"
-                            className={`${fieldBase} pl-12 md:pl-12`}
+                            className={`${fieldBase} pl-12 md:pl-12 ${prefillFieldClass("name")}`}
                           />
                         </div>
                       </div>
@@ -1589,12 +1638,17 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                               key={type}
                               type="button"
                               onClick={() =>
-                                setDetails((p) => ({
-                                  ...p,
-                                  type,
-                                  breed: "",
-                                  exoticType: "",
-                                }))
+                                {
+                                  markPrefillEdited("type");
+                                  markPrefillEdited("breed");
+                                  markPrefillEdited("exoticType");
+                                  setDetails((p) => ({
+                                    ...p,
+                                    type,
+                                    breed: "",
+                                    exoticType: "",
+                                  }));
+                                }
                               }
                               className={[
                                 "p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all duration-200",
@@ -1602,6 +1656,11 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                                 details.type === type
                                   ? "border-[#3998de] bg-[#3998de]/5 text-[#3998de]"
                                   : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100",
+                                routePrefillFlags.type &&
+                                !prefillEdited.type &&
+                                details.type === type
+                                  ? "!border-sky-300 !bg-sky-50 !text-sky-700"
+                                  : "",
                               ].join(" ")}
                             >
                               <div
@@ -1664,7 +1723,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                                   ? setBreedDropdownOpen((prev) => !prev)
                                   : null
                               }
-                              className={`${selectBase} text-left`}
+                              className={`${selectBase} text-left ${prefillFieldClass("breed")}`}
                               disabled={loadingBreeds || breedOptions.length === 0}
                             >
                               {loadingBreeds
@@ -1693,6 +1752,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                                         key={b.value}
                                         type="button"
                                         onClick={() => {
+                                          markPrefillEdited("breed");
                                           setDetails((p) => ({ ...p, breed: b.value }));
                                           setBreedDropdownOpen(false);
                                           setBreedSearch("");
@@ -1740,14 +1800,15 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                             <input
                               type="text"
                               value={details.exoticType}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                markPrefillEdited("exoticType");
                                 setDetails((p) => ({
                                   ...p,
                                   exoticType: e.target.value,
-                                }))
-                              }
+                                }));
+                              }}
                               placeholder="e.g. Parrot, Rabbit, Turtle, Guinea pig"
-                              className={`${fieldBase} pl-12 md:pl-12`}
+                              className={`${fieldBase} pl-12 md:pl-12 ${prefillFieldClass("exoticType")}`}
                             />
                           </div>
                           <p className="text-xs text-gray-500">
@@ -1777,10 +1838,11 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                                 type="date"
                                 value={details.petDob}
                                 max={todayISO()}
-                                onChange={(e) =>
-                                  setDetails((p) => ({ ...p, petDob: e.target.value }))
-                                }
-                                className={`${fieldBase} pl-12 md:pl-12`}
+                                onChange={(e) => {
+                                  markPrefillEdited("petDob");
+                                  setDetails((p) => ({ ...p, petDob: e.target.value }));
+                                }}
+                                className={`${fieldBase} pl-12 md:pl-12 ${prefillFieldClass("petDob")}`}
                               />
                             </div>
                           </div>
@@ -1966,15 +2028,16 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
 
                         <textarea
                           value={details.problemText}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            markPrefillEdited("problemText");
                             setDetails((p) => ({
                               ...p,
                               problemText: e.target.value,
-                            }))
-                          }
+                            }));
+                          }}
                           placeholder="Example: My dog has been limping since yesterday, not putting weight on front leg, and cries when touched. He's also less active than usual..."
                           rows={4}
-                          className={textareaBase}
+                          className={`${textareaBase} ${prefillFieldClass("problemText")}`}
                         />
 
                         <div className="flex items-center justify-between text-xs">
