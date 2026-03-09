@@ -54,6 +54,7 @@ const formatInr = (value) => {
 };
 
 const round2 = (n) => Number((Number(n) || 0).toFixed(2));
+const toInt = (n) => Math.round(Number(n) || 0);
 
 const optimizeAvatarUrl = (value) => {
   const raw = String(value || "").trim();
@@ -236,9 +237,9 @@ export const PaymentScreen = ({
     if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
     return round2(taxableAmount + gstAmount);
   }, [gstAmount, paymentMeta, taxableAmount]);
-  const createOrderAmountInr = useMemo(() => round2(total), [total]);
+  const createOrderAmountInr = useMemo(() => toInt(total), [total]);
   const createOrderAmountPaise = useMemo(
-    () => Math.round(createOrderAmountInr * 100),
+    () => createOrderAmountInr * 100,
     [createOrderAmountInr]
   );
 
@@ -374,16 +375,16 @@ export const PaymentScreen = ({
       gst_number_given: hasGstNumber ? 1 : undefined,
       amount_includes_gst: 0,
       gst_rate_percent: 18,
-      consultation_amount_inr: consultationAmount,
-      taxable_amount_inr: taxableAmount,
-      gst_amount_inr: gstAmount,
-      taxable_amount_before_discount_inr: taxableAmountBeforeDiscount,
-      gst_amount_before_discount_inr: gstAmountBeforeDiscount,
-      service_charge_inr: round2(service),
+      consultation_amount_inr: toInt(consultationAmount),
+      taxable_amount_inr: toInt(taxableAmount),
+      gst_amount_inr: toInt(gstAmount),
+      taxable_amount_before_discount_inr: toInt(taxableAmountBeforeDiscount),
+      gst_amount_before_discount_inr: toInt(gstAmountBeforeDiscount),
+      service_charge_inr: toInt(service),
       first_user_offer_applied: discountAmount > 0 ? 1 : 0,
-      offer_discount_inr: discountAmount,
-      original_amount_inr: totalBeforeDiscount,
-      final_amount_inr: total,
+      offer_discount_inr: toInt(discountAmount),
+      original_amount_inr: toInt(totalBeforeDiscount),
+      final_amount_inr: toInt(total),
     });
   }, [
     paymentMeta,
@@ -712,11 +713,11 @@ export const PaymentScreen = ({
                         <div className="text-right">
                           {discountAmount > 0 ? (
                             <div className="text-[11px] font-medium text-gray-400 line-through">
-                              Rs {formatInr(totalBeforeDiscount)}
+                              Rs {formatInr(toInt(totalBeforeDiscount))}
                             </div>
                           ) : null}
                           <div className="text-base font-bold text-gray-900">
-                            Rs {formatInr(total)}
+                            Rs {formatInr(createOrderAmountInr)}
                           </div>
                         </div>
                       </div>
@@ -762,7 +763,9 @@ export const PaymentScreen = ({
                       }`}
                     >
                       <span>
-                        {isPaying ? "Processing..." : `Pay Rs ${formatInr(total)}`}
+                        {isPaying
+                          ? "Processing..."
+                          : `Pay Rs ${formatInr(createOrderAmountInr)}`}
                       </span>
                       <span className="flex items-center gap-2 text-white/80">
                         Proceed <ArrowRight size={18} />
@@ -803,7 +806,11 @@ export const PaymentScreen = ({
               : "bg-[#1d4ed8] hover:bg-[#1e40af] text-white shadow-md"
           }`}
         >
-          <span>{isPaying ? "Processing..." : `Pay Rs ${formatInr(total)}`}</span>
+          <span>
+            {isPaying
+              ? "Processing..."
+              : `Pay Rs ${formatInr(createOrderAmountInr)}`}
+          </span>
           <span className="flex items-center gap-2 text-white/80">
             Proceed <ArrowRight size={16} />
           </span>
