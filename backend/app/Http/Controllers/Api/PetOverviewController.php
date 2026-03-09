@@ -408,28 +408,7 @@ class PetOverviewController extends Controller
         }
 
         $items = DB::table('prescriptions')
-            ->select([
-                'id',
-                'doctor_id',
-                'user_id',
-                'pet_id',
-                'diagnosis',
-                'disease_name',
-                'medications_json',
-                'diagnosis_status',
-                'treatment_plan',
-                'home_care',
-                'follow_up_date',
-                'follow_up_type',
-                'follow_up_notes',
-                'visit_notes',
-                'exam_notes',
-                'case_severity',
-                'visit_category',
-                'content_html',
-                'image_path',
-                'created_at',
-            ])
+            ->select('prescriptions.*')
             ->where(function ($q) use ($petId) {
                 if (Schema::hasColumn('prescriptions', 'pet_id')) {
                     $q->where('pet_id', $petId);
