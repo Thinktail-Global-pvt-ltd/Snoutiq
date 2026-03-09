@@ -186,6 +186,7 @@ const isDayTime = (date = new Date()) => {
 const DEFAULT_PRIMARY_PAYMENT_VET = {
   id: 116,
   doctor_id: 116,
+  clinic_id: 115,
   name: "Dr. Shashannk Goyal",
   doctor_name: "Dr Shashannk Goyal",
   qualification: "MVSc",
@@ -217,6 +218,7 @@ const DEFAULT_PRIMARY_PAYMENT_VET = {
   raw: {
     id: 116,
     doctor_id: 116,
+    clinic_id: 115,
     doctor_name: "Dr Shashannk Goyal",
     degree: "MVSc",
     years_of_experience: "10",
@@ -321,8 +323,9 @@ const resolvePrimaryPaymentVet = (inputVet) => {
   return {
     ...DEFAULT_PRIMARY_PAYMENT_VET,
     ...(isProvidedShashank ? sourceVet : {}),
-    id: doctorId,
-    doctor_id: doctorId,
+    id: 116,
+     doctor_id: 116,
+    clinic_id: 115,
     name: displayName,
     doctor_name: doctorName,
     priceDay,
@@ -333,12 +336,14 @@ const resolvePrimaryPaymentVet = (inputVet) => {
     autoAssigned: true,
     assignedBy: "snoutiq",
     raw: {
-      ...(DEFAULT_PRIMARY_PAYMENT_VET.raw || {}),
-      ...(isProvidedShashank && sourceVet?.raw ? sourceVet.raw : {}),
-      id: doctorId,
-      doctor_id: doctorId,
-      doctor_name: doctorName,
-    },
+  ...(DEFAULT_PRIMARY_PAYMENT_VET.raw || {}),
+  ...(isProvidedShashank && sourceVet?.raw ? sourceVet.raw : {}),
+  id: 116,
+  doctor_id: 116,
+  clinic_id: 115,
+  vet_registeration_id: 115,
+  doctor_name: doctorName,
+},
   };
 };
 
@@ -530,7 +535,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
   const [otpPhone, setOtpPhone] = useState("");
   const otpInputRef = useRef(null);
   const [liveDoctorCount, setLiveDoctorCount] = useState(null);
-  const paymentVet = useMemo(() => resolvePrimaryPaymentVet(vet), [vet]);
+  const paymentVet = useMemo(() => resolvePrimaryPaymentVet(), []);
   const [resolvedDoctorImage, setResolvedDoctorImage] = useState(
     () => paymentVet?.image || ""
   );

@@ -1249,7 +1249,7 @@ export default function VideoConsultLP() {
 
       <LPNavbar
         consultPath={CONSULT_DETAILS_ROUTE}
-        onConsultClick={goToPetDetailsScreen}
+        onConsultClick={scrollToConsultForm}
       />
 
       {/* -- LIVE STATUS BAR ----------------------------------------------- */}

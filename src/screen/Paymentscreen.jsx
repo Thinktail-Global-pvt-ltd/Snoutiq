@@ -277,26 +277,8 @@ export const PaymentScreen = ({
       petDetails?.callSessionId
     );
 
-    const clinicId = toNumber(
-      pickValue(
-        paymentMeta?.clinic_id,
-        paymentMeta?.clinicId,
-        vet?.clinic_id,
-        vet?.raw?.clinic_id,
-        vet?.raw?.vet_registeration_id
-      )
-    );
-
-    const doctorId = toNumber(
-      pickValue(
-        paymentMeta?.doctor_id,
-        paymentMeta?.doctorId,
-        vet?.doctor_id,
-        vet?.id,
-        vet?.raw?.doctor_id,
-        vet?.raw?.id
-      )
-    );
+const clinicId = 115;
+const doctorId = 116;
 
     const userId = toNumber(
       pickValue(
@@ -458,9 +440,7 @@ export const PaymentScreen = ({
         key,
         order_id: orderId,
         name: "Snoutiq Veterinary Consultation",
-        description: vet?.name
-          ? `Video consultation with ${vet.name} (${rateType.toUpperCase()} slot)`
-          : "Video consultation",
+       description: `Video consultation with Dr. Shashannk Goyal (${rateType.toUpperCase()} slot)`,
         handler: async (response) => {
           updateStatus("info", "Verifying payment...");
           try {
@@ -503,9 +483,20 @@ export const PaymentScreen = ({
       setIsPaying(false);
     }
   };
+const effectiveVet = useMemo(
+  () => ({
+    name: "Dr. Shashannk Goyal",
+    image: vet?.image || "",
+  }),
+  [vet?.image]
+);
 
-  const doctorDisplayName = vet?.name?.split(" ")[1] || vet?.name || "Vet";
-  const imageSrc = useMemo(() => optimizeAvatarUrl(vet?.image), [vet?.image]);
+const doctorDisplayName = effectiveVet.name.replace(/^Dr\.?\s*/i, "");
+const imageSrc = useMemo(
+  () => optimizeAvatarUrl(effectiveVet.image),
+  [effectiveVet.image]
+);
+
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col">
@@ -537,7 +528,7 @@ export const PaymentScreen = ({
                   {imageSrc ? (
                     <img
                       src={imageSrc}
-                      alt={vet?.name || "Vet"}
+                    alt={effectiveVet.name}
                       width={64}
                       height={64}
                       className="w-12 h-12 rounded-full object-cover md:w-16 md:h-16"
@@ -878,7 +869,7 @@ export const ConfirmationScreen = ({ vet, skipConversion = false }) => {
           </h2>
 
           <p className="text-stone-500 mb-8 max-w-[250px] mx-auto md:max-w-2xl md:text-lg">
-            <strong className="text-stone-700">{vet?.name || "Your vet"}</strong>{" "}
+            <strong className="text-stone-700">Dr. Shashannk Goyal</strong>{" "}
             has been notified and will respond in about 10-15 minutes.
           </p>
 
