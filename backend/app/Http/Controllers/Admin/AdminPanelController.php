@@ -296,7 +296,7 @@ class AdminPanelController extends Controller
                 'clinic:id,name',
                 'doctor:id,doctor_name,doctor_email,doctor_mobile',
                 'user' => function ($query) use ($petColumns) {
-                    $query->select('id', 'name', 'email', 'phone')
+                    $query->select('id', 'name', 'email', 'phone', 'city')
                         ->with([
                             'pets' => function ($petQuery) use ($petColumns) {
                                 $petQuery->select($petColumns)
@@ -441,7 +441,7 @@ class AdminPanelController extends Controller
                 'clinic:id,name',
                 'doctor:id,vet_registeration_id,doctor_name,doctor_email,doctor_mobile',
                 'user' => function ($query) use ($petColumns) {
-                    $query->select('id', 'name', 'email', 'phone')
+                    $query->select('id', 'name', 'email', 'phone', 'city')
                         ->with([
                             'pets' => function ($petQuery) use ($petColumns) {
                                 $petQuery->select($petColumns)
@@ -558,6 +558,22 @@ class AdminPanelController extends Controller
                 $doctor->id,
                 $transaction->clinic_id ?? 'NULL'
             ));
+    }
+
+    public function deleteAppointmentTransaction(Transaction $transaction): RedirectResponse
+    {
+        if (! $this->isAppointmentTransaction($transaction)) {
+            return redirect()
+                ->route('admin.transactions.appointments')
+                ->withErrors(['transaction' => 'Only appointment transactions can be deleted from this page.']);
+        }
+
+        $transactionId = (int) $transaction->id;
+        $transaction->delete();
+
+        return redirect()
+            ->route('admin.transactions.appointments')
+            ->with('status', "Transaction #{$transactionId} deleted.");
     }
 
     private function appointmentTransactionsQuery(): Builder

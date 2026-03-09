@@ -153,7 +153,7 @@
                                     <th>Current Doctor</th>
                                     <th>User</th>
                                     <th>Pet</th>
-                                    <th class="text-nowrap">Change Doctor</th>
+                                    <th class="text-nowrap">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -243,7 +243,7 @@
                                                 <div class="text-muted small">DOB: {{ $petDob }}</div>
                                             @endif
                                         </td>
-                                        <td class="text-nowrap" data-label="Change Doctor">
+                                        <td class="text-nowrap" data-label="Actions">
                                             <form action="{{ route('admin.transactions.appointments.doctor', $txn) }}" method="POST" class="doctor-update-form d-flex flex-column gap-2">
                                                 @csrf
                                                 <select name="doctor_id" class="form-select form-select-sm" required>
@@ -258,6 +258,13 @@
                                                 </select>
                                                 <button type="submit" class="btn btn-sm btn-primary" @disabled($doctorOptions->isEmpty())>
                                                     Update Doctor
+                                                </button>
+                                            </form>
+                                            <form action="{{ route('admin.transactions.appointments.delete', $txn) }}" method="POST" class="mt-2" onsubmit="return confirm('Delete transaction #{{ $txn->id }}? This cannot be undone.');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                                                    Delete
                                                 </button>
                                             </form>
                                         </td>

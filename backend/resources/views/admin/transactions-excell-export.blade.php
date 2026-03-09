@@ -250,6 +250,7 @@
                                                     data-pet-dob="{{ $petDob }}"
                                                     data-doctor-mobile="{{ $doctorMobile }}"
                                                     data-user-phone="{{ $txn->user->phone ?? 'N/A' }}"
+                                                    data-user-city="{{ $txn->user->city ?? 'N/A' }}"
                                                 >
                                                     View Details
                                                 </button>
@@ -429,16 +430,18 @@
         `;
     }
 
-    function renderPetDetails(petDob, doctorMobile, userPhone) {
+    function renderPetDetails(petDob, doctorMobile, userPhone, userCity) {
         const dobText = String(petDob || '').trim() || 'N/A';
         const mobileText = String(doctorMobile || '').trim() || 'N/A';
         const userPhoneText = String(userPhone || '').trim() || 'N/A';
+        const userCityText = String(userCity || '').trim() || 'N/A';
         timelineDetailsEl.innerHTML = `
             <div class="border rounded p-2 bg-light">
                 <div class="d-flex flex-column gap-1">
                     <div><span class="text-muted">Pet DOB:</span> <strong>${escapeHtml(dobText)}</strong></div>
                     <div><span class="text-muted">Doctor Mobile:</span> <strong>${escapeHtml(mobileText)}</strong></div>
                     <div><span class="text-muted">User Phone:</span> <strong>${escapeHtml(userPhoneText)}</strong></div>
+                    <div><span class="text-muted">User City:</span> <strong>${escapeHtml(userCityText)}</strong></div>
                 </div>
             </div>
         `;
@@ -471,6 +474,7 @@
         const petDob = btn.getAttribute('data-pet-dob') || '';
         const doctorMobile = btn.getAttribute('data-doctor-mobile') || '';
         const userPhone = btn.getAttribute('data-user-phone') || '';
+        const userCity = btn.getAttribute('data-user-city') || '';
 
         if (!petId || !userId || !timelineModal) {
             alert('Pet details unavailable for this row.');
@@ -479,7 +483,7 @@
 
         timelineTitleEl.textContent = `${petName} Timeline`;
         timelineMetaEl.textContent = `Transaction #${transactionId} | Pet ID: ${petId} | User ID: ${userId}`;
-        renderPetDetails(petDob, doctorMobile, userPhone);
+        renderPetDetails(petDob, doctorMobile, userPhone, userCity);
         renderReportedSymptom(reportedSymptom);
         timelineContentEl.innerHTML = '<div class="text-muted">Loading timeline...</div>';
         timelineModal.show();

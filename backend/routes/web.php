@@ -236,6 +236,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/transactions/excell-export', [AdminPanelController::class, 'excellExportTransactions'])->name('admin.transactions.excell-export');
         Route::get('/transactions/appointments', [AdminPanelController::class, 'appointmentTransactions'])->name('admin.transactions.appointments');
         Route::post('/transactions/appointments/{transaction}/doctor', [AdminPanelController::class, 'updateAppointmentTransactionDoctor'])->name('admin.transactions.appointments.doctor');
+        Route::delete('/transactions/appointments/{transaction}', [AdminPanelController::class, 'deleteAppointmentTransaction'])->name('admin.transactions.appointments.delete');
         Route::get('/supports', [AdminPanelController::class, 'supports'])->name('admin.supports');
         Route::get('/sp/{user}', [AdminPanelController::class, 'serviceProviderProfile'])->name('admin.sp.profile');
 
