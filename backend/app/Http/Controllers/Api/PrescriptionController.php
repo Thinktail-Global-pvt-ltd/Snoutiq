@@ -180,6 +180,41 @@ class PrescriptionController extends Controller
         return response()->json($prescriptions);
     }
 
+    // GET /api/prescriptions/by-user-pet?user_id=&pet_id=
+    public function byUserPet(Request $request)
+    {
+        $payload = $request->validate([
+            'user_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
+            'pet_id' => ['required', 'integer', 'min:1', 'exists:pets,id'],
+        ]);
+
+        if (!Schema::hasColumn('prescriptions', 'pet_id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'prescriptions.pet_id column is missing.',
+            ], 500);
+        }
+
+        $prescriptions = Prescription::query()
+            ->with(['doctor', 'user', 'pet'])
+            ->where('user_id', (int) $payload['user_id'])
+            ->where('pet_id', (int) $payload['pet_id'])
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (Prescription $prescription) {
+                $row = $prescription->toArray(); // full prescription row + loaded relations
+                $row['image_url'] = $this->buildPrescriptionUrl($prescription->image_path);
+                return $row;
+            })
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'count' => $prescriptions->count(),
+            'data' => $prescriptions,
+        ]);
+    }
+
     // GET /api/pets/{pet_id}/prescriptions/medications-json
     public function medicationsByPet(Request $request, int $petId)
     {
