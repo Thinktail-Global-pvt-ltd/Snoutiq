@@ -59,6 +59,8 @@ class MedicalRecordController extends Controller
             'follow_up_notes' => ['nullable', 'string'],
             'pet_id' => ['nullable', 'integer'],
             'video_appointment_id' => ['nullable', 'integer', 'exists:video_apointment,id'],
+            'in_clinic_appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
+            'in_clinic_appointtment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
         $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
@@ -131,6 +133,9 @@ class MedicalRecordController extends Controller
         $medsJson = $structuredMedications ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null);
         $diseaseName = $validated['disease_name'] ?? $validated['diagnosis'] ?? null;
         $isChronic = ($validated['diagnosis_status'] ?? '') === 'chronic';
+        $inClinicAppointmentId = $validated['in_clinic_appointment_id']
+            ?? $validated['in_clinic_appointtment_id']
+            ?? null;
 
         $prescriptionPayload = [
             'medical_record_id' => $record->id,
@@ -157,6 +162,7 @@ class MedicalRecordController extends Controller
             'follow_up_notes' => $validated['follow_up_notes'] ?? $prescription->follow_up_notes,
             'pet_id' => $petId ?? $prescription->pet_id,
             'video_appointment_id' => $validated['video_appointment_id'] ?? $prescription->video_appointment_id,
+            'in_clinic_appointment_id' => $inClinicAppointmentId ?? $prescription->in_clinic_appointment_id,
             'medications_json' => $medsJson ?? $prescription->medications_json,
         ];
         if ($hasDoctorTreatmentColumn) {
@@ -219,6 +225,8 @@ class MedicalRecordController extends Controller
             'follow_up_notes' => ['nullable', 'string'],
             'pet_id' => ['nullable', 'integer'],
             'video_appointment_id' => ['nullable', 'integer', 'exists:video_apointment,id'],
+            'in_clinic_appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
+            'in_clinic_appointtment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'record_file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
         ]);
         $hasDoctorTreatmentColumn = Schema::hasColumn('prescriptions', 'doctor_treatment');
@@ -281,6 +289,10 @@ class MedicalRecordController extends Controller
             }
             $recordFilePath = $filePayload['path'];
         }
+        $inClinicAppointmentId = $validated['in_clinic_appointment_id']
+            ?? $validated['in_clinic_appointtment_id']
+            ?? null;
+
         $record = MedicalRecord::create([
             'user_id' => $user->id,
             'doctor_id' => $doctorId,
@@ -317,6 +329,7 @@ class MedicalRecordController extends Controller
             'follow_up_notes' => $validated['follow_up_notes'] ?? null,
             'pet_id' => $petId,
             'video_appointment_id' => $validated['video_appointment_id'] ?? null,
+            'in_clinic_appointment_id' => $inClinicAppointmentId,
             'medications_json' => $this->decodeMedicationsInput($request->input('medications_json'))
                 ?? $this->maybeStructureMedicines($validated['medicines'] ?? null, $validated['diagnosis'] ?? null, $validated['notes'] ?? null),
         ];
