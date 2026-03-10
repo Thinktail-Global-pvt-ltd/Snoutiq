@@ -330,7 +330,7 @@ function GetStartedCtaLabel({ amount }) {
       <Zap className="h-4 w-4 shrink-0 text-current" />
 
       <span className="font-extrabold text-white">
-        Counslt Now
+        Consult a Vet Now
       </span>
 
       <ArrowRight className="h-4 w-4 shrink-0 text-white/80" />
@@ -345,6 +345,58 @@ function GetStartedCtaLabel({ amount }) {
         ₹{formatInr(originalAmount)}
       </span>
     </span>
+  );
+}
+
+function DynamicPriceStrip({ currentPrice, originalPrice, rateType }) {
+  return (
+    <div className="overflow-hidden rounded-[18px] border border-[#f06a2f] bg-[#ece1db] shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
+      <div className="flex items-start gap-3 px-4 py-3 sm:items-center sm:px-5">
+        <div className="shrink-0 pr-3 sm:pr-4">
+          <div className="text-[2rem] leading-none font-medium text-[#f06a2f] sm:text-[2.35rem]">
+            ₹{formatInr(currentPrice)}
+          </div>
+        </div>
+
+        <div className="mt-1 h-14 w-px shrink-0 bg-[#d6b8aa] sm:mt-0 sm:h-12" />
+
+        <div className="min-w-0 flex-1">
+          <div className="block">
+            <strong className="block text-[15px] font-extrabold leading-[1.2] text-slate-900">
+              Flat fee. Everything included.
+            </strong>
+
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-sm font-semibold text-slate-400 line-through">
+                ₹{formatInr(originalPrice)}
+              </span>
+
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em]",
+                  rateType === "night"
+                    ? "bg-slate-900 text-white"
+                    : "bg-orange-100 text-orange-700"
+                )}
+              >
+                {rateType === "night" ? "Night" : "Day"}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-2 text-sm text-slate-700">
+            <p className="leading-5 sm:hidden">
+              <span className="block">Video call · Expert advice</span>
+              <span className="block">Follow-up guidance</span>
+            </p>
+
+            <p className="hidden leading-6 sm:block">
+              Video call · Expert advice · Follow-up guidance
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -859,9 +911,45 @@ const consultFormRef = useRef(null);
 
       <LPNavbar consultPath={CONSULT_DETAILS_ROUTE} onConsultClick={scrollToConsultForm} />
 
+
+{/* Top green trust strip */}
+<section className="bg-[#067a5f]">
+  <div className="mx-auto max-w-6xl px-4 py-2">
+    <div className="flex flex-nowrap items-center justify-center gap-3 overflow-x-auto whitespace-nowrap text-[11px] font-semibold text-white sm:text-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <span className="inline-flex items-center gap-1.5 shrink-0">
+        <span>Licensed Vets</span>
+      </span>
+
+      <span className="shrink-0 text-white/70">·</span>
+
+      <span className="inline-flex items-center gap-1.5 shrink-0">
+        <span>Video Consultation</span>
+      </span>
+
+      <span className="shrink-0 text-white/70">·</span>
+
+      <span className="inline-flex items-center gap-1.5 shrink-0">
+        <span>Response in 15 Min</span>
+      </span>
+
+      <span className="shrink-0 text-white/70">·</span>
+
+      <span className="inline-flex items-center gap-1.5 shrink-0">
+        <span>Pan India</span>
+      </span>
+    </div>
+  </div>
+</section>
       <main className="flex-1 pb-24 md:pb-0">
+
         {/* ── HERO + FORM: form is ALWAYS visible, no step 1 gate ── */}
         <section className="relative overflow-hidden bg-gradient-to-b from-[#f0f7ff] to-white px-4 pt-6 pb-10 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-6xl">
+    <span className="inline-flex items-center gap-2 rounded-md bg-[#dfe5e0] px-3.5 py-2 text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#0b7a63]">
+      <span className="h-2 w-2 rounded-full bg-[#0b7a63]" />
+      Online Vet Consultation
+    </span>
+  </div>
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute top-0 right-0 h-72 w-72 rounded-full bg-brand/5 blur-3xl -translate-y-1/3 translate-x-1/4" />
             <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-orange-100/40 blur-2xl" />
@@ -870,15 +958,25 @@ const consultFormRef = useRef(null);
           <div className="relative max-w-6xl mx-auto">
 
             <h1 className="text-[1.85rem] sm:text-[2.6rem] lg:text-[3.2rem] font-bold text-slate-800 leading-[1.1] text-center mb-3">
-              Talk to a Vet Online in 15 Minutes – Video Consultation
+              {/* Talk to a Vet Online in 15 Minutes – Video Consultation */}
+              Online Vet Consultation – <span className="text-accent">Talk to a Vet Online</span> in 15 Minutes
             </h1>
             <p className="text-slate-500 text-center text-base mb-7 max-w-3xl mx-auto leading-relaxed">
-               Speak to a licensed veterinarian online anywhere in India.
-               Instant video consultation for dogs and cats. Current {slotLabel.toLowerCase()} is
-               {" "}₹{formatInr(discountedConsultAmount)} after the ₹100 offer.
+               Talk to a licensed vet online via video call. Get proper advice and a full care plan for your pet — from anywhere in India, without leaving home.
+                {/* {slotLabel.toLowerCase()} is
+               {" "}₹{formatInr(discountedConsultAmount)} after the ₹100 offer. */}
             </p>
+            <section className="bg-white px-4 pb-4 sm:px-6 lg:px-8">
+  <div className="mx-auto max-w-6xl">
+    <DynamicPriceStrip
+      currentPrice={discountedConsultAmount}
+      originalPrice={consultAmount}
+      rateType={rateType}
+    />
+  </div>
+</section>
             {/* ── Trust bar ABOVE headline ── */}
-            <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
+            {/* <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />Licensed vets
               </span>
@@ -891,7 +989,7 @@ const consultFormRef = useRef(null);
               <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
                 <Globe className="h-3.5 w-3.5 text-brand" />All India · 24/7
               </span>
-            </div>
+            </div> */}
 
             {/* ── DIRECT FORM — always shown, no issue-gate step ── */}
             <div
@@ -907,11 +1005,11 @@ const consultFormRef = useRef(null);
                   </div>
                   <div>
                     <p className="text-sm font-extrabold text-slate-900">Describe the issue?</p>
-                    <p className="text-xs text-slate-500">Takes 60 seconds · Vet calls within 15 min</p>
+                    {/* <p className="text-xs text-slate-500">Takes 60 seconds · Vet calls within 15 min</p> */}
                   </div>
                   <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
                     <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Vets online
+                    7+ Vets online
                   </div>
                 </div>
 
@@ -946,12 +1044,13 @@ const consultFormRef = useRef(null);
                   )}
 
                   {/* ── GET STARTED CTA ── */}
-                 <button
+               <button
   type="button"
   onClick={goToPetDetailsScreen}
-  className="group w-full rounded-2xl bg-accent py-4 text-white shadow-lg shadow-orange-200/60 transition-all hover:bg-accent-hover active:scale-[0.99] text-base font-extrabold"
+  className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-4 text-base font-extrabold text-white shadow-lg shadow-orange-200/60 transition-all hover:bg-accent-hover active:scale-[0.99]"
 >
-  Get Started
+  <span>Start Online Vet Consultation</span>
+  <ArrowRight className="h-4 w-4 shrink-0 text-white/80 transition-transform group-hover:translate-x-0.5" />
 </button>
 
                   {/* Micro trust row */}
@@ -978,7 +1077,32 @@ const consultFormRef = useRef(null);
           </div>
         </section>
 
-        {/* REVIEWS */}
+
+        {/* HOW IT WORKS */}
+        <section id="how-it-works" className="py-14 px-4 bg-white scroll-mt-24">
+          <div className="max-w-4xl mx-auto">
+            <p className="text-xs font-extrabold text-brand text-center tracking-widest mb-2">HOW IT WORKS</p>
+            <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">Sorted in under 15 minutes</h2>
+            <div className="relative space-y-3">
+              <div className="absolute left-[22px] top-10 bottom-10 w-px bg-slate-100" />
+              {[
+                { n: "01", title: "Tell us about your pet & issue", desc: "Fill in your pet's details and describe what's wrong. Attach a photo or report — it helps the vet prepare before the call." },
+                { n: "02", title: "Pay securely (₹399 / ₹499)", desc: "One-time fee. UPI, cards, or netbanking. No subscription, no hidden charges." },
+                { n: "03", title: "Vet calls you within 15 minutes", desc: "A verified vet calls on WhatsApp video or your number. They review your case before calling." },
+                { n: "04", title: "Get your care plan & follow-up", desc: "The vet assesses your pet, shares personalized care guidance, and sends follow-up care instructions on WhatsApp." },
+              ].map((s, i) => (
+                <div key={i} className="flex gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-100 relative">
+                  <div className="h-11 w-11 rounded-2xl bg-brand text-white flex items-center justify-center font-extrabold text-xs shrink-0 relative z-10">{s.n}</div>
+                  <div>
+                    <p className="font-extrabold text-slate-900 text-sm mb-1">{s.title}</p>
+                    <p className="text-slate-500 text-xs leading-relaxed">{s.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+                {/* REVIEWS */}
         <section className="bg-slate-50 px-4 py-10">
           <div className="mx-auto max-w-5xl">
             <h2 className="text-center text-2xl font-extrabold text-slate-900">What pet parents say</h2>
@@ -1008,30 +1132,6 @@ const consultFormRef = useRef(null);
           </div>
         </section>
 
-        {/* HOW IT WORKS */}
-        <section id="how-it-works" className="py-14 px-4 bg-white scroll-mt-24">
-          <div className="max-w-4xl mx-auto">
-            <p className="text-xs font-extrabold text-brand text-center tracking-widest mb-2">HOW IT WORKS</p>
-            <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">From worried to sorted in 15 minutes</h2>
-            <div className="relative space-y-3">
-              <div className="absolute left-[22px] top-10 bottom-10 w-px bg-slate-100" />
-              {[
-                { n: "01", title: "Tell us about your pet & issue", desc: "Fill in your pet's details and describe what's wrong. Attach a photo or report — it helps the vet prepare before the call." },
-                { n: "02", title: "Pay securely (₹399 / ₹499)", desc: "One-time fee. UPI, cards, or netbanking. No subscription, no hidden charges." },
-                { n: "03", title: "Vet calls you within 15 minutes", desc: "A verified vet calls on WhatsApp video or your number. They review your case before calling." },
-                { n: "04", title: "Get your care plan & follow-up", desc: "The vet assesses your pet, shares personalized care guidance, and sends follow-up care instructions on WhatsApp." },
-              ].map((s, i) => (
-                <div key={i} className="flex gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-100 relative">
-                  <div className="h-11 w-11 rounded-2xl bg-brand text-white flex items-center justify-center font-extrabold text-xs shrink-0 relative z-10">{s.n}</div>
-                  <div>
-                    <p className="font-extrabold text-slate-900 text-sm mb-1">{s.title}</p>
-                    <p className="text-slate-500 text-xs leading-relaxed">{s.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
         {/* CTA BREAK */}
         <section className="px-4 py-6 bg-white">
@@ -1093,7 +1193,6 @@ const consultFormRef = useRef(null);
                       {vet.specialization ? <p className="text-xs text-slate-600 line-clamp-2">{listToDisplayText(vet.specialization)}</p> : null}
                       <div className="flex items-center justify-between text-xs text-slate-500">
                         <span>{vet.responseDay || "0-15 mins"}</span>
-                        <span>₹{vet.dayRate || "399"} day · ₹{vet.nightRate || "499"} night</span>
                       </div>
                     </div>
                   </div>
