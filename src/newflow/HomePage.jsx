@@ -1,25 +1,25 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import * as k from "react";
 import { Link as b } from "react-router-dom";
-import { Navbar as Q } from "./Navbar";
-import { Footer as G } from "./NewFooter";
-import { Button as w } from "./NewButton";
-import { ServiceCard as A } from "./ServiceCard";
 import {
   ArrowRight as v,
+  Button as w,
   CalendarDays as X,
   ChevronDown as K,
   FileText as R,
+  Footer as G,
   HeartPulse as $,
   MapPin as Y,
+  Navbar as Q,
   PawPrint as U,
   Scissors as O,
+  ServiceCard as A,
   ShieldCheck as H,
   Smartphone as P,
   Stethoscope as E,
   Syringe as W,
   Video as _,
-} from "lucide-react";
+} from "./HomePageChrome";
 const e = { jsx: _jsx, jsxs: _jsxs };
 const N =
     "https://play.google.com/store/apps/details?id=com.petai.snoutiq&hl=en_IN",
