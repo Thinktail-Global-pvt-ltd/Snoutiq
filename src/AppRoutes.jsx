@@ -1,3 +1,5 @@
+import "./app.css";
+
 import React, { lazy } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Navigate, Route, Routes } from "react-router-dom";
