@@ -19,7 +19,7 @@ class ClinicFinancialsController extends Controller
     public function show(Request $request)
     {
         $clinicId = $request->input('clinic_id');
-        $vetId    = $request->input('vet_id') ?: $clinicId; // allow vet_id or fallback to clinic_id
+        $vetId    = $request->input('vet_id');
 
         if ((!$clinicId && !$vetId) || (isset($clinicId) && (!is_numeric($clinicId) || (int) $clinicId <= 0))) {
             return response()->json([
@@ -43,19 +43,14 @@ class ClinicFinancialsController extends Controller
         // Base query - fetch recent transactions for this clinic/vet
         $query = Transaction::query()
             ->with(['doctor.clinic', 'user.pets'])
-            ->orderByDesc('created_at')
-            ->limit(600);
+            ->orderByDesc('created_at');
 
-        if ($clinicId || $vetId) {
-            $query->where(function ($q) use ($clinicId, $vetId) {
-                if ($clinicId) {
-                    $q->orWhere('clinic_id', $clinicId);
-                }
-                if ($vetId) {
-                    $q->orWhereHas('doctor', function ($qq) use ($vetId) {
-                        $qq->where('vet_registeration_id', $vetId);
-                    });
-                }
+        if ($clinicId) {
+            $query->where('clinic_id', $clinicId);
+        }
+        if ($vetId) {
+            $query->whereHas('doctor', function ($qq) use ($vetId) {
+                $qq->where('vet_registeration_id', $vetId);
             });
         }
 
@@ -114,9 +109,6 @@ class ClinicFinancialsController extends Controller
 
         // Apply in-memory filters for lightweight searches/labels
         $filtered = $normalized->filter(function (array $txn) use ($status, $type, $search) {
-            if (!($txn['prescription_send'] ?? false)) {
-                return false;
-            }
             if ($status && $txn['status'] !== $status) {
                 return false;
             }
