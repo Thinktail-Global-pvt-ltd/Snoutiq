@@ -10,13 +10,30 @@ export default defineConfig({
       apply: "build",
       transformIndexHtml: {
         order: "post",
-        handler(html) {
-          return html.replace(
+        handler(html, ctx) {
+          const homeChunkFile = Object.values(ctx.bundle || {}).find(
+            (asset) =>
+              asset &&
+              asset.type === "chunk" &&
+              asset.name === "HomePage" &&
+              typeof asset.fileName === "string",
+          )?.fileName;
+
+          let transformedHtml = html.replace(
             /<link rel="stylesheet"([^>]*?)href="([^"]+\.css)"([^>]*)>/g,
             (_, preAttrs = "", href, postAttrs = "") =>
               `<link rel="preload" as="style"${preAttrs}href="${href}"${postAttrs} onload="this.onload=null;this.rel='stylesheet'">` +
               `<noscript><link rel="stylesheet"${preAttrs}href="${href}"${postAttrs}></noscript>`,
           );
+
+          if (homeChunkFile) {
+            transformedHtml = transformedHtml.replace(
+              "</head>",
+              `<script>if(window.location.pathname==="/"){var link=document.createElement("link");link.rel="modulepreload";link.href="/${homeChunkFile}";document.head.appendChild(link);}</script></head>`,
+            );
+          }
+
+          return transformedHtml;
         },
       },
     },
