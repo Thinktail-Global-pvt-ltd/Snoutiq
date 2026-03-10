@@ -323,6 +323,21 @@ const PET_ISSUE_OPTIONS = [
   { label: "Other", emoji: "❓" },
 ];
 
+const HERO_REVIEW_CARDS = [
+  {
+    name: "Priya M.",
+    text: "My dog started vomiting at midnight. SnoutiQ connected me to a vet in under 5 minutes and saved us a stressful clinic visit.",
+  },
+  {
+    name: "Rahul S.",
+    text: "My cat had watery eyes at night. The vet explained everything clearly and followed up the next day. The process felt very reliable.",
+  },
+  {
+    name: "Ananya K.",
+    text: "My Labrador was not eating. The consultation was smooth, the vet was experienced, and the advice was practical from the first call.",
+  },
+];
+
 const fieldBase =
   "w-full rounded-lg border border-gray-200 bg-white p-2.5 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-xl md:p-3 md:text-sm";
 const selectBase = `${fieldBase} appearance-none pr-12`;
@@ -357,9 +372,11 @@ export default function VideoConsultLP() {
   const navigate = useNavigate();
   const { rateType } = getCurrentPrice();
   const consultAmount = PAYMENT_AMOUNTS[rateType] || PAYMENT_AMOUNTS.day;
+  const discountedConsultAmount = Math.max(consultAmount - 100, 0);
   const slotLabel =
     rateType === "day" ? "Day (8 AM - 10 PM)" : "Night (10 PM - 8 AM)";
   const [selectedIssue, setSelectedIssue] = useState(null);
+  const [leadStep, setLeadStep] = useState(1);
   const [leadForm, setLeadForm] = useState({
     ownerName: "",
     petName: "",
@@ -399,23 +416,30 @@ export default function VideoConsultLP() {
   }, [scrollToIdWithRetry]);
 
   const getLeadError = () => {
-    if (!leadForm.ownerName.trim()) return "Please enter pet owner name";
-    if (!leadForm.petName.trim()) return "Please enter pet name";
+    if (!leadForm.ownerName.trim()) return "Please enter your name";
+    if (!leadForm.petName.trim()) return "Please enter your pet's name";
     if (!leadForm.petType) return "Please select pet type";
-    if (
-      (leadForm.petType === "dog" || leadForm.petType === "cat") &&
-      !leadForm.breed
-    ) {
-      return "Please select breed";
-    }
-    if (leadForm.petType === "exotic" && !leadForm.exoticType.trim()) {
-      return "Please specify your exotic pet";
-    }
     if (leadForm.description.trim().length <= 10) {
       return "Please describe the issue in detail (minimum 10 characters)";
     }
     return "";
   };
+
+  const handleLeadIssueSelect = useCallback(
+    (issue) => {
+      setSelectedIssue(issue);
+      setLeadStep(2);
+      setLeadForm((prev) => ({
+        ...prev,
+        description: prev.description.trim()
+          ? prev.description
+          : `Issue: ${issue}. `,
+      }));
+      setLeadError("");
+      scrollToConsultForm();
+    },
+    [scrollToConsultForm]
+  );
 
   const goToPetDetailsScreen = useCallback(() => {
     const error = getLeadError();
@@ -935,37 +959,6 @@ export default function VideoConsultLP() {
     return breedOptions.find((b) => b.value === details.breed)?.label || "";
   }, [details.breed, breedOptions]);
 
-  const leadBreedOptions = useMemo(() => {
-    if (leadForm.petType === "dog") return dogBreeds;
-    if (leadForm.petType === "cat") return catBreeds;
-    return [];
-  }, [leadForm.petType, dogBreeds, catBreeds]);
-
-  const leadFilteredBreedOptions = useMemo(() => {
-    const term = breedSearch.trim().toLowerCase();
-    if (!term) return leadBreedOptions;
-
-    const filtered = leadBreedOptions.filter((breed) =>
-      String(breed?.label || "").toLowerCase().includes(term)
-    );
-
-    if (leadForm.breed && !filtered.some((breed) => breed.value === leadForm.breed)) {
-      const selected = leadBreedOptions.find((breed) => breed.value === leadForm.breed);
-      if (selected) return [selected, ...filtered];
-    }
-
-    return filtered;
-  }, [breedSearch, leadBreedOptions, leadForm.breed]);
-
-  const leadSelectedBreedLabel = useMemo(() => {
-    if (!leadForm.breed) return "";
-    return leadBreedOptions.find((breed) => breed.value === leadForm.breed)?.label || "";
-  }, [leadForm.breed, leadBreedOptions]);
-
-  const leadShowBreed =
-    leadForm.petType === "dog" || leadForm.petType === "cat";
-  const leadIsExotic = leadForm.petType === "exotic";
-
   const showBreed = details.type === "dog" || details.type === "cat";
   const isExotic = details.type === "exotic";
   const approxAge = useMemo(() => calcAgeFromDob(details.petDob), [details.petDob]);
@@ -1290,272 +1283,229 @@ export default function VideoConsultLP() {
 
             <p className="text-slate-500 text-center text-base mb-7 max-w-3xl mx-auto leading-relaxed">
               Speak to a licensed veterinarian online anywhere in India.
-              Instant video consultation for dogs & cats. Day consult ₹399.
-              Night emergency consult ₹499.
+              Instant video consultation for dogs and cats. Current {slotLabel.toLowerCase()} is
+              {" "}₹{formatInr(discountedConsultAmount)} after the ₹100 offer.
             </p>
 
-            {/* -- "WHAT'S WRONG WITH YOUR PET?" SECTION -------------------- */}
-            <div className="max-w-4xl mx-auto mb-6">
-            <h2 className="text-3xl font-extrabold text-slate-900 text-center mb-8">Online vet consultation for dogs, cats and pets across India</h2>
-              <div className="bg-white rounded-2xl shadow-md shadow-slate-200/60 border border-slate-100 overflow-hidden">
-                <div className="px-4 py-4 border-b border-slate-100">
-                  <h2 className="text-base font-extrabold text-slate-900 text-center">What&apos;s wrong with your pet?</h2>
-                  <p className="text-xs text-slate-500 text-center mt-0.5 flex items-center justify-center gap-1">
-                    <span>🔍</span> Select the main issue – helps us match you with the right vet
-                  </p>
-                </div>
-                <div className="px-4 py-4">
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {PET_ISSUE_OPTIONS.map((issue) => (
-                      <button
-                        key={issue.label}
-                        type="button"
-                        onClick={() => {
-                          setSelectedIssue(issue.label);
-                          setLeadForm((prev) => ({
-                            ...prev,
-                            description: prev.description.trim()
-                              ? prev.description
-                              : `Issue selected: ${issue.label}`,
-                          }));
-                          scrollToConsultForm();
-                        }}
+            <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                Licensed vets
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+                <Clock className="h-3.5 w-3.5 text-emerald-500" />
+                Under 15 min
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+                <Star className="h-3.5 w-3.5 text-amber-400" />
+                4.8★ from 200+ pet parents
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+                <Globe className="h-3.5 w-3.5 text-brand" />
+                All India · {slotLabel}
+              </span>
+            </div>
+
+            <div id="consult-form" className="scroll-mt-28">
+              <div className="mx-auto max-w-3xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_32px_90px_-48px_rgba(15,23,42,0.4)]">
+                <div className="grid grid-cols-2 border-b border-slate-100 text-xs font-bold">
+                  {["Select issue", "Your details"].map((label, index) => {
+                    const stepNumber = index + 1;
+                    const isActive = leadStep === stepNumber;
+                    const isDone = leadStep > stepNumber;
+
+                    return (
+                      <div
+                        key={label}
                         className={cn(
-                          "inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold transition-all duration-200",
-                          selectedIssue === issue.label
-                            ? "border-brand bg-brand/10 text-brand"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-brand/40 hover:bg-brand/5 hover:text-brand"
+                          "px-4 py-3 text-center transition-colors",
+                          isDone
+                            ? "bg-brand text-white"
+                            : isActive
+                            ? "border-b-2 border-brand bg-brand/10 text-brand"
+                            : "bg-white text-slate-400"
                         )}
                       >
-                        <span>{issue.emoji}</span>
-                        {issue.label}
+                        {stepNumber}. {label}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-4 sm:p-5">
+                  {leadStep === 1 ? (
+                    <div className="space-y-4">
+                      <div className="text-center">
+                        <h2 className="text-lg font-extrabold text-slate-900">
+                          What&apos;s the main issue?
+                        </h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                          One tap to get started. We&apos;ll prefill the concern and
+                          move you to the short form.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap justify-center gap-2.5">
+                        {PET_ISSUE_OPTIONS.map((issue) => (
+                          <button
+                            key={issue.label}
+                            type="button"
+                            onClick={() => handleLeadIssueSelect(issue.label)}
+                            className={cn(
+                              "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-all duration-200",
+                              selectedIssue === issue.label
+                                ? "border-brand bg-brand/10 text-brand"
+                                : "border-slate-200 bg-white text-slate-700 hover:border-brand/40 hover:bg-brand/5 hover:text-brand"
+                            )}
+                          >
+                            <span>{issue.emoji}</span>
+                            {issue.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <p className="text-center text-xs font-medium text-slate-400">
+                        Select one issue above to continue in 10 seconds.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <button
+                        type="button"
+                        onClick={() => setLeadStep(1)}
+                        className="text-xs font-semibold text-brand hover:underline"
+                      >
+                        ← Change selected issue
                       </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            {/* -- FORM CARD ------------------------------------------------- */}
-            <div id="consult-form" className="scroll-mt-28">
-              <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden mt-6 max-w-3xl mx-auto">
-                <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
-                  <h3 className="text-base font-extrabold text-slate-900 text-center">
-                    Start with basic pet details
-                  </h3>
-                  <p className="text-xs text-slate-500 text-center mt-1">
-                    Fill these basics first. Full details will open on next screen.
-                  </p>
-                </div>
+                      <div className="flex items-center gap-2 rounded-2xl border border-brand/20 bg-brand/5 px-3 py-3 text-sm font-semibold text-brand">
+                        <span className="text-base">
+                          {PET_ISSUE_OPTIONS.find((issue) => issue.label === selectedIssue)?.emoji || "🐾"}
+                        </span>
+                        <span>Issue selected: {selectedIssue || "General concern"}</span>
+                        <CheckCircle2 className="ml-auto h-4 w-4" />
+                      </div>
 
-                <div className="p-4 sm:p-5 space-y-4">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Pet Owner Name <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                      <input
-                        type="text"
-                        value={leadForm.ownerName}
-                        onChange={(e) => {
-                          setLeadForm((prev) => ({ ...prev, ownerName: e.target.value }));
-                          setLeadError("");
-                        }}
-                        placeholder="Enter your full name"
-                        className={cn(fieldBase, "pl-12 md:pl-12")}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Pet Name <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <PawPrint size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                      <input
-                        type="text"
-                        value={leadForm.petName}
-                        onChange={(e) => {
-                          setLeadForm((prev) => ({ ...prev, petName: e.target.value }));
-                          setLeadError("");
-                        }}
-                        placeholder="Enter your pet's name"
-                        className={cn(fieldBase, "pl-12 md:pl-12")}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Pet Type <span className="text-red-500">*</span>
-                    </label>
-                    <div className="grid grid-cols-3 gap-3 md:gap-4">
-                      {["dog", "cat", "exotic"].map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => {
-                            setLeadForm((prev) => ({
-                              ...prev,
-                              petType: type,
-                              breed: "",
-                              exoticType: "",
-                            }));
-                            setLeadError("");
-                          }}
-                          className={cn(
-                            "p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all duration-200",
-                            "md:p-5 md:flex-row md:justify-center md:gap-3 md:rounded-2xl",
-                            leadForm.petType === type
-                              ? "border-brand bg-brand/5 text-brand"
-                              : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100"
-                          )}
-                        >
-                          <div className={leadForm.petType === type ? "text-brand" : "text-gray-500"}>
-                            {getPetTypeIcon(type)}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Your Name <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <User size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                              type="text"
+                              value={leadForm.ownerName}
+                              onChange={(e) => {
+                                setLeadForm((prev) => ({ ...prev, ownerName: e.target.value }));
+                                setLeadError("");
+                              }}
+                              placeholder="Your full name"
+                              className={cn(fieldBase, "pl-12 md:pl-12")}
+                            />
                           </div>
-                          <span className="capitalize text-sm font-medium md:text-base">{type}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                        </div>
 
-                  {leadShowBreed ? (
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Breed <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative" ref={breedDropdownRef}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (loadingBreeds || !leadBreedOptions.length) return;
-                            setBreedDropdownOpen((prev) => !prev);
-                          }}
-                          className={cn(selectBase, "text-left pl-12 md:pl-12")}
-                          disabled={loadingBreeds || leadBreedOptions.length === 0}
-                        >
-                          {loadingBreeds
-                            ? `Loading ${leadForm.petType} breeds...`
-                            : leadSelectedBreedLabel || `Select ${leadForm.petType} breed`}
-                        </button>
-                        <PawPrint size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                        {breedDropdownOpen ? (
-                          <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
-                            <div className="p-2 border-b border-gray-100">
-                              <input
-                                type="text"
-                                value={breedSearch}
-                                onChange={(e) => setBreedSearch(e.target.value)}
-                                placeholder={`Search ${leadForm.petType} breeds`}
-                                className={fieldBase}
-                                autoFocus
-                              />
-                            </div>
-                            <div className="max-h-56 overflow-auto">
-                              {leadFilteredBreedOptions.length ? (
-                                leadFilteredBreedOptions.map((breed) => (
-                                  <button
-                                    key={breed.value}
-                                    type="button"
-                                    onClick={() => {
-                                      setLeadForm((prev) => ({ ...prev, breed: breed.value }));
-                                      setLeadError("");
-                                      setBreedDropdownOpen(false);
-                                      setBreedSearch("");
-                                    }}
-                                    className={cn(
-                                      "w-full px-4 py-2 text-left text-sm hover:bg-gray-50",
-                                      leadForm.breed === breed.value
-                                        ? "bg-gray-50 font-semibold text-gray-900"
-                                        : "text-gray-700"
-                                    )}
-                                  >
-                                    {breed.label}
-                                  </button>
-                                ))
-                              ) : (
-                                <div className="px-4 py-2 text-sm text-gray-500">No breeds found</div>
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Pet Name <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <PawPrint size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                              type="text"
+                              value={leadForm.petName}
+                              onChange={(e) => {
+                                setLeadForm((prev) => ({ ...prev, petName: e.target.value }));
+                                setLeadError("");
+                              }}
+                              placeholder="Your pet's name"
+                              className={cn(fieldBase, "pl-12 md:pl-12")}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Pet Type <span className="text-red-500">*</span>
+                        </label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {["dog", "cat", "exotic"].map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => {
+                                setLeadForm((prev) => ({
+                                  ...prev,
+                                  petType: type,
+                                  breed: "",
+                                  exoticType: "",
+                                }));
+                                setLeadError("");
+                              }}
+                              className={cn(
+                                "rounded-2xl border-2 px-3 py-3 text-center text-sm font-bold capitalize transition-all",
+                                leadForm.petType === type
+                                  ? "border-brand bg-brand/5 text-brand"
+                                  : "border-slate-200 bg-slate-50 text-slate-500 hover:border-brand/30 hover:bg-brand/5"
                               )}
-                            </div>
-                          </div>
-                        ) : null}
+                            >
+                              <span className="mb-1 flex justify-center">
+                                {getPetTypeIcon(type)}
+                              </span>
+                              {type}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      {breedError ? (
-                        <p className="text-xs text-amber-600">{breedError}</p>
-                      ) : null}
-                    </div>
-                  ) : null}
 
-                  {leadIsExotic ? (
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Which exotic pet? <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <Rabbit size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        <input
-                          type="text"
-                          value={leadForm.exoticType}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Brief Description <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          value={leadForm.description}
                           onChange={(e) => {
-                            setLeadForm((prev) => ({ ...prev, exoticType: e.target.value }));
+                            setLeadForm((prev) => ({ ...prev, description: e.target.value }));
                             setLeadError("");
                           }}
-                          placeholder="e.g. Rabbit, Parrot, Turtle"
-                          className={cn(fieldBase, "pl-12 md:pl-12")}
+                          placeholder="Example: My dog has been vomiting since morning and is eating less than usual..."
+                          rows={4}
+                          className={textareaBase}
                         />
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">Minimum 10 characters</span>
+                          <span className={leadForm.description.trim().length > 10 ? "font-semibold text-emerald-600" : "text-gray-400"}>
+                            {leadForm.description.trim().length}/10+
+                          </span>
+                        </div>
                       </div>
+
+                      {leadError ? (
+                        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
+                          <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+                          <p className="text-sm">{leadError}</p>
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={goToPetDetailsScreen}
+                        className="group w-full rounded-2xl bg-accent py-4 text-white shadow-lg shadow-orange-200/60 transition-all hover:bg-accent-hover active:scale-[0.99]"
+                      >
+                        <ConsultCtaLabel amount={consultAmount} prefixText="Continue" />
+                      </button>
+
+                      <p className="text-center text-xs text-slate-400">
+                        Full medical details, uploads, and payment open on the next screen.
+                      </p>
                     </div>
-                  ) : null}
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Describe the issue <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      value={leadForm.description}
-                      onChange={(e) => {
-                        setLeadForm((prev) => ({ ...prev, description: e.target.value }));
-                        setLeadError("");
-                      }}
-                      placeholder="Example: My dog is vomiting since morning and is eating less than usual..."
-                      rows={4}
-                      className={textareaBase}
-                    />
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500">Minimum 10 characters</span>
-                      <span className={leadForm.description.trim().length > 10 ? "text-emerald-600 font-semibold" : "text-gray-400"}>
-                        {leadForm.description.trim().length}/10+
-                      </span>
-                    </div>
-                  </div>
-
-                  {leadError ? (
-                    <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
-                      <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
-                      <p className="text-sm">{leadError}</p>
-                    </div>
-                  ) : null}
-
-                  <button
-                    type="button"
-                    onClick={goToPetDetailsScreen}
-                    className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white font-extrabold text-base py-4 rounded-2xl transition-all shadow-lg shadow-orange-200/50 active:scale-[0.99]"
-                  >
-                    Continue
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-
-                  <p className="text-center text-xs text-slate-400">
-                    Next screen me owner details, DOB, upload, aur baki flow same rahega
-                  </p>
+                  )}
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-center gap-5 mt-5 text-xs text-slate-400 flex-wrap">
+            <div className="mt-5 flex items-center justify-center gap-5 text-xs text-slate-400 flex-wrap">
               <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-brand" />Verified vets</span>
               <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-brand" />Under 15 min wait</span>
               <span className="flex items-center gap-1.5"><Star className="h-3.5 w-3.5 text-brand" />4.8★ from 200+ pet parents</span>
@@ -1572,6 +1522,44 @@ export default function VideoConsultLP() {
                 <p className="text-slate-400 text-xs mt-0.5">{s.l}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="bg-slate-50 px-4 py-10">
+          <div className="mx-auto max-w-5xl">
+            <h2 className="text-center text-2xl font-extrabold text-slate-900">
+              What pet parents say
+            </h2>
+            <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500">
+              Real feedback from families who needed quick guidance without the
+              stress of finding an emergency clinic first.
+            </p>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {HERO_REVIEW_CARDS.map((review) => (
+                <div
+                  key={review.name}
+                  className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                >
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 text-sm font-black text-brand">
+                      {review.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{review.name}</p>
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 5 }).map((_, index) => (
+                          <Star
+                            key={`${review.name}-${index}`}
+                            className="h-3.5 w-3.5 fill-amber-400 text-amber-400"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm leading-6 text-slate-600">{review.text}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -1726,7 +1714,7 @@ export default function VideoConsultLP() {
                 <button
                   key={item.label}
                   type="button"
-                  onClick={scrollToConsultForm}
+                  onClick={() => handleLeadIssueSelect(item.label)}
                   className="flex items-center justify-center gap-2.5 bg-white border border-slate-200 rounded-full py-3 px-4 text-sm text-slate-700 font-medium hover:border-brand/40 hover:bg-brand/5 hover:text-brand transition-all duration-200"
                 >
                   <span>{item.emoji}</span>
