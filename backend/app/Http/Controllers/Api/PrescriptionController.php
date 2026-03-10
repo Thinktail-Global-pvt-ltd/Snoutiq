@@ -561,31 +561,7 @@ class PrescriptionController extends Controller
             ], 404);
         }
 
-        $petColumns = [
-            'id',
-            'user_id',
-            'name',
-            'pet_gender',
-            'breed',
-        ];
         $hasPetWeightColumn = Schema::hasColumn('pets', 'weight');
-        if ($hasPetWeightColumn) {
-            $petColumns[] = 'weight';
-        }
-
-        // Include optional columns only if they exist to avoid runtime errors on older schemas.
-        if (Schema::hasColumn('pets', 'video_calling_upload_file')) {
-            $petColumns[] = 'video_calling_upload_file';
-        }
-        if (Schema::hasColumn('pets', 'reported_symptom')) {
-            $petColumns[] = 'reported_symptom';
-        }
-        if (Schema::hasColumn('pets', 'pet_dob')) {
-            $petColumns[] = 'pet_dob';
-        }
-        if (Schema::hasColumn('pets', 'dog_disease_payload')) {
-            $petColumns[] = 'dog_disease_payload';
-        }
 
         $petsQuery = Pet::query()
             ->where('user_id', $user->id);
@@ -596,7 +572,7 @@ class PrescriptionController extends Controller
 
         $pets = $petsQuery
             ->orderByDesc('id')
-            ->get($petColumns)
+            ->get()
             ->map(function ($pet) use ($hasPetWeightColumn) {
                 // Surface vaccination info from dog_disease_payload if present.
                 $payload = $pet->dog_disease_payload ?? null;
@@ -612,6 +588,10 @@ class PrescriptionController extends Controller
                 }
                 return $pet;
             });
+
+        $userData = DB::table('users')
+            ->where('id', $user->id)
+            ->first();
 
         if ($petId && $pets->isEmpty()) {
             return response()->json([
@@ -672,10 +652,7 @@ class PrescriptionController extends Controller
             'success' => true,
             'data' => [
                 'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
+                    ...((array) $userData),
                 ],
                 'pets' => $pets,
                 'prescriptions' => $prescriptions,
