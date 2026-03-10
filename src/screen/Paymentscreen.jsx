@@ -649,34 +649,7 @@ const imageSrc = useMemo(
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                  <div className="text-xs font-semibold text-amber-800 mb-2">
-                    Important Information
-                  </div>
-                  <ul className="text-xs text-amber-800/90 list-disc pl-4 space-y-1">
-                    <li>Not all issues can be solved via video consultation.</li>
-                    <li>Clinic visit may be required after the call.</li>
-                    <li>Information shared is for this consultation session only.</li>
-                  </ul>
-                </div>
-
-                <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-600">
-                  <input
-                    type="checkbox"
-                    checked={acknowledged}
-                    onChange={(e) => setAcknowledged(e.target.checked)}
-                    className="mt-1 h-4 w-4 accent-[#3998de]"
-                  />
-                  <div>
-                    <div className="font-bold text-gray-700">
-                      I acknowledge and agree to proceed
-                    </div>
-                    <div className="text-gray-500">
-                      I understand the limitations and conditions of this consultation.
-                    </div>
-                  </div>
-                </label>
-              </div>
+           
 
               <div className="space-y-6 md:sticky md:top-24">
                   <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -778,6 +751,34 @@ const imageSrc = useMemo(
                       automatically.
                     </p>
                   </div>
+                       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="text-xs font-semibold text-amber-800 mb-2">
+                    Important Information
+                  </div>
+                  <ul className="text-xs text-amber-800/90 list-disc pl-4 space-y-1">
+                    <li>Not all issues can be solved via video consultation.</li>
+                    <li>Clinic visit may be required after the call.</li>
+                    <li>Information shared is for this consultation session only.</li>
+                  </ul>
+                </div>
+
+                <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-600 ">
+                  <input
+                    type="checkbox"
+                    checked={acknowledged}
+                    onChange={(e) => setAcknowledged(e.target.checked)}
+                    className="mt-1 h-4 w-4 accent-[#3998de]"
+                  />
+                  <div>
+                    <div className="font-bold text-gray-700">
+                      I acknowledge and agree to proceed
+                    </div>
+                    <div className="text-gray-500">
+                      I understand the limitations and conditions of this consultation.
+                    </div>
+                  </div>
+                </label>
+              </div>
 
                   <div className="hidden md:block space-y-3">
                     <Button

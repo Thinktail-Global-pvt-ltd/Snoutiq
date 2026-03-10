@@ -946,13 +946,13 @@ const consultFormRef = useRef(null);
                   )}
 
                   {/* ── GET STARTED CTA ── */}
-                  <button
-                    type="button"
-                    onClick={goToPetDetailsScreen}
-                    className="group w-full rounded-2xl bg-accent py-4 text-white shadow-lg shadow-orange-200/60 transition-all hover:bg-accent-hover active:scale-[0.99] text-base"
-                  >
-                    <GetStartedCtaLabel amount={consultAmount} />
-                  </button>
+                 <button
+  type="button"
+  onClick={goToPetDetailsScreen}
+  className="group w-full rounded-2xl bg-accent py-4 text-white shadow-lg shadow-orange-200/60 transition-all hover:bg-accent-hover active:scale-[0.99] text-base font-extrabold"
+>
+  Get Started
+</button>
 
                   {/* Micro trust row */}
                   <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400 flex-wrap pt-0.5">
