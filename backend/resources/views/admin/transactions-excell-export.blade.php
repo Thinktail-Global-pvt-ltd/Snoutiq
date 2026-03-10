@@ -353,7 +353,6 @@
                                                     data-pet-name="{{ $petRecord->name ?? 'Pet' }}"
                                                     data-transaction-id="{{ $txn->id }}"
                                                     data-reported-symptom="{{ $issue }}"
-                                                    data-pet-dob="{{ $petDob }}"
                                                     data-doctor-mobile="{{ $doctorMobile }}"
                                                     data-user-phone="{{ $txn->user->phone ?? 'N/A' }}"
                                                     data-user-city="{{ $txn->user->city ?? 'N/A' }}"
@@ -466,19 +465,6 @@
         }[char]));
     }
 
-    function formatTimelineDate(value) {
-        if (!value) return '—';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return '—';
-        return date.toLocaleString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-
     function normalizeFieldValue(value) {
         if (value === null || value === undefined) return '';
         if (typeof value === 'boolean') return value ? 'Yes' : 'No';
@@ -510,10 +496,23 @@
             .replace(/\b\w/g, (ch) => ch.toUpperCase());
     }
 
+    function isTimestampLikeField(key) {
+        const normalized = String(key || '').toLowerCase();
+        return normalized.includes('_at')
+            || normalized.includes('date')
+            || normalized.includes('time')
+            || normalized.includes('dob')
+            || normalized.includes('expires')
+            || normalized.includes('verified');
+    }
+
     function renderFieldGroup(container, title, fields) {
         if (!container) return;
 
-        const entries = Object.entries(fields || {}).filter(([, rawValue]) => normalizeFieldValue(rawValue) !== '');
+        const entries = Object.entries(fields || {}).filter(([key, rawValue]) => {
+            if (isTimestampLikeField(key)) return false;
+            return normalizeFieldValue(rawValue) !== '';
+        });
         if (entries.length === 0) {
             container.innerHTML = '';
             return;
@@ -559,7 +558,6 @@
         if (entry?.source === 'appointments') {
             return `
                 <div>Status: <strong>${escapeHtml(record.status || 'n/a')}</strong></div>
-                <div>Scheduled: <strong>${escapeHtml(record.schedule_time || record.scheduled_for || '—')}</strong></div>
                 <div>Doctor ID: <strong>${escapeHtml(record.doctor_id || '—')}</strong></div>
             `;
         }
@@ -582,9 +580,8 @@
             <div class="d-flex flex-column gap-2">
                 ${data.map((entry) => `
                     <div class="border rounded p-2">
-                        <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                        <div class="d-flex align-items-center gap-2 mb-1">
                             <span class="badge ${sourceBadgeClass(entry?.source)}">${escapeHtml(sourceLabel(entry?.source))}</span>
-                            <span class="text-muted">${escapeHtml(formatTimelineDate(entry?.created_at))}</span>
                         </div>
                         ${summaryHtml(entry)}
                     </div>
@@ -603,15 +600,13 @@
         `;
     }
 
-    function renderPetDetails(petDob, doctorMobile, userPhone, userCity) {
-        const dobText = String(petDob || '').trim() || 'N/A';
+    function renderPetDetails(doctorMobile, userPhone, userCity) {
         const mobileText = String(doctorMobile || '').trim() || 'N/A';
         const userPhoneText = String(userPhone || '').trim() || 'N/A';
         const userCityText = String(userCity || '').trim() || 'N/A';
         timelineDetailsEl.innerHTML = `
             <div class="border rounded p-2 bg-light">
                 <div class="d-flex flex-column gap-1">
-                    <div><span class="text-muted">Pet DOB:</span> <strong>${escapeHtml(dobText)}</strong></div>
                     <div><span class="text-muted">Doctor Mobile:</span> <strong>${escapeHtml(mobileText)}</strong></div>
                     <div><span class="text-muted">User Phone:</span> <strong>${escapeHtml(userPhoneText)}</strong></div>
                     <div><span class="text-muted">User City:</span> <strong>${escapeHtml(userCityText)}</strong></div>
@@ -644,7 +639,6 @@
         const petName = btn.getAttribute('data-pet-name') || 'Pet';
         const transactionId = btn.getAttribute('data-transaction-id') || '—';
         const reportedSymptom = btn.getAttribute('data-reported-symptom') || '';
-        const petDob = btn.getAttribute('data-pet-dob') || '';
         const doctorMobile = btn.getAttribute('data-doctor-mobile') || '';
         const userPhone = btn.getAttribute('data-user-phone') || '';
         const userCity = btn.getAttribute('data-user-city') || '';
@@ -658,7 +652,7 @@
 
         timelineTitleEl.textContent = `${petName} Timeline`;
         timelineMetaEl.textContent = `Transaction #${transactionId} | Pet ID: ${petId} | User ID: ${userId}`;
-        renderPetDetails(petDob, doctorMobile, userPhone, userCity);
+        renderPetDetails(doctorMobile, userPhone, userCity);
         renderReportedSymptom(reportedSymptom);
         renderFieldGroup(timelineUserFieldsEl, 'User Table (Non-null Fields)', userFields);
         renderFieldGroup(timelinePetFieldsEl, 'Pet Table (Non-null Fields)', petFields);
