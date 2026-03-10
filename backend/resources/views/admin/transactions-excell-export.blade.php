@@ -79,6 +79,9 @@
         .excel-export-table td[data-label="Manual WhatsApp"] .d-flex {
             justify-content: flex-start !important;
         }
+        .excel-export-table td[data-label="Status"] .btn {
+            width: 100%;
+        }
         .excel-export-table td[data-label="Details"] .btn {
             width: 100%;
         }
@@ -105,6 +108,7 @@
 @php
     $capturedTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'captured');
     $pendingTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'pending');
+    $statusConversionLogs = $statusConversionLogs ?? collect();
     $totalPaise = $capturedTransactions->sum('amount_paise');
     $pendingTotalPaise = $pendingTransactions->sum('amount_paise');
     $formatInr = fn ($paise) => number_format(($paise ?? 0) / 100, 2);
@@ -248,6 +252,17 @@
                                             'pending' => 'text-bg-warning',
                                             default => 'text-bg-light',
                                         };
+                                        $statusLogsForTransaction = $statusConversionLogs->get($txn->id, collect());
+                                        $statusLogCount = $statusLogsForTransaction->count();
+                                        $latestStatusLog = $statusLogCount > 0 ? $statusLogsForTransaction->first() : null;
+                                        $latestStatusLogTime = null;
+                                        if ($latestStatusLog && !empty($latestStatusLog->created_at)) {
+                                            try {
+                                                $latestStatusLogTime = \Illuminate\Support\Carbon::parse($latestStatusLog->created_at)->format('d M Y, H:i');
+                                            } catch (\Throwable $e) {
+                                                $latestStatusLogTime = (string) $latestStatusLog->created_at;
+                                            }
+                                        }
                                         $prescriptionId = $txn->prescription_id
                                             ?? data_get($txn->metadata, 'notes.prescription_id')
                                             ?? data_get($txn->metadata, 'prescription_id');
@@ -272,6 +287,30 @@
                                         <td class="text-nowrap" data-label="Created">{{ optional($txn->created_at)->format('d M Y, H:i') ?? '—' }}</td>
                                         <td data-label="Status">
                                             <span class="badge {{ $statusClass }} text-uppercase">{{ $txn->status ?? 'n/a' }}</span>
+                                            @if($status === 'pending')
+                                                <form action="{{ route('admin.transactions.excell-export.capture', $txn) }}" method="POST" class="mt-2">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">
+                                                        Mark Captured
+                                                    </button>
+                                                </form>
+                                            @endif
+                                            @if($statusLogCount > 0)
+                                                <div class="small text-muted mt-2">
+                                                    <div>Conversions: {{ $statusLogCount }}</div>
+                                                    @if($latestStatusLog)
+                                                        <div>
+                                                            Last: {{ strtoupper((string) ($latestStatusLog->previous_status ?? '—')) }}
+                                                            → {{ strtoupper((string) ($latestStatusLog->new_status ?? '—')) }}
+                                                        </div>
+                                                        <div>
+                                                            By:
+                                                            {{ $latestStatusLog->changed_by_name ?? (($latestStatusLog->changed_by_user_id ?? null) ? 'User ID: '.$latestStatusLog->changed_by_user_id : 'N/A') }}
+                                                        </div>
+                                                        <div>At: {{ $latestStatusLogTime ?? '—' }}</div>
+                                                    @endif
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="fw-semibold" data-label="Amount (₹)">₹{{ $formatInr($txn->amount_paise) }}</td>
                                         <td data-label="Clinic">

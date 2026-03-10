@@ -234,7 +234,70 @@ class AdminPanelController extends Controller
             return $this->streamExcellExportTransactionsCsv($transactions);
         }
 
-        return view('admin.transactions-excell-export', compact('transactions'));
+        $statusConversionLogs = $this->transactionStatusConversionLogs($transactions);
+
+        return view('admin.transactions-excell-export', compact('transactions', 'statusConversionLogs'));
+    }
+
+    public function markExcellExportTransactionCaptured(Request $request, Transaction $transaction): RedirectResponse
+    {
+        if (! $this->isExcellExportTransaction($transaction)) {
+            return redirect()
+                ->route('admin.transactions.excell-export')
+                ->withErrors(['transaction' => 'Only Excel export campaign transactions can be updated from this page.']);
+        }
+
+        $currentStatus = strtolower(trim((string) ($transaction->status ?? '')));
+        if ($currentStatus !== 'pending') {
+            return redirect()
+                ->route('admin.transactions.excell-export')
+                ->with('status', "Transaction #{$transaction->id} is already {$transaction->status}.");
+        }
+
+        $previousStatus = (string) ($transaction->status ?? 'pending');
+        $newStatus = 'captured';
+        $changedAt = now();
+
+        $metadata = is_array($transaction->metadata) ? $transaction->metadata : [];
+        $logEntry = [
+            'changed_at' => $changedAt->toIso8601String(),
+            'changed_by_user_id' => optional($request->user())->id,
+            'changed_by_name' => optional($request->user())->name,
+            'previous_status' => $previousStatus,
+            'new_status' => $newStatus,
+            'source' => 'admin.transactions.excell-export',
+        ];
+
+        $history = data_get($metadata, 'status_conversion_logs', []);
+        if (!is_array($history)) {
+            $history = [];
+        }
+        $history[] = $logEntry;
+        $metadata['status_conversion_logs'] = $history;
+        $metadata['last_status_conversion'] = $logEntry;
+
+        DB::transaction(function () use ($transaction, $metadata, $previousStatus, $newStatus, $request, $changedAt): void {
+            $transaction->status = $newStatus;
+            $transaction->metadata = $metadata;
+            $transaction->save();
+
+            if (Schema::hasTable('transaction_status_conversion_logs')) {
+                DB::table('transaction_status_conversion_logs')->insert([
+                    'transaction_id' => $transaction->id,
+                    'previous_status' => $previousStatus,
+                    'new_status' => $newStatus,
+                    'changed_by_user_id' => optional($request->user())->id,
+                    'changed_by_name' => optional($request->user())->name,
+                    'source' => 'admin.transactions.excell-export',
+                    'created_at' => $changedAt,
+                    'updated_at' => $changedAt,
+                ]);
+            }
+        });
+
+        return redirect()
+            ->route('admin.transactions.excell-export')
+            ->with('status', "Transaction #{$transaction->id} updated from {$previousStatus} to {$newStatus}.");
     }
 
     public function deleteExcellExportTransaction(Transaction $transaction): RedirectResponse
@@ -343,6 +406,28 @@ class AdminPanelController extends Controller
         } catch (\Throwable $e) {
             return (string) $value;
         }
+    }
+
+    private function transactionStatusConversionLogs(Collection $transactions): Collection
+    {
+        if (!Schema::hasTable('transaction_status_conversion_logs') || $transactions->isEmpty()) {
+            return collect();
+        }
+
+        $transactionIds = $transactions->pluck('id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($transactionIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('transaction_status_conversion_logs')
+            ->whereIn('transaction_id', $transactionIds)
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('transaction_id');
     }
 
     private function streamExcellExportTransactionsCsv(Collection $transactions)
