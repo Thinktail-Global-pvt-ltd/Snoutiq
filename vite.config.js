@@ -3,7 +3,24 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   base: "/", // keep as-is for dev
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: "async-entry-css",
+      apply: "build",
+      transformIndexHtml: {
+        order: "post",
+        handler(html) {
+          return html.replace(
+            /<link rel="stylesheet"([^>]*?)href="([^"]+\.css)"([^>]*)>/g,
+            (_, preAttrs = "", href, postAttrs = "") =>
+              `<link rel="preload" as="style"${preAttrs}href="${href}"${postAttrs} onload="this.onload=null;this.rel='stylesheet'">` +
+              `<noscript><link rel="stylesheet"${preAttrs}href="${href}"${postAttrs}></noscript>`,
+          );
+        },
+      },
+    },
+  ],
 
   server: {
     proxy: {

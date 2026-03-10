@@ -42,16 +42,14 @@ const loadHomePage = () => import("./newflow/HomePage");
 const loadAppRoutes = () => import("./AppRoutes");
 
 if (typeof window !== "undefined") {
+  const preloadAppRoutes = () => {
+    NON_HOME_PRELOAD_EVENTS.forEach((eventName) => {
+      window.removeEventListener(eventName, preloadAppRoutes);
+    });
+    void loadAppRoutes();
+  };
+
   if (window.location.pathname === HOME_PATH) {
-    void loadHomePage();
-
-    const preloadAppRoutes = () => {
-      NON_HOME_PRELOAD_EVENTS.forEach((eventName) => {
-        window.removeEventListener(eventName, preloadAppRoutes);
-      });
-      void loadAppRoutes();
-    };
-
     NON_HOME_PRELOAD_EVENTS.forEach((eventName) => {
       window.addEventListener(eventName, preloadAppRoutes, {
         once: true,
@@ -59,7 +57,7 @@ if (typeof window !== "undefined") {
       });
     });
   } else {
-    void loadAppRoutes();
+    preloadAppRoutes();
   }
 }
 
