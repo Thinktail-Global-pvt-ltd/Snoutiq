@@ -4985,18 +4985,18 @@ export const VetDashboardScreen = ({ onLogout, auth: authFromProps }) => {
                                 </span>{" "}
                                 {activeTransaction?.user?.name || "Pet Parent"}
                               </p>
-                              <p>
+                              {/* <p>
                                 <span className="font-semibold text-slate-900">
                                   Location:
                                 </span>{" "}
                                 {consultationLocationLabel}
-                              </p>
-                              <p>
+                              </p> */}
+                              {/* <p>
                                 <span className="font-semibold text-slate-900">
                                   Clinic:
                                 </span>{" "}
                                 {clinicNameLabel} ({clinicCityLabel})
-                              </p>
+                              </p> */}
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
                               <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">

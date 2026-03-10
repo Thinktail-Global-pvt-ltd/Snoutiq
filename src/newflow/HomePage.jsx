@@ -692,6 +692,7 @@ function Ie() {
       upsertJsonLdTag("faq-schema", xe);
     }, []),
     k.useEffect(() => {
+      if (!showDeferredSections) return;
       let s = !1;
       let r = null;
 
@@ -734,7 +735,7 @@ function Ie() {
           }
         }
       };
-    }, []),
+    }, [showDeferredSections]),
     k.useEffect(() => {
       if (showHeroPanel && showDeferredSections) return;
       if (typeof window === "undefined") return;

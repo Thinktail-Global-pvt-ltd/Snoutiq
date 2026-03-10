@@ -11,13 +11,29 @@ export default defineConfig({
       transformIndexHtml: {
         order: "post",
         handler(html, ctx) {
-          const homeChunkFile = Object.values(ctx.bundle || {}).find(
+          const bundle = ctx.bundle || {};
+          const homeChunk = Object.values(bundle).find(
             (asset) =>
               asset &&
               asset.type === "chunk" &&
               asset.name === "HomePage" &&
               typeof asset.fileName === "string",
-          )?.fileName;
+          );
+          const homePreloadFiles = [];
+          const visitedHomeImports = new Set();
+
+          const collectHomeImports = (fileName) => {
+            if (!fileName || visitedHomeImports.has(fileName)) return;
+
+            const chunk = bundle[fileName];
+            if (!chunk || chunk.type !== "chunk") return;
+
+            visitedHomeImports.add(fileName);
+            homePreloadFiles.push(`/${fileName}`);
+            chunk.imports.forEach(collectHomeImports);
+          };
+
+          collectHomeImports(homeChunk?.fileName);
 
           let transformedHtml = html.replace(
             /<link rel="stylesheet"([^>]*?)href="([^"]+\.css)"([^>]*)>/g,
@@ -26,10 +42,12 @@ export default defineConfig({
               `<noscript><link rel="stylesheet"${preAttrs}href="${href}"${postAttrs}></noscript>`,
           );
 
-          if (homeChunkFile) {
+          if (homePreloadFiles.length) {
             transformedHtml = transformedHtml.replace(
               "</head>",
-              `<script>if(window.location.pathname==="/"){var link=document.createElement("link");link.rel="modulepreload";link.href="/${homeChunkFile}";document.head.appendChild(link);}</script></head>`,
+              `<script>if(window.location.pathname==="/"){${JSON.stringify(
+                homePreloadFiles,
+              )}.forEach(function(href){var link=document.createElement("link");link.rel="modulepreload";link.href=href;link.crossOrigin="";document.head.appendChild(link);});}</script></head>`,
             );
           }
 
