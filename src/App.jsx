@@ -9,6 +9,8 @@ import MainLayout from "./layouts/MainLayout";
 
 const HOME_PATH = "/";
 const NON_HOME_PRELOAD_EVENTS = ["pointerdown", "keydown", "touchstart"];
+let homePagePromise;
+let appRoutesPromise;
 
 const ScrollToTopAndHash = () => {
   const { pathname, hash } = useLocation();
@@ -38,10 +40,15 @@ const LoadingScreen = () => (
   </div>
 );
 
-const loadHomePage = () => import("./newflow/HomePage");
-const loadAppRoutes = () => import("./AppRoutes");
+const loadHomePage = () =>
+  (homePagePromise ??= import("./newflow/HomePage"));
+const loadAppRoutes = () => (appRoutesPromise ??= import("./AppRoutes"));
 
 if (typeof window !== "undefined") {
+  if (window.location.pathname === HOME_PATH) {
+    void loadHomePage();
+  }
+
   const preloadAppRoutes = () => {
     NON_HOME_PRELOAD_EVENTS.forEach((eventName) => {
       window.removeEventListener(eventName, preloadAppRoutes);
