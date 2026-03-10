@@ -80,6 +80,7 @@ use App\Http\Controllers\Api\V1\VaccinationBookingController as V1VaccinationBoo
 use App\Http\Controllers\Api\V1\VaccinationPaymentController as V1VaccinationPaymentController;
 use App\Http\Controllers\Api\ClinicFinancialsController;
 use App\Http\Controllers\Api\PetConsultTimelineController;
+use App\Services\PetDiseaseInferenceService;
 
 Route::post('/call/request', [ApiCallController::class, 'requestCall']);
 Route::post('/call/test', [ApiCallController::class, 'requestTestCall']);
@@ -904,6 +905,14 @@ Route::post('/user-pet-observation', function (Request $request) {
             'observation' => $observation->only(['id', 'user_id', 'pet_id', 'appetite', 'energy', 'mood', 'observed_at']),
         ];
     });
+
+    if (!empty(data_get($result, 'pet.id'))) {
+        app(PetDiseaseInferenceService::class)->syncFromReportedSymptom(
+            petId: (int) data_get($result, 'pet.id'),
+            reportedSymptom: data_get($result, 'pet.reported_symptom'),
+            source: 'api.user-pet-observation'
+        );
+    }
 
     return response()->json([
         'success' => true,

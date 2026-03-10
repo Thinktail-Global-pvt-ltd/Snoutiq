@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use App\Services\Ai\DogDiseaseSuggester;
+use App\Services\PetDiseaseInferenceService;
 
 class AdminController extends Controller
 {
@@ -411,28 +411,17 @@ class AdminController extends Controller
         }
 
         $pet = $petRows[0];
-        $symptom = trim($payload['symptom']);
-
-        try {
-            $suggester = new DogDiseaseSuggester();
-            $result = $suggester->suggest($symptom, [
-                'name'       => $pet->name ?? null,
-                'breed'      => $pet->breed ?? null,
-                'pet_age'    => $pet->pet_age ?? null,
+        $symptom = trim($payload['symptom']) ?: null;
+        $inference = app(PetDiseaseInferenceService::class)->syncFromReportedSymptom(
+            petId: (int) $petId,
+            reportedSymptom: $symptom,
+            contextOverrides: [
+                'name' => $pet->name ?? null,
+                'breed' => $pet->breed ?? null,
+                'pet_age' => $pet->pet_age ?? null,
                 'pet_gender' => $pet->pet_gender ?? null,
-            ]);
-            $diseaseName = $result['disease_name'] ?? 'Unknown dog disease';
-            $category = strtolower($result['category'] ?? 'normal');
-        } catch (\Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Could not generate disease suggestion: '.$e->getMessage(),
-            ], 500);
-        }
-
-        DB::update(
-            'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, health_state = ?, updated_at = NOW() WHERE id = ?',
-            [$symptom, $diseaseName, in_array($category, ['normal','chronic'], true) ? $category : null, $petId]
+            ],
+            source: 'api.admin.pets.dog-disease'
         );
 
         return response()->json([
@@ -440,8 +429,8 @@ class AdminController extends Controller
             'data' => [
                 'pet_id' => $petId,
                 'symptom_saved' => $symptom,
-                'suggested_disease' => $diseaseName,
-                'category' => in_array($category, ['normal','chronic'], true) ? $category : 'normal',
+                'suggested_disease' => $inference['suggested_disease'] ?? 'Unknown dog disease',
+                'category' => $inference['category'] ?? 'normal',
             ],
         ]);
     }

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Pet;
+use App\Services\PetDiseaseInferenceService;
 use Carbon\Carbon;
 
 class PrescriptionController extends Controller
@@ -511,6 +512,14 @@ class PrescriptionController extends Controller
                     $petUpdates['updated_at'] = now();
                 }
                 DB::table('pets')->where('id', $pet->id)->update($petUpdates);
+            }
+
+            if (array_key_exists('reported_symptom', $validated)) {
+                app(PetDiseaseInferenceService::class)->syncFromReportedSymptom(
+                    petId: (int) $pet->id,
+                    reportedSymptom: $validated['reported_symptom'],
+                    source: 'api.users.medical-summary'
+                );
             }
         }
 

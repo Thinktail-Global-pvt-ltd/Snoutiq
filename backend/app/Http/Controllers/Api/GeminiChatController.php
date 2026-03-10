@@ -13,7 +13,7 @@ use App\Models\ChatRoom;
 use App\Models\Pet;
 use Illuminate\Support\Str;
 use App\Support\GeminiConfig;
-use App\Services\Ai\DogDiseaseSuggester;
+use App\Services\PetDiseaseInferenceService;
 
 class GeminiChatController extends Controller
 {
@@ -61,24 +61,15 @@ class GeminiChatController extends Controller
             'pet_gender' => $data['pet_gender'] ?? ($pet->pet_gender ?? null),
         ];
 
-        if ($symptomText === '') {
-            $diseaseName = 'Unknown dog disease';
-            $category = 'normal';
-        } else {
-            try {
-                $suggester = new DogDiseaseSuggester();
-                $result = $suggester->suggest($symptomText, $context);
-                $diseaseName = $result['disease_name'] ?? 'Unknown dog disease';
-                $category = strtolower($result['category'] ?? 'normal');
-            } catch (\Throwable $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Could not generate disease suggestion: '.$e->getMessage(),
-                ], 500);
-            }
-        }
-
         $reportedSymptom = $symptomText !== '' ? $symptomText : null;
+        $inference = app(PetDiseaseInferenceService::class)->syncFromReportedSymptom(
+            petId: (int) $data['pet_id'],
+            reportedSymptom: $reportedSymptom,
+            contextOverrides: $context,
+            source: 'api.chat.dog-disease'
+        );
+        $diseaseName = $inference['suggested_disease'] ?? 'Unknown dog disease';
+        $category = $inference['category'] ?? 'normal';
 
         // Handle optional video calling upload file
         $videoUploadPath = $this->storePetCardForAi($request, 'video_calling_upload_file');
@@ -87,11 +78,8 @@ class GeminiChatController extends Controller
         }
 
         DB::update(
-            'UPDATE pets SET reported_symptom = ?, suggested_disease = ?, health_state = ?, dog_disease_payload = ?, pet_card_for_ai = ?, video_calling_upload_file = ?, updated_at = NOW() WHERE id = ?',
+            'UPDATE pets SET dog_disease_payload = ?, pet_card_for_ai = ?, video_calling_upload_file = ?, updated_at = NOW() WHERE id = ?',
             [
-                $reportedSymptom,
-                $diseaseName,
-                in_array($category, ['normal','chronic'], true) ? $category : null,
                 json_encode([
                     'user_id' => $data['user_id'],
                     'pet_id' => $data['pet_id'],
@@ -154,6 +142,11 @@ class GeminiChatController extends Controller
         if ($reportedSymptom === '') {
             $reportedSymptom = null;
         }
+        $inference = app(PetDiseaseInferenceService::class)->syncFromReportedSymptom(
+            petId: (int) $petRow->id,
+            reportedSymptom: $reportedSymptom,
+            source: 'api.chat.dog-disease-question'
+        );
 
         // Persist payload + optional video upload
         $payload = [];
@@ -176,7 +169,6 @@ class GeminiChatController extends Controller
 
         DB::table('pets')->where('id', $petRow->id)->update([
             'dog_disease_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
-            'reported_symptom' => $reportedSymptom,
             'video_calling_upload_file' => $videoUploadPath,
             'updated_at' => now(),
         ]);
@@ -185,6 +177,8 @@ class GeminiChatController extends Controller
             'success' => true,
             'question' => $question,
             'reported_symptom' => $reportedSymptom,
+            'suggested_disease' => $inference['suggested_disease'],
+            'category' => $inference['category'],
             'dog_disease_payload' => $payload,
             'video_calling_upload_file' => $videoUploadPath ? $this->buildPetCardUrl($videoUploadPath) : null,
         ]);

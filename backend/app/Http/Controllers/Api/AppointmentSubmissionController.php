@@ -9,6 +9,7 @@ use App\Models\Doctor;
 use App\Models\Pet;
 use App\Models\User;
 use App\Models\VetRegisterationTemp;
+use App\Services\PetDiseaseInferenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -120,11 +121,11 @@ class AppointmentSubmissionController extends Controller
             && Schema::hasTable('pets')
             && Schema::hasColumn('pets', 'reported_symptom')
         ) {
-            $pet = Pet::find((int) $validated['pet_id']);
-            if ($pet) {
-                $pet->reported_symptom = $validated['notes'];
-                $pet->save();
-            }
+            app(PetDiseaseInferenceService::class)->syncFromReportedSymptom(
+                petId: (int) $validated['pet_id'],
+                reportedSymptom: $validated['notes'],
+                source: 'api.appointments.submit'
+            );
         }
 
         $appointment = Appointment::create([
