@@ -53,6 +53,7 @@ const Support = lazy(() => import("./pages/Support"));
 const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
 const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
 const CsvUploadPage = lazy(() => import("./pages/CsvUploadPage"));
+const InternalUserDeletePage = lazy(() => import("./pages/InternalUserDeletePage"));
 const Auth = lazy(() => import("./pages/Auth"));
 const VetDashboard = lazy(() => import("./pages/VetDashboard"));
 const VetRegisterSuccess = lazy(() => import("./pages/VetRegisterSuccess"));
@@ -221,6 +222,10 @@ function App() {
             <Route path="/call-demo" element={<CallRecordingDemo />} />
             <Route path="/csv-upload" element={<CsvUploadPage />} />
             <Route path="/s3-upload-test" element={<S3UploadTest />} />
+            <Route
+              path="/__ops/company-user-archive-r4k9d2x"
+              element={<InternalUserDeletePage />}
+            />
             <Route path="/blog" element={<Blog />} />
             <Route
               path="/blog/dog-winter-care-guide"

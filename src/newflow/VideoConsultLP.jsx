@@ -1296,7 +1296,7 @@ export default function VideoConsultLP() {
 
             {/* -- "WHAT'S WRONG WITH YOUR PET?" SECTION -------------------- */}
             <div className="max-w-4xl mx-auto mb-6">
-            <h2 className="text-4xl font-extrabold text-slate-900 text-center mb-8">Online vet consultation for dogs, cats and pets across India</h2>
+            <h2 className="text-3xl font-extrabold text-slate-900 text-center mb-8">Online vet consultation for dogs, cats and pets across India</h2>
               <div className="bg-white rounded-2xl shadow-md shadow-slate-200/60 border border-slate-100 overflow-hidden">
                 <div className="px-4 py-4 border-b border-slate-100">
                   <h2 className="text-base font-extrabold text-slate-900 text-center">What&apos;s wrong with your pet?</h2>
@@ -1862,7 +1862,7 @@ export default function VideoConsultLP() {
         </section>
 
         {/* -- EXPLORE MORE PET CARE -------------------------------------------- */}
-        <section className="py-10 px-4 bg-white border-t border-slate-100">
+        {/* <section className="py-10 px-4 bg-white border-t border-slate-100">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-lg font-extrabold text-slate-900 mb-5">Explore more pet care</h2>
             <div className="flex flex-wrap gap-2">
@@ -1885,7 +1885,7 @@ export default function VideoConsultLP() {
               ))}
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* FINAL CTA */}
         <section className="py-14 px-4 bg-slate-900 relative overflow-hidden">

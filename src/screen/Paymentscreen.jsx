@@ -83,9 +83,24 @@ const stripEmpty = (payload) =>
     )
   );
 
-const isDayTime = (date = new Date()) => {
-  const hour = date.getHours();
-  return hour >= 8 && hour < 22;
+const getCurrentPricingIST = () => {
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const hour = Number(parts.find((p) => p.type === "hour")?.value || 0);
+  const rateType = hour >= 8 && hour < 22 ? "day" : "night";
+  const consultationAmount = rateType === "night" ? 599 : 499;
+  const slotLabel =
+    rateType === "night" ? "Night (10 PM - 8 AM)" : "Day (8 AM - 10 PM)";
+
+  return {
+    rateType,
+    consultationAmount,
+    slotLabel,
+  };
 };
 
 export const PaymentScreen = ({
@@ -97,39 +112,16 @@ export const PaymentScreen = ({
 }) => {
   // ✅ slot decide: priority -> bookingRateType (from selection)
   // fallback -> current time (if parent didn't pass)
-  const rateType = useMemo(() => {
-    if (vet?.bookingRateType === "day" || vet?.bookingRateType === "night") {
-      return vet.bookingRateType;
-    }
-    return isDayTime() ? "day" : "night";
-  }, [vet?.bookingRateType]);
+  const livePricing = useMemo(() => getCurrentPricingIST(), []);
+  const rateType = livePricing.rateType;
 
   // ✅ fee: priority -> bookingPrice (from selection), fallback -> rateType price
-  const fee = useMemo(() => {
-    const booking = Number(vet?.bookingPrice);
-    if (Number.isFinite(booking) && booking > 0) return booking;
-
-    const fallback = Number(
-      rateType === "night" ? (vet?.priceNight ?? 599) : (vet?.priceDay ?? 499)
-    );
-    if (Number.isFinite(fallback) && fallback > 0) return fallback;
-
-    return rateType === "night" ? 599 : 499;
-  }, [vet?.bookingPrice, vet?.priceDay, vet?.priceNight, rateType]);
+  const fee = livePricing.consultationAmount;
+  const slotLabel = livePricing.slotLabel;
 
   const consultationAmount = useMemo(() => {
-    const metaAmount = toNumber(
-      pickValue(
-        paymentMeta?.consultation_amount_inr,
-        paymentMeta?.consultationAmountInr
-      )
-    );
-    if (metaAmount !== undefined) return round2(Math.max(metaAmount, 0));
     return round2(Math.max(fee, 0));
-  }, [fee, paymentMeta]);
-
-  const slotLabel =
-    rateType === "night" ? "Night (10 PM - 8 AM)" : "Day (8 AM - 10 PM)";
+  }, [fee]);
 
   // ✅ TESTING: remove service charge for now
   const service = useMemo(() => {
@@ -414,7 +406,52 @@ const doctorId = 116;
       return;
     }
 
-    if (!createOrderAmountPaise || createOrderAmountPaise <= 0) {
+    const latestPricing = getCurrentPricingIST();
+
+    const latestConsultationAmount = round2(
+      Math.max(latestPricing.consultationAmount, 0)
+    );
+    const latestService = 0;
+    const latestTaxableAmountBeforeDiscount = round2(
+      Math.max(latestConsultationAmount + latestService, 0)
+    );
+    const latestDiscountAmount = round2(
+      Math.min(100, latestTaxableAmountBeforeDiscount)
+    );
+    const latestTaxableAmount = round2(
+      Math.max(latestTaxableAmountBeforeDiscount - latestDiscountAmount, 0)
+    );
+    const latestGstAmountBeforeDiscount = round2(
+      latestTaxableAmountBeforeDiscount * gstRate
+    );
+    const latestGstAmount = round2(latestTaxableAmount * gstRate);
+    const latestTotalBeforeDiscount = round2(
+      latestTaxableAmountBeforeDiscount + latestGstAmountBeforeDiscount
+    );
+    const latestTotal = round2(latestTaxableAmount + latestGstAmount);
+
+    const latestCreateOrderAmountInr = toInt(latestTotal);
+    const latestCreateOrderAmountPaise = latestCreateOrderAmountInr * 100;
+
+    const latestPaymentContext = stripEmpty({
+      ...paymentContext,
+      booking_rate_type: latestPricing.rateType,
+      slot_label: latestPricing.slotLabel,
+      consultation_amount_inr: toInt(latestConsultationAmount),
+      taxable_amount_inr: toInt(latestTaxableAmount),
+      gst_amount_inr: toInt(latestGstAmount),
+      taxable_amount_before_discount_inr: toInt(
+        latestTaxableAmountBeforeDiscount
+      ),
+      gst_amount_before_discount_inr: toInt(latestGstAmountBeforeDiscount),
+      service_charge_inr: toInt(latestService),
+      first_user_offer_applied: latestDiscountAmount > 0 ? 1 : 0,
+      offer_discount_inr: toInt(latestDiscountAmount),
+      original_amount_inr: toInt(latestTotalBeforeDiscount),
+      final_amount_inr: toInt(latestTotal),
+    });
+
+    if (!latestCreateOrderAmountPaise || latestCreateOrderAmountPaise <= 0) {
       updateStatus("error", "Invalid consultation amount.");
       return;
     }
@@ -424,9 +461,9 @@ const doctorId = 116;
 
     try {
       const order = await apiPost("/api/create-order", {
-        amount: createOrderAmountInr,
-        amount_paise: createOrderAmountPaise,
-        ...paymentContext,
+        amount: latestCreateOrderAmountInr,
+        amount_paise: latestCreateOrderAmountPaise,
+        ...latestPaymentContext,
       });
 
       const orderId = order?.order_id || order?.order?.id;
@@ -440,12 +477,12 @@ const doctorId = 116;
         key,
         order_id: orderId,
         name: "Snoutiq Veterinary Consultation",
-       description: `Video consultation with Dr. Shashannk Goyal (${rateType.toUpperCase()} slot)`,
+        description: `Video consultation with Dr. Shashannk Goyal (${latestPricing.rateType.toUpperCase()} slot)`,
         handler: async (response) => {
           updateStatus("info", "Verifying payment...");
           try {
             const verify = await apiPost("/api/rzp/verify", {
-              ...paymentContext,
+              ...latestPaymentContext,
               razorpay_order_id: response?.razorpay_order_id,
               razorpay_payment_id: response?.razorpay_payment_id,
               razorpay_signature: response?.razorpay_signature,
