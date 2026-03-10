@@ -67,14 +67,12 @@ const normalizeDoctorImageUrl = (rawUrl, assetRoot) => {
   if (!rawUrl) return "";
   let url = String(rawUrl).trim();
   if (!url) return "";
-
   if (url.startsWith("http")) {
     return url.replace(
       "https://snoutiq.com/https://snoutiq.com",
       "https://snoutiq.com"
     );
   }
-
   if (url.startsWith("/")) url = url.slice(1);
   return `${assetRoot}/${url}`;
 };
@@ -149,7 +147,6 @@ const formatInr = (value) => {
 };
 
 const round2 = (n) => Number((Number(n) || 0).toFixed(2));
-
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const calcAgeFromDob = (dob) => {
@@ -158,21 +155,14 @@ const calcAgeFromDob = (dob) => {
   if (Number.isNaN(birth.getTime())) return "";
   const today = new Date();
   if (birth > today) return "";
-
   let years = today.getFullYear() - birth.getFullYear();
   let months = today.getMonth() - birth.getMonth();
   let days = today.getDate() - birth.getDate();
-
   if (days < 0) months -= 1;
-  if (months < 0) {
-    years -= 1;
-    months += 12;
-  }
-
+  if (months < 0) { years -= 1; months += 12; }
   if (years <= 0 && months <= 0) return "Less than 1 month";
   if (years <= 0) return `${months} mo${months === 1 ? "" : "s"}`;
   if (months === 0) return `${years} yr${years === 1 ? "" : "s"}`;
-
   return `${years} yr${years === 1 ? "" : "s"} ${months} mo${months === 1 ? "" : "s"}`;
 };
 
@@ -228,12 +218,8 @@ const listToDisplayText = (value) => {
 
 const formatBreedName = (breedKey, subBreed = null) => {
   const cap = (s) =>
-    String(s)
-      .split(/[-_\s]/)
-      .filter(Boolean)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-
+    String(s).split(/[-_\s]/).filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   const base = cap(breedKey);
   if (!subBreed) return base;
   return `${cap(subBreed)} ${base}`;
@@ -246,35 +232,23 @@ const compressImageFile = async (
   if (!file) return null;
   const isImage = file.type?.startsWith("image/");
   if (!isImage) return file;
-
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) return file;
-
   let { width, height } = bitmap;
   const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
   const targetW = Math.round(width * ratio);
   const targetH = Math.round(height * ratio);
-
   const canvas = document.createElement("canvas");
   canvas.width = targetW;
   canvas.height = targetH;
-
   const ctx = canvas.getContext("2d");
   if (!ctx) return file;
-
   ctx.drawImage(bitmap, 0, 0, targetW, targetH);
-
   const blob = await new Promise((resolve) => {
-    canvas.toBlob(
-      (b) => resolve(b),
-      outputMime,
-      outputMime === "image/png" ? undefined : quality
-    );
+    canvas.toBlob((b) => resolve(b), outputMime, outputMime === "image/png" ? undefined : quality);
   });
-
   if (!blob) return file;
   if (blob.size >= file.size) return file;
-
   const ext = outputMime === "image/webp" ? "webp" : "jpg";
   const safeName = (file.name?.replace(/\.[^/.]+$/, "") || "upload") + `_compressed.${ext}`;
   return new File([blob], safeName, { type: outputMime });
@@ -313,15 +287,15 @@ const YES_NO_OPTIONS = [
   { label: "No", value: "0" },
 ];
 
-// --- Pet issue quick-select options (for "What's wrong with your pet?" section) --
-const PET_ISSUE_OPTIONS = [
-  { label: "Vomiting", emoji: "🤢" },
-  { label: "Not eating", emoji: "🍽️" },
-  { label: "Skin itching", emoji: "🐾" },
-  { label: "Injury", emoji: "🩹" },
-  { label: "Diarrhea", emoji: "💧" },
-  { label: "Other", emoji: "❓" },
-];
+// --- Pet issue quick-select options --
+// const PET_ISSUE_OPTIONS = [
+//   { label: "Vomiting", emoji: "🤢" },
+//   { label: "Not eating", emoji: "🍽️" },
+//   { label: "Skin itching", emoji: "🐾" },
+//   { label: "Injury", emoji: "🩹" },
+//   { label: "Diarrhea", emoji: "💧" },
+//   { label: "Other", emoji: "❓" },
+// ];
 
 const HERO_REVIEW_CARDS = [
   {
@@ -341,27 +315,59 @@ const HERO_REVIEW_CARDS = [
 const fieldBase =
   "w-full rounded-lg border border-gray-200 bg-white p-2.5 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-xl md:p-3 md:text-sm";
 const selectBase = `${fieldBase} appearance-none pr-12`;
-const textareaBase = `${fieldBase} resize-none min-h-[120px]`;
+const textareaBase = `${fieldBase} resize-none min-h-[100px]`;
 const cardBase = "rounded-xl border border-gray-200 bg-white overflow-hidden";
 const cardHeaderBase = "flex items-center gap-3 border-b border-gray-100 px-3 py-2.5";
 const cardBodyBase = "px-3 py-3 space-y-3";
+
+// ── NEW: compact CTA label for "Get Started" button ──────────────────────────
+function GetStartedCtaLabel({ amount }) {
+  const originalAmount = Number(amount) || 0;
+  const discounted = Math.max(originalAmount - 100, 0);
+
+  return (
+    <span className="inline-flex items-center justify-center gap-2 flex-wrap text-center leading-tight">
+      <Zap className="h-4 w-4 shrink-0 text-current" />
+
+      <span className="font-extrabold text-white">
+        Counslt Now
+      </span>
+
+      <ArrowRight className="h-4 w-4 shrink-0 text-white/80" />
+
+      {/* Main Price First */}
+      <span className="whitespace-nowrap rounded-full bg-white px-3 py-0.5 text-sm font-black text-orange-600 shadow-sm">
+        ₹{formatInr(discounted)}
+      </span>
+
+      {/* Original Price Cut */}
+      <span className="whitespace-nowrap text-lg font-bold text-white/80 line-through">
+        ₹{formatInr(originalAmount)}
+      </span>
+    </span>
+  );
+}
 
 function ConsultCtaLabel({ amount, prefixText = "Consult Now" }) {
   const originalAmount = Number(amount) || 0;
   const discounted = Math.max(originalAmount - 100, 0);
 
   return (
-    <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-center align-middle leading-tight sm:flex-nowrap">
+    <span className="inline-flex items-center justify-center gap-2 flex-wrap text-center leading-tight">
       <Zap className="h-4 w-4 shrink-0 text-current" />
-      <span className="font-extrabold text-white group-disabled:text-slate-400">{prefixText}</span>
-      <span className="whitespace-nowrap line-through text-sm font-bold text-white/70 group-disabled:text-slate-400">
+
+      <span className="font-extrabold text-white group-disabled:text-slate-400">
+        {prefixText}
+      </span>
+
+      {/* Main price first */}
+      <span className="whitespace-nowrap rounded-full bg-white px-3 py-1 text-sm font-black text-orange-600 shadow-sm">
+        ₹{formatInr(discounted)}
+      </span>
+
+      {/* Original price cut */}
+      <span className="whitespace-nowrap text-sm font-bold text-white/60 line-through">
         ₹{formatInr(originalAmount)}
-      </span>
-      <span className="whitespace-nowrap rounded-full bg-yellow-300 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-900 group-disabled:bg-slate-300 group-disabled:text-slate-500">
-        ₹100 OFF
-      </span>
-      <span className="whitespace-nowrap rounded-full bg-white px-3 py-1 text-sm font-black text-orange-600 shadow-sm group-disabled:bg-slate-100 group-disabled:text-slate-500">
-        Now ₹{formatInr(discounted)}
       </span>
     </span>
   );
@@ -375,8 +381,9 @@ export default function VideoConsultLP() {
   const discountedConsultAmount = Math.max(consultAmount - 100, 0);
   const slotLabel =
     rateType === "day" ? "Day (8 AM - 10 PM)" : "Night (10 PM - 8 AM)";
+
+  // ── SIMPLIFIED: single step form, no issue pre-select step ──────────────
   const [selectedIssue, setSelectedIssue] = useState(null);
-  const [leadStep, setLeadStep] = useState(1);
   const [leadForm, setLeadForm] = useState({
     ownerName: "",
     petName: "",
@@ -391,7 +398,6 @@ export default function VideoConsultLP() {
     (id, { offset = 0, retries = 10, delay = 120 } = {}) => {
       if (typeof window === "undefined") return;
       let attempts = 0;
-
       const attemptScroll = () => {
         const target = document.getElementById(id);
         if (target) {
@@ -399,47 +405,38 @@ export default function VideoConsultLP() {
           window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
           return;
         }
-
         attempts += 1;
-        if (attempts <= retries) {
-          window.setTimeout(attemptScroll, delay);
-        }
+        if (attempts <= retries) window.setTimeout(attemptScroll, delay);
       };
-
       attemptScroll();
     },
     []
   );
 
   const scrollToConsultForm = useCallback(() => {
-    scrollToIdWithRetry("consult-form", { offset: 96 });
+    scrollToIdWithRetry("consult-form", { offset: 80 });
   }, [scrollToIdWithRetry]);
 
   const getLeadError = () => {
-    if (!leadForm.ownerName.trim()) return "Please enter your name";
-    if (!leadForm.petName.trim()) return "Please enter your pet's name";
-    if (!leadForm.petType) return "Please select pet type";
+    // if (!leadForm.ownerName.trim()) return "Please enter your name";
+    // if (!leadForm.petName.trim()) return "Please enter your pet's name";
+    // if (!leadForm.petType) return "Please select pet type";
     if (leadForm.description.trim().length <= 10) {
       return "Please describe the issue in detail (minimum 10 characters)";
     }
     return "";
   };
 
-  const handleLeadIssueSelect = useCallback(
-    (issue) => {
-      setSelectedIssue(issue);
-      setLeadStep(2);
-      setLeadForm((prev) => ({
-        ...prev,
-        description: prev.description.trim()
-          ? prev.description
-          : `Issue: ${issue}. `,
-      }));
-      setLeadError("");
-      scrollToConsultForm();
-    },
-    [scrollToConsultForm]
-  );
+  // ── Issue chip select: just updates description, no step change ──────────
+  // const handleLeadIssueSelect = useCallback((issue) => {
+  //   setSelectedIssue(issue);
+  //   setLeadForm((prev) => ({
+  //     ...prev,
+  //     description: prev.description.trim() ? prev.description : `Issue: ${issue}. `,
+  //   }));
+  //   setLeadError("");
+  // },
+  //  []);
 
   const goToPetDetailsScreen = useCallback(() => {
     const error = getLeadError();
@@ -447,9 +444,7 @@ export default function VideoConsultLP() {
       setLeadError(error);
       return;
     }
-
     setLeadError("");
-
     navigate(CONSULT_DETAILS_ROUTE, {
       state: {
         prefill: {
@@ -457,8 +452,7 @@ export default function VideoConsultLP() {
           name: leadForm.petName.trim(),
           type: leadForm.petType || null,
           breed: leadForm.petType === "exotic" ? "" : leadForm.breed || "",
-          exoticType:
-            leadForm.petType === "exotic" ? leadForm.exoticType.trim() : "",
+          exoticType: leadForm.petType === "exotic" ? leadForm.exoticType.trim() : "",
           problemText: leadForm.description.trim(),
           selectedIssue: selectedIssue || "",
           source: "video_consult_lp",
@@ -468,207 +462,128 @@ export default function VideoConsultLP() {
   }, [leadForm, navigate, selectedIssue]);
 
   // --- JSON-LD Schemas ------------------------------------------------------
-  const serviceSchema = useMemo(
-    () => ({
-      "@context": "https://schema.org",
-      "@type": "MedicalService",
-      name: "Online Vet Consultation India",
-      serviceType: "Online Veterinary Consultation",
-      provider: {
-        "@type": "Organization",
-        name: "SnoutiQ",
-        url: "https://www.snoutiq.com",
-      },
-      areaServed: { "@type": "Country", name: "India" },
-      availableChannel: {
-        "@type": "ServiceChannel",
-        serviceLocation: {
-          "@type": "VirtualLocation",
-          url: CANONICAL,
-        },
-      },
-      offers: {
-        "@type": "Offer",
-        priceCurrency: "INR",
-        price: "399",
-        availability: "https://schema.org/InStock",
+  const serviceSchema = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "MedicalService",
+    name: "Online Vet Consultation India",
+    serviceType: "Online Veterinary Consultation",
+    provider: { "@type": "Organization", name: "SnoutiQ", url: "https://www.snoutiq.com" },
+    areaServed: { "@type": "Country", name: "India" },
+    availableChannel: {
+      "@type": "ServiceChannel",
+      serviceLocation: { "@type": "VirtualLocation", url: CANONICAL },
+    },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "INR",
+      price: "399",
+      availability: "https://schema.org/InStock",
       description: "Day ₹399 (8AM–10PM), Night ₹499 (10PM–8AM)",
-      },
-      aggregateRating: {
-        "@type": "AggregateRating",
-        ratingValue: "4.8",
-        bestRating: "5",
-        worstRating: "1",
-        ratingCount: "214",
-        reviewCount: "214",
-      },
-    }),
-    []
-  );
+    },
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "4.8",
+      bestRating: "5",
+      worstRating: "1",
+      ratingCount: "214",
+      reviewCount: "214",
+    },
+  }), []);
 
-  const faqSchema = useMemo(
-    () => ({
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: [
-        {
-          "@type": "Question",
-          name: "How does online vet consultation work?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "You receive a WhatsApp video call within 15 minutes after payment. The vet reviews your pet details before calling.",
-          },
+  const faqSchema = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "How does online vet consultation work?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "You receive a WhatsApp video call within 15 minutes after payment. The vet reviews your pet details before calling.",
         },
-        {
-          "@type": "Question",
-          name: "Is online vet consultation available across India?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Yes, SnoutIQ provides 24/7 online vet consultation across India.",
-          },
+      },
+      {
+        "@type": "Question",
+        name: "Is online vet consultation available across India?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes, SnoutIQ provides 24/7 online vet consultation across India.",
         },
-        {
-          "@type": "Question",
-          name: "What do I receive after an online vet consultation?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "You receive expert veterinary guidance, personalized care guidance, a consultation summary, and follow-up care instructions based on your pet's needs.",
-          },
+      },
+      {
+        "@type": "Question",
+        name: "What do I receive after an online vet consultation?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "You receive expert veterinary guidance, personalized care guidance, a consultation summary, and follow-up care instructions based on your pet's needs.",
         },
-      ],
-    }),
-    []
-  );
+      },
+    ],
+  }), []);
 
-  const reviewSchema = useMemo(
-    () => ({
-      "@context": "https://schema.org",
-      "@type": "LocalBusiness",
-      name: "SnoutiQ – Online Vet Consultation India",
-      url: "https://www.snoutiq.com",
-      image: "https://www.snoutiq.com/logo.png",
-      telephone: "+91-9999999999",
-      address: {
-        "@type": "PostalAddress",
-        addressCountry: "IN",
+  const reviewSchema = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: "SnoutiQ – Online Vet Consultation India",
+    url: "https://www.snoutiq.com",
+    image: "https://www.snoutiq.com/logo.png",
+    telephone: "+91-9999999999",
+    address: { "@type": "PostalAddress", addressCountry: "IN" },
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "4.8",
+      bestRating: "5",
+      worstRating: "1",
+      ratingCount: "214",
+      reviewCount: "214",
+    },
+    review: [
+      {
+        "@type": "Review",
+        author: { "@type": "Person", name: "Priya M." },
+        datePublished: "2025-12-10",
+        reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
+        reviewBody: "My dog started vomiting at midnight. SnoutiQ connected me to a vet in under 5 minutes.",
+        name: "Excellent midnight emergency support",
       },
-      aggregateRating: {
-        "@type": "AggregateRating",
-        ratingValue: "4.8",
-        bestRating: "5",
-        worstRating: "1",
-        ratingCount: "214",
-        reviewCount: "214",
+      {
+        "@type": "Review",
+        author: { "@type": "Person", name: "Rahul S." },
+        datePublished: "2025-11-22",
+        reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
+        reviewBody: "My cat had watery eyes and I panicked at night. The vet explained everything clearly.",
+        name: "Quick and professional online vet consultation",
       },
-      review: [
-        {
-          "@type": "Review",
-          author: { "@type": "Person", name: "Priya M." },
-          datePublished: "2025-12-10",
-          reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-          reviewBody: "My dog started vomiting at midnight. SnoutiQ connected me to a vet in under 5 minutes. The doctor was calm, thorough and gave very clear advice. Saved us a stressful emergency clinic visit.",
-          name: "Excellent midnight emergency support",
-        },
-        {
-          "@type": "Review",
-          author: { "@type": "Person", name: "Rahul S." },
-          datePublished: "2025-11-22",
-          reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-          reviewBody: "My cat had watery eyes and I panicked at night. The online vet consultation on SnoutiQ was super easy to book. The vet explained everything clearly and even followed up the next day.",
-          name: "Quick and professional online vet consultation",
-        },
-        {
-          "@type": "Review",
-          author: { "@type": "Person", name: "Ananya K." },
-          datePublished: "2026-01-05",
-          reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-          reviewBody: "Used SnoutiQ for my Labrador puppy who wasn't eating. The vet was very experienced and the video quality was excellent. ₹399 is so worth it compared to clinic charges.",
-          name: "Best online vet in India – highly recommend",
-        },
-        {
-          "@type": "Review",
-          author: { "@type": "Person", name: "Deepa R." },
-          datePublished: "2025-10-18",
-          reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" },
-          reviewBody: "Really impressed by how prepared the vet was before the call. They had already reviewed my dog's photo and symptoms. The follow up came on WhatsApp within minutes. Brilliant service.",
-          name: "Vet was fully prepared before the video call",
-        },
-        {
-          "@type": "Review",
-          author: { "@type": "Person", name: "Vikram T." },
-          datePublished: "2026-02-01",
-          reviewRating: { "@type": "Rating", ratingValue: "4", bestRating: "5" },
-          reviewBody: "Good experience overall. The vet was knowledgeable and the wait time was around 10 minutes which is great for a Sunday night. Would definitely use again for non-emergency advice.",
-          name: "Reliable 24/7 vet service across India",
-        },
-      ],
-    }),
-    []
-  );
+    ],
+  }), []);
 
-  const productSchema = useMemo(
-    () => ({
-      "@context": "https://schema.org",
-      "@type": "Product",
-      name: "Online Vet Consultation – SnoutiQ",
-      description: "Talk to a licensed veterinarian online in India via WhatsApp video call within 15 minutes and receive personalized care guidance with clear follow-up care guidance.",
-      url: CANONICAL,
-      brand: { "@type": "Brand", name: "SnoutiQ" },
-      offers: [
-        {
-          "@type": "Offer",
-          name: "Day Consultation",
-          priceCurrency: "INR",
-          price: "399",
-          priceValidUntil: "2026-12-31",
-          availability: "https://schema.org/InStock",
-          url: CANONICAL,
-          description: "Online vet consultation during 8AM–10PM IST",
-        },
-        {
-          "@type": "Offer",
-          name: "Night Consultation",
-          priceCurrency: "INR",
-          price: "499",
-          priceValidUntil: "2026-12-31",
-          availability: "https://schema.org/InStock",
-          url: CANONICAL,
-          description: "Emergency online vet consultation during 10PM–8AM IST",
-        },
-      ],
-      aggregateRating: {
-        "@type": "AggregateRating",
-        ratingValue: "4.8",
-        bestRating: "5",
-        worstRating: "1",
-        ratingCount: "214",
-        reviewCount: "214",
-      },
-    }),
-    []
-  );
+  const productSchema = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: "Online Vet Consultation – SnoutiQ",
+    description: "Talk to a licensed veterinarian online in India via WhatsApp video call within 15 minutes.",
+    url: CANONICAL,
+    brand: { "@type": "Brand", name: "SnoutiQ" },
+    offers: [
+      { "@type": "Offer", name: "Day Consultation", priceCurrency: "INR", price: "399", availability: "https://schema.org/InStock", url: CANONICAL },
+      { "@type": "Offer", name: "Night Consultation", priceCurrency: "INR", price: "499", availability: "https://schema.org/InStock", url: CANONICAL },
+    ],
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "4.8",
+      bestRating: "5",
+      worstRating: "1",
+      ratingCount: "214",
+      reviewCount: "214",
+    },
+  }), []);
 
   // --- State ----------------------------------------------------------------
   const [details, setDetails] = useState({
-    ownerName: "",
-    ownerMobile: "",
-    city: "",
-    name: "",
-    type: null,
-    breed: "",
-    petDob: "",
-    gender: "",
-    problemText: "",
-    mood: "calm",
-    petDoc2: "",
-    exoticType: "",
-    lastDaysEnergy: "",
-    lastDaysAppetite: "",
-    hasPhoto: false,
-    isNeutered: "",
-    vaccinatedYesNo: "",
-    dewormingYesNo: "",
-    weightKg: "",
+    ownerName: "", ownerMobile: "", city: "", name: "", type: null, breed: "",
+    petDob: "", gender: "", problemText: "", mood: "calm", petDoc2: "",
+    exoticType: "", lastDaysEnergy: "", lastDaysAppetite: "", hasPhoto: false,
+    isNeutered: "", vaccinatedYesNo: "", dewormingYesNo: "", weightKg: "",
   });
 
   const [uploadFile, setUploadFile] = useState(null);
@@ -701,49 +616,58 @@ export default function VideoConsultLP() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [breedDropdownOpen]);
+  useEffect(() => {
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        setShowStickyCta(false); // form visible → sticky hide
+      } else {
+        setShowStickyCta(true); // form screen se bahar → sticky show
+      }
+    },
+    {
+      threshold: 0.2,
+    }
+  );
+
+  if (consultFormRef.current) {
+    observer.observe(consultFormRef.current);
+  }
+
+  return () => {
+    if (consultFormRef.current) {
+      observer.unobserve(consultFormRef.current);
+    }
+  };
+}, []);
 
   useEffect(() => {
     let active = true;
     const abortController = new AbortController();
     let idleHandle = null;
-
     const fetchLiveStatus = async () => {
       try {
         const baseUrl = apiBaseUrl();
-        const res = await fetch(`${baseUrl}/api/doctors/availability-status`, {
-          method: "GET",
-          signal: abortController.signal,
-        });
+        const res = await fetch(`${baseUrl}/api/doctors/availability-status`, { method: "GET", signal: abortController.signal });
         const data = await res.json();
         if (!active) return;
-
         const onlineFromCounts = Number.isFinite(data?.counts?.online_doctors) ? data.counts.online_doctors : null;
         const onlineFromList = Array.isArray(data?.online_doctors) ? data.online_doctors.length : null;
-        const onlineValue = onlineFromCounts !== null ? onlineFromCounts : onlineFromList;
-
-        setLiveDoctorCount(onlineValue);
-      } catch {
-        if (active) setLiveDoctorCount(null);
-      }
+        setLiveDoctorCount(onlineFromCounts !== null ? onlineFromCounts : onlineFromList);
+      } catch { if (active) setLiveDoctorCount(null); }
     };
-
     const runDeferredFetch = () => { void fetchLiveStatus(); };
-
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
       idleHandle = window.requestIdleCallback(runDeferredFetch, { timeout: 1200 });
     } else {
       idleHandle = window.setTimeout(runDeferredFetch, 350);
     }
-
     return () => {
       active = false;
       abortController.abort();
       if (typeof window !== "undefined") {
-        if ("cancelIdleCallback" in window && idleHandle !== null) {
-          window.cancelIdleCallback(idleHandle);
-        } else if (idleHandle !== null) {
-          window.clearTimeout(idleHandle);
-        }
+        if ("cancelIdleCallback" in window && idleHandle !== null) window.cancelIdleCallback(idleHandle);
+        else if (idleHandle !== null) window.clearTimeout(idleHandle);
       }
     };
   }, []);
@@ -751,46 +675,27 @@ export default function VideoConsultLP() {
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-
     const loadFeaturedVets = async () => {
       setVetsLoading(true);
       setVetsError("");
-
       try {
         const base = apiBaseUrl().replace(/\/+$/, "");
-        const res = await fetch(`${base}${DOCTOR_LIST_ENDPOINT}`, {
-          method: "GET",
-          signal: controller.signal,
-        });
+        const res = await fetch(`${base}${DOCTOR_LIST_ENDPOINT}`, { method: "GET", signal: controller.signal });
         const data = await res.json();
         if (!active) return;
-
         const assetRoot = getAssetRoot();
         const flattened = [];
-
         (data?.data || []).forEach((entry) => {
-          (entry?.doctors || []).forEach((doctor) => {
-            if (!doctor) return;
-            flattened.push({
-              ...doctor,
-              clinic_name: entry?.name || "",
-            });
-          });
+          (entry?.doctors || []).forEach((doctor) => { if (!doctor) return; flattened.push({ ...doctor, clinic_name: entry?.name || "" }); });
         });
-
-        const cleaned = flattened.filter(
-          (doc) => doc?.doctor_name || doc?.doctor_email || doc?.doctor_mobile
-        );
-
+        const cleaned = flattened.filter((doc) => doc?.doctor_name || doc?.doctor_email || doc?.doctor_mobile);
         const prioritized = [...cleaned].sort((a, b) => {
           const aIsShashank = isDrShashankVet(a?.doctor_name);
           const bIsShashank = isDrShashankVet(b?.doctor_name);
-
           if (aIsShashank && !bIsShashank) return -1;
           if (!aIsShashank && bIsShashank) return 1;
           return 0;
         });
-
         const topFour = prioritized.slice(0, 4).map((doc) => ({
           id: doc?.id,
           doctor_id: doc?.doctor_id || doc?.id,
@@ -811,47 +716,33 @@ export default function VideoConsultLP() {
           image: resolveDoctorImage(doc, assetRoot),
           raw: doc,
         }));
-
         setFeaturedVets(topFour);
       } catch (error) {
-        if (error?.name !== "AbortError") {
-          setVetsError("Could not load doctors right now.");
-        }
+        if (error?.name !== "AbortError") setVetsError("Could not load doctors right now.");
       } finally {
         if (active) setVetsLoading(false);
       }
     };
-
     loadFeaturedVets();
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
+    return () => { active = false; controller.abort(); };
   }, []);
 
   useEffect(() => {
     const abortController = new AbortController();
-
     const fetchDogBreeds = async () => {
-      setBreedError("");
-      setLoadingBreeds(true);
+      setBreedError(""); setLoadingBreeds(true);
       try {
         const baseUrl = apiBaseUrl();
         const res = await fetch(`${baseUrl}/api/dog-breeds/all`, { method: "GET", signal: abortController.signal });
         const data = await res.json();
-
         if (data?.status === "success" && data?.breeds) {
           const list = [];
           Object.keys(data.breeds).forEach((breedKey) => {
             const subBreeds = data.breeds[breedKey];
-            if (!subBreeds || subBreeds.length === 0) {
+            if (!subBreeds || subBreeds.length === 0) list.push({ label: formatBreedName(breedKey), value: breedKey });
+            else {
               list.push({ label: formatBreedName(breedKey), value: breedKey });
-            } else {
-              list.push({ label: formatBreedName(breedKey), value: breedKey });
-              subBreeds.forEach((sub) => {
-                list.push({ label: formatBreedName(breedKey, sub), value: `${breedKey}/${sub}` });
-              });
+              subBreeds.forEach((sub) => list.push({ label: formatBreedName(breedKey, sub), value: `${breedKey}/${sub}` }));
             }
           });
           list.sort((a, b) => a.label.localeCompare(b.label));
@@ -859,81 +750,50 @@ export default function VideoConsultLP() {
           setDogBreeds(list);
         } else {
           setDogBreeds([{ label: "Mixed Breed", value: "mixed_breed" }, { label: "Other", value: "other" }]);
-          setBreedError("Could not load breeds (using defaults).");
         }
       } catch (error) {
         if (error?.name === "AbortError") return;
         setDogBreeds([{ label: "Mixed Breed", value: "mixed_breed" }, { label: "Other", value: "other" }]);
-        setBreedError("Network error while loading breeds.");
-      } finally {
-        setLoadingBreeds(false);
-      }
+      } finally { setLoadingBreeds(false); }
     };
-
     const fetchCatBreeds = async () => {
-      setBreedError("");
-      setLoadingBreeds(true);
+      setBreedError(""); setLoadingBreeds(true);
       try {
         const baseUrl = apiBaseUrl();
         const res = await fetch(`${baseUrl}/api/cat-breeds/with-indian`, { method: "GET", signal: abortController.signal });
         const data = await res.json();
-
         if (data?.success && Array.isArray(data?.data)) {
-          const list = data.data
-            .map((breed) => ({ label: breed?.name || breed?.id || "Unknown", value: breed?.name || breed?.id || "unknown" }))
-            .filter((item) => item.label);
+          const list = data.data.map((breed) => ({ label: breed?.name || breed?.id || "Unknown", value: breed?.name || breed?.id || "unknown" })).filter((item) => item.label);
           list.sort((a, b) => a.label.localeCompare(b.label));
           list.push({ label: "Mixed / Other", value: "other" });
           setCatBreeds(list);
-        } else {
-          setCatBreeds([{ label: "Mixed / Other", value: "other" }]);
-          setBreedError("Could not load cat breeds (using defaults).");
-        }
+        } else { setCatBreeds([{ label: "Mixed / Other", value: "other" }]); }
       } catch (error) {
         if (error?.name === "AbortError") return;
         setCatBreeds([{ label: "Mixed / Other", value: "other" }]);
-        setBreedError("Network error while loading cat breeds.");
-      } finally {
-        setLoadingBreeds(false);
-      }
+      } finally { setLoadingBreeds(false); }
     };
-
     const activeType = leadForm.petType || details.type;
-
     if (activeType === "dog") fetchDogBreeds();
     else if (activeType === "cat") fetchCatBreeds();
-    else {
-      setBreedError("");
-      setLoadingBreeds(false);
-    }
-
+    else { setBreedError(""); setLoadingBreeds(false); }
     if (activeType !== "dog") setDogBreeds([]);
     if (activeType !== "cat") setCatBreeds([]);
-
-    setBreedSearch("");
-    setBreedDropdownOpen(false);
-
+    setBreedSearch(""); setBreedDropdownOpen(false);
     if (activeType === "exotic") {
       setDetails((p) => ({ ...p, breed: "" }));
-      setLeadForm((prev) =>
-        prev.breed ? { ...prev, breed: "" } : prev
-      );
+      setLeadForm((prev) => prev.breed ? { ...prev, breed: "" } : prev);
     } else {
       setDetails((p) => ({ ...p, exoticType: "" }));
-      setLeadForm((prev) =>
-        prev.exoticType ? { ...prev, exoticType: "" } : prev
-      );
+      setLeadForm((prev) => prev.exoticType ? { ...prev, exoticType: "" } : prev);
     }
-
     return () => { abortController.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [details.type, leadForm.petType]);
 
   useEffect(() => {
     return () => {
-      if (uploadPreviewUrl) {
-        try { URL.revokeObjectURL(uploadPreviewUrl); } catch {}
-      }
+      if (uploadPreviewUrl) { try { URL.revokeObjectURL(uploadPreviewUrl); } catch {} }
     };
   }, [uploadPreviewUrl]);
 
@@ -943,271 +803,23 @@ export default function VideoConsultLP() {
     return [];
   }, [details.type, dogBreeds, catBreeds]);
 
-  const filteredBreedOptions = useMemo(() => {
-    const term = breedSearch.trim().toLowerCase();
-    if (!term) return breedOptions;
-    const filtered = breedOptions.filter((b) => String(b?.label || "").toLowerCase().includes(term));
-    if (details.breed && !filtered.some((b) => b.value === details.breed)) {
-      const selected = breedOptions.find((b) => b.value === details.breed);
-      if (selected) return [selected, ...filtered];
-    }
-    return filtered;
-  }, [breedOptions, breedSearch, details.breed]);
-
-  const selectedBreedLabel = useMemo(() => {
-    if (!details.breed) return "";
-    return breedOptions.find((b) => b.value === details.breed)?.label || "";
-  }, [details.breed, breedOptions]);
-
   const showBreed = details.type === "dog" || details.type === "cat";
   const isExotic = details.type === "exotic";
-  const approxAge = useMemo(() => calcAgeFromDob(details.petDob), [details.petDob]);
-
-  const uploadKind = useMemo(() => {
-    if (!uploadFile?.type) return "file";
-    if (uploadFile.type.startsWith("image/")) return "image";
-    if (uploadFile.type === "application/pdf") return "pdf";
-    return "file";
-  }, [uploadFile]);
-
-  const uploadIcon = useMemo(() => {
-    if (uploadKind === "image") return <ImageIcon className="w-4 h-4" />;
-    return <FileText className="w-4 h-4" />;
-  }, [uploadKind]);
-
-  const uploadLabel = useMemo(() => {
-    if (uploadKind === "image") return "Image";
-    if (uploadKind === "pdf") return "PDF";
-    return "File";
-  }, [uploadKind]);
 
   const applyUploadFile = useCallback(async (file) => {
     if (!file) return;
-
-    if (uploadPreviewUrl) {
-      try { URL.revokeObjectURL(uploadPreviewUrl); } catch {}
-    }
-
+    if (uploadPreviewUrl) { try { URL.revokeObjectURL(uploadPreviewUrl); } catch {} }
     const lowerName = file.name?.toLowerCase() || "";
     const isVideo = file.type?.startsWith("video/") || /\.(mp4|mov|avi|mkv|webm)$/i.test(lowerName);
-    if (isVideo) {
-      alert("Video uploads are not supported. Please upload a photo or PDF.");
-      return;
-    }
-
+    if (isVideo) { alert("Video uploads are not supported. Please upload a photo or PDF."); return; }
     const isImage = file.type?.startsWith("image/");
     const isPdf = file.type === "application/pdf" || lowerName.endsWith(".pdf");
-    if (!isImage && !isPdf) {
-      alert("Please upload a JPG, PNG, or PDF file.");
-      return;
-    }
-
-    if (isImage) {
-      const url = URL.createObjectURL(file);
-      setUploadPreviewUrl(url);
-    } else {
-      setUploadPreviewUrl("");
-    }
-
+    if (!isImage && !isPdf) { alert("Please upload a JPG, PNG, or PDF file."); return; }
+    if (isImage) { const url = URL.createObjectURL(file); setUploadPreviewUrl(url); } else { setUploadPreviewUrl(""); }
     setUploadFile(file);
     setDetails((prev) => ({ ...prev, hasPhoto: true }));
     setUploadMeta({ name: file.name, size: file.size, type: file.type, compressedSize: null });
   }, [uploadPreviewUrl]);
-
-  const handlePhotoUpload = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    await applyUploadFile(f);
-    e.target.value = "";
-  };
-
-  const handleDrop = async (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const f = e.dataTransfer?.files?.[0];
-    if (!f) return;
-    await applyUploadFile(f);
-  };
-
-  const handleDragOver = (e) => e.preventDefault();
-  const handleDragEnter = (e) => { e.preventDefault(); setIsDragging(true); };
-  const handleDragLeave = () => setIsDragging(false);
-
-  const step1Valid =
-    details.ownerName.trim().length > 0 &&
-    ownerPhoneDigits.length === 10 &&
-    details.city.trim().length > 1;
-
-  const step2Valid =
-    details.name.trim().length > 0 &&
-    details.type !== null &&
-    details.petDob &&
-    details.gender &&
-    (!showBreed || details.breed) &&
-    (!isExotic || details.exoticType.trim().length > 0);
-
-  const step3Valid =
-    details.problemText.trim().length > 10 &&
-    details.lastDaysEnergy &&
-    details.lastDaysAppetite &&
-    details.mood &&
-    details.hasPhoto &&
-    !!uploadFile;
-
-  const isValidAll = step1Valid && step2Valid && step3Valid;
-
-  const getSubmitTooltip = () => {
-    if (!details.ownerName.trim()) return "Please enter owner name";
-    if (ownerPhoneDigits.length !== 10) return "Please enter 10-digit mobile number";
-    if (!details.city.trim()) return "Please enter city name";
-    if (!details.name.trim()) return "Please enter your pet's name";
-    if (!details.type) return "Please select pet type";
-    if (!details.gender) return "Please select pet gender";
-    if (isExotic && !details.exoticType.trim()) return "Please specify your exotic pet type";
-    if (showBreed && !details.breed) return "Please select breed";
-    if (!details.petDob) return "Please select pet's date of birth";
-    if (details.problemText.trim().length <= 10) return "Please describe the problem in detail (minimum 10 characters)";
-    if (!details.lastDaysEnergy) return "Please select energy level";
-    if (!details.lastDaysAppetite) return "Please select appetite level";
-    if (!details.mood) return "Please select mood";
-    if (!details.hasPhoto || !uploadFile) return "Please upload a photo or PDF";
-    return "";
-  };
-
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-
-  const submitObservation = async () => {
-    setSubmitError("");
-
-    if (!isValidAll) {
-      setSubmitError(getSubmitTooltip() || "Please complete all fields.");
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      let fileToSend = uploadFile;
-
-      if (uploadFile?.type?.startsWith("image/")) {
-        const compressed = await compressImageFile(uploadFile, { maxWidth: 1280, maxHeight: 1280, quality: 0.72, outputMime: "image/jpeg" });
-        fileToSend = compressed;
-        setUploadMeta((prev) => (prev ? { ...prev, compressedSize: compressed?.size ?? null } : prev));
-      }
-
-      const fd = new FormData();
-      fd.append("name", details.ownerName);
-      fd.append("phone", formatPhone(details.ownerMobile));
-      fd.append("city", details.city.trim());
-      fd.append("type", details.type || "");
-      fd.append("dob", details.petDob || "");
-      fd.append("pet_name", details.name || "");
-      if (details.weightKg !== "") fd.append("weight", details.weightKg);
-      fd.append("gender", details.gender || "");
-
-      const breedValue = details.type === "exotic" ? details.exoticType.trim() : details.breed || "";
-      fd.append("breed", breedValue);
-      fd.append("reported_symptom", details.problemText || "");
-      fd.append("appetite", details.lastDaysAppetite || "");
-      fd.append("energy", details.lastDaysEnergy || "");
-      fd.append("mood", details.mood || "calm");
-      const fixedVet = PRIMARY_FIXED_VET;
-      const fixedDoctorId = fixedVet.doctor_id;
-      const fixedClinicId = fixedVet.clinic_id || fixedVet.vet_registeration_id;
-      fd.append("doctor_id", String(fixedDoctorId));
-      fd.append("assigned_doctor_id", String(fixedDoctorId));
-      fd.append("vet_registeration_id", String(fixedClinicId));
-      fd.append("clinic_id", String(fixedClinicId));
-
-      if (details.isNeutered !== "") fd.append("is_neutered", details.isNeutered);
-      if (details.vaccinatedYesNo !== "") fd.append("vaccenated_yes_no", details.vaccinatedYesNo);
-      if (details.dewormingYesNo !== "") fd.append("deworming_yes_no", details.dewormingYesNo);
-      if (details.petDoc2?.trim()) fd.append("pet_doc2", details.petDoc2.trim());
-      if (fileToSend) fd.append("file", fileToSend);
-
-      const baseUrl = apiBaseUrl();
-      const res = await fetch(`${baseUrl}/api/user-pet-observation`, { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || "Failed to submit observation");
-
-      const observation = data?.data ?? data ?? {};
-      const userId = toNumber(pickValue(observation?.user_id, observation?.userId, observation?.user?.id, data?.user_id, data?.userId, data?.user?.id, data?.data?.user_id, data?.data?.userId, data?.data?.user?.id));
-      const petId = toNumber(pickValue(observation?.pet_id, observation?.petId, observation?.pet?.id, data?.pet_id, data?.petId, data?.pet?.id, data?.data?.pet_id, data?.data?.petId, data?.data?.pet?.id));
-
-      const nextPayload = { ...details, observation, observationResponse: data, user_id: userId, pet_id: petId };
-
-      const gstRate = 0.18;
-      const baseAmount = round2(Math.max(consultAmount, 0));
-      const discountAmount = round2(Math.min(100, baseAmount));
-      const taxableAmount = round2(Math.max(baseAmount - discountAmount, 0));
-      const gstAmountBeforeDiscount = round2(baseAmount * gstRate);
-      const gstAmount = round2(taxableAmount * gstRate);
-      const totalBeforeDiscount = round2(baseAmount + gstAmountBeforeDiscount);
-      const total = round2(taxableAmount + gstAmount);
-
-      const shashankVet =
-        featuredVets.find((vet) => isDrShashankVet(vet?.name || vet?.doctor_name)) ||
-        PRIMARY_FIXED_VET;
-
-      const paymentDoctorId = PRIMARY_FIXED_VET.doctor_id;
-      const paymentClinicId = PRIMARY_FIXED_VET.clinic_id || PRIMARY_FIXED_VET.vet_registeration_id;
-
-      const paymentMeta = {
-        order_type: "excell_export_campaign",
-        service_id: "consult_basic",
-        doctor_id: paymentDoctorId,
-        clinic_id: paymentClinicId,
-        vet_registeration_id: paymentClinicId,
-        booking_rate_type: rateType,
-        slot_label: slotLabel,
-        user_id: userId,
-        pet_id: petId,
-        consultation_amount_inr: baseAmount,
-        taxable_amount_inr: taxableAmount,
-        gst_amount_inr: gstAmount,
-        taxable_amount_before_discount_inr: baseAmount,
-        gst_amount_before_discount_inr: gstAmountBeforeDiscount,
-        service_charge_inr: 0,
-        first_user_offer_applied: discountAmount > 0 ? 1 : 0,
-        offer_discount_inr: discountAmount,
-        original_amount_inr: totalBeforeDiscount,
-        final_amount_inr: total,
-      };
-
-      const paymentVet = {
-        ...PRIMARY_FIXED_VET,
-        ...shashankVet,
-        id: PRIMARY_FIXED_VET.doctor_id,
-        doctor_id: PRIMARY_FIXED_VET.doctor_id,
-        clinic_id: paymentClinicId,
-        vet_registeration_id: paymentClinicId,
-        name: "Dr. Shashannk Goyal",
-        doctor_name: "Dr Shashannk Goyal",
-        bookingRateType: rateType,
-        bookingPrice: consultAmount,
-        priceDay: PAYMENT_AMOUNTS.day,
-        priceNight: PAYMENT_AMOUNTS.night,
-        image: shashankVet?.image || PRIMARY_FIXED_VET.image || "",
-        raw: {
-          ...(PRIMARY_FIXED_VET.raw || {}),
-          ...(shashankVet?.raw || {}),
-          id: PRIMARY_FIXED_VET.doctor_id,
-          doctor_id: PRIMARY_FIXED_VET.doctor_id,
-          vet_registeration_id: paymentClinicId,
-          doctor_name: "Dr Shashannk Goyal",
-        },
-      };
-
-      navigate(`${VIDEO_CONSULT_BASE_ROUTE}/payment`, {
-        state: { petDetails: nextPayload, paymentMeta, vet: paymentVet },
-      });
-    } catch (e) {
-      setSubmitError(e?.message || "Something went wrong. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const getPetTypeIcon = (type) => {
     switch (type) {
@@ -1217,6 +829,11 @@ export default function VideoConsultLP() {
       default: return <PawPrint size={20} />;
     }
   };
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [showStickyCta, setShowStickyCta] = useState(false);
+const consultFormRef = useRef(null);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -1240,275 +857,111 @@ export default function VideoConsultLP() {
         <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
       </Helmet>
 
-      <LPNavbar
-        consultPath={CONSULT_DETAILS_ROUTE}
-        onConsultClick={scrollToConsultForm}
-      />
-
-      {/* -- LIVE STATUS BAR ----------------------------------------------- */}
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200 py-2 px-4">
-        <p className="text-xs font-bold text-green-700 flex items-center justify-center gap-2 flex-wrap">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            {liveDoctorCount === null
-              ? "Checking vets online…"
-              : `${liveDoctorCount} ${liveDoctorCount === 1 ? "vet is" : "vets are"} online right now`}
-          </span>
-          <span className="text-green-400">·</span>
-          <span>Average wait: 15 minutes</span>
-          <span className="text-green-400">·</span>
-          <span>Available 24/7 · All India</span>
-        </p>
-      </div>
+      <LPNavbar consultPath={CONSULT_DETAILS_ROUTE} onConsultClick={scrollToConsultForm} />
 
       <main className="flex-1 pb-24 md:pb-0">
-        {/* -- HERO + FORM --------------------------------------------------- */}
-        <section className="relative overflow-hidden bg-gradient-to-b from-[#f0f7ff] to-white px-4 pt-8 pb-14 sm:px-6 lg:px-8">
+        {/* ── HERO + FORM: form is ALWAYS visible, no step 1 gate ── */}
+        <section className="relative overflow-hidden bg-gradient-to-b from-[#f0f7ff] to-white px-4 pt-6 pb-10 sm:px-6 lg:px-8">
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute top-0 right-0 h-72 w-72 rounded-full bg-brand/5 blur-3xl -translate-y-1/3 translate-x-1/4" />
             <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-orange-100/40 blur-2xl" />
           </div>
 
           <div className="relative max-w-6xl mx-auto">
-            <div className="flex justify-center mb-5">
-              <span className="inline-flex items-center gap-2 bg-white border border-brand/20 text-brand text-xs font-extrabold px-4 py-1.5 rounded-full shadow-sm">
-                <Zap className="h-3 w-3" />
-                Online Vet Consultation · All India · 24/7
-              </span>
-            </div>
 
-            <h1 className="text-[2.1rem] sm:text-[2.8rem] lg:text-[3.4rem] font-extrabold text-slate-900 leading-[1.1] text-center mb-3">
-              Talk to a Vet Online in 15 Minutes – Video Consultation 
+            <h1 className="text-[1.85rem] sm:text-[2.6rem] lg:text-[3.2rem] font-bold text-slate-800 leading-[1.1] text-center mb-3">
+              Talk to a Vet Online in 15 Minutes – Video Consultation
             </h1>
-
             <p className="text-slate-500 text-center text-base mb-7 max-w-3xl mx-auto leading-relaxed">
-              Speak to a licensed veterinarian online anywhere in India.
-              Instant video consultation for dogs and cats. Current {slotLabel.toLowerCase()} is
-              {" "}₹{formatInr(discountedConsultAmount)} after the ₹100 offer.
+               Speak to a licensed veterinarian online anywhere in India.
+               Instant video consultation for dogs and cats. Current {slotLabel.toLowerCase()} is
+               {" "}₹{formatInr(discountedConsultAmount)} after the ₹100 offer.
             </p>
-
-            <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
+            {/* ── Trust bar ABOVE headline ── */}
+            <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                Licensed vets
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />Licensed vets
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
-                <Clock className="h-3.5 w-3.5 text-emerald-500" />
-                Under 15 min
+                <Clock className="h-3.5 w-3.5 text-emerald-500" />Under 15 min
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
-                <Star className="h-3.5 w-3.5 text-amber-400" />
-                4.8★ from 200+ pet parents
+                <Star className="h-3.5 w-3.5 text-amber-400" />4.8★ · 200+ pet parents
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
-                <Globe className="h-3.5 w-3.5 text-brand" />
-                All India · {slotLabel}
+                <Globe className="h-3.5 w-3.5 text-brand" />All India · 24/7
               </span>
             </div>
 
-            <div id="consult-form" className="scroll-mt-28">
-              <div className="mx-auto max-w-3xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_32px_90px_-48px_rgba(15,23,42,0.4)]">
-                <div className="grid grid-cols-2 border-b border-slate-100 text-xs font-bold">
-                  {["Select issue", "Your details"].map((label, index) => {
-                    const stepNumber = index + 1;
-                    const isActive = leadStep === stepNumber;
-                    const isDone = leadStep > stepNumber;
-
-                    return (
-                      <div
-                        key={label}
-                        className={cn(
-                          "px-4 py-3 text-center transition-colors",
-                          isDone
-                            ? "bg-brand text-white"
-                            : isActive
-                            ? "border-b-2 border-brand bg-brand/10 text-brand"
-                            : "bg-white text-slate-400"
-                        )}
-                      >
-                        {stepNumber}. {label}
-                      </div>
-                    );
-                  })}
+            {/* ── DIRECT FORM — always shown, no issue-gate step ── */}
+            <div
+  id="consult-form"
+  ref={consultFormRef}
+  className="scroll-mt-20"
+>
+              <div className="mx-auto max-w-2xl overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_80px_-40px_rgba(15,23,42,0.35)]">
+                {/* Form header */}
+                <div className="bg-gradient-to-r from-brand/10 to-brand/5 border-b border-brand/10 px-5 py-3.5 flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white">
+                    <PawPrint className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-extrabold text-slate-900">Describe the issue?</p>
+                    <p className="text-xs text-slate-500">Takes 60 seconds · Vet calls within 15 min</p>
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Vets online
+                  </div>
                 </div>
 
-                <div className="p-4 sm:p-5">
-                  {leadStep === 1 ? (
-                    <div className="space-y-4">
-                      <div className="text-center">
-                        <h2 className="text-lg font-extrabold text-slate-900">
-                          What&apos;s the main issue?
-                        </h2>
-                        <p className="mt-1 text-sm text-slate-500">
-                          One tap to get started. We&apos;ll prefill the concern and
-                          move you to the short form.
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap justify-center gap-2.5">
-                        {PET_ISSUE_OPTIONS.map((issue) => (
-                          <button
-                            key={issue.label}
-                            type="button"
-                            onClick={() => handleLeadIssueSelect(issue.label)}
-                            className={cn(
-                              "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-all duration-200",
-                              selectedIssue === issue.label
-                                ? "border-brand bg-brand/10 text-brand"
-                                : "border-slate-200 bg-white text-slate-700 hover:border-brand/40 hover:bg-brand/5 hover:text-brand"
-                            )}
-                          >
-                            <span>{issue.emoji}</span>
-                            {issue.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <p className="text-center text-xs font-medium text-slate-400">
-                        Select one issue above to continue in 10 seconds.
-                      </p>
+                <div className="p-4 sm:p-5 space-y-4">
+              
+                  {/* Description */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      {/* Describe the issue <span className="text-red-500">*</span> */}
+                    </label>
+                    <textarea
+                      value={leadForm.description}
+                      onChange={(e) => { setLeadForm((p) => ({ ...p, description: e.target.value })); setLeadError(""); }}
+                      placeholder="Example: My dog has been vomiting since morning and is not eating..."
+                      rows={3}
+                      className={textareaBase}
+                    />
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Min 10 characters</span>
+                      <span className={leadForm.description.trim().length > 10 ? "font-semibold text-emerald-600" : "text-gray-400"}>
+                        {leadForm.description.trim().length}/10+
+                      </span>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <button
-                        type="button"
-                        onClick={() => setLeadStep(1)}
-                        className="text-xs font-semibold text-brand hover:underline"
-                      >
-                        ← Change selected issue
-                      </button>
+                  </div>
 
-                      <div className="flex items-center gap-2 rounded-2xl border border-brand/20 bg-brand/5 px-3 py-3 text-sm font-semibold text-brand">
-                        <span className="text-base">
-                          {PET_ISSUE_OPTIONS.find((issue) => issue.label === selectedIssue)?.emoji || "🐾"}
-                        </span>
-                        <span>Issue selected: {selectedIssue || "General concern"}</span>
-                        <CheckCircle2 className="ml-auto h-4 w-4" />
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700">
-                            Your Name <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <User size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                              type="text"
-                              value={leadForm.ownerName}
-                              onChange={(e) => {
-                                setLeadForm((prev) => ({ ...prev, ownerName: e.target.value }));
-                                setLeadError("");
-                              }}
-                              placeholder="Your full name"
-                              className={cn(fieldBase, "pl-12 md:pl-12")}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700">
-                            Pet Name <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative">
-                            <PawPrint size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                              type="text"
-                              value={leadForm.petName}
-                              onChange={(e) => {
-                                setLeadForm((prev) => ({ ...prev, petName: e.target.value }));
-                                setLeadError("");
-                              }}
-                              placeholder="Your pet's name"
-                              className={cn(fieldBase, "pl-12 md:pl-12")}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Pet Type <span className="text-red-500">*</span>
-                        </label>
-                        <div className="grid grid-cols-3 gap-3">
-                          {["dog", "cat", "exotic"].map((type) => (
-                            <button
-                              key={type}
-                              type="button"
-                              onClick={() => {
-                                setLeadForm((prev) => ({
-                                  ...prev,
-                                  petType: type,
-                                  breed: "",
-                                  exoticType: "",
-                                }));
-                                setLeadError("");
-                              }}
-                              className={cn(
-                                "rounded-2xl border-2 px-3 py-3 text-center text-sm font-bold capitalize transition-all",
-                                leadForm.petType === type
-                                  ? "border-brand bg-brand/5 text-brand"
-                                  : "border-slate-200 bg-slate-50 text-slate-500 hover:border-brand/30 hover:bg-brand/5"
-                              )}
-                            >
-                              <span className="mb-1 flex justify-center">
-                                {getPetTypeIcon(type)}
-                              </span>
-                              {type}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Brief Description <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          value={leadForm.description}
-                          onChange={(e) => {
-                            setLeadForm((prev) => ({ ...prev, description: e.target.value }));
-                            setLeadError("");
-                          }}
-                          placeholder="Example: My dog has been vomiting since morning and is eating less than usual..."
-                          rows={4}
-                          className={textareaBase}
-                        />
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-500">Minimum 10 characters</span>
-                          <span className={leadForm.description.trim().length > 10 ? "font-semibold text-emerald-600" : "text-gray-400"}>
-                            {leadForm.description.trim().length}/10+
-                          </span>
-                        </div>
-                      </div>
-
-                      {leadError ? (
-                        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
-                          <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
-                          <p className="text-sm">{leadError}</p>
-                        </div>
-                      ) : null}
-
-                      <button
-                        type="button"
-                        onClick={goToPetDetailsScreen}
-                        className="group w-full rounded-2xl bg-accent py-4 text-white shadow-lg shadow-orange-200/60 transition-all hover:bg-accent-hover active:scale-[0.99]"
-                      >
-                        <ConsultCtaLabel amount={consultAmount} prefixText="Continue" />
-                      </button>
-
-                      <p className="text-center text-xs text-slate-400">
-                        Full medical details, uploads, and payment open on the next screen.
-                      </p>
+                  {/* Error */}
+                  {leadError && (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-red-700">
+                      <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                      <p className="text-sm">{leadError}</p>
                     </div>
                   )}
+
+                  {/* ── GET STARTED CTA ── */}
+                  <button
+                    type="button"
+                    onClick={goToPetDetailsScreen}
+                    className="group w-full rounded-2xl bg-accent py-4 text-white shadow-lg shadow-orange-200/60 transition-all hover:bg-accent-hover active:scale-[0.99] text-base"
+                  >
+                    <GetStartedCtaLabel amount={consultAmount} />
+                  </button>
+
+                  {/* Micro trust row */}
+                  <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400 flex-wrap pt-0.5">
+                    <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-brand" />Secure payment</span>
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-brand" />Vet calls in 15 min</span>
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-brand" />No subscription</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="mt-5 flex items-center justify-center gap-5 text-xs text-slate-400 flex-wrap">
-              <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-brand" />Verified vets</span>
-              <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-brand" />Under 15 min wait</span>
-              <span className="flex items-center gap-1.5"><Star className="h-3.5 w-3.5 text-brand" />4.8★ from 200+ pet parents</span>
             </div>
           </div>
         </section>
@@ -1525,21 +978,16 @@ export default function VideoConsultLP() {
           </div>
         </section>
 
+        {/* REVIEWS */}
         <section className="bg-slate-50 px-4 py-10">
           <div className="mx-auto max-w-5xl">
-            <h2 className="text-center text-2xl font-extrabold text-slate-900">
-              What pet parents say
-            </h2>
+            <h2 className="text-center text-2xl font-extrabold text-slate-900">What pet parents say</h2>
             <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500">
-              Real feedback from families who needed quick guidance without the
-              stress of finding an emergency clinic first.
+              Real feedback from families who needed quick guidance without the stress of finding an emergency clinic.
             </p>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {HERO_REVIEW_CARDS.map((review) => (
-                <div
-                  key={review.name}
-                  className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
-                >
+                <div key={review.name} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-3 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 text-sm font-black text-brand">
                       {review.name.charAt(0)}
@@ -1547,11 +995,8 @@ export default function VideoConsultLP() {
                     <div>
                       <p className="text-sm font-bold text-slate-900">{review.name}</p>
                       <div className="flex items-center gap-0.5">
-                        {Array.from({ length: 5 }).map((_, index) => (
-                          <Star
-                            key={`${review.name}-${index}`}
-                            className="h-3.5 w-3.5 fill-amber-400 text-amber-400"
-                          />
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                         ))}
                       </div>
                     </div>
@@ -1590,28 +1035,24 @@ export default function VideoConsultLP() {
 
         {/* CTA BREAK */}
         <section className="px-4 py-6 bg-white">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-2xl mx-auto">
             <button type="button" onClick={scrollToConsultForm} className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white font-extrabold text-base py-4 rounded-2xl shadow-lg shadow-orange-200/50 transition-all">
-              <ConsultCtaLabel amount={consultAmount} />
+              <GetStartedCtaLabel amount={consultAmount} />
             </button>
           </div>
         </section>
 
-        {/* -- OUR LICENSED VETERINARIANS -------------------------------------- */}
+        {/* OUR VETS */}
         <section id="our-vets" className="py-14 px-4 bg-white scroll-mt-24">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-end justify-between gap-4 flex-wrap mb-8">
               <div>
                 <h2 className="text-2xl font-extrabold text-slate-900 mb-2 flex items-center gap-2">
-                  <PawPrint className="h-6 w-6 text-brand" />
-                  Our Licensed Veterinarians
+                  <PawPrint className="h-6 w-6 text-brand" />Our Licensed Veterinarians
                 </h2>
-                <p className="text-slate-500 text-sm">
-                  Verified doctors with experience across dogs, cats, and exotic pets.
-                </p>
+                <p className="text-slate-500 text-sm">Verified doctors with experience across dogs, cats, and exotic pets.</p>
               </div>
             </div>
-
             {vetsLoading ? (
               <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:overflow-visible md:mx-0 md:px-0">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -1620,82 +1061,54 @@ export default function VideoConsultLP() {
                     <div className="p-4 space-y-2">
                       <div className="h-4 bg-slate-100 rounded animate-pulse" />
                       <div className="h-3 bg-slate-100 rounded w-4/5 animate-pulse" />
-                      <div className="h-3 bg-slate-100 rounded w-2/3 animate-pulse" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : vetsError ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-                {vetsError}
-              </div>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">{vetsError}</div>
             ) : featuredVets.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                No vets available right now. Please check back soon.
-              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">No vets available right now. Please check back soon.</div>
             ) : (
               <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:overflow-visible md:mx-0 md:px-0">
                 {featuredVets.map((vet) => (
                   <div key={vet.id} className="min-w-[240px] snap-start rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm md:min-w-0">
                     <div className="h-40 bg-slate-100 relative">
                       {vet.image ? (
-                        <img
-                          src={vet.image}
-                          alt={vet.name}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                        />
+                        <img src={vet.image} alt={vet.name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
                       ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-slate-200 text-slate-600 text-xl font-bold">
-                          {getInitials(vet.name)}
-                        </div>
+                        <div className="h-full w-full flex items-center justify-center bg-slate-200 text-slate-600 text-xl font-bold">{getInitials(vet.name)}</div>
                       )}
                       {vet.rating ? (
                         <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-slate-700 shadow">
-                          <Star className="h-3.5 w-3.5 text-amber-400" />
-                          {vet.rating}
+                          <Star className="h-3.5 w-3.5 text-amber-400" />{vet.rating}
                         </span>
                       ) : null}
                     </div>
                     <div className="p-4 space-y-2">
                       <div>
                         <p className="text-sm font-extrabold text-slate-900">{vet.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {vet.degree || "Veterinary Doctor"}
-                          {vet.experience ? ` · ${vet.experience} yrs` : ""}
-                        </p>
+                        <p className="text-xs text-slate-500">{vet.degree || "Veterinary Doctor"}{vet.experience ? ` · ${vet.experience} yrs` : ""}</p>
                       </div>
-                      {vet.specialization ? (
-                        <p className="text-xs text-slate-600 line-clamp-2">
-                          {listToDisplayText(vet.specialization)}
-                        </p>
-                      ) : null}
+                      {vet.specialization ? <p className="text-xs text-slate-600 line-clamp-2">{listToDisplayText(vet.specialization)}</p> : null}
                       <div className="flex items-center justify-between text-xs text-slate-500">
                         <span>{vet.responseDay || "0-15 mins"}</span>
-                        <span>
-                          ₹{vet.dayRate || "399"} day · ₹{vet.nightRate || "499"} night
-                        </span>
+                        <span>₹{vet.dayRate || "399"} day · ₹{vet.nightRate || "499"} night</span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-
             <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                onClick={scrollToConsultForm}
-                className="w-full max-w-3xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
-              >
-                <ConsultCtaLabel amount={consultAmount} />
+              <button type="button" onClick={scrollToConsultForm} className="w-full max-w-2xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all">
+                <GetStartedCtaLabel amount={consultAmount} />
               </button>
             </div>
           </div>
         </section>
 
-        {/* -- TALK TO A VET FOR COMMON PET PROBLEMS --------------------------- */}
+        {/* COMMON PROBLEMS */}
         <section id="common-problems" className="py-14 px-4 bg-slate-50 scroll-mt-24">
           <div className="max-w-6xl mx-auto">
             <h2 className="text-2xl font-extrabold text-slate-900 mb-2">Talk to a Vet Online for Common Pet Problems</h2>
@@ -1725,13 +1138,12 @@ export default function VideoConsultLP() {
           </div>
         </section>
 
-        {/* -- ONLINE VET CONSULTATION ACROSS INDIA ---------------------------- */}
+        {/* ACROSS INDIA */}
         <section id="across-india" className="py-8 px-4 bg-slate-50 scroll-mt-24">
           <div className="max-w-6xl mx-auto">
             <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 p-6">
               <h2 className="text-xl font-extrabold text-slate-900 mb-1 flex items-center gap-2">
-                <Globe size={20} className="text-brand" />
-                Online Vet Consultation Across India
+                <Globe size={20} className="text-brand" />Online Vet Consultation Across India
               </h2>
               <p className="text-sm text-slate-700 mb-1">
                 <strong>Snoutiq provides online vet consultations across India including Delhi NCR, Mumbai, Bangalore, Hyderabad, Chennai, Pune, Kolkata, Ahmedabad and other cities.</strong>{" "}
@@ -1739,98 +1151,35 @@ export default function VideoConsultLP() {
               </p>
               <div className="flex flex-wrap gap-2 mt-4">
                 {["Delhi NCR", "Mumbai", "Bangalore", "Hyderabad", "Chennai", "Pune", "Kolkata", "Jaipur", "Lucknow"].map((city) => (
-                  <span key={city} className="inline-block border border-slate-300 rounded-full px-3 py-1 text-xs font-semibold text-slate-700 bg-white">
-                    {city}
-                  </span>
+                  <span key={city} className="inline-block border border-slate-300 rounded-full px-3 py-1 text-xs font-semibold text-slate-700 bg-white">{city}</span>
                 ))}
               </div>
             </div>
           </div>
         </section>
 
-        {/* -- WHY ONLINE VET CONSULTATION WORKS ------------------------------ */}
+        {/* WHY ONLINE VET */}
         <section className="py-14 px-4 bg-white">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-2xl font-extrabold text-slate-900 mb-8">Why online vet consultation works</h2>
             <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                <h3 className="font-extrabold text-slate-900 text-base mb-2 flex items-center gap-2">
-                  <span className="text-xl">✅</span> Benefits
-                </h3>
-                <p className="text-slate-600 text-sm leading-relaxed">
-                  Instant access from home, avoid travel stress for your pet, affordable follow-up care, and quick emergency triage. Perfect for minor illnesses, behaviour concerns, and post-op checks.
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                <h3 className="font-extrabold text-slate-900 text-base mb-2 flex items-center gap-2">
-                  <span className="text-xl">📡</span> When to use teleconsult
-                </h3>
-                <p className="text-slate-600 text-sm leading-relaxed">
-                  Vomiting, loose stools, skin issues, dietary advice, vaccination reminders, lethargy — if your pet is stable, a video call works. For severe breathing issues or trauma, visit a clinic.
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                <h3 className="font-extrabold text-slate-900 text-base mb-2 flex items-center gap-2">
-                  <span className="text-xl">📋</span> How consultation works
-                </h3>
-                <p className="text-slate-600 text-sm leading-relaxed">
-                  After the video exam, vets send a consultation summary, personalized care guidance, and follow-up care instructions via WhatsApp. Follow-up support is included if needed within 48 hrs.
-                </p>
-              </div>
+              {[
+                { icon: "✅", title: "Benefits", text: "Instant access from home, avoid travel stress for your pet, affordable follow-up care, and quick emergency triage. Perfect for minor illnesses, behaviour concerns, and post-op checks." },
+                { icon: "📡", title: "When to use teleconsult", text: "Vomiting, loose stools, skin issues, dietary advice, vaccination reminders, lethargy — if your pet is stable, a video call works. For severe breathing issues or trauma, visit a clinic." },
+                { icon: "📋", title: "How consultation works", text: "After the video exam, vets send a consultation summary, personalized care guidance, and follow-up care instructions via WhatsApp. Follow-up support is included if needed within 48 hrs." },
+              ].map((item) => (
+                <div key={item.title} className="bg-white rounded-2xl border border-slate-200 p-5">
+                  <h3 className="font-extrabold text-slate-900 text-base mb-2 flex items-center gap-2">
+                    <span className="text-xl">{item.icon}</span> {item.title}
+                  </h3>
+                  <p className="text-slate-600 text-sm leading-relaxed">{item.text}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* PRICING */}
-        <section id="pricing" className="py-14 px-4 bg-slate-50 scroll-mt-24">
-          <div className="max-w-6xl mx-auto">
-            <p className="text-xs font-extrabold text-brand text-center tracking-widest mb-2">PRICING</p>
-            <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-2">One flat fee. Everything included.</h2>
-            <p className="text-slate-500 text-sm text-center mb-8">No subscription. No extra charges for follow-up care.</p>
-            <div className="grid sm:grid-cols-2 gap-4 mb-5">
-              <div className="bg-white rounded-2xl border-2 border-brand p-5 relative shadow-lg shadow-brand/10">
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white text-[10px] font-extrabold px-3 py-1 rounded-full whitespace-nowrap">8 AM – 10 PM</span>
-                <p className="text-sm text-slate-500 font-semibold mt-1 mb-1">Day consult</p>
-                <p className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-4xl font-extrabold tracking-tight">
-                  <span className="text-slate-400 line-through">₹499</span>
-                  <span className="text-slate-500 text-2xl font-bold">- ₹100 =</span>
-                  <span className="text-orange-600">₹399</span>
-                </p>
-                <ul className="space-y-2 text-xs text-slate-600">
-                  {["Video / WhatsApp call with vet", "Vet reviews your case before calling", "WhatsApp follow-up care for 24 hours"].map((f) => (
-                    <li key={f} className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-brand shrink-0" />{f}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 relative">
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-extrabold px-3 py-1 rounded-full whitespace-nowrap">10 PM – 8 AM</span>
-                <p className="text-sm text-slate-500 font-semibold mt-1 mb-1">Night consult</p>
-                <p className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-4xl font-extrabold tracking-tight">
-                  <span className="text-slate-400 line-through">₹599</span>
-                  <span className="text-slate-500 text-2xl font-bold">- ₹100 =</span>
-                  <span className="text-orange-600">₹499</span>
-                </p>
-                <ul className="space-y-2 text-xs text-slate-600">
-                  {["Video / WhatsApp call with vet", "Vet reviews your case before calling", "WhatsApp follow-up care for 24 hours"].map((f) => (
-                    <li key={f} className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />{f}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            <p className="text-xs text-slate-400 text-center">Same quality vets. Same service. Night rate reflects 24/7 availability.</p>
-            <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                onClick={scrollToConsultForm}
-                className="w-full max-w-3xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
-              >
-                <ConsultCtaLabel amount={consultAmount} />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* -- FAQ ------------------------------------------------------------ */}
+        {/* FAQ */}
         <section id="faq" className="py-14 px-4 bg-white scroll-mt-24">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">Frequently Asked Questions</h2>
@@ -1849,47 +1198,20 @@ export default function VideoConsultLP() {
           </div>
         </section>
 
-        {/* -- EXPLORE MORE PET CARE -------------------------------------------- */}
-        {/* <section className="py-10 px-4 bg-white border-t border-slate-100">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-lg font-extrabold text-slate-900 mb-5">Explore more pet care</h2>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { emoji: "🐶", label: "Dog neutering", href: "/dog-neutering" },
-                { emoji: "🐱", label: "Cat neutering", href: "/cat-neutering" },
-                { emoji: "💉", label: "Puppy vaccination", href: "/puppy-vaccination" },
-                { emoji: "🐱", label: "Kitten vaccination", href: "/kitten-vaccination" },
-                { emoji: "📖", label: "Pet care blog", href: "/blog" },
-                { emoji: "🏥", label: "In-clinic near me", href: "/clinic" },
-              ].map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  className="inline-flex items-center gap-2 border border-slate-200 rounded-full px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:border-brand/40 hover:bg-brand/5 hover:text-brand transition-all duration-200"
-                >
-                  <span>{link.emoji}</span>
-                  {link.label}
-                </a>
-              ))}
-            </div>
-          </div>
-        </section> */}
-
         {/* FINAL CTA */}
         <section className="py-14 px-4 bg-slate-900 relative overflow-hidden">
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-brand/10 blur-3xl" />
             <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-accent/5 blur-3xl" />
           </div>
-          <div className="relative max-w-3xl mx-auto text-center">
+          <div className="relative max-w-2xl mx-auto text-center">
             <p className="text-3xl mb-3">🐾</p>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3 leading-tight">
-              Your pet needs you to act.<br />
-              <span className="text-brand">A vet is standing by.</span>
+              Your pet needs you to act.<br /><span className="text-brand">A vet is standing by.</span>
             </h2>
-            <p className="text-slate-400 text-sm mb-7">Fill in your pet&apos;s details, describe the issue, upload photo/PDF, and a vet calls you on WhatsApp within 15 minutes after payment with clear next-step care guidance.</p>
+            <p className="text-slate-400 text-sm mb-7">Fill in your pet's details, describe the issue, and a vet calls you on WhatsApp within 15 minutes after payment.</p>
             <button type="button" onClick={scrollToConsultForm} className="w-full bg-accent hover:bg-accent-hover text-white font-extrabold text-lg py-4 rounded-2xl shadow-xl shadow-orange-900/30 transition-all mb-3">
-              <ConsultCtaLabel amount={consultAmount} />
+              <GetStartedCtaLabel amount={consultAmount} />
             </button>
           </div>
         </section>
@@ -1900,18 +1222,25 @@ export default function VideoConsultLP() {
         <p className="text-xs text-slate-400 text-center">
           © {new Date().getFullYear()} SnoutIQ ·{" "}
           <a href="/" className="hover:text-brand font-semibold">Home</a> ·{" "}
-          <a href="/privacy-policy" className="hover:text-brand">Privacy Policy</a> ·{" "}
+          <a href="/privacy-policy" className="hover:text-brand">Privacy Policy</a>
         </p>
       </footer>
 
-      {/* Sticky Mobile CTA */}
-      <div className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-white/98 backdrop-blur-sm border-t border-slate-200 p-3 shadow-2xl">
-        <div className="flex gap-2.5 items-center max-w-lg mx-auto">
-          <button type="button" onClick={scrollToConsultForm} className="flex-1 bg-accent hover:bg-accent-hover text-white font-extrabold py-3.5 rounded-xl text-sm transition-colors">
-            <ConsultCtaLabel amount={consultAmount} />
-          </button>
-        </div>
-      </div>
+      {/* ── Sticky Mobile CTA — bigger tap target, clearer label ── */}
+      {showStickyCta && (
+  <div className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-white/98 backdrop-blur-sm border-t border-slate-200 px-4 py-3 shadow-2xl">
+    <button
+      type="button"
+      onClick={scrollToConsultForm}
+      className="w-full bg-accent hover:bg-accent-hover text-white font-extrabold py-4 rounded-xl text-base transition-colors shadow-lg shadow-orange-200/60"
+    >
+      <GetStartedCtaLabel amount={consultAmount} />
+    </button>
+    <p className="text-center text-[10px] text-slate-400 mt-1.5">
+      Vet calls you within 15 min · All India · 24/7
+    </p>
+  </div>
+)}
     </div>
   );
 }
@@ -1952,9 +1281,7 @@ export const VideoConsultPaymentPage = () => {
       <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md text-center rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
           <h2 className="text-lg font-extrabold text-slate-900">Payment link not ready</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Please start the consultation form again so we can generate your payment.
-          </p>
+          <p className="mt-2 text-sm text-slate-600">Please start the consultation form again so we can generate your payment.</p>
           <button
             type="button"
             onClick={() => navigate(`${VIDEO_CONSULT_BASE_ROUTE}/owner`, { replace: true })}
@@ -1973,15 +1300,13 @@ export const VideoConsultPaymentPage = () => {
       petDetails={petDetails}
       paymentMeta={paymentMeta}
       onBack={() => navigate(`${VIDEO_CONSULT_BASE_ROUTE}/problem`)}
-      onPay={(verify) =>
-        {
-          fireConversion();
-          navigate("/consultation-booked", {
-            replace: true,
-            state: { vet, verify, skipConversion: true },
-          });
-        }
-      }
+      onPay={(verify) => {
+        fireConversion();
+        navigate("/consultation-booked", {
+          replace: true,
+          state: { vet, verify, skipConversion: true },
+        });
+      }}
     />
   );
 };
@@ -1996,9 +1321,7 @@ export const VideoConsultThankYou = () => {
       <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md text-center rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
           <h2 className="text-lg font-extrabold text-slate-900">Booking details missing</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Please return to the consultation form to continue.
-          </p>
+          <p className="mt-2 text-sm text-slate-600">Please return to the consultation form to continue.</p>
           <div className="mt-5 flex flex-col gap-3">
             <button
               type="button"

@@ -460,7 +460,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     // ✅ NEW: gender (required)
     gender: "",
     problemText: routePrefill?.problemText || "",
-    mood: "calm",
+    mood: "",
     petDoc2: "",
     exoticType: routePrefill?.exoticType || "",
     lastDaysEnergy: "",
@@ -1006,9 +1006,9 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     (!showBreed || details.breed) &&
     (!isExotic || details.exoticType.trim().length > 0) &&
     details.problemText.trim().length > 10 &&
-    details.lastDaysEnergy &&
-    details.lastDaysAppetite &&
-    details.mood &&
+    details.isNeutered !== "" &&
+    details.vaccinatedYesNo !== "" &&
+    details.dewormingYesNo !== "" &&
     details.hasPhoto &&
     !!uploadFile;
 
@@ -1027,9 +1027,9 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
     if (!details.petDob) return "Please select pet's date of birth";
     if (details.problemText.trim().length <= 10)
       return "Please describe the problem in detail (minimum 10 characters)";
-    if (!details.lastDaysEnergy) return "Please select energy level";
-    if (!details.lastDaysAppetite) return "Please select appetite level";
-    if (!details.mood) return "Please select mood";
+    if (details.isNeutered === "") return "Please select neutered status";
+    if (details.vaccinatedYesNo === "") return "Please select vaccination status";
+    if (details.dewormingYesNo === "") return "Please select deworming status";
     if (!details.hasPhoto || !uploadFile) return "Please upload a photo or PDF";
     return "";
   };
@@ -1077,9 +1077,15 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
       fd.append("breed", breedValue);
 
       fd.append("reported_symptom", details.problemText || "");
-      fd.append("appetite", details.lastDaysAppetite || "");
-      fd.append("energy", details.lastDaysEnergy || "");
-      fd.append("mood", details.mood || "calm");
+      if (details.lastDaysAppetite) {
+        fd.append("appetite", details.lastDaysAppetite);
+      }
+      if (details.lastDaysEnergy) {
+        fd.append("energy", details.lastDaysEnergy);
+      }
+      if (details.mood) {
+        fd.append("mood", details.mood);
+      }
       if (details.isNeutered !== "") {
         fd.append("is_neutered", details.isNeutered);
       }
@@ -1906,7 +1912,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Is your pet neutered?
+                            Is your pet neutered? <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
                             <CheckCircle2
@@ -1936,7 +1942,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
 
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Vaccinated?
+                            Vaccinated? <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
                             <Shield
@@ -1966,7 +1972,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
 
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Deworming done recently?
+                            Deworming done recently? <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
                             <Activity
@@ -2064,7 +2070,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
                       <div className="grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Energy Level <span className="text-red-500">*</span>
+                            Energy Level
                           </label>
                           <div className="relative">
                             <Activity
@@ -2094,7 +2100,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
 
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Appetite <span className="text-red-500">*</span>
+                            Appetite
                           </label>
                           <div className="relative">
                             <Coffee
@@ -2124,7 +2130,7 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
 
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-gray-700">
-                            Mood <span className="text-red-500">*</span>
+                            Mood
                           </label>
                           <div className="relative">
                             <Heart
@@ -2743,8 +2749,3 @@ const PetDetailsScreen = ({ onSubmit, vet }) => {
 };
 
 export default PetDetailsScreen;
-
-
-
-
-
