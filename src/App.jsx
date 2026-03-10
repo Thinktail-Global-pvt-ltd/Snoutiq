@@ -1,12 +1,14 @@
 import React, { lazy, Suspense, useEffect } from "react";
 import {
   BrowserRouter as Router,
-  Routes,
   Route,
-  Navigate,
+  Routes,
   useLocation,
 } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
+
+const HOME_PATH = "/";
+const NON_HOME_PRELOAD_EVENTS = ["pointerdown", "keydown", "touchstart"];
 
 const ScrollToTopAndHash = () => {
   const { pathname, hash } = useLocation();
@@ -30,260 +32,55 @@ const ScrollToTopAndHash = () => {
   return null;
 };
 
-// ✅ Core / Call pages (were direct imports)
-const CallLab = lazy(() => import("./pages/CallLab"));
-const DoctorReceiver = lazy(() => import("./pages/DoctorReceiver"));
-const Uiapp = lazy(() => import("./screen/Uiapp"));
-// ✅ Public pages
-const PrivacyPolicy = lazy(() => import("./policies/PrivacyPolicy"));
-const TearmsCondition = lazy(() => import("./policies/TearmsCondition"));
-const Cancelation = lazy(() => import("./policies/Cancelation"));
-const CookiePolicy = lazy(() => import("./policies/CookiePolicy"));
-const MedicalDataConsent = lazy(() => import("./policies/MedicalDataConsent"));
-const ShippingPolicy = lazy(() => import("./policies/ShippingPolicy"));
-
-// ✅ App pages
-const DoctorDashboard = lazy(() => import("./pages/DoctorDashboard"));
-const CallTestPage = lazy(() => import("./pages/CallTestPage"));
-const CallRecordingDemo = lazy(() => import("./pages/CallRecordingDemo"));
-const PatientCallTest = lazy(() => import("./pages/PatientCallTest"));
-const DoctorReceiverTest = lazy(() => import("./pages/DoctorReceiverTest"));
-const Home = lazy(() => import("./pages/Home"));
-const Support = lazy(() => import("./pages/Support"));
-const NotFoundPage = lazy(() => import("./components/NotFoundPage"));
-const S3UploadTest = lazy(() => import("./pages/S3UploadTest"));
-const CsvUploadPage = lazy(() => import("./pages/CsvUploadPage"));
-const InternalUserDeletePage = lazy(() => import("./pages/InternalUserDeletePage"));
-const Auth = lazy(() => import("./pages/Auth"));
-const VetDashboard = lazy(() => import("./pages/VetDashboard"));
-const VetRegisterSuccess = lazy(() => import("./pages/VetRegisterSuccess"));
-
-// ✅ Blog (were direct imports — heavy)
-const Blog = lazy(() => import("./blog/Blog"));
-const DogWinterCareGuide = lazy(() => import("./blog/DogWinterCareGuide"));
-const TickFeverGuide = lazy(() => import("./blog/TickFeverGuide"));
-const PetPawProtecteGuide = lazy(() => import("./blog/PetPawProtecteGuide"));
-const FirstAidEvery = lazy(() => import("./blog/FirstAidEvery"));
-const BoostYourDog = lazy(() => import("./blog/BoostYourDog"));
-const VaccinationSchedule = lazy(() => import("./blog/VaccinationSchedule"));
-const BestFoodForDog = lazy(() => import("./blog/BestFoodForDog"));
-const HowVetsGrow = lazy(() => import("./blog/HowVetsGrow"));
-const RegisterAsAnOnlineVet = lazy(() => import("./blog/RegisterAsAnOnlineVet"));
-const OnlineVetConsultation = lazy(() => import("./blog/OnlineVetConsultation"));
-const VetsIncreaseMonthlyRevenue = lazy(() =>
-  import("./blog/VetsIncreaseMonthlyRevenue")
-);
-const TopFriendlyDogBreeds = lazy(() => import("./blog/TopFriendlyDogBreeds"));
-const BestCatBreedsInIndia = lazy(() => import("./blog/BestCatBreedsInIndia"));
-const CatVaccinationScheduleIndia = lazy(() =>
-  import("./blog/CatVaccinationScheduleIndia")
-);
-const CatsDiseasesAndSymptoms = lazy(() =>
-  import("./blog/CatsDiseasesAndSymptoms")
-);
-const BestCatFoodInIndia = lazy(() => import("./blog/BestCatFoodInIndia"));
-const FoodsGoldenRetrieversShouldNeverEat = lazy(() =>
-  import("./blog/FoodsGoldenRetrieversShouldNeverEat")
-);
-const BestDogFoodForGoldenRetrievers = lazy(() =>
-  import("./blog/BestDogFoodForGoldenRetrievers")
-);
-const GoldenRetrieverVaccinationScheduleIndia = lazy(() =>
-  import("./blog/GoldenRetrieverVaccinationScheduleIndia")
-);
-const WhyWinterGroomingIsImportantForCats = lazy(() =>
-  import("./blog/WhyWinterGroomingIsImportantForCats")
+const LoadingScreen = () => (
+  <div className="flex h-screen items-center justify-center">
+    <div className="h-14 w-14 animate-spin rounded-full border-4 border-slate-200 border-t-brand" />
+  </div>
 );
 
-// ✅ Other pages/components that were direct imports
-const DelhiPage = lazy(() => import("./pages/DelhiPage"));
-const GurugramPage = lazy(() => import("./pages/GurugramPage"));
-const ClinicsSolutionPage = lazy(() => import("./pages/ClinicsSolutionPage"));
-const AITriagePage = lazy(() => import("./pages/AITriagePage"));
+const loadHomePage = () => import("./newflow/HomePage");
+const loadAppRoutes = () => import("./AppRoutes");
 
-const HomePage = lazy(() => import("./components/Home"));
-const DoctorRegistration = lazy(() => import("./components/DoctorRegistration"));
-const ConsultationBooked = lazy(() => import("./pages/ConsultationBooked"));
-const HomePage1 = lazy(() => import("./newflow/HomePage"));
-const NewAbout = lazy(()=> import("./newflow/NewAbout"));
-const NewCounsult = lazy(() => import("./newflow/NewCounsult"));
-const NewClinics = lazy(() => import("./newflow/NewClinics"));
-const NewVets = lazy(() => import("./newflow/NewVets"));
-const NewVideoConsultation = lazy(() => import("./newflow/NewVideoConsultationLP"));
-const VideoConsultLP = lazy(() => import("./newflow/VideoConsultLP"));
-const VideoConsultPaymentPage = lazy(() =>
-  import("./newflow/VideoConsultLP").then((m) => ({
-    default: m.VideoConsultPaymentPage,
-  }))
-);
-const SymptomsHub = lazy(() => import("./newflow/SymptomsHub"));
-const PuppyVaccinationDelhi = lazy(() => import("./newflow/PuppyVaccinationDelhi"));
-const KittenVaccinationDelhi = lazy(() => import("./newflow/KittenVaccinationDelhi"));
-const DogNeuteringDelhi = lazy(() => import("./newflow/DogNeuteringDelhi"));
-const CatNeuteringDelhi = lazy(() => import("./newflow/CatNeuteringDelhi"));
-const VaccinationLP = lazy(() => import("./newflow/VaccinationLP"));
-const NeuteringLP = lazy(() => import("./newflow/NeuteringLP"));
-const VetInsightsHub = lazy(() => import("./newflow/VetInsightsHub"));
-const DrSharmaInterview = lazy(() => import("./newflow/DrSharmaInterview"));
-const DogVomitingPage = lazy(() => import("./newflow/DogVomitingPage"));
+if (typeof window !== "undefined") {
+  if (window.location.pathname === HOME_PATH) {
+    void loadHomePage();
+
+    const preloadAppRoutes = () => {
+      NON_HOME_PRELOAD_EVENTS.forEach((eventName) => {
+        window.removeEventListener(eventName, preloadAppRoutes);
+      });
+      void loadAppRoutes();
+    };
+
+    NON_HOME_PRELOAD_EVENTS.forEach((eventName) => {
+      window.addEventListener(eventName, preloadAppRoutes, {
+        once: true,
+        passive: true,
+      });
+    });
+  } else {
+    void loadAppRoutes();
+  }
+}
+
+const HomePage = lazy(loadHomePage);
+const AppRoutes = lazy(loadAppRoutes);
 
 function App() {
   return (
     <Router>
       <ScrollToTopAndHash />
 
-      <Suspense
-          fallback={
-            <div className="flex items-center justify-center h-screen">
-              <div className="h-14 w-14 rounded-full border-4 border-slate-200 border-t-brand animate-spin" />
-            </div>
-          }
-        >
-          <Routes>
-            <Route element={<MainLayout />}>
-            {/* Home page - will redirect authenticated users to dashboard */}
-            <Route path="/" element={<HomePage1 />} />
-              <Route path="/about" element={<NewAbout />} />
-                <Route path="/parents" element={<NewCounsult />} />
-                <Route path="/clinics" element={<NewClinics />} />
-                <Route path="/vets" element={<NewVets />} />
-                <Route path="/veterinary-doctor-online-india" element={<NewVideoConsultation />} />
-                <Route path="/online-vet-consultation/payment" element={<VideoConsultPaymentPage />} />
-                <Route
-                  path="/online-vet-consultation/thank-you"
-                  element={<Navigate to="/consultation-booked" replace />}
-                />
-                <Route path="/online-vet-consultation/:view" element={<VideoConsultLP />} />
-                <Route path="/online-vet-consultation" element={<VideoConsultLP />} />
-                <Route path="/symptoms" element={<SymptomsHub />} />
-                <Route path="/puppy-vaccination-delhi" element={<PuppyVaccinationDelhi />} />
-                <Route path="/kitten-vaccination-delhi" element={<KittenVaccinationDelhi />} />
-                <Route path="/dog-neutering-delhi" element={<DogNeuteringDelhi />} />
-                <Route path="/cat-neutering-delhi" element={<CatNeuteringDelhi />} />
-                <Route path="/lp/vaccination" element={<VaccinationLP />} />
-                <Route path="/lp/neutering" element={<NeuteringLP />} />
-                <Route path="/vet-insights" element={<VetInsightsHub />} />
-                <Route path="/vet-insights/interview-dr-sharma-emergency-care" element={<DrSharmaInterview />} />
-                <Route path="/dog-vomiting-treatment-india" element={<DogVomitingPage />} />
-
-            <Route path="/20+vetsonline" element={<HomePage />} />
-            <Route path="/consult" element={<HomePage />} />
-            <Route path="/whychooseteleconsult" element={<HomePage />} />
-            <Route path="/howwework" element={<HomePage />} />
-            <Route path="/commitment" element={<HomePage />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/vet-register-success" element={<VetRegisterSuccess />} />
-            <Route path="/vet-dashboard" element={<VetDashboard />} />
-             <Route path="/veterinary-practice-software" element={<Home />} />
-            {/* <Route
-              path="/register-pet-details"
-              element={<RegisterPetOwner />}
-            /> */}
-            {/* <Route path="/pet-data-register" element={<RegisterPetOwner />} /> */}
-            {/* Policy pages (public) */}
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TearmsCondition />} />
-            <Route path="/cancellation-policy" element={<Cancelation />} />
-            <Route path="/cookie-policy" element={<CookiePolicy />} />
-            <Route path="/vetclinic-register" element={<DoctorRegistration />} />
-            <Route
-              path="/medical-data-consent"
-              element={<MedicalDataConsent />}
-            />
-
-            <Route path="/shipping-policy" element={<ShippingPolicy />} />
-            <Route
-              path="/consultation-booked"
-              element={<ConsultationBooked />}
-            />
-            <Route path="/404" element={<NotFoundPage />} />
-            {/* <Route path="/patient-dashboard" element={<PatientDashboard />} /> */}
-            {/* <Route
-              path="/doctor-dashboard"
-              element={<DoctorDashboard doctorId={501} />}
-            /> */}
-            <Route path="/patient-call-test" element={<PatientCallTest />} />
-            <Route path="/doctor-receiver-test" element={<DoctorReceiverTest />} />
-            <Route path="/call-lab" element={<CallLab />} />
-            <Route path="/doctor-receiver" element={<DoctorReceiver />} />
-            <Route path="/UI-test" element={<Uiapp />} />
-            {/* Multiple doctor routes if needed */}
-            <Route
-              path="/doctor-dashboard/:doctorId"
-              element={
-                <DoctorDashboard
-                  doctorId={
-                    parseInt(window.location.pathname.split("/")[2]) || 501
-                  }
-                />
-              }
-            />
-            {/* Protected Routes - require authentication */}
-            <Route path="/call-demo" element={<CallRecordingDemo />} />
-            <Route path="/csv-upload" element={<CsvUploadPage />} />
-            <Route path="/s3-upload-test" element={<S3UploadTest />} />
-            <Route
-              path="/__ops/company-user-archive-r4k9d2x"
-              element={<InternalUserDeletePage />}
-            />
-            <Route path="/blog" element={<Blog />} />
-            <Route
-              path="/blog/dog-winter-care-guide"
-              element={<DogWinterCareGuide />}
-            />
-             <Route
-              path="/blog/online-vet-consultation"
-              element={<OnlineVetConsultation />}
-            />
-             <Route
-              path="/blog/register-as-an-online-vet"
-              element={<RegisterAsAnOnlineVet />}
-            />
-              <Route
-              path="/blog/online-vet-consultation"
-              element={<OnlineVetConsultation />}
-            />
-            <Route
-              path="/blog/symptoms-of-tick-fever-in-dogs"
-              element={<TickFeverGuide />}
-            />
-             <Route
-              path="/blog/Vets-Increase-Monthly-Revenue"
-              element={<VetsIncreaseMonthlyRevenue />}
-            />
-            
-            <Route
-              path="/blog/protecting-pet-paws-in-winter-tips-guide"
-              element={<PetPawProtecteGuide />}
-            />
-            <Route path="/blog/first-aid-tips-every-pet-parent-should-know" element={<FirstAidEvery/>}/>
-            <Route path="/blog/boost-your-dogs-immunity-naturally" element={<BoostYourDog/>}/>
-            <Route path="/blog/vaccination-schedule-for-pets-in-india" element={<VaccinationSchedule/>}/>
-            <Route path="/blog/best-food-for-dogs-in-winter" element={<BestFoodForDog/>}/>
-            <Route path="/blog/how-vets-grow-with-online-consultations" element={<HowVetsGrow/>}/>
-            <Route path="/blog/top-friendly-dog-breeds-in-india" element={<TopFriendlyDogBreeds/>}/>
-            <Route path="/blog/best-cat-breeds-in-india" element={<BestCatBreedsInIndia/>}/>
-            <Route path="/blog/cat-vaccination-schedule-india" element={<CatVaccinationScheduleIndia/>}/>
-            <Route path="/blog/cats-diseases-and-symptoms" element={<CatsDiseasesAndSymptoms/>}/>
-            <Route path="/blog/best-cat-food-in-india" element={<BestCatFoodInIndia/>}/>
-            <Route path="/blog/foods-golden-retrievers-should-never-eat" element={<FoodsGoldenRetrieversShouldNeverEat/>}/>
-            <Route path="/blog/best-dog-food-for-golden-retrievers" element={<BestDogFoodForGoldenRetrievers/>}/>
-            <Route path="/blog/golden-retriever-vaccination-schedule-india" element={<GoldenRetrieverVaccinationScheduleIndia/>}/>
-            <Route path="/blog/why-winter-grooming-is-important-for-cats" element={<WhyWinterGroomingIsImportantForCats/>}/>
-            {/* <Route path="/pricing" element={<PricingPage />} /> */}
-            <Route path="/delhi" element={<DelhiPage />} />
-            <Route path="/gurugram" element={<GurugramPage />} />
-            <Route path="/clinics-solution" element={<ClinicsSolutionPage />} />
-            {/* <Route path="/features" element={<FeaturesPage />} /> */}
-            {/* <Route path="/video-consult" element={<VideoConsultPage />} /> */}
-            {/* <Route path="/ai-triage" element={<AITriagePage />} /> */}
-            <Route path="*" element={<NotFoundPage />} />
-            </Route>
-          </Routes>
-        </Suspense>
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route element={<MainLayout />}>
+            <Route path={HOME_PATH} element={<HomePage />} />
+            <Route path="*" element={<AppRoutes />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </Router>
   );
 }
 
 export default App;
-

@@ -7,6 +7,14 @@ body {
   background: #fff;
   color: #0f172a;
 }
+
+@supports (content-visibility: auto) {
+  main[data-home-page] > section:nth-of-type(n + 3) {
+    content-visibility: auto;
+    contain-intrinsic-size: 900px;
+  }
+}
+
 /* Smooth fade-in animation for messages */
 @keyframes fadeIn {
   from {

@@ -613,6 +613,12 @@ function pe() {
 }
 function Ie() {
   const [a, t] = k.useState(te),
+    [showDeferredSections, setShowDeferredSections] = k.useState(!1),
+    [showHeroPanel, setShowHeroPanel] = k.useState(() =>
+      typeof window === "undefined"
+        ? !0
+        : window.matchMedia("(min-width: 1024px)").matches,
+    ),
     { amount, finalAmount, label, rateType } = getCurrentPrice(),
     consultPriceText = `₹${formatInr(finalAmount)}`,
     originalPriceText = `₹${formatInr(amount)}`,
@@ -730,6 +736,61 @@ function Ie() {
       };
     }, []),
     k.useEffect(() => {
+      if (showHeroPanel && showDeferredSections) return;
+      if (typeof window === "undefined") return;
+
+      let s = !1;
+      let r = null;
+      let n = null;
+      const o = ["scroll", "touchstart", "pointerdown"];
+
+      const x = () => {
+        o.forEach((i) => {
+          window.removeEventListener(i, d);
+        });
+      };
+
+      const d = () => {
+        if (s) return;
+        s = !0;
+        x();
+
+        if ("cancelIdleCallback" in window && r !== null) {
+          window.cancelIdleCallback(r);
+        } else if (n !== null) {
+          window.clearTimeout(n);
+        }
+
+        k.startTransition(() => {
+          setShowHeroPanel(!0);
+          setShowDeferredSections(!0);
+        });
+      };
+
+      o.forEach((i) => {
+        window.addEventListener(i, d, {
+          once: !0,
+          passive: !0,
+        });
+      });
+
+      if ("requestIdleCallback" in window) {
+        r = window.requestIdleCallback(d, { timeout: 900 });
+      } else {
+        n = window.setTimeout(d, 450);
+      }
+
+      return () => {
+        x();
+        if ("cancelIdleCallback" in window && r !== null) {
+          window.cancelIdleCallback(r);
+        } else if (n !== null) {
+          window.clearTimeout(n);
+        }
+      };
+    }, [showDeferredSections, showHeroPanel]),
+    k.useEffect(() => {
+      if (!showDeferredSections) return;
       const s = document.querySelector("[data-stats-section]");
       let r = !1,
         n;
@@ -812,12 +873,13 @@ function Ie() {
             }));
         }
       );
-    }, []),
+    }, [showDeferredSections]),
     e.jsxs("div", {
       className: "flex min-h-screen flex-col bg-white", 
       children: [
         e.jsx(Q, { consultPath: "/20+vetsonline?start=details" }),
         e.jsxs("main", {
+          "data-home-page": !0,
           className: "flex-1",
           children: [
             e.jsx("section", {
@@ -976,94 +1038,99 @@ function Ie() {
                         }),
                       ],
                     }),
-                    e.jsxs("div", {
-                      className: "relative",
-                      children: [
-                        e.jsx("div", {
-                          className:
-                            "absolute inset-0 rounded-3xl bg-gradient-to-br from-brand/10 to-transparent blur-2xl scale-95",
-                        }),
-                        e.jsxs("div", {
-                          className:
-                            "relative space-y-4 rounded-3xl border border-slate-100 bg-white/80 p-5 shadow-2xl shadow-slate-200/60 backdrop-blur sm:p-6",
+                    showHeroPanel
+                      ? e.jsxs("div", {
+                          className: "relative",
                           children: [
+                            e.jsx("div", {
+                              className:
+                                "absolute inset-0 rounded-3xl bg-gradient-to-br from-brand/10 to-transparent blur-2xl scale-95",
+                            }),
                             e.jsxs("div", {
                               className:
-                                "flex items-center gap-3 pb-4 border-b border-slate-100",
+                                "relative space-y-4 rounded-3xl border border-slate-100 bg-white/80 p-5 shadow-2xl shadow-slate-200/60 backdrop-blur sm:p-6",
                               children: [
-                                e.jsx("div", {
+                                e.jsxs("div", {
                                   className:
-                                    "h-10 w-10 rounded-2xl bg-brand flex items-center justify-center",
-                                  children: e.jsx("span", {
-                                    className: "text-white font-black text-sm",
-                                    children: "S",
-                                  }),
-                                }),
-                                e.jsxs("div", {
+                                    "flex items-center gap-3 pb-4 border-b border-slate-100",
                                   children: [
-                                    e.jsx("p", {
+                                    e.jsx("div", {
                                       className:
-                                        "font-bold text-slate-900 text-sm",
-                                      children: "SnoutIQ Pet App",
+                                        "h-10 w-10 rounded-2xl bg-brand flex items-center justify-center",
+                                      children: e.jsx("span", {
+                                        className: "text-white font-black text-sm",
+                                        children: "S",
+                                      }),
                                     }),
-                                    e.jsx("p", {
-                                      className: "text-xs text-slate-400",
-                                      children:
-                                        "All your pet's healthcare, one place",
+                                    e.jsxs("div", {
+                                      children: [
+                                        e.jsx("p", {
+                                          className:
+                                            "font-bold text-slate-900 text-sm",
+                                          children: "SnoutIQ Pet App",
+                                        }),
+                                        e.jsx("p", {
+                                          className: "text-xs text-slate-400",
+                                          children:
+                                            "All your pet's healthcare, one place",
+                                        }),
+                                      ],
+                                    }),
+                                    e.jsxs("div", {
+                                      className: "ml-auto flex gap-1",
+                                      children: [
+                                        e.jsx("span", {
+                                          className:
+                                            "h-2.5 w-2.5 rounded-full bg-red-400",
+                                        }),
+                                        e.jsx("span", {
+                                          className:
+                                            "h-2.5 w-2.5 rounded-full bg-yellow-400",
+                                        }),
+                                        e.jsx("span", {
+                                          className:
+                                            "h-2.5 w-2.5 rounded-full bg-green-400",
+                                        }),
+                                      ],
                                     }),
                                   ],
                                 }),
-                                e.jsxs("div", {
-                                  className: "ml-auto flex gap-1",
-                                  children: [
-                                    e.jsx("span", {
-                                      className:
-                                        "h-2.5 w-2.5 rounded-full bg-red-400",
-                                    }),
-                                    e.jsx("span", {
-                                      className:
-                                        "h-2.5 w-2.5 rounded-full bg-yellow-400",
-                                    }),
-                                    e.jsx("span", {
-                                      className:
-                                        "h-2.5 w-2.5 rounded-full bg-green-400",
-                                    }),
-                                  ],
+                                e.jsx(S, {
+                                  icon: _,
+                                  title: "Instant Tele-Consult",
+                                  desc: "Video call a qualified vet anywhere in India. Under 5 min wait, 24/7.",
+                                  tag: "All India",
+                                }),
+                                e.jsx(S, {
+                                  icon: Y,
+                                  title: "Find Clinics Near You",
+                                  desc: "GPS-powered search for verified vet clinics across Delhi NCR.",
+                                  tag: "Delhi NCR",
+                                }),
+                                e.jsx(S, {
+                                  icon: X,
+                                  title: "Online Appointments",
+                                  desc: "Book, reschedule, and get reminders - no phone tag with reception.",
+                                }),
+                                e.jsx(S, {
+                                  icon: R,
+                                  title: "Digital Health Records",
+                                  desc: "Vaccination history, reminders, and reports - always accessible.",
                                 }),
                               ],
                             }),
-                            e.jsx(S, {
-                              icon: _,
-                              title: "Instant Tele-Consult",
-                              desc: "Video call a qualified vet anywhere in India. Under 5 min wait, 24/7.",
-                              tag: "All India",
-                            }),
-                            e.jsx(S, {
-                              icon: Y,
-                              title: "Find Clinics Near You",
-                              desc: "GPS-powered search for verified vet clinics across Delhi NCR.",
-                              tag: "Delhi NCR",
-                            }),
-                            e.jsx(S, {
-                              icon: X,
-                              title: "Online Appointments",
-                              desc: "Book, reschedule, and get reminders - no phone tag with reception.",
-                            }),
-                            e.jsx(S, {
-                              icon: R,
-                              title: "Digital Health Records",
-                              desc: "Vaccination history, reminders, and reports - always accessible.",
-                            }),
                           ],
-                        }),
-                      ],
-                    }),
+                        })
+                      : null,
                   ],
                 }),
               }),
             }),
-            e.jsx(pe, {}),
-            e.jsx("section", {
+            showDeferredSections
+              ? e.jsxs(k.Fragment, {
+                  children: [
+                    e.jsx(pe, {}),
+                    e.jsx("section", {
               className: "bg-slate-50 py-16 sm:py-20",
               children: e.jsxs("div", {
                 className: "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8",
@@ -1668,7 +1735,7 @@ function Ie() {
                 ],
               }),
             }),
-            e.jsxs("section", {
+                    e.jsxs("section", {
               className: "relative overflow-hidden bg-brand py-14 sm:py-16",
               children: [
                 e.jsxs("div", {
@@ -1732,10 +1799,13 @@ function Ie() {
                   ],
                 }),
               ],
-            }),
+                    }),
+                  ],
+                })
+              : null,
           ],
         }),
-        e.jsx(G, {}),
+        showDeferredSections ? e.jsx(G, {}) : null,
       ],
     })
   );
