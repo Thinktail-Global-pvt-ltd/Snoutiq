@@ -2,12 +2,20 @@
 
 namespace App\Services;
 
+use App\Models\WhatsAppNotification;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
+use Throwable;
 
 class WhatsAppService
 {
+    private const STATUS_SENT = 'sent';
+    private const STATUS_FAILED = 'failed';
+
+    private static ?bool $notificationTableExists = null;
+
     public function __construct(
         private readonly ?string $phoneNumberId,
         private readonly ?string $accessToken,
@@ -113,6 +121,15 @@ class WhatsAppService
     private function dispatch(array $payload, bool $returnResponse = false): array
     {
         if (!$this->isConfigured()) {
+            $this->storeDispatchLog(
+                $payload,
+                self::STATUS_FAILED,
+                null,
+                null,
+                'WhatsApp credentials missing',
+                null,
+                null
+            );
             throw new RuntimeException('WhatsApp credentials missing');
         }
 
@@ -120,29 +137,159 @@ class WhatsAppService
             ->acceptJson()
             ->post("https://graph.facebook.com/v22.0/{$this->phoneNumberId}/messages", $payload);
 
+        $responseBody = $response->body();
+        $responseJson = $response->json();
+        $responsePayload = is_array($responseJson) ? $responseJson : null;
+
         if (!$response->successful()) {
-            $body = $response->json();
-            $errorMessage = data_get($body, 'error.message') ?? $response->body();
-            $errorDetails = data_get($body, 'error.error_data.details') ?? null;
+            $errorMessage = data_get($responsePayload, 'error.message') ?? $responseBody;
+            $errorDetails = data_get($responsePayload, 'error.error_data.details') ?? null;
+
+            $errorDetailsText = null;
+            if (is_string($errorDetails)) {
+                $errorDetailsText = $errorDetails;
+            } elseif ($errorDetails !== null) {
+                $encoded = json_encode($errorDetails);
+                $errorDetailsText = $encoded === false ? null : $encoded;
+            }
 
             Log::error('whatsapp.send.failed', [
                 'status' => $response->status(),
-                'body' => $response->body(),
+                'body' => $responseBody,
                 'error_message' => $errorMessage,
-                'error_details' => $errorDetails,
+                'error_details' => $errorDetailsText,
             ]);
 
             $message = 'Failed to send WhatsApp message';
             if ($errorMessage) {
                 $message .= ': ' . $errorMessage;
             }
-            if ($errorDetails) {
-                $message .= ' (' . $errorDetails . ')';
+            if ($errorDetailsText) {
+                $message .= ' (' . $errorDetailsText . ')';
             }
+
+            $this->storeDispatchLog(
+                $payload,
+                self::STATUS_FAILED,
+                $response->status(),
+                $responsePayload,
+                is_string($errorMessage) ? $errorMessage : (string) $errorMessage,
+                $errorDetailsText,
+                $responseBody
+            );
 
             throw new RuntimeException($message);
         }
 
-        return $returnResponse ? $response->json() : [];
+        $this->storeDispatchLog(
+            $payload,
+            self::STATUS_SENT,
+            $response->status(),
+            $responsePayload,
+            null,
+            null,
+            $responseBody
+        );
+
+        return $returnResponse ? ($responsePayload ?? []) : [];
+    }
+
+    private function storeDispatchLog(
+        array $payload,
+        string $status,
+        ?int $httpStatus,
+        ?array $responsePayload,
+        ?string $errorMessage,
+        ?string $errorDetails,
+        ?string $responseBody
+    ): void {
+        if (! $this->canPersistNotificationLogs()) {
+            return;
+        }
+
+        [$source, $sourceFile, $sourceLine] = $this->resolveDispatchSource();
+        $template = is_array($payload['template'] ?? null) ? $payload['template'] : [];
+        $templateName = is_string($template['name'] ?? null) ? $template['name'] : null;
+        $languageCode = data_get($template, 'language.code');
+
+        try {
+            WhatsAppNotification::query()->create([
+                'recipient' => is_string($payload['to'] ?? null) ? $payload['to'] : null,
+                'message_type' => is_string($payload['type'] ?? null) ? $payload['type'] : null,
+                'template_name' => $this->truncate($templateName, 120),
+                'language_code' => is_string($languageCode) ? $this->truncate($languageCode, 32) : null,
+                'status' => $status,
+                'http_status' => $httpStatus,
+                'provider_message_id' => $this->truncate(
+                    is_string(data_get($responsePayload, 'messages.0.id'))
+                        ? data_get($responsePayload, 'messages.0.id')
+                        : null,
+                    191
+                ),
+                'payload' => $payload,
+                'response_payload' => $responsePayload,
+                'response_body' => $responseBody,
+                'error_message' => $errorMessage,
+                'error_details' => $errorDetails,
+                'source' => $this->truncate($source, 255),
+                'source_file' => $this->truncate($sourceFile, 255),
+                'source_line' => $sourceLine,
+                'sent_at' => $status === self::STATUS_SENT ? now() : null,
+            ]);
+        } catch (Throwable $e) {
+            Log::warning('whatsapp.notification.persist_failed', [
+                'error' => $e->getMessage(),
+                'status' => $status,
+                'to' => $payload['to'] ?? null,
+            ]);
+        }
+    }
+
+    private function canPersistNotificationLogs(): bool
+    {
+        if (self::$notificationTableExists !== null) {
+            return self::$notificationTableExists;
+        }
+
+        try {
+            self::$notificationTableExists = Schema::hasTable((new WhatsAppNotification())->getTable());
+        } catch (Throwable $e) {
+            self::$notificationTableExists = false;
+            Log::warning('whatsapp.notification.table_check_failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return self::$notificationTableExists;
+    }
+
+    private function resolveDispatchSource(): array
+    {
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 30);
+
+        foreach ($trace as $frame) {
+            $class = $frame['class'] ?? null;
+            if (! is_string($class) || $class === self::class) {
+                continue;
+            }
+
+            $function = is_string($frame['function'] ?? null) ? $frame['function'] : 'unknown';
+            $source = $class . '@' . $function;
+            $file = isset($frame['file']) && is_string($frame['file']) ? $frame['file'] : null;
+            $line = isset($frame['line']) ? (int) $frame['line'] : null;
+
+            return [$source, $file, $line];
+        }
+
+        return [null, null, null];
+    }
+
+    private function truncate(?string $value, int $length): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        return substr($value, 0, $length);
     }
 }
