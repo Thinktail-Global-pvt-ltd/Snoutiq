@@ -9,6 +9,8 @@ class WhatsAppNotification extends Model
 {
     use HasFactory;
 
+    protected $table = 'whatsapp_notifications';
+
     protected $fillable = [
         'recipient',
         'message_type',
