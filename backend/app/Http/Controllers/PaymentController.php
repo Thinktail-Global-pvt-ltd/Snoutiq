@@ -113,25 +113,10 @@ class PaymentController extends Controller
                 amountInInr: $amountInInr
             );
 
-            // Fire WhatsApp notification only for video consult orders (best-effort)
+            // WhatsApp for video consult is intentionally deferred to payment verify success.
             $whatsAppMeta = null;
             $vetWhatsAppMeta = null;
             $prescriptionDocMeta = null;
-            if (($notes['order_type'] ?? null) === 'video_consult') {
-                // Also notify pet parent on create-order using pp_booking_confirmed.
-                $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
-                    context: $context,
-                    notes: $notes,
-                    amountInInr: $amountInInr
-                );
-                // For video consults: notify vet immediately at order creation.
-                $vetWhatsAppMeta = $this->notifyVetVideoConsultBooked(
-                    context: $context,
-                    notes: $notes,
-                    amountInInr: $amountInInr
-                );
-                $prescriptionDocMeta = $this->sendDoctorPrescriptionDocument($context);
-            }
 
             return response()->json([
                 'success'  => true,
@@ -379,12 +364,20 @@ class PaymentController extends Controller
                     ?? ($record->raw_response['notes']['type'] ?? null);
 
                 if ($orderType === 'video_consult' && $this->isSuccessfulPaymentStatus($status)) {
-                    // On successful payment, confirm booking to pet parent.
+                    // On successful payment, send all video-consult WhatsApp messages.
                     $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
                         context: $context,
                         notes: $notes,
                         amountInInr: $amountInInr
                     );
+
+                    $vetWhatsAppMeta = $this->notifyVetVideoConsultBooked(
+                        context: $context,
+                        notes: $notes,
+                        amountInInr: $amountInInr
+                    );
+
+                    $prescriptionDocMeta = $this->sendDoctorPrescriptionDocument($context);
                 } elseif ($orderType === 'excell_export_campaign' && $this->isSuccessfulPaymentStatus($status)) {
                     $whatsAppMeta = $this->notifyExcelExportCampaignBooked(
                         context: $context,
