@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\TransactionInvoiceController;
 use App\Models\CustomerTicket;
 use App\Models\Doctor;
 use App\Models\GroomerBooking;
@@ -24,6 +25,8 @@ use Illuminate\Support\Collection;
 
 class AdminPanelController extends Controller
 {
+    private const EXCELL_EXPORT_VALID_INVOICE_AMOUNTS = [471, 589];
+
     public function __construct(
         private readonly DoctorAvailabilityService $doctorAvailabilityService,
         private readonly CallAnalyticsService $callAnalyticsService,
@@ -226,8 +229,10 @@ class AdminPanelController extends Controller
 
     public function excellExportTransactions(Request $request)
     {
-        $transactions = $this->attachLatestPrescriptionIds(
+        $transactions = $this->appendExcellExportInvoiceFlags(
+            $this->attachLatestPrescriptionIds(
             $this->excellExportTransactionsQuery()->get()
+            )
         );
 
         if (strtolower((string) $request->query('export')) === 'csv') {
@@ -237,6 +242,30 @@ class AdminPanelController extends Controller
         $statusConversionLogs = $this->transactionStatusConversionLogs($transactions);
 
         return view('admin.transactions-excell-export', compact('transactions', 'statusConversionLogs'));
+    }
+
+    public function downloadExcellExportInvoice(
+        Request $request,
+        Transaction $transaction,
+        TransactionInvoiceController $invoiceController
+    ) {
+        if (! $this->isExcellExportTransaction($transaction)) {
+            abort(404);
+        }
+
+        if (! $this->isValidExcellExportInvoiceAmount($transaction)) {
+            return redirect()
+                ->route('admin.transactions.excell-export')
+                ->withErrors([
+                    'invoice' => sprintf(
+                        'Transaction #%d has invalid payment amount ₹%d. Invoice is allowed only for ₹471 or ₹589.',
+                        $transaction->id,
+                        $this->resolveExcellExportAmountInRupees($transaction)
+                    ),
+                ]);
+        }
+
+        return $invoiceController->show($request, $transaction);
     }
 
     public function markExcellExportTransactionCaptured(Request $request, Transaction $transaction): RedirectResponse
@@ -361,13 +390,7 @@ class AdminPanelController extends Controller
     private function excellExportTransactionsQuery(): Builder
     {
         return Transaction::query()
-            ->where(function ($query) {
-                $query->whereIn('status', ['captured', 'pending', 'CAPTURED', 'PENDING']);
-            })
-            ->where(function ($query) {
-                $query->where('type', 'excell_export_campaign')
-                    ->orWhere('metadata->order_type', 'excell_export_campaign');
-            })
+            ->where('type', 'excell_export_campaign')
             ->whereHas('clinic') // skip rows whose clinic entry was deleted
             ->with([
                 'clinic:id,name',
@@ -382,6 +405,54 @@ class AdminPanelController extends Controller
                 'pet',
             ])
             ->orderByDesc('created_at');
+    }
+
+    private function appendExcellExportInvoiceFlags(Collection $transactions): Collection
+    {
+        return $transactions->each(function (Transaction $transaction): void {
+            $amountInRupees = $this->resolveExcellExportAmountInRupees($transaction);
+            $transaction->setAttribute('invoice_amount_inr', $amountInRupees);
+            $transaction->setAttribute(
+                'invoice_eligible',
+                in_array($amountInRupees, self::EXCELL_EXPORT_VALID_INVOICE_AMOUNTS, true)
+            );
+        });
+    }
+
+    private function resolveExcellExportAmountInRupees(Transaction $transaction): int
+    {
+        $amountPaise = null;
+
+        if (is_numeric($transaction->amount_paise ?? null) && (int) $transaction->amount_paise > 0) {
+            $amountPaise = (int) $transaction->amount_paise;
+        } elseif (is_numeric($transaction->actual_amount_paid_by_consumer_paise ?? null) && (int) $transaction->actual_amount_paid_by_consumer_paise > 0) {
+            $amountPaise = (int) $transaction->actual_amount_paid_by_consumer_paise;
+        } else {
+            $rawAmount = $transaction->getAttribute('amount');
+            if (is_numeric($rawAmount)) {
+                $numericAmount = (float) $rawAmount;
+                if ($numericAmount > 1000) {
+                    $amountPaise = (int) round($numericAmount);
+                } else {
+                    return max((int) round($numericAmount), 0);
+                }
+            }
+        }
+
+        if (! is_numeric($amountPaise) || (int) $amountPaise <= 0) {
+            return 0;
+        }
+
+        return max((int) round(((int) $amountPaise) / 100), 0);
+    }
+
+    private function isValidExcellExportInvoiceAmount(Transaction $transaction): bool
+    {
+        return in_array(
+            $this->resolveExcellExportAmountInRupees($transaction),
+            self::EXCELL_EXPORT_VALID_INVOICE_AMOUNTS,
+            true
+        );
     }
 
     private function resolveExcellExportPetRecord(Transaction $transaction): ?Pet
