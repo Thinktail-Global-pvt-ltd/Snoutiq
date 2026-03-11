@@ -209,7 +209,7 @@ class TransactionInvoiceController extends Controller
             $customerPhone = 'N/A';
         }
 
-        $placeOfSupply = $this->resolvePlaceOfSupply($transaction);
+        $placeOfSupply = 'Gurugram';
         $paymentMethod = $this->resolvePaymentMethodLabel((string) ($transaction->payment_method ?? ''));
 
         $taxableDisplay = 'INR ' . $this->formatInrWhole($taxablePaise);
@@ -230,19 +230,24 @@ class TransactionInvoiceController extends Controller
 body {
     margin: 0;
     font-family: DejaVu Sans, sans-serif;
-    color: #222;
-    background: #ececec;
-    font-size: 13px;
+    color: #0f172a;
+    background: #f3f5f8;
+    font-size: 12.5px;
+}
+.sheet {
+    padding: 26px;
 }
 .page {
-    padding: 50px 56px 42px;
+    background: #ffffff;
+    border: 1px solid #d9e0ea;
+    padding: 32px 36px 30px;
 }
 table {
     width: 100%;
     border-collapse: collapse;
 }
 .top td {
-    vertical-align: bottom;
+    vertical-align: middle;
 }
 .logo {
     font-size: 32px;
@@ -250,7 +255,7 @@ table {
     letter-spacing: 0.8px;
 }
 .logo-image {
-    width: 205px;
+    width: 215px;
     height: auto;
 }
 .logo-o {
@@ -258,17 +263,18 @@ table {
 }
 .invoice-title {
     text-align: right;
-    font-size: 34px;
+    font-size: 32px;
     font-weight: 700;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    color: #111827;
 }
 .rule {
-    border-top: 1.6px solid #303030;
-    margin: 8px 0 10px;
+    border-top: 1.4px solid #1f2937;
+    margin: 10px 0 12px;
 }
 .vendor td {
     vertical-align: top;
-    line-height: 1.34;
+    line-height: 1.35;
 }
 .vendor-left {
     width: 68%;
@@ -279,6 +285,7 @@ table {
 }
 .label {
     font-weight: 700;
+    color: #111827;
 }
 .bill {
     margin-top: 2px;
@@ -296,44 +303,49 @@ table {
 .invoice-to {
     font-weight: 700;
     margin-bottom: 7px;
+    color: #111827;
 }
 .party-name {
-    font-size: 18px;
+    font-size: 19px;
     font-weight: 800;
     margin-bottom: 8px;
+    letter-spacing: 0.2px;
 }
 .meta-line {
     margin-top: 2px;
 }
 .date-underline {
     width: 40px;
-    border-top: 1.4px solid #303030;
+    border-top: 1.3px solid #1f2937;
     margin-top: 8px;
 }
 .service-table {
-    margin-top: 16px;
-    border-top: 1.6px solid #303030;
-    border-bottom: 1.6px solid #303030;
+    margin-top: 18px;
+    border-top: 1.4px solid #1f2937;
+    border-bottom: 1.4px solid #1f2937;
 }
 .service-table thead tr {
-    border-bottom: 1.6px solid #303030;
+    background: #f8fafc;
+    border-bottom: 1.3px solid #1f2937;
 }
 .service-table th {
-    padding: 9px 12px;
+    padding: 10px 12px;
     text-align: left;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
+    color: #111827;
+    letter-spacing: 0.3px;
 }
 .service-table th:last-child,
 .service-table td:last-child {
     text-align: right;
 }
 .service-table td {
-    padding: 14px 12px 32px;
-    font-size: 14px;
+    padding: 15px 12px 28px;
+    font-size: 13.5px;
 }
 .summary {
-    margin-top: 20px;
+    margin-top: 22px;
 }
 .summary td {
     vertical-align: top;
@@ -345,6 +357,7 @@ table {
     font-size: 14px;
     font-weight: 700;
     margin-bottom: 7px;
+    color: #111827;
 }
 .payment-value {
     font-size: 14px;
@@ -358,45 +371,48 @@ table {
 }
 .tax-table td {
     padding: 2px 0;
-    font-size: 14px;
+    font-size: 13.5px;
 }
 .tax-table td:last-child {
     text-align: right;
 }
 .tax-divider {
-    border-top: 1.6px solid #303030;
-    margin: 7px 0 6px;
+    border-top: 1.5px solid #1f2937;
+    margin: 8px 0 6px;
 }
 .tax-total {
     width: 100%;
 }
 .tax-total td {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 800;
+    color: #111827;
 }
 .tax-total td:last-child {
     text-align: right;
 }
 .words-title {
-    margin-top: 7px;
-    font-size: 14px;
+    margin-top: 8px;
+    font-size: 13px;
     font-weight: 700;
+    color: #111827;
 }
 .words-value {
     margin-top: 2px;
-    font-size: 14px;
+    font-size: 13.5px;
 }
 .footer {
-    margin-top: 34px;
+    margin-top: 40px;
 }
 .footer td {
     vertical-align: top;
 }
 .thanks {
     width: 58%;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 700;
-    padding-top: 6px;
+    color: #111827;
+    padding-top: 7px;
 }
 .sign {
     width: 42%;
@@ -410,19 +426,21 @@ table {
     margin-bottom: 4px;
 }
 .signature-image {
-    width: 140px;
+    width: 146px;
     height: auto;
-    margin-bottom: 6px;
+    margin-bottom: 7px;
 }
 .sign-title {
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 800;
     text-transform: uppercase;
     line-height: 1.2;
+    color: #111827;
 }
 .sign-org {
     font-size: 12px;
-    line-height: 1.3;
+    line-height: 1.35;
+    color: #111827;
 }
 CSS;
 
@@ -434,6 +452,7 @@ CSS;
     <style>{$style}</style>
 </head>
 <body>
+    <div class="sheet">
     <div class="page">
         <table class="top">
             <tr>
@@ -538,6 +557,7 @@ CSS;
                 </td>
             </tr>
         </table>
+    </div>
     </div>
 </body>
 </html>
