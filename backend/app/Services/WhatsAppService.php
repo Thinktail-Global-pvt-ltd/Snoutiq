@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\WhatsAppNotification;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 use Throwable;
 
@@ -203,7 +202,8 @@ class WhatsAppService
         ?string $errorDetails,
         ?string $responseBody
     ): void {
-        if (! $this->canPersistNotificationLogs()) {
+        // Skip only when we already know table is unavailable.
+        if (self::$notificationTableExists === false) {
             return;
         }
 
@@ -237,6 +237,10 @@ class WhatsAppService
                 'sent_at' => $status === self::STATUS_SENT ? now() : null,
             ]);
         } catch (Throwable $e) {
+            if ($this->isMissingTableError($e)) {
+                self::$notificationTableExists = false;
+            }
+
             Log::warning('whatsapp.notification.persist_failed', [
                 'error' => $e->getMessage(),
                 'status' => $status,
@@ -245,22 +249,12 @@ class WhatsAppService
         }
     }
 
-    private function canPersistNotificationLogs(): bool
+    private function isMissingTableError(Throwable $e): bool
     {
-        if (self::$notificationTableExists !== null) {
-            return self::$notificationTableExists;
-        }
-
-        try {
-            self::$notificationTableExists = Schema::hasTable((new WhatsAppNotification())->getTable());
-        } catch (Throwable $e) {
-            self::$notificationTableExists = false;
-            Log::warning('whatsapp.notification.table_check_failed', [
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return self::$notificationTableExists;
+        $message = strtolower($e->getMessage());
+        return str_contains($message, '42s02')
+            || str_contains($message, 'base table or view not found')
+            || str_contains($message, 'whatsapp_notifications');
     }
 
     private function resolveDispatchSource(): array
