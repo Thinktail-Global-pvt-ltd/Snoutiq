@@ -170,7 +170,7 @@
                 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3 excel-export-summary">
                     <div>
                         <h2 class="h5 mb-1">Excel Export Campaign Transactions</h2>
-                        <p class="text-muted mb-0">All rows from <code>transactions</code> where <code>type = excell_export_campaign</code>. Invoice is allowed only for valid payment amounts: <strong>₹471</strong> or <strong>₹589</strong>.</p>
+                        <p class="text-muted mb-0">All rows from <code>transactions</code> where <code>type = excell_export_campaign</code>. Invoice is allowed only when status is not <code>pending</code> and payment amount is <strong>₹471</strong> or <strong>₹589</strong>.</p>
                     </div>
                     <div class="d-flex gap-2 excel-export-badges align-items-center">
                         <span class="badge text-bg-primary-subtle text-primary-emphasis px-3 py-2">{{ number_format($transactions->count()) }} records</span>
@@ -252,6 +252,8 @@
                                         $parentMsg = "Hi {$parentName}, your {$petType} {$petName} is booked with {$doctorName}. They'll respond within {$responseMinutes} minutes. Amount paid ₹{$amountInr}. Vet: {$doctorName}. - SnoutIQ";
                                         $vetMsg = "Hi Dr. {$doctorName}, a new consultation is assigned. Pet: {$petName} ({$petType}). Parent: {$parentName} ({$parentPhone}). Issue: {$issue}. Prescription: (add link if any). Please respond within {$responseMinutes} mins. - SnoutIQ";
                                         $invoiceAmountInr = (int) ($txn->invoice_amount_inr ?? 0);
+                                        $invoiceAmountEligible = (bool) ($txn->invoice_amount_eligible ?? false);
+                                        $invoiceStatusEligible = (bool) ($txn->invoice_status_eligible ?? false);
                                         $invoiceEligible = (bool) ($txn->invoice_eligible ?? false);
                                         $status = strtolower((string) ($txn->status ?? 'n/a'));
                                         $statusClass = match ($status) {
@@ -401,7 +403,13 @@
                                                 </div>
                                             @else
                                                 <span class="badge text-bg-danger">Invalid Payment (₹{{ $invoiceAmountInr }})</span>
-                                                <div class="text-muted small mt-1">Allowed only for ₹471 / ₹589</div>
+                                                @if(!$invoiceStatusEligible)
+                                                    <div class="text-muted small mt-1">Payment is pending. Mark captured first to enable invoice.</div>
+                                                @elseif(!$invoiceAmountEligible)
+                                                    <div class="text-muted small mt-1">Allowed only for ₹471 / ₹589</div>
+                                                @else
+                                                    <div class="text-muted small mt-1">Invoice not allowed for this transaction state.</div>
+                                                @endif
                                             @endif
                                         </td>
                                         <td data-label="Delete">

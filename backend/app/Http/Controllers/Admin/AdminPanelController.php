@@ -253,6 +253,17 @@ class AdminPanelController extends Controller
             abort(404);
         }
 
+        if (! $this->isExcellExportInvoiceStatusEligible($transaction)) {
+            return redirect()
+                ->route('admin.transactions.excell-export')
+                ->withErrors([
+                    'invoice' => sprintf(
+                        'Transaction #%d is pending. Invoice can be generated only after payment is captured.',
+                        $transaction->id
+                    ),
+                ]);
+        }
+
         if (! $this->isValidExcellExportInvoiceAmount($transaction)) {
             return redirect()
                 ->route('admin.transactions.excell-export')
@@ -411,10 +422,14 @@ class AdminPanelController extends Controller
     {
         return $transactions->each(function (Transaction $transaction): void {
             $amountInRupees = $this->resolveExcellExportAmountInRupees($transaction);
+            $amountEligible = in_array($amountInRupees, self::EXCELL_EXPORT_VALID_INVOICE_AMOUNTS, true);
+            $statusEligible = $this->isExcellExportInvoiceStatusEligible($transaction);
             $transaction->setAttribute('invoice_amount_inr', $amountInRupees);
+            $transaction->setAttribute('invoice_amount_eligible', $amountEligible);
+            $transaction->setAttribute('invoice_status_eligible', $statusEligible);
             $transaction->setAttribute(
                 'invoice_eligible',
-                in_array($amountInRupees, self::EXCELL_EXPORT_VALID_INVOICE_AMOUNTS, true)
+                $amountEligible && $statusEligible
             );
         });
     }
@@ -453,6 +468,11 @@ class AdminPanelController extends Controller
             self::EXCELL_EXPORT_VALID_INVOICE_AMOUNTS,
             true
         );
+    }
+
+    private function isExcellExportInvoiceStatusEligible(Transaction $transaction): bool
+    {
+        return strtolower(trim((string) ($transaction->status ?? ''))) !== 'pending';
     }
 
     private function resolveExcellExportPetRecord(Transaction $transaction): ?Pet
