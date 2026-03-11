@@ -108,6 +108,8 @@
 @php
     $capturedTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'captured');
     $pendingTransactions = $transactions->filter(fn ($txn) => strtolower((string) ($txn->status ?? '')) === 'pending');
+    $validPaymentTransactions = $transactions->filter(fn ($txn) => (bool) ($txn->invoice_eligible ?? false));
+    $invalidPaymentTransactions = $transactions->reject(fn ($txn) => (bool) ($txn->invoice_eligible ?? false));
     $statusConversionLogs = $statusConversionLogs ?? collect();
     $totalPaise = $capturedTransactions->sum('amount_paise');
     $pendingTotalPaise = $pendingTransactions->sum('amount_paise');
@@ -168,13 +170,15 @@
                 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3 excel-export-summary">
                     <div>
                         <h2 class="h5 mb-1">Excel Export Campaign Transactions</h2>
-                        <p class="text-muted mb-0">All <strong>captured + pending</strong> payments where <code>type</code> or <code>metadata.order_type</code> equals <strong>excell_export_campaign</strong>.</p>
+                        <p class="text-muted mb-0">All rows from <code>transactions</code> where <code>type = excell_export_campaign</code>. Invoice is allowed only for valid payment amounts: <strong>₹471</strong> or <strong>₹589</strong>.</p>
                     </div>
                     <div class="d-flex gap-2 excel-export-badges align-items-center">
                         <span class="badge text-bg-primary-subtle text-primary-emphasis px-3 py-2">{{ number_format($transactions->count()) }} records</span>
                         <span class="badge text-bg-success-subtle text-success-emphasis px-3 py-2">₹{{ $formatInr($totalPaise) }} collected</span>
                         <span class="badge text-bg-warning-subtle text-warning-emphasis px-3 py-2">{{ number_format($pendingTransactions->count()) }} pending</span>
                         <span class="badge text-bg-warning-subtle text-warning-emphasis px-3 py-2">₹{{ $formatInr($pendingTotalPaise) }} pending amount</span>
+                        <span class="badge text-bg-success-subtle text-success-emphasis px-3 py-2">{{ number_format($validPaymentTransactions->count()) }} valid payments</span>
+                        <span class="badge text-bg-danger-subtle text-danger-emphasis px-3 py-2">{{ number_format($invalidPaymentTransactions->count()) }} invalid payments</span>
                         <a href="{{ route('admin.transactions.excell-export', ['export' => 'csv']) }}" class="btn btn-sm btn-outline-dark text-nowrap">
                             Export CSV
                         </a>
@@ -215,6 +219,7 @@
                                     <th>Pet</th>
                                     <th>Details</th>
                                     <th class="text-nowrap">Prescription</th>
+                                    <th class="text-nowrap">Invoice</th>
                                     <th class="text-nowrap">Delete</th>
                                     <th class="text-nowrap">Manual WhatsApp</th>
                                 </tr>
@@ -246,6 +251,8 @@
                                         $amountInr = $formatInr($txn->amount_paise);
                                         $parentMsg = "Hi {$parentName}, your {$petType} {$petName} is booked with {$doctorName}. They'll respond within {$responseMinutes} minutes. Amount paid ₹{$amountInr}. Vet: {$doctorName}. - SnoutIQ";
                                         $vetMsg = "Hi Dr. {$doctorName}, a new consultation is assigned. Pet: {$petName} ({$petType}). Parent: {$parentName} ({$parentPhone}). Issue: {$issue}. Prescription: (add link if any). Please respond within {$responseMinutes} mins. - SnoutIQ";
+                                        $invoiceAmountInr = (int) ($txn->invoice_amount_inr ?? 0);
+                                        $invoiceEligible = (bool) ($txn->invoice_eligible ?? false);
                                         $status = strtolower((string) ($txn->status ?? 'n/a'));
                                         $statusClass = match ($status) {
                                             'captured' => 'text-bg-success',
@@ -377,6 +384,24 @@
                                                 </a>
                                             @else
                                                 <span class="text-muted small">Unavailable</span>
+                                            @endif
+                                        </td>
+                                        <td data-label="Invoice">
+                                            @if($invoiceEligible)
+                                                <span class="badge text-bg-success mb-2">Valid Payment (₹{{ $invoiceAmountInr }})</span>
+                                                <div>
+                                                    <a
+                                                        href="{{ route('admin.transactions.excell-export.invoice', $txn) }}"
+                                                        class="btn btn-sm btn-outline-primary text-nowrap"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        Generate Invoice
+                                                    </a>
+                                                </div>
+                                            @else
+                                                <span class="badge text-bg-danger">Invalid Payment (₹{{ $invoiceAmountInr }})</span>
+                                                <div class="text-muted small mt-1">Allowed only for ₹471 / ₹589</div>
                                             @endif
                                         </td>
                                         <td data-label="Delete">

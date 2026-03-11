@@ -234,6 +234,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/analytics/pincode-heatmap', [AdminPanelController::class, 'pincodeHeatmap'])->name('admin.analytics.pincode-heatmap');
         Route::get('/whatsapp-templates', [AdminPanelController::class, 'whatsappTemplates'])->name('admin.whatsapp.templates');
         Route::get('/transactions/excell-export', [AdminPanelController::class, 'excellExportTransactions'])->name('admin.transactions.excell-export');
+        Route::get('/transactions/excell-export/{transaction}/invoice', [AdminPanelController::class, 'downloadExcellExportInvoice'])->name('admin.transactions.excell-export.invoice');
         Route::post('/transactions/excell-export/{transaction}/capture', [AdminPanelController::class, 'markExcellExportTransactionCaptured'])->name('admin.transactions.excell-export.capture');
         Route::delete('/transactions/excell-export/{transaction}', [AdminPanelController::class, 'deleteExcellExportTransaction'])->name('admin.transactions.excell-export.delete');
         Route::get('/transactions/appointments', [AdminPanelController::class, 'appointmentTransactions'])->name('admin.transactions.appointments');
