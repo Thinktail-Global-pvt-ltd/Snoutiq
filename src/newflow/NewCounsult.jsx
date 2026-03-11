@@ -31,7 +31,7 @@ export default function NewCounsult() {
             sizes="100vw"
             loading="eager"
             decoding="async"
-            fetchPriority="high"
+            fetchpriority="high"
           />
           <div className="absolute inset-0 bg-slate-900/55" />
 

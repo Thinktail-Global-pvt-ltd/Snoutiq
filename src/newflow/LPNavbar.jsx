@@ -62,7 +62,7 @@ export function LPNavbar({ consultPath = "/parents", onConsultClick }) {
                 height={24}
                 loading="eager"
                 decoding="async"
-                fetchPriority="high"
+                fetchpriority="high"
                 draggable={false}
                 onDragStart={(e) => e.preventDefault()}
                 onContextMenu={(e) => e.preventDefault()}

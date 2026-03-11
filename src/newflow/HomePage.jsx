@@ -458,7 +458,7 @@ function me({ vet: a, idx: t }) {
                   alt: a.name,
                   loading: "lazy",
                   decoding: "async",
-                  fetchPriority: "low",
+                  fetchpriority: "low",
                   width: 96,
                   height: 96,
                   onError: () => o(!0),

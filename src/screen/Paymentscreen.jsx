@@ -570,7 +570,7 @@ const imageSrc = useMemo(
                       height={64}
                       className="w-12 h-12 rounded-full object-cover md:w-16 md:h-16"
                       loading="eager"
-                      fetchPriority="high"
+                      fetchpriority="high"
                       decoding="async"
                     />
                   ) : (

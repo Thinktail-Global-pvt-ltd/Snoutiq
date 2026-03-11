@@ -55,7 +55,7 @@ export default function NewVets() {
                     sizes="(min-width: 1024px) 45vw, 100vw"
                     loading="eager"
                     decoding="async"
-                    fetchPriority="high"
+                    fetchpriority="high"
                   />
                 </div>
               </div>

@@ -23,7 +23,7 @@ export default function NewAbout() {
             sizes="100vw"
             loading="eager"
             decoding="async"
-            fetchPriority="high"
+            fetchpriority="high"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/45 via-slate-900/40 to-slate-900/45" />
 

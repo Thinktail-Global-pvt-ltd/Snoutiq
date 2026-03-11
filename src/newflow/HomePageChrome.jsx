@@ -493,7 +493,7 @@ export function Navbar({ consultPath = "/20+vetsonline?start=details" }) {
                 height={24}
                 loading="eager"
                 decoding="async"
-                fetchPriority="high"
+                fetchpriority="high"
                 draggable={false}
                 onDragStart={(event) => event.preventDefault()}
                 onContextMenu={(event) => event.preventDefault()}

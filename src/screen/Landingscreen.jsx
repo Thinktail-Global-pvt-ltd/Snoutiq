@@ -782,7 +782,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                 width={124}
                 height={24}
                 loading="eager"
-                fetchPriority="high"
+                fetchpriority="high"
                 decoding="async"
               />
             </button>
@@ -977,7 +977,7 @@ const LandingScreen = ({ onStart, onVetAccess, onSelectVet }) => {
                               width={640}
                               height={480}
                               loading={index === 0 ? "eager" : "lazy"}
-                              fetchPriority={index === 0 ? "high" : "low"}
+                              fetchpriority={index === 0 ? "high" : "low"}
                               decoding="async"
                             />
                           </div>

@@ -1,4 +1,7 @@
 import React, {
+  Suspense,
+  lazy,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -9,36 +12,13 @@ import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LPNavbar } from "../newflow/LPNavbar";
 import { apiBaseUrl } from "../lib/api";
-import { PaymentScreen, ConfirmationScreen } from "../screen/Paymentscreen";
 import {
   ArrowRight,
-  CheckCircle2,
   ChevronDown,
-  Upload,
-  Clock,
-  ShieldCheck,
   Star,
   Zap,
-  Camera,
-  FileText,
-  Image as ImageIcon,
-  User,
-  MessageCircle,
-  Calendar,
-  Activity,
-  Coffee,
-  Heart,
   PawPrint,
   AlertCircle,
-  Dog,
-  Cat,
-  Rabbit,
-  Shield,
-  MapPin,
-  Scale,
-  Lightbulb,
-  Stethoscope,
-  Pill,
   Globe,
 } from "lucide-react";
 
@@ -46,7 +26,7 @@ import {
 const TITLE =
   "Talk to a Vet Online Now | Video Call in 15 Minutes";
 const DESCRIPTION =
-  "Need urgent pet advice? Talk to a licensed vet online via video call. Connect in 15 minutes. Day ₹399 · Night ₹499.";
+  "Need urgent pet advice? Talk to a licensed vet online via video call. Connect in 15 minutes. Day \u20B9399 \u00B7 Night \u20B9499.";
 const CANONICAL = "https://www.snoutiq.com/talk-to-vet-online";
 const KEYWORDS = [
   "online vet consultation",
@@ -112,25 +92,6 @@ const isDrShashankVet = (value) => {
   return key.includes("shash") && key.includes("goyal");
 };
 
-const PRIMARY_FIXED_VET = {
-  id: 116,
-  doctor_id: 116,
-  clinic_id: 115,
-  vet_registeration_id: 115,
-  name: "Dr. Shashannk Goyal",
-  doctor_name: "Dr Shashannk Goyal",
-  image: "",
-  isSnoutiqAssigned: true,
-  autoAssigned: true,
-  assignedBy: "snoutiq",
-  raw: {
-    id: 116,
-    doctor_id: 116,
-    vet_registeration_id: 115,
-    doctor_name: "Dr Shashannk Goyal",
-  },
-};
-
 // --- Helpers -----------------------------------------------------------------
 const cn = (...v) => v.filter(Boolean).join(" ");
 
@@ -138,8 +99,8 @@ function getCurrentPrice() {
   const h = new Date().getHours();
   const isDay = h >= 8 && h < 22;
   return isDay
-    ? { price: "₹499", label: "Day rate · 8AM–10PM", rateType: "day" }
-    : { price: "₹599", label: "Night rate · 10PM–8AM", rateType: "night" };
+    ? { price: "\u20B9499", label: "Day rate \u00B7 8AM-10PM", rateType: "day" }
+    : { price: "\u20B9599", label: "Night rate \u00B7 10PM-8AM", rateType: "night" };
 }
 
 const PAYMENT_AMOUNTS = {
@@ -157,53 +118,6 @@ const formatInr = (value) => {
 };
 
 const round2 = (n) => Number((Number(n) || 0).toFixed(2));
-const todayISO = () => new Date().toISOString().slice(0, 10);
-
-const calcAgeFromDob = (dob) => {
-  if (!dob) return "";
-  const birth = new Date(dob);
-  if (Number.isNaN(birth.getTime())) return "";
-  const today = new Date();
-  if (birth > today) return "";
-  let years = today.getFullYear() - birth.getFullYear();
-  let months = today.getMonth() - birth.getMonth();
-  let days = today.getDate() - birth.getDate();
-  if (days < 0) months -= 1;
-  if (months < 0) {
-    years -= 1;
-    months += 12;
-  }
-  if (years <= 0 && months <= 0) return "Less than 1 month";
-  if (years <= 0) return `${months} mo${months === 1 ? "" : "s"}`;
-  if (months === 0) return `${years} yr${years === 1 ? "" : "s"}`;
-  return `${years} yr${years === 1 ? "" : "s"} ${months} mo${months === 1 ? "" : "s"}`;
-};
-
-const formatPhone = (value) => {
-  const digits = String(value || "").replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.startsWith("91")) return digits;
-  return `91${digits}`;
-};
-
-const pickValue = (...values) => {
-  for (const value of values) {
-    if (value === undefined || value === null) continue;
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed) return trimmed;
-      continue;
-    }
-    return value;
-  }
-  return undefined;
-};
-
-const toNumber = (value) => {
-  if (value === undefined || value === null || value === "") return undefined;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : undefined;
-};
 
 const normalizeDisplayText = (value) => {
   if (value === undefined || value === null) return "";
@@ -247,90 +161,6 @@ const listToDisplayText = (value) => {
   return text;
 };
 
-const formatBreedName = (breedKey, subBreed = null) => {
-  const cap = (s) =>
-    String(s)
-      .split(/[-_\s]/)
-      .filter(Boolean)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-  const base = cap(breedKey);
-  if (!subBreed) return base;
-  return `${cap(subBreed)} ${base}`;
-};
-
-const compressImageFile = async (
-  file,
-  {
-    maxWidth = 1280,
-    maxHeight = 1280,
-    quality = 0.72,
-    outputMime = "image/jpeg",
-  } = {},
-) => {
-  if (!file) return null;
-  const isImage = file.type?.startsWith("image/");
-  if (!isImage) return file;
-  const bitmap = await createImageBitmap(file).catch(() => null);
-  if (!bitmap) return file;
-  let { width, height } = bitmap;
-  const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
-  const targetW = Math.round(width * ratio);
-  const targetH = Math.round(height * ratio);
-  const canvas = document.createElement("canvas");
-  canvas.width = targetW;
-  canvas.height = targetH;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
-  ctx.drawImage(bitmap, 0, 0, targetW, targetH);
-  const blob = await new Promise((resolve) => {
-    canvas.toBlob(
-      (b) => resolve(b),
-      outputMime,
-      outputMime === "image/png" ? undefined : quality,
-    );
-  });
-  if (!blob) return file;
-  if (blob.size >= file.size) return file;
-  const ext = outputMime === "image/webp" ? "webp" : "jpg";
-  const safeName =
-    (file.name?.replace(/\.[^/.]+$/, "") || "upload") + `_compressed.${ext}`;
-  return new File([blob], safeName, { type: outputMime });
-};
-
-// --- Form constants -----------------------------------------------------------
-const ENERGY_OPTIONS = [
-  { label: "Normal", value: "normal" },
-  { label: "Lower than usual", value: "low" },
-  { label: "Very low", value: "very_low" },
-  { label: "Hyperactive", value: "high" },
-];
-
-const APPETITE_OPTIONS = [
-  { label: "Normal", value: "normal" },
-  { label: "Eating less", value: "less" },
-  { label: "Not eating", value: "none" },
-  { label: "Eating more", value: "more" },
-];
-
-const MOOD_OPTIONS = [
-  { label: "Calm", value: "calm" },
-  { label: "Restless", value: "restless" },
-  { label: "Anxious", value: "anxious" },
-  { label: "Aggressive", value: "aggressive" },
-  { label: "Playful", value: "playful" },
-];
-
-const GENDER_OPTIONS = [
-  { label: "Male", value: "male" },
-  { label: "Female", value: "female" },
-];
-
-const YES_NO_OPTIONS = [
-  { label: "Yes", value: "1" },
-  { label: "No", value: "0" },
-];
-
 // --- Pet issue quick-select options --
 // const PET_ISSUE_OPTIONS = [
 //   { label: "Vomiting", emoji: "🤢" },
@@ -352,18 +182,95 @@ const HERO_REVIEW_CARDS = [
   },
   {
     name: "Ananya K.",
-    text: "Honestly just needed someone knowledgeable to talk to at 11pm when my dog was acting strange. ₹399 to talk to a real vet online — totally worth it.",
+    text: "Honestly just needed someone knowledgeable to talk to at 11pm when my dog was acting strange. \u20B9399 to talk to a real vet online - totally worth it.",
   },
 ];
 
-const fieldBase =
+const SOCIAL_PROOF_STATS = [
+  { v: "200+", l: "Consultations done" },
+  { v: "4.8 \u2605", l: "Average rating" },
+  { v: "< 15 min", l: "Avg. wait time" },
+];
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    n: "01",
+    title: "Tell us what's wrong",
+    desc: "Tap your pet's symptoms. 30 seconds, no lengthy forms.",
+  },
+  {
+    n: "02",
+    title: "Pay securely (\u20B9399 / \u20B9499)",
+    desc: "UPI, card or netbanking. No hidden charges.",
+    extra: "No subscription. No recurring fee.",
+  },
+  {
+    n: "03",
+    title: "A vet calls you within 15 minutes",
+    desc: "A licensed vet joins your video call - ready to listen and help.",
+  },
+  {
+    n: "04",
+    title: "Get answers + a care plan",
+    desc: "Know exactly what to do. Follow-up included at no extra cost.",
+  },
+];
+
+const INDIA_CITIES = [
+  "Delhi NCR",
+  "Mumbai",
+  "Bangalore",
+  "Hyderabad",
+  "Chennai",
+  "Pune",
+  "Kolkata",
+  "Jaipur",
+  "Lucknow",
+];
+
+const FAQ_ITEMS = [
+  {
+    q: "Is talking to a vet online as good as going to a clinic?",
+    a: "For most non-emergency situations - yes. Vomiting, loose motion, not eating, lethargy, skin issues, behaviour problems - a vet can give you proper guidance over video. If your pet needs a physical exam, the vet will tell you directly and refer you.",
+  },
+  {
+    q: "How much does it cost?",
+    a: "Day consultation starts at \u20B9399, and night emergency (10pm-8am) is \u20B9499. No hidden fees.",
+  },
+  {
+    q: "How quickly will the vet connect?",
+    a: "Usually within 15 minutes of booking. You'll get a WhatsApp confirmation immediately after payment with the vet's details.",
+  },
+  {
+    q: "What happens after the consultation?",
+    a: "The vet shares a complete care plan covering what to do next, what to watch out for, and follow-up if needed - all included in the \u20B9399 fee.",
+  },
+  {
+    q: "What animals can I consult for?",
+    a: "Dogs, cats, and most small animals. If you're unsure, book and the vet will let you know if they need to refer you.",
+  },
+];
+
+const BELOW_THE_FOLD_SECTION_STYLE = {
+  contentVisibility: "auto",
+  containIntrinsicSize: "1px 720px",
+};
+
+const TEXTAREA_BASE =
   "w-full rounded-lg border border-gray-200 bg-white p-2.5 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed md:rounded-xl md:p-3 md:text-sm";
-const selectBase = `${fieldBase} appearance-none pr-12`;
-const textareaBase = `${fieldBase} resize-none min-h-[100px]`;
-const cardBase = "rounded-xl border border-gray-200 bg-white overflow-hidden";
-const cardHeaderBase =
-  "flex items-center gap-3 border-b border-gray-100 px-3 py-2.5";
-const cardBodyBase = "px-3 py-3 space-y-3";
+const textareaBase = `${TEXTAREA_BASE} resize-none min-h-[100px]`;
+
+const LazyPaymentScreen = lazy(() =>
+  import("../screen/Paymentscreen").then((module) => ({
+    default: module.PaymentScreen,
+  })),
+);
+
+const LazyConfirmationScreen = lazy(() =>
+  import("../screen/Paymentscreen").then((module) => ({
+    default: module.ConfirmationScreen,
+  })),
+);
 
 // ── NEW: compact CTA label for "Get Started" button ──────────────────────────
 function GetStartedCtaLabel({ amount }) {
@@ -380,12 +287,12 @@ function GetStartedCtaLabel({ amount }) {
 
       {/* Main Price First */}
       <span className="whitespace-nowrap rounded-full bg-white px-3 py-0.5 text-sm font-black text-orange-600 shadow-sm">
-        ₹{formatInr(discounted)}
+        {"\u20B9"}{formatInr(discounted)}
       </span>
 
       {/* Original Price Cut */}
       <span className="whitespace-nowrap text-lg font-bold text-white/80 line-through">
-        ₹{formatInr(originalAmount)}
+        {"\u20B9"}{formatInr(originalAmount)}
       </span>
     </span>
   );
@@ -397,7 +304,7 @@ function DynamicPriceStrip({ currentPrice, originalPrice, rateType }) {
       <div className="flex items-start gap-3 px-4 py-3 sm:items-center sm:px-5">
         <div className="shrink-0 pr-3 sm:pr-4">
           <div className="text-[2rem] leading-none font-medium text-[#f06a2f] sm:text-[2.35rem]">
-            ₹{formatInr(currentPrice)}
+            {"\u20B9"}{formatInr(currentPrice)}
           </div>
         </div>
 
@@ -411,7 +318,7 @@ function DynamicPriceStrip({ currentPrice, originalPrice, rateType }) {
 
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-sm font-semibold text-slate-400 line-through">
-                ₹{formatInr(originalPrice)}
+                {"\u20B9"}{formatInr(originalPrice)}
               </span>
 
               <span
@@ -429,11 +336,11 @@ function DynamicPriceStrip({ currentPrice, originalPrice, rateType }) {
 
           <div className="mt-2 text-sm text-slate-700">
             <p className="leading-5 sm:hidden">
-              <span className="block">Video call · Expert advice</span>
+              <span className="block">Video call {"\u00B7"} Expert advice</span>
               <span className="block">Follow-up guidance</span>
             </p>
             <p className="hidden leading-6 sm:block">
-              Video call · Expert advice · Follow-up guidance
+              Video call {"\u00B7"} Expert advice {"\u00B7"} Follow-up guidance
             </p>
           </div>
         </div>
@@ -442,30 +349,355 @@ function DynamicPriceStrip({ currentPrice, originalPrice, rateType }) {
   );
 }
 
-function ConsultCtaLabel({ amount, prefixText = "Consult Now" }) {
-  const originalAmount = Number(amount) || 0;
-  const discounted = Math.max(originalAmount - 100, 0);
-
+const PaymentRouteFallback = memo(function PaymentRouteFallback() {
   return (
-    <span className="inline-flex items-center justify-center gap-2 flex-wrap text-center leading-tight">
-      <Zap className="h-4 w-4 shrink-0 text-current" />
-
-      <span className="font-extrabold text-white group-disabled:text-slate-400">
-        {prefixText}
-      </span>
-
-      {/* Main price first */}
-      <span className="whitespace-nowrap rounded-full bg-white px-3 py-1 text-sm font-black text-orange-600 shadow-sm">
-        ₹{formatInr(discounted)}
-      </span>
-
-      {/* Original price cut */}
-      <span className="whitespace-nowrap text-sm font-bold text-white/60 line-through">
-        ₹{formatInr(originalAmount)}
-      </span>
-    </span>
+    <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
+      <div className="h-12 w-12 rounded-full border-4 border-slate-200 border-t-brand animate-spin" />
+    </div>
   );
-}
+});
+
+const SocialProofSection = memo(function SocialProofSection() {
+  return (
+    <section
+      className="bg-slate-900 py-7 px-4"
+      style={BELOW_THE_FOLD_SECTION_STYLE}
+    >
+      <div className="max-w-6xl mx-auto grid grid-cols-3 gap-4 text-center">
+        {SOCIAL_PROOF_STATS.map((stat) => (
+          <div key={stat.l}>
+            <p className="text-xl sm:text-2xl font-extrabold text-white">
+              {stat.v}
+            </p>
+            <p className="text-slate-400 text-xs mt-0.5">{stat.l}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+});
+
+const HowItWorksSection = memo(function HowItWorksSection() {
+  return (
+    <section
+      id="how-it-works"
+      className="py-14 px-4 bg-white scroll-mt-24"
+      style={BELOW_THE_FOLD_SECTION_STYLE}
+    >
+      <div className="max-w-4xl mx-auto">
+        <p className="text-xs font-extrabold text-brand text-center tracking-widest mb-2">
+          HOW IT WORKS
+        </p>
+        <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">
+          Talking to a vet takes 2 minutes to set up
+        </h2>
+        <div className="relative space-y-3">
+          <div className="absolute left-[22px] top-10 bottom-10 w-px bg-slate-100" />
+          {HOW_IT_WORKS_STEPS.map((step) => (
+            <div
+              key={step.n}
+              className="flex gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-100 relative"
+            >
+              <div className="h-11 w-11 rounded-2xl bg-brand text-white flex items-center justify-center font-extrabold text-xs shrink-0 relative z-10">
+                {step.n}
+              </div>
+              <div>
+                <p className="font-extrabold text-slate-900 text-sm mb-1">
+                  {step.title}
+                </p>
+                <p className="text-slate-500 text-xs leading-relaxed">
+                  {step.desc}
+                </p>
+                {step.extra ? (
+                  <p className="text-green-500 text-xs leading-relaxed">
+                    {step.extra}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+});
+
+const FeaturedVetsSection = memo(function FeaturedVetsSection({
+  consultAmount,
+  featuredVets,
+  sectionRef,
+  showLoadingState,
+  vetsError,
+  onConsultClick,
+}) {
+  return (
+    <section
+      id="our-vets"
+      ref={sectionRef}
+      className="py-14 px-4 bg-white scroll-mt-24"
+      style={BELOW_THE_FOLD_SECTION_STYLE}
+    >
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-end justify-between gap-4 flex-wrap mb-8">
+          <div>
+            <h2 className="text-2xl font-extrabold text-slate-900 mb-2 flex items-center gap-2">
+              <PawPrint className="h-6 w-6 text-brand" />
+              Who you'll talk to
+            </h2>
+            <p className="text-slate-500 text-sm">
+              Licensed vets, ready to help you now
+            </p>
+          </div>
+        </div>
+        {showLoadingState ? (
+          <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:overflow-visible md:mx-0 md:px-0">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div
+                key={index}
+                className="min-w-[240px] snap-start rounded-2xl border border-slate-200 overflow-hidden md:min-w-0"
+              >
+                <div className="h-40 bg-slate-100 animate-pulse" />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 bg-slate-100 rounded animate-pulse" />
+                  <div className="h-3 bg-slate-100 rounded w-4/5 animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : vetsError ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+            {vetsError}
+          </div>
+        ) : featuredVets.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            No vets available right now. Please check back soon.
+          </div>
+        ) : (
+          <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:overflow-visible md:mx-0 md:px-0">
+            {featuredVets.map((vet) => (
+              <div
+                key={vet.id}
+                className="min-w-[240px] snap-start rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm md:min-w-0"
+              >
+                <div className="h-40 bg-slate-100 relative">
+                  {vet.image ? (
+                    <img
+                      src={vet.image}
+                      alt={vet.name}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      fetchpriority="low"
+                      width="320"
+                      height="160"
+                      sizes="(min-width: 1024px) 25vw, (min-width: 768px) 50vw, 240px"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center bg-slate-200 text-slate-600 text-xl font-bold">
+                      {getInitials(vet.name)}
+                    </div>
+                  )}
+                  {vet.rating ? (
+                    <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-slate-700 shadow">
+                      <Star className="h-3.5 w-3.5 text-amber-400" />
+                      {vet.rating}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="p-4 space-y-2">
+                  <div>
+                    <p className="text-sm font-extrabold text-slate-900">
+                      {vet.name}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {vet.degree || "Veterinary Doctor"}
+                      {vet.experience ? ` \u00B7 ${vet.experience} yrs` : ""}
+                    </p>
+                  </div>
+                  {vet.specialization ? (
+                    <p className="text-xs text-slate-600 line-clamp-2">
+                      {listToDisplayText(vet.specialization)}
+                    </p>
+                  ) : null}
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>{vet.responseDay || "0-15 mins"}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={onConsultClick}
+            className="w-full max-w-2xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
+          >
+            <GetStartedCtaLabel amount={consultAmount} />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+});
+
+const ReviewsSection = memo(function ReviewsSection() {
+  return (
+    <section
+      className="bg-slate-50 px-4 py-10"
+      style={BELOW_THE_FOLD_SECTION_STYLE}
+    >
+      <div className="mx-auto max-w-5xl">
+        <h2 className="text-center text-2xl font-extrabold text-slate-900">
+          Pet parent reviews
+        </h2>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500">
+          What pet parents say about talking to a vet online
+        </p>
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          {HERO_REVIEW_CARDS.map((review) => (
+            <div
+              key={review.name}
+              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <div className="mb-3 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 text-sm font-black text-brand">
+                  {review.name.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    {review.name}
+                  </p>
+                  <div className="flex items-center gap-0.5">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <Star
+                        key={index}
+                        className="h-3.5 w-3.5 fill-amber-400 text-amber-400"
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm leading-6 text-slate-600">{review.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+});
+
+const AcrossIndiaSection = memo(function AcrossIndiaSection() {
+  return (
+    <section
+      id="across-india"
+      className="py-8 px-4 bg-slate-50 scroll-mt-24"
+      style={BELOW_THE_FOLD_SECTION_STYLE}
+    >
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 p-6">
+          <h2 className="text-xl font-extrabold text-slate-900 mb-1 flex items-center gap-2">
+            <Globe size={20} className="text-brand" />
+            Talk to a vet online from anywhere in India
+          </h2>
+          <div className="flex flex-wrap gap-2 mt-4">
+            {INDIA_CITIES.map((city) => (
+              <span
+                key={city}
+                className="inline-block border border-slate-300 rounded-full px-3 py-1 text-xs font-semibold text-slate-700 bg-white"
+              >
+                {city}
+              </span>
+            ))}
+          </div>
+          <p className="text-sm text-slate-700 mt-2">
+            <strong>
+              As long as you have internet, you can talk to a vet. Available
+              across every city in India, day or night.
+            </strong>{" "}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+});
+
+const FaqSection = memo(function FaqSection() {
+  return (
+    <section
+      id="faq"
+      className="py-14 px-4 bg-white scroll-mt-24"
+      style={BELOW_THE_FOLD_SECTION_STYLE}
+    >
+      <div className="max-w-4xl mx-auto">
+        <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">
+          Frequently Asked Questions
+        </h2>
+        <div className="space-y-0 divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
+          {FAQ_ITEMS.map((item) => (
+            <FaqItem key={item.q} q={item.q} a={item.a} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+});
+
+const FinalCtaSection = memo(function FinalCtaSection({
+  consultAmount,
+  onConsultClick,
+}) {
+  return (
+    <section
+      className="py-14 px-4 bg-slate-900 relative overflow-hidden"
+      style={BELOW_THE_FOLD_SECTION_STYLE}
+    >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-brand/10 blur-3xl" />
+        <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-accent/5 blur-3xl" />
+      </div>
+      <div className="relative max-w-2xl mx-auto text-center">
+        <p className="text-3xl mb-3">{"\u{1F43E}"}</p>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3 leading-tight">
+          Don't wait and worry.
+          <br />
+          <span className="text-brand">Talk to a vet now.</span>
+        </h2>
+        <p className="text-slate-400 text-sm mb-7">
+          Fill in your pet's details, describe the issue, and a vet calls you on
+          WhatsApp within 15 minutes after payment.
+        </p>
+        <button
+          type="button"
+          onClick={onConsultClick}
+          className="w-full bg-accent hover:bg-accent-hover text-white font-extrabold text-lg py-4 rounded-2xl shadow-xl shadow-orange-900/30 transition-all mb-3"
+        >
+          <GetStartedCtaLabel amount={consultAmount} />
+        </button>
+      </div>
+    </section>
+  );
+});
+
+const PageFooter = memo(function PageFooter() {
+  return (
+    <footer
+      className="bg-white border-t border-slate-100 py-4 px-4 pb-28 md:pb-4"
+      style={BELOW_THE_FOLD_SECTION_STYLE}
+    >
+      <p className="text-xs text-slate-400 text-center">
+        {"\u00A9"} {new Date().getFullYear()} SnoutIQ {"\u00B7"}{" "}
+        <a href="/" className="hover:text-brand font-semibold">
+          Home
+        </a>{" "}
+        {"\u00B7"}{" "}
+        <a href="/privacy-policy" className="hover:text-brand">
+          Privacy Policy
+        </a>
+      </p>
+    </footer>
+  );
+});
 
 // --- Main --------------------------------------------------------------------
 export default function TalkToVet() {
@@ -473,11 +705,8 @@ export default function TalkToVet() {
   const { rateType } = getCurrentPrice();
   const consultAmount = PAYMENT_AMOUNTS[rateType] || PAYMENT_AMOUNTS.day;
   const discountedConsultAmount = Math.max(consultAmount - 100, 0);
-  const slotLabel =
-    rateType === "day" ? "Day (8 AM - 10 PM)" : "Night (10 PM - 8 AM)";
 
   // ── SIMPLIFIED: single step form, no issue pre-select step ──────────────
-  const [selectedIssue, setSelectedIssue] = useState(null);
   const [leadForm, setLeadForm] = useState({
     ownerName: "",
     petName: "",
@@ -550,12 +779,12 @@ export default function TalkToVet() {
           exoticType:
             leadForm.petType === "exotic" ? leadForm.exoticType.trim() : "",
           problemText: leadForm.description.trim(),
-          selectedIssue: selectedIssue || "",
+          selectedIssue: "",
           source: "video_consult_lp",
         },
       },
     });
-  }, [leadForm, navigate, selectedIssue]);
+  }, [leadForm, navigate]);
 
   // --- JSON-LD Schemas ------------------------------------------------------
   const serviceSchema = useMemo(
@@ -631,7 +860,7 @@ export default function TalkToVet() {
     () => ({
       "@context": "https://schema.org",
       "@type": "LocalBusiness",
-      name: "SnoutiQ – Online Vet Consultation India",
+      name: "SnoutiQ - Online Vet Consultation India",
       url: "https://www.snoutiq.com",
       image: "https://www.snoutiq.com/logo.png",
       telephone: "+91-9999999999",
@@ -680,7 +909,7 @@ export default function TalkToVet() {
     () => ({
       "@context": "https://schema.org",
       "@type": "Product",
-      name: "Online Vet Consultation – SnoutiQ",
+      name: "Online Vet Consultation - SnoutiQ",
       description:
         "Talk to a licensed veterinarian online in India via WhatsApp video call within 15 minutes.",
       url: CANONICAL,
@@ -716,61 +945,14 @@ export default function TalkToVet() {
   );
 
   // --- State ----------------------------------------------------------------
-  const [details, setDetails] = useState({
-    ownerName: "",
-    ownerMobile: "",
-    city: "",
-    name: "",
-    type: null,
-    breed: "",
-    petDob: "",
-    gender: "",
-    problemText: "",
-    mood: "calm",
-    petDoc2: "",
-    exoticType: "",
-    lastDaysEnergy: "",
-    lastDaysAppetite: "",
-    hasPhoto: false,
-    isNeutered: "",
-    vaccinatedYesNo: "",
-    dewormingYesNo: "",
-    weightKg: "",
-  });
-
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploadPreviewUrl, setUploadPreviewUrl] = useState("");
-  const [uploadMeta, setUploadMeta] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-
-  const [dogBreeds, setDogBreeds] = useState([]);
-  const [catBreeds, setCatBreeds] = useState([]);
-  const [breedSearch, setBreedSearch] = useState("");
-  const [breedDropdownOpen, setBreedDropdownOpen] = useState(false);
-  const [loadingBreeds, setLoadingBreeds] = useState(false);
-  const [breedError, setBreedError] = useState("");
-  const breedDropdownRef = useRef(null);
-
-  const [liveDoctorCount, setLiveDoctorCount] = useState(null);
   const [featuredVets, setFeaturedVets] = useState([]);
-  const [vetsLoading, setVetsLoading] = useState(true);
+  const [vetsLoading, setVetsLoading] = useState(false);
   const [vetsError, setVetsError] = useState("");
+  const [showStickyCta, setShowStickyCta] = useState(false);
+  const [shouldLoadFeaturedVets, setShouldLoadFeaturedVets] = useState(false);
+  const consultFormRef = useRef(null);
+  const vetsSectionRef = useRef(null);
 
-  const ownerPhoneDigits = details.ownerMobile.replace(/\D/g, "");
-
-  useEffect(() => {
-    if (!breedDropdownOpen) return;
-    const handleClick = (event) => {
-      if (
-        breedDropdownRef.current &&
-        !breedDropdownRef.current.contains(event.target)
-      ) {
-        setBreedDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [breedDropdownOpen]);
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -797,53 +979,49 @@ export default function TalkToVet() {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    const abortController = new AbortController();
     let idleHandle = null;
-    const fetchLiveStatus = async () => {
-      try {
-        const baseUrl = apiBaseUrl();
-        const res = await fetch(`${baseUrl}/api/doctors/availability-status`, {
-          method: "GET",
-          signal: abortController.signal,
-        });
-        const data = await res.json();
-        if (!active) return;
-        const onlineFromCounts = Number.isFinite(data?.counts?.online_doctors)
-          ? data.counts.online_doctors
-          : null;
-        const onlineFromList = Array.isArray(data?.online_doctors)
-          ? data.online_doctors.length
-          : null;
-        setLiveDoctorCount(
-          onlineFromCounts !== null ? onlineFromCounts : onlineFromList,
-        );
-      } catch {
-        if (active) setLiveDoctorCount(null);
-      }
+    if (shouldLoadFeaturedVets) return undefined;
+
+    const enableFeaturedVets = () => {
+      setShouldLoadFeaturedVets(true);
     };
-    const runDeferredFetch = () => {
-      void fetchLiveStatus();
-    };
+
+    const observer =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(
+            ([entry]) => {
+              if (!entry.isIntersecting) return;
+              enableFeaturedVets();
+            },
+            { rootMargin: "320px 0px" },
+          )
+        : null;
+
+    if (observer && vetsSectionRef.current) {
+      observer.observe(vetsSectionRef.current);
+    }
+
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleHandle = window.requestIdleCallback(runDeferredFetch, {
-        timeout: 1200,
+      idleHandle = window.requestIdleCallback(enableFeaturedVets, {
+        timeout: 1800,
       });
     } else {
-      idleHandle = window.setTimeout(runDeferredFetch, 350);
+      idleHandle = window.setTimeout(enableFeaturedVets, 1200);
     }
+
     return () => {
-      active = false;
-      abortController.abort();
+      observer?.disconnect();
       if (typeof window !== "undefined") {
         if ("cancelIdleCallback" in window && idleHandle !== null)
           window.cancelIdleCallback(idleHandle);
         else if (idleHandle !== null) window.clearTimeout(idleHandle);
       }
     };
-  }, []);
+  }, [shouldLoadFeaturedVets]);
 
   useEffect(() => {
+    if (!shouldLoadFeaturedVets) return undefined;
+
     let active = true;
     const controller = new AbortController();
     const loadFeaturedVets = async () => {
@@ -903,196 +1081,14 @@ export default function TalkToVet() {
         if (active) setVetsLoading(false);
       }
     };
-    loadFeaturedVets();
+    void loadFeaturedVets();
     return () => {
       active = false;
       controller.abort();
     };
-  }, []);
+  }, [shouldLoadFeaturedVets]);
 
-  useEffect(() => {
-    const abortController = new AbortController();
-    const fetchDogBreeds = async () => {
-      setBreedError("");
-      setLoadingBreeds(true);
-      try {
-        const baseUrl = apiBaseUrl();
-        const res = await fetch(`${baseUrl}/api/dog-breeds/all`, {
-          method: "GET",
-          signal: abortController.signal,
-        });
-        const data = await res.json();
-        if (data?.status === "success" && data?.breeds) {
-          const list = [];
-          Object.keys(data.breeds).forEach((breedKey) => {
-            const subBreeds = data.breeds[breedKey];
-            if (!subBreeds || subBreeds.length === 0)
-              list.push({ label: formatBreedName(breedKey), value: breedKey });
-            else {
-              list.push({ label: formatBreedName(breedKey), value: breedKey });
-              subBreeds.forEach((sub) =>
-                list.push({
-                  label: formatBreedName(breedKey, sub),
-                  value: `${breedKey}/${sub}`,
-                }),
-              );
-            }
-          });
-          list.sort((a, b) => a.label.localeCompare(b.label));
-          list.push(
-            { label: "Mixed Breed", value: "mixed_breed" },
-            { label: "Other", value: "other" },
-          );
-          setDogBreeds(list);
-        } else {
-          setDogBreeds([
-            { label: "Mixed Breed", value: "mixed_breed" },
-            { label: "Other", value: "other" },
-          ]);
-        }
-      } catch (error) {
-        if (error?.name === "AbortError") return;
-        setDogBreeds([
-          { label: "Mixed Breed", value: "mixed_breed" },
-          { label: "Other", value: "other" },
-        ]);
-      } finally {
-        setLoadingBreeds(false);
-      }
-    };
-    const fetchCatBreeds = async () => {
-      setBreedError("");
-      setLoadingBreeds(true);
-      try {
-        const baseUrl = apiBaseUrl();
-        const res = await fetch(`${baseUrl}/api/cat-breeds/with-indian`, {
-          method: "GET",
-          signal: abortController.signal,
-        });
-        const data = await res.json();
-        if (data?.success && Array.isArray(data?.data)) {
-          const list = data.data
-            .map((breed) => ({
-              label: breed?.name || breed?.id || "Unknown",
-              value: breed?.name || breed?.id || "unknown",
-            }))
-            .filter((item) => item.label);
-          list.sort((a, b) => a.label.localeCompare(b.label));
-          list.push({ label: "Mixed / Other", value: "other" });
-          setCatBreeds(list);
-        } else {
-          setCatBreeds([{ label: "Mixed / Other", value: "other" }]);
-        }
-      } catch (error) {
-        if (error?.name === "AbortError") return;
-        setCatBreeds([{ label: "Mixed / Other", value: "other" }]);
-      } finally {
-        setLoadingBreeds(false);
-      }
-    };
-    const activeType = leadForm.petType || details.type;
-    if (activeType === "dog") fetchDogBreeds();
-    else if (activeType === "cat") fetchCatBreeds();
-    else {
-      setBreedError("");
-      setLoadingBreeds(false);
-    }
-    if (activeType !== "dog") setDogBreeds([]);
-    if (activeType !== "cat") setCatBreeds([]);
-    setBreedSearch("");
-    setBreedDropdownOpen(false);
-    if (activeType === "exotic") {
-      setDetails((p) => ({ ...p, breed: "" }));
-      setLeadForm((prev) => (prev.breed ? { ...prev, breed: "" } : prev));
-    } else {
-      setDetails((p) => ({ ...p, exoticType: "" }));
-      setLeadForm((prev) =>
-        prev.exoticType ? { ...prev, exoticType: "" } : prev,
-      );
-    }
-    return () => {
-      abortController.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [details.type, leadForm.petType]);
-
-  useEffect(() => {
-    return () => {
-      if (uploadPreviewUrl) {
-        try {
-          URL.revokeObjectURL(uploadPreviewUrl);
-        } catch {}
-      }
-    };
-  }, [uploadPreviewUrl]);
-
-  const breedOptions = useMemo(() => {
-    if (details.type === "dog") return dogBreeds;
-    if (details.type === "cat") return catBreeds;
-    return [];
-  }, [details.type, dogBreeds, catBreeds]);
-
-  const showBreed = details.type === "dog" || details.type === "cat";
-  const isExotic = details.type === "exotic";
-
-  const applyUploadFile = useCallback(
-    async (file) => {
-      if (!file) return;
-      if (uploadPreviewUrl) {
-        try {
-          URL.revokeObjectURL(uploadPreviewUrl);
-        } catch {}
-      }
-      const lowerName = file.name?.toLowerCase() || "";
-      const isVideo =
-        file.type?.startsWith("video/") ||
-        /\.(mp4|mov|avi|mkv|webm)$/i.test(lowerName);
-      if (isVideo) {
-        alert("Video uploads are not supported. Please upload a photo or PDF.");
-        return;
-      }
-      const isImage = file.type?.startsWith("image/");
-      const isPdf =
-        file.type === "application/pdf" || lowerName.endsWith(".pdf");
-      if (!isImage && !isPdf) {
-        alert("Please upload a JPG, PNG, or PDF file.");
-        return;
-      }
-      if (isImage) {
-        const url = URL.createObjectURL(file);
-        setUploadPreviewUrl(url);
-      } else {
-        setUploadPreviewUrl("");
-      }
-      setUploadFile(file);
-      setDetails((prev) => ({ ...prev, hasPhoto: true }));
-      setUploadMeta({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        compressedSize: null,
-      });
-    },
-    [uploadPreviewUrl],
-  );
-
-  const getPetTypeIcon = (type) => {
-    switch (type) {
-      case "dog":
-        return <Dog size={20} />;
-      case "cat":
-        return <Cat size={20} />;
-      case "exotic":
-        return <Rabbit size={20} />;
-      default:
-        return <PawPrint size={20} />;
-    }
-  };
-
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-  const [showStickyCta, setShowStickyCta] = useState(false);
-  const consultFormRef = useRef(null);
+  const showVetLoadingState = !shouldLoadFeaturedVets || vetsLoading;
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -1178,8 +1174,7 @@ export default function TalkToVet() {
               Your pet needs help and you need answers now. Talk to a licensed
               vet online via video call — get expert advice, a care plan, and
               peace of mind in 15 minutes.
-              {/* {slotLabel.toLowerCase()} is
-               {" "}₹{formatInr(discountedConsultAmount)} after the ₹100 offer. */}
+
             </p>
             <section className="bg-white px-4 pb-4 sm:px-6 lg:px-8">
               <div className="mx-auto max-w-6xl">
@@ -1288,12 +1283,12 @@ export default function TalkToVet() {
                     <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
                       <span className="flex items-center gap-1 whitespace-nowrap">
                         <span>🔒</span>
-                        <span>Secure · Razorpay</span>
+                        <span>Secure {"\u00B7"} Razorpay</span>
                       </span>
 
                       <span className="flex items-center gap-1 whitespace-nowrap">
                         <span>💳</span>
-                        <span>UPI · Card · Net banking</span>
+                        <span>UPI {"\u00B7"} Card {"\u00B7"} Net banking</span>
                       </span>
                     </div>
 
@@ -1312,225 +1307,18 @@ export default function TalkToVet() {
           </div>
         </section>
 
-        {/* SOCIAL PROOF */}
-        <section className="bg-slate-900 py-7 px-4">
-          <div className="max-w-6xl mx-auto grid grid-cols-3 gap-4 text-center">
-            {[
-              { v: "200+", l: "Consultations done" },
-              { v: "4.8 ★", l: "Average rating" },
-              { v: "< 15 min", l: "Avg. wait time" },
-            ].map((s) => (
-              <div key={s.l}>
-                <p className="text-xl sm:text-2xl font-extrabold text-white">
-                  {s.v}
-                </p>
-                <p className="text-slate-400 text-xs mt-0.5">{s.l}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+        <SocialProofSection />
+        <HowItWorksSection />
+        <FeaturedVetsSection
+          consultAmount={consultAmount}
+          featuredVets={featuredVets}
+          sectionRef={vetsSectionRef}
+          showLoadingState={showVetLoadingState}
+          vetsError={vetsError}
+          onConsultClick={scrollToConsultForm}
+        />
+        <ReviewsSection />
 
-        {/* HOW IT WORKS */}
-        <section id="how-it-works" className="py-14 px-4 bg-white scroll-mt-24">
-          <div className="max-w-4xl mx-auto">
-            <p className="text-xs font-extrabold text-brand text-center tracking-widest mb-2">
-              HOW IT WORKS
-            </p>
-            <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">
-              Talking to a vet takes 2 minutes to set up
-            </h2>
-            <div className="relative space-y-3">
-              <div className="absolute left-[22px] top-10 bottom-10 w-px bg-slate-100" />
-              {[
-                {
-                  n: "01",
-                  title: "Tell us what's wrong",
-                  desc: "Tap your pet's symptoms. 30 seconds, no lengthy forms.",
-                },
-                {
-                  n: "02",
-                  title: "Pay securely (₹399 / ₹499)",
-                  desc: "UPI, card or netbanking. No hidden charges.",
-                  extra: "No subscription. No recurring fee.",
-                },
-                {
-                  n: "03",
-                  title: "A vet calls you within 15 minutes",
-                  desc: "A licensed vet joins your video call — ready to listen and help.",
-                },
-                {
-                  n: "04",
-                  title: "Get answers + a care plan",
-                  desc: "Know exactly what to do. Follow-up included at no extra cost.",
-                },
-              ].map((s, i) => (
-                <div
-                  key={i}
-                  className="flex gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-100 relative"
-                >
-                  <div className="h-11 w-11 rounded-2xl bg-brand text-white flex items-center justify-center font-extrabold text-xs shrink-0 relative z-10">
-                    {s.n}
-                  </div>
-                  <div>
-                    <p className="font-extrabold text-slate-900 text-sm mb-1">
-                      {s.title}
-                    </p>
-                    <p className="text-slate-500 text-xs leading-relaxed">
-                      {s.desc}
-                    </p>
-                    {s.extra && (
-                      <p className="text-green-500 text-xs leading-relaxed ">
-                        {s.extra}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* OUR VETS */}
-        <section id="our-vets" className="py-14 px-4 bg-white scroll-mt-24">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex items-end justify-between gap-4 flex-wrap mb-8">
-              <div>
-                <h2 className="text-2xl font-extrabold text-slate-900 mb-2 flex items-center gap-2">
-                  <PawPrint className="h-6 w-6 text-brand" />
-                 Who you'll talk to
-                </h2>
-                <p className="text-slate-500 text-sm">
-                  Licensed vets, ready to help you now
-                </p>
-              </div>
-            </div>
-            {vetsLoading ? (
-              <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:overflow-visible md:mx-0 md:px-0">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="min-w-[240px] snap-start rounded-2xl border border-slate-200 overflow-hidden md:min-w-0"
-                  >
-                    <div className="h-40 bg-slate-100 animate-pulse" />
-                    <div className="p-4 space-y-2">
-                      <div className="h-4 bg-slate-100 rounded animate-pulse" />
-                      <div className="h-3 bg-slate-100 rounded w-4/5 animate-pulse" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : vetsError ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-                {vetsError}
-              </div>
-            ) : featuredVets.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                No vets available right now. Please check back soon.
-              </div>
-            ) : (
-              <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-5 md:overflow-visible md:mx-0 md:px-0">
-                {featuredVets.map((vet) => (
-                  <div
-                    key={vet.id}
-                    className="min-w-[240px] snap-start rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm md:min-w-0"
-                  >
-                    <div className="h-40 bg-slate-100 relative">
-                      {vet.image ? (
-                        <img
-                          src={vet.image}
-                          alt={vet.name}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-slate-200 text-slate-600 text-xl font-bold">
-                          {getInitials(vet.name)}
-                        </div>
-                      )}
-                      {vet.rating ? (
-                        <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-slate-700 shadow">
-                          <Star className="h-3.5 w-3.5 text-amber-400" />
-                          {vet.rating}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="p-4 space-y-2">
-                      <div>
-                        <p className="text-sm font-extrabold text-slate-900">
-                          {vet.name}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {vet.degree || "Veterinary Doctor"}
-                          {vet.experience ? ` · ${vet.experience} yrs` : ""}
-                        </p>
-                      </div>
-                      {vet.specialization ? (
-                        <p className="text-xs text-slate-600 line-clamp-2">
-                          {listToDisplayText(vet.specialization)}
-                        </p>
-                      ) : null}
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span>{vet.responseDay || "0-15 mins"}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                onClick={scrollToConsultForm}
-                className="w-full max-w-2xl rounded-2xl bg-accent hover:bg-accent-hover text-white text-base font-extrabold py-4 shadow-lg shadow-orange-200/60 transition-all"
-              >
-                <GetStartedCtaLabel amount={consultAmount} />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* REVIEWS */}
-        <section className="bg-slate-50 px-4 py-10">
-          <div className="mx-auto max-w-5xl">
-            <h2 className="text-center text-2xl font-extrabold text-slate-900">
-              Pet parent reviews
-            </h2>
-            <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500">
-              What pet parents say about talking to a vet online
-            </p>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {HERO_REVIEW_CARDS.map((review) => (
-                <div
-                  key={review.name}
-                  className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
-                >
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 text-sm font-black text-brand">
-                      {review.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">
-                        {review.name}
-                      </p>
-                      <div className="flex items-center gap-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className="h-3.5 w-3.5 fill-amber-400 text-amber-400"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-sm leading-6 text-slate-600">
-                    {review.text}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
         {/* CTA BREAK */}
         <section className="px-4 py-6 bg-white">
@@ -1544,124 +1332,15 @@ export default function TalkToVet() {
             </button>
           </div>
         </section>
-
-             {/* ACROSS INDIA */}
-        <section
-          id="across-india"
-          className="py-8 px-4 bg-slate-50 scroll-mt-24"
-        >
-          <div className="max-w-6xl mx-auto">
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 p-6">
-              <h2 className="text-xl font-extrabold text-slate-900 mb-1 flex items-center gap-2">
-                <Globe size={20} className="text-brand" />
-                Talk to a vet online from anywhere in India
-              </h2>
-             
-              <div className="flex flex-wrap gap-2 mt-4">
-                {[
-                  "Delhi NCR",
-                  "Mumbai",
-                  "Bangalore",
-                  "Hyderabad",
-                  "Chennai",
-                  "Pune",
-                  "Kolkata",
-                  "Jaipur",
-                  "Lucknow",
-                ].map((city) => (
-                  <span
-                    key={city}
-                    className="inline-block border border-slate-300 rounded-full px-3 py-1 text-xs font-semibold text-slate-700 bg-white"
-                  >
-                    {city}
-                  </span>
-                ))}
-              </div>
-               <p className="text-sm text-slate-700 mt-2">
-                <strong>
-              As long as you have internet, you can talk to a vet. Available across every city in India, day or night.
-            </strong>{" "}
-            </p>
-            </div>
-          </div>
-        </section>
-
-        {/* FAQ */}
-        <section id="faq" className="py-14 px-4 bg-white scroll-mt-24">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">
-              Frequently Asked Questions
-            </h2>
-            <div className="space-y-0 divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
-              {[
-                {
-                  q: "Is talking to a vet online as good as going to a clinic?",
-                  a: "For most non-emergency situations — yes. Vomiting, loose motion, not eating, lethargy, skin issues, behaviour problems — a vet can give you proper guidance over video. If your pet needs a physical exam, the vet will tell you directly and refer you.",
-                },
-                {
-                  q: "How much does it cost?",
-                  a: "Day consultation starts at ₹399, and night emergency (10pm–8am) is ₹499. No hidden fees.",
-                },
-                {
-                  q: "How quickly will the vet connect?",
-                  a: "Usually within 15 minutes of booking. You'll get a WhatsApp confirmation immediately after payment with the vet's details.",
-                },
-                {
-                  q: "What happens after the consultation?",
-                  a: "The vet shares a complete care plan covering what to do next, what to watch out for, and follow-up if needed — all included in the ₹399 fee.",
-                },
-                {
-                  q: "What animals can I consult for?",
-                  a: "Dogs, cats, and most small animals. If you're unsure, book and the vet will let you know if they need to refer you.",
-                },
-              ].map((f, i) => (
-                <FaqItem key={i} q={f.q} a={f.a} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* FINAL CTA */}
-        <section className="py-14 px-4 bg-slate-900 relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-brand/10 blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-accent/5 blur-3xl" />
-          </div>
-          <div className="relative max-w-2xl mx-auto text-center">
-            <p className="text-3xl mb-3">🐾</p>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3 leading-tight">
-             Don't wait and worry.
-              <br />
-              <span className="text-brand">Talk to a vet now.</span>
-            </h2>
-            <p className="text-slate-400 text-sm mb-7">
-              Fill in your pet's details, describe the issue, and a vet calls
-              you on WhatsApp within 15 minutes after payment.
-            </p>
-            <button
-              type="button"
-              onClick={scrollToConsultForm}
-              className="w-full bg-accent hover:bg-accent-hover text-white font-extrabold text-lg py-4 rounded-2xl shadow-xl shadow-orange-900/30 transition-all mb-3"
-            >
-              <GetStartedCtaLabel amount={consultAmount} />
-            </button>
-          </div>
-        </section>
+        <AcrossIndiaSection />
+        <FaqSection />
+        <FinalCtaSection
+          consultAmount={consultAmount}
+          onConsultClick={scrollToConsultForm}
+        />
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-100 py-4 px-4 pb-28 md:pb-4">
-        <p className="text-xs text-slate-400 text-center">
-          © {new Date().getFullYear()} SnoutIQ ·{" "}
-          <a href="/" className="hover:text-brand font-semibold">
-            Home
-          </a>{" "}
-          ·{" "}
-          <a href="/privacy-policy" className="hover:text-brand">
-            Privacy Policy
-          </a>
-        </p>
-      </footer>
+      <PageFooter />
 
       {/* ── Sticky Mobile CTA — bigger tap target, clearer label ── */}
       {showStickyCta && (
@@ -1674,7 +1353,7 @@ export default function TalkToVet() {
             <GetStartedCtaLabel amount={consultAmount} />
           </button>
           <p className="text-center text-[10px] text-slate-400 mt-1.5">
-            Vet calls you within 15 min · All India · 24/7
+            Vet calls you within 15 min {"\u00B7"} All India {"\u00B7"} 24/7
           </p>
         </div>
       )}
@@ -1756,19 +1435,21 @@ export const VideoConsultPaymentPage = () => {
   }
 
   return (
-    <PaymentScreen
-      vet={vet}
-      petDetails={petDetails}
-      paymentMeta={paymentMeta}
-      onBack={() => navigate(`${VIDEO_CONSULT_BASE_ROUTE}/problem`)}
-      onPay={(verify) => {
-        fireConversion();
-        navigate("/consultation-booked", {
-          replace: true,
-          state: { vet, verify, skipConversion: true },
-        });
-      }}
-    />
+    <Suspense fallback={<PaymentRouteFallback />}>
+      <LazyPaymentScreen
+        vet={vet}
+        petDetails={petDetails}
+        paymentMeta={paymentMeta}
+        onBack={() => navigate(`${VIDEO_CONSULT_BASE_ROUTE}/problem`)}
+        onPay={(verify) => {
+          fireConversion();
+          navigate("/consultation-booked", {
+            replace: true,
+            state: { vet, verify, skipConversion: true },
+          });
+        }}
+      />
+    </Suspense>
   );
 };
 
@@ -1810,5 +1491,9 @@ export const VideoConsultThankYou = () => {
     );
   }
 
-  return <ConfirmationScreen vet={vet} />;
+  return (
+    <Suspense fallback={<PaymentRouteFallback />}>
+      <LazyConfirmationScreen vet={vet} />
+    </Suspense>
+  );
 };
