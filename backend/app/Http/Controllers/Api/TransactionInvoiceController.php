@@ -218,13 +218,12 @@ class TransactionInvoiceController extends Controller
         $totalDisplay = 'INR ' . $this->formatInrWhole($totalPaise);
         $amountWords = $this->amountInWords((int) round(max($totalPaise, 0) / 100));
         $logoDataUri = $this->imageDataUri(public_path('invoice-assets/thinktail-logo-crop.png'));
-        $signatureDataUri = $this->imageDataUri(public_path('invoice-assets/thinktail-signature-crop.png'));
+        $signatureDataUri = $this->imageDataUri(public_path('invoice-assets/thinktail-signature-crop.png'))
+            ?? $this->embeddedSignatureDataUri();
         $logoHtml = $logoDataUri !== null
             ? '<img class="logo-image" src="' . $this->e($logoDataUri) . '" alt="Snoutiq">'
             : '<div class="logo">SN<span class="logo-o">OO</span>TIQ</div>';
-        $signatureHtml = $signatureDataUri !== null
-            ? '<img class="signature-image" src="' . $this->e($signatureDataUri) . '" alt="Signature">'
-            : '<div class="signature-mark">Authorised</div>';
+        $signatureHtml = '<img class="signature-image" src="' . $this->e($signatureDataUri) . '" alt="Signature">';
 
         $style = <<<CSS
 body {
@@ -694,17 +693,7 @@ HTML;
 
     protected function resolvePlaceOfSupply(Transaction $transaction): string
     {
-        $candidate = trim((string) ($transaction->user->city ?? ''));
-        if ($candidate !== '') {
-            return $candidate;
-        }
-
-        $candidate = trim((string) ($transaction->clinic->city ?? ''));
-        if ($candidate !== '') {
-            return $candidate;
-        }
-
-        return 'Gurgaon';
+        return 'gugugram';
     }
 
     protected function resolvePaymentMethodLabel(string $paymentMethod): string
@@ -815,6 +804,21 @@ HTML;
         }
 
         return 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+    }
+
+    protected function embeddedSignatureDataUri(): string
+    {
+        $svg = <<<'SVG'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80">
+  <path d="M14 50c5-18 10-35 21-41 8-4 11 3 10 9-2 11-7 23-4 35 2 8 11 8 16 1" fill="none" stroke="#1f2246" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M58 56c4-14 8-30 16-40 8-10 19-6 18 8-1 17-8 28-9 43" fill="none" stroke="#1f2246" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M88 41c6-12 15-25 27-25 7 0 10 5 8 11-2 6-8 9-14 11-6 2-12 4-16 10 7 8 20 8 27 2" fill="none" stroke="#1f2246" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M130 58c2-13 8-25 16-34 7-8 17-13 24-8 8 6 6 19-1 26-7 8-18 11-28 8 4 7 13 12 22 11" fill="none" stroke="#1f2246" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M24 72c54-17 112-23 182-16" fill="none" stroke="#1f2246" stroke-width="2.1" stroke-linecap="round"/>
+</svg>
+SVG;
+
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
     }
 
     protected function formatInrTwoDecimals(int $paise): string
