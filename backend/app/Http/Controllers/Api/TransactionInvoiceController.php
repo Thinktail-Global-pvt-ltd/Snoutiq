@@ -694,7 +694,7 @@ HTML;
 
     protected function resolvePlaceOfSupply(Transaction $transaction): string
     {
-        return 'gugugram';
+        return 'Gurugram';
     }
 
     protected function resolvePaymentMethodLabel(string $paymentMethod): string
