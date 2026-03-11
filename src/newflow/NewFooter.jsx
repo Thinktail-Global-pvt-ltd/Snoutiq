@@ -155,39 +155,6 @@ export function NewFooter() {
             </ul>
           </div>
 
-          <div>
-            <h3 className="text-slate-900 font-semibold mb-4">Landing Pages</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link to="/lp/vaccination" className="hover:text-brand transition-colors">
-                  Vaccination LP
-                </Link>
-              </li>
-              <li>
-                <Link to="/lp/neutering" className="hover:text-brand transition-colors">
-                  Neutering LP
-                </Link>
-              </li>
-              <li>
-                <Link
-                   to="/online-vet-consultation"
-                  className="hover:text-brand transition-colors"
-                >
-                  Online Vet Consultation
-                </Link>
-              </li>
-              <li>
-                <Link to="/vets" className="hover:text-brand transition-colors">
-                  For Vets
-                </Link>
-              </li>
-              <li>
-                <Link to="/clinics" className="hover:text-brand transition-colors">
-                  For Clinics
-                </Link>
-              </li>
-            </ul>
-          </div>
 
           <div>
             <h3 className="text-slate-900 font-semibold mb-4">Company</h3>

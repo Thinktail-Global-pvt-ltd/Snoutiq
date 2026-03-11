@@ -3,6 +3,8 @@ import "./app.css";
 import React, { lazy } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Navigate, Route, Routes } from "react-router-dom";
+import TalkToVet from "./newflow/TalkToVet";
+import PetDoctorOnline from "./newflow/PetDoctorOnline";
 
 const CallLab = lazy(() => import("./pages/CallLab"));
 const DoctorReceiver = lazy(() => import("./pages/DoctorReceiver"));
@@ -133,6 +135,9 @@ export default function AppRoutes() {
           element={<VideoConsultLP />}
         />
         <Route path="/online-vet-consultation" element={<VideoConsultLP />} />
+        <Route path="/talk-to-vet-online" element={<TalkToVet />} />
+        <Route path="/pet-doctor-online" element={<PetDoctorOnline/>}/>
+
         <Route path="/symptoms" element={<SymptomsHub />} />
         <Route
           path="/puppy-vaccination-delhi"

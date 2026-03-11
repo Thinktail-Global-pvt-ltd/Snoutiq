@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LPNavbar } from "../newflow/LPNavbar";
@@ -37,10 +37,11 @@ import {
 } from "lucide-react";
 
 // --- SEO constants -----------------------------------------------------------
-const TITLE = "Trusted Online Vet Consultation India | Expert Vet Guidance 24/7";
+const TITLE =
+  "Pet Doctor Online India | Online Vet Consultation for Dogs & Cats | SnoutIQ";
 const DESCRIPTION =
-  "Consult licensed veterinarians in India via WhatsApp video within 15 minutes. Trusted online vet consultation for dogs, cats, and exotic pets with personalized care guidance and follow-up care guidance.";
-const CANONICAL = "https://www.snoutiq.com/online-vet-consultation";
+  "Consult a qualified pet doctor online in India for dogs, cats, and other pets. Get expert online vet consultation via video call within 15 minutes with follow-up guidance.";
+const CANONICAL = "https://www.snoutiq.com/pet-doctor-online";
 const KEYWORDS = [
   "online vet consultation",
   "talk to vet online",
@@ -300,15 +301,15 @@ const YES_NO_OPTIONS = [
 const HERO_REVIEW_CARDS = [
   {
     name: "Priya M.",
-    text: "My dog was vomiting at midnight. Got an online vet consultation within 10 minutes. We didn't need to rush to an emergency clinic — the vet sorted it on the call.",
+    text: "I needed an actual doctor to look at my dog, not just Google. Got connected to a proper pet doctor online within 10 minutes. She knew exactly what was wrong.",
   },
   {
     name: "Rahul S.",
-    text: "The vet was thorough and actually listened. Shared a full care plan on the call itself. Much better than waiting 2 hours at the clinic for a minor issue.",
+    text: "The pet doctor online was more thorough than some clinic visits I've had. Took his time, asked the right questions, and gave a clear plan. Very professional.",
   },
   {
     name: "Ananya K.",
-    text: "₹399 for a proper video consultation is very reasonable. The vet gave a full assessment and told me exactly what to do next. Really impressed.",
+    text: "₹399 to see a qualified dog doctor online is unbeatable. My Labrador had a skin issue — the vet assessed it on video and I knew what to do within 20 minutes.",
   },
 ];
 
@@ -330,7 +331,7 @@ function GetStartedCtaLabel({ amount }) {
       <Zap className="h-4 w-4 shrink-0 text-current" />
 
       <span className="font-extrabold text-white">
-        Consult a Vet Now
+         Consult a Pet Doctor Now 
       </span>
 
       <ArrowRight className="h-4 w-4 shrink-0 text-white/80" />
@@ -386,12 +387,12 @@ function DynamicPriceStrip({ currentPrice, originalPrice, rateType }) {
 
           <div className="mt-2 text-sm text-slate-700">
             <p className="leading-5 sm:hidden">
-              <span className="block">Video call · Expert advice</span>
-              <span className="block">Follow-up guidance</span>
+              <span className="block">Video call with a pet doctor </span>
+              <span className="block">· Expert advice · Follow-up</span>
             </p>
 
             <p className="hidden leading-6 sm:block">
-              Video call · Expert advice · Follow-up guidance
+              Video call with a pet doctor · Expert advice · Follow-up
             </p>
           </div>
         </div>
@@ -426,7 +427,7 @@ function ConsultCtaLabel({ amount, prefixText = "Consult Now" }) {
 }
 
 // --- Main --------------------------------------------------------------------
-export default function VideoConsultLP() {
+export default function PetDoctorOnline() {
   const navigate = useNavigate();
   const { rateType } = getCurrentPrice();
   const consultAmount = PAYMENT_AMOUNTS[rateType] || PAYMENT_AMOUNTS.day;
@@ -917,19 +918,18 @@ const consultFormRef = useRef(null);
   <div className="mx-auto max-w-6xl px-4 py-2">
     <div className="flex flex-nowrap items-center justify-center gap-3 overflow-x-auto whitespace-nowrap text-[11px] font-semibold text-white sm:text-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <span className="inline-flex items-center gap-1.5 shrink-0">
-        <span>Licensed Vets</span>
+        <span>Qualified Pet Doctors</span>
+      </span>
+      <span className="shrink-0 text-white/70">·</span>
+
+      <span className="inline-flex items-center gap-1.5 shrink-0">
+        <span>Dogs & Cats</span>
       </span>
 
       <span className="shrink-0 text-white/70">·</span>
 
       <span className="inline-flex items-center gap-1.5 shrink-0">
-        <span>Video Consultation</span>
-      </span>
-
-      <span className="shrink-0 text-white/70">·</span>
-
-      <span className="inline-flex items-center gap-1.5 shrink-0">
-        <span>Response in 15 Min</span>
+        <span>Video Consult in 15 Min</span>
       </span>
 
       <span className="shrink-0 text-white/70">·</span>
@@ -947,7 +947,7 @@ const consultFormRef = useRef(null);
             <div className="mx-auto max-w-6xl">
     <span className="inline-flex items-center gap-2 rounded-md bg-[#dfe5e0] px-3.5 py-2 text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#0b7a63]">
       <span className="h-2 w-2 rounded-full bg-[#0b7a63]" />
-      Online Vet Consultation
+      Pet Doctor Online
     </span>
   </div>
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -959,10 +959,11 @@ const consultFormRef = useRef(null);
 
             <h1 className="text-[1.85rem] sm:text-[2.6rem] lg:text-[3.2rem] font-bold text-slate-800 leading-[1.1] text-center mb-3">
               {/* Talk to a Vet Online in 15 Minutes – Video Consultation */}
-              Online Vet Consultation – <span className="text-accent">Talk to a Vet Online</span> in 15 Minutes
+              Consult a Pet Doctor <span className="text-accent">Online – for Your</span> Dog, Cat or Pet
             </h1>
+            
             <p className="text-slate-500 text-center text-base mb-7 max-w-3xl mx-auto leading-relaxed">
-               Talk to a licensed vet online via video call. Get proper advice and a full care plan for your pet — from anywhere in India, without leaving home.
+               Connect with a qualified pet doctor online via video call. Get expert advice for your dog, cat or pet — from a licensed veterinarian, in 15 minutes.
                 {/* {slotLabel.toLowerCase()} is
                {" "}₹{formatInr(discountedConsultAmount)} after the ₹100 offer. */}
             </p>
@@ -1049,11 +1050,11 @@ const consultFormRef = useRef(null);
   onClick={goToPetDetailsScreen}
   className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-4 text-base font-extrabold text-white shadow-lg shadow-orange-200/60 transition-all hover:bg-accent-hover active:scale-[0.99]"
 >
-  <span>Start Online Vet Consultation</span>
+  <span> Consult a Pet Doctor Now </span>
   <ArrowRight className="h-4 w-4 shrink-0 text-white/80 transition-transform group-hover:translate-x-0.5" />
 </button>
 
-                   {/* Micro trust row */}
+                  {/* Micro trust row */}
                      <div className="pt-0.5">
                     <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
                       <span className="flex items-center gap-1 whitespace-nowrap">
@@ -1102,15 +1103,15 @@ const consultFormRef = useRef(null);
               HOW IT WORKS
             </p>
             <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">
-              Sorted in under 15 minutes
+              Talking to a vet takes 2 minutes to set up
             </h2>
             <div className="relative space-y-3">
               <div className="absolute left-[22px] top-10 bottom-10 w-px bg-slate-100" />
               {[
                 {
                   n: "01",
-                  title: "Select your pet's symptoms",
-                  desc: "Takes 30 seconds. No lengthy forms.",
+                  title: "Describe your pet's symptoms",
+                  desc: "Select what's wrong. Takes 30 seconds.",
                 },
                 {
                   n: "02",
@@ -1120,13 +1121,13 @@ const consultFormRef = useRef(null);
                 },
                 {
                   n: "03",
-                  title: "Vet joins the video call",
-                  desc: "A licensed vet connects within 15 minutes to assess your pet.",
+                  title: "A pet doctor joins the video call",
+                  desc: "A licensed, qualified vet connects within 15 minutes to assess your pet properly.",
                 },
                 {
                   n: "04",
-                  title: "Get your care plan + follow-up",
-                  desc: "Vet shares a complete care plan. Follow-up included at no extra cost.",
+                  title: "Get a proper care plan",
+                  desc: "The pet doctor walks you through exactly what your pet needs. Follow-up included.",
                 },
               ].map((s, i) => (
                 <div
@@ -1155,15 +1156,15 @@ const consultFormRef = useRef(null);
           </div>
         </section>
 
-     {/* OUR VETS */}
+            {/* OUR VETS */}
         <section id="our-vets" className="py-4 px-4 bg-white scroll-mt-24">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-end justify-between gap-4 flex-wrap mb-8">
               <div>
                 <h2 className="text-2xl font-extrabold text-slate-900 mb-2 flex items-center gap-2">
-                  <PawPrint className="h-6 w-6 text-brand" />Our Licensed Veterinarians
+                  <PawPrint className="h-6 w-6 text-brand" />Our pet doctors
                 </h2>
-                <p className="text-slate-500 text-sm">Verified doctors with experience across dogs, cats, and exotic pets.</p>
+                <p className="text-slate-500 text-sm">Qualified vets for dogs, cats & pets</p>
               </div>
             </div>
             {vetsLoading ? (
@@ -1220,88 +1221,92 @@ const consultFormRef = useRef(null);
           </div>
         </section>
 
-                {/* REVIEWS */}
-        <section className="bg-slate-50 px-4 py-10">
-          <div className="mx-auto max-w-5xl">
-            <h2 className="text-center text-2xl font-extrabold text-slate-900">Pet parent reviews</h2>
-            <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500">
-              What people say
-            </p>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {HERO_REVIEW_CARDS.map((review) => (
-                <div key={review.name} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 text-sm font-black text-brand">
-                      {review.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{review.name}</p>
-                      <div className="flex items-center gap-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-sm leading-6 text-slate-600">{review.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-
-        {/* CTA BREAK */}
-        <section className="px-4 py-6 bg-white">
-          <div className="max-w-2xl mx-auto">
-            <button type="button" onClick={scrollToConsultForm} className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white font-extrabold text-base py-4 rounded-2xl shadow-lg shadow-orange-200/50 transition-all">
-              <GetStartedCtaLabel amount={consultAmount} />
-            </button>
-          </div>
-        </section>
-
-        {/* ACROSS INDIA */}
-         <section
-           id="across-india"
-           className="py-8 px-4 bg-slate-50 scroll-mt-24"
-         >
-           <div className="max-w-6xl mx-auto">
-             <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 p-6">
-               <h2 className="text-xl font-extrabold text-slate-900 mb-1 flex items-center gap-2">
-                 <Globe size={20} className="text-brand" />
-                 Online vet consultation across India
-               </h2>
-              
-               <div className="flex flex-wrap gap-2 mt-4">
-                 {[
-                   "Delhi NCR",
-                   "Mumbai",
-                   "Bangalore",
-                   "Hyderabad",
-                   "Chennai",
-                   "Pune",
-                   "Kolkata",
-                   "Jaipur",
-                   "Lucknow",
-                 ].map((city) => (
-                   <span
-                     key={city}
-                     className="inline-block border border-slate-300 rounded-full px-3 py-1 text-xs font-semibold text-slate-700 bg-white"
-                   >
-                     {city}
-                   </span>
-                 ))}
+              {/* REVIEWS */}
+                   <section className="bg-slate-50 px-4 py-10">
+                     <div className="mx-auto max-w-5xl">
+                       <h2 className="text-center text-2xl font-extrabold text-slate-900">
+                         Pet parent reviews
+                       </h2>
+                       <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-slate-500">
+                         What pet parents say about talking to a vet online
+                       </p>
+                       <div className="mt-6 grid gap-4 md:grid-cols-3">
+                         {HERO_REVIEW_CARDS.map((review) => (
+                           <div
+                             key={review.name}
+                             className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                           >
+                             <div className="mb-3 flex items-center gap-3">
+                               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 text-sm font-black text-brand">
+                                 {review.name.charAt(0)}
+                               </div>
+                               <div>
+                                 <p className="text-sm font-bold text-slate-900">
+                                   {review.name}
+                                 </p>
+                                 <div className="flex items-center gap-0.5">
+                                   {Array.from({ length: 5 }).map((_, i) => (
+                                     <Star
+                                       key={i}
+                                       className="h-3.5 w-3.5 fill-amber-400 text-amber-400"
+                                     />
+                                   ))}
+                                 </div>
+                               </div>
+                             </div>
+                             <p className="text-sm leading-6 text-slate-600">
+                               {review.text}
+                             </p>
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   </section>
+     
+     
+                  {/* ACROSS INDIA */}
+             <section
+               id="across-india"
+               className="py-8 px-4 bg-slate-50 scroll-mt-24"
+             >
+               <div className="max-w-6xl mx-auto">
+                 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 p-6">
+                   <h2 className="text-xl font-extrabold text-slate-900 mb-1 flex items-center gap-2">
+                     <Globe size={20} className="text-brand" />
+                    Pet doctor online — available across India
+                   </h2>
+                  
+                   <div className="flex flex-wrap gap-2 mt-4">
+                     {[
+                       "Delhi NCR",
+                       "Mumbai",
+                       "Bangalore",
+                       "Hyderabad",
+                       "Chennai",
+                       "Pune",
+                       "Kolkata",
+                       "Jaipur",
+                       "Lucknow",
+                     ].map((city) => (
+                       <span
+                         key={city}
+                         className="inline-block border border-slate-300 rounded-full px-3 py-1 text-xs font-semibold text-slate-700 bg-white"
+                       >
+                         {city}
+                       </span>
+                     ))}
+                   </div>
+                    <p className="text-sm text-slate-700 mt-2">
+                     <strong>
+                   Our pet doctors are available pan-India via video call. Delhi, Mumbai, Bangalore, Hyderabad — wherever you are.
+                 </strong>{" "}
+                 </p>
+                 </div>
                </div>
-                <p className="text-sm text-slate-700 mt-2">
-                 <strong>
-              Video consultation is available anywhere in India. As long as you have internet, a vet can consult your pet.
-             </strong>{" "}
-             </p>
-             </div>
-           </div>
-         </section>
+             </section>
+     
 
-         {/* FAQ */}
+           {/* FAQ */}
         <section id="faq" className="py-14 px-4 bg-white scroll-mt-24">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-2xl font-extrabold text-slate-900 text-center mb-8">
@@ -1310,8 +1315,8 @@ const consultFormRef = useRef(null);
             <div className="space-y-0 divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
               {[
                 {
-                  q: "Can an online vet consultation actually help?",
-                  a: "Yes — for most non-emergency issues. Vomiting, loose motion, not eating, skin problems, lethargy, behaviour concerns — a vet can properly assess and advise via video. If your pet needs a physical exam, the vet will tell you clearly and refer you.",
+                  q: "Is an online pet doctor as qualified as a clinic vet?",
+                  a: "Yes — all our vets are licensed (BVSc / MVSc) with hands-on experience. For most non-emergency issues they can give you a thorough assessment on video. If your pet needs a physical examination, the vet will tell you and refer you to a clinic.",
                 },
                 {
                   q: "How much does it cost?",
@@ -1345,25 +1350,23 @@ const consultFormRef = useRef(null);
           <div className="relative max-w-2xl mx-auto text-center">
             <p className="text-3xl mb-3">🐾</p>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3 leading-tight">
-              Your pet needs help.<br /><span className="text-brand">A vet is standing by.</span>
+              Your pet needs a doctor.<br /><span className="text-brand">One is ready now.</span>
             </h2>
             <p className="text-slate-400 text-sm mb-7">Fill in your pet's details, describe the issue, and a vet calls you on WhatsApp within 15 minutes after payment.</p>
             <button type="button" onClick={scrollToConsultForm} className="w-full bg-accent hover:bg-accent-hover text-white font-extrabold text-lg py-4 rounded-2xl shadow-xl shadow-orange-900/30 transition-all mb-3">
               <GetStartedCtaLabel amount={consultAmount} />
             </button>
           </div>
-                {/* <footer className="bg-white border-t border-slate-100 py-4 px-4 pb-28 md:pb-4"> */}
         <p className="text-xs text-slate-400 text-center">
           © {new Date().getFullYear()} SnoutIQ ·{" "}
           <a href="/" className="hover:text-brand font-semibold">Home</a> ·{" "}
           <a href="/privacy-policy" className="hover:text-brand">Privacy Policy</a>
         </p>
-      {/* </footer> */}
         </section>
       </main>
 
       {/* Footer */}
-
+    
 
       {/* ── Sticky Mobile CTA — bigger tap target, clearer label ── */}
       {showStickyCta && (

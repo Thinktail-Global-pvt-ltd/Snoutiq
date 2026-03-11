@@ -652,17 +652,6 @@ export function Footer() {
           </div>
 
           <div>
-            <h3 className="mb-4 font-semibold text-slate-900">Landing Pages</h3>
-            <ul className="space-y-2 text-sm">
-              <li><Link to="/lp/vaccination" className="transition-colors hover:text-brand">Vaccination LP</Link></li>
-              <li><Link to="/lp/neutering" className="transition-colors hover:text-brand">Neutering LP</Link></li>
-              <li><Link to="/online-vet-consultation" className="transition-colors hover:text-brand">Online Vet Consultation</Link></li>
-              <li><Link to="/vets" className="transition-colors hover:text-brand">For Vets</Link></li>
-              <li><Link to="/clinics" className="transition-colors hover:text-brand">For Clinics</Link></li>
-            </ul>
-          </div>
-
-          <div>
             <h3 className="mb-4 font-semibold text-slate-900">Company</h3>
             <ul className="space-y-2 text-sm">
               <li><Link to="/about" className="transition-colors hover:text-brand">About Us</Link></li>
