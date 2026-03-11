@@ -44,10 +44,10 @@ import {
 
 // --- SEO constants -----------------------------------------------------------
 const TITLE =
-  "Trusted Online Vet Consultation India | Expert Vet Guidance 24/7";
+  "Talk to a Vet Online Now | Video Call in 15 Minutes";
 const DESCRIPTION =
-  "Consult licensed veterinarians in India via WhatsApp video within 15 minutes. Trusted online vet consultation for dogs, cats, and exotic pets with personalized care guidance and follow-up care guidance.";
-const CANONICAL = "https://www.snoutiq.com/talk-to-vet";
+  "Need urgent pet advice? Talk to a licensed vet online via video call. Connect in 15 minutes. Day ₹399 · Night ₹499.";
+const CANONICAL = "https://www.snoutiq.com/talk-to-vet-online";
 const KEYWORDS = [
   "online vet consultation",
   "talk to vet online",
@@ -61,7 +61,7 @@ const KEYWORDS = [
 ].join(", ");
 
 const CONSULT_DETAILS_ROUTE = "/20+vetsonline?start=details";
-const VIDEO_CONSULT_BASE_ROUTE = "/online-vet-consultation";
+const VIDEO_CONSULT_BASE_ROUTE = "/talk-to-vet-online";
 const DOCTOR_LIST_ENDPOINT = "/api/exported_from_excell_doctors";
 
 const getAssetRoot = () => {

@@ -38,9 +38,9 @@ import {
 
 // --- SEO constants -----------------------------------------------------------
 const TITLE =
-  "Pet Doctor Online India | Online Vet Consultation for Dogs & Cats | SnoutIQ";
+  "Pet Doctor Online India | 24/7 Online Vet Consultation";
 const DESCRIPTION =
-  "Consult a qualified pet doctor online in India for dogs, cats, and other pets. Get expert online vet consultation via video call within 15 minutes with follow-up guidance.";
+  "Need urgent pet advice? Connect with a licensed pet doctor online via Video call. Fast response. Transparent pricing. Available across India.";
 const CANONICAL = "https://www.snoutiq.com/pet-doctor-online";
 const KEYWORDS = [
   "online vet consultation",
@@ -55,7 +55,7 @@ const KEYWORDS = [
 ].join(", ");
 
 const CONSULT_DETAILS_ROUTE = "/20+vetsonline?start=details";
-const VIDEO_CONSULT_BASE_ROUTE = "/online-vet-consultation";
+const VIDEO_CONSULT_BASE_ROUTE = "/pet-doctor-online";
 const DOCTOR_LIST_ENDPOINT = "/api/exported_from_excell_doctors";
 
 const getAssetRoot = () => {
