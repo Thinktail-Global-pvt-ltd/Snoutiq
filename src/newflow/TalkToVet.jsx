@@ -1277,7 +1277,9 @@ export default function TalkToVet() {
                     onClick={goToPetDetailsScreen}
                     className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-4 text-base font-extrabold text-white shadow-lg shadow-orange-200/60 transition-all hover:bg-accent-hover active:scale-[0.99]"
                   >
-                    <GetStartedCtaLabel amount={consultAmount} />
+                    {/* <GetStartedCtaLabel amount={consultAmount} /> */}
+                      <span className="font-extrabold text-white">Talk to Vet Now</span>
+
                     <ArrowRight className="h-4 w-4 shrink-0 text-white/80 transition-transform group-hover:translate-x-0.5" />
                   </button>
 
