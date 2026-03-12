@@ -461,6 +461,7 @@
                 <div id="petTimelineSymptom" class="small mb-3"></div>
                 <div id="petTimelineUserFields" class="small"></div>
                 <div id="petTimelinePetFields" class="small"></div>
+                <div id="petTimelineImagePreview" class="small"></div>
                 <div id="petTimelineContent" class="small text-muted">Click "View Details" to load timeline.</div>
             </div>
         </div>
@@ -484,6 +485,7 @@
     const timelineSymptomEl = document.getElementById('petTimelineSymptom');
     const timelineUserFieldsEl = document.getElementById('petTimelineUserFields');
     const timelinePetFieldsEl = document.getElementById('petTimelinePetFields');
+    const timelineImagePreviewEl = document.getElementById('petTimelineImagePreview');
     const timelineContentEl = document.getElementById('petTimelineContent');
     const timelineModal = timelineModalEl ? new bootstrap.Modal(timelineModalEl) : null;
 
@@ -558,6 +560,76 @@
                     ${entries.map(([key, rawValue]) => `
                         <div><span class="text-muted">${escapeHtml(formatFieldLabel(key))}:</span> <strong>${escapeHtml(normalizeFieldValue(rawValue))}</strong></div>
                     `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function toAbsoluteUrl(rawUrl) {
+        const value = String(rawUrl || '').trim();
+        if (value === '') return '';
+        if (value.startsWith('data:image/')) return value;
+        if (/^https?:\/\//i.test(value)) return value;
+        if (value.startsWith('/')) return `${window.location.origin}${value}`;
+        return `${window.location.origin}/${value.replace(/^\/+/, '')}`;
+    }
+
+    function isLikelyImageUrl(url) {
+        const value = String(url || '').toLowerCase();
+        if (value.startsWith('data:image/')) return true;
+        return /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(value);
+    }
+
+    function firstNonEmptyValue(...values) {
+        for (const value of values) {
+            const normalized = String(value ?? '').trim();
+            if (normalized !== '') return normalized;
+        }
+        return '';
+    }
+
+    function resolveImagePreview(userFields, petFields) {
+        const imageUrl = firstNonEmptyValue(
+            petFields?.pet_doc2,
+            petFields?.pet_doc1,
+            petFields?.pic_link,
+            userFields?.pet_doc2,
+            userFields?.pet_doc1,
+        );
+        const mimeType = firstNonEmptyValue(
+            petFields?.pet_doc2_mime,
+            petFields?.pet_doc1_mime,
+            userFields?.pet_doc2_mime,
+            userFields?.pet_doc1_mime,
+        ).toLowerCase();
+
+        const absoluteUrl = toAbsoluteUrl(imageUrl);
+        const canPreview = absoluteUrl !== '' && (isLikelyImageUrl(absoluteUrl) || mimeType.startsWith('image/'));
+
+        return {
+            imageUrl: absoluteUrl,
+            canPreview,
+        };
+    }
+
+    function renderImagePreview(userFields, petFields) {
+        if (!timelineImagePreviewEl) return;
+
+        const { imageUrl, canPreview } = resolveImagePreview(userFields, petFields);
+        if (!imageUrl) {
+            timelineImagePreviewEl.innerHTML = '';
+            return;
+        }
+
+        timelineImagePreviewEl.innerHTML = `
+            <div class="border rounded p-2 bg-light mb-3">
+                <div class="text-muted mb-2">Pet Image Preview</div>
+                ${canPreview
+                    ? `<img src="${escapeHtml(imageUrl)}" alt="Pet document preview" style="max-width: 220px; width: 100%; height: auto; border-radius: 0.45rem; border: 1px solid #d1d5db;">`
+                    : `<div class="small text-muted">Preview unavailable for this file type.</div>`
+                }
+                <div class="mt-2">
+                    <a href="${escapeHtml(imageUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary">Open Image</a>
                 </div>
             </div>
         `;
@@ -689,6 +761,7 @@
         renderReportedSymptom(reportedSymptom);
         renderFieldGroup(timelineUserFieldsEl, 'User Table (Non-null Fields)', userFields);
         renderFieldGroup(timelinePetFieldsEl, 'Pet Table (Non-null Fields)', petFields);
+        renderImagePreview(userFields, petFields);
         timelineContentEl.innerHTML = '<div class="text-muted">Loading timeline...</div>';
         timelineModal.show();
 
