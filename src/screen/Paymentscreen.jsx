@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import doctorProfile4 from "../assets/doctor4.jpeg";
 import { Button } from "../components/Button";
 import { PET_FLOW_STEPS, ProgressBar } from "../components/Sharedcomponents";
 import { apiPost } from "../lib/api";
@@ -431,7 +432,7 @@ export const PaymentScreen = ({
   const effectiveVet = useMemo(
     () => ({
       name: STATIC_DOCTOR_NAME,
-      image: "",
+      image: doctorProfile4,
     }),
     []
   );
@@ -499,7 +500,7 @@ export const PaymentScreen = ({
 
                       <p className="mt-1 text-xs text-gray-500 md:text-sm">
                         Video Consultation • 15 mins •{" "}
-                        <span className="font-semibold text-gray-700">{slotLabel}</span>
+                        {/* <span className="font-semibold text-gray-700">{slotLabel}</span> */}
                       </p>
 
                       <div className="mt-3 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
