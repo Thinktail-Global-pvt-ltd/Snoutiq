@@ -463,41 +463,152 @@ export const PaymentScreen = ({
       </div>
 
       <div className="w-full">
-        <div className="flex-1 px-4 pb-28 pt-4 overflow-y-auto md:px-6 md:pb-20 md:pt-8">
+        <div className="flex-1 px-4 pb-44 pt-4 overflow-y-auto md:px-6 md:pb-20 md:pt-8">
           <div className="mx-auto w-full max-w-5xl">
             <ProgressBar current={3} steps={PET_FLOW_STEPS} />
 
             <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-6">
-                <div className="rounded-xl border border-gray-200 bg-white p-5 flex items-center gap-4">
-                  {imageSrc ? (
-                    <img
-                      src={imageSrc}
-                    alt={effectiveVet.name}
-                      width={64}
-                      height={64}
-                      className="w-12 h-12 rounded-full object-cover md:w-16 md:h-16"
-                      loading="eager"
-                      fetchpriority="high"
-                      decoding="async"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-stone-200" />
-                  )}
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+                  <div className="flex items-start gap-3 md:items-center md:gap-4">
+                    {imageSrc ? (
+                      <img
+                        src={imageSrc}
+                        alt={effectiveVet.name}
+                        width={64}
+                        height={64}
+                        className="h-14 w-14 rounded-2xl object-cover md:h-16 md:w-16"
+                        loading="eager"
+                        fetchpriority="high"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="h-14 w-14 rounded-2xl bg-stone-200 md:h-16 md:w-16" />
+                    )}
 
-                  <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-gray-900 md:text-base">
-                      Consulting Dr. {doctorDisplayName}
-                    </h3>
-                    <p className="text-xs text-gray-500 md:text-sm">
-                      Video Consultation - 15 mins -{" "}
-                      <span className="font-semibold">{slotLabel}</span>
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-semibold text-gray-900 md:text-base">
+                          Consulting Dr. {doctorDisplayName}
+                        </h3>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                          <ShieldCheck size={12} />
+                          Secure
+                        </span>
+                      </div>
+
+                      <p className="mt-1 text-xs text-gray-500 md:text-sm">
+                        Video Consultation • 15 mins •{" "}
+                        <span className="font-semibold text-gray-700">{slotLabel}</span>
+                      </p>
+
+                      <div className="mt-3 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                        <div>
+                          <p className="text-[11px] text-gray-500">Payable amount</p>
+                          <div className="flex items-center gap-2">
+                            {discountAmount > 0 ? (
+                              <span className="text-[11px] text-gray-400 line-through">
+                                Rs {formatInr(toInt(totalBeforeDiscount))}
+                              </span>
+                            ) : null}
+                            <span className="text-base font-bold text-gray-900">
+                              Rs {formatInr(createOrderAmountInr)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {discountAmount > 0 ? (
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 border border-emerald-200">
+                            Rs {formatInr(discountAmount)} OFF
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:hidden">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-gray-900">Payment Summary</h4>
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                      Instant confirmation
+                    </span>
                   </div>
 
-                  <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
-                    <ShieldCheck size={14} />
-                    Secure
+                  {isOfferApplied ? (
+                    <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5">
+                      <p className="text-[11px] font-semibold text-blue-800">
+                        Special offer applied: You get Rs 100 OFF on this consultation.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-4 space-y-3 text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Consultation Charge</span>
+                      <span>Rs {formatInr(consultationAmount)}</span>
+                    </div>
+
+                    {service > 0 ? (
+                      <div className="flex justify-between">
+                        <span>Service Charge</span>
+                        <span>Rs {formatInr(service)}</span>
+                      </div>
+                    ) : null}
+
+                    {discountAmount > 0 ? (
+                      <div className="flex justify-between font-semibold text-emerald-700">
+                        <span>Special Discount</span>
+                        <span>- Rs {formatInr(discountAmount)}</span>
+                      </div>
+                    ) : null}
+
+                    <div className="flex justify-between">
+                      <span>Taxable Amount</span>
+                      <span>Rs {formatInr(taxableAmount)}</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span>GST (18%)</span>
+                      <span>Rs {formatInr(gstAmount)}</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span>Digital Prescription</span>
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold">
+                        FREE
+                      </span>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-4 flex justify-between items-end font-semibold text-gray-900">
+                      <span>Total to pay</span>
+                      <div className="text-right">
+                        {discountAmount > 0 ? (
+                          <div className="text-[11px] font-medium text-gray-400 line-through">
+                            Rs {formatInr(toInt(totalBeforeDiscount))}
+                          </div>
+                        ) : null}
+                        <div className="text-lg font-bold text-gray-900">
+                          Rs {formatInr(createOrderAmountInr)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <label className="block text-[11px] font-semibold text-gray-600">
+                      GST Number (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={gstNumber}
+                      onChange={(e) => setGstNumber(e.target.value)}
+                      placeholder="07ABCDE1234F1Z5"
+                      className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                    <p className="mt-2 text-[11px] text-gray-500">
+                      Add your GST number if a tax invoice is required.
+                    </p>
                   </div>
                 </div>
 
@@ -557,10 +668,44 @@ export const PaymentScreen = ({
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 md:hidden">
+                  <div className="text-xs font-semibold text-amber-800 mb-2">
+                    Important Information
+                  </div>
+                  <ul className="space-y-1.5 pl-4 text-xs text-amber-800/90 list-disc">
+                    <li>Not all issues can be solved via video consultation.</li>
+                    <li>Clinic visit may be required after the call.</li>
+                    <li>Information shared is for this consultation session only.</li>
+                  </ul>
+                </div>
+
+                <label className="rounded-2xl border border-gray-200 bg-white p-4 text-xs text-gray-600 flex items-start gap-3 md:hidden">
+                  <input
+                    type="checkbox"
+                    checked={acknowledged}
+                    onChange={(e) => setAcknowledged(e.target.checked)}
+                    className="mt-1 h-4 w-4 accent-[#3998de]"
+                  />
+                  <div>
+                    <div className="font-bold text-gray-700">
+                      I acknowledge and agree to proceed
+                    </div>
+                    <div className="mt-1 text-gray-500">
+                      I understand the limitations and conditions of this consultation.
+                    </div>
+                  </div>
+                </label>
+
+                {statusMessage ? (
+                  <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 md:hidden">
+                    <p className={`text-xs text-center ${statusClassName}`}>{statusMessage}</p>
+                  </div>
+                ) : null}
+
               </div>
 
               <div className="space-y-6 md:sticky md:top-24">
-                  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <div className="hidden md:block rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-semibold text-gray-800">Payment Summary</h4>
                       <div className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
@@ -645,7 +790,7 @@ export const PaymentScreen = ({
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-600">
+                  <div className="hidden md:block rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-600">
                     <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
                       <ShieldCheck size={14} className="text-emerald-600" />
                       100% Money-Back Promise
@@ -655,7 +800,7 @@ export const PaymentScreen = ({
                       automatically.
                     </p>
                   </div>
-                       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                       <div className="hidden md:block rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <div className="text-xs font-semibold text-amber-800 mb-2">
                     Important Information
                   </div>
@@ -666,7 +811,7 @@ export const PaymentScreen = ({
                   </ul>
                 </div>
 
-                <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-600 ">
+                <label className="hidden md:flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-600">
                   <input
                     type="checkbox"
                     checked={acknowledged}
@@ -727,42 +872,53 @@ export const PaymentScreen = ({
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 safe-area-pb max-w-md mx-auto z-20 md:hidden">
-        <Button
-          onClick={handlePay}
-          disabled={isPaying || !acknowledged}
-          fullWidth
-          className={`flex items-center justify-between text-sm font-semibold ${
-            isPaying || !acknowledged
-              ? "opacity-50 cursor-not-allowed bg-gray-300"
-              : "bg-[#1d4ed8] hover:bg-[#1e40af] text-white shadow-md"
-          }`}
-        >
-          <span>
-            {isPaying
-              ? "Processing..."
-              : `Pay Rs ${formatInr(createOrderAmountInr)}`}
-          </span>
-          <span className="flex items-center gap-2 text-white/80">
-            Proceed <ArrowRight size={16} />
-          </span>
-        </Button>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur md:hidden">
+        <div className="mx-auto w-full max-w-5xl px-4 pb-4 pt-3">
+          <div className="mb-3 flex items-end justify-between">
+            <div>
+              <p className="text-[11px] font-medium text-gray-500">Total payable</p>
+              <div className="flex items-center gap-2">
+                {discountAmount > 0 ? (
+                  <span className="text-xs text-gray-400 line-through">
+                    Rs {formatInr(toInt(totalBeforeDiscount))}
+                  </span>
+                ) : null}
+                <span className="text-lg font-bold text-gray-900">
+                  Rs {formatInr(createOrderAmountInr)}
+                </span>
+              </div>
+            </div>
 
-        <p className="text-[10px] text-center text-gray-500 mt-2 flex items-center justify-center gap-1">
-          <ShieldCheck size={10} className="text-emerald-600" /> Secure UPI / Card Payment
-        </p>
+            {discountAmount > 0 ? (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                Rs {formatInr(discountAmount)} OFF
+              </span>
+            ) : null}
+          </div>
 
-        {discountAmount > 0 ? (
-          <p className="text-[10px] text-center mt-1 font-medium text-emerald-700">
-            Special discount applied: Rs {formatInr(discountAmount)} OFF
+          <Button
+            onClick={handlePay}
+            disabled={isPaying || !acknowledged}
+            fullWidth
+            className={`flex items-center justify-between rounded-2xl py-3.5 text-sm font-semibold ${
+              isPaying || !acknowledged
+                ? "cursor-not-allowed bg-gray-300 opacity-50"
+                : "bg-[#1d4ed8] text-white shadow-lg shadow-blue-200 hover:bg-[#1e40af]"
+            }`}
+          >
+            <span>
+              {isPaying ? "Processing..." : `Pay Rs ${formatInr(createOrderAmountInr)}`}
+            </span>
+            <span className="flex items-center gap-2 text-white/80">
+              Proceed <ArrowRight size={16} />
+            </span>
+          </Button>
+
+          <p className="mt-2 text-[10px] text-center text-gray-500 flex items-center justify-center gap-1">
+            <ShieldCheck size={10} className="text-emerald-600" />
+            Secure UPI / Card Payment
           </p>
-        ) : null}
-
-        {statusMessage ? (
-          <p className={`text-xs text-center mt-2 ${statusClassName}`}>
-            {statusMessage}
-          </p>
-        ) : null}
+        </div>
       </div>
       {showSuccessModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
