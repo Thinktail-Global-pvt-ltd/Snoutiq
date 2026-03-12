@@ -2495,6 +2495,7 @@ Route::get('/medical-records/user/{user}', [MedicalRecordController::class, 'use
 Route::post('/medical-records', [MedicalRecordController::class, 'store']);
 Route::match(['put','patch'], '/medical-records/{record}', [MedicalRecordController::class, 'update']);
 Route::get('/medical-records/slug/{slug}', [MedicalRecordController::class, 'indexBySlug']);
+Route::get('/affected-systems', [\App\Http\Controllers\Api\AffectedSystemController::class, 'index']);
 
   // AI Summary from pets
   // Apply 'web' middleware to enable session access from browser-based calls
