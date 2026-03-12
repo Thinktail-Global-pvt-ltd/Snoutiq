@@ -588,14 +588,21 @@
         return '';
     }
 
-    function resolveImagePreview(userFields, petFields) {
-        const imageUrl = firstNonEmptyValue(
+    function buildPetBlobPreviewUrl(petId) {
+        const id = String(petId || '').trim();
+        if (!id) return '';
+        return `${window.location.origin}${timelinePathPrefix}/api/auth/pets/${encodeURIComponent(id)}/pet-doc2-blob`;
+    }
+
+    function resolveImagePreview(userFields, petFields, petId) {
+        const fallbackImageUrl = firstNonEmptyValue(
             petFields?.pet_doc2,
             petFields?.pet_doc1,
             petFields?.pic_link,
             userFields?.pet_doc2,
             userFields?.pet_doc1,
         );
+        const blobImageUrl = buildPetBlobPreviewUrl(petId);
         const mimeType = firstNonEmptyValue(
             petFields?.pet_doc2_mime,
             petFields?.pet_doc1_mime,
@@ -603,19 +610,25 @@
             userFields?.pet_doc1_mime,
         ).toLowerCase();
 
-        const absoluteUrl = toAbsoluteUrl(imageUrl);
-        const canPreview = absoluteUrl !== '' && (isLikelyImageUrl(absoluteUrl) || mimeType.startsWith('image/'));
+        const fallbackAbsoluteUrl = toAbsoluteUrl(fallbackImageUrl);
+        const primaryUrl = blobImageUrl || fallbackAbsoluteUrl;
+        const canPreview = primaryUrl !== '' && (
+            primaryUrl.includes('/api/auth/pets/')
+            || isLikelyImageUrl(primaryUrl)
+            || mimeType.startsWith('image/')
+        );
 
         return {
-            imageUrl: absoluteUrl,
+            imageUrl: primaryUrl,
+            fallbackImageUrl: fallbackAbsoluteUrl,
             canPreview,
         };
     }
 
-    function renderImagePreview(userFields, petFields) {
+    function renderImagePreview(userFields, petFields, petId) {
         if (!timelineImagePreviewEl) return;
 
-        const { imageUrl, canPreview } = resolveImagePreview(userFields, petFields);
+        const { imageUrl, fallbackImageUrl, canPreview } = resolveImagePreview(userFields, petFields, petId);
         if (!imageUrl) {
             timelineImagePreviewEl.innerHTML = '';
             return;
@@ -625,7 +638,7 @@
             <div class="border rounded p-2 bg-light mb-3">
                 <div class="text-muted mb-2">Pet Image Preview</div>
                 ${canPreview
-                    ? `<img src="${escapeHtml(imageUrl)}" alt="Pet document preview" style="max-width: 220px; width: 100%; height: auto; border-radius: 0.45rem; border: 1px solid #d1d5db;">`
+                    ? `<img src="${escapeHtml(imageUrl)}" data-fallback="${escapeHtml(fallbackImageUrl || '')}" alt="Pet document preview" style="max-width: 220px; width: 100%; height: auto; border-radius: 0.45rem; border: 1px solid #d1d5db;" onerror="if(this.dataset.fallback){this.onerror=null;this.src=this.dataset.fallback;}">`
                     : `<div class="small text-muted">Preview unavailable for this file type.</div>`
                 }
                 <div class="mt-2">
@@ -761,7 +774,7 @@
         renderReportedSymptom(reportedSymptom);
         renderFieldGroup(timelineUserFieldsEl, 'User Table (Non-null Fields)', userFields);
         renderFieldGroup(timelinePetFieldsEl, 'Pet Table (Non-null Fields)', petFields);
-        renderImagePreview(userFields, petFields);
+        renderImagePreview(userFields, petFields, petId);
         timelineContentEl.innerHTML = '<div class="text-muted">Loading timeline...</div>';
         timelineModal.show();
 
