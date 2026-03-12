@@ -106,7 +106,7 @@ export default function NewCounsult() {
                 description="Connect with a verified vet instantly from the comfort of your home. Perfect for triage, minor ailments, and behavioral advice."
                 icon={Video}
                 badge="All India"
-                price="₹399 (Day) / ₹499 (Night)"
+                price="₹399 after ₹100 off"
                 href="/online-vet-consultation-india"
                 ctaText="Consult Now"
                 features={[
